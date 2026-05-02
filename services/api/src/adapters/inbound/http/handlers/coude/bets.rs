@@ -3,6 +3,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 
 use super::dto::BetDto;
@@ -14,7 +15,10 @@ use super::dto::ResolveBetsResponse;
 use super::taunts::TauntEventDto;
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::enums::system::role::Role;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 
 /// POST /api/coude/{guild_id}/bets
@@ -24,9 +28,11 @@ use crate::domain::entities::coude::bet::NewCoudeBet;
 /// au bot via ce payload (meme pattern que `/donner`).
 pub async fn place_bet(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<PlaceBetDto>,
 ) -> Result<Json<PlaceBetResponse>, ApiError> {
+    check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour place_bet").await?;
     let combat_id = parse_combat_id(&dto.combat_id)?;
     let outcome = state
         .coude_bets_uc

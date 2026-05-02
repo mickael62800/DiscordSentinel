@@ -4,6 +4,7 @@
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -13,7 +14,22 @@ use super::dto::StealDto;
 use super::dto::TransferCoinsDto;
 use super::taunts::TauntEventDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::enums::system::role::Role;
+
+/// Phase 7 B — Helper local pour gater les mutations coude.
+/// Pass-through si rbac absent (= appel bot interne sans X-Discord-Token).
+/// Bloque les appels desktop depuis un user non-moderator.
+async fn gate_coude_mutation(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    guild_id: &str,
+    label: &'static str,
+) -> Result<(), ApiError> {
+    check_role_for_guild(state, rbac, guild_id, Role::Moderator, label).await
+}
 
 // ── Transferts ──
 
@@ -28,9 +44,11 @@ pub struct TransferCoinsResponse {
 /// POST /api/coude/{guild_id}/transfer
 pub async fn transfer_coins(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<TransferCoinsDto>,
 ) -> Result<Json<TransferCoinsResponse>, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour un transfert coude").await?;
     let taunts = state
         .coude_economy_uc
         .transfer(&guild_id, &dto.from_id, &dto.to_id, dto.amount)
@@ -53,9 +71,11 @@ pub struct StealResponse {
 /// POST /api/coude/{guild_id}/steal
 pub async fn record_steal(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<StealDto>,
 ) -> Result<Json<StealResponse>, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour record_steal").await?;
     let outcome = state
         .coude_economy_uc
         .steal(&guild_id, &dto.thief_id, &dto.victim_id, dto.amount)
@@ -83,9 +103,11 @@ pub struct StealFailPenaltyResponse {
 /// POST /api/coude/{guild_id}/steal-fail-penalty (migration wallet unifie).
 pub async fn steal_fail_penalty(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<StealFailPenaltyDto>,
 ) -> Result<Json<StealFailPenaltyResponse>, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour steal_fail_penalty").await?;
     let (lost, taunts) = state
         .coude_economy_uc
         .steal_fail_penalty(&guild_id, &dto.thief_id, dto.amount)
@@ -101,9 +123,11 @@ pub async fn steal_fail_penalty(
 /// POST /api/coude/{guild_id}/players/{user_id}/casino-win
 pub async fn record_casino_win(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<GainDto>,
 ) -> Result<StatusCode, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-win").await?;
     state
         .coude_economy_uc
         .record_casino_win(&guild_id, &user_id, dto.gain)
@@ -114,9 +138,11 @@ pub async fn record_casino_win(
 /// POST /api/coude/{guild_id}/players/{user_id}/casino-loss
 pub async fn record_casino_loss(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<LostDto>,
 ) -> Result<StatusCode, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-loss").await?;
     state
         .coude_economy_uc
         .record_casino_loss(&guild_id, &user_id, dto.lost)
@@ -127,8 +153,10 @@ pub async fn record_casino_loss(
 /// POST /api/coude/{guild_id}/players/{user_id}/casino-faillite
 pub async fn record_casino_faillite(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-faillite").await?;
     let total_lost = state
         .coude_economy_uc
         .record_casino_faillite(&guild_id, &user_id)
