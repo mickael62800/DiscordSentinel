@@ -536,6 +536,22 @@ services:
         condition: service_started
     networks: *worker-networks-internal
 
+  announcement-worker:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-announcement-worker
+    healthcheck: *worker-healthcheck
+    environment:
+      <<: *worker-env
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks: *worker-networks-internal
+
   coude-worker:
     <<: *rust-base
     build:

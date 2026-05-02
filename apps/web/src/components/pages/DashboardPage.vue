@@ -34,6 +34,7 @@ const allSections: Section[] = [
   { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x", requiredBot: "audit-bot" },
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
+  { key: "community.announcements", path: "/announcements", label: "Annonces planifiées", icon: "clock" },
   { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
   { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
   { key: "community.voice-themes", path: "/voice-themes", label: "Themes vocaux", icon: "layers", requiredBot: "voice-bot" },

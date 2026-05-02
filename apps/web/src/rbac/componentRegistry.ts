@@ -46,6 +46,9 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "system.members", label: "Bouton Membres", category: "Dashboard", minRole: "moderator" },
   { key: "config.ai-dataset", label: "Bouton Dataset IA", category: "Dashboard", minRole: "admin" },
 
+  // ── Dashboard : communaute ──
+  { key: "community.announcements", label: "Bouton Annonces planifiées", category: "Dashboard", minRole: "admin" },
+
   // ── Dashboard : modération (sous-pages) ──
   // Strikes / Notes / Rappels / Preuves / Reviews ont ete fusionnes
   // dans /moderation (onglets Suivi utilisateur + Workflow).

@@ -41,6 +41,7 @@ export const routes: RouteRecordRaw[] = [
 
   // ── Communauté ──
   { path: "/welcome", name: "welcome", component: () => import("../components/pages/WelcomePage.vue") },
+  { path: "/announcements", name: "announcements", component: () => import("../components/pages/AnnouncementsPage.vue") },
   { path: "/tickets", name: "tickets", component: () => import("../components/pages/TicketsPage.vue") },
   { path: "/voice-channels", name: "voice-channels", component: () => import("../components/pages/VoiceChannelsPage.vue") },
   { path: "/voice-themes", name: "voice-themes", component: () => import("../components/pages/VoiceThemesPage.vue") },
