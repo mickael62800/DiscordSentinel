@@ -9,26 +9,41 @@ import AppBadge from "@/components/atoms/AppBadge.vue";
 interface Props {
   title: string;
   category: string;
-  /** Limite de lignes affichees par colonne (defaut 50). */
-  maxItems?: number;
+  /** Lignes par page (defaut 20). */
+  pageSize?: number;
 }
-const props = withDefaults(defineProps<Props>(), { maxItems: 50 });
+const props = withDefaults(defineProps<Props>(), { pageSize: 20 });
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
 const { filteredLogs, loading, filterLevel, clearLogs } = useLogs(props.category);
-
-const visible = computed(() => filteredLogs.value.slice(0, props.maxItems));
 
 const expandedId = ref<string | number | null>(null);
 function toggle(id: string | number) {
   expandedId.value = expandedId.value === id ? null : id;
 }
 
+// ── Pagination ──
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredLogs.value.length / props.pageSize)));
+const visible = computed(() => {
+  const start = (currentPage.value - 1) * props.pageSize;
+  return filteredLogs.value.slice(start, start + props.pageSize);
+});
+
+function goToPage(p: number) {
+  if (p < 1 || p > totalPages.value) return;
+  currentPage.value = p;
+}
+
 async function handleClear() {
-  const ok = await confirm({ message: `Supprimer tous les journaux ${props.title.toLowerCase()} ?` });
+  const ok = await confirm({
+    title: `Vider ${props.title}`,
+    message: `Supprimer définitivement tous les journaux ${props.title.toLowerCase()} ?`,
+  });
   if (!ok) return;
   await clearLogs();
+  currentPage.value = 1;
 }
 </script>
 
@@ -43,7 +58,16 @@ async function handleClear() {
           <option value="warn">Warn</option>
           <option value="error">Error</option>
         </select>
-        <button class="clear-icon" title="Vider" @click="handleClear">🗑</button>
+        <button class="clear-btn" title="Vider tous les journaux" @click="handleClear">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 6h18" />
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+          </svg>
+          <span>Vider</span>
+        </button>
       </div>
     </header>
 
@@ -74,8 +98,13 @@ async function handleClear() {
       </li>
     </ul>
 
-    <footer v-if="filteredLogs.length > visible.length" class="col-foot">
-      {{ filteredLogs.length - visible.length }} ligne(s) plus anciennes masquées
+    <footer v-if="!loading && filteredLogs.length > 0" class="col-foot">
+      <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(1)" title="Première page">«</button>
+      <button class="page-btn" :disabled="currentPage === 1" @click="goToPage(currentPage - 1)">‹</button>
+      <span class="page-info">{{ currentPage }} / {{ totalPages }}</span>
+      <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(currentPage + 1)">›</button>
+      <button class="page-btn" :disabled="currentPage === totalPages" @click="goToPage(totalPages)" title="Dernière page">»</button>
+      <span class="total-count">{{ filteredLogs.length }} log{{ filteredLogs.length > 1 ? "s" : "" }}</span>
     </footer>
   </div>
 </template>
@@ -84,7 +113,9 @@ async function handleClear() {
 .logs-column {
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* Hauteur calculee : viewport - en-tete page (env. 130px) - margin */
+  height: calc(100vh - 200px);
+  min-height: 400px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -97,36 +128,51 @@ async function handleClear() {
   padding: 10px 12px;
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
 .col-head h3 { margin: 0; font-size: 13px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px; }
-.col-actions { display: flex; gap: 6px; align-items: center; }
+.col-actions { display: flex; gap: 8px; align-items: center; }
 .level-select {
-  padding: 4px 8px;
-  font-size: 11px;
+  padding: 6px 10px;
+  height: 30px;
+  font-size: 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
 }
-.clear-icon {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  width: 26px;
-  height: 26px;
-  cursor: pointer;
+.level-select:hover { border-color: var(--accent); }
+
+.clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
   font-size: 12px;
-  color: var(--text-secondary);
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border));
+  color: var(--danger, #ef4444);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.clear-icon:hover { color: var(--danger); border-color: var(--danger); }
+.clear-btn:hover {
+  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
+  border-color: var(--danger, #ef4444);
+}
+.clear-btn:active { transform: translateY(1px); }
+.clear-btn svg { width: 14px; height: 14px; }
 
 .log-list {
   list-style: none;
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  max-height: 65vh;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .log-item {
   padding: 8px 12px;
@@ -176,14 +222,47 @@ async function handleClear() {
   color: var(--text-secondary);
   font-style: italic;
   font-size: 12px;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .col-foot {
-  padding: 8px 12px;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 11px;
+}
+.page-btn {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.page-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.page-info {
+  padding: 0 6px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  min-width: 40px;
+  text-align: center;
+}
+.total-count {
+  margin-left: auto;
+  color: var(--text-secondary);
+  font-size: 10px;
 }
 </style>
