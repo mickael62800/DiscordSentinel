@@ -162,6 +162,10 @@ async fn handle_panel_select(ctx: &Context, component: &ComponentInteraction) {
     let mut removed_names: Vec<String> = Vec::new();
     let mut skipped_legacy = 0usize;
 
+    // On track aussi l'etat final attendu pour pouvoir afficher la liste
+    // complete des jeux actifs apres l'operation (sans re-fetch member).
+    let mut active_role_ids: HashSet<RoleId> = current_role_ids.clone();
+
     for g in &chunk_games {
         let role_id = match g.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()) {
             Some(id) => RoleId::new(id),
@@ -176,52 +180,102 @@ async fn handle_panel_select(ctx: &Context, component: &ComponentInteraction) {
 
         if wants && !has {
             match member.add_role(&ctx.http, role_id).await {
-                Ok(()) => added_names.push(g.game_name.clone()),
+                Ok(()) => {
+                    added_names.push(g.game_name.clone());
+                    active_role_ids.insert(role_id);
+                }
                 Err(e) => warn!(error = %e, game = %g.game_name, "Erreur add_role"),
             }
         } else if !wants && has {
             match member.remove_role(&ctx.http, role_id).await {
-                Ok(()) => removed_names.push(g.game_name.clone()),
+                Ok(()) => {
+                    removed_names.push(g.game_name.clone());
+                    active_role_ids.remove(&role_id);
+                }
                 Err(e) => warn!(error = %e, game = %g.game_name, "Erreur remove_role"),
             }
         }
     }
 
-    let response = build_sync_response(&added_names, &removed_names, skipped_legacy);
+    // Calcule la liste complete des jeux actuellement actifs pour cet user
+    // (toutes categories confondues, pas juste le chunk courant). Permet a
+    // l'user de voir son etat a chaque interaction puisque Discord ne peut
+    // pas pre-cocher les options du panel public.
+    let all_games = api.list_games_by_category(&guild_id_str, None).await.unwrap_or_default();
+    let active_games: Vec<String> = all_games
+        .iter()
+        .filter_map(|g| {
+            let rid = g.role_id.as_deref().and_then(|s| s.parse::<u64>().ok())?;
+            if active_role_ids.contains(&RoleId::new(rid)) {
+                Some(g.game_name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let response = build_sync_response(&added_names, &removed_names, skipped_legacy, &active_games);
     reply_ephemeral(ctx, component, &response).await;
 }
 
-fn build_sync_response(added: &[String], removed: &[String], skipped_legacy: usize) -> String {
-    if added.is_empty() && removed.is_empty() && skipped_legacy == 0 {
-        return "Aucun changement.".to_string();
-    }
-    let mut lines = vec!["**Abonnements mis a jour :**".to_string()];
-    if !added.is_empty() {
-        let shown: Vec<&String> = added.iter().take(10).collect();
-        let extra = added.len().saturating_sub(shown.len());
-        let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-        if extra > 0 {
-            lines.push(format!("+ {} (+{} autres)", names, extra));
-        } else {
-            lines.push(format!("+ {}", names));
+fn build_sync_response(
+    added: &[String],
+    removed: &[String],
+    skipped_legacy: usize,
+    active_games: &[String],
+) -> String {
+    let mut lines = Vec::new();
+
+    if !added.is_empty() || !removed.is_empty() {
+        lines.push("**Abonnements mis a jour :**".to_string());
+        if !added.is_empty() {
+            let shown: Vec<&String> = added.iter().take(10).collect();
+            let extra = added.len().saturating_sub(shown.len());
+            let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            if extra > 0 {
+                lines.push(format!("+ {} (+{} autres)", names, extra));
+            } else {
+                lines.push(format!("+ {}", names));
+            }
         }
-    }
-    if !removed.is_empty() {
-        let shown: Vec<&String> = removed.iter().take(10).collect();
-        let extra = removed.len().saturating_sub(shown.len());
-        let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-        if extra > 0 {
-            lines.push(format!("- {} (+{} autres)", names, extra));
-        } else {
-            lines.push(format!("- {}", names));
+        if !removed.is_empty() {
+            let shown: Vec<&String> = removed.iter().take(10).collect();
+            let extra = removed.len().saturating_sub(shown.len());
+            let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            if extra > 0 {
+                lines.push(format!("- {} (+{} autres)", names, extra));
+            } else {
+                lines.push(format!("- {}", names));
+            }
         }
+    } else if skipped_legacy == 0 {
+        lines.push("Aucun changement.".to_string());
     }
+
     if skipped_legacy > 0 {
         lines.push(format!(
             "*{} jeu(x) ignore(s) : pas encore de role Discord associe (recree-les via `/game-admin create`).*",
             skipped_legacy
         ));
     }
+
+    // Liste complete des jeux actuellement suivis pour que l'user voie son
+    // etat (le panel Discord ne peut pas pre-cocher selon l'utilisateur).
+    if active_games.is_empty() {
+        lines.push("\n**Tu ne suis aucun jeu actuellement.**".to_string());
+    } else {
+        let shown: Vec<&String> = active_games.iter().take(20).collect();
+        let extra = active_games.len().saturating_sub(shown.len());
+        let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+        let suffix = if extra > 0 { format!(" (+{} autres)", extra) } else { String::new() };
+        lines.push(format!(
+            "\n**Tu suis actuellement ({}) :** {}{}",
+            active_games.len(),
+            names,
+            suffix
+        ));
+    }
+
     lines.join("\n")
 }
 
