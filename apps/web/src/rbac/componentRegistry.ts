@@ -48,6 +48,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
 
   // ── Dashboard : communaute ──
   { key: "community.announcements", label: "Bouton Annonces planifiées", category: "Dashboard", minRole: "admin" },
+  { key: "community.confessions", label: "Bouton Confessions (modération)", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : modération (sous-pages) ──
   // Strikes / Notes / Rappels / Preuves / Reviews ont ete fusionnes

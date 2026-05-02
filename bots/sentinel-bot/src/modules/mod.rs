@@ -6,6 +6,7 @@ pub mod automod;
 pub mod blackjack;
 pub mod cleanup;
 pub mod community;
+pub mod confessions;
 pub mod coude;
 pub mod games;
 pub mod moderation;

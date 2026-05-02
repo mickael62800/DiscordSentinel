@@ -38,6 +38,7 @@ fn command_module(name: &str) -> &'static str {
         | "modstats" | "evidence" | "review" | "template" | "transcript"
         | "export" | "massmute" | "massban" => "moderation",
         "ticket" => "tickets",
+        "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
         _ => "unknown",
     }
@@ -381,6 +382,7 @@ impl EventHandler for Handler {
                             modules::moderation::handle_command(&ctx, &command).await
                         }
                         "ticket" => modules::tickets::handle_command(&ctx, &command).await,
+                        "confess" | "confess-admin" => modules::confessions::handle_command(&ctx, &command).await,
                         _ if modules::coude::handles_command(name) => {
                             modules::coude::handle_command(&ctx, &command).await
                         }
@@ -428,6 +430,8 @@ impl EventHandler for Handler {
                 let cid = component.data.custom_id.as_str();
                 if modules::announcements::handles_component(cid) {
                     modules::announcements::on_component(&ctx, &component).await;
+                } else if modules::confessions::handles_component(cid) {
+                    modules::confessions::on_component(&ctx, &component).await;
                 } else if modules::welcome::handles_component(cid) {
                     modules::welcome::on_component(&ctx, &component).await;
                 } else if modules::games::handles_component(cid) {
@@ -464,6 +468,8 @@ impl EventHandler for Handler {
                     modules::voice::on_modal(&ctx, &modal).await;
                 } else if modules::tickets::handles_modal(mcid) {
                     modules::tickets::on_modal(&ctx, &modal).await;
+                } else if modules::confessions::handles_modal(mcid) {
+                    modules::confessions::on_modal(&ctx, &modal).await;
                 }
             }
             Interaction::Autocomplete(autocomplete) => {
