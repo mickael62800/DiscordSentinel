@@ -4,7 +4,7 @@ use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
-    AnnouncementRun, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
+    AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
     ScheduledAnnouncement,
 };
 use crate::domain::errors::DomainError;
@@ -44,6 +44,8 @@ struct AnnouncementRow {
     mention_here: bool,
     mention_role_ids: serde_json::Value,
     channel_ids: serde_json::Value,
+    buttons: serde_json::Value,
+    auto_reactions: serde_json::Value,
     created_by: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -79,6 +81,8 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
             mention_here: r.mention_here,
             mention_role_ids: role_ids,
             channel_ids: chans,
+            buttons: serde_json::from_value(r.buttons).unwrap_or_default(),
+            auto_reactions: serde_json::from_value(r.auto_reactions).unwrap_or_default(),
             created_by: r.created_by,
             created_at: r.created_at,
             updated_at: r.updated_at,
@@ -123,7 +127,7 @@ const SELECT_ANNOUNCEMENT: &str = r#"
         content_type, content_text, embed_title, embed_color,
         embed_image_url, embed_thumbnail_url,
         mention_everyone, mention_here, mention_role_ids,
-        channel_ids,
+        channel_ids, buttons, auto_reactions,
         created_by, created_at, updated_at,
         last_run_at, next_run_at
     FROM scheduled_announcements
@@ -141,12 +145,13 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 content_type, content_text, embed_title, embed_color,
                 embed_image_url, embed_thumbnail_url,
                 mention_everyone, mention_here, mention_role_ids,
-                channel_ids, created_by, created_at, updated_at,
+                channel_ids, buttons, auto_reactions,
+                created_by, created_at, updated_at,
                 last_run_at, next_run_at
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23,
-                $24, $25, $26, $27
+                $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
+                $23, $24, $25, $26, $27, $28, $29
             )"#,
         )
         .bind(a.id)
@@ -171,6 +176,8 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.mention_here)
         .bind(serde_json::to_value(&a.mention_role_ids).unwrap_or_default())
         .bind(serde_json::to_value(&a.channel_ids).unwrap_or_default())
+        .bind(serde_json::to_value(&a.buttons).unwrap_or_default())
+        .bind(serde_json::to_value(&a.auto_reactions).unwrap_or_default())
         .bind(&a.created_by)
         .bind(a.created_at)
         .bind(a.updated_at)
@@ -192,8 +199,8 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 content_type = $12, content_text = $13, embed_title = $14, embed_color = $15,
                 embed_image_url = $16, embed_thumbnail_url = $17,
                 mention_everyone = $18, mention_here = $19, mention_role_ids = $20,
-                channel_ids = $21,
-                updated_at = NOW(), next_run_at = $22
+                channel_ids = $21, buttons = $22, auto_reactions = $23,
+                updated_at = NOW(), next_run_at = $24
             WHERE id = $1"#,
         )
         .bind(a.id)
@@ -217,6 +224,8 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.mention_here)
         .bind(serde_json::to_value(&a.mention_role_ids).unwrap_or_default())
         .bind(serde_json::to_value(&a.channel_ids).unwrap_or_default())
+        .bind(serde_json::to_value(&a.buttons).unwrap_or_default())
+        .bind(serde_json::to_value(&a.auto_reactions).unwrap_or_default())
         .bind(a.next_run_at)
         .execute(&self.pool)
         .await
@@ -372,5 +381,69 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(rows.into_iter().map(AnnouncementRun::from).collect())
+    }
+
+    async fn record_button_interaction(
+        &self,
+        i: &ButtonInteraction,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO announcement_button_interactions
+                (id, announcement_id, run_id, user_id, user_name, button_custom_id, button_label, clicked_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+        )
+        .bind(i.id)
+        .bind(i.announcement_id)
+        .bind(i.run_id)
+        .bind(&i.user_id)
+        .bind(&i.user_name)
+        .bind(&i.button_custom_id)
+        .bind(&i.button_label)
+        .bind(i.clicked_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn list_button_interactions(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ButtonInteraction>, DomainError> {
+        #[derive(sqlx::FromRow)]
+        struct InterRow {
+            id: Uuid,
+            announcement_id: Uuid,
+            run_id: Option<Uuid>,
+            user_id: String,
+            user_name: Option<String>,
+            button_custom_id: String,
+            button_label: Option<String>,
+            clicked_at: chrono::DateTime<chrono::Utc>,
+        }
+        let rows = sqlx::query_as::<_, InterRow>(
+            "SELECT id, announcement_id, run_id, user_id, user_name, button_custom_id, button_label, clicked_at
+             FROM announcement_button_interactions
+             WHERE announcement_id = $1 ORDER BY clicked_at DESC LIMIT $2",
+        )
+        .bind(announcement_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| ButtonInteraction {
+                id: r.id,
+                announcement_id: r.announcement_id,
+                run_id: r.run_id,
+                user_id: r.user_id,
+                user_name: r.user_name,
+                button_custom_id: r.button_custom_id,
+                button_label: r.button_label,
+                clicked_at: r.clicked_at,
+            })
+            .collect())
     }
 }

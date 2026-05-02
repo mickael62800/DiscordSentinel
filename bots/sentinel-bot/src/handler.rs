@@ -426,7 +426,9 @@ impl EventHandler for Handler {
             }
             Interaction::Component(component) => {
                 let cid = component.data.custom_id.as_str();
-                if modules::welcome::handles_component(cid) {
+                if modules::announcements::handles_component(cid) {
+                    modules::announcements::on_component(&ctx, &component).await;
+                } else if modules::welcome::handles_component(cid) {
                     modules::welcome::on_component(&ctx, &component).await;
                 } else if modules::games::handles_component(cid) {
                     modules::games::on_component(&ctx, &component).await;

@@ -3,7 +3,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
-    AnnouncementRun, ChannelPostResult, ContentType, RecurrenceType, ScheduledAnnouncement,
+    AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
+    RecurrenceType, ScheduledAnnouncement,
 };
 use crate::domain::errors::DomainError;
 
@@ -27,6 +28,8 @@ pub struct CreateAnnouncementCommand {
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
     pub channel_ids: Vec<String>,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
     pub created_by: String,
 }
 
@@ -50,6 +53,8 @@ pub struct UpdateAnnouncementCommand {
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
     pub channel_ids: Vec<String>,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
 }
 
 /// Payload pret a etre envoye au bot Discord pour publication.
@@ -64,6 +69,8 @@ pub struct RenderedAnnouncement {
     pub embed: Option<RenderedEmbed>,
     /// Texte de mentions a prepend au message (ex: "@everyone <@&role_id>").
     pub mentions_prefix: String,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -104,4 +111,22 @@ pub trait ManageAnnouncementsUseCase: Send + Sync {
     async fn preview(&self, id: Uuid) -> Result<RenderedAnnouncement, DomainError>;
 
     async fn list_runs(&self, announcement_id: Uuid, limit: i64) -> Result<Vec<AnnouncementRun>, DomainError>;
+
+    /// Enregistre un clic sur un bouton (appele par le bot apres
+    /// interaction Discord).
+    async fn record_button_interaction(
+        &self,
+        announcement_id: Uuid,
+        run_id: Option<Uuid>,
+        user_id: String,
+        user_name: Option<String>,
+        button_custom_id: String,
+        button_label: Option<String>,
+    ) -> Result<(), DomainError>;
+
+    async fn list_button_interactions(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ButtonInteraction>, DomainError>;
 }

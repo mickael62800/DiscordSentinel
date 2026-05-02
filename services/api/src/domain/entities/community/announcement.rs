@@ -37,6 +37,47 @@ impl RecurrenceType {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum ButtonStyle {
+    Primary,
+    Secondary,
+    Success,
+    Danger,
+    Link,
+}
+
+impl ButtonStyle {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Primary => "primary",
+            Self::Secondary => "secondary",
+            Self::Success => "success",
+            Self::Danger => "danger",
+            Self::Link => "link",
+        }
+    }
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "primary" => Some(Self::Primary),
+            "secondary" => Some(Self::Secondary),
+            "success" => Some(Self::Success),
+            "danger" => Some(Self::Danger),
+            "link" => Some(Self::Link),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnouncementButton {
+    pub label: String,
+    pub style: String, // "primary" | "secondary" | "success" | "danger" | "link"
+    pub custom_id: Option<String>,
+    pub url: Option<String>,
+    pub emoji: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ContentType {
     Text,
     Embed,
@@ -88,6 +129,11 @@ pub struct ScheduledAnnouncement {
 
     pub channel_ids: Vec<String>,
 
+    /// Boutons interactifs (max 5). Vide si aucun.
+    pub buttons: Vec<AnnouncementButton>,
+    /// Emojis a ajouter en reaction au message apres post. Vide si aucun.
+    pub auto_reactions: Vec<String>,
+
     pub created_by: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -123,6 +169,19 @@ impl RunStatus {
             _ => None,
         }
     }
+}
+
+/// Trace une interaction d'un user sur un bouton de l'annonce.
+#[derive(Debug, Clone)]
+pub struct ButtonInteraction {
+    pub id: Uuid,
+    pub announcement_id: Uuid,
+    pub run_id: Option<Uuid>,
+    pub user_id: String,
+    pub user_name: Option<String>,
+    pub button_custom_id: String,
+    pub button_label: Option<String>,
+    pub clicked_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

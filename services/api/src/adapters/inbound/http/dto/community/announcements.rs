@@ -3,8 +3,8 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
-    AnnouncementRun, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
-    ScheduledAnnouncement,
+    AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
+    RecurrenceType, RunStatus, ScheduledAnnouncement,
 };
 
 #[derive(Debug, Deserialize)]
@@ -33,6 +33,10 @@ pub struct CreateAnnouncementDto {
     #[serde(default)]
     pub mention_role_ids: Vec<String>,
     pub channel_ids: Vec<String>,
+    #[serde(default)]
+    pub buttons: Vec<AnnouncementButton>,
+    #[serde(default)]
+    pub auto_reactions: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,6 +64,10 @@ pub struct UpdateAnnouncementDto {
     #[serde(default)]
     pub mention_role_ids: Vec<String>,
     pub channel_ids: Vec<String>,
+    #[serde(default)]
+    pub buttons: Vec<AnnouncementButton>,
+    #[serde(default)]
+    pub auto_reactions: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -91,6 +99,8 @@ pub struct AnnouncementDto {
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
     pub channel_ids: Vec<String>,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
     pub created_by: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -123,6 +133,8 @@ impl From<ScheduledAnnouncement> for AnnouncementDto {
             mention_here: a.mention_here,
             mention_role_ids: a.mention_role_ids,
             channel_ids: a.channel_ids,
+            buttons: a.buttons,
+            auto_reactions: a.auto_reactions,
             created_by: a.created_by,
             created_at: a.created_at,
             updated_at: a.updated_at,
@@ -178,4 +190,41 @@ pub fn parse_run_status(s: &str) -> Result<RunStatus, String> {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RecordRunResultDto {
     pub channels_posted: Vec<ChannelPostResult>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ButtonClickDto {
+    pub announcement_id: Uuid,
+    pub run_id: Option<Uuid>,
+    pub user_id: String,
+    pub user_name: Option<String>,
+    pub button_custom_id: String,
+    pub button_label: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ButtonInteractionDto {
+    pub id: Uuid,
+    pub announcement_id: Uuid,
+    pub run_id: Option<Uuid>,
+    pub user_id: String,
+    pub user_name: Option<String>,
+    pub button_custom_id: String,
+    pub button_label: Option<String>,
+    pub clicked_at: DateTime<Utc>,
+}
+
+impl From<ButtonInteraction> for ButtonInteractionDto {
+    fn from(b: ButtonInteraction) -> Self {
+        Self {
+            id: b.id,
+            announcement_id: b.announcement_id,
+            run_id: b.run_id,
+            user_id: b.user_id,
+            user_name: b.user_name,
+            button_custom_id: b.button_custom_id,
+            button_label: b.button_label,
+            clicked_at: b.clicked_at,
+        }
+    }
 }

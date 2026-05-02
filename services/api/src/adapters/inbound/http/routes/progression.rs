@@ -68,11 +68,19 @@ fn announcement_inner() -> Router<AppState> {
         .route("/{id}/toggle", post(handlers::community::announcements::toggle_announcement))
         .route("/{id}/preview", get(handlers::community::announcements::preview_announcement))
         .route("/{id}/runs", get(handlers::community::announcements::list_runs))
+        .route(
+            "/{id}/interactions",
+            get(handlers::community::announcements::list_button_interactions),
+        )
         // Worker / bot (interne)
         .route("/internal/due", get(handlers::community::announcements::fetch_due))
         .route(
             "/internal/runs/{run_id}/result",
             post(handlers::community::announcements::record_run_result),
+        )
+        .route(
+            "/internal/button-click",
+            post(handlers::community::announcements::record_button_click),
         )
 }
 

@@ -6,8 +6,9 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::community::announcements::{
-    parse_content_type, parse_recurrence, AnnouncementDto, AnnouncementRunDto,
-    CreateAnnouncementDto, RecordRunResultDto, ToggleAnnouncementDto, UpdateAnnouncementDto,
+    parse_content_type, parse_recurrence, AnnouncementDto, AnnouncementRunDto, ButtonClickDto,
+    ButtonInteractionDto, CreateAnnouncementDto, RecordRunResultDto, ToggleAnnouncementDto,
+    UpdateAnnouncementDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
@@ -53,6 +54,8 @@ pub async fn create_announcement(
         mention_here: dto.mention_here,
         mention_role_ids: dto.mention_role_ids,
         channel_ids: dto.channel_ids,
+        buttons: dto.buttons,
+        auto_reactions: dto.auto_reactions,
         created_by,
     };
     let ann = state.announcements_uc.create(cmd).await?;
@@ -86,6 +89,8 @@ pub async fn update_announcement(
         mention_here: dto.mention_here,
         mention_role_ids: dto.mention_role_ids,
         channel_ids: dto.channel_ids,
+        buttons: dto.buttons,
+        auto_reactions: dto.auto_reactions,
     };
     let ann = state.announcements_uc.update(cmd).await?;
     Ok(single_dto(ann))
@@ -182,4 +187,38 @@ pub async fn record_run_result(
         .record_run_result(run_id, dto.channels_posted)
         .await?;
     Ok(Json(()))
+}
+
+/// POST /api/announcements/internal/button-click — appele par le bot
+/// quand un user clique sur un bouton interactif d'une annonce.
+pub async fn record_button_click(
+    State(state): State<AppState>,
+    Json(dto): Json<ButtonClickDto>,
+) -> Result<Json<()>, ApiError> {
+    state
+        .announcements_uc
+        .record_button_interaction(
+            dto.announcement_id,
+            dto.run_id,
+            dto.user_id,
+            dto.user_name,
+            dto.button_custom_id,
+            dto.button_label,
+        )
+        .await?;
+    Ok(Json(()))
+}
+
+/// GET /api/announcements/{id}/interactions — liste des clics sur les boutons.
+pub async fn list_button_interactions(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<RunsLimitQuery>,
+) -> Result<Json<Vec<ButtonInteractionDto>>, ApiError> {
+    let limit = params.limit.unwrap_or(100).min(1000);
+    let interactions = state
+        .announcements_uc
+        .list_button_interactions(id, limit)
+        .await?;
+    Ok(map_to_dtos(interactions))
 }

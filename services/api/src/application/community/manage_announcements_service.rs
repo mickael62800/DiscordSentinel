@@ -5,8 +5,8 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
-    compute_next_run_at, render_template, AnnouncementRun, ChannelPostResult, ContentType,
-    InterpolationContext, RecurrenceType, RunStatus, ScheduledAnnouncement,
+    compute_next_run_at, render_template, AnnouncementRun, ButtonInteraction, ChannelPostResult,
+    ContentType, InterpolationContext, RecurrenceType, RunStatus, ScheduledAnnouncement,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_announcements::{
@@ -120,6 +120,8 @@ impl ManageAnnouncementsService {
             content_text,
             embed,
             mentions_prefix: Self::build_mentions_prefix(a),
+            buttons: a.buttons.clone(),
+            auto_reactions: a.auto_reactions.clone(),
         }
     }
 }
@@ -166,6 +168,8 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             mention_here: cmd.mention_here,
             mention_role_ids: cmd.mention_role_ids,
             channel_ids: cmd.channel_ids,
+            buttons: cmd.buttons,
+            auto_reactions: cmd.auto_reactions,
             created_by: cmd.created_by,
             created_at: now,
             updated_at: now,
@@ -215,6 +219,8 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         ann.mention_here = cmd.mention_here;
         ann.mention_role_ids = cmd.mention_role_ids;
         ann.channel_ids = cmd.channel_ids;
+        ann.buttons = cmd.buttons;
+        ann.auto_reactions = cmd.auto_reactions;
         ann.updated_at = Utc::now();
         ann.next_run_at = next;
 
@@ -318,5 +324,35 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
 
     async fn list_runs(&self, announcement_id: Uuid, limit: i64) -> Result<Vec<AnnouncementRun>, DomainError> {
         self.repo.list_runs(announcement_id, limit).await
+    }
+
+    async fn record_button_interaction(
+        &self,
+        announcement_id: Uuid,
+        run_id: Option<Uuid>,
+        user_id: String,
+        user_name: Option<String>,
+        button_custom_id: String,
+        button_label: Option<String>,
+    ) -> Result<(), DomainError> {
+        let interaction = ButtonInteraction {
+            id: Uuid::new_v4(),
+            announcement_id,
+            run_id,
+            user_id,
+            user_name,
+            button_custom_id,
+            button_label,
+            clicked_at: Utc::now(),
+        };
+        self.repo.record_button_interaction(&interaction).await
+    }
+
+    async fn list_button_interactions(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ButtonInteraction>, DomainError> {
+        self.repo.list_button_interactions(announcement_id, limit).await
     }
 }

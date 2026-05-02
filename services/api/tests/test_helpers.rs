@@ -265,6 +265,8 @@ impl crate::ports::inbound::community::manage_announcements::ManageAnnouncements
     async fn record_run_result(&self, _: uuid::Uuid, _: Vec<crate::domain::entities::community::announcement::ChannelPostResult>) -> Result<(), DomainError> { unimplemented!() }
     async fn preview(&self, _: uuid::Uuid) -> Result<crate::ports::inbound::community::manage_announcements::RenderedAnnouncement, DomainError> { unimplemented!() }
     async fn list_runs(&self, _: uuid::Uuid, _: i64) -> Result<Vec<crate::domain::entities::community::announcement::AnnouncementRun>, DomainError> { unimplemented!() }
+    async fn record_button_interaction(&self, _: uuid::Uuid, _: Option<uuid::Uuid>, _: String, _: Option<String>, _: String, _: Option<String>) -> Result<(), DomainError> { unimplemented!() }
+    async fn list_button_interactions(&self, _: uuid::Uuid, _: i64) -> Result<Vec<crate::domain::entities::community::announcement::ButtonInteraction>, DomainError> { unimplemented!() }
 }
 
 pub struct StubRolePanels;

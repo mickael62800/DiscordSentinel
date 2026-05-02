@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
-    AnnouncementRun, ChannelPostResult, RunStatus, ScheduledAnnouncement,
+    AnnouncementRun, ButtonInteraction, ChannelPostResult, RunStatus, ScheduledAnnouncement,
 };
 use crate::domain::errors::DomainError;
 
@@ -53,4 +53,17 @@ pub trait AnnouncementRepository: Send + Sync {
         announcement_id: Uuid,
         limit: i64,
     ) -> Result<Vec<AnnouncementRun>, DomainError>;
+
+    /// Insert une interaction sur un bouton (cliqué par un user).
+    async fn record_button_interaction(
+        &self,
+        interaction: &ButtonInteraction,
+    ) -> Result<(), DomainError>;
+
+    /// Liste des interactions sur les boutons d'une annonce.
+    async fn list_button_interactions(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ButtonInteraction>, DomainError>;
 }

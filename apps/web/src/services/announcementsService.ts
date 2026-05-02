@@ -27,6 +27,8 @@ export interface ScheduledAnnouncement {
   mention_here: boolean;
   mention_role_ids: string[];
   channel_ids: string[];
+  buttons: AnnouncementButton[];
+  auto_reactions: string[];
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -42,6 +44,14 @@ export interface RenderedEmbed {
   thumbnail_url: string | null;
 }
 
+export interface AnnouncementButton {
+  label: string;
+  style: "primary" | "secondary" | "success" | "danger" | "link";
+  custom_id?: string | null;
+  url?: string | null;
+  emoji?: string | null;
+}
+
 export interface RenderedAnnouncement {
   announcement_id: string;
   run_id: string;
@@ -50,6 +60,19 @@ export interface RenderedAnnouncement {
   content_text: string;
   embed: RenderedEmbed | null;
   mentions_prefix: string;
+  buttons: AnnouncementButton[];
+  auto_reactions: string[];
+}
+
+export interface ButtonInteraction {
+  id: string;
+  announcement_id: string;
+  run_id: string | null;
+  user_id: string;
+  user_name: string | null;
+  button_custom_id: string;
+  button_label: string | null;
+  clicked_at: string;
 }
 
 export interface ChannelPostResult {
@@ -89,6 +112,8 @@ export interface CreateAnnouncementBody {
   mention_here?: boolean;
   mention_role_ids?: string[];
   channel_ids: string[];
+  buttons?: AnnouncementButton[];
+  auto_reactions?: string[];
 }
 
 export type UpdateAnnouncementBody = Omit<CreateAnnouncementBody, "guild_id">;
@@ -117,5 +142,8 @@ export const announcementsService = {
   },
   listRuns(id: string, limit = 50): Promise<AnnouncementRun[]> {
     return httpGet(`/api/announcements/${id}/runs?limit=${limit}`);
+  },
+  listButtonInteractions(id: string, limit = 100): Promise<ButtonInteraction[]> {
+    return httpGet(`/api/announcements/${id}/interactions?limit=${limit}`);
   },
 };

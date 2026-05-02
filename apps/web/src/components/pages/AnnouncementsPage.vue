@@ -11,7 +11,11 @@ import {
   type CreateAnnouncementBody,
   type RecurrenceType,
   type ContentType,
+  type AnnouncementButton,
 } from "@/services/announcementsService";
+import { guildsService, type DiscordTextChannel } from "@/services/guildsService";
+import { discordRolesService } from "@/services/discordRolesService";
+import type { DiscordRole } from "@/types";
 
 const { selectedGuildId } = useGuildSelector();
 const { success: toastOk, error: toastErr } = useToast();
@@ -19,12 +23,21 @@ const { confirm } = useConfirm();
 
 const announcements = ref<ScheduledAnnouncement[]>([]);
 const loading = ref(false);
+const channels = ref<DiscordTextChannel[]>([]);
+const roles = ref<DiscordRole[]>([]);
 
 async function fetchAll() {
   if (!selectedGuildId.value) return;
   loading.value = true;
   try {
-    announcements.value = await announcementsService.list(selectedGuildId.value);
+    const [list, ch, ro] = await Promise.all([
+      announcementsService.list(selectedGuildId.value),
+      guildsService.getTextChannels(selectedGuildId.value).catch(() => []),
+      discordRolesService.getAll(selectedGuildId.value).catch(() => []),
+    ]);
+    announcements.value = list;
+    channels.value = ch;
+    roles.value = ro;
   } catch (e: unknown) {
     toastErr(`Echec chargement annonces : ${(e as Error)?.message ?? e}`);
   } finally {
@@ -56,8 +69,10 @@ interface FormState {
   embed_thumbnail_url: string;
   mention_everyone: boolean;
   mention_here: boolean;
-  mention_role_ids: string;
-  channel_ids: string;
+  selected_role_ids: string[];
+  selected_channel_ids: string[];
+  buttons: AnnouncementButton[];
+  auto_reactions_text: string;
 }
 
 const form = ref<FormState>(emptyForm());
@@ -84,8 +99,10 @@ function emptyForm(): FormState {
     embed_thumbnail_url: "",
     mention_everyone: false,
     mention_here: false,
-    mention_role_ids: "",
-    channel_ids: "",
+    selected_role_ids: [],
+    selected_channel_ids: [],
+    buttons: [],
+    auto_reactions_text: "",
   };
 }
 
@@ -114,8 +131,10 @@ function openEdit(a: ScheduledAnnouncement) {
     embed_thumbnail_url: a.embed_thumbnail_url ?? "",
     mention_everyone: a.mention_everyone,
     mention_here: a.mention_here,
-    mention_role_ids: a.mention_role_ids.join(","),
-    channel_ids: a.channel_ids.join(","),
+    selected_role_ids: [...a.mention_role_ids],
+    selected_channel_ids: [...a.channel_ids],
+    buttons: a.buttons.map((b) => ({ ...b })),
+    auto_reactions_text: a.auto_reactions.join(" "),
   };
 }
 
@@ -125,9 +144,12 @@ function closeForm() {
 
 function buildBody(): CreateAnnouncementBody {
   const f = form.value;
-  const ids = (s: string) =>
-    s.split(",").map((x) => x.trim()).filter(Boolean);
   const colorInt = parseInt(f.embed_color_hex.replace("#", ""), 16);
+  const reactions = f.auto_reactions_text
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 20);
   return {
     guild_id: selectedGuildId.value!,
     name: f.name,
@@ -151,10 +173,66 @@ function buildBody(): CreateAnnouncementBody {
     embed_thumbnail_url: f.content_type === "embed" ? f.embed_thumbnail_url || null : null,
     mention_everyone: f.mention_everyone,
     mention_here: f.mention_here,
-    mention_role_ids: ids(f.mention_role_ids),
-    channel_ids: ids(f.channel_ids),
+    mention_role_ids: f.selected_role_ids,
+    channel_ids: f.selected_channel_ids,
+    buttons: f.buttons.filter((b) => b.label.trim()),
+    auto_reactions: reactions,
   };
 }
+
+// ── Helpers boutons ─────────────────────────────────────────────────────
+
+function addButton() {
+  if (form.value.buttons.length >= 5) {
+    toastErr("Maximum 5 boutons par annonce (limite Discord).");
+    return;
+  }
+  form.value.buttons.push({
+    label: "",
+    style: "primary",
+    custom_id: `btn_${form.value.buttons.length + 1}`,
+    url: null,
+    emoji: null,
+  });
+}
+
+function removeButton(idx: number) {
+  form.value.buttons.splice(idx, 1);
+}
+
+// ── Helpers picker channels/roles ──────────────────────────────────────
+
+function toggleChannel(id: string) {
+  const arr = form.value.selected_channel_ids;
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i, 1);
+  else arr.push(id);
+}
+
+function toggleRole(id: string) {
+  const arr = form.value.selected_role_ids;
+  const i = arr.indexOf(id);
+  if (i >= 0) arr.splice(i, 1);
+  else arr.push(id);
+}
+
+const channelSearch = ref("");
+const roleSearch = ref("");
+
+const filteredChannels = computed(() =>
+  channelSearch.value
+    ? channels.value.filter((c) =>
+        c.name.toLowerCase().includes(channelSearch.value.toLowerCase()),
+      )
+    : channels.value,
+);
+const filteredRoles = computed(() =>
+  roleSearch.value
+    ? roles.value.filter((r) =>
+        r.name.toLowerCase().includes(roleSearch.value.toLowerCase()),
+      )
+    : roles.value,
+);
 
 async function saveForm() {
   if (!selectedGuildId.value) return;
@@ -271,7 +349,7 @@ function fmtDate(iso: string | null): string {
 const formCanSave = computed(() => {
   const f = form.value;
   if (!f.name.trim()) return false;
-  if (!f.channel_ids.trim()) return false;
+  if (f.selected_channel_ids.length === 0) return false;
   if (f.recurrence_type === "once" && !f.scheduled_at) return false;
   return true;
 });
@@ -436,15 +514,114 @@ const formCanSave = computed(() => {
             </label>
           </div>
 
-          <label>
-            IDs de rôles à mentionner (séparés par virgule)
-            <input v-model="form.mention_role_ids" type="text" placeholder="123456789012345678,..." />
-          </label>
+          <div class="picker-section">
+            <h4>Rôles à mentionner</h4>
+            <input v-model="roleSearch" type="text" placeholder="🔍 Rechercher un rôle..." class="picker-search" />
+            <div class="picker-grid">
+              <label
+                v-for="r in filteredRoles"
+                :key="r.id"
+                class="picker-item"
+                :class="{ selected: form.selected_role_ids.includes(r.id) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.selected_role_ids.includes(r.id)"
+                  @change="toggleRole(r.id)"
+                />
+                <span class="role-color" :style="{ background: r.color ? '#' + r.color.toString(16).padStart(6, '0') : '#888' }" />
+                <span class="picker-label">@{{ r.name }}</span>
+              </label>
+              <p v-if="filteredRoles.length === 0" class="muted small">Aucun rôle trouvé.</p>
+            </div>
+            <p class="muted small">Sélectionnés : {{ form.selected_role_ids.length }}</p>
+          </div>
 
-          <label>
-            IDs des salons cibles * (séparés par virgule, au moins 1)
-            <input v-model="form.channel_ids" type="text" placeholder="123456789012345678,..." />
-          </label>
+          <div class="picker-section">
+            <h4>Salons cibles * <span class="req-count">({{ form.selected_channel_ids.length }} sélectionné{{ form.selected_channel_ids.length > 1 ? "s" : "" }})</span></h4>
+            <input v-model="channelSearch" type="text" placeholder="🔍 Rechercher un salon..." class="picker-search" />
+            <div class="picker-grid">
+              <label
+                v-for="c in filteredChannels"
+                :key="c.id"
+                class="picker-item"
+                :class="{ selected: form.selected_channel_ids.includes(c.id) }"
+              >
+                <input
+                  type="checkbox"
+                  :checked="form.selected_channel_ids.includes(c.id)"
+                  @change="toggleChannel(c.id)"
+                />
+                <span class="picker-label">#{{ c.name }}</span>
+              </label>
+              <p v-if="filteredChannels.length === 0" class="muted small">Aucun salon trouvé.</p>
+            </div>
+          </div>
+
+          <hr class="sep" />
+
+          <!-- Section Boutons -->
+          <div class="buttons-section">
+            <div class="section-head">
+              <h4>🔘 Boutons interactifs (max 5)</h4>
+              <button type="button" class="btn-secondary xs" @click="addButton">+ Ajouter</button>
+            </div>
+            <p class="muted small">
+              Boutons cliquables sous l'annonce. Chaque clic est tracé (visible dans l'historique).
+            </p>
+            <div v-if="form.buttons.length === 0" class="muted small">Aucun bouton.</div>
+            <div v-else class="button-list">
+              <div v-for="(btn, idx) in form.buttons" :key="idx" class="button-row">
+                <input v-model="btn.label" type="text" placeholder="Label" maxlength="80" class="btn-label" />
+                <select v-model="btn.style" class="btn-style">
+                  <option value="primary">Bleu</option>
+                  <option value="secondary">Gris</option>
+                  <option value="success">Vert</option>
+                  <option value="danger">Rouge</option>
+                  <option value="link">Lien</option>
+                </select>
+                <input
+                  v-if="btn.style === 'link'"
+                  v-model="btn.url"
+                  type="url"
+                  placeholder="https://..."
+                  class="btn-url"
+                />
+                <input
+                  v-else
+                  v-model="btn.custom_id"
+                  type="text"
+                  placeholder="ID action (ex: rsvp_yes)"
+                  class="btn-cid"
+                  maxlength="80"
+                />
+                <input
+                  v-model="btn.emoji"
+                  type="text"
+                  placeholder="🎉"
+                  class="btn-emoji"
+                  maxlength="32"
+                />
+                <button type="button" class="btn-danger xs" @click="removeButton(idx)">🗑</button>
+              </div>
+            </div>
+          </div>
+
+          <hr class="sep" />
+
+          <!-- Section Réactions -->
+          <div>
+            <h4>💬 Réactions automatiques (max 20)</h4>
+            <p class="muted small">
+              Emojis ajoutés en réaction au message. Séparés par espace ou virgule.
+              Format unicode (👍) ou custom Discord (<code>&lt;:nom:id&gt;</code>).
+            </p>
+            <input
+              v-model="form.auto_reactions_text"
+              type="text"
+              placeholder="👍 ❤️ 🎉 ou <:custom:1234>"
+            />
+          </div>
         </div>
         <footer class="modal-foot">
           <button class="btn-secondary" :disabled="saving" @click="closeForm">Annuler</button>
@@ -604,4 +781,65 @@ const formCanSave = computed(() => {
 .prev-text { white-space: pre-wrap; margin: 0; font-size: 13px; }
 .prev-img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
 .prev-thumb { max-width: 80px; max-height: 80px; border-radius: 6px; float: right; margin-left: 10px; }
+
+/* Pickers visuels (channels / roles) */
+.picker-section { margin-bottom: 18px; }
+.picker-section h4 { margin: 0 0 6px 0; font-size: 13px; }
+.picker-section .req-count { color: var(--text-secondary); font-weight: 400; font-size: 12px; }
+.picker-search {
+  width: 100%; box-sizing: border-box;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+.picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  margin-bottom: 6px;
+}
+.picker-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 0;
+}
+.picker-item:hover { background: var(--bg-hover); }
+.picker-item.selected { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.picker-item input { width: auto; margin: 0; }
+.picker-item .picker-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.role-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* Section boutons */
+.buttons-section { margin-bottom: 18px; }
+.section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.section-head h4 { margin: 0; font-size: 13px; }
+.button-list { display: flex; flex-direction: column; gap: 6px; }
+.button-row { display: grid; grid-template-columns: 1.4fr 0.8fr 1.2fr 0.5fr auto; gap: 6px; align-items: center; }
+.button-row input, .button-row select {
+  width: 100%; box-sizing: border-box;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.btn-emoji { text-align: center; }
 </style>
