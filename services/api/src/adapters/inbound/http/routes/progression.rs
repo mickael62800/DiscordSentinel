@@ -84,11 +84,59 @@ fn announcement_inner() -> Router<AppState> {
         )
 }
 
+fn confession_inner() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::community::confessions::create_confession))
+        .route("/{guild_id}/list", get(handlers::community::confessions::list_confessions))
+        .route(
+            "/by-id/{id}",
+            get(handlers::community::confessions::get_confession)
+                .patch(handlers::community::confessions::edit_confession)
+                .delete(handlers::community::confessions::delete_confession),
+        )
+        .route(
+            "/by-id/{id}/message-refs",
+            post(handlers::community::confessions::update_message_refs),
+        )
+        .route(
+            "/by-message-id/{message_id}",
+            get(handlers::community::confessions::get_by_message_id),
+        )
+        .route(
+            "/by-id/{confession_id}/replies",
+            get(handlers::community::confessions::list_replies)
+                .post(handlers::community::confessions::create_reply),
+        )
+        .route(
+            "/replies/{id}/message-id",
+            post(handlers::community::confessions::update_reply_message_id),
+        )
+        .route(
+            "/replies/{id}",
+            delete(handlers::community::confessions::delete_reply),
+        )
+        .route("/reports", post(handlers::community::confessions::create_report))
+        .route(
+            "/{guild_id}/reports",
+            get(handlers::community::confessions::list_reports),
+        )
+        .route(
+            "/reports/{id}/resolve",
+            post(handlers::community::confessions::resolve_report),
+        )
+        .route(
+            "/config/{guild_id}",
+            get(handlers::community::confessions::get_config),
+        )
+        .route("/config", post(handlers::community::confessions::save_config))
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/api/conduct", conduct_inner())
         .nest("/api/levels", level_inner())
         .nest("/api/announcements", announcement_inner())
+        .nest("/api/confessions", confession_inner())
         .nest("/api/role-panels", role_panel_inner())
         .nest("/api/auto-roles", auto_role_inner())
 }

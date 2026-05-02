@@ -269,6 +269,29 @@ impl crate::ports::inbound::community::manage_announcements::ManageAnnouncements
     async fn list_button_interactions(&self, _: uuid::Uuid, _: i64) -> Result<Vec<crate::domain::entities::community::announcement::ButtonInteraction>, DomainError> { unimplemented!() }
 }
 
+#[allow(dead_code)]
+pub struct StubConfessions;
+#[async_trait]
+impl crate::ports::inbound::community::manage_confessions::ManageConfessionsUseCase for StubConfessions {
+    async fn create(&self, _: crate::ports::inbound::community::manage_confessions::CreateConfessionCommand) -> Result<crate::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+    async fn update_message_refs(&self, _: uuid::Uuid, _: String, _: String, _: Option<String>) -> Result<(), DomainError> { unimplemented!() }
+    async fn edit_content(&self, _: uuid::Uuid, _: &str, _: String) -> Result<crate::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+    async fn delete(&self, _: uuid::Uuid, _: String, _: Option<String>) -> Result<crate::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+    async fn get(&self, _: uuid::Uuid) -> Result<crate::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+    async fn get_by_message_id(&self, _: &str) -> Result<Option<crate::domain::entities::community::confession::Confession>, DomainError> { unimplemented!() }
+    async fn get_by_public_number(&self, _: &str, _: i32) -> Result<crate::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str, _: i64, _: bool) -> Result<Vec<crate::domain::entities::community::confession::Confession>, DomainError> { unimplemented!() }
+    async fn create_reply(&self, _: crate::ports::inbound::community::manage_confessions::CreateReplyCommand) -> Result<crate::domain::entities::community::confession::ConfessionReply, DomainError> { unimplemented!() }
+    async fn update_reply_message_id(&self, _: uuid::Uuid, _: String) -> Result<(), DomainError> { unimplemented!() }
+    async fn delete_reply(&self, _: uuid::Uuid, _: String) -> Result<crate::domain::entities::community::confession::ConfessionReply, DomainError> { unimplemented!() }
+    async fn list_replies(&self, _: uuid::Uuid) -> Result<Vec<crate::domain::entities::community::confession::ConfessionReply>, DomainError> { unimplemented!() }
+    async fn create_report(&self, _: crate::ports::inbound::community::manage_confessions::CreateReportCommand) -> Result<crate::domain::entities::community::confession::ConfessionReport, DomainError> { unimplemented!() }
+    async fn list_reports(&self, _: &str, _: Option<crate::domain::entities::community::confession::ReportStatus>, _: i64) -> Result<Vec<crate::domain::entities::community::confession::ConfessionReport>, DomainError> { unimplemented!() }
+    async fn resolve_report(&self, _: uuid::Uuid, _: crate::domain::entities::community::confession::ReportStatus, _: String) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::community::confession::ConfessionConfig, DomainError> { unimplemented!() }
+    async fn save_config(&self, _: crate::domain::entities::community::confession::ConfessionConfig) -> Result<crate::domain::entities::community::confession::ConfessionConfig, DomainError> { unimplemented!() }
+}
+
 pub struct StubRolePanels;
 #[async_trait]
 impl ManageRolePanelsUseCase for StubRolePanels {
@@ -880,6 +903,7 @@ fn base_state() -> AppState {
         audit_logs_uc: Arc::new(StubAuditLogs),
         levels_uc: Arc::new(StubLevels),
         announcements_uc: Arc::new(StubAnnouncements),
+        confessions_uc: Arc::new(StubConfessions),
         role_panels_uc: Arc::new(StubRolePanels),
         notes_uc: Arc::new(StubNotes),
         reminders_uc: Arc::new(StubReminders),

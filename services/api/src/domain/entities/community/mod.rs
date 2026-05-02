@@ -1,5 +1,6 @@
 pub mod announcement;
 pub mod conduct;
+pub mod confession;
 pub mod daily_activity;
 pub mod guild_member;
 pub mod guild_member_reset;
