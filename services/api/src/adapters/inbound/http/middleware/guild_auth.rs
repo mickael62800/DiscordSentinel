@@ -85,25 +85,19 @@ pub async fn guild_auth_middleware(
 /// `/api/voice-channels/by-channel/{channel_id}` faisait passer le
 /// channel_id pour un guild_id et faisait echouer le guild_auth en 403.
 fn extract_guild_id_from_path(path: &str) -> Option<String> {
+    // Mots-cles qui designent un autre type de snowflake que guild_id
+    // (channel_id, user_id, message_id, link_id...). Le snowflake suivant
+    // doit etre ignore. Liste minimale et conservative : on n'inclut que
+    // les prefixes qui ne sont JAMAIS suivis d'un guild_id dans nos routes.
     const NON_GUILD_PREFIXES: &[&str] = &[
         "by-channel",
         "by-message",
         "by-user",
-        "channel",
-        "channels",
-        "message",
-        "messages",
-        "user",
-        "users",
-        "member",
-        "members",
+        "by-role",
         "co-admins",
         "bans",
-        "invites",
-        "themes",
-        "by-role",
-        "role",
-        "roles",
+        "user",
+        "users",
     ];
     let segments: Vec<&str> = path.split('/').collect();
     for (i, seg) in segments.iter().enumerate() {
