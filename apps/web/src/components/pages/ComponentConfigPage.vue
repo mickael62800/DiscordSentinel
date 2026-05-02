@@ -59,10 +59,11 @@ const roleFields = computed(() => configFields.value.filter((f) => f.type === "r
 const enumFields = computed(() => configFields.value.filter((f) => f.type === "enum"));
 
 /// Detecte les inputs textarea (multi-ligne) : par convention les cles
-/// finissant par "_message" sont rendues en <textarea> dans ConfigFieldRow.
-/// On les isole pour ne pas creer de decalage visuel avec les single-line.
+/// finissant par "_message" ou "_multipliers" sont rendues en <textarea>
+/// dans ConfigFieldRow. On les isole pour ne pas creer de decalage
+/// visuel avec les single-line.
 function isMultilineKey(k: string): boolean {
-  return k.endsWith("_message");
+  return k.endsWith("_message") || k.endsWith("_multipliers");
 }
 const longTextFields = computed(() =>
   configFields.value.filter((f) => f.type === "text" && isMultilineKey(f.key)),

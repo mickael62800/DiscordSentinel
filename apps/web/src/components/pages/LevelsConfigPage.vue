@@ -4,10 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { levelsService, type AddXpPayload } from "@/services/levelsService";
 import { conductService } from "@/services/conductService";
-import { botConfigService } from "@/services/botConfigService";
 import type { LevelConfig, ConductConfig } from "@/types";
-
-const PROGRESSION_BOT = "progression-bot";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -24,77 +21,6 @@ const levelsDraft = reactive({
   enabled: true,
 });
 const savingLevels = ref(false);
-
-// ── Multiplicateurs XP (lus/ecrits dans bot_guild_config bot=progression-bot) ──
-const multipliersDraft = reactive({
-  xp_channel_multipliers: "",
-  xp_role_multipliers: "",
-});
-const savingMultipliers = ref(false);
-
-async function fetchMultipliers() {
-  if (!guildIdFilter.value) return;
-  try {
-    const all = await botConfigService.getGuildConfig(guildIdFilter.value);
-    const ch = all.find((c) => c.bot_name === PROGRESSION_BOT && c.config_key === "xp_channel_multipliers");
-    const ro = all.find((c) => c.bot_name === PROGRESSION_BOT && c.config_key === "xp_role_multipliers");
-    multipliersDraft.xp_channel_multipliers = ch?.config_value ?? "";
-    multipliersDraft.xp_role_multipliers = ro?.config_value ?? "";
-  } catch (e) {
-    console.error("Erreur chargement multiplicateurs:", e);
-  }
-}
-
-/** Valide chaque ligne au format `id:multiplicateur` (id numerique, mult > 0). */
-function validateMultipliers(raw: string): { ok: boolean; firstError?: string } {
-  const lines = raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  for (const line of lines) {
-    const [idPart, multPart] = line.split(":").map((s) => s?.trim() ?? "");
-    if (!/^\d+$/.test(idPart)) return { ok: false, firstError: `ID invalide : "${line}"` };
-    const m = Number(multPart);
-    if (!Number.isFinite(m) || m <= 0) return { ok: false, firstError: `Multiplicateur invalide : "${line}"` };
-  }
-  return { ok: true };
-}
-
-async function saveMultipliers() {
-  if (!guildIdFilter.value) return;
-  const checks = [
-    validateMultipliers(multipliersDraft.xp_channel_multipliers),
-    validateMultipliers(multipliersDraft.xp_role_multipliers),
-  ];
-  for (const c of checks) {
-    if (!c.ok) {
-      showError(c.firstError ?? "Format invalide");
-      return;
-    }
-  }
-  savingMultipliers.value = true;
-  try {
-    if (multipliersDraft.xp_channel_multipliers.trim()) {
-      await botConfigService.set(
-        guildIdFilter.value, PROGRESSION_BOT, "xp_channel_multipliers",
-        multipliersDraft.xp_channel_multipliers.trim(),
-      );
-    } else {
-      await botConfigService.remove(guildIdFilter.value, PROGRESSION_BOT, "xp_channel_multipliers");
-    }
-    if (multipliersDraft.xp_role_multipliers.trim()) {
-      await botConfigService.set(
-        guildIdFilter.value, PROGRESSION_BOT, "xp_role_multipliers",
-        multipliersDraft.xp_role_multipliers.trim(),
-      );
-    } else {
-      await botConfigService.remove(guildIdFilter.value, PROGRESSION_BOT, "xp_role_multipliers");
-    }
-    success("Multiplicateurs XP enregistrés.");
-  } catch (e) {
-    console.error(e);
-    showError("Erreur sauvegarde multiplicateurs.");
-  } finally {
-    savingMultipliers.value = false;
-  }
-}
 
 const xpDraft = reactive<AddXpPayload>({
   guild_id: "",
@@ -248,12 +174,10 @@ async function syncBans() {
 onMounted(() => {
   fetchLevelsCfg();
   fetchConductCfg();
-  fetchMultipliers();
 });
 watch(guildIdFilter, () => {
   fetchLevelsCfg();
   fetchConductCfg();
-  fetchMultipliers();
 });
 </script>
 
@@ -303,45 +227,6 @@ watch(guildIdFilter, () => {
           <div class="actions full">
             <button type="submit" class="btn-primary" :disabled="savingLevels">
               {{ savingLevels ? "Enregistrement…" : "Enregistrer" }}
-            </button>
-          </div>
-        </form>
-      </section>
-
-      <!-- ── Multiplicateurs XP ── -->
-      <section class="card">
-        <h2>✖️ Multiplicateurs XP</h2>
-        <p class="hint">
-          Ajuste l'XP gagné dans certains salons ou par les utilisateurs portant
-          certains rôles. Format : <code>ID:multiplicateur</code> par ligne.
-          <strong>2.0</strong> = double XP, <strong>0.5</strong> = moitié.
-          Appliqué à la fois sur le texte et le vocal.
-        </p>
-        <form @submit.prevent="saveMultipliers" class="form">
-          <label class="full">
-            Multiplicateurs par <strong>salon</strong>
-            <textarea
-              v-model="multipliersDraft.xp_channel_multipliers"
-              rows="4"
-              placeholder="123456789012345678:2.0
-987654321098765432:0.5"
-            ></textarea>
-          </label>
-          <label class="full">
-            Multiplicateurs par <strong>rôle</strong>
-            <textarea
-              v-model="multipliersDraft.xp_role_multipliers"
-              rows="4"
-              placeholder="111222333444555666:2.0   (ex: rôle VIP)"
-            ></textarea>
-          </label>
-          <p class="hint">
-            <strong>Cumul</strong> : si un user VIP (rôle ×2) écrit dans un salon ×0.5, il gagne
-            <code>base × 0.5 × 2 = base</code> (XP normal). Combinaisons multiplicatives.
-          </p>
-          <div class="actions full">
-            <button type="submit" class="btn-primary" :disabled="savingMultipliers">
-              {{ savingMultipliers ? "Enregistrement…" : "Enregistrer les multiplicateurs" }}
             </button>
           </div>
         </form>
