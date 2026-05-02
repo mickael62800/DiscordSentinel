@@ -40,7 +40,7 @@ async function saveEditXp() {
   try {
     const body: { guild_id: string; user_id: string; xp_text?: number; xp_voice?: number } = {
       guild_id: selectedGuildId.value,
-      user_id: user.id,
+      user_id: user.user_id,
     };
     if (mode === "text") body.xp_text = xp;
     else if (mode === "voice") body.xp_voice = xp;
@@ -68,11 +68,11 @@ async function resetUserXp(user: UserLevel, target: "all" | "text" | "voice") {
     message: `Remettre a 0 ${labels[target]} pour ${user.username} ? Action irreversible.`,
   });
   if (!ok) return;
-  resetting.value = `${user.id}-${target}`;
+  resetting.value = `${user.user_id}-${target}`;
   try {
     await levelsService.resetUserXp({
       guild_id: selectedGuildId.value,
-      user_id: user.id,
+      user_id: user.user_id,
       target,
     });
     toastOk(`XP ${target} reset pour ${user.username}.`);
@@ -343,7 +343,7 @@ function levelToXp(level: number): string {
               </button>
               <button
                 class="action-btn reset"
-                :disabled="resetting === `${user.id}-${viewMode === 'global' ? 'all' : viewMode}`"
+                :disabled="resetting === `${user.user_id}-${viewMode === 'global' ? 'all' : viewMode}`"
                 :title="`Remettre a 0 l'XP ${viewMode === 'global' ? 'total' : viewMode === 'text' ? 'texte' : 'vocal'}`"
                 @click="resetUserXp(user, viewMode === 'global' ? 'all' : viewMode)"
               >
