@@ -83,7 +83,7 @@ pub async fn load_game_portal_config(
         rcon_port_range_end: parse_u16(find(&entries, "rcon_port_range_end"), 25799),
         allowed_templates: parse_csv(
             find(&entries, "allowed_templates"),
-            "minecraft-vanilla,valheim,terraria,factorio,palworld",
+            "minecraft-vanilla,valheim,terraria,factorio,palworld,ark,7dtd",
         ),
         default_idle_shutdown_days: parse_i32(find(&entries, "default_idle_shutdown_days"), 7),
         docker_network_name: parse_string(
