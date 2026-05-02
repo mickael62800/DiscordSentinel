@@ -150,6 +150,7 @@ watch(selectedGuildId, load);
                 v-for="r in ROLES_ORDER"
                 :key="r"
                 class="cell"
+                :data-role="r"
                 :class="{
                   on: matrix[def.key]?.[r],
                   off: !matrix[def.key]?.[r],
@@ -159,8 +160,8 @@ watch(selectedGuildId, load);
                 @click="toggle(def, r)"
                 :title="r === 'owner' ? 'Owner toujours visible' : (matrix[def.key]?.[r] ? 'Visible — clic pour cacher' : 'Caché — clic pour afficher')"
               >
-                <span v-if="matrix[def.key]?.[r]">✓</span>
-                <span v-else>✗</span>
+                <span class="cell-role-label">{{ r }}</span>
+                <span class="cell-icon">{{ matrix[def.key]?.[r] ? "✓" : "✗" }}</span>
               </td>
             </tr>
           </tbody>
@@ -259,4 +260,70 @@ watch(selectedGuildId, load);
   border-color: var(--accent);
 }
 .btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: white; }
+
+/* Label rôle visible uniquement en mobile (desktop = colonnes thead) */
+.cell-role-label { display: none; }
+
+@media (max-width: 768px) {
+  /* Convertit la table en cards verticales */
+  .vis-table thead { display: none; }
+  .vis-table,
+  .vis-table tbody,
+  .vis-table tr {
+    display: block;
+    width: 100%;
+  }
+  .vis-table tr {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+  }
+  .vis-table td {
+    display: block;
+    border-bottom: none;
+    padding: 4px 0;
+  }
+  .comp-cell {
+    margin-bottom: 8px;
+  }
+  /* Les 4 cells de rôle alignées en grid 2x2 */
+  .cell {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px !important;
+    border-radius: 6px;
+    text-align: left;
+  }
+  .cell-role-label {
+    display: inline-block;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .cell-icon {
+    font-size: 14px;
+  }
+  /* Espacement entre les rôles */
+  .cell + .cell {
+    margin-top: 4px;
+  }
+  .min-col,
+  .role-col {
+    width: auto;
+    text-align: left;
+  }
+  .vis-head {
+    flex-direction: column;
+  }
+  .vis-actions {
+    width: 100%;
+  }
+  .vis-actions .btn {
+    flex: 1;
+  }
+}
 </style>

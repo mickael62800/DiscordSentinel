@@ -301,16 +301,37 @@ onMounted(load);
 }
 
 @media (max-width: 640px) {
-  .grid-table {
-    font-size: 12px;
+  /* Convertit la table en cards verticales : 1 row = 1 card empilee. */
+  .grid-table thead {
+    display: none;
   }
-  .grid-table th,
+  .grid-table,
+  .grid-table tbody,
+  .grid-table tr {
+    display: block;
+    width: 100%;
+  }
+  .grid-table tr {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+  }
   .grid-table td {
-    padding: 6px 4px;
+    display: block;
+    padding: 4px 0;
+    border-bottom: none;
   }
   .role-select {
     min-width: 0;
     width: 100%;
+  }
+  .row-label {
+    font-size: 13px;
+  }
+  .row-key {
+    font-size: 10px;
   }
 }
 </style>

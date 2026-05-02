@@ -145,13 +145,14 @@ function roleVariant(role: RbacRole): BadgeVariant {
         message="Ajoutez un premier owner via SQL direct, ou via l'interface si vous etes deja owner."
       />
 
+      <div class="rbac-table-wrap">
       <table v-else class="rbac-table">
         <thead>
           <tr>
             <th>Utilisateur</th>
             <th>Role</th>
-            <th>Attribue le</th>
-            <th>Par</th>
+            <th class="col-meta">Attribue le</th>
+            <th class="col-meta">Par</th>
             <th v-if="canEdit">Actions</th>
           </tr>
         </thead>
@@ -165,7 +166,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
                   :alt="user.display_name"
                   class="avatar"
                 />
-                <div>
+                <div class="user-cell-text">
                   <strong>{{ user.display_name }}</strong>
                   <div class="user-id">{{ user.discord_user_id }}</div>
                 </div>
@@ -183,8 +184,8 @@ function roleVariant(role: RbacRole): BadgeVariant {
               </select>
               <AppBadge v-else :label="user.role" :variant="roleVariant(user.role)" />
             </td>
-            <td>{{ fmt(user.granted_at) }}</td>
-            <td>{{ user.granted_by ?? "—" }}</td>
+            <td class="col-meta">{{ fmt(user.granted_at) }}</td>
+            <td class="col-meta">{{ user.granted_by ?? "—" }}</td>
             <td v-if="canEdit">
               <button
                 class="btn-danger"
@@ -196,6 +197,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
           </tr>
         </tbody>
       </table>
+      </div>
 
       <button v-if="canView && !loading" class="btn-refresh" @click="refresh">
         \u{1f504} Actualiser
@@ -290,6 +292,30 @@ function roleVariant(role: RbacRole): BadgeVariant {
   -webkit-overflow-scrolling: touch;
 }
 
+.rbac-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.user-cell-text {
+  min-width: 0;
+  overflow: hidden;
+}
+.user-cell-text strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  /* Cache les colonnes Attribue le / Par sur mobile */
+  .col-meta {
+    display: none;
+  }
+}
+
 @media (max-width: 480px) {
   .add-form input[type="text"] {
     min-width: 0;
@@ -301,6 +327,14 @@ function roleVariant(role: RbacRole): BadgeVariant {
   }
   .rbac-table {
     font-size: 0.85rem;
+  }
+  .rbac-table th,
+  .rbac-table td {
+    padding: 0.5rem 0.6rem;
+  }
+  .user-id {
+    font-size: 0.7rem;
+    word-break: break-all;
   }
 }
 

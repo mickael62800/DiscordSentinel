@@ -1205,4 +1205,30 @@ watch(selectedComponent, loadFormValues);
   border-radius: 8px;
 }
 
+/* ── Responsive mobile (<= 640px) ───────────────────────────────────
+   Force 1 colonne sur les grilles de modules + 1 champ par ligne dans
+   le panneau de paramètres pour éviter les débordements catastrophiques. */
+@media (max-width: 640px) {
+  .component-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .component-card {
+    padding: 12px;
+  }
+  /* Toutes les grilles de fields (boolean / number / channel / role /
+     enum / text) passent en 1 colonne. Les selecteurs ciblent par
+     `grid-template-columns: repeat(...)` (toutes les grilles internes). */
+  [class*="-fields"],
+  [class*="-grid"]:not(.component-grid) {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+  /* Tous les inputs prennent 100% en mobile */
+  .form-input,
+  .form-input-number {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
 </style>
