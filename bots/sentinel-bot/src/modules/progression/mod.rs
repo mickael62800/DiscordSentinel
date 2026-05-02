@@ -198,8 +198,8 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
             .unwrap_or_default();
         let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
-        let raw = (seconds as f64 / 60.0) * xp_per_minute * channel_mult * role_mult;
-        let xp_amount = raw.round() as i64;
+        let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
+        let xp_amount = multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
         info!(
             guild = %guild_id, user = %user_id, channel = %channel_id,
             seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
@@ -377,9 +377,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
     let base_xp = BaseApiClient::config_u64(&guild_config, "xp_per_message", 15) as f64;
-    let final_xp = (base_xp * channel_mult * role_mult * streak_mult)
-        .round()
-        .clamp(1.0, 1000.0) as i64;
+    let final_xp = multipliers::calc_xp_amount(base_xp, channel_mult, role_mult, streak_mult, 1.0, 1000.0);
     info!(
         guild = %guild_id, user = %msg.author.id, channel = %msg.channel_id,
         base_xp, channel_mult, role_mult, streak_mult, final_xp,
@@ -544,8 +542,8 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                         } else {
                             (5.0, 1.0, 1.0)
                         };
-                        let raw_xp = (seconds as f64 / 60.0) * xp_per_minute * channel_mult * role_mult;
-                        let xp_amount = raw_xp.round() as i64;
+                        let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
+                        let xp_amount = multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
                         info!(
                             guild = %guild_id, user = %user_id, channel = %channel_id_str,
                             seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
