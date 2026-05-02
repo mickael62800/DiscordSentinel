@@ -44,10 +44,18 @@ const chartData = computed(() => {
     new Date(t).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit" }),
   );
 
+  // Palette de 8 couleurs bien distinctes (indigo / vert / orange / rose /
+  // cyan / violet / jaune / rouge). Suffisant pour ~8 disques montes ;
+  // au-dela on cycle mais c'est rare en prod (un host avec 8+ disques).
   const colors = [
-    { border: "rgba(99, 102, 241, 1)", bg: "rgba(99, 102, 241, 0.15)" },
-    { border: "rgba(34, 197, 94, 1)", bg: "rgba(34, 197, 94, 0.15)" },
-    { border: "rgba(249, 115, 22, 1)", bg: "rgba(249, 115, 22, 0.15)" },
+    { border: "rgba(99, 102, 241, 1)",  bg: "rgba(99, 102, 241, 0.15)" },  // indigo
+    { border: "rgba(34, 197, 94, 1)",   bg: "rgba(34, 197, 94, 0.15)" },   // vert
+    { border: "rgba(249, 115, 22, 1)",  bg: "rgba(249, 115, 22, 0.15)" },  // orange
+    { border: "rgba(236, 72, 153, 1)",  bg: "rgba(236, 72, 153, 0.15)" },  // rose
+    { border: "rgba(6, 182, 212, 1)",   bg: "rgba(6, 182, 212, 0.15)" },   // cyan
+    { border: "rgba(168, 85, 247, 1)",  bg: "rgba(168, 85, 247, 0.15)" },  // violet
+    { border: "rgba(234, 179, 8, 1)",   bg: "rgba(234, 179, 8, 0.15)" },   // jaune
+    { border: "rgba(239, 68, 68, 1)",   bg: "rgba(239, 68, 68, 0.15)" },   // rouge
   ];
 
   const datasets = Array.from(byMount.entries()).map(([mount, points], i) => {
