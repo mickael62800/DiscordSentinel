@@ -1,15 +1,88 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { botConfigService } from "@/services/botConfigService";
+import { levelsService } from "@/services/levelsService";
 import { useLevels } from "../../composables/useLevels";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useToast } from "../../composables/useToast";
+import { useConfirm } from "../../composables/useConfirm";
 import ErrorState from "../atoms/ErrorState.vue";
 import type { UserLevel, DiscordRole } from "../../types";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 
 const { config, leaderboard, rewards, roles, loading, error, fetchAll, setReward, deleteReward } = useLevels();
 const { selectedGuildId } = useGuildSelector();
-useRealtimeRefresh(["xp_gained"], fetchAll);
+const { success: toastOk, error: toastErr } = useToast();
+const { confirm } = useConfirm();
+useRealtimeRefresh(["xp_gained", "xp_admin_set", "xp_admin_reset"], fetchAll);
+
+// ── Admin overrides : edit XP / reset ──
+const editTarget = ref<{ user: UserLevel; mode: ViewMode } | null>(null);
+const editXpInput = ref<number>(0);
+const editing = ref(false);
+const resetting = ref<string | null>(null);
+
+function openEditModal(user: UserLevel, mode: ViewMode) {
+  editTarget.value = { user, mode };
+  editXpInput.value = mode === "text" ? user.xp_text : mode === "voice" ? user.xp_voice : (user.xp_text + user.xp_voice);
+}
+
+function closeEditModal() {
+  editTarget.value = null;
+  editXpInput.value = 0;
+}
+
+async function saveEditXp() {
+  if (!editTarget.value || !selectedGuildId.value) return;
+  const { user, mode } = editTarget.value;
+  const xp = Math.max(0, Math.floor(Number(editXpInput.value) || 0));
+  editing.value = true;
+  try {
+    const body: { guild_id: string; user_id: string; xp_text?: number; xp_voice?: number } = {
+      guild_id: selectedGuildId.value,
+      user_id: user.id,
+    };
+    if (mode === "text") body.xp_text = xp;
+    else if (mode === "voice") body.xp_voice = xp;
+    else {
+      // global : repartit equitablement
+      body.xp_text = Math.floor(xp / 2);
+      body.xp_voice = xp - Math.floor(xp / 2);
+    }
+    await levelsService.setUserXp(body);
+    toastOk(`XP ${mode} mis a jour pour ${user.username}.`);
+    closeEditModal();
+    await fetchAll();
+  } catch (e: unknown) {
+    toastErr(`Echec edit XP : ${(e as Error)?.message ?? e}`);
+  } finally {
+    editing.value = false;
+  }
+}
+
+async function resetUserXp(user: UserLevel, target: "all" | "text" | "voice") {
+  if (!selectedGuildId.value) return;
+  const labels = { all: "tout (texte + vocal)", text: "le texte", voice: "le vocal" };
+  const ok = await confirm({
+    title: `Reset ${labels[target]} de ${user.username}`,
+    message: `Remettre a 0 ${labels[target]} pour ${user.username} ? Action irreversible.`,
+  });
+  if (!ok) return;
+  resetting.value = `${user.id}-${target}`;
+  try {
+    await levelsService.resetUserXp({
+      guild_id: selectedGuildId.value,
+      user_id: user.id,
+      target,
+    });
+    toastOk(`XP ${target} reset pour ${user.username}.`);
+    await fetchAll();
+  } catch (e: unknown) {
+    toastErr(`Echec reset : ${(e as Error)?.message ?? e}`);
+  } finally {
+    resetting.value = null;
+  }
+}
 
 type ViewMode = "global" | "text" | "voice";
 type PageTab = "leaderboard" | "rewards";
@@ -260,6 +333,23 @@ function levelToXp(level: number): string {
               <span class="xp-total">{{ userXp(user).toLocaleString() }}</span>
               <span class="xp-label">XP {{ viewMode === 'text' ? 'texte' : viewMode === 'voice' ? 'vocal' : 'total' }}</span>
             </div>
+            <div class="user-actions">
+              <button
+                class="action-btn edit"
+                title="Modifier l'XP de cet utilisateur (selon l'onglet courant)"
+                @click="openEditModal(user, viewMode)"
+              >
+                ✎ Edit
+              </button>
+              <button
+                class="action-btn reset"
+                :disabled="resetting === `${user.id}-${viewMode === 'global' ? 'all' : viewMode}`"
+                :title="`Remettre a 0 l'XP ${viewMode === 'global' ? 'total' : viewMode === 'text' ? 'texte' : 'vocal'}`"
+                @click="resetUserXp(user, viewMode === 'global' ? 'all' : viewMode)"
+              >
+                ↺ Reset
+              </button>
+            </div>
           </div>
 
           <div v-if="leaderboard.length === 0" class="empty">
@@ -378,6 +468,40 @@ function levelToXp(level: number): string {
           </div>
       </template>
     </template>
+
+    <!-- Modale Edit XP -->
+    <div v-if="editTarget" class="modal-overlay" @click.self="closeEditModal">
+      <div class="modal-card">
+        <header class="modal-head">
+          <h3>
+            ✎ Modifier l'XP de <strong>{{ editTarget.user.username }}</strong>
+          </h3>
+          <button class="modal-close" @click="closeEditModal">×</button>
+        </header>
+        <div class="modal-body">
+          <p class="modal-hint">
+            Champ : <strong>XP {{ editTarget.mode === 'text' ? 'texte' : editTarget.mode === 'voice' ? 'vocal' : 'total (réparti texte+vocal)' }}</strong>.
+            Le niveau correspondant sera recalculé automatiquement.
+          </p>
+          <label class="modal-field">
+            <span>Nouvelle valeur XP</span>
+            <input
+              v-model.number="editXpInput"
+              type="number"
+              min="0"
+              step="1"
+              :disabled="editing"
+            />
+          </label>
+        </div>
+        <footer class="modal-foot">
+          <button class="btn-secondary" :disabled="editing" @click="closeEditModal">Annuler</button>
+          <button class="btn-primary" :disabled="editing" @click="saveEditXp">
+            {{ editing ? 'Enregistrement…' : 'Enregistrer' }}
+          </button>
+        </footer>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -876,4 +1000,87 @@ function levelToXp(level: number): string {
   padding: 40px;
   text-align: center;
 }
+
+/* ── Boutons admin Edit / Reset par ligne user ── */
+.user-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-left: 12px;
+}
+.action-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  white-space: nowrap;
+}
+.action-btn.edit:hover { color: var(--accent); border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.action-btn.reset { color: var(--danger, #ef4444); border-color: color-mix(in srgb, var(--danger, #ef4444) 40%, var(--border)); }
+.action-btn.reset:hover:not(:disabled) { background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent); border-color: var(--danger, #ef4444); }
+.action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Modale Edit XP ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%; max-width: 480px;
+  display: flex; flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h3 { margin: 0; font-size: 16px; }
+.modal-close {
+  background: transparent; border: 0; cursor: pointer;
+  font-size: 24px; line-height: 1; color: var(--text-secondary);
+  padding: 0 6px;
+}
+.modal-close:hover { color: var(--text-primary); }
+.modal-body { padding: 20px; }
+.modal-hint { font-size: 13px; color: var(--text-secondary); margin: 0 0 16px 0; }
+.modal-field {
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 13px; font-weight: 600;
+}
+.modal-field input {
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+}
+.modal-field input:focus { outline: none; border-color: var(--accent); }
+.modal-foot {
+  display: flex; justify-content: flex-end; gap: 10px;
+  padding: 14px 20px; border-top: 1px solid var(--border);
+}
+.modal-foot button {
+  padding: 8px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; font-weight: 600; border: 1px solid var(--border);
+}
+.modal-foot button:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary { background: transparent; color: var(--text-primary); }
+.btn-secondary:hover:not(:disabled) { background: var(--bg-hover); }
+.btn-primary {
+  background: var(--accent); color: white; border-color: var(--accent);
+}
+.btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
 </style>

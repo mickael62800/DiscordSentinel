@@ -43,4 +43,21 @@ export const levelsService = {
   deleteReward(guildId: string, level: number, source: string): Promise<unknown> {
     return httpDelete(`/api/levels/rewards/${guildId}/${level}${q({ source })}`);
   },
+  /** Admin override : set valeur exacte XP texte/voix (champs Option). */
+  setUserXp(body: {
+    guild_id: string;
+    user_id: string;
+    xp_text?: number;
+    xp_voice?: number;
+  }): Promise<UserLevel> {
+    return httpPost("/api/levels/admin/set-xp", body);
+  },
+  /** Admin override : reset XP a 0 (target = "all" / "text" / "voice"). */
+  resetUserXp(body: {
+    guild_id: string;
+    user_id: string;
+    target: "all" | "text" | "voice";
+  }): Promise<UserLevel> {
+    return httpPost("/api/levels/admin/reset-xp", body);
+  },
 };

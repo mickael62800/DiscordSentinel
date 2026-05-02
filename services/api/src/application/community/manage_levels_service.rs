@@ -12,7 +12,9 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_levels::ResetTarget;
 use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 use crate::ports::outbound::community::level_repository::LevelRepository;
 
 pub struct ManageLevelsService {
@@ -170,6 +172,73 @@ impl ManageLevelsUseCase for ManageLevelsService {
 
     async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError> {
         self.repo.delete_reward(guild_id, level, source).await
+    }
+
+    async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError> {
+        // Charge l'existant (404 si pas trouve : on force a passer par add_xp avant pour creer la ligne)
+        let mut user = self
+            .repo
+            .get_user_level(cmd.guild_id.as_ref(), cmd.user_id.as_ref())
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!(
+                "User {} n'a pas encore de progression sur la guild {}",
+                cmd.user_id.as_ref(), cmd.guild_id.as_ref()
+            )))?;
+
+        if let Some(xp_t) = cmd.xp_text {
+            if xp_t < 0 {
+                return Err(DomainError::ValidationError("xp_text doit etre >= 0".into()));
+            }
+            user.xp_text = xp_t;
+            user.level_text = level_from_xp(xp_t);
+        }
+        if let Some(xp_v) = cmd.xp_voice {
+            if xp_v < 0 {
+                return Err(DomainError::ValidationError("xp_voice doit etre >= 0".into()));
+            }
+            user.xp_voice = xp_v;
+            user.level_voice = level_from_xp(xp_v);
+        }
+        // Recalcule le total a partir des deux sources.
+        user.xp = user.xp_text + user.xp_voice;
+        user.level = level_from_xp(user.xp);
+        user.updated_at = Utc::now();
+
+        self.repo.upsert_user_level(&user).await?;
+        Ok(user)
+    }
+
+    async fn reset_user_xp(&self, guild_id: &str, user_id: &str, target: ResetTarget) -> Result<UserLevel, DomainError> {
+        let mut user = self
+            .repo
+            .get_user_level(guild_id, user_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!(
+                "User {user_id} n'a pas encore de progression sur la guild {guild_id}"
+            )))?;
+
+        match target {
+            ResetTarget::Text => {
+                user.xp_text = 0;
+                user.level_text = 0;
+            }
+            ResetTarget::Voice => {
+                user.xp_voice = 0;
+                user.level_voice = 0;
+            }
+            ResetTarget::All => {
+                user.xp_text = 0;
+                user.level_text = 0;
+                user.xp_voice = 0;
+                user.level_voice = 0;
+            }
+        }
+        user.xp = user.xp_text + user.xp_voice;
+        user.level = level_from_xp(user.xp);
+        user.updated_at = Utc::now();
+
+        self.repo.upsert_user_level(&user).await?;
+        Ok(user)
     }
 }
 

@@ -35,6 +35,23 @@ pub struct AddXpResult {
     pub source: XpSource,
 }
 
+/// Set la valeur exacte de l'XP texte et/ou voix d'un utilisateur.
+/// `None` = ne pas modifier ce champ. Les niveaux sont recalcules
+/// automatiquement depuis les nouvelles valeurs d'XP.
+pub struct SetUserXpCommand {
+    pub guild_id: GuildId,
+    pub user_id: UserId,
+    pub xp_text: Option<i64>,
+    pub xp_voice: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResetTarget {
+    All,
+    Text,
+    Voice,
+}
+
 #[async_trait]
 pub trait ManageLevelsUseCase: Send + Sync {
     async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError>;
@@ -47,4 +64,8 @@ pub trait ManageLevelsUseCase: Send + Sync {
     async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError>;
     async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError>;
     async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError>;
+    /// Set valeur exacte XP texte/voix (admin override). Recalcule les niveaux.
+    async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError>;
+    /// Reset XP a 0 sur la cible (text / voice / all). Recalcule les niveaux.
+    async fn reset_user_xp(&self, guild_id: &str, user_id: &str, target: ResetTarget) -> Result<UserLevel, DomainError>;
 }

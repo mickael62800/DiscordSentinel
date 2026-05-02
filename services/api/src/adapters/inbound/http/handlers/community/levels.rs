@@ -17,7 +17,11 @@ use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::community::level::XpSource;
+use crate::adapters::inbound::http::dto::community::levels::ResetUserXpDto;
+use crate::adapters::inbound::http::dto::community::levels::SetUserXpDto;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
+use crate::ports::inbound::community::manage_levels::ResetTarget;
+use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 
 pub async fn get_config(
     State(state): State<AppState>,
@@ -123,6 +127,64 @@ pub async fn delete_reward(
 #[derive(serde::Deserialize)]
 pub struct DeleteRewardParams {
     pub source: Option<String>,
+}
+
+pub async fn set_user_xp(
+    State(state): State<AppState>,
+    Json(dto): Json<SetUserXpDto>,
+) -> Result<Json<UserLevelDto>, ApiError> {
+    let guild_id = dto.guild_id.clone();
+    let user_id = dto.user_id.clone();
+    let user = state
+        .levels_uc
+        .set_user_xp(SetUserXpCommand {
+            guild_id: dto.guild_id,
+            user_id: dto.user_id,
+            xp_text: dto.xp_text,
+            xp_voice: dto.xp_voice,
+        })
+        .await?;
+    state.broadcaster.broadcast(
+        "xp_admin_set",
+        serde_json::json!({
+            "guild_id": &guild_id,
+            "user_id": &user_id,
+            "xp": user.xp,
+            "level": user.level,
+        }),
+    );
+    Ok(single_dto(user))
+}
+
+pub async fn reset_user_xp(
+    State(state): State<AppState>,
+    Json(dto): Json<ResetUserXpDto>,
+) -> Result<Json<UserLevelDto>, ApiError> {
+    let target = match dto.target.as_str() {
+        "text" => ResetTarget::Text,
+        "voice" => ResetTarget::Voice,
+        "all" => ResetTarget::All,
+        other => {
+            return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
+                format!("target invalide: {other} (attendu: all/text/voice)"),
+            )));
+        }
+    };
+    let guild_id = dto.guild_id.clone();
+    let user_id = dto.user_id.clone();
+    let user = state
+        .levels_uc
+        .reset_user_xp(&guild_id, &user_id, target)
+        .await?;
+    state.broadcaster.broadcast(
+        "xp_admin_reset",
+        serde_json::json!({
+            "guild_id": &guild_id,
+            "user_id": &user_id,
+            "target": dto.target,
+        }),
+    );
+    Ok(single_dto(user))
 }
 
 #[cfg(test)]

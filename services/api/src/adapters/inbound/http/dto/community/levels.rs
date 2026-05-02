@@ -48,6 +48,25 @@ pub struct AddXpDto {
 
 fn default_source() -> String { "text".to_string() }
 
+/// Set la valeur exacte XP texte/voix d'un user (admin override).
+/// Champs Option : non envoye = on ne touche pas a ce champ.
+#[derive(Debug, Deserialize)]
+pub struct SetUserXpDto {
+    pub guild_id: GuildId,
+    pub user_id: UserId,
+    pub xp_text: Option<i64>,
+    pub xp_voice: Option<i64>,
+}
+
+/// Reset XP d'un user (admin override).
+/// `target` = "all" / "text" / "voice".
+#[derive(Debug, Deserialize)]
+pub struct ResetUserXpDto {
+    pub guild_id: GuildId,
+    pub user_id: UserId,
+    pub target: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SetRewardDto {
     pub guild_id: GuildId,
