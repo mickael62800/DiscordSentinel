@@ -53,6 +53,7 @@ pub struct AppState {
     pub watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>,
     pub audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>,
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
+    pub announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase>,
     pub role_panels_uc: Arc<dyn ManageRolePanelsUseCase>,
     pub notes_uc: Arc<dyn ManageNotesUseCase>,
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,

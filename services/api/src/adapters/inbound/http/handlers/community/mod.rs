@@ -1,3 +1,4 @@
+pub mod announcements;
 pub mod conduct;
 pub mod discord_roles;
 pub mod guild_channels;

@@ -247,6 +247,24 @@ impl ManageLevelsUseCase for StubLevels {
     async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { unimplemented!() }
     async fn set_reward(&self, _: &str, _: i32, _: &str, _: XpSource) -> Result<LevelReward, DomainError> { unimplemented!() }
     async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { unimplemented!() }
+    async fn set_user_xp(&self, _: manage_levels::SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
+    async fn reset_user_xp(&self, _: &str, _: &str, _: manage_levels::ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
+}
+
+#[allow(dead_code)]
+pub struct StubAnnouncements;
+#[async_trait]
+impl crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase for StubAnnouncements {
+    async fn create(&self, _: crate::ports::inbound::community::manage_announcements::CreateAnnouncementCommand) -> Result<crate::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
+    async fn update(&self, _: crate::ports::inbound::community::manage_announcements::UpdateAnnouncementCommand) -> Result<crate::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
+    async fn delete(&self, _: uuid::Uuid) -> Result<(), DomainError> { unimplemented!() }
+    async fn get(&self, _: uuid::Uuid) -> Result<crate::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::community::announcement::ScheduledAnnouncement>, DomainError> { unimplemented!() }
+    async fn toggle(&self, _: uuid::Uuid, _: bool) -> Result<bool, DomainError> { unimplemented!() }
+    async fn fetch_due_and_prepare(&self, _: chrono::DateTime<chrono::Utc>, _: i64) -> Result<Vec<crate::ports::inbound::community::manage_announcements::RenderedAnnouncement>, DomainError> { unimplemented!() }
+    async fn record_run_result(&self, _: uuid::Uuid, _: Vec<crate::domain::entities::community::announcement::ChannelPostResult>) -> Result<(), DomainError> { unimplemented!() }
+    async fn preview(&self, _: uuid::Uuid) -> Result<crate::ports::inbound::community::manage_announcements::RenderedAnnouncement, DomainError> { unimplemented!() }
+    async fn list_runs(&self, _: uuid::Uuid, _: i64) -> Result<Vec<crate::domain::entities::community::announcement::AnnouncementRun>, DomainError> { unimplemented!() }
 }
 
 pub struct StubRolePanels;
@@ -859,6 +877,7 @@ fn base_state() -> AppState {
         watched_users_uc: Arc::new(StubWatchedUsers),
         audit_logs_uc: Arc::new(StubAuditLogs),
         levels_uc: Arc::new(StubLevels),
+        announcements_uc: Arc::new(StubAnnouncements),
         role_panels_uc: Arc::new(StubRolePanels),
         notes_uc: Arc::new(StubNotes),
         reminders_uc: Arc::new(StubReminders),

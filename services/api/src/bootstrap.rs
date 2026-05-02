@@ -369,6 +369,8 @@ pub async fn build_app_state(
     let daily_activity_repo = Arc::new(PgDailyActivityRepository::new(pg_pool.clone()));
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
     let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
+    let announcement_repo = Arc::new(crate::adapters::outbound::postgres::community::announcement_repository::PgAnnouncementRepository::new(pg_pool.clone()));
+    let announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase> = Arc::new(crate::application::community::manage_announcements_service::ManageAnnouncementsService::new(announcement_repo));
     let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
     let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
     let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo.clone()));
@@ -728,6 +730,7 @@ pub async fn build_app_state(
         watched_users_uc,
         audit_logs_uc,
         levels_uc,
+        announcements_uc,
         role_panels_uc,
         notes_uc,
         reminders_uc,

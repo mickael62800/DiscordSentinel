@@ -1,3 +1,4 @@
+pub mod manage_announcements;
 pub mod manage_conduct;
 pub mod manage_levels;
 pub mod manage_members;

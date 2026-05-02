@@ -1,3 +1,4 @@
+pub mod announcements;
 pub mod conduct;
 pub mod levels;
 pub mod role_panels;

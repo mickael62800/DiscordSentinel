@@ -55,10 +55,32 @@ fn auto_role_inner() -> Router<AppState> {
         .route("/{guild_id}/{role_id}", delete(handlers::community::role_panels::delete_auto_role))
 }
 
+fn announcement_inner() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::community::announcements::create_announcement))
+        .route("/{guild_id}", get(handlers::community::announcements::list_announcements))
+        .route(
+            "/by-id/{id}",
+            get(handlers::community::announcements::get_announcement)
+                .patch(handlers::community::announcements::update_announcement)
+                .delete(handlers::community::announcements::delete_announcement),
+        )
+        .route("/{id}/toggle", post(handlers::community::announcements::toggle_announcement))
+        .route("/{id}/preview", get(handlers::community::announcements::preview_announcement))
+        .route("/{id}/runs", get(handlers::community::announcements::list_runs))
+        // Worker / bot (interne)
+        .route("/internal/due", get(handlers::community::announcements::fetch_due))
+        .route(
+            "/internal/runs/{run_id}/result",
+            post(handlers::community::announcements::record_run_result),
+        )
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/api/conduct", conduct_inner())
         .nest("/api/levels", level_inner())
+        .nest("/api/announcements", announcement_inner())
         .nest("/api/role-panels", role_panel_inner())
         .nest("/api/auto-roles", auto_role_inner())
 }
