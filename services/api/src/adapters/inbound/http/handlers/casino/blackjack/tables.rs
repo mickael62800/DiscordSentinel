@@ -65,7 +65,16 @@ pub async fn join_table(
     }
 
     state.blackjack_table_repo.add_player(&table_id, &dto.user_id, &dto.user_name).await?;
-    state.blackjack_table_repo.touch_activity(&table_id).await.ok();
+    // touch_activity best-effort : si elle echoue, la table peut etre
+    // marquee inactive a tort par le worker cleanup. On log au moins.
+    if let Err(e) = state.blackjack_table_repo.touch_activity(&table_id).await {
+        tracing::warn!(
+            event_type = "blackjack.touch_activity_failed",
+            table_id = %table_id,
+            error = %e,
+            "Echec touch_activity : table risque d'etre nettoyee a tort"
+        );
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

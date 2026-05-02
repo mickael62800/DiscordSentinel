@@ -219,17 +219,57 @@ pub fn parse_csv_symbols(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// Parse "30,25,20" en vec d entiers (parse fail = 0).
+/// Parse "30,25,20" en vec d entiers. Une valeur invalide est traduite
+/// en 0 (pas de poids) mais loggee en warn pour que l'admin voit que
+/// sa config slot a un probleme. L'index est preserve (pas de skip)
+/// pour ne pas decaler les symboles.
 pub fn parse_csv_weights(s: &str) -> Vec<u32> {
     s.split(',')
-        .map(|p| p.trim().parse::<u32>().unwrap_or(0))
+        .enumerate()
+        .map(|(i, p)| {
+            let trimmed = p.trim();
+            match trimmed.parse::<u32>() {
+                Ok(v) => v,
+                Err(_) if !trimmed.is_empty() => {
+                    tracing::warn!(
+                        event_type = "slot.config_parse_error",
+                        kind = "weight",
+                        index = i,
+                        value = trimmed,
+                        "Slot config: poids invalide -> traite comme 0 (symbole {} ne sortira jamais)",
+                        i
+                    );
+                    0
+                }
+                _ => 0,
+            }
+        })
         .collect()
 }
 
-/// Parse "2.0,3,5.5" en vec de floats (parse fail = 0.0).
+/// Parse "2.0,3,5.5" en vec de floats. Idem parse_csv_weights pour les
+/// valeurs invalides : 0.0 + warning, index preserve.
 pub fn parse_csv_multipliers(s: &str) -> Vec<f64> {
     s.split(',')
-        .map(|p| p.trim().parse::<f64>().unwrap_or(0.0))
+        .enumerate()
+        .map(|(i, p)| {
+            let trimmed = p.trim();
+            match trimmed.parse::<f64>() {
+                Ok(v) => v,
+                Err(_) if !trimmed.is_empty() => {
+                    tracing::warn!(
+                        event_type = "slot.config_parse_error",
+                        kind = "multiplier",
+                        index = i,
+                        value = trimmed,
+                        "Slot config: multiplicateur invalide -> traite comme 0.0 (symbole {} ne paiera pas)",
+                        i
+                    );
+                    0.0
+                }
+                _ => 0.0,
+            }
+        })
         .collect()
 }
 

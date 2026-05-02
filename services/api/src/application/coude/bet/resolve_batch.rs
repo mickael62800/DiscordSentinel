@@ -198,6 +198,9 @@ impl ResolveBettingBatchService {
                 .ok();
 
             // Explosion : les 2 joueurs perdent explosion_loss chacun.
+            // BUG critique fix : les erreurs etaient warn-only, masquant des
+            // pertes/credits manques. On passe en error! avec event_type=
+            // "combat.wallet_inconsistency" pour visibilite dans Logs systeme.
             if explosion_loss > 0 {
                 let desc = format!("Explosion combat {}", combat.id);
                 if let Err(e) = self
@@ -205,14 +208,32 @@ impl ResolveBettingBatchService {
                     .debit(&combat.guild_id, &combat.attacker_id, explosion_loss, "coude_combat_explosion", &desc)
                     .await
                 {
-                    warn!(error = %e, "Echec debit attacker explosion");
+                    tracing::error!(
+                        event_type = "combat.wallet_inconsistency",
+                        combat_id = %combat.id,
+                        guild_id = %combat.guild_id,
+                        user_id = %combat.attacker_id,
+                        op = "debit_explosion_attacker",
+                        amount = explosion_loss,
+                        error = %e,
+                        "Echec debit attacker explosion : combat marque resolu mais joueur n'a pas perdu de pieces"
+                    );
                 }
                 if let Err(e) = self
                     .wallet_repo
                     .debit(&combat.guild_id, &combat.defender_id, explosion_loss, "coude_combat_explosion", &desc)
                     .await
                 {
-                    warn!(error = %e, "Echec debit defender explosion");
+                    tracing::error!(
+                        event_type = "combat.wallet_inconsistency",
+                        combat_id = %combat.id,
+                        guild_id = %combat.guild_id,
+                        user_id = %combat.defender_id,
+                        op = "debit_explosion_defender",
+                        amount = explosion_loss,
+                        error = %e,
+                        "Echec debit defender explosion : combat marque resolu mais joueur n'a pas perdu de pieces"
+                    );
                 }
                 // Migration #3 wallet : on utilise record_draw (counter-only
                 // apres migration) plutot que record_coins_lost (qui debite
@@ -342,6 +363,8 @@ impl ResolveBettingBatchService {
             .ok();
 
         // Transferts wallet
+        // BUG critique fix : warn! -> error! avec event_type clair pour
+        // detecter les incoherences (winner sans coins / loser non debite).
         let combat_desc = format!("Combat {winner_id} vs {loser_id}");
         if coins_transferred > 0 {
             if let Err(e) = self
@@ -349,7 +372,16 @@ impl ResolveBettingBatchService {
                 .credit(&combat.guild_id, &winner_id, coins_transferred, "coude_combat_win", &combat_desc)
                 .await
             {
-                warn!(error = %e, "Echec credit winner");
+                tracing::error!(
+                    event_type = "combat.wallet_inconsistency",
+                    combat_id = %combat.id,
+                    guild_id = %combat.guild_id,
+                    user_id = %winner_id,
+                    op = "credit_winner",
+                    amount = coins_transferred,
+                    error = %e,
+                    "Echec credit winner : combat marque gagne mais le winner n'a pas recu ses pieces"
+                );
             }
         }
         if actual_loss > 0 {
@@ -358,7 +390,16 @@ impl ResolveBettingBatchService {
                 .debit(&combat.guild_id, &loser_id, actual_loss, "coude_combat_loss", &combat_desc)
                 .await
             {
-                warn!(error = %e, "Echec debit loser");
+                tracing::error!(
+                    event_type = "combat.wallet_inconsistency",
+                    combat_id = %combat.id,
+                    guild_id = %combat.guild_id,
+                    user_id = %loser_id,
+                    op = "debit_loser",
+                    amount = actual_loss,
+                    error = %e,
+                    "Echec debit loser : combat marque perdu mais le loser n'a pas perdu de pieces"
+                );
             }
         }
 
@@ -390,14 +431,39 @@ impl ResolveBettingBatchService {
             let vol_capped = result.vol_coins.min(available);
             if vol_capped > 0 {
                 let vol_desc = format!("Vol chaos combat {}", combat.id);
-                let _ = self
+                // BUG critique fix : `let _` -> tracing::error! pour visibilite.
+                if let Err(e) = self
                     .wallet_repo
                     .debit(&combat.guild_id, &loser_id, vol_capped, "coude_combat_vol_victim", &vol_desc)
-                    .await;
-                let _ = self
+                    .await
+                {
+                    tracing::error!(
+                        event_type = "combat.wallet_inconsistency",
+                        combat_id = %combat.id,
+                        guild_id = %combat.guild_id,
+                        user_id = %loser_id,
+                        op = "vol_chaos_debit_victim",
+                        amount = vol_capped,
+                        error = %e,
+                        "Echec debit victime vol chaos : le winner sera quand meme credite"
+                    );
+                }
+                if let Err(e) = self
                     .wallet_repo
                     .credit(&combat.guild_id, &winner_id, vol_capped, "coude_combat_vol_bonus", &vol_desc)
-                    .await;
+                    .await
+                {
+                    tracing::error!(
+                        event_type = "combat.wallet_inconsistency",
+                        combat_id = %combat.id,
+                        guild_id = %combat.guild_id,
+                        user_id = %winner_id,
+                        op = "vol_chaos_credit_winner",
+                        amount = vol_capped,
+                        error = %e,
+                        "Echec credit winner vol chaos : la victime peut avoir ete debitee sans contrepartie"
+                    );
+                }
             }
         }
 

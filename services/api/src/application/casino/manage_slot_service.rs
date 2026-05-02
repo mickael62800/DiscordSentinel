@@ -59,11 +59,25 @@ impl ManageSlotService {
     /// Charge la config du bot 'slot-bot' pour la guild et la decode en
     /// `SlotConfig` typee. Fallback sur les defauts pour chaque cle absente.
     async fn load_config(&self, guild_id: &str) -> Result<SlotConfig, DomainError> {
-        let entries = self
+        // Bug fix : on retournait silencieusement les defauts si le repo
+        // plantait (DB down, permissions). L'admin pouvait croire que sa
+        // config slot etait active alors que les defauts l'ecrasaient.
+        let entries = match self
             .bot_config_repo
             .get_config(guild_id, MODULE_BOT_NAME)
             .await
-            .unwrap_or_default();
+        {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(
+                    event_type = "slot.config_load_failed",
+                    guild_id = %guild_id,
+                    error = %e,
+                    "Echec lecture config slot-bot, utilisation des defauts"
+                );
+                Vec::new()
+            }
+        };
 
         let mut cfg = SlotConfig::default();
         let mut symbols_raw: Option<String> = None;

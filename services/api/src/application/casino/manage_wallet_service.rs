@@ -59,14 +59,16 @@ impl ManageWalletService {
         Self { repo, taunts_uc }
     }
 
-    async fn read_balance(&self, guild_id: &str, user_id: &str) -> i64 {
-        self.repo
+    /// Lit le solde courant. Propage les erreurs DB plutot que de retourner
+    /// 0 silencieusement (qui causait des faux positifs faillite et des
+    /// payouts incorrects en cas de connection timeout).
+    async fn read_balance(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
+        Ok(self
+            .repo
             .get(guild_id, user_id)
-            .await
-            .ok()
-            .flatten()
+            .await?
             .map(|w| w.coins)
-            .unwrap_or(0)
+            .unwrap_or(0))
     }
 }
 
@@ -113,7 +115,7 @@ impl ManageWalletUseCase for ManageWalletService {
             ));
         }
 
-        let previous = self.read_balance(guild_id, user_id).await;
+        let previous = self.read_balance(guild_id, user_id).await?;
         let wallet = self
             .repo
             .credit(guild_id, user_id, amount, source, description)
@@ -152,7 +154,7 @@ impl ManageWalletUseCase for ManageWalletService {
             ));
         }
 
-        let previous = self.read_balance(guild_id, user_id).await;
+        let previous = self.read_balance(guild_id, user_id).await?;
         let wallet = self
             .repo
             .debit(guild_id, user_id, amount, source, description)
@@ -194,13 +196,13 @@ impl ManageWalletUseCase for ManageWalletService {
             ));
         }
 
-        let sender_before = self.read_balance(guild_id, from_user).await;
+        let sender_before = self.read_balance(guild_id, from_user).await?;
 
         self.repo
             .transfer(guild_id, from_user, to_user, amount, source, description)
             .await?;
 
-        let sender_after = self.read_balance(guild_id, from_user).await;
+        let sender_after = self.read_balance(guild_id, from_user).await?;
 
         let mut triggered = Vec::new();
 
@@ -219,7 +221,7 @@ impl ManageWalletUseCase for ManageWalletService {
     }
 
     async fn get_balance(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
-        Ok(self.read_balance(guild_id, user_id).await)
+        self.read_balance(guild_id, user_id).await
     }
 
     // ── Mode "tx en cours" ────────────────────────────────────────────────
