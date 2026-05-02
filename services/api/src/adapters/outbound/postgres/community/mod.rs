@@ -1,3 +1,4 @@
+pub mod announcement_repository;
 pub mod conduct_repository;
 pub mod daily_activity_repository;
 pub mod discord_role_repository;
