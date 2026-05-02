@@ -57,6 +57,7 @@ impl LevelRepository for MockRepo {
     async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { Ok(vec![]) }
     async fn upsert_reward(&self, _: &LevelReward) -> Result<(), DomainError> { Ok(()) }
     async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { Ok(()) }
+    async fn refresh_leaderboard_view(&self) -> Result<(), DomainError> { Ok(()) }
 }
 
 fn make_cmd(xp_per_msg: i32, xp_per_voice: i32, cooldown: i32) -> SaveLevelConfigCommand {
@@ -160,11 +161,17 @@ async fn add_xp_boundary_10000_accepted() {
 // ══════════════════════════════════════════════════════════
 
 #[tokio::test]
-async fn get_config_not_found_maps_to_domain_error() {
+async fn get_config_returns_defaults_when_repo_empty() {
+    // Comportement : pas de 404 sur une guild jamais sauve, on retourne
+    // les valeurs par defaut pour eviter de polluer la console frontend.
     let svc = make_svc();
-    let err = svc.get_config("ghost").await.unwrap_err();
-    assert!(matches!(err, DomainError::NotFound(_)));
-    assert!(format!("{err:?}").contains("ghost"));
+    let cfg = svc.get_config("ghost").await.unwrap();
+    assert_eq!(cfg.xp_per_message, 15);
+    assert_eq!(cfg.xp_per_voice_minute, 5);
+    assert_eq!(cfg.xp_cooldown_secs, 60);
+    assert!(cfg.enabled);
+    assert!(cfg.excluded_channels.is_empty());
+    assert!(cfg.level_up_channel_id.is_none());
 }
 
 #[tokio::test]

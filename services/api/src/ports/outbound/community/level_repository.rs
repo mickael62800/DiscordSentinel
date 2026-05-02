@@ -21,4 +21,8 @@ pub trait LevelRepository: Send + Sync {
     async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError>;
     async fn upsert_reward(&self, reward: &LevelReward) -> Result<(), DomainError>;
     async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError>;
+    /// Force le refresh de la vue materialized mv_level_leaderboard
+    /// (utilise apres une mutation admin set/reset XP pour que le
+    /// leaderboard cote frontend voit la valeur a jour immediatement).
+    async fn refresh_leaderboard_view(&self) -> Result<(), DomainError>;
 }

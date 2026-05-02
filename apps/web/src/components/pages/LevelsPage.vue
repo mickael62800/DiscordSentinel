@@ -35,6 +35,12 @@ function closeEditModal() {
 async function saveEditXp() {
   if (!editTarget.value || !selectedGuildId.value) return;
   const { user, mode } = editTarget.value;
+  // Garde-fou : on n'edite jamais le mode global directement.
+  // Global = texte + vocal, recalcule automatiquement par le backend.
+  if (mode === "global") {
+    toastErr("Le total n'est pas editable directement. Modifie l'XP texte ou l'XP vocal.");
+    return;
+  }
   const xp = Math.max(0, Math.floor(Number(editXpInput.value) || 0));
   editing.value = true;
   try {
@@ -43,12 +49,7 @@ async function saveEditXp() {
       user_id: user.user_id,
     };
     if (mode === "text") body.xp_text = xp;
-    else if (mode === "voice") body.xp_voice = xp;
-    else {
-      // global : repartit equitablement
-      body.xp_text = Math.floor(xp / 2);
-      body.xp_voice = xp - Math.floor(xp / 2);
-    }
+    else body.xp_voice = xp;
     await levelsService.setUserXp(body);
     toastOk(`XP ${mode} mis a jour pour ${user.username}.`);
     closeEditModal();
@@ -334,9 +335,13 @@ function levelToXp(level: number): string {
               <span class="xp-label">XP {{ viewMode === 'text' ? 'texte' : viewMode === 'voice' ? 'vocal' : 'total' }}</span>
             </div>
             <div class="user-actions">
+              <!-- Edit cache en mode Global : XP global = texte + vocal,
+                   donc on n'edite que les 2 sources separement (le total
+                   se recalcule automatiquement cote backend). -->
               <button
+                v-if="viewMode !== 'global'"
                 class="action-btn edit"
-                title="Modifier l'XP de cet utilisateur (selon l'onglet courant)"
+                :title="`Modifier l'XP ${viewMode === 'text' ? 'texte' : 'vocal'} de cet utilisateur`"
                 @click="openEditModal(user, viewMode)"
               >
                 ✎ Edit

@@ -320,4 +320,14 @@ impl LevelRepository for PgLevelRepository {
 
         Ok(())
     }
+
+    async fn refresh_leaderboard_view(&self) -> Result<(), DomainError> {
+        // CONCURRENTLY pour ne pas bloquer les lectures en cours.
+        // Necessite un index UNIQUE sur la MV (deja en place : (guild_id, user_id)).
+        sqlx::query("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_level_leaderboard")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(())
+    }
 }

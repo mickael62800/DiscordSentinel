@@ -107,5 +107,5 @@ fn user_history_to_proto(h: UserModerationHistory) -> proto::UserHistory {
 
 
 #[cfg(test)]
-#[path = "tests/moderation.rs"]
+#[path = "tests/actions.rs"]
 mod tests;

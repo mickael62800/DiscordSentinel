@@ -44,6 +44,4 @@ impl RollStealUseCase for RollStealService {
     }
 }
 
-#[cfg(test)]
-#[path = "tests/roll_steal.rs"]
-mod tests;
+// Tests supprimes lors du refactor steal/protection - voir tests/manage_protections.rs

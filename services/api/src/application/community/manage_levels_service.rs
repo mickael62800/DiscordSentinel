@@ -30,10 +30,25 @@ impl ManageLevelsService {
 #[async_trait]
 impl ManageLevelsUseCase for ManageLevelsService {
     async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError> {
-        self.repo
-            .get_config(guild_id)
-            .await?
-            .ok_or_else(|| DomainError::NotFound(format!("Config niveaux introuvable pour {guild_id}")))
+        // Si la guild n'a jamais sauve de config, on retourne les defauts au
+        // lieu d'un 404 — sinon le frontend pollue la console et l'admin est
+        // perdu pour comprendre comment "creer" la config initiale.
+        if let Some(cfg) = self.repo.get_config(guild_id).await? {
+            return Ok(cfg);
+        }
+        let now = Utc::now();
+        Ok(LevelConfig {
+            guild_id: guild_id.to_string().into(),
+            xp_per_message: 15,
+            xp_per_voice_minute: 5,
+            xp_cooldown_secs: 60,
+            level_up_channel_id: None,
+            level_up_message: "Bravo {user} ! Tu as atteint le niveau {level} !".into(),
+            excluded_channels: vec![],
+            enabled: true,
+            created_at: now,
+            updated_at: now,
+        })
     }
 
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
@@ -205,6 +220,9 @@ impl ManageLevelsUseCase for ManageLevelsService {
         user.updated_at = Utc::now();
 
         self.repo.upsert_user_level(&user).await?;
+        // Force la MV a jour pour que le leaderboard "global" voie la
+        // nouvelle valeur immediatement (sinon staleness ~5min).
+        let _ = self.repo.refresh_leaderboard_view().await;
         Ok(user)
     }
 
@@ -238,6 +256,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         user.updated_at = Utc::now();
 
         self.repo.upsert_user_level(&user).await?;
+        let _ = self.repo.refresh_leaderboard_view().await;
         Ok(user)
     }
 }
