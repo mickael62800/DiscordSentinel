@@ -43,7 +43,7 @@ pub async fn run_redis_subscriber(
                 logger.warn(
                     "Redis stream tail deconnecte, reconnexion...",
                     serde_json::json!({
-                        "event": "redis_disconnected",
+                        "event_type": "redis.disconnected",
                         "retry_delay_secs": delay,
                     }),
                 );
@@ -53,7 +53,7 @@ pub async fn run_redis_subscriber(
                 logger.error(
                     "Erreur Redis stream tail",
                     serde_json::json!({
-                        "event": "redis_error",
+                        "event_type": "redis.error",
                         "error": e.to_string(),
                         "retry_delay_secs": delay,
                     }),
@@ -81,7 +81,7 @@ async fn tail_loop(
     logger.info(
         "Redis stream tail connecte",
         serde_json::json!({
-            "event": "redis_connected",
+            "event_type": "redis.connected",
             "stream": stream_key,
         }),
     );
@@ -94,10 +94,38 @@ async fn tail_loop(
         .block(BLOCK_MS as usize)
         .count(BATCH_COUNT);
 
+    // Stats agregees pour eviter de spammer 1 log par event Discord
+    let mut events_broadcast: u64 = 0;
+    let mut payloads_invalid: u64 = 0;
+    let mut payloads_missing: u64 = 0;
+    let mut last_stats_log = std::time::Instant::now();
+    let stats_interval = std::time::Duration::from_secs(60);
+
     loop {
         let reply: Option<StreamReadReply> = conn
             .xread_options(&[stream_key], &[last_id.as_str()], &opts)
             .await?;
+
+        // Flush stats toutes les 60s — un log "alive" pour montrer que ca tourne
+        // + visibilite sur le throughput et les erreurs accumulees.
+        if last_stats_log.elapsed() >= stats_interval {
+            if events_broadcast + payloads_invalid + payloads_missing > 0 {
+                logger.info(
+                    "Stats gateway (60s)",
+                    serde_json::json!({
+                        "event_type": "gateway.stats",
+                        "events_broadcast": events_broadcast,
+                        "payloads_invalid": payloads_invalid,
+                        "payloads_missing": payloads_missing,
+                        "clients_connected": broadcaster.connected_count(),
+                    }),
+                );
+            }
+            events_broadcast = 0;
+            payloads_invalid = 0;
+            payloads_missing = 0;
+            last_stats_log = std::time::Instant::now();
+        }
 
         let Some(reply) = reply else { continue };
 
@@ -111,6 +139,7 @@ async fn tail_loop(
                     Some(redis::Value::SimpleString(s)) => s.clone(),
                     _ => {
                         warn!(entry_id = %entry.id, "Entry sans champ payload, ignoree");
+                        payloads_missing += 1;
                         last_id = entry.id.clone();
                         continue;
                     }
@@ -119,9 +148,22 @@ async fn tail_loop(
                 match serde_json::from_str::<WsEvent>(&payload_str) {
                     Ok(event) => {
                         broadcaster.broadcast(event);
+                        events_broadcast += 1;
                     }
                     Err(e) => {
                         warn!(error = %e, "Event stream invalide, ignore");
+                        payloads_invalid += 1;
+                        // 1er payload invalide -> log API (sinon flooding)
+                        if payloads_invalid == 1 {
+                            logger.warn(
+                                "Event Redis stream invalide",
+                                serde_json::json!({
+                                    "event_type": "gateway.payload_invalid",
+                                    "error": e.to_string(),
+                                    "preview": payload_str.chars().take(120).collect::<String>(),
+                                }),
+                            );
+                        }
                     }
                 }
 

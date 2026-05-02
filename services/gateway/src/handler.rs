@@ -93,7 +93,7 @@ async fn handle_socket(
     let clients = broadcaster.connected_count();
     info!(clients, client_ip = %client_ip, "WebSocket client connected");
     logger.info("Client WebSocket connecte", serde_json::json!({
-        "event": "client_connected",
+        "event_type": "websocket.client_connected",
         "client_ip": &client_ip,
         "total_clients": clients,
     }));
@@ -115,12 +115,23 @@ async fn handle_socket(
                             }
                             Err(e) => {
                                 warn!(error = %e, event_type = %ws_event.event, "Failed to serialize event");
+                                logger.warn("Echec serialisation event", serde_json::json!({
+                                    "event_type": "websocket.serialize_error",
+                                    "error": e.to_string(),
+                                    "ws_event_type": ws_event.event,
+                                    "client_ip": &client_ip,
+                                }));
                             }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                         warn!(skipped = n, client_ip = %client_ip, "Client lagged");
                         events_skipped += n;
+                        logger.warn("Client lagged (events skip)", serde_json::json!({
+                            "event_type": "websocket.client_lagged",
+                            "skipped": n,
+                            "client_ip": &client_ip,
+                        }));
                     }
                     Err(_) => break,
                 }
@@ -143,7 +154,7 @@ async fn handle_socket(
     let clients = broadcaster.connected_count();
     info!(clients, client_ip = %client_ip, events_relayed, events_skipped, "WebSocket client disconnected");
     logger.info("Client WebSocket deconnecte", serde_json::json!({
-        "event": "client_disconnected",
+        "event_type": "websocket.client_disconnected",
         "client_ip": &client_ip,
         "total_clients": clients,
         "events_relayed": events_relayed,

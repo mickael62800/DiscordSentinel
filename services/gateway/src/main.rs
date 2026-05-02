@@ -126,7 +126,7 @@ async fn main() {
         .expect("Impossible de bind le port");
 
     gw_logger.info("Gateway WebSocket demarree", serde_json::json!({
-        "event": "startup",
+        "event_type": "gateway.startup",
         "bind": config.bind_addr(),
         "max_connections": config.max_connections,
     }));
@@ -146,7 +146,7 @@ async fn main() {
     info!(timeout_secs = config.shutdown_timeout_secs, "Arret en cours, attente des connexions...");
     tokio::time::sleep(timeout).await;
 
-    gw_logger.warn("Gateway WebSocket arretee", serde_json::json!({"event": "shutdown"}));
+    gw_logger.warn("Gateway WebSocket arretee", serde_json::json!({"event_type": "gateway.shutdown"}));
 
     info!("Sentinel Gateway arrete proprement");
 }

@@ -311,7 +311,50 @@ pub fn load_env_bool(key: &str, default: bool) -> bool {
 
 // ── Periodic Scheduler ──
 
+/// Envoie un log structure d'execution de tache vers l'API (categorie "worker").
+/// Helper public reutilisable pour loguer du contexte applicatif depuis un job.
+pub async fn send_worker_log(
+    api_url: &str,
+    worker_name: &str,
+    level: &str,
+    job_name: &str,
+    message: &str,
+    details: serde_json::Value,
+) {
+    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    let client = reqwest::Client::new();
+    // Merge job dans les details pour retrouver facilement
+    let mut details_obj = match details {
+        serde_json::Value::Object(m) => m,
+        _ => serde_json::Map::new(),
+    };
+    details_obj.insert("job".to_string(), serde_json::Value::String(job_name.to_string()));
+    details_obj.insert("event_type".to_string(), serde_json::Value::String(format!("job.{}", level)));
+
+    let mut req = client
+        .post(format!("{}/api/logs", api_url))
+        .json(&serde_json::json!({
+            "level": level,
+            "bot": worker_name,
+            "message": message,
+            "category": "worker",
+            "details": serde_json::Value::Object(details_obj),
+        }));
+    if !api_key.is_empty() {
+        req = req.bearer_auth(&api_key);
+    }
+    if let Err(e) = req.send().await {
+        tracing::debug!(error = %e, worker = worker_name, "send_worker_log echec");
+    }
+}
+
 /// Lance une tache periodique avec gestion du shutdown et reporting d'erreurs.
+///
+/// Logs envoyes a l'API (categorie worker) :
+/// - 1 log "info" au boot (lifecycle)
+/// - 1 log "info" a chaque tick reussi avec duree + interval (`event_type: job.success`)
+/// - 1 log "warn" si la duree depasse 5s (job lent)
+/// - 1 log "error" sur Err(e) du job (`event_type: job.error`)
 pub fn spawn_periodic<F>(
     name: &'static str,
     interval_secs: u64,
@@ -328,20 +371,34 @@ pub fn spawn_periodic<F>(
     info!(task = name, interval_secs, "Tache periodique planifiee");
 
     tokio::spawn(async move {
-        let client = reqwest::Client::new();
-        let api_key = std::env::var("API_KEY").unwrap_or_default();
+        // Log boot (info) — confirme cote API que ce job tourne effectivement
+        send_worker_log(
+            &api_url,
+            worker_name,
+            "info",
+            name,
+            &format!("Job {} planifie (intervalle {}s)", name, interval_secs),
+            serde_json::json!({ "interval_secs": interval_secs, "event_type": "job.scheduled" }),
+        ).await;
+
         let interval = Duration::from_secs(interval_secs);
+        let slow_threshold = Duration::from_secs(5);
+        let mut tick_count: u64 = 0;
 
         loop {
             tokio::time::sleep(interval).await;
 
             if *shutdown.borrow() {
                 info!(task = name, "Tache periodique arretee (shutdown)");
+                send_worker_log(
+                    &api_url, worker_name, "info", name,
+                    &format!("Job {} arrete (shutdown)", name),
+                    serde_json::json!({ "ticks": tick_count, "event_type": "job.stopped" }),
+                ).await;
                 break;
             }
 
             // Verifie le flag enabled en DB avant chaque tick.
-            // Si toutes les guilds ont desactive ce worker, on skip la tache.
             if !is_worker_globally_enabled(&pool, worker_name).await {
                 tracing::debug!(
                     task = name,
@@ -351,25 +408,41 @@ pub fn spawn_periodic<F>(
                 continue;
             }
 
-            if let Err(e) = task_fn(pool.clone()).await {
-                error!(task = name, error = %e, "Erreur tache periodique");
-                let mut req = client
-                    .post(format!("{}/api/logs", api_url))
-                    .json(&serde_json::json!({
-                        "level": "error",
-                        "bot": worker_name,
-                        "message": format!("Erreur job {} : {}", name, e),
-                        "category": "worker",
-                        "details": {"job": name, "error": e.to_string()},
-                    }));
-                if !api_key.is_empty() {
-                    req = req.bearer_auth(&api_key);
+            tick_count += 1;
+            let start = std::time::Instant::now();
+            let result = task_fn(pool.clone()).await;
+            let elapsed = start.elapsed();
+            let elapsed_ms = elapsed.as_millis() as u64;
+
+            match result {
+                Ok(()) => {
+                    let level = if elapsed > slow_threshold { "warn" } else { "info" };
+                    let msg = if elapsed > slow_threshold {
+                        format!("Job {} lent ({} ms)", name, elapsed_ms)
+                    } else {
+                        format!("Job {} ok ({} ms)", name, elapsed_ms)
+                    };
+                    send_worker_log(
+                        &api_url, worker_name, level, name, &msg,
+                        serde_json::json!({
+                            "elapsed_ms": elapsed_ms,
+                            "tick": tick_count,
+                            "event_type": if elapsed > slow_threshold { "job.slow" } else { "job.success" },
+                        }),
+                    ).await;
                 }
-                if let Err(log_err) = req
-                    .send()
-                    .await
-                {
-                    warn!(error = %log_err, task = name, "Erreur envoi log d'erreur a l'API");
+                Err(e) => {
+                    error!(task = name, error = %e, elapsed_ms, "Erreur tache periodique");
+                    send_worker_log(
+                        &api_url, worker_name, "error", name,
+                        &format!("Erreur job {} : {}", name, e),
+                        serde_json::json!({
+                            "error": e.to_string(),
+                            "elapsed_ms": elapsed_ms,
+                            "tick": tick_count,
+                            "event_type": "job.error",
+                        }),
+                    ).await;
                 }
             }
         }
