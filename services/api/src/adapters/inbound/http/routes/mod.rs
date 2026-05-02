@@ -10,6 +10,7 @@ pub mod bot;
 pub mod bot_persistence;
 pub mod coude;
 pub mod dashboard;
+pub mod game_portal;
 pub mod games;
 pub mod members;
 pub mod moderation;

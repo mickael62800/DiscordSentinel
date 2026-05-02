@@ -71,6 +71,25 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
             default_role: Role::Owner, floor: Role::Moderator,
         });
 
+        // ── Game Portal ──────────────────────────────────────────────
+        m.insert("game.server.create", GateDef {
+            default_role: Role::Admin, floor: Role::Moderator,
+        });
+        m.insert("game.server.delete", GateDef {
+            default_role: Role::Owner, floor: Role::Admin,
+        });
+        m.insert("game.server.start_stop", GateDef {
+            default_role: Role::Moderator, floor: Role::Moderator,
+        });
+        m.insert("game.server.config_edit", GateDef {
+            default_role: Role::Admin, floor: Role::Moderator,
+        });
+        // RCON = console admin avec /op, /whitelist, /kick. Strictement
+        // owner par defaut, descendable a Admin maximum.
+        m.insert("game.server.command_rcon", GateDef {
+            default_role: Role::Owner, floor: Role::Admin,
+        });
+
         m
     })
 }

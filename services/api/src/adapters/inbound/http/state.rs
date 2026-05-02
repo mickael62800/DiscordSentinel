@@ -38,6 +38,8 @@ use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepos
 use crate::ports::outbound::system::guild_repository::GuildRepository;
 use crate::ports::outbound::system::log_repository::LogRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
+use crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 #[derive(Clone)]
 pub struct AppState {
     pub analyze_uc: Arc<dyn AnalyzeMessageUseCase>,
@@ -122,6 +124,9 @@ pub struct AppState {
     pub temp_role_repo: Arc<dyn crate::ports::outbound::community::temp_role_repository::TempRoleRepository>,
     pub pending_action_repo: Arc<dyn crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository>,
     pub blackjack_table_repo: Arc<dyn crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository>,
+    /// Game Portal : use cases lifecycle serveurs Docker.
+    pub game_servers_uc: Arc<dyn ManageGameServersUseCase>,
+    pub game_templates_uc: Arc<dyn ManageGameTemplatesUseCase>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

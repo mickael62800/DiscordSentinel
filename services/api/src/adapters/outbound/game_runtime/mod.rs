@@ -5,5 +5,6 @@
 //! - `redis_port_allocator` : impl PortAllocator via Redis SETNX.
 
 pub mod docker_runtime;
+pub mod noop_runtime;
 pub mod rcon_minecraft;
 pub mod redis_port_allocator;
