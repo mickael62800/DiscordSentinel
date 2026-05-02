@@ -1,5 +1,5 @@
 [package]
-name = "sentinel-game-portal-worker"
+name = "game-portal-worker"
 version = "0.1.0"
 edition = "2021"
 description = "Worker DiscordSentinel — orchestre le cycle de vie des serveurs Game Portal (health, idle shutdown, reconciler)"

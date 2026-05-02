@@ -36,7 +36,7 @@ struct JobReport {
 
 #[tokio::main]
 async fn main() {
-    common::init_tracing("info,sentinel_game_portal_worker=info");
+    common::init_tracing("info,game_portal_worker=info");
     let api_url = common::load_api_url();
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 

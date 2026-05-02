@@ -1069,6 +1069,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "game-portal-worker"
+version = "0.1.0"
+dependencies = [
+ "dotenvy",
+ "reqwest",
+ "sentinel-worker-common",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3296,21 +3311,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
-]
-
-[[package]]
-name = "sentinel-game-portal-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

@@ -557,7 +557,7 @@ services:
     build:
       <<: *build-alpine
       args:
-        BIN_NAME: sentinel-game-portal-worker
+        BIN_NAME: game-portal-worker
     healthcheck: *worker-healthcheck
     environment:
       <<: *worker-env
