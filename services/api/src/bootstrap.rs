@@ -756,15 +756,20 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
         ),
     );
+    let game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository> = Arc::new(
+        crate::adapters::outbound::postgres::game::player_session_repository::PgPlayerSessionRepository::new(pg_pool.clone()),
+    );
+    let game_server_repo_dyn: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository> = game_server_repo.clone();
+    let game_audit_repo_dyn: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository> = game_audit_repo.clone();
     let game_servers_uc: Arc<dyn crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase> = Arc::new(
         crate::application::game::manage_game_servers_service::ManageGameServersService {
             server_repo: game_server_repo,
             template_repo: game_template_repo,
             config_repo: game_config_repo,
             audit_repo: game_audit_repo,
-            container_runtime,
-            rcon_client,
-            port_allocator,
+            container_runtime: container_runtime.clone(),
+            rcon_client: rcon_client.clone(),
+            port_allocator: port_allocator.clone(),
             bot_config: bot_config_repo.clone(),
         },
     );
@@ -851,6 +856,12 @@ pub async fn build_app_state(
         blackjack_table_repo: Arc::new(PgBlackjackTableRepository::new(pg_pool.clone())),
         game_servers_uc,
         game_templates_uc,
+        game_server_repo: game_server_repo_dyn,
+        game_audit_repo: game_audit_repo_dyn,
+        game_session_repo,
+        game_container_runtime: container_runtime,
+        game_rcon_client: rcon_client,
+        game_port_allocator: port_allocator,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

@@ -127,6 +127,14 @@ pub struct AppState {
     /// Game Portal : use cases lifecycle serveurs Docker.
     pub game_servers_uc: Arc<dyn ManageGameServersUseCase>,
     pub game_templates_uc: Arc<dyn ManageGameTemplatesUseCase>,
+    /// Game Portal : adapters exposes pour les endpoints internes /jobs/*
+    /// appeles par game-portal-worker (health/idle/reconcile).
+    pub game_server_repo: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository>,
+    pub game_audit_repo: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository>,
+    pub game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository>,
+    pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,
+    pub game_rcon_client: Arc<dyn crate::ports::outbound::game::rcon_client::RconClient>,
+    pub game_port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

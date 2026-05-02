@@ -22,6 +22,7 @@ members = [
     "services/workers/coude-worker",
     "services/workers/discord-audit-sync-worker",
     "services/workers/export-worker",
+    "services/workers/game-portal-worker",
     "services/workers/moderation-worker",
     "services/workers/monitoring-worker",
     "services/workers/temp-roles-worker",

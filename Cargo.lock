@@ -3299,6 +3299,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentinel-game-portal-worker"
+version = "0.1.0"
+dependencies = [
+ "dotenvy",
+ "reqwest",
+ "sentinel-worker-common",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "sentinel-gateway"
 version = "0.1.0"
 dependencies = [

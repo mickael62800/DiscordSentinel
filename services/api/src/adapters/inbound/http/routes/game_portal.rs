@@ -59,5 +59,19 @@ pub fn routes() -> Router<AppState> {
             "/api/games/servers/{server_id}/command",
             post(handlers::game::servers::execute_rcon),
         )
+        // Endpoints internes pour game-portal-worker (auth via API key,
+        // pas de RBAC user — le worker est de confiance).
+        .route(
+            "/api/games/internal/jobs/health-check",
+            post(handlers::game::jobs::job_health_check),
+        )
+        .route(
+            "/api/games/internal/jobs/idle-shutdown",
+            post(handlers::game::jobs::job_idle_shutdown),
+        )
+        .route(
+            "/api/games/internal/jobs/reconcile",
+            post(handlers::game::jobs::job_reconcile),
+        )
 }
 

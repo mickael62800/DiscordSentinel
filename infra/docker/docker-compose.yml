@@ -552,6 +552,22 @@ services:
         condition: service_healthy
     networks: *worker-networks-internal
 
+  game-portal-worker:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-game-portal-worker
+    healthcheck: *worker-healthcheck
+    environment:
+      <<: *worker-env
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks: *worker-networks-internal
+
   coude-worker:
     <<: *rust-base
     build:
