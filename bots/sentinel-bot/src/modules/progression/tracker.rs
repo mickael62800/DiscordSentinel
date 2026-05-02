@@ -26,6 +26,9 @@ pub struct UserStats {
 struct VoiceSession {
     active_since: Option<i64>,
     credited_seconds: u64,
+    /// ID du channel vocal courant. Sert a appliquer le multiplicateur
+    /// XP du salon (xp_channel_multipliers) au moment du credit.
+    channel_id: u64,
 }
 
 /// Tracker in-memory pour les messages et le temps vocal.
@@ -56,7 +59,7 @@ impl StatsTracker {
     /// `is_afk` = true si l'utilisateur arrive deja self_mute + self_deaf :
     /// dans ce cas la session demarre en pause et aucun temps n'est compte
     /// tant qu'il n'est pas sorti de l'AFK.
-    pub async fn voice_join(&self, guild_id: u64, user_id: u64, is_afk: bool) {
+    pub async fn voice_join(&self, guild_id: u64, user_id: u64, channel_id: u64, is_afk: bool) {
         let mut sessions = self.voice_sessions.write().await;
         let active_since = if is_afk { None } else { Some(Utc::now().timestamp()) };
         sessions.insert(
@@ -64,8 +67,28 @@ impl StatsTracker {
             VoiceSession {
                 active_since,
                 credited_seconds: 0,
+                channel_id,
             },
         );
+    }
+
+    /// Met a jour le channel courant d'une session existante (ex: l'user
+    /// change de salon vocal sans quitter le serveur). Permet d'appliquer
+    /// le bon multiplicateur au prochain tick / voice_leave.
+    pub async fn set_voice_channel(&self, guild_id: u64, user_id: u64, channel_id: u64) {
+        let mut sessions = self.voice_sessions.write().await;
+        if let Some(s) = sessions.get_mut(&(guild_id, user_id)) {
+            // Si l'utilisateur etait actif dans l'ancien channel, on credite
+            // le tail dans `credited_seconds` AVANT de changer pour appliquer
+            // le bon multiplicateur a l'XP courante.
+            if let Some(since) = s.active_since {
+                let now = Utc::now().timestamp();
+                let delta = (now - since).max(0) as u64;
+                s.credited_seconds = s.credited_seconds.saturating_add(delta);
+                s.active_since = Some(now);
+            }
+            s.channel_id = channel_id;
+        }
     }
 
     /// Met a jour l'etat AFK d'un utilisateur encore en vocal. Fait la
@@ -101,7 +124,7 @@ impl StatsTracker {
     ///
     /// Ne touche pas a `credited_seconds` (reserve aux transitions AFK)
     /// pour eviter un double paiement lors du `voice_leave` final.
-    pub async fn credit_active_sessions(&self) -> Vec<(u64, u64, u64)> {
+    pub async fn credit_active_sessions(&self) -> Vec<(u64, u64, u64, u64)> {
         let mut sessions = self.voice_sessions.write().await;
         let now = Utc::now().timestamp();
         let mut credited = Vec::new();
@@ -109,7 +132,7 @@ impl StatsTracker {
             if let Some(since) = session.active_since {
                 let delta = (now - since).max(0) as u64;
                 if delta > 0 {
-                    credited.push((*gid, *uid, delta));
+                    credited.push((*gid, *uid, delta, session.channel_id));
                     session.active_since = Some(now);
                 }
             }
@@ -121,16 +144,18 @@ impl StatsTracker {
     /// au demarrage du bot, pour ne pas perdre le temps des users
     /// deja en vocal quand le bot redemarre. Idempotent : n'ecrase pas
     /// une session existante.
-    pub async fn hydrate(&self, guild_id: u64, user_id: u64, is_afk: bool) {
+    pub async fn hydrate(&self, guild_id: u64, user_id: u64, channel_id: u64, is_afk: bool) {
         let mut sessions = self.voice_sessions.write().await;
         sessions.entry((guild_id, user_id)).or_insert_with(|| {
             let active_since = if is_afk { None } else { Some(Utc::now().timestamp()) };
             VoiceSession {
                 active_since,
                 credited_seconds: 0,
+                channel_id,
             }
         });
     }
+
 
     /// Enregistre la sortie d'un utilisateur du salon vocal, cumule le temps
     /// actif (hors AFK) et retourne les secondes comptabilisees pour l'XP.
@@ -258,7 +283,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_join_afk_then_leave_gives_zero() {
         let tracker = StatsTracker::new();
-        tracker.voice_join(1, 100, true).await;
+        tracker.voice_join(1, 100, 0, true).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let duration = tracker.voice_leave(1, 100).await;
         assert_eq!(duration, 0, "une session entierement AFK ne doit pas crediter de temps");
@@ -267,7 +292,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_active_then_afk_credit_preserved() {
         let tracker = StatsTracker::new();
-        tracker.voice_join(1, 100, false).await;
+        tracker.voice_join(1, 100, 0, false).await;
         // bascule AFK immediatement : le tail actif (~0s) est credit
         tracker.set_voice_afk(1, 100, true).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
@@ -279,7 +304,7 @@ mod tests {
     #[tokio::test]
     async fn test_voice_join_then_leave() {
         let tracker = StatsTracker::new();
-        tracker.voice_join(1, 100, false).await;
+        tracker.voice_join(1, 100, 0, false).await;
         // Sleep tres court pour avoir une duree > 0
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let duration = tracker.voice_leave(1, 100).await;
