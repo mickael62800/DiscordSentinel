@@ -48,6 +48,18 @@ async fn main() {
     run_migrations(&pg_pool).await;
 
     let redis_client = bootstrap::connect_redis(&config).await;
+
+    // Invalide le cache des definitions de bots au boot. Les definitions
+    // viennent de migrations SQL (bot_definitions) — sans ca, l'ajout d'un
+    // nouveau bot/worker via migration reste invisible jusqu'a expiration
+    // du TTL Redis (1h).
+    {
+        use redis::AsyncCommands;
+        if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
+            let _ = conn.del::<_, ()>("bot:definitions").await;
+        }
+    }
+
     let state = bootstrap::build_app_state(&config, pg_pool.clone(), redis_client).await;
     bootstrap::spawn_security_workers(&state);
 

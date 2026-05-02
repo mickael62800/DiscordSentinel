@@ -79,14 +79,43 @@ pub async fn guild_auth_middleware(
 /// Cherche `{guild_id}` dans le path. Heuristique : on prend le premier
 /// segment qui ressemble a un Discord snowflake (uniquement des chiffres,
 /// 17-20 caracteres).
+///
+/// Skip les segments precedes d'un mot-cle qui designe un autre type de
+/// snowflake (channel_id, user_id, message_id...). Sans ca, une URL comme
+/// `/api/voice-channels/by-channel/{channel_id}` faisait passer le
+/// channel_id pour un guild_id et faisait echouer le guild_auth en 403.
 fn extract_guild_id_from_path(path: &str) -> Option<String> {
-    path.split('/').find_map(|seg| {
+    const NON_GUILD_PREFIXES: &[&str] = &[
+        "by-channel",
+        "by-message",
+        "by-user",
+        "channel",
+        "channels",
+        "message",
+        "messages",
+        "user",
+        "users",
+        "member",
+        "members",
+        "co-admins",
+        "bans",
+        "invites",
+        "themes",
+        "by-role",
+        "role",
+        "roles",
+    ];
+    let segments: Vec<&str> = path.split('/').collect();
+    for (i, seg) in segments.iter().enumerate() {
         if seg.len() >= 17 && seg.len() <= 20 && seg.chars().all(|c| c.is_ascii_digit()) {
-            Some(seg.to_string())
-        } else {
-            None
+            let prev = if i > 0 { segments[i - 1] } else { "" };
+            if NON_GUILD_PREFIXES.contains(&prev) {
+                continue;
+            }
+            return Some(seg.to_string());
         }
-    })
+    }
+    None
 }
 
 async fn get_or_fetch_user_guilds(

@@ -374,13 +374,37 @@ async fn lookup_role(state: &AppState, user_id: &str, guild_id: &str) -> Result<
 /// snowflake Discord (17-20 chiffres). Duplique de guild_auth pour eviter
 /// une dependance inter-middleware.
 fn extract_guild_id_from_path(path: &str) -> Option<String> {
-    path.split('/').find_map(|seg| {
+    const NON_GUILD_PREFIXES: &[&str] = &[
+        "by-channel",
+        "by-message",
+        "by-user",
+        "channel",
+        "channels",
+        "message",
+        "messages",
+        "user",
+        "users",
+        "member",
+        "members",
+        "co-admins",
+        "bans",
+        "invites",
+        "themes",
+        "by-role",
+        "role",
+        "roles",
+    ];
+    let segments: Vec<&str> = path.split('/').collect();
+    for (i, seg) in segments.iter().enumerate() {
         if seg.len() >= 17 && seg.len() <= 20 && seg.chars().all(|c| c.is_ascii_digit()) {
-            Some(seg.to_string())
-        } else {
-            None
+            let prev = if i > 0 { segments[i - 1] } else { "" };
+            if NON_GUILD_PREFIXES.contains(&prev) {
+                continue;
+            }
+            return Some(seg.to_string());
         }
-    })
+    }
+    None
 }
 
 fn short_hash(input: &str) -> String {
