@@ -86,9 +86,11 @@ pub async fn get_expired_combats(
 /// POST /api/coude/{guild_id}/combats
 pub async fn create_combat(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<CreateCombatDto>,
 ) -> Result<Json<FullCombatDto>, ApiError> {
+    check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour create_combat").await?;
     let combat = state
         .coude_combats_uc
         .create(NewCoudeCombat {
@@ -148,10 +150,14 @@ pub async fn cancel_combat(
 /// POST /api/coude/combats/{combat_id}/resolve
 pub async fn resolve_combat(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
     Json(dto): Json<ResolveCombatDto>,
 ) -> Result<StatusCode, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour resolve_combat").await?;
+    }
     state
         .coude_combats_uc
         .resolve(
@@ -173,10 +179,14 @@ pub async fn resolve_combat(
 /// POST /api/coude/combats/{combat_id}/betting
 pub async fn set_combat_betting(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
     Json(dto): Json<SetBettingDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour set_combat_betting").await?;
+    }
     let success = state
         .coude_combats_uc
         .set_betting(id, &dto.message_id)
@@ -187,9 +197,13 @@ pub async fn set_combat_betting(
 /// POST /api/coude/combats/{combat_id}/expire
 pub async fn expire_combat(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour expire_combat").await?;
+    }
     state.coude_combats_uc.expire(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

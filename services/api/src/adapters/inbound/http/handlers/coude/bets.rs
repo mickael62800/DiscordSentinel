@@ -85,10 +85,15 @@ pub async fn get_betting_combat(
 /// Résolution pari-mutuel 15% de commission (10% vainqueur / 5% perdant, 85% aux parieurs).
 pub async fn resolve_bets(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
     Json(dto): Json<ResolveBetsDto>,
 ) -> Result<Json<ResolveBetsResponse>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    // Gate Moderator+: lookup guild_id du combat puis check role.
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour resolve_bets").await?;
+    }
     let outcome = state.coude_bets_uc.resolve(id, dto.winner_id).await?;
     let mut resp: ResolveBetsResponse = outcome.plan.into();
     resp.taunt_events = outcome
@@ -102,9 +107,13 @@ pub async fn resolve_bets(
 /// POST /api/coude/combats/{combat_id}/refund-bets
 pub async fn refund_bets(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour refund_bets").await?;
+    }
     let summary = state.coude_bets_uc.refund(id).await?;
     Ok(Json(serde_json::json!({
         "refunded_count": summary.refunded_count,
