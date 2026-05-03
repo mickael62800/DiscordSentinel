@@ -1,14 +1,23 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{ConnectInfo, Query, State, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use subtle::ConstantTimeEq;
+use tokio::sync::Mutex;
 use tracing::{info, warn};
 
 use crate::broadcaster::EventBroadcaster;
 use crate::logger::GatewayLogger;
+
+/// Cache local des tokens Discord deja valides (TTL 5 min). Evite de
+/// hit l'API sur chaque reconnexion WS (les clients reconnect souvent).
+const TOKEN_CACHE_TTL: Duration = Duration::from_secs(300);
+
+#[derive(Clone)]
+pub struct CachedAuth { authorized: bool, expires_at: Instant }
 
 /// WebSocket close code: "Try Again Later" (server at capacity)
 const WS_CLOSE_TRY_AGAIN_LATER: u16 = 1013;
@@ -27,7 +36,56 @@ pub struct WsQuery {
 pub struct GatewayState {
     pub broadcaster: Arc<EventBroadcaster>,
     pub api_key: String,
+    pub api_url: String,
     pub logger: Arc<GatewayLogger>,
+    pub http_client: reqwest::Client,
+    pub token_cache: Arc<Mutex<std::collections::HashMap<String, CachedAuth>>>,
+}
+
+/// Verifie via l'API que le token Discord appartient a un user whitelist.
+/// Cache 5min en memoire pour eviter le round-trip a chaque reconnexion.
+async fn discord_token_authorized(state: &GatewayState, discord_token: &str) -> bool {
+    // Cache check
+    {
+        let cache = state.token_cache.lock().await;
+        if let Some(cached) = cache.get(discord_token) {
+            if cached.expires_at > Instant::now() {
+                return cached.authorized;
+            }
+        }
+    }
+
+    // Hit /api/auth/check-access avec Bearer API_KEY (services internes)
+    // + X-Discord-Token. L'API renvoie 200/403 selon le whitelist.
+    let url = format!("{}/api/auth/check-access", state.api_url.trim_end_matches('/'));
+    let result = state
+        .http_client
+        .get(&url)
+        .bearer_auth(&state.api_key)
+        .header("x-discord-token", discord_token)
+        .send()
+        .await;
+
+    let authorized = match result {
+        Ok(resp) => resp.status().is_success(),
+        Err(e) => {
+            warn!(error = %e, "check-access call failed -> deny WS auth");
+            false
+        }
+    };
+
+    // Cache resultat (positif ou negatif).
+    let mut cache = state.token_cache.lock().await;
+    cache.insert(
+        discord_token.to_string(),
+        CachedAuth { authorized, expires_at: Instant::now() + TOKEN_CACHE_TTL },
+    );
+    // Nettoyage opportuniste : retire les entrees expirees pour eviter une
+    // croissance illimitee si beaucoup de tokens differents transitent.
+    let now = Instant::now();
+    cache.retain(|_, v| v.expires_at > now);
+
+    authorized
 }
 
 /// Handler WebSocket — auth via query param ?token=
@@ -50,11 +108,18 @@ pub async fn ws_handler(
             .as_ref()
             .map(|t| t.as_bytes().ct_eq(state.api_key.as_bytes()).into())
             .unwrap_or(false);
-        let valid_discord_token = query
-            .discord_token
-            .as_ref()
-            .map(|t| !t.is_empty())
-            .unwrap_or(false);
+        // Plus d'acceptation aveugle d'un token Discord non-vide : on hit
+        // /api/auth/check-access pour valider que le user est dans la
+        // whitelist (api_user_guilds OU SUPERADMIN_USER_IDS). Sans ca, un
+        // user Discord random pourrait sniffer tous les events de toutes
+        // les guilds (infractions, bans, etc.) en temps reel.
+        let valid_discord_token = if valid_api_key {
+            false // pas besoin, deja autorise via API key
+        } else if let Some(t) = query.discord_token.as_deref() {
+            !t.is_empty() && discord_token_authorized(&state, t).await
+        } else {
+            false
+        };
         if !valid_api_key && !valid_discord_token {
             warn!(client_ip = %addr, "WebSocket rejected: no valid auth (token or discord_token)");
             return StatusCode::UNAUTHORIZED.into_response();

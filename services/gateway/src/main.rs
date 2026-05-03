@@ -84,7 +84,13 @@ async fn main() {
     let ws_state = GatewayState {
         broadcaster: broadcaster.clone(),
         api_key: config.api_key.clone(),
+        api_url: config.api_url.clone(),
         logger: gw_logger.clone(),
+        http_client: reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .expect("reqwest client"),
+        token_cache: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
     };
 
     let trace_layer = TraceLayer::new_for_http()
