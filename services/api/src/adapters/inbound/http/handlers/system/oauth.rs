@@ -96,8 +96,15 @@ pub async fn authorize(State(state): State<AppState>) -> Response {
         }
     }
 
+    // PAS de `prompt=none` ici : Discord refuse silencieusement avec
+    // ?error=login_required quand la session navigateur a expire ou
+    // que l'app a ete revoquee, ce qui pieges les users dans une boucle
+    // /login -> Discord -> /login?error=login_required. Le default
+    // Discord (pas de prompt explicite) est exactement ce qu'on veut :
+    // re-auth silencieuse si app deja autorisee + session active,
+    // consent screen sinon.
     let url = format!(
-        "{}?response_type=code&client_id={}&scope={}&redirect_uri={}&state={}&prompt=none",
+        "{}?response_type=code&client_id={}&scope={}&redirect_uri={}&state={}",
         DISCORD_AUTHORIZE_URL,
         percent_encode(&state.discord_oauth_client_id),
         percent_encode(OAUTH_SCOPES),
