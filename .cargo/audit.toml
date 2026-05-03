@@ -1,0 +1,20 @@
+# Configuration cargo-audit : advisories transitives non-exploitables dans
+# notre contexte. Reverifier a chaque bump majeur de serenity / tokenizers.
+
+[advisories]
+ignore = [
+  # rustls-webpki 0.102 via serenity 0.12 -> tokio-tungstenite 0.21.
+  # Notre seul usage = validation cert TLS Discord pour le gateway WS.
+  # Discord n'utilise ni CRL, ni name constraints URI/wildcards => CVEs N/A.
+  "RUSTSEC-2025-0061",
+  "RUSTSEC-2026-0049",
+  "RUSTSEC-2026-0098",
+  "RUSTSEC-2026-0099",
+  "RUSTSEC-2026-0104",
+  # rsa Marvin attack -> tire par sqlx-mysql via proc-macro sqlx-macros.
+  # Compile-time uniquement, jamais linke dans le binaire runtime.
+  "RUSTSEC-2023-0071",
+  # paste, rustls-pemfile : warnings unmaintained, pas de CVE active.
+  "RUSTSEC-2024-0436",
+  "RUSTSEC-2025-0134",
+]

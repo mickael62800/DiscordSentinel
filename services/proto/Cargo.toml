@@ -9,9 +9,9 @@ name = "sentinel_proto"
 path = "src/lib.rs"
 
 [dependencies]
-tonic = { version = "0.12", features = ["transport", "codegen", "prost"] }
+tonic = { version = "0.13", features = ["transport", "codegen", "prost", "server", "router", "tls-ring"] }
 prost = "0.13"
 
 [build-dependencies]
-tonic-build = { version = "0.12", default-features = false, features = ["prost", "transport"] }
+tonic-build = { version = "0.13", default-features = false, features = ["prost", "transport"] }
 protoc-bin-vendored = "3.1"

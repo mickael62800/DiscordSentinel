@@ -49,7 +49,7 @@ reqwest = { workspace = true }
 # gRPC interne (Phase 7A) — coexistence avec Axum sur un port distinct.
 # Phase 7A optimisations : compression Gzip + tonic-health pour healthcheck.
 tonic = { workspace = true }
-tonic-health = "0.12"
+tonic-health = "0.13"
 prost = { workspace = true }
 sentinel-proto = { workspace = true }
 
