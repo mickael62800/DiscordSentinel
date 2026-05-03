@@ -315,3 +315,174 @@ input[type="checkbox"]:not(.toggle input):not([hidden]):disabled {
     transform: rotate(45deg) scale(1) translate(-1px, -1px);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+ * Patterns partages — sections type "dashboard data" (cards
+ * avec table + filtres + status). Utilises principalement par
+ * ServerSecurityPage et ses organisms-onglets.
+ * ═══════════════════════════════════════════════════════════ */
+
+/* Section header (pour les .card avec h2 + actions a droite) */
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.card-head h2 { margin: 0; }
+.card-actions { display: flex; gap: 8px; align-items: center; }
+
+/* Buttons compacts (overrides du .btn global de plus haut) */
+.btn-secondary {
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--transition-base), color var(--transition-base);
+}
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-secondary.xs { padding: 3px 8px; font-size: 11px; }
+.btn-secondary.danger {
+  border-color: color-mix(in srgb, var(--danger) 50%, var(--border));
+  color: var(--danger);
+}
+.btn-secondary.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 15%, var(--bg-secondary));
+}
+
+/* Table de donnees compacte (admin/security) */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.data-table th,
+.data-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.data-table th {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+.data-table .num { text-align: right; }
+.data-table .danger { color: var(--danger); font-weight: 700; }
+.data-table tr.alert { background: color-mix(in srgb, var(--danger) 6%, transparent); }
+.data-table .ua {
+  max-width: 350px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.actions-h { text-align: right; }
+.actions { text-align: right; white-space: nowrap; }
+
+/* Pills de status / code */
+.code-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+}
+.code-pill.warn {
+  background: color-mix(in srgb, var(--warning, #e67e22) 18%, var(--bg-secondary));
+  color: var(--warning, #e67e22);
+}
+.code-pill.danger {
+  background: color-mix(in srgb, var(--danger) 18%, var(--bg-secondary));
+  color: var(--danger);
+}
+
+/* Badges arrondis (status visuels) */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge.ok { background: color-mix(in srgb, var(--success, #2ecc71) 18%, transparent); color: var(--success, #2ecc71); }
+.badge.warning { background: color-mix(in srgb, var(--warning, #e67e22) 18%, transparent); color: var(--warning, #e67e22); }
+.badge.danger { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+
+/* Empty / info / error banners */
+.empty-state {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+}
+.info-banner {
+  padding: 14px;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+}
+.info-banner p { margin: 0 0 8px; font-size: 13px; }
+.info-banner .hint { font-family: "JetBrains Mono", monospace; }
+.error-banner {
+  padding: 12px;
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-left: 3px solid var(--danger);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* CVE / KPI summary cards (Trivy, suspicious patterns) */
+.cve-summary { display: flex; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
+.cve-stat {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  min-width: 90px;
+}
+.cve-stat .lbl {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.cve-stat strong { font-size: 22px; }
+.cve-stat.danger strong { color: var(--danger); }
+.cve-stat.warning strong { color: var(--warning, #e67e22); }
+.cve-stat.ok strong { color: var(--success, #2ecc71); }
+
+/* Tables : scroll horizontal + tronquage hash sur mobile */
+@media (max-width: 768px) {
+  .data-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
+  .data-table th, .data-table td { padding: 6px 8px !important; }
+  .data-table td .mono,
+  .data-table td code {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+  }
+}
