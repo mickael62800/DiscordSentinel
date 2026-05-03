@@ -1,0 +1,152 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import type { SystemInfo } from "@/services/systemService";
+
+const props = defineProps<{ info: SystemInfo }>();
+
+function formatUptime(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}j ${h}h ${m}m`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function diskBarColor(pct: number): string {
+  if (pct >= 90) return "var(--danger)";
+  if (pct >= 75) return "var(--warning, #e67e22)";
+  return "var(--success, #2ecc71)";
+}
+
+const ramPct = computed(() =>
+  props.info.host.mem_total_mb > 0
+    ? (props.info.host.mem_used_mb / props.info.host.mem_total_mb) * 100
+    : 0,
+);
+const cpuPct = computed(() => props.info.host.cpu_percent ?? 0);
+</script>
+
+<template>
+  <section class="dash-section">
+    <h2 class="section-title">Ressources host</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">CPU host</span>
+          <span class="metric-value">{{ cpuPct.toFixed(1) }}%</span>
+        </div>
+        <div class="bar">
+          <div class="bar-fill" :style="{ width: `${Math.min(cpuPct, 100)}%`, background: diskBarColor(cpuPct) }"></div>
+        </div>
+        <div class="metric-sub">{{ info.host.cpu_cores }} cœurs disponibles</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">RAM host</span>
+          <span class="metric-value">{{ ramPct.toFixed(1) }}%</span>
+        </div>
+        <div class="bar">
+          <div class="bar-fill" :style="{ width: `${Math.min(ramPct, 100)}%`, background: diskBarColor(ramPct) }"></div>
+        </div>
+        <div class="metric-sub">
+          {{ info.host.mem_used_mb.toLocaleString() }} / {{ info.host.mem_total_mb.toLocaleString() }} MB
+        </div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">CPU process API</span>
+          <span class="metric-value">{{ info.process.cpu_percent.toFixed(1) }}%</span>
+        </div>
+        <div class="bar">
+          <div class="bar-fill" :style="{ width: `${Math.min(info.process.cpu_percent, 100)}%`, background: 'var(--accent)' }"></div>
+        </div>
+        <div class="metric-sub">RAM process : {{ info.process.mem_used_mb }} MB</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-header">
+          <span class="metric-label">Redis</span>
+          <span class="metric-value">{{ info.redis.used_memory_mb }} MB</span>
+        </div>
+        <div class="metric-sub">
+          {{ info.redis.connected_clients }} clients · {{ info.redis.total_keys.toLocaleString() }} clés
+          · uptime {{ formatUptime(info.redis.uptime_seconds) }}
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
+
+<style scoped>
+.dash-section { margin-bottom: 24px; }
+.section-title {
+  position: relative;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 14px 0;
+  padding: 0 0 8px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.section-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.metric-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.metric-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.metric-sub {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+}
+
+.bar {
+  height: 8px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease, background 0.3s ease;
+}
+</style>
