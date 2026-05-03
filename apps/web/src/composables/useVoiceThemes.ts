@@ -1,4 +1,4 @@
-import { onMounted, ref, watch } from "vue";
+import { ref, watch } from "vue";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { voiceThemesService } from "@/services/voiceChannelsService";
@@ -8,28 +8,34 @@ import type {
   VoiceChannelTheme,
 } from "@/types/voice-extended";
 
-export function useVoiceThemes() {
-  const { guildIdFilter } = useGuildSelector();
-  const { success, error: showError } = useToast();
-  const themes = ref<VoiceChannelTheme[]>([]);
-  const loading = ref(true);
+// Singleton module-scoped : un cache partage entre Table et FormModal.
+const { guildIdFilter } = useGuildSelector();
 
-  async function fetchThemes() {
-    if (!guildIdFilter.value) {
-      themes.value = [];
-      loading.value = false;
-      return;
-    }
-    loading.value = true;
-    try {
-      themes.value = await voiceThemesService.list(guildIdFilter.value);
-    } catch (e) {
-      console.error(e);
-      showError("Erreur chargement thèmes.");
-    } finally {
-      loading.value = false;
-    }
+const themes = ref<VoiceChannelTheme[]>([]);
+const loading = ref(true);
+
+async function fetchThemes() {
+  const { error: showError } = useToast();
+  if (!guildIdFilter.value) {
+    themes.value = [];
+    loading.value = false;
+    return;
   }
+  loading.value = true;
+  try {
+    themes.value = await voiceThemesService.list(guildIdFilter.value);
+  } catch (e) {
+    console.error(e);
+    showError("Erreur chargement thèmes.");
+  } finally {
+    loading.value = false;
+  }
+}
+
+watch(guildIdFilter, fetchThemes, { immediate: true });
+
+export function useVoiceThemes() {
+  const { success, error: showError } = useToast();
 
   async function create(payload: CreateThemePayload) {
     if (!guildIdFilter.value) return;
@@ -47,11 +53,7 @@ export function useVoiceThemes() {
   async function update(themeId: string, payload: UpdateThemePayload) {
     if (!guildIdFilter.value) return;
     try {
-      const updated = await voiceThemesService.update(
-        guildIdFilter.value,
-        themeId,
-        payload,
-      );
+      const updated = await voiceThemesService.update(guildIdFilter.value, themeId, payload);
       const idx = themes.value.findIndex((t) => t.id === themeId);
       if (idx !== -1) themes.value[idx] = updated;
       success("Thème mis à jour.");
@@ -73,9 +75,6 @@ export function useVoiceThemes() {
       showError("Erreur suppression thème.");
     }
   }
-
-  onMounted(fetchThemes);
-  watch(guildIdFilter, fetchThemes);
 
   return { themes, loading, fetchThemes, create, update, remove };
 }
