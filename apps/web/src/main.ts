@@ -27,15 +27,13 @@ function ensureProdConfig() {
 }
 
 router.beforeEach(async (to, _from, next) => {
-  console.log("[router] beforeEach -> route", to.name, "path", to.path, "hash", to.hash ? "present" : "absent");
   ensureProdConfig();
   const { user, hasConfig, checkSession } = useAuth();
   await checkSession();
-  console.log("[router] after checkSession, user =", user.value?.username ?? null, "hasConfig =", hasConfig.value);
   // Setup uniquement si vraiment pas de config (cas dev sans defaults).
-  if (!hasConfig.value && to.name !== "setup") { console.log("[router] -> setup (no config)"); next({ name: "setup" }); return; }
-  if (!to.meta.public && !user.value) { console.log("[router] -> login (no user, route private)"); next({ name: "login" }); return; }
-  if (user.value && (to.name === "login" || to.name === "setup")) { console.log("[router] -> dashboard (user logged + route login/setup)"); next({ name: "dashboard" }); return; }
+  if (!hasConfig.value && to.name !== "setup") { next({ name: "setup" }); return; }
+  if (!to.meta.public && !user.value) { next({ name: "login" }); return; }
+  if (user.value && (to.name === "login" || to.name === "setup")) { next({ name: "dashboard" }); return; }
 
   // Prefetch async des donnees stables apres login. Non bloquant : on next()
   // immediatement. Les composables singleton (useBotDefinitions, useBotEnabledStatus,

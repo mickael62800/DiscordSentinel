@@ -20,7 +20,6 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   if (cfg?.api_key) h["Authorization"] = `Bearer ${cfg.api_key}`;
   const tok = getDiscordToken();
   if (tok) h["X-Discord-Token"] = tok;
-  console.log("[http] headers built, hasToken:", !!tok, "hasApiKey:", !!cfg?.api_key);
   return h;
 }
 
@@ -28,7 +27,6 @@ async function handle<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     if (resp.status === 401) {
       const path = window.location.pathname;
-      console.error("[http] 401 sur", resp.url, "- path actuel:", path, "- token present:", !!getDiscordToken());
       // Cas particulier : si on est sur /auth/callback, NE PAS purger le
       // token. Une requete zombie partie avant l'OAuth callback pourrait
       // recevoir son 401 APRES que AuthCallbackPage ait stocke le nouveau
@@ -36,7 +34,6 @@ async function handle<T>(resp: Response): Promise<T> {
       // /login?expired=1 garantie. On laisse AuthCallbackPage gerer son
       // cycle de vie en paix.
       if (path.startsWith("/auth/")) {
-        console.warn("[http] 401 sur /auth/* : on NE purge PAS (eviter de tuer le token fraichement stocke)");
         throw new Error("Unauthorized: session expired");
       }
       // Token invalide/expire : on purge la session locale et on redirige
@@ -48,12 +45,9 @@ async function handle<T>(resp: Response): Promise<T> {
       } catch { /* storage quota / cookies disabled : ignore */ }
       // Skip redirect si deja sur login/setup (eviter boucle de redir).
       if (path !== "/login" && path !== "/setup") {
-        console.error("[http] redirect HARD vers /login?expired=1");
         // Soft redirect via window.location pour reset l'app entiere
         // (Pinia stores, composables singletons, etc.).
         window.location.href = "/login?expired=1";
-      } else {
-        console.warn("[http] 401 sur path public, pas de redirect");
       }
       throw new Error("Unauthorized: session expired");
     }

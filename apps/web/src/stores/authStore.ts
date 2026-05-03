@@ -19,21 +19,13 @@ export const useAuthStore = defineStore("auth", () => {
   const hasConfig = ref(false);
 
   async function checkSession() {
-    console.log("[auth] checkSession() called", {
-      initialized: initialized.value,
-      path: window.location.pathname,
-      hash: window.location.hash ? "present" : "absent",
-      hasToken: !!getDiscordToken(),
-      hasUser: !!authService.getCurrentUser(),
-    });
-    if (initialized.value) { console.log("[auth] already init, skip"); return; }
+    if (initialized.value) return;
     initialized.value = true;
 
     // hasConfig = uniquement la config API (URL + cle). Le OAuth Discord
     // est desormais gere cote backend, le front n'a plus besoin de
     // client_id/client_secret localement.
     hasConfig.value = configService.getApiConfig() !== null;
-    console.log("[auth] hasConfig =", hasConfig.value);
     if (!hasConfig.value) return;
 
     // Restore le user depuis le storage (rapide).
@@ -56,10 +48,7 @@ export const useAuthStore = defineStore("auth", () => {
     // le user obsolete sans pinguer l'API : la requete serait garantie 401
     // et redirigerait sur /login?expired=1, cassant notamment le retour
     // OAuth (/auth/callback) ou le token n'est pas encore en place.
-    console.log("[auth] after restore, user =", user.value ? user.value.username : null, "token =", !!getDiscordToken());
-
     if (user.value && !getDiscordToken()) {
-      console.warn("[auth] user en cache MAIS pas de token -> purge silencieuse");
       user.value = null;
       try {
         const store = await getKv();
@@ -73,16 +62,13 @@ export const useAuthStore = defineStore("auth", () => {
     // session pour forcer une re-authentification. Evite que le user reste
     // "connecte" cote front avec un token expire qui spam des 401.
     if (user.value) {
-      console.log("[auth] ping /api/auth/check-access avec token", getDiscordToken().slice(0, 8) + "...");
       try {
         const { httpGet } = await import("@/api/http");
         // /api/auth/check-access exige X-Discord-Token valide. Sur token
         // expire, l'API retourne 401 -> http.ts purge auto + redirige
         // vers /login. Sur 403, on purge manuellement aussi.
         await httpGet("/api/auth/check-access");
-        console.log("[auth] check-access OK");
       } catch (e) {
-        console.error("[auth] check-access failed:", e);
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes("session expired") || msg.includes("403")) {
           // http.ts a deja redirige sur 401. Sur 403, on clear ici.
