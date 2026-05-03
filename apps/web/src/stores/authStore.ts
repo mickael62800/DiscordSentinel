@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { authService } from "@/services/authService";
 import { configService } from "@/services/configService";
 import { Store as KvStore } from "@/api/store";
+import { getDiscordToken } from "@/api/config";
 import type { DiscordUser } from "@/api/config";
 
 const STORE_FILE = "auth.json";
@@ -39,6 +40,21 @@ export const useAuthStore = defineStore("auth", () => {
       }
     } catch {
       // Pas de session locale.
+    }
+
+    // Si on a un user en cache MAIS plus de token Discord en sessionStorage
+    // (ex: tab ferme + rouvert, ou utilisateur revient de l'OAuth callback
+    // avant que AuthCallbackPage ait pu stocker le nouveau token), on purge
+    // le user obsolete sans pinguer l'API : la requete serait garantie 401
+    // et redirigerait sur /login?expired=1, cassant notamment le retour
+    // OAuth (/auth/callback) ou le token n'est pas encore en place.
+    if (user.value && !getDiscordToken()) {
+      user.value = null;
+      try {
+        const store = await getKv();
+        await store.delete(USER_KEY);
+      } catch { /* ignore */ }
+      return;
     }
 
     // Si on a un user en cache, valide que le token Discord est encore
