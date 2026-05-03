@@ -1,4 +1,4 @@
-import { ref, onMounted, watch, type Ref, type WatchSource } from "vue";
+import { ref, watch, type Ref, type WatchSource } from "vue";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 
@@ -53,8 +53,17 @@ export function useGuildFetch<T>(
     }
   }
 
-  if (immediate) onMounted(refresh);
-  if (guildScoped) watch(guildIdFilter, refresh);
+  // Important : pattern singleton-friendly. onMounted ne fonctionne que dans
+  // un setup() ; or beaucoup de composables hissent useGuildFetch au scope
+  // module pour partager le cache entre organisms. Dans ce cas onMounted ne
+  // fire jamais et la page reste sur "Chargement…" jusqu'a un F5.
+  // Solution : si guildScoped, watch immediate fait office d'auto-fetch
+  // (declenche au 1er load + a chaque changement de guild).
+  if (guildScoped) {
+    watch(guildIdFilter, refresh, { immediate });
+  } else if (immediate) {
+    void refresh();
+  }
   if (options?.watchSources?.length) watch(options.watchSources, refresh);
 
   return { data, loading, error, refresh };
