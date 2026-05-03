@@ -36,7 +36,7 @@ watch(selectedGuildId, reload);
 
     <template v-else>
       <div v-if="current" class="current-card">
-        <div class="current-head page--wide">
+        <div class="current-head page--xs">
           <div>
             <div class="label">Semaine en cours</div>
             <div class="dates">

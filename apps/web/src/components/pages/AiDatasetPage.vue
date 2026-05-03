@@ -5,7 +5,7 @@ import DatasetMessagesTable from "../organisms/DatasetMessagesTable.vue";
 </script>
 
 <template>
-  <div class="dataset-page page--wide">
+  <div class="dataset-page page--constrained">
     <div class="mobile-only-block">
       <div class="mobile-block-card">
         <div class="mobile-block-icon">🖥️</div>

@@ -15,7 +15,7 @@ function backToList() {
 </script>
 
 <template>
-  <div class="tickets page--wide">
+  <div class="tickets page--sm">
     <TicketsListPanel v-if="!selectedId" @select="selectTicket" />
     <TicketDetailPanel v-else :ticket-id="selectedId" @back="backToList" />
   </div>

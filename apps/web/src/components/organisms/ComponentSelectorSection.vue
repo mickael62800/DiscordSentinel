@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { BotDefinition } from "../../types";
+import { useBotEnabledStatus } from "@/composables/useBotEnabledStatus";
 
 defineProps<{
   title: string;
@@ -10,6 +11,8 @@ defineProps<{
 const emit = defineEmits<{
   (e: "select", name: string): void;
 }>();
+
+const { isBotEnabled } = useBotEnabledStatus();
 </script>
 
 <template>
@@ -23,11 +26,15 @@ const emit = defineEmits<{
         v-for="def in definitions"
         :key="def.bot_name"
         class="component-card"
-        :class="{ active: selectedKey === def.bot_name }"
+        :class="{
+          active: selectedKey === def.bot_name,
+          'is-disabled': !isBotEnabled(def.bot_name),
+        }"
         @click="emit('select', def.bot_name)"
       >
         <div class="component-card-header">
           <div class="component-name">{{ def.display_name }}</div>
+          <span v-if="!isBotEnabled(def.bot_name)" class="off-pill" title="Désactivé pour cette guild">OFF</span>
         </div>
         <div class="component-desc">{{ def.description }}</div>
         <div class="component-params">
@@ -87,6 +94,29 @@ const emit = defineEmits<{
 .component-card.active {
   border-color: var(--accent);
   background: rgba(99, 102, 241, 0.08);
+}
+
+/* Composant desactive pour cette guild : bordure rouge + tint subtil. */
+.component-card.is-disabled {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 6%, var(--bg-secondary));
+}
+.component-card.is-disabled:hover {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, var(--bg-secondary));
+}
+.component-card.is-disabled.active {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 14%, var(--bg-secondary));
+}
+.off-pill {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--danger);
+  color: white;
 }
 
 .component-card-header {

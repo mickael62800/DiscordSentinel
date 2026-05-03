@@ -53,7 +53,7 @@ watch(selectedGuildId, loadXpRoleMode, { immediate: true });
 </script>
 
 <template>
-  <div class="levels">
+  <div class="levels page--constrained">
     <h1>Niveaux & XP</h1>
 
     <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAll" />

@@ -334,7 +334,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
           <tr><th>Nom</th><th>Image</th><th>État</th><th>Statut</th><th>Ports</th><th>Taille</th><th class="actions-h">Actions</th></tr>
         </thead>
         <tbody>
-          <tr v-for="c in filteredContainers" :key="c.id">
+          <tr v-for="c in filteredContainers" :key="c.id" :class="{ 'row-disabled': c.state !== 'running' }">
             <td><code>{{ cleanName(c.names[0] ?? shortId(c.id)) }}</code></td>
             <td class="muted">{{ c.image }}</td>
             <td><span class="state-pill" :class="c.state">{{ c.state }}</span></td>
@@ -630,6 +630,18 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 }
 .btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Ligne d'un container/worker desactive (state != running) : box-shadow rouge
+   inset pour souligner sans casser le table-layout. */
+.docker-table tbody tr.row-disabled td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--danger);
+}
+.docker-table tbody tr.row-disabled {
+  background: color-mix(in srgb, var(--danger) 6%, transparent);
+}
+.docker-table tbody tr.row-disabled:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
 .btn.xs { padding: 3px 8px; font-size: 11px; }
 .btn.danger { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); color: var(--danger); }
 .btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 15%, var(--bg-secondary)); }

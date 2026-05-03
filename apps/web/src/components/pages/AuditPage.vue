@@ -4,7 +4,7 @@ import AuditEntriesList from "../organisms/AuditEntriesList.vue";
 </script>
 
 <template>
-  <div class="audit page--wide">
+  <div class="audit page--xs">
     <h1>Journal d'audit</h1>
     <AuditFilters />
     <AuditEntriesList />

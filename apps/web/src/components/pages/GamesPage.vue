@@ -50,7 +50,7 @@ const defaultCategory = computed(() =>
 </script>
 
 <template>
-  <div class="games-page page--wide">
+  <div class="games-page page--xs">
     <div class="page-header">
       <h1>Gestion des jeux</h1>
       <div class="header-actions">

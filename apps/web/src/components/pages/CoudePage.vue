@@ -61,7 +61,7 @@ async function handlePurgeAll() {
 </script>
 
 <template>
-  <div class="coude-page page--wide">
+  <div class="coude-page page--constrained">
     <header class="hero">
       <div class="hero-text">
         <h1 class="hero-title">

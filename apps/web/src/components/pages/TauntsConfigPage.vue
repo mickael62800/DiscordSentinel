@@ -9,7 +9,7 @@ const { loading, error, fetchConfig } = useTauntsConfig();
 </script>
 
 <template>
-  <div class="taunts-page page--constrained">
+  <div class="taunts-page page--xs">
     <header class="page-header">
       <h1>🔥 Railleries automatiques</h1>
       <p class="subtitle">

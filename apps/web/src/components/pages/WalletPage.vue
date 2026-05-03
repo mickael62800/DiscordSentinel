@@ -74,7 +74,7 @@ onMounted(fetchWallets);
 </script>
 
 <template>
-  <div class="wallet-page page--wide">
+  <div class="wallet-page page--constrained">
     <header class="hero">
       <div class="hero-text">
         <h1 class="hero-title">

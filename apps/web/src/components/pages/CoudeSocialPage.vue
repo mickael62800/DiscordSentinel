@@ -7,7 +7,7 @@ const { lookupUserId, loading } = useCoudeSocial();
 </script>
 
 <template>
-  <div class="page page--constrained">
+  <div class="page page--xs">
     <header class="page-header">
       <h1>👊 Coude — Sous-systèmes sociaux</h1>
       <p class="lede">
