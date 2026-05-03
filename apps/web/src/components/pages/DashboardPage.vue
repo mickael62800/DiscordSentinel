@@ -7,7 +7,7 @@ const { sections } = useDashboardSections();
 </script>
 
 <template>
-  <div class="home">
+  <div class="home page--wide">
     <DashboardHero />
 
     <div class="section-grid">
@@ -32,9 +32,6 @@ const { sections } = useDashboardSections();
   display: flex;
   flex-direction: column;
   overflow: auto;
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
 }
 
 .section-grid {

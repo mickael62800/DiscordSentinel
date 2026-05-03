@@ -15,7 +15,7 @@ const tabs: Array<{ key: SubTab; label: string; icon: string }> = [
 </script>
 
 <template>
-  <div class="coude-hub">
+  <div class="coude-hub page--wide">
     <h1>⚔️ Coup de Coude</h1>
 
     <div class="hub-tabs">

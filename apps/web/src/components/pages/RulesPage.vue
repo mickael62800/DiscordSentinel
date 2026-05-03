@@ -31,7 +31,7 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 </script>
 
 <template>
-  <div class="rules">
+  <div class="rules page--wide">
     <h1>Regles de moderation</h1>
 
     <div v-if="loading" class="loading">Chargement...</div>

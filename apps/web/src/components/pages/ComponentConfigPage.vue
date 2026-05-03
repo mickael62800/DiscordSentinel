@@ -62,7 +62,7 @@ watch(selectedGuildId, () => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>Configuration des composants</h1>
       <p class="page-subtitle">Parametrer chaque composant pour le serveur selectionne</p>

@@ -278,7 +278,7 @@ watch(selectedServerId, async (sid) => {
 </script>
 
 <template>
-  <div class="portal">
+  <div class="portal page--wide">
     <header class="topbar">
       <div class="brand">
         <span class="logo">🎮</span>

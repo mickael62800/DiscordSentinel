@@ -99,7 +99,7 @@ watch(lookupUserId, async (id) => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--wide">
     <header v-if="!props.embedded" class="page-header">
       <h1>📎 Preuves modération</h1>
       <p class="lede">

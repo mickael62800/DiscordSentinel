@@ -4,7 +4,7 @@ import StrikesUserLookup from "../organisms/StrikesUserLookup.vue";
 </script>
 
 <template>
-  <div class="strikes-page">
+  <div class="strikes-page page--constrained">
     <header class="page-header">
       <h1>⚖️ Strikes</h1>
       <p class="lede">
@@ -20,7 +20,7 @@ import StrikesUserLookup from "../organisms/StrikesUserLookup.vue";
 </template>
 
 <style scoped>
-.strikes-page { max-width: 1100px; margin: 0 auto; padding: 24px; }
+.strikes-page { padding: 24px; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 { margin: 0 0 8px 0; font-size: 1.6rem; }
 .lede { color: var(--text-secondary); margin: 0; }

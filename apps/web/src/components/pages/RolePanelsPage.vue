@@ -31,7 +31,7 @@ function styleColor(style: string): string {
 </script>
 
 <template>
-  <div class="role-panels">
+  <div class="role-panels page--constrained">
     <div class="page-header-row">
       <h1>Roles & Auto-Roles</h1>
       <div class="header-actions">

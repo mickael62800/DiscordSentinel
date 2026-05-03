@@ -1,7 +1,8 @@
-.page {
-  max-width: 1100px;
-  margin: 0 auto;
-}
+/* .page sert uniquement de hook pour les styles descendants partages
+   (.card, .table, .lookup, .btn-*). Le sizing est gere par les classes
+   utilitaires .page--constrained / .page--wide / .page--narrow definies
+   dans styles/global.css — a appliquer sur le meme element racine. */
+.page { /* no sizing here */ }
 .page-header {
   margin-bottom: 24px;
 }

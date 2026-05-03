@@ -61,7 +61,7 @@ async function handlePurgeAll() {
 </script>
 
 <template>
-  <div class="coude-page">
+  <div class="coude-page page--wide">
     <header class="hero">
       <div class="hero-text">
         <h1 class="hero-title">
@@ -107,8 +107,6 @@ async function handlePurgeAll() {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
 .hero {

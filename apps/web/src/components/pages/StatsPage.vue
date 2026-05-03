@@ -24,7 +24,7 @@ const periods = computed(() => [7, 14, 30, 90]);
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="dashboard page--wide">
     <div class="dashboard-header">
       <h1>Statistiques du serveur</h1>
       <div class="header-actions">

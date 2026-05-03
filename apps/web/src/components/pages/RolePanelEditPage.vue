@@ -4,7 +4,7 @@ import AutoRolesPanel from "../organisms/AutoRolesPanel.vue";
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>🎨 Nouveau panel de rôles</h1>
       <p class="lede">

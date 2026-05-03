@@ -486,3 +486,21 @@ input[type="checkbox"]:not(.toggle input):not([hidden]):disabled {
     vertical-align: middle;
   }
 }
+
+/* ── Page width utilities ──────────────────────────────────────
+   Conteneurs de page standardises. A appliquer sur le wrapper
+   racine de chaque page (a la place des max-width copies).
+   - constrained : pages form/config (lisibilite, alignement)
+   - wide        : dashboards/tables/charts denses
+   - narrow      : login / callback / reviews single-card
+*/
+.page--constrained,
+.page--wide,
+.page--narrow {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.page--constrained { max-width: 1280px; }
+.page--wide        { max-width: 1920px; }
+.page--narrow      { max-width: 480px;  }

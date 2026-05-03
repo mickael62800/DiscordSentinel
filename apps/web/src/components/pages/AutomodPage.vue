@@ -5,7 +5,7 @@ import AutomodDetectionsTimeline from "@/components/organisms/AutomodDetectionsT
 </script>
 
 <template>
-  <div class="automod-page">
+  <div class="automod-page page--constrained">
     <header class="page-header">
       <h1>🤖 Automod</h1>
       <p class="lede">
@@ -24,11 +24,7 @@ import AutomodDetectionsTimeline from "@/components/organisms/AutomodDetectionsT
 </template>
 
 <style scoped>
-.automod-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-}
+.automod-page { padding: 24px; }
 .page-header { margin-bottom: 24px; }
 .page-header h1 {
   margin: 0 0 8px 0;

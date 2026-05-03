@@ -20,7 +20,7 @@ watch(lookupUserId, (id) => {
 </script>
 
 <template>
-  <div class="notes-page">
+  <div class="notes-page page--constrained">
     <header v-if="!props.embedded" class="page-header">
       <h1>📝 Notes modération</h1>
       <p class="lede">
@@ -37,7 +37,7 @@ watch(lookupUserId, (id) => {
 </template>
 
 <style scoped>
-.notes-page { max-width: 900px; margin: 0 auto; }
+.notes-page {}
 .page-header { margin-bottom: 24px; }
 .page-header h1 { margin: 0 0 8px 0; font-size: 22px; }
 .lede { color: var(--text-secondary); margin: 0; font-size: 13px; }

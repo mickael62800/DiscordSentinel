@@ -4,7 +4,7 @@ import SecurityEventsList from "../organisms/SecurityEventsList.vue";
 </script>
 
 <template>
-  <div class="security">
+  <div class="security page--wide">
     <header class="page-header">
       <h1>Evenements de securite</h1>
       <p class="page-subtitle">Detection des raids, comptes suspects et actions massives</p>

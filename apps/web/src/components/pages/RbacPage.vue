@@ -31,7 +31,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 </script>
 
 <template>
-  <div class="rbac-page">
+  <div class="rbac-page page--constrained">
     <header class="page-header">
       <h1>🔐 Gestion RBAC</h1>
       <p class="subtitle">
@@ -66,7 +66,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 </template>
 
 <style scoped>
-.rbac-page { padding: 1.5rem; max-width: 1200px; }
+.rbac-page { padding: 1.5rem; }
 .page-header h1 { margin: 0 0 0.25rem 0; }
 .subtitle {
   color: var(--color-text-muted, #888);

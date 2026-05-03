@@ -74,7 +74,7 @@ onMounted(fetchWallets);
 </script>
 
 <template>
-  <div class="wallet-page">
+  <div class="wallet-page page--wide">
     <header class="hero">
       <div class="hero-text">
         <h1 class="hero-title">
@@ -177,8 +177,6 @@ onMounted(fetchWallets);
   display: flex;
   flex-direction: column;
   gap: 20px;
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
 /* Hero */

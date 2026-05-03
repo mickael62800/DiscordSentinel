@@ -33,7 +33,7 @@ function handleOpenNotesEvidence(userId: string) {
 </script>
 
 <template>
-  <div class="moderation-hub">
+  <div class="moderation-hub page--constrained">
     <h1>Moderation</h1>
 
     <AppTabs

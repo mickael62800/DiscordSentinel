@@ -6,7 +6,7 @@ import ConductActionsCard from "../organisms/ConductActionsCard.vue";
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>⚙️ Levels & Conduite — Configuration</h1>
       <p class="lede">

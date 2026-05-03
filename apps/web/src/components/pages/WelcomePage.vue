@@ -6,7 +6,7 @@ const { config, loading } = useWelcome();
 </script>
 
 <template>
-  <div class="welcome-page">
+  <div class="welcome-page page--constrained">
     <header class="page-header">
       <h1>👋 Welcome / Onboarding</h1>
       <p class="lede">
@@ -26,10 +26,7 @@ const { config, loading } = useWelcome();
 </template>
 
 <style scoped>
-.welcome-page {
-  max-width: 1100px;
-  margin: 0 auto;
-}
+.welcome-page {}
 .page-header { margin-bottom: 24px; }
 .page-header h1 {
   margin: 0 0 8px 0;

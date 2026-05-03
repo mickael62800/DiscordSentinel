@@ -6,7 +6,7 @@ import WheelRecentSpinsTable from "../organisms/WheelRecentSpinsTable.vue";
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--wide">
     <header class="page-header">
       <h1>🪙 Roue du Destin — analytics</h1>
       <p class="lede">

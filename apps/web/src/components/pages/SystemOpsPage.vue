@@ -51,7 +51,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>🛠️ System Operations</h1>
       <p class="lede">

@@ -62,7 +62,7 @@ const rtp = computed(() =>
 </script>
 
 <template>
-  <div class="page">
+  <div class="page page--wide">
     <header class="page-header">
       <h1>🎰 Slot Machine — analytics</h1>
       <p class="lede">

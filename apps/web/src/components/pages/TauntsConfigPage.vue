@@ -9,7 +9,7 @@ const { loading, error, fetchConfig } = useTauntsConfig();
 </script>
 
 <template>
-  <div class="taunts-page">
+  <div class="taunts-page page--constrained">
     <header class="page-header">
       <h1>🔥 Railleries automatiques</h1>
       <p class="subtitle">
@@ -31,8 +31,6 @@ const { loading, error, fetchConfig } = useTauntsConfig();
 
 <style scoped>
 .taunts-page {
-  max-width: 820px;
-  margin: 0 auto;
   padding: 24px;
   display: flex;
   flex-direction: column;

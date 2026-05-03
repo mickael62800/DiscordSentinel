@@ -44,7 +44,7 @@ function statusClass(code: unknown): string {
 </script>
 
 <template>
-  <div class="logs-page">
+  <div class="logs-page page--wide">
     <h1 class="page-title">Journaux</h1>
 
     <div class="tab-content">
