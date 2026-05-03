@@ -2,6 +2,8 @@
 import { ref, watch } from "vue";
 import type { Infraction } from "../../types";
 import { conductService } from "@/services/conductService";
+import AppModal from "../atoms/AppModal.vue";
+import AppButton from "../atoms/AppButton.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -73,126 +75,80 @@ defineExpose({
 </script>
 
 <template>
-  <teleport to="body">
-    <div v-if="visible && target" class="modal-overlay" @click.self="close">
-      <div class="card modal-content">
-        <div class="modal-header">
-          <h3>Annuler la proposition de ban</h3>
-          <button class="modal-close" @click="close">&times;</button>
+  <AppModal
+    :visible="visible && !!target"
+    title="Annuler la proposition de ban"
+    size="lg"
+    @close="close"
+  >
+    <template v-if="target">
+      <div class="modal-user">
+        <div class="avatar-placeholder user-avatar-placeholder">
+          {{ target.username.charAt(0).toUpperCase() }}
         </div>
-
-        <div class="modal-body">
-          <div class="modal-user">
-            <div class="avatar-placeholder user-avatar-placeholder">
-              {{ target.username.charAt(0).toUpperCase() }}
-            </div>
-            <div class="user-info">
-              <span class="username">{{ target.username }}</span>
-              <span class="user-id">{{ target.user_id }}</span>
-            </div>
-            <div class="points-badge" :class="{ zero: currentPoints === 0 }">
-              <span class="points-label">Points</span>
-              <span class="points-value">
-                {{ loading ? "…" : (currentPoints ?? "?") }}
-              </span>
-            </div>
-          </div>
-
-          <div class="warning">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <p>
-              Si les points de conduite restent a <strong>0</strong>, le worker
-              recreera automatiquement une proposition de ban dans les minutes
-              qui suivent. Pour eviter cela, redonnez quelques points ci-dessous.
-            </p>
-          </div>
-
-          <label class="modal-label" for="grant-input">Points a redonner</label>
-          <input
-            id="grant-input"
-            v-model.number="grantAmount"
-            type="number"
-            min="1"
-            max="100"
-            class="modal-input"
-            :disabled="submitting"
-          />
-
-          <p v-if="error" class="form-error">{{ error }}</p>
+        <div class="user-info">
+          <span class="username">{{ target.username }}</span>
+          <span class="user-id mono">{{ target.user_id }}</span>
         </div>
-
-        <div class="modal-footer">
-          <button
-            class="modal-cancel"
-            :disabled="submitting"
-            @click="close"
-          >
-            Fermer
-          </button>
-          <button
-            class="ghost-btn"
-            :disabled="submitting"
-            title="Supprimer la proposition sans modifier les points (sera probablement recreee)"
-            @click="confirmDeleteOnly"
-          >
-            Annuler quand meme
-          </button>
-          <button
-            class="primary-btn"
-            :disabled="submitting || grantAmount <= 0"
-            @click="confirmWithGrant"
-          >
-            {{ submitting ? "…" : `Redonner ${grantAmount} pts et annuler` }}
-          </button>
+        <div class="points-badge" :class="{ zero: currentPoints === 0 }">
+          <span class="points-label">Points</span>
+          <span class="points-value">
+            {{ loading ? "…" : (currentPoints ?? "?") }}
+          </span>
         </div>
       </div>
-    </div>
-  </teleport>
+
+      <div class="warning">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        <p>
+          Si les points de conduite restent a <strong>0</strong>, le worker
+          recreera automatiquement une proposition de ban dans les minutes
+          qui suivent. Pour eviter cela, redonnez quelques points ci-dessous.
+        </p>
+      </div>
+
+      <label class="modal-label" for="grant-input">Points a redonner</label>
+      <input
+        id="grant-input"
+        v-model.number="grantAmount"
+        type="number"
+        min="1"
+        max="100"
+        class="modal-input"
+        :disabled="submitting"
+      />
+
+      <p v-if="error" class="form-error">{{ error }}</p>
+    </template>
+
+    <template #footer>
+      <AppButton variant="secondary" :disabled="submitting" @click="close">
+        Fermer
+      </AppButton>
+      <button
+        class="ghost-btn"
+        :disabled="submitting"
+        title="Supprimer la proposition sans modifier les points (sera probablement recreee)"
+        @click="confirmDeleteOnly"
+      >
+        Annuler quand meme
+      </button>
+      <AppButton
+        variant="primary"
+        :disabled="submitting || grantAmount <= 0"
+        @click="confirmWithGrant"
+      >
+        {{ submitting ? "…" : `Redonner ${grantAmount} pts et annuler` }}
+      </AppButton>
+    </template>
+  </AppModal>
 </template>
 
 <style scoped>
-.modal-content {
-  padding: 0;
-  width: 100%;
-  max-width: 520px;
-  box-shadow: var(--shadow-lg);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-lg) var(--space-xl);
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 24px;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.modal-close:hover {
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: var(--space-xl);
-}
-
 .modal-user {
   display: flex;
   align-items: center;
@@ -203,30 +159,10 @@ defineExpose({
   border-radius: var(--radius-md);
 }
 
-.user-avatar-placeholder {
-  width: 36px;
-  height: 36px;
-  font-size: 14px;
-}
-
-.user-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.username {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.user-id {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-family: "JetBrains Mono", "Cascadia Code", monospace;
-}
+.user-avatar-placeholder { width: 36px; height: 36px; font-size: 14px; }
+.user-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.username { font-weight: 600; font-size: 14px; }
+.user-id { font-size: 11px; color: var(--text-secondary); }
 
 .points-badge {
   display: flex;
@@ -238,24 +174,9 @@ defineExpose({
   background: var(--bg-card);
   border: 1px solid var(--border);
 }
-
-.points-badge.zero {
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.points-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-secondary);
-}
-
-.points-value {
-  font-size: 18px;
-  font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
-}
+.points-badge.zero { border-color: var(--danger); color: var(--danger); }
+.points-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); }
+.points-value { font-size: 18px; font-weight: 700; font-family: "JetBrains Mono", monospace; }
 
 .warning {
   display: flex;
@@ -269,26 +190,10 @@ defineExpose({
   font-size: 13px;
   line-height: 1.4;
 }
+.warning svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--warning, #f59e0b); margin-top: 1px; }
+.warning p { margin: 0; }
 
-.warning svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  color: var(--warning, #f59e0b);
-  margin-top: 1px;
-}
-
-.warning p {
-  margin: 0;
-}
-
-.modal-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: var(--space-sm);
-}
+.modal-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); }
 
 .modal-input {
   width: 100%;
@@ -302,40 +207,9 @@ defineExpose({
   outline: none;
   transition: border-color var(--transition-base);
 }
+.modal-input:focus { border-color: var(--accent); }
 
-.modal-input:focus {
-  border-color: var(--accent);
-}
-
-.form-error {
-  margin-top: 10px;
-  color: var(--danger);
-  font-size: 13px;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-lg) var(--space-xl);
-  border-top: 1px solid var(--border);
-  flex-wrap: wrap;
-}
-
-.modal-cancel {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-lg);
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.modal-cancel:hover:not(:disabled) {
-  background: var(--bg-hover);
-}
+.form-error { margin-top: 10px; color: var(--danger); font-size: 13px; }
 
 .ghost-btn {
   background: transparent;
@@ -347,30 +221,6 @@ defineExpose({
   font-weight: 500;
   cursor: pointer;
 }
-
-.ghost-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-
-.primary-btn {
-  background: var(--accent);
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: var(--space-sm) var(--space-lg);
-  color: white;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.primary-btn:hover:not(:disabled) {
-  opacity: 0.92;
-}
-
-.primary-btn:disabled,
-.ghost-btn:disabled,
-.modal-cancel:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.ghost-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.ghost-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

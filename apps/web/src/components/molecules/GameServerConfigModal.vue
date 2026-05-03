@@ -6,6 +6,8 @@ import {
   type GameTemplate,
 } from "@/services/gamePortalService";
 import { useToast } from "@/composables/useToast";
+import AppModal from "../atoms/AppModal.vue";
+import AppButton from "../atoms/AppButton.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -23,7 +25,6 @@ const emit = defineEmits<{
 
 const { success, error: toastError } = useToast();
 
-// Etat editable : key -> string (sera serialise vers le backend)
 const values = ref<Record<string, string>>({});
 const saving = ref(false);
 
@@ -31,7 +32,6 @@ watch(
   () => [props.open, props.serverId, props.template],
   () => {
     if (props.open && props.template) {
-      // Pre-remplit avec : initialConfig (override) || default du schema
       const next: Record<string, string> = {};
       for (const f of props.template.config_schema) {
         const fromOverride = props.initialConfig[f.key];
@@ -63,9 +63,6 @@ function isBoolTrue(key: string): boolean {
 
 async function save() {
   if (!props.serverId) return;
-  // Filtre : on n'envoie que les clefs qui different du default OU sont
-  // explicitement non-vides. Permet de "reset au default" en effacant un
-  // champ manuellement.
   const payload: Record<string, string> = {};
   for (const f of fields.value) {
     const v = values.value[f.key];
@@ -92,160 +89,90 @@ async function save() {
 </script>
 
 <template>
-  <div v-if="open" class="modal-overlay" @click.self="emit('close')">
-    <div class="modal">
-      <header class="modal-head">
-        <div>
-          <h2>Configuration — {{ serverName }}</h2>
-          <p class="modal-sub" v-if="template">
-            Template <code>{{ template.slug }}</code> — {{ fields.length }} champ(s)
-          </p>
-        </div>
-        <button class="btn-close" @click="emit('close')" aria-label="Fermer">×</button>
-      </header>
-
-      <div v-if="!template" class="modal-empty">Template introuvable.</div>
-      <div v-else-if="fields.length === 0" class="modal-empty">
-        Aucun champ configurable pour ce template.
+  <AppModal :visible="open" size="lg" @close="emit('close')">
+    <template #header>
+      <div>
+        <h2>Configuration — {{ serverName }}</h2>
+        <p class="modal-sub" v-if="template">
+          Template <code>{{ template.slug }}</code> — {{ fields.length }} champ(s)
+        </p>
       </div>
-      <div v-else class="modal-body">
-        <div v-for="f in fields" :key="f.key" class="field">
-          <label :for="`cfg-${f.key}`" class="field-label">
-            {{ f.label }}
-            <code class="field-key">{{ f.key }}</code>
-          </label>
+    </template>
 
-          <!-- Boolean -->
-          <label v-if="f.type === 'boolean'" class="check-row">
-            <input
-              type="checkbox"
-              :checked="isBoolTrue(f.key)"
-              @change="setBool(f.key, ($event.target as HTMLInputElement).checked)"
-            />
-            <span>{{ isBoolTrue(f.key) ? "Activé" : "Désactivé" }}</span>
-          </label>
-
-          <!-- Enum -->
-          <select
-            v-else-if="f.type === 'enum' && f.options"
-            :id="`cfg-${f.key}`"
-            v-model="values[f.key]"
-            class="field-input"
-          >
-            <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
-
-          <!-- Number -->
-          <input
-            v-else-if="f.type === 'number'"
-            :id="`cfg-${f.key}`"
-            v-model="values[f.key]"
-            type="number"
-            :min="f.min"
-            :max="f.max"
-            :placeholder="f.default !== undefined ? String(f.default) : ''"
-            class="field-input"
-          />
-
-          <!-- Text -->
-          <input
-            v-else
-            :id="`cfg-${f.key}`"
-            v-model="values[f.key]"
-            type="text"
-            :maxlength="f.max_length"
-            :placeholder="f.default !== undefined ? String(f.default) : ''"
-            class="field-input"
-          />
-        </div>
-      </div>
-
-      <footer class="modal-foot">
-        <button class="btn-cancel" :disabled="saving" @click="emit('close')">
-          Annuler
-        </button>
-        <button class="btn-save" :disabled="saving" @click="save">
-          {{ saving ? "Sauvegarde…" : "Enregistrer" }}
-        </button>
-      </footer>
+    <div v-if="!template" class="modal-empty">Template introuvable.</div>
+    <div v-else-if="fields.length === 0" class="modal-empty">
+      Aucun champ configurable pour ce template.
     </div>
-  </div>
+    <div v-else class="fields-stack">
+      <div v-for="f in fields" :key="f.key" class="field">
+        <label :for="`cfg-${f.key}`" class="field-label">
+          {{ f.label }}
+          <code class="field-key">{{ f.key }}</code>
+        </label>
+
+        <label v-if="f.type === 'boolean'" class="check-row">
+          <input
+            type="checkbox"
+            :checked="isBoolTrue(f.key)"
+            @change="setBool(f.key, ($event.target as HTMLInputElement).checked)"
+          />
+          <span>{{ isBoolTrue(f.key) ? "Activé" : "Désactivé" }}</span>
+        </label>
+
+        <select
+          v-else-if="f.type === 'enum' && f.options"
+          :id="`cfg-${f.key}`"
+          v-model="values[f.key]"
+          class="field-input"
+        >
+          <option v-for="opt in f.options" :key="opt" :value="opt">{{ opt }}</option>
+        </select>
+
+        <input
+          v-else-if="f.type === 'number'"
+          :id="`cfg-${f.key}`"
+          v-model="values[f.key]"
+          type="number"
+          :min="f.min"
+          :max="f.max"
+          :placeholder="f.default !== undefined ? String(f.default) : ''"
+          class="field-input"
+        />
+
+        <input
+          v-else
+          :id="`cfg-${f.key}`"
+          v-model="values[f.key]"
+          type="text"
+          :maxlength="f.max_length"
+          :placeholder="f.default !== undefined ? String(f.default) : ''"
+          class="field-input"
+        />
+      </div>
+    </div>
+
+    <template #footer>
+      <AppButton variant="secondary" :disabled="saving" @click="emit('close')">
+        Annuler
+      </AppButton>
+      <AppButton variant="primary" :disabled="saving" @click="save">
+        {{ saving ? "Sauvegarde…" : "Enregistrer" }}
+      </AppButton>
+    </template>
+  </AppModal>
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--modal-overlay, rgba(0, 0, 0, 0.6));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 16px;
-}
-
-.modal {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 12px);
-  width: 100%;
-  max-width: 640px;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: var(--shadow-xl);
-}
-
-.modal-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: var(--space-lg);
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-head h2 {
-  margin: 0;
-  font-size: 16px;
-}
-
 .modal-sub {
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--text-secondary);
 }
-
 .modal-sub code {
   background: var(--bg-card);
   padding: 1px 6px;
   border-radius: 4px;
   font-family: monospace;
-}
-
-.btn-close {
-  width: 32px;
-  height: 32px;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 22px;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-}
-
-.btn-close:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: var(--space-lg);
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  flex: 1;
-  min-height: 0;
 }
 
 .modal-empty {
@@ -254,11 +181,9 @@ async function save() {
   color: var(--text-secondary);
 }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.fields-stack { display: flex; flex-direction: column; gap: 14px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
 
 .field-label {
   font-size: 12px;
@@ -288,11 +213,7 @@ async function save() {
   color: var(--text-primary);
   font-size: 13px;
 }
-
-.field-input:focus {
-  outline: none;
-  border-color: var(--accent);
-}
+.field-input:focus { outline: none; border-color: var(--accent); }
 
 .check-row {
   display: flex;
@@ -303,55 +224,5 @@ async function save() {
   color: var(--text-primary);
   cursor: pointer;
   user-select: none;
-}
-
-.modal-foot {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding: var(--space-md) var(--space-lg);
-  border-top: 1px solid var(--border);
-}
-
-.btn-cancel,
-.btn-save {
-  padding: 8px 18px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  border: 1px solid var(--border);
-}
-
-.btn-cancel {
-  background: transparent;
-  color: var(--text-secondary);
-}
-
-.btn-cancel:hover:not(:disabled) {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-
-.btn-save {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
-}
-
-.btn-save:hover:not(:disabled) {
-  background: var(--accent-hover);
-}
-
-.btn-cancel:disabled,
-.btn-save:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-@media (max-width: 600px) {
-  .modal {
-    max-height: 95vh;
-  }
 }
 </style>

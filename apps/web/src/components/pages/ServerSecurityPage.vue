@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/composables/useToast";
 import { useMyRole } from "@/composables/useMyRole";
 import TrafficTrendChart from "@/components/organisms/TrafficTrendChart.vue";
+import AppTabs from "@/components/molecules/AppTabs.vue";
 
 const { error: showError } = useToast();
 const { role, isSuper } = useMyRole();
@@ -302,17 +303,13 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
       </div>
     </div>
 
-    <!-- ── Onglets ── -->
-    <div class="tabs">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        :class="['tab', { active: currentTab === tab.key }]"
-        @click="currentTab = tab.key"
-      >
-        <span class="tab-icon">{{ tab.icon }}</span> {{ tab.label }}
-      </button>
-    </div>
+    <AppTabs
+      :model-value="currentTab"
+      :tabs="tabs"
+      variant="plain"
+      class="security-tabs-wrap"
+      @update:model-value="(k) => (currentTab = k as TabKey)"
+    />
 
     <!-- ════════ ONGLET 1 : VUE D'ENSEMBLE ════════ -->
     <div v-if="currentTab === 'overview'" class="tab-content">
@@ -1009,32 +1006,10 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
 .mono { font-family: "JetBrains Mono", monospace; }
 .header-actions { display: flex; gap: 8px; align-items: center; }
 
-/* Tabs */
-.tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
+.security-tabs-wrap {
   margin-bottom: 20px;
   overflow-x: auto;
 }
-.tab {
-  background: transparent;
-  border: none;
-  border-bottom: 2px solid transparent;
-  padding: 10px 16px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.15s ease;
-}
-.tab:hover { color: var(--text-primary); }
-.tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
-}
-.tab-icon { margin-right: 4px; }
 .tab-content { animation: fadeIn 0.15s ease; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
