@@ -4,7 +4,7 @@
 
 import {
   getDiscordUser, setDiscordUser,
-  clearApiConfig, clearDiscordToken, clearDiscordConfig,
+  clearDiscordToken,
   type DiscordUser,
 } from "@/api/config";
 import { getApiBaseUrl } from "@/utils/api";
@@ -24,7 +24,5 @@ export const authService = {
   logout() {
     setDiscordUser(null);
     clearDiscordToken();
-    clearDiscordConfig();
-    clearApiConfig();
   },
 };

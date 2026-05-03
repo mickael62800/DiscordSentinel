@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { authService } from "@/services/authService";
-import { configService } from "@/services/configService";
 import { Store as KvStore } from "@/api/store";
 import { getDiscordToken } from "@/api/config";
 import type { DiscordUser } from "@/api/config";
@@ -16,17 +15,10 @@ export const useAuthStore = defineStore("auth", () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const initialized = ref(false);
-  const hasConfig = ref(false);
 
   async function checkSession() {
     if (initialized.value) return;
     initialized.value = true;
-
-    // hasConfig = uniquement la config API (URL + cle). Le OAuth Discord
-    // est desormais gere cote backend, le front n'a plus besoin de
-    // client_id/client_secret localement.
-    hasConfig.value = configService.getApiConfig() !== null;
-    if (!hasConfig.value) return;
 
     // Restore le user depuis le storage (rapide).
     try {
@@ -58,41 +50,30 @@ export const useAuthStore = defineStore("auth", () => {
     }
 
     // Si on a un user en cache, valide que le token Discord est encore
-    // accepte par l'API. Si l'endpoint refuse (401/403/503), on purge la
-    // session pour forcer une re-authentification. Evite que le user reste
-    // "connecte" cote front avec un token expire qui spam des 401.
+    // accepte par l'API. Sur 401 (token expire) -> http.ts purge + redirige.
+    // Sur 403 (whitelist_middleware refuse : user pas/plus dans api_user_guilds)
+    // on clear localement et on redirige sur /login?error=not_invited pour
+    // proposer un code d'invitation.
     if (user.value) {
       try {
         const { httpGet } = await import("@/api/http");
-        // /api/auth/check-access exige X-Discord-Token valide. Sur token
-        // expire, l'API retourne 401 -> http.ts purge auto + redirige
-        // vers /login. Sur 403, on purge manuellement aussi.
         await httpGet("/api/auth/check-access");
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes("session expired") || msg.includes("403")) {
-          // http.ts a deja redirige sur 401. Sur 403, on clear ici.
-          if (!msg.includes("session expired")) {
-            user.value = null;
-            try {
-              const store = await getKv();
-              await store.delete(USER_KEY);
-            } catch { /* ignore */ }
+        if (msg.includes("403")) {
+          user.value = null;
+          try {
+            const store = await getKv();
+            await store.delete(USER_KEY);
+          } catch { /* ignore */ }
+          // Redirect manuel vers login avec message explicite.
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login?error=not_invited";
           }
         }
-        // Autres erreurs (network) : on laisse passer, l'app re-essayera.
+        // 401 / network : http.ts gere ou on laisse passer.
       }
     }
-  }
-
-  async function saveConfig(clientId: string, clientSecret: string) {
-    configService.saveDiscordConfig(clientId, clientSecret);
-    hasConfig.value = true;
-  }
-
-  async function clearConfig() {
-    configService.clearDiscordConfig();
-    hasConfig.value = false;
   }
 
   async function login() {
@@ -129,7 +110,7 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   return {
-    user, loading, error, initialized, hasConfig,
-    checkSession, saveConfig, clearConfig, login, logout, avatarUrl,
+    user, loading, error, initialized,
+    checkSession, login, logout, avatarUrl,
   };
 });

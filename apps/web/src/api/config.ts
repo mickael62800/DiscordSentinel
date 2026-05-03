@@ -1,13 +1,12 @@
-// Config persistante (API url / key + tokens bots) en localStorage pour la version web.
-// Remplace ConfigStore (keyring OS) du desktop.
+// Config persistante (API url + tokens bots) en localStorage pour la version web.
+// Le client_id/secret Discord OAuth est gere cote backend, le front n'en
+// voit jamais rien.
 
 const K_API = "ds.api.config";
-const K_DISCORD = "ds.discord.config";
 const K_DISCORD_USER = "ds.discord.user";
 const K_BOT_TOKENS = "ds.bot.tokens";
 
 export interface ApiConfig { api_url: string; api_key: string }
-export interface DiscordConfig { client_id: string; client_secret: string }
 export interface DiscordUser { id: string; username: string; avatar?: string | null; global_name?: string | null }
 
 export function getApiConfig(): ApiConfig | null {
@@ -16,20 +15,6 @@ export function getApiConfig(): ApiConfig | null {
 }
 export function setApiConfig(cfg: ApiConfig) {
   localStorage.setItem(K_API, JSON.stringify(cfg));
-}
-export function clearApiConfig() {
-  localStorage.removeItem(K_API);
-}
-
-export function getDiscordConfig(): DiscordConfig | null {
-  const raw = localStorage.getItem(K_DISCORD);
-  return raw ? JSON.parse(raw) : null;
-}
-export function setDiscordConfig(cfg: DiscordConfig) {
-  localStorage.setItem(K_DISCORD, JSON.stringify(cfg));
-}
-export function clearDiscordConfig() {
-  localStorage.removeItem(K_DISCORD);
 }
 
 export function getDiscordUser(): DiscordUser | null {

@@ -43,8 +43,8 @@ async function handle<T>(resp: Response): Promise<T> {
         clearDiscordToken();
         localStorage.removeItem("ds.discord.user");
       } catch { /* storage quota / cookies disabled : ignore */ }
-      // Skip redirect si deja sur login/setup (eviter boucle de redir).
-      if (path !== "/login" && path !== "/setup") {
+      // Skip redirect si deja sur login (eviter boucle de redir).
+      if (path !== "/login") {
         // Soft redirect via window.location pour reset l'app entiere
         // (Pinia stores, composables singletons, etc.).
         window.location.href = "/login?expired=1";

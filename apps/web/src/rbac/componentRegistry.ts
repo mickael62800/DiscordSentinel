@@ -38,7 +38,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "moderation.hub", label: "Bouton Modération", category: "Dashboard", minRole: "moderator" },
   { key: "security.hub", label: "Bouton Sécurité", category: "Dashboard", minRole: "admin" },
   { key: "security.audit", label: "Bouton Audit", category: "Dashboard", minRole: "moderator" },
-  { key: "system.settings", label: "Bouton Paramètres", category: "Dashboard", minRole: "admin" },
   { key: "system.rbac", label: "Bouton RBAC", category: "Dashboard", minRole: "owner" },
   { key: "system.systemops", label: "Bouton SystemOps", category: "Dashboard", minRole: "admin" },
   { key: "system.server_health", label: "Bouton État serveur", category: "Dashboard", minRole: "admin" },
@@ -88,7 +87,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "config.system-ops", label: "Bouton System Ops", category: "Dashboard", minRole: "admin" },
   { key: "config.server-health", label: "Bouton État serveur (config)", category: "Dashboard", minRole: "admin" },
   { key: "config.system-logs", label: "Bouton Logs système (bots/workers/API/WS)", category: "Dashboard", minRole: "admin" },
-  { key: "config.settings", label: "Bouton Paramètres (config)", category: "Dashboard", minRole: "admin" },
 
   // ── Docker ──
   { key: "docker.section", label: "Section Docker (visibilité)", category: "Docker", minRole: "admin" },

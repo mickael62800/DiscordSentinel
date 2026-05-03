@@ -87,7 +87,6 @@ const allSections: Section[] = [
   // pas dans le groupe Journaux (qui est metier Discord uniquement).
   { key: "config.system-logs", path: "/system-logs", label: "Logs système", icon: "list" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
-  { key: "config.settings", path: "/settings", label: "Parametres", icon: "settings" },
 ];
 
 // Sections visibles selon l'etat des bots :

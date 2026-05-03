@@ -76,7 +76,7 @@ onMounted(async () => {
       // Cleanup le token pour ne pas laisser une session "fantome"
       setDiscordToken("");
       setDiscordUser(null);
-      store.$patch({ user: null, hasConfig: true, initialized: true });
+      store.$patch({ user: null, initialized: true });
       await new Promise((r) => setTimeout(r, 2500));
       router.replace({ name: "login", query: { error: "not_invited" } });
       return;
@@ -88,7 +88,7 @@ onMounted(async () => {
   }
 
   // Injecte directement dans le store Pinia pour eviter un re-check async.
-  store.$patch({ user, hasConfig: true, initialized: true, error: null });
+  store.$patch({ user, initialized: true, error: null });
 
   router.replace({ name: "dashboard" });
 });

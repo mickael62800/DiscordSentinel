@@ -3,14 +3,12 @@ import type { RouteRecordRaw } from "vue-router";
 // Pages eagerly chargees : critiques au boot (login flow, callback OAuth).
 // Tout le reste est lazy-loaded -> chaque page = un chunk separe, charge
 // uniquement a la 1ere navigation. Reduit ~70-80% le bundle initial.
-import SetupPage from "../components/pages/SetupPage.vue";
 import LoginPage from "../components/pages/LoginPage.vue";
 import AuthCallbackPage from "../components/pages/AuthCallbackPage.vue";
 import DashboardPage from "../components/pages/DashboardPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   // ── Public / boot critique (eager) ──
-  { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
   { path: "/login", name: "login", component: LoginPage, meta: { public: true } },
   { path: "/auth/callback", name: "auth-callback", component: AuthCallbackPage, meta: { public: true } },
 
@@ -77,5 +75,4 @@ export const routes: RouteRecordRaw[] = [
   { path: "/server-health", name: "server-health", component: () => import("../components/pages/ServerHealthPage.vue") },
   { path: "/server-security", name: "server-security", component: () => import("../components/pages/ServerSecurityPage.vue") },
   { path: "/ai-dataset", name: "ai-dataset", component: () => import("../components/pages/AiDatasetPage.vue") },
-  { path: "/settings", name: "settings", component: () => import("../components/pages/SettingsPage.vue") },
 ];

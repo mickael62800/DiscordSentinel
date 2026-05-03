@@ -1,14 +1,12 @@
 // Helper pour recuperer l'URL de l'API backend depuis la config locale.
-// (anciennement bridgait vers un invoke Tauri ; on lit directement
-// configService desormais.)
 
-import { configService } from "@/services/configService";
+import { getApiConfig } from "@/api/config";
 
 let cachedUrl: string | null = null;
 
 export async function getApiBaseUrl(): Promise<string> {
   if (cachedUrl !== null) return cachedUrl;
-  const config = configService.getApiConfig();
+  const config = getApiConfig();
   // En prod, fallback URL relative -> passe par le proxy nginx.
   // En dev, fallback localhost:3000 -> hit l'API directement.
   const fallback = import.meta.env.PROD ? "" : "http://localhost:3000";

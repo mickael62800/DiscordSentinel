@@ -160,6 +160,16 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .merge(heavy_routes)
         // Toutes les routes de domaine protegees
         .merge(protected_domain_routes())
+        // Defense en profondeur : rejette tout user Discord non whitelist
+        // (pas dans api_user_guilds, pas superadmin) sur tous les endpoints
+        // proteges sauf check-access et redeem-invitation. Bloque la fuite
+        // de /api/guilds, /api/docker/*, /api/security/* a un user random
+        // qui aurait juste un token Discord valide. Doit tourner APRES
+        // rbac_middleware (qui injecte RoleContext).
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::adapters::inbound::http::middleware::whitelist::whitelist_middleware,
+        ))
         // Phase 7 B — RBAC fin : enrichit la requete avec le role du user
         // sur la guild courante (extension RoleContext). Doit tourner apres
         // guild_auth pour reutiliser le meme flow de token.
