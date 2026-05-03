@@ -20,12 +20,14 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   if (cfg?.api_key) h["Authorization"] = `Bearer ${cfg.api_key}`;
   const tok = getDiscordToken();
   if (tok) h["X-Discord-Token"] = tok;
+  console.log("[http] headers built, hasToken:", !!tok, "hasApiKey:", !!cfg?.api_key);
   return h;
 }
 
 async function handle<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     if (resp.status === 401) {
+      console.error("[http] 401 sur", resp.url, "- path actuel:", window.location.pathname, "- token present:", !!getDiscordToken());
       // Token invalide/expire : on purge la session locale et on redirige
       // vers /login pour forcer une re-authentification. Evite la boucle
       // infinie ou le user reste "logge" cote front mais 401 cote API.
@@ -36,9 +38,12 @@ async function handle<T>(resp: Response): Promise<T> {
       const path = window.location.pathname;
       // Skip si deja sur login/setup/auth-callback (eviter boucle de redir).
       if (path !== "/login" && path !== "/setup" && !path.startsWith("/auth/")) {
+        console.error("[http] redirect HARD vers /login?expired=1");
         // Soft redirect via window.location pour reset l'app entiere
         // (Pinia stores, composables singletons, etc.).
         window.location.href = "/login?expired=1";
+      } else {
+        console.warn("[http] 401 sur path public, pas de redirect");
       }
       throw new Error("Unauthorized: session expired");
     }

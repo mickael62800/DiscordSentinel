@@ -14,6 +14,7 @@ const message = ref("Connexion en cours…");
 const PENDING_INVITE_KEY = "ds.pending_invitation_code";
 
 onMounted(async () => {
+  console.log("[callback] onMounted, hash =", window.location.hash ? "present" : "absent");
   // Backend redirige ici avec les infos dans le FRAGMENT (#…) pour eviter
   // que le token n'apparaisse dans les logs serveur ou le referer.
   const hash = window.location.hash.startsWith("#")
@@ -25,7 +26,10 @@ onMounted(async () => {
   const id = params.get("id");
   const username = params.get("username");
 
+  console.log("[callback] parsed", { hasToken: !!token, id, username });
+
   if (!token || !id || !username) {
+    console.error("[callback] callback invalide - hash incomplet");
     router.replace({ name: "login", query: { error: "callback_invalide" } });
     return;
   }
@@ -39,6 +43,7 @@ onMounted(async () => {
 
   setDiscordToken(token);
   setDiscordUser(user);
+  console.log("[callback] token + user stockes (sessionStorage + localStorage)");
 
   // Nettoie l'URL (retire le fragment sensible) avant la prochaine nav.
   history.replaceState(null, "", window.location.pathname);
@@ -68,8 +73,10 @@ onMounted(async () => {
   // avec un message explicatif pour proposer la saisie d'un code.
   status.value = "redeeming";
   message.value = "Vérification des accès…";
+  console.log("[callback] ping check-access...");
   try {
     const access = await invitationsService.checkAccess();
+    console.log("[callback] check-access OK, is_authorized =", access.is_authorized);
     if (!access.is_authorized) {
       message.value = "Accès refusé. Tu n'es pas dans la liste des utilisateurs autorisés.";
       status.value = "error";
@@ -84,12 +91,13 @@ onMounted(async () => {
   } catch (e: any) {
     // Si check-access echoue (rate limit Discord, etc.), on laisse passer
     // pour ne pas bloquer un user legitime sur une erreur transitoire.
-    console.warn("check-access failed, proceeding anyway:", e);
+    console.warn("[callback] check-access failed, proceeding anyway:", e);
   }
 
   // Injecte directement dans le store Pinia pour eviter un re-check async.
   store.$patch({ user, hasConfig: true, initialized: true, error: null });
 
+  console.log("[callback] redirect -> dashboard");
   router.replace({ name: "dashboard" });
 });
 </script>
