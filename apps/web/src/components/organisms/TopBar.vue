@@ -30,7 +30,9 @@ function goHome() {
 }
 
 onMounted(() => {
-  fetchGuilds();
+  // Defense en profondeur : ne fetch pas si pas d'utilisateur logge
+  // (sinon 401 parasite qui peut purger le token d'une session voisine).
+  if (user.value) fetchGuilds();
 });
 </script>
 
