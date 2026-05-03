@@ -5,33 +5,34 @@ import { useSharedUserLookup } from "./useSharedUserLookup";
 import { useToast } from "./useToast";
 import type { UserNote, AddNotePayload } from "@/types/notes";
 
-export function useNotes() {
-  const { guildIdFilter } = useGuildSelector();
-  const { sharedUserId } = useSharedUserLookup();
-  const { success, error: showError } = useToast();
+// Singleton module-scoped : un seul cache partage entre Lookup / AddForm / List.
+const { guildIdFilter } = useGuildSelector();
+const { sharedUserId } = useSharedUserLookup();
 
-  const notes = ref<UserNote[]>([]);
-  // Reuse le ref module-level partage pour rester en phase avec EvidencePage
-  // et permettre au bouton du journal de pre-remplir l'ID.
-  const lookupUserId = sharedUserId;
-  const loading = ref(false);
+const notes = ref<UserNote[]>([]);
+const lookupUserId = sharedUserId;
+const loading = ref(false);
 
-  async function fetch(userId: string) {
-    if (!guildIdFilter.value || !userId.trim()) {
-      notes.value = [];
-      return;
-    }
-    loading.value = true;
-    try {
-      notes.value = await notesService.list(guildIdFilter.value, userId.trim());
-    } catch (e) {
-      console.error("Erreur chargement notes :", e);
-      showError("Impossible de charger les notes.");
-      notes.value = [];
-    } finally {
-      loading.value = false;
-    }
+async function fetch(userId: string) {
+  const { error: showError } = useToast();
+  if (!guildIdFilter.value || !userId.trim()) {
+    notes.value = [];
+    return;
   }
+  loading.value = true;
+  try {
+    notes.value = await notesService.list(guildIdFilter.value, userId.trim());
+  } catch (e) {
+    console.error("Erreur chargement notes :", e);
+    showError("Impossible de charger les notes.");
+    notes.value = [];
+  } finally {
+    loading.value = false;
+  }
+}
+
+export function useNotes() {
+  const { success, error: showError } = useToast();
 
   async function add(payload: AddNotePayload) {
     try {
