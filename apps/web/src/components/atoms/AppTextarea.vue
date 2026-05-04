@@ -8,7 +8,7 @@ defineProps<{
   required?: boolean;
   disabled?: boolean;
   readonly?: boolean;
-  maxlength?: number;
+  maxlength?: number | string;
 }>();
 
 defineEmits<{
