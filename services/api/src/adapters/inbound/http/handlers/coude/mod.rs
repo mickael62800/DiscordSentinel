@@ -25,6 +25,7 @@ pub mod vendetta;
 pub mod tout_ou_rien;
 pub mod travaux;
 pub mod steal_roll;
+pub mod steal_attempts;
 pub mod flavor;
 pub mod prank;
 pub mod bounty;

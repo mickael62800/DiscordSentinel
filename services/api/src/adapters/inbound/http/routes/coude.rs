@@ -186,6 +186,17 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/steal/roll",
             post(handlers::coude::steal_roll::roll_steal),
         )
+        // Phase 5 — persistance des tentatives /voler (timer 60s deplace
+        // dans sentinel-worker).
+        .route("/steals", post(handlers::coude::steal_attempts::create_steal_attempt))
+        .route(
+            "/steals/{id}/defend",
+            patch(handlers::coude::steal_attempts::mark_defended),
+        )
+        .route(
+            "/steals/{id}/resolved",
+            patch(handlers::coude::steal_attempts::mark_resolved),
+        )
         // Phase 3 #9 audit : catalogue de templates flavor.
         .route(
             "/flavor/{key}/random",
