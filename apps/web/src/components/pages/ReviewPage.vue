@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { reviewService } from "@/services/moderationAdvancedService";
 import type { ReviewQueueEntry } from "@/types/moderation-advanced";
+import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -107,7 +108,7 @@ function formatDate(iso: string): string {
         <p>Statut : <strong>{{ resolveDialog.status }}</strong></p>
         <label>
           Notes du relecteur (optionnel)
-          <textarea v-model="resolveDialog.notes" rows="3"></textarea>
+          <AppTextarea v-model="resolveDialog.notes" :rows="3" />
         </label>
         <div class="actions">
           <button class="btn-secondary" @click="resolveDialog = null">Annuler</button>

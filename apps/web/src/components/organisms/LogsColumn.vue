@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, ref } from "vue";
 import { useLogs } from "@/composables/useLogs";
 import { useFormatDate } from "@/composables/useFormatDate";
@@ -52,12 +53,12 @@ async function handleClear() {
     <header class="col-head">
       <h3>{{ title }}</h3>
       <div class="col-actions">
-        <select v-model="filterLevel" class="level-select">
+        <AppSelect v-model="filterLevel" class="level-select">
           <option value="all">Tous</option>
           <option value="info">Info</option>
           <option value="warn">Warn</option>
           <option value="error">Error</option>
-        </select>
+        </AppSelect>
         <button class="clear-btn" title="Vider tous les journaux" @click="handleClear">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18" />

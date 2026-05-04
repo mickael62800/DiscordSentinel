@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { ref } from "vue";
 import { useAuditLogs } from "@/composables/useAuditLogs";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -52,10 +53,10 @@ async function handlePurgeAll() {
       class="search-input"
       placeholder="Rechercher par nom, salon..."
     />
-    <select v-model="filterEventType" class="event-select">
+    <AppSelect v-model="filterEventType" class="event-select">
       <option value="">Tous les évènements</option>
       <option v-for="t in eventTypes" :key="t" :value="t">{{ eventLabel(t) }}</option>
-    </select>
+    </AppSelect>
     <button
       v-if="logs.length > 0 && visible('db.purge.audit_logs')"
       class="purge-btn"

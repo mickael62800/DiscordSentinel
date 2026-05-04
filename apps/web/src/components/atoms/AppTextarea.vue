@@ -1,40 +1,32 @@
 <script setup lang="ts">
 defineProps<{
-  modelValue: string | number | null | undefined;
-  type?: string;
+  modelValue: string | null | undefined;
   placeholder?: string;
-  min?: number;
-  max?: number;
   id?: string;
   name?: string;
+  rows?: number;
   required?: boolean;
   disabled?: boolean;
   readonly?: boolean;
   maxlength?: number;
-  autocomplete?: string;
-  pattern?: string;
 }>();
 
 defineEmits<{
-  "update:modelValue": [value: string | number];
+  "update:modelValue": [value: string];
 }>();
 </script>
 
 <template>
-  <input
+  <textarea
     :id="id"
     :name="name"
-    :type="type ?? 'text'"
     :value="modelValue ?? ''"
     :placeholder="placeholder"
-    :min="min"
-    :max="max"
+    :rows="rows ?? 3"
     :required="required"
     :disabled="disabled"
     :readonly="readonly"
     :maxlength="maxlength"
-    :autocomplete="autocomplete"
-    :pattern="pattern"
-    @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
+    @input="$emit('update:modelValue', ($event.target as HTMLTextAreaElement).value)"
   />
 </template>

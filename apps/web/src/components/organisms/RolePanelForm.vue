@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive } from "vue";
 import { useRouter } from "vue-router";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -8,6 +10,7 @@ import type { CreateRolePanelEntryPayload } from "@/services/rolePanelsService";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
+import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
 const router = useRouter();
 const { selectedGuildId } = useGuildSelector();
@@ -76,19 +79,19 @@ async function onSavePanel() {
     <h2>Configuration du panel</h2>
     <form @submit.prevent="onSavePanel" class="form">
       <label>Titre *
-        <input v-model="draft.title" required placeholder="Ex. Notifications" />
+        <AppInput v-model="draft.title" required placeholder="Ex. Notifications" />
       </label>
       <label>Salon Discord *
         <ChannelSelect v-model="draft.channel_id" :guild-id="selectedGuildId" />
       </label>
       <label class="full">Description
-        <textarea v-model="draft.description" rows="2"></textarea>
+        <AppTextarea v-model="draft.description" :rows="2" />
       </label>
       <label>Mode
-        <select v-model="draft.mode">
+        <AppSelect v-model="draft.mode">
           <option value="button">Boutons (jusqu'à 25 rôles)</option>
           <option value="select">Select menu (jusqu'à 25 rôles)</option>
-        </select>
+        </AppSelect>
       </label>
       <label>Max rôles par user
         <NumberInputWithUnit v-model.number="draft.max_roles" :min="1" placeholder="vide = illimité" />
@@ -107,12 +110,12 @@ async function onSavePanel() {
         <div v-else class="entry-list">
           <div v-for="(entry, idx) in draft.entries" :key="idx" class="entry-row">
             <RoleSelect v-model="entry.role_id" :guild-id="selectedGuildId" class="role-id" />
-            <input v-model="entry.role_name" placeholder="Nom (optionnel)" class="role-name" />
-            <input v-model="entry.emoji" placeholder="🎮" class="emoji" maxlength="4" />
-            <input v-model="entry.label" placeholder="Texte bouton" class="label" />
-            <select v-model="entry.style" class="style">
+            <AppInput v-model="entry.role_name" placeholder="Nom (optionnel)" class="role-name" />
+            <AppInput v-model="entry.emoji" placeholder="🎮" class="emoji" maxlength="4" />
+            <AppInput v-model="entry.label" placeholder="Texte bouton" class="label" />
+            <AppSelect v-model="entry.style" class="style">
               <option v-for="s in STYLES" :key="s.key" :value="s.key">{{ s.label }}</option>
-            </select>
+            </AppSelect>
             <button type="button" class="btn-icon-danger" @click="removeEntry(idx)">🗑️</button>
           </div>
         </div>

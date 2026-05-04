@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { onMounted, watch, ref, computed } from "vue";
 import { useMembers } from "../../composables/useMembers";
 import { useGuildSelector } from "../../composables/useGuildSelector";
@@ -64,16 +66,16 @@ function rolesCount(roles: unknown): number {
     </div>
 
     <div class="filters">
-      <input v-model="search" type="text" class="search-input" placeholder="Rechercher par nom ou ID..." />
-      <select v-model="watchFilter" class="sort-select">
+      <AppInput v-model="search" type="text" class="search-input" placeholder="Rechercher par nom ou ID..." />
+      <AppSelect v-model="watchFilter" class="sort-select">
         <option value="all">Tous les membres</option>
         <option value="watched">Surveilles uniquement</option>
         <option value="unwatched">Non surveilles</option>
-      </select>
-      <select v-model="sortBy" class="sort-select">
+      </AppSelect>
+      <AppSelect v-model="sortBy" class="sort-select">
         <option value="username">Tri par nom</option>
         <option value="joined_at">Tri par date d'arrivee</option>
-      </select>
+      </AppSelect>
     </div>
 
     <div v-if="loading" class="loading">Chargement...</div>

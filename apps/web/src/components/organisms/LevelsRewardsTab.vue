@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, computed } from "vue";
 import { useLevels } from "../../composables/useLevels";
 import type { DiscordRole } from "../../types";
@@ -109,7 +110,7 @@ function levelToXp(level: number): string {
       <p class="rewards-desc">
         Definissez le niveau texte et/ou vocal requis pour obtenir chaque role. Laissez vide pour les roles non lies a l'XP.
       </p>
-      <input v-model="roleSearch" class="role-search" placeholder="Rechercher un role..." />
+      <AppInput v-model="roleSearch" class="role-search" placeholder="Rechercher un role..." />
     </div>
 
     <div class="rewards-table">

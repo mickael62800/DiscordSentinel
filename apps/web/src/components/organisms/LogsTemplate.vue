@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, ref } from "vue";
 import { useLogs } from "../../composables/useLogs";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
@@ -151,7 +152,7 @@ async function handleClear() {
   <div class="logs">
     <h1 v-if="!hideTitle">{{ title }}</h1>
 
-    <input v-model="search" type="text" placeholder="Rechercher dans tous les champs..." class="search-global" />
+    <AppInput v-model="search" type="text" placeholder="Rechercher dans tous les champs..." class="search-global" />
 
     <div class="filters-row">
       <FilterBar :filters="filters" @update:filter="onFilterUpdate" />

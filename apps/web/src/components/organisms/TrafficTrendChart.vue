@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { Line } from "vue-chartjs";
 import { registerChartJs } from "@/utils/chartjs";
@@ -76,12 +77,12 @@ const chartOptions = computed(() => ({
     <div class="card-head">
       <h2>📈 Trafic anormal</h2>
       <div class="card-actions">
-        <select v-model="window">
+        <AppSelect v-model="window">
           <option value="1h">1h</option>
           <option value="6h">6h</option>
           <option value="24h">24h</option>
           <option value="7d">7j</option>
-        </select>
+        </AppSelect>
         <button class="btn xs" @click="load">↻</button>
       </div>
     </div>

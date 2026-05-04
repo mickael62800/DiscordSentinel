@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { useTickets } from "../../composables/useTickets";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
@@ -109,22 +110,22 @@ async function handleBulkDelete() {
         </div>
         <div class="filter-field">
           <label>Statut</label>
-          <select v-model="filterStatus">
+          <AppSelect v-model="filterStatus">
             <option value="all">Tous</option>
             <option value="open">Ouvert</option>
             <option value="pending">En attente</option>
             <option value="closed">Ferme</option>
-          </select>
+          </AppSelect>
         </div>
         <div class="filter-field">
           <label>Priorite</label>
-          <select v-model="filterPriority">
+          <AppSelect v-model="filterPriority">
             <option value="all">Toutes</option>
             <option value="urgent">Urgent</option>
             <option value="high">Elevee</option>
             <option value="medium">Moyenne</option>
             <option value="low">Faible</option>
-          </select>
+          </AppSelect>
         </div>
         <div class="filter-field">
           <label>Du</label>

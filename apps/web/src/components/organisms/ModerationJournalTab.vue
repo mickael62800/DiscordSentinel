@@ -18,6 +18,7 @@ import DataTable from "./DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
 import AppSelect from "../atoms/AppSelect.vue";
+import AppTextarea from "../atoms/AppTextarea.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppModal from "../atoms/AppModal.vue";
 import LoadingState from "../atoms/LoadingState.vue";
@@ -648,7 +649,7 @@ async function handleActionSubmit() {
     >
       <form class="action-form" @submit.prevent="handleActionSubmit">
         <FormField label="ID du serveur">
-          <input v-model="actionGuildId" type="text" placeholder="ID du serveur" />
+          <AppInput v-model="actionGuildId" type="text" placeholder="ID du serveur" />
         </FormField>
 
         <FormField label="Utilisateur cible (nom OU ID Discord)">
@@ -688,28 +689,28 @@ async function handleActionSubmit() {
 
         <div class="form-row two-col">
           <FormField label="ID cible">
-            <input v-model="actionTargetId" type="text" placeholder="Auto ou manuel" />
+            <AppInput v-model="actionTargetId" type="text" placeholder="Auto ou manuel" />
           </FormField>
           <FormField label="Nom cible">
-            <input v-model="actionTargetName" type="text" placeholder="Auto ou manuel" />
+            <AppInput v-model="actionTargetName" type="text" placeholder="Auto ou manuel" />
           </FormField>
         </div>
 
         <div class="form-row two-col">
           <FormField label="Action">
-            <select v-model="actionType">
+            <AppSelect v-model="actionType">
               <option value="warn">Avertissement</option>
               <option value="mute">Sourdine</option>
               <option value="ban">Bannissement</option>
-            </select>
+            </AppSelect>
           </FormField>
           <FormField label="Gravite">
-            <select v-model="actionGravity">
+            <AppSelect v-model="actionGravity">
               <option value="low">Faible</option>
               <option value="medium">Moyen</option>
               <option value="high">Eleve</option>
               <option value="critical">Critique</option>
-            </select>
+            </AppSelect>
           </FormField>
         </div>
 
@@ -726,7 +727,7 @@ async function handleActionSubmit() {
         </FormField>
 
         <FormField label="Raison">
-          <textarea v-model="actionReason" rows="3" placeholder="Pourquoi cette action ?"></textarea>
+          <AppTextarea v-model="actionReason" :rows="3" placeholder="Pourquoi cette action ?" />
         </FormField>
 
         <p v-if="actionError" class="error-msg">{{ actionError }}</p>

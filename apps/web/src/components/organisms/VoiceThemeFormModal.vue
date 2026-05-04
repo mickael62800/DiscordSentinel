@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, watch } from "vue";
 import { useVoiceThemes } from "@/composables/useVoiceThemes";
 import type { CreateThemePayload, VoiceChannelTheme } from "@/types/voice-extended";
@@ -79,18 +81,18 @@ async function onSave() {
       <h3>{{ editing ? "Modifier le thème" : "Nouveau thème" }}</h3>
       <form @submit.prevent="onSave" class="form-grid">
         <label>Nom *
-          <input v-model="draft.name" required />
+          <AppInput v-model="draft.name" required />
         </label>
         <label>Emoji
-          <input v-model="draft.emoji" placeholder="🎮" />
+          <AppInput v-model="draft.emoji" placeholder="🎮" />
         </label>
         <label class="full">Template du nom (variables {username}, {theme})
-          <input v-model="draft.channel_name_template" />
+          <AppInput v-model="draft.channel_name_template" />
         </label>
         <label>Visibilité
-          <select v-model="draft.visibility">
+          <AppSelect v-model="draft.visibility">
             <option v-for="v in VISIBILITIES" :key="v.key" :value="v.key">{{ v.label }}</option>
-          </select>
+          </AppSelect>
         </label>
         <label>Limite de membres
           <NumberInputWithUnit v-model.number="draft.member_limit" :min="0" placeholder="0 = illimité" />

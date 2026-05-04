@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
 import {
   serverSecurityService,
@@ -275,12 +276,12 @@ const tabs = [
         <div class="card-head">
           <h2>📋 Events serveur ({{ serverEvents.length }})</h2>
           <div class="card-actions">
-            <select v-model="eventsFilter" @change="loadServerEvents">
+            <AppSelect v-model="eventsFilter" @change="loadServerEvents">
               <option value="all">Toutes actions</option>
               <option value="docker">Docker</option>
               <option value="security">Sécurité</option>
               <option value="rbac">RBAC</option>
-            </select>
+            </AppSelect>
             <button class="btn-secondary xs" @click="loadServerEvents">↻</button>
           </div>
         </div>
@@ -346,13 +347,13 @@ const tabs = [
         <div class="modal-form">
           <label>
             Ne garder que les logs de moins de :
-            <select v-model.number="cleanupOpts.days">
+            <AppSelect v-model.number="cleanupOpts.days">
               <option :value="0">0 jours (TOUT supprimer)</option>
               <option :value="1">1 jour</option>
               <option :value="7">7 jours</option>
               <option :value="30">30 jours</option>
               <option :value="90">90 jours</option>
-            </select>
+            </AppSelect>
           </label>
           <label class="checkbox">
             <input type="checkbox" v-model="cleanupOpts.includeAudit" />

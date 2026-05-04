@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
 import {
   serverSecurityService,
@@ -87,11 +88,11 @@ onMounted(refresh);
       <div class="card-head">
         <h2>📊 Top IPs par requêtes</h2>
         <div class="card-actions">
-          <select v-model="topIpsWindow" @change="loadTopIps">
+          <AppSelect v-model="topIpsWindow" @change="loadTopIps">
             <option value="1h">1h</option>
             <option value="24h">24h</option>
             <option value="7d">7j</option>
-          </select>
+          </AppSelect>
           <button class="btn-secondary xs" @click="loadTopIps">↻</button>
         </div>
       </div>
@@ -126,11 +127,11 @@ onMounted(refresh);
       <div class="card-head">
         <h2>🔒 Échecs d'authentification ({{ authFailures.length }})</h2>
         <div class="card-actions">
-          <select v-model="authWindow" @change="loadAuthFailures">
+          <AppSelect v-model="authWindow" @change="loadAuthFailures">
             <option value="1h">1h</option>
             <option value="24h">24h</option>
             <option value="7d">7j</option>
-          </select>
+          </AppSelect>
           <button class="btn-secondary xs" @click="loadAuthFailures">↻</button>
         </div>
       </div>

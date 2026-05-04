@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, watch } from "vue";
 import { discordRolesService } from "@/services/discordRolesService";
 import { useDiscordRoles } from "../../composables/useDiscordRoles";
@@ -104,7 +105,7 @@ async function saveEdit() {
       <div class="edit-grid-2">
         <div class="edit-field">
           <label>Nom</label>
-          <input v-model="editName" type="text" class="modal-input" placeholder="Nom du role" />
+          <AppInput v-model="editName" type="text" class="modal-input" placeholder="Nom du role" />
         </div>
         <div class="edit-field">
           <label>Couleur</label>

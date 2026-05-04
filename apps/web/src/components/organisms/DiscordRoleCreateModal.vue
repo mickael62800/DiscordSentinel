@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, watch } from "vue";
 import { discordRolesService } from "@/services/discordRolesService";
 import { useDiscordRoles } from "../../composables/useDiscordRoles";
@@ -55,7 +56,7 @@ async function createRole() {
   >
     <div class="modal-field">
       <label>Nom</label>
-      <input v-model="newRoleName" type="text" class="modal-input" placeholder="Nom du role" />
+      <AppInput v-model="newRoleName" type="text" class="modal-input" placeholder="Nom du role" />
     </div>
     <div class="modal-field">
       <label>Couleur</label>

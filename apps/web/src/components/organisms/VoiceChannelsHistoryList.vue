@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { ref, computed } from "vue";
 import { useVoiceChannels } from "../../composables/useVoiceChannels";
 import { useFormatDate } from "../../composables/useFormatDate";
@@ -108,11 +109,11 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
     </div>
 
     <div class="filter-row history-filters">
-      <select v-model="historyFilterKind" class="filter-select">
+      <AppSelect v-model="historyFilterKind" class="filter-select">
         <option value="all">Tous les types</option>
         <option value="public">Public</option>
         <option value="private">Prive</option>
-      </select>
+      </AppSelect>
       <input
         v-model="historySearch"
         type="search"

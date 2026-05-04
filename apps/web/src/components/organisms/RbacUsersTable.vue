@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { ref, computed } from "vue";
 import { useRbac } from "@/composables/useRbac";
 import { useFormatDate } from "@/composables/useFormatDate";
@@ -82,9 +83,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
           type="text"
           placeholder="Nom d'affichage (optionnel)"
         />
-        <select v-model="newRole">
+        <AppSelect v-model="newRole">
           <option v-for="role in ROLES" :key="role" :value="role">{{ role }}</option>
-        </select>
+        </AppSelect>
         <button type="submit" :disabled="submitting">{{ submitting ? "..." : "Ajouter" }}</button>
         <button type="button" @click="resetForm">Annuler</button>
       </form>
@@ -133,7 +134,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
                 @change="onRoleChange(user.discord_user_id, ($event.target as HTMLSelectElement).value as RbacRole)"
               >
                 <option v-for="role in ROLES" :key="role" :value="role">{{ role }}</option>
-              </select>
+              </AppSelect>
               <AppBadge v-else :label="user.role" :variant="roleVariant(user.role)" />
             </td>
             <td class="col-meta">{{ fmt(user.granted_at) }}</td>

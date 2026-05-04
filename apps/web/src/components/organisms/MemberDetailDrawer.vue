@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, computed, watch } from "vue";
 import { useMembers } from "../../composables/useMembers";
 import { useFormatDate } from "../../composables/useFormatDate";
@@ -638,7 +639,7 @@ function discordProfileUrl(userId: string): string {
             <h3>Ajuster les points</h3>
             <div class="adjust-form">
               <NumberInputWithUnit v-model.number="adjustAmount" :min="1" :max="12" class="adjust-input" />
-              <input v-model="adjustReason" type="text" class="adjust-reason" placeholder="Raison..." />
+              <AppInput v-model="adjustReason" type="text" class="adjust-reason" placeholder="Raison..." />
               <button class="adjust-btn add" :disabled="adjusting || !adjustReason" @click="doAdjust(true)">+ Ajouter</button>
               <button class="adjust-btn remove" :disabled="adjusting || !adjustReason" @click="doAdjust(false)">- Retirer</button>
             </div>

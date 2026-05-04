@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useRolePanels } from "@/composables/useRolePanels";
@@ -60,7 +61,7 @@ async function onAdd() {
 
     <div class="auto-role-form">
       <RoleSelect v-model="draft.role_id" :guild-id="selectedGuildId" />
-      <input v-model="draft.role_name" placeholder="Nom (optionnel)" />
+      <AppInput v-model="draft.role_name" placeholder="Nom (optionnel)" />
       <NumberInputWithUnit v-model.number="draft.delay_secs" :min="0" unit="s" placeholder="Délai" />
       <button class="btn-primary" @click="onAdd">Ajouter</button>
     </div>

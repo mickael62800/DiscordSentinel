@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, reactive, watch } from "vue";
 import { useWelcome } from "@/composables/useWelcome";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppToggle from "@/components/atoms/AppToggle.vue";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
+import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
 const { config, saving, saveConfig } = useWelcome();
 const { guildIdFilter } = useGuildSelector();
@@ -153,19 +155,19 @@ async function onSave() {
           <ChannelSelect v-model="draft.welcome_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre embed
-          <input v-model="draft.welcome_title" placeholder="Bienvenue !" />
+          <AppInput v-model="draft.welcome_title" placeholder="Bienvenue !" />
         </label>
         <label>Couleur (hex)
           <input v-model="draft.welcome_embed_color" type="color" />
         </label>
         <label>Image (URL)
-          <input v-model="draft.welcome_image_url" placeholder="https://..." />
+          <AppInput v-model="draft.welcome_image_url" placeholder="https://..." />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.welcome_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.welcome_message" :rows="6" />
         </label>
         <label class="full">Footer
-          <input v-model="draft.welcome_footer_text" />
+          <AppInput v-model="draft.welcome_footer_text" />
         </label>
       </div>
 
@@ -176,7 +178,7 @@ async function onSave() {
           <span>Activer le DM</span>
         </label>
         <label class="full">Message DM
-          <textarea v-model="draft.welcome_dm_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.welcome_dm_message" :rows="6" />
         </label>
       </details>
 
@@ -210,10 +212,10 @@ async function onSave() {
           <RoleSelect v-model="draft.rules_role_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Texte du bouton
-          <input v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
+          <AppInput v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.rules_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.rules_message" :rows="6" />
         </label>
       </div>
     </fieldset>
@@ -231,7 +233,7 @@ async function onSave() {
           <ChannelSelect v-model="draft.counter_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Format
-          <input v-model="draft.counter_format" placeholder="👥 {count} membres" />
+          <AppInput v-model="draft.counter_format" placeholder="👥 {count} membres" />
         </label>
       </div>
     </fieldset>
@@ -249,16 +251,16 @@ async function onSave() {
           <ChannelSelect v-model="draft.anniversary_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre
-          <input v-model="draft.anniversary_title" />
+          <AppInput v-model="draft.anniversary_title" />
         </label>
         <label>Image (URL)
-          <input v-model="draft.anniversary_image_url" />
+          <AppInput v-model="draft.anniversary_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.anniversary_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.anniversary_message" :rows="6" />
         </label>
         <label class="full">Footer
-          <input v-model="draft.anniversary_footer_text" />
+          <AppInput v-model="draft.anniversary_footer_text" />
         </label>
       </div>
     </fieldset>
@@ -276,16 +278,16 @@ async function onSave() {
           <ChannelSelect v-model="draft.leave_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre
-          <input v-model="draft.leave_title" />
+          <AppInput v-model="draft.leave_title" />
         </label>
         <label>Image (URL)
-          <input v-model="draft.leave_image_url" />
+          <AppInput v-model="draft.leave_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.leave_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.leave_message" :rows="6" />
         </label>
         <label class="full">Footer
-          <input v-model="draft.leave_footer_text" />
+          <AppInput v-model="draft.leave_footer_text" />
         </label>
       </div>
     </fieldset>
@@ -299,16 +301,16 @@ async function onSave() {
       </p>
       <div class="grid">
         <label>Titre
-          <input v-model="draft.rejoin_title" />
+          <AppInput v-model="draft.rejoin_title" />
         </label>
         <label>Image (URL)
-          <input v-model="draft.rejoin_image_url" />
+          <AppInput v-model="draft.rejoin_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.rejoin_message" rows="6"></textarea>
+          <AppTextarea v-model="draft.rejoin_message" :rows="6" />
         </label>
         <label class="full">Footer
-          <input v-model="draft.rejoin_footer_text" />
+          <AppInput v-model="draft.rejoin_footer_text" />
         </label>
       </div>
     </fieldset>

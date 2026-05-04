@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { dockerService, type DockerContainer, type DockerImage, type DockerNetwork, type DockerOverview, type DockerVolume } from "@/services/dockerService";
 import { useToast } from "@/composables/useToast";
@@ -323,11 +324,11 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
     <!-- ── Containers ── -->
     <div v-else-if="tab === 'containers'">
       <div class="filters">
-        <select v-model="filterContainerState">
+        <AppSelect v-model="filterContainerState">
           <option value="all">Tous ({{ containers.length }})</option>
           <option value="running">Running ({{ containers.filter(c => c.state === 'running').length }})</option>
           <option value="stopped">Arrêtés ({{ containers.filter(c => c.state !== 'running').length }})</option>
-        </select>
+        </AppSelect>
       </div>
       <table class="docker-table">
         <thead>
@@ -473,13 +474,13 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
           <strong>📋 Logs : {{ logsContainer ? cleanName(logsContainer.names[0] ?? '') : '' }}</strong>
           <div class="logs-controls">
             <label>Lignes :
-              <select v-model.number="logsTail" @change="fetchLogs">
+              <AppSelect v-model.number="logsTail" @change="fetchLogs">
                 <option :value="50">50</option>
                 <option :value="200">200</option>
                 <option :value="500">500</option>
                 <option :value="2000">2000</option>
                 <option :value="5000">5000</option>
-              </select>
+              </AppSelect>
             </label>
             <button class="btn xs" :disabled="logsLoading" @click="fetchLogs">↻</button>
             <button class="btn xs" @click="closeLogs">Fermer</button>

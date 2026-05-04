@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { useVoiceChannels } from "../../composables/useVoiceChannels";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
@@ -60,11 +61,11 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
 <template>
   <div>
     <div class="filter-row">
-      <select v-model="filterKind" class="filter-select">
+      <AppSelect v-model="filterKind" class="filter-select">
         <option value="all">Tous les types</option>
         <option value="public">Public</option>
         <option value="private">Prive</option>
-      </select>
+      </AppSelect>
       <button
         v-if="filteredChannels.length > 0"
         class="cleanup-btn"

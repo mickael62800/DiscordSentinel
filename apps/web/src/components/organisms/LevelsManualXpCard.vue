@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive, ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -53,19 +55,19 @@ async function grant() {
     </p>
     <form @submit.prevent="grant" class="form">
       <label>User ID *
-        <input v-model="draft.user_id" required />
+        <AppInput v-model="draft.user_id" required />
       </label>
       <label>Username
-        <input v-model="draft.username" placeholder="(optionnel)" />
+        <AppInput v-model="draft.username" placeholder="(optionnel)" />
       </label>
       <label>Montant *
         <NumberInputWithUnit v-model.number="draft.amount" required unit="xp" />
       </label>
       <label>Source
-        <select v-model="draft.source">
+        <AppSelect v-model="draft.source">
           <option value="text">Texte</option>
           <option value="voice">Vocal</option>
-        </select>
+        </AppSelect>
       </label>
       <div class="actions full">
         <button type="submit" class="btn-primary" :disabled="granting">

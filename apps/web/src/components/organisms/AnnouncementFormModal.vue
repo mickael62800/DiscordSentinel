@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import {
@@ -14,6 +16,7 @@ import type { DiscordRole } from "@/types";
 import AppModal from "../atoms/AppModal.vue";
 import AppButton from "../atoms/AppButton.vue";
 import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
+import AppTextarea from "../atoms/AppTextarea.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -264,16 +267,16 @@ async function save() {
     <div class="grid-2">
       <label>
         Nom *
-        <input v-model="form.name" type="text" placeholder="ex: Rappel Tournoi du dimanche" />
+        <AppInput v-model="form.name" type="text" placeholder="ex: Rappel Tournoi du dimanche" />
       </label>
       <label>
         Type de récurrence
-        <select v-model="form.recurrence_type">
+        <AppSelect v-model="form.recurrence_type">
           <option value="once">Ponctuelle (une fois)</option>
           <option value="daily">Quotidienne</option>
           <option value="weekly">Hebdomadaire</option>
           <option value="monthly">Mensuelle</option>
-        </select>
+        </AppSelect>
       </label>
     </div>
 
@@ -290,9 +293,9 @@ async function save() {
 
     <label v-if="form.recurrence_type === 'weekly'">
       Jour de la semaine
-      <select v-model.number="form.recurrence_day_of_week">
+      <AppSelect v-model.number="form.recurrence_day_of_week">
         <option v-for="(d, i) in dowLabels" :key="i" :value="i">{{ d }}</option>
-      </select>
+      </AppSelect>
     </label>
 
     <label v-if="form.recurrence_type === 'monthly'">
@@ -314,17 +317,17 @@ async function save() {
 
     <label>
       Format
-      <select v-model="form.content_type">
+      <AppSelect v-model="form.content_type">
         <option value="text">Texte simple</option>
         <option value="embed">Embed riche (carte)</option>
-      </select>
+      </AppSelect>
     </label>
 
     <template v-if="form.content_type === 'embed'">
       <div class="grid-2">
         <label>
           Titre embed
-          <input v-model="form.embed_title" type="text" />
+          <AppInput v-model="form.embed_title" type="text" />
         </label>
         <label>
           Couleur
@@ -333,17 +336,17 @@ async function save() {
       </div>
       <label>
         URL image (grande, en bas)
-        <input v-model="form.embed_image_url" type="url" placeholder="https://..." />
+        <AppInput v-model="form.embed_image_url" type="url" placeholder="https://..." />
       </label>
       <label>
         URL thumbnail (petite, à droite)
-        <input v-model="form.embed_thumbnail_url" type="url" placeholder="https://..." />
+        <AppInput v-model="form.embed_thumbnail_url" type="url" placeholder="https://..." />
       </label>
     </template>
 
     <label>
       {{ form.content_type === "embed" ? "Description (variables : {date} {day_name} {time} ...)" : "Contenu (variables : {date} {day_name} {time} ...)" }}
-      <textarea v-model="form.content_text" rows="5"></textarea>
+      <AppTextarea v-model="form.content_text" :rows="5" />
     </label>
 
     <hr class="sep" />
@@ -478,14 +481,14 @@ async function save() {
       <div v-if="form.buttons.length === 0" class="muted small">Aucun bouton.</div>
       <div v-else class="button-list">
         <div v-for="(btn, idx) in form.buttons" :key="idx" class="button-row">
-          <input v-model="btn.label" type="text" placeholder="Label" maxlength="80" class="btn-label" />
-          <select v-model="btn.style" class="btn-style">
+          <AppInput v-model="btn.label" type="text" placeholder="Label" maxlength="80" class="btn-label" />
+          <AppSelect v-model="btn.style" class="btn-style">
             <option value="primary">Bleu</option>
             <option value="secondary">Gris</option>
             <option value="success">Vert</option>
             <option value="danger">Rouge</option>
             <option value="link">Lien</option>
-          </select>
+          </AppSelect>
           <input
             v-if="btn.style === 'link'"
             v-model="btn.url"

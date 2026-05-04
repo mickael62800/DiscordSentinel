@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -63,7 +64,7 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
         <NumberInputWithUnit v-model.number="draft.regen_amount" :min="0" />
       </label>
       <label>Intervalle regen (ISO 8601)
-        <input v-model="draft.regen_interval" placeholder="P1D" />
+        <AppInput v-model="draft.regen_interval" placeholder="P1D" />
       </label>
       <label>Pénalité warn
         <NumberInputWithUnit v-model.number="draft.penalty_warn" :min="0" />

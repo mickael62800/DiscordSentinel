@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { invitationsService, type InvitationDto } from "@/services/invitationsService";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -126,25 +128,25 @@ watch(selectedGuildId, load);
       <div class="form-row">
         <label>
           Rôle attribué
-          <select v-model="formRole">
+          <AppSelect v-model="formRole">
             <option value="viewer">Viewer (lecture seule)</option>
             <option value="moderator">Modérateur</option>
             <option value="admin">Admin</option>
             <option value="owner">Owner</option>
-          </select>
+          </AppSelect>
         </label>
         <label>
           Expiration
-          <select v-model.number="formExpiresHours">
+          <AppSelect v-model.number="formExpiresHours">
             <option :value="24">1 jour</option>
             <option :value="168">7 jours</option>
             <option :value="720">30 jours</option>
             <option :value="0">Jamais</option>
-          </select>
+          </AppSelect>
         </label>
         <label class="grow">
           Notes (privé, ex: "Pour Bob, modo backup")
-          <input v-model="formNotes" placeholder="(facultatif)" />
+          <AppInput v-model="formNotes" placeholder="(facultatif)" />
         </label>
       </div>
       <div class="form-actions">
@@ -177,12 +179,12 @@ watch(selectedGuildId, load);
 
     <!-- Filtres + compteurs -->
     <div class="filter-bar">
-      <select v-model="filterStatus">
+      <AppSelect v-model="filterStatus">
         <option value="all">Tous ({{ counts.total }})</option>
         <option value="active">Actifs ({{ counts.active }})</option>
         <option value="used">Utilisés ({{ counts.used }})</option>
         <option value="expired">Expirés ({{ counts.expired }})</option>
-      </select>
+      </AppSelect>
       <button class="btn xs" @click="load">↻</button>
     </div>
 

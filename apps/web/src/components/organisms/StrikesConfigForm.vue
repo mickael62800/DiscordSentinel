@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { reactive, watch } from "vue";
 import { useStrikes } from "@/composables/useStrikes";
 import type { StrikeThreshold } from "@/types/strikes";
@@ -90,9 +91,9 @@ async function onSave() {
                 <NumberInputWithUnit v-model.number="t.strikes" :min="1" />
               </td>
               <td>
-                <select v-model="t.action">
+                <AppSelect v-model="t.action">
                   <option v-for="a in ACTIONS" :key="a" :value="a">{{ a }}</option>
-                </select>
+                </AppSelect>
               </td>
               <td>
                 <div class="cell-inline">

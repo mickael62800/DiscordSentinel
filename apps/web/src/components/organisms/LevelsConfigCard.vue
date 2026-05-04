@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -89,7 +90,7 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
         <ChannelSelect v-model="draft.level_up_channel_id" :guild-id="guildIdFilter ?? null" />
       </label>
       <label class="full">Message level-up (variables {user}, {level})
-        <input v-model="draft.level_up_message" />
+        <AppInput v-model="draft.level_up_message" />
       </label>
       <label class="full">Salons exclus
         <IdsListPickerField

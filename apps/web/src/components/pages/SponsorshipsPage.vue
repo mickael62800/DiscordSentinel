@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { onMounted, reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -78,11 +79,11 @@ function formatDate(iso: string): string {
       <form @submit.prevent="onCreate" class="form">
         <label>
           Sponsor (parrain) ID *
-          <input v-model="draft.sponsor_id" required />
+          <AppInput v-model="draft.sponsor_id" required />
         </label>
         <label>
           Sponsored (filleul) ID *
-          <input v-model="draft.sponsored_id" required />
+          <AppInput v-model="draft.sponsored_id" required />
         </label>
         <div class="actions full">
           <button type="submit" class="btn-primary">Enregistrer</button>

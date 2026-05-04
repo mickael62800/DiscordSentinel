@@ -1,7 +1,9 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useNotes } from "@/composables/useNotes";
+import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { lookupUserId, add } = useNotes();
@@ -44,13 +46,13 @@ async function onAdd() {
     <form class="add-form" @submit.prevent="onAdd">
       <label>
         Catégorie
-        <select v-model="draft.category">
+        <AppSelect v-model="draft.category">
           <option v-for="c in CATEGORIES" :key="c.key" :value="c.key">{{ c.label }}</option>
-        </select>
+        </AppSelect>
       </label>
       <label class="full">
         Contenu
-        <textarea v-model="draft.content" rows="3" required></textarea>
+        <AppTextarea v-model="draft.content" :rows="3" required />
       </label>
       <div class="actions">
         <button type="submit" class="btn-primary" :disabled="!canSubmit">Ajouter</button>

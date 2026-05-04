@@ -6,6 +6,7 @@ import { useSharedUserLookup } from "@/composables/useSharedUserLookup";
 import { evidenceService } from "@/services/moderationAdvancedService";
 import type { EvidenceEntry } from "@/types/moderation-advanced";
 import type { Infraction } from "@/types";
+import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
 interface Props {
   /** Quand true, cache l'en-tete et le champ de recherche (utilise dans le
@@ -180,7 +181,7 @@ watch(lookupUserId, async (id) => {
         </label>
         <label>
           Description (optionnel, max 500 chars)
-          <textarea v-model="draft.description" rows="2"></textarea>
+          <AppTextarea v-model="draft.description" :rows="2" />
         </label>
         <div class="actions">
           <button type="submit" class="btn-primary" :disabled="!draft.url.trim()">

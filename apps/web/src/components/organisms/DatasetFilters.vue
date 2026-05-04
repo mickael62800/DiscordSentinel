@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AppSelect from "@/components/atoms/AppSelect.vue";
+import AppInput from "@/components/atoms/AppInput.vue";
 import { useAiDataset } from "@/composables/useAiDataset";
 import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
@@ -16,7 +18,7 @@ function search() {
   <section class="card filters">
     <div class="filter">
       <label>Channel ID</label>
-      <input v-model="filterChannel" placeholder="(facultatif)" />
+      <AppInput v-model="filterChannel" placeholder="(facultatif)" />
     </div>
     <div class="filter">
       <label>Du</label>
@@ -32,12 +34,12 @@ function search() {
     </div>
     <div class="filter">
       <label>Par page</label>
-      <select v-model.number="limit">
+      <AppSelect v-model.number="limit">
         <option :value="100">100</option>
         <option :value="200">200</option>
         <option :value="500">500</option>
         <option :value="1000">1000</option>
-      </select>
+      </AppSelect>
     </div>
     <div class="filter actions">
       <button class="btn" :disabled="loading" @click="search">🔍 Rechercher</button>

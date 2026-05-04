@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -113,7 +114,7 @@ const sortedRoles = computed(() =>
       <form @submit.prevent="onCreate" class="form">
         <label>
           User ID *
-          <input v-model="draft.user_id" required />
+          <AppInput v-model="draft.user_id" required />
         </label>
         <label>
           Rôle *
