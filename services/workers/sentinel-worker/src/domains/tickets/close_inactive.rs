@@ -1,0 +1,122 @@
+//! Ferme les tickets inactifs > inactive_close_days (defaut 7j).
+//! Pour chaque ticket ferme, XADD un event `ticket_auto_closed` que le
+//! bot consume pour faire le menage Discord (notification + delete
+//! channel).
+
+use std::collections::HashMap;
+
+use sqlx::PgPool;
+use tracing::{debug, info, warn};
+use uuid::Uuid;
+
+const STREAM_KEY: &str = "sentinel:events";
+const STREAM_MAXLEN: usize = 10_000;
+const PAYLOAD_FIELD: &str = "payload";
+const DEFAULT_INACTIVE_DAYS: i64 = 7;
+
+#[derive(sqlx::FromRow)]
+struct InactiveTicket {
+    id: Uuid,
+    server: String,
+    channel_id: Option<String>,
+    inactive_days: i64,
+}
+
+pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
+    // Charge les overrides per-guild (inactive_close_days). 1 query.
+    let timeouts = load_timeouts(pool).await;
+
+    // Filtre grossier en SQL : tickets non closed, mis a jour il y a au
+    // moins 1 jour. Ensuite affinage par config guild.
+    let candidates: Vec<InactiveTicket> = sqlx::query_as::<_, InactiveTicket>(
+        "SELECT id, server, channel_id, \
+                EXTRACT(EPOCH FROM (NOW() - updated_at))::bigint / 86400 AS inactive_days \
+         FROM tickets \
+         WHERE status != 'closed' \
+           AND updated_at < NOW() - INTERVAL '1 day' \
+         ORDER BY updated_at ASC \
+         LIMIT 200",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("query inactive tickets: {e}"))?;
+
+    if candidates.is_empty() {
+        debug!("Aucun ticket inactif candidat");
+        return Ok(());
+    }
+
+    let mut conn = redis
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|e| format!("redis connect: {e}"))?;
+
+    let mut closed = 0u32;
+    for t in &candidates {
+        let timeout_days = timeouts
+            .get(&t.server)
+            .copied()
+            .unwrap_or(DEFAULT_INACTIVE_DAYS);
+        if timeout_days <= 0 || t.inactive_days < timeout_days {
+            continue;
+        }
+
+        // UPDATE atomique avec garde sur status (idempotence).
+        let updated = sqlx::query(
+            "UPDATE tickets SET status = 'closed', updated_at = NOW() \
+             WHERE id = $1 AND status != 'closed'",
+        )
+        .bind(t.id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("close ticket: {e}"))?;
+        if updated.rows_affected() == 0 {
+            continue;
+        }
+
+        let payload = serde_json::json!({
+            "event": "ticket_auto_closed",
+            "data": {
+                "ticket_id": t.id.to_string(),
+                "guild_id": t.server,
+                "channel_id": t.channel_id,
+                "inactive_days": t.inactive_days,
+                "timeout_days": timeout_days,
+            }
+        });
+
+        let res: redis::RedisResult<String> = redis::cmd("XADD")
+            .arg(STREAM_KEY)
+            .arg("MAXLEN")
+            .arg("~")
+            .arg(STREAM_MAXLEN)
+            .arg("*")
+            .arg(PAYLOAD_FIELD)
+            .arg(payload.to_string())
+            .query_async(&mut conn)
+            .await;
+        if let Err(e) = res {
+            warn!(error = %e, ticket_id = %t.id, "XADD ticket_auto_closed echoue");
+        }
+        closed += 1;
+    }
+
+    if closed > 0 {
+        info!(closed, "Tickets inactifs fermes -> events publies");
+    }
+    Ok(())
+}
+
+async fn load_timeouts(pool: &PgPool) -> HashMap<String, i64> {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT guild_id, config_value FROM bot_guild_config \
+         WHERE bot_name = 'ticket-bot' AND config_key = 'inactive_close_days'",
+    )
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    rows.into_iter()
+        .filter_map(|(g, v)| v.parse::<i64>().ok().map(|n| (g, n)))
+        .collect()
+}

@@ -72,6 +72,10 @@ const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
 // est de 60s, donc une latence max de 65s pour la resolution AFK.
 const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
 
+// Phase 5 — Tickets close inactifs : tick 30 min (meme cadence que
+// l'ancienne boucle bot).
+const DEFAULT_TICKETS_CLOSE_INACTIVE_SECS: u64 = 1800;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -138,6 +142,9 @@ pub struct WorkerConfig {
     pub cashbox_tick_secs: u64,
     pub cashbox_min_days: u64,
     pub steal_expiry_check_secs: u64,
+
+    // ── Tickets ──
+    pub tickets_close_inactive_secs: u64,
 }
 
 impl WorkerConfig {
@@ -271,6 +278,12 @@ impl WorkerConfig {
             steal_expiry_check_secs: load_env(
                 "STEAL_EXPIRY_CHECK_SECS",
                 DEFAULT_STEAL_EXPIRY_CHECK_SECS,
+            ),
+
+            // tickets
+            tickets_close_inactive_secs: load_env(
+                "TICKETS_CLOSE_INACTIVE_SECS",
+                DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
             ),
         }
     }
@@ -496,6 +509,14 @@ impl WorkerConfig {
             "steal_expiry_check_secs",
             "STEAL_EXPIRY_CHECK_SECS",
             DEFAULT_STEAL_EXPIRY_CHECK_SECS,
+        );
+
+        // tickets
+        self.tickets_close_inactive_secs = config_or_env(
+            db,
+            "tickets_close_inactive_secs",
+            "TICKETS_CLOSE_INACTIVE_SECS",
+            DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
         );
     }
 }

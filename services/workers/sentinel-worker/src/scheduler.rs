@@ -528,8 +528,32 @@ pub fn start(
         });
     }
 
-    // Phase 4 : nouveaux jobs migres depuis le bot (vol, security,
-    // tickets, automod, progression, auto-roles).
+    // ─────────────────────────────────────────────────────────────
+    // Phase 5 — Domaine tickets : fermeture auto des tickets inactifs.
+    // Avant : boucle 30min dans le bot. Maintenant : worker UPDATE
+    // status='closed' + XADD event 'ticket_auto_closed' que le bot
+    // consume pour le menage Discord (notification + delete channel).
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "close_inactive_tickets",
+            config.tickets_close_inactive_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "ticket-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::tickets::close_inactive::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // Phases suivantes : migrer les autres timers du bot (security,
+    // automod, progression, auto-roles, voice-afk).
 
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);

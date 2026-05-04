@@ -243,19 +243,15 @@ pub async fn on_ready(ctx: &Context, _ready: &Ready) {
 // ── Background tasks ──
 
 /// Spawn les background tasks du module tickets :
-/// - fermeture auto des tickets inactifs (toutes les 30 min)
-/// - escalade SLA (toutes les 5 min)
-/// - consumer Redis pour le relay staff -> salon Discord
+/// - escalade SLA (toutes les 5 min) — TODO migrer vers worker (etat
+///   in-memory non resilient)
+/// - consumer Redis : relay staff + ticket_auto_closed (Phase 5)
+///
+/// Phase 5 : la fermeture auto des tickets inactifs (30 min) a ete
+/// deplacee dans sentinel-worker (`tickets::close_inactive`). Le worker
+/// UPDATE status='closed' en DB et XADD un event que le bot consume
+/// ici pour le menage Discord (notification + delete channel).
 pub fn spawn_background(ctx: Context) {
-    // Inactive tickets
-    let ctx_inactive = ctx.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(1800)).await;
-            close_inactive_tickets(&ctx_inactive).await;
-        }
-    });
-
     // SLA escalation
     let ctx_esc = ctx.clone();
     tokio::spawn(async move {
@@ -265,7 +261,7 @@ pub fn spawn_background(ctx: Context) {
         }
     });
 
-    // Redis consumer
+    // Redis consumer (relay staff + ticket_auto_closed)
     let ctx_redis = ctx.clone();
     tokio::spawn(async move {
         let consumer = sentinel_shared::event_bus::default_consumer_name();
@@ -664,6 +660,49 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
         Some(d) => d,
         None => return,
     };
+
+    // Phase 5 : ticket ferme automatiquement par sentinel-worker (job
+    // close_inactive_tickets). Le bot fait le menage Discord :
+    // notification + delete channel apres 3s.
+    if event_type == "ticket_auto_closed" {
+        let channel_id_str = data
+            .get("channel_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let timeout_days = data
+            .get("timeout_days")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(7);
+        if channel_id_str.is_empty() {
+            return;
+        }
+        let ch_id = match channel_id_str.parse::<u64>() {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let channel_id = ChannelId::new(ch_id);
+        let embed = sentinel_shared::embeds::neutral_embed(
+            "\u{1f550} Ticket ferme automatiquement",
+        )
+        .description(format!(
+            "Ce ticket a ete ferme apres {} jours d'inactivite.",
+            timeout_days
+        ));
+        if let Err(e) = channel_id
+            .send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new().embed(embed),
+            )
+            .await
+        {
+            warn!(error = %e, "Failed to send auto-close notification");
+        }
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+        if let Err(e) = channel_id.delete(&ctx.http).await {
+            warn!(error = %e, "Failed to delete inactive ticket channel");
+        }
+        return;
+    }
 
     // Phase 2 sync : ticket ferme depuis le web -> on lock le channel
     // Discord pour eviter les nouveaux messages. Si actor.source != "web",
