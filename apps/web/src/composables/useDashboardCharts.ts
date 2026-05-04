@@ -26,7 +26,7 @@ export function useDashboardCharts(externalDays?: Ref<number>) {
           ? dashboardChartsService.getTopUsers(guildIdFilter.value, 10)
           : Promise.resolve([]),
       ]);
-      activity.value = activityData;
+      activity.value = fillMissingDays(activityData, days.value);
       topUsers.value = usersData;
     } catch (e) {
       error.value = String(e);
@@ -42,4 +42,48 @@ export function useDashboardCharts(externalDays?: Ref<number>) {
   watch([guildIdFilter, days], fetchAll);
 
   return { activity, topUsers, loading, error, days, fetchAll };
+}
+
+/**
+ * Comble les jours manquants dans l'historique d'activite : l'API ne
+ * renvoie que les jours qui ont au moins une ligne en base, donc un
+ * serveur calme cree des trous dans les graphiques. On normalise sur
+ * une plage continue de `days` jours en remplissant les manquants par
+ * des zeros.
+ */
+function fillMissingDays(rows: DailyActivity[], days: number): DailyActivity[] {
+  const byDay = new Map<string, DailyActivity>();
+  for (const r of rows) byDay.set(dayKey(r.day), r);
+
+  const result: DailyActivity[] = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = dayKey(d.toISOString());
+    const existing = byDay.get(key);
+    if (existing) {
+      result.push(existing);
+    } else {
+      result.push({
+        day: key,
+        messages: 0,
+        voice_minutes: 0,
+        active_members: 0,
+        new_members: 0,
+        leaves: 0,
+        infractions: 0,
+        warns: 0,
+        mutes: 0,
+        bans: 0,
+      });
+    }
+  }
+  return result;
+}
+
+function dayKey(iso: string): string {
+  return iso.slice(0, 10);
 }

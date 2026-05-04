@@ -26,7 +26,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             sqlx::query_as(
                 "SELECT hour, EXTRACT(ISODOW FROM day)::float8 - 1 AS day_of_week, \
                  SUM(messages)::bigint AS messages, SUM(infractions)::bigint AS infractions \
-                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2 \
+                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer\
                  GROUP BY hour, EXTRACT(ISODOW FROM day) ORDER BY day_of_week, hour",
             )
             .bind(gid)
@@ -37,7 +37,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             sqlx::query_as(
                 "SELECT hour, EXTRACT(ISODOW FROM day)::float8 - 1 AS day_of_week, \
                  SUM(messages)::bigint AS messages, SUM(infractions)::bigint AS infractions \
-                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1 \
+                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1::integer\
                  GROUP BY hour, EXTRACT(ISODOW FROM day) ORDER BY day_of_week, hour",
             )
             .bind(days)
@@ -213,7 +213,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         let rows: Vec<(i16, Option<f64>, Option<f64>)> = if let Some(gid) = guild_id {
             sqlx::query_as(
                 "SELECT hour, AVG(messages)::float8 AS avg_msg, AVG(infractions)::float8 AS avg_infr \
-                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2 \
+                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer\
                  GROUP BY hour ORDER BY avg_msg DESC",
             )
             .bind(gid)
@@ -223,7 +223,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         } else {
             sqlx::query_as(
                 "SELECT hour, AVG(messages)::float8 AS avg_msg, AVG(infractions)::float8 AS avg_infr \
-                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1 \
+                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1::integer\
                  GROUP BY hour ORDER BY avg_msg DESC",
             )
             .bind(days)
