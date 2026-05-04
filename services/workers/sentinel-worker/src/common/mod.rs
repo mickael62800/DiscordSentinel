@@ -247,21 +247,62 @@ pub fn load_redis_url() -> String {
 
 // ── DB Config Loading ──
 
+/// Anciens noms de workers fusionnes dans sentinel-worker (avril 2026).
+/// On continue de lire leurs overrides config dans `bot_guild_config`
+/// pour ne pas perdre les valeurs personnalisees existantes (ex
+/// `combat_expiry_check_secs` mis sur `coude-worker`).
+const LEGACY_WORKER_NAMES: &[&str] = &[
+    "ai-worker",
+    "analytics-worker",
+    "announcement-worker",
+    "appeal-sla-worker",
+    "audit-cache-worker",
+    "blackjack-cleanup-worker",
+    "cache-worker",
+    "cleanup-worker",
+    "coude-worker",
+    "discord-audit-sync-worker",
+    "export-worker",
+    "game-portal-worker",
+    "moderation-worker",
+    "monitoring-worker",
+    "temp-roles-worker",
+    "ticket-bot",
+    "security-bot",
+];
+
 /// Charge toute la config d'un worker depuis la table bot_guild_config.
-/// Retourne un HashMap<config_key, config_value> (toutes les guilds mergees, global).
-/// Les workers n'ont pas de guild_id specifique — on charge la config "globale"
-/// (premiere valeur trouvee pour chaque cle).
+/// Retourne un HashMap<config_key, config_value>.
+///
+/// Pour preserver les overrides existants apres la fusion des 15
+/// workers en `sentinel-worker`, on lit AUSSI les rows avec les
+/// anciens `bot_name` (cf `LEGACY_WORKER_NAMES`). L'ordre de priorite :
+///   1. Cle exacte sous `sentinel-worker` (la plus recente).
+///   2. Cle sous un ancien nom (compat retro).
+///   3. Defaut env var / hardcoded.
 pub async fn load_worker_config(pool: &PgPool, worker_name: &str) -> std::collections::HashMap<String, String> {
-    let rows: Vec<(String, String)> = sqlx::query_as(
-        "SELECT config_key, config_value FROM bot_guild_config WHERE bot_name = $1 ORDER BY updated_at DESC",
+    let mut all_names: Vec<&str> = Vec::with_capacity(1 + LEGACY_WORKER_NAMES.len());
+    all_names.push(worker_name);
+    all_names.extend_from_slice(LEGACY_WORKER_NAMES);
+
+    let rows: Vec<(String, String, String)> = sqlx::query_as(
+        "SELECT bot_name, config_key, config_value \
+         FROM bot_guild_config \
+         WHERE bot_name = ANY($1) \
+         ORDER BY \
+            CASE WHEN bot_name = $2 THEN 0 ELSE 1 END, \
+            updated_at DESC",
     )
+    .bind(&all_names)
     .bind(worker_name)
     .fetch_all(pool)
     .await
     .unwrap_or_default();
 
     let mut map = std::collections::HashMap::new();
-    for (key, value) in rows {
+    for (_bot_name, key, value) in rows {
+        // entry().or_insert() preserve la 1ere occurrence -> la priorite
+        // est definie par l'ORDER BY (sentinel-worker d'abord).
         map.entry(key).or_insert(value);
     }
     map
