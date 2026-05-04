@@ -1,0 +1,87 @@
+//! sentinel-worker — orchestrateur unifie des jobs periodiques
+//! DiscordSentinel.
+//!
+//! Pourquoi ce binaire ?
+//! Avant la fusion, chaque domaine avait son propre worker (ai-worker,
+//! analytics-worker, cleanup-worker, etc. — 16 binaires). La plupart ne
+//! faisaient qu'un simple `loop { sleep N; query DB; do action; }` :
+//! 16 runtimes Tokio, 16 pools Postgres, 16 connexions Redis, 16 images
+//! Docker, 16 healthchecks. Surcout RAM/ops important pour aucun
+//! benefice d'isolation pratique (ils crashaient ensemble en cas de
+//! coupure DB/Redis de toute facon).
+//!
+//! Cette crate fusionne tous ces jobs dans un binaire unique, organise
+//! par **domaine** (`src/domains/{domain}/{job}.rs`). Chaque job reste
+//! une fonction independante `run(deps) -> Result`, schedulee par
+//! `scheduler.rs`. Le code metier ne change pas — seul le packaging
+//! evolue.
+//!
+//! Migration progressive : les anciens workers continuent de tourner
+//! pendant qu'on absorbe leurs jobs ici, puis on decommissione leurs
+//! conteneurs un par un.
+
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
+mod config;
+mod domains;
+mod scheduler;
+
+use tokio::sync::watch;
+use tracing::info;
+
+use crate::config::WorkerConfig;
+use sentinel_worker_common as common;
+
+const WORKER_NAME: &str = "sentinel-worker";
+
+#[tokio::main]
+async fn main() {
+    common::init_tracing("sentinel_worker=info");
+    common::metrics::init_observability(WORKER_NAME);
+
+    let mut config = WorkerConfig::from_env();
+    info!("Demarrage de Sentinel Worker (orchestrateur unifie)");
+
+    let pg_pool = common::create_pg_pool(&config.database_url).await;
+    info!("PostgreSQL connecte");
+
+    // Surcharge eventuelle depuis bot_guild_config (config dynamique).
+    let db_config = common::load_worker_config(&pg_pool, WORKER_NAME).await;
+    if !db_config.is_empty() {
+        config.apply_db_config(&db_config);
+        info!(keys = db_config.len(), "Config DB chargee");
+    }
+
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
+
+    scheduler::start(&config, pg_pool.clone(), shutdown_rx);
+    common::start_heartbeat(config.api_url.clone(), WORKER_NAME);
+
+    common::send_lifecycle_log(
+        &config.api_url,
+        WORKER_NAME,
+        "info",
+        "Sentinel Worker demarre",
+    )
+    .await;
+
+    info!("Sentinel Worker pret");
+
+    common::shutdown_signal().await;
+
+    common::send_lifecycle_log(
+        &config.api_url,
+        WORKER_NAME,
+        "warn",
+        "Sentinel Worker en cours d'arret",
+    )
+    .await;
+
+    info!("Arret en cours...");
+    let _ = shutdown_tx.send(true);
+
+    pg_pool.close().await;
+    info!("Sentinel Worker arrete proprement");
+}

@@ -26,6 +26,7 @@ members = [
     "services/workers/moderation-worker",
     "services/workers/monitoring-worker",
     "services/workers/temp-roles-worker",
+    "services/workers/sentinel-worker",
 
     # Bot Discord unifie
     "bots/sentinel-bot",
