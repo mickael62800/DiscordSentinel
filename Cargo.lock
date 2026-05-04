@@ -1011,21 +1011,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "game-portal-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2985,60 +2970,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a7852d02fc848982e0c167ef163aaff9cd91dc640ba85e263cb1ce46fae51cd"
 
 [[package]]
-name = "sentinel-ai-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-analytics-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-announcement-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "sentinel-api"
 version = "0.1.0"
 dependencies = [
@@ -3084,61 +3015,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentinel-appeal-sla-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-audit-cache-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sentinel-blackjack-cleanup-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "sentinel-bot"
 version = "0.1.0"
 dependencies = [
@@ -3160,101 +3036,6 @@ dependencies = [
  "serenity",
  "tikv-jemallocator",
  "time",
- "tokio",
- "tonic",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-cache-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-cleanup-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-coude-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "rand 0.8.6",
- "redis",
- "reqwest",
- "sentinel-proto",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tonic",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-discord-audit-sync-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "sentinel-export-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "reqwest",
- "sentinel-proto",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
  "tokio",
  "tonic",
  "tracing",
@@ -3285,41 +3066,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sentinel-moderation-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-monitoring-worker"
-version = "0.1.0"
-dependencies = [
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "sentinel-proto"
 version = "0.1.0"
 dependencies = [
@@ -3345,25 +3091,6 @@ dependencies = [
  "tokio",
  "tonic",
  "tracing",
-]
-
-[[package]]
-name = "sentinel-temp-roles-worker"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dotenvy",
- "redis",
- "reqwest",
- "sentinel-worker-common",
- "serde",
- "serde_json",
- "sqlx",
- "tikv-jemallocator",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]
