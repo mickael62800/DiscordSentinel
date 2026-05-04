@@ -191,44 +191,84 @@ pub async fn load_temp_roles(ctx: &Context, guild_ids: &[serenity::model::id::Gu
     }
 }
 
-/// Spawn le background task de nettoyage des roles temporaires expires (60s loop).
+/// Phase 5D — Consumer Redis pour les events `temp_role_expire` publies
+/// par le worker `temp_roles::expire_temp_roles` (sentinel-worker).
+///
+/// Avant : ce module avait sa propre boucle 60s qui scannait un
+/// `TempRoleTracker` in-memory. Probleme : si le bot redemarrait, le
+/// tracker etait reconstruit depuis l'API mais les expirations en cours
+/// pendant le restart etaient ratees.
+///
+/// Maintenant : le worker scanne la DB (source de verite) et publie un
+/// event a chaque expiration. Le bot consume et execute le retrait
+/// Discord. Resilient aux redemarrages.
 pub fn spawn_temp_role_cleanup(ctx: Context) {
     tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-
-            let data = ctx.data.read().await;
-            let Some(tracker) = data.get::<TempRoleKey>() else { continue };
-
-            let expired = tracker.expired();
-            for temp in &expired {
-                let guild_id = serenity::model::id::GuildId::new(temp.guild_id);
-                let user_id = serenity::model::id::UserId::new(temp.user_id);
-                let role_id = RoleId::new(temp.role_id);
-
-                if let Ok(member) = guild_id.member(&ctx.http, user_id).await {
-                    if member.remove_role(&ctx.http, role_id).await.is_ok() {
-                        info!(
-                            guild = %temp.guild_id,
-                            user = %temp.user_id,
-                            role = %temp.role_id,
-                            "Role temporaire expire et retire"
-                        );
-                    }
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "community-bot-temp-role-expire".to_string(),
+            consumer,
+            move |payload_json| {
+                let ctx = ctx.clone();
+                async move {
+                    handle_temp_role_expire(&ctx, &payload_json).await;
                 }
-                tracker.remove(temp.guild_id, temp.user_id, temp.role_id);
-
-                if let Some(api) = data.get::<RolesApiKey>() {
-                    api.delete_temp_role(
-                        &temp.guild_id.to_string(),
-                        &temp.user_id.to_string(),
-                        &temp.role_id.to_string(),
-                    )
-                    .await;
-                }
-            }
-        }
+            },
+        )
+        .await;
     });
+}
+
+async fn handle_temp_role_expire(ctx: &Context, payload_json: &str) {
+    let event: serde_json::Value = match serde_json::from_str(payload_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if event.get("event").and_then(|v| v.as_str()) != Some("temp_role_expire") {
+        return;
+    }
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    let guild_id_str = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
+    let user_id_str = data.get("user_id").and_then(|v| v.as_str()).unwrap_or("");
+    let role_id_str = data.get("role_id").and_then(|v| v.as_str()).unwrap_or("");
+    if guild_id_str.is_empty() || user_id_str.is_empty() || role_id_str.is_empty() {
+        return;
+    }
+
+    let guild_id_u64: u64 = match guild_id_str.parse() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let user_id_u64: u64 = match user_id_str.parse() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let role_id_u64: u64 = match role_id_str.parse() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let guild_id = serenity::model::id::GuildId::new(guild_id_u64);
+    let user_id = serenity::model::id::UserId::new(user_id_u64);
+    let role_id = RoleId::new(role_id_u64);
+
+    if let Ok(member) = guild_id.member(&ctx.http, user_id).await {
+        if member.remove_role(&ctx.http, role_id).await.is_ok() {
+            info!(guild = %guild_id_str, user = %user_id_str, role = %role_id_str, "Role temporaire retire (event)");
+        }
+    }
+
+    // Cleanup tracker in-memory (defensif, plus la source de verite).
+    let bot_data = ctx.data.read().await;
+    if let Some(tracker) = bot_data.get::<TempRoleKey>() {
+        tracker.remove(guild_id_u64, user_id_u64, role_id_u64);
+    }
+    if let Some(api) = bot_data.get::<RolesApiKey>() {
+        api.delete_temp_role(guild_id_str, user_id_str, role_id_str).await;
+    }
 }
 
 /// Synchronise les roles Discord de toutes les guilds vers l'API.
