@@ -108,6 +108,16 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                         .await;
                 }
 
+                // Phase 5F — supprime la row DB pour eviter que le worker
+                // ne kick le user qui vient juste de valider.
+                if let Some(base) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+                    let path = format!(
+                        "/api/security/quarantine/{}/{}",
+                        guild_id, user_id
+                    );
+                    let _ = base.delete_json::<serde_json::Value>(&path).await;
+                }
+
                 let event = SecurityEvent {
                     guild_id: guild_id.to_string(),
                     event_type: "captcha_verified".to_string(),
@@ -189,6 +199,15 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                 quarantine
                     .release_user(ctx, guild_id, user_id, RoleId::new(role_id))
                     .await;
+
+                // Phase 5F — supprime la row DB pour eviter kick worker.
+                if let Some(base) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+                    let path = format!(
+                        "/api/security/quarantine/{}/{}",
+                        guild_id, user_id
+                    );
+                    let _ = base.delete_json::<serde_json::Value>(&path).await;
+                }
 
                 let event = SecurityEvent {
                     guild_id: guild_id.to_string(),

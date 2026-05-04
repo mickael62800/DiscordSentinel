@@ -5,6 +5,7 @@ pub mod component_min_role;
 pub mod component_visibility;
 pub mod docker;
 pub mod invitations;
+pub mod quarantine;
 pub mod security;
 pub mod server_events;
 pub mod exports;

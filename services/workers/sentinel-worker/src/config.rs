@@ -76,6 +76,10 @@ const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
 // l'ancienne boucle bot).
 const DEFAULT_TICKETS_CLOSE_INACTIVE_SECS: u64 = 1800;
 
+// Phase 5F — Quarantine kick : tick 15s (l'ancienne boucle etait a 30s
+// mais avec une fenetre captcha typique de 5min, 15s = bonne reactivite).
+const DEFAULT_QUARANTINE_KICK_CHECK_SECS: u64 = 15;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -145,6 +149,9 @@ pub struct WorkerConfig {
 
     // ── Tickets ──
     pub tickets_close_inactive_secs: u64,
+
+    // ── Security ──
+    pub quarantine_kick_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -284,6 +291,12 @@ impl WorkerConfig {
             tickets_close_inactive_secs: load_env(
                 "TICKETS_CLOSE_INACTIVE_SECS",
                 DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
+            ),
+
+            // security
+            quarantine_kick_check_secs: load_env(
+                "QUARANTINE_KICK_CHECK_SECS",
+                DEFAULT_QUARANTINE_KICK_CHECK_SECS,
             ),
         }
     }
@@ -517,6 +530,14 @@ impl WorkerConfig {
             "tickets_close_inactive_secs",
             "TICKETS_CLOSE_INACTIVE_SECS",
             DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
+        );
+
+        // security
+        self.quarantine_kick_check_secs = config_or_env(
+            db,
+            "quarantine_kick_check_secs",
+            "QUARANTINE_KICK_CHECK_SECS",
+            DEFAULT_QUARANTINE_KICK_CHECK_SECS,
         );
     }
 }

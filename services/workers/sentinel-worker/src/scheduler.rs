@@ -552,8 +552,33 @@ pub fn start(
         );
     }
 
-    // Phases suivantes : migrer les autres timers du bot (security,
-    // automod, progression, auto-roles, voice-afk).
+    // ─────────────────────────────────────────────────────────────
+    // Phase 5F — Domaine security : kick auto des quarantaines expirees
+    // (captcha non valide). Le bot publie via API a chaque mise en
+    // quarantaine, ce job claim les expirees et XADD quarantine_expired.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "kick_expired_quarantine",
+            config.quarantine_kick_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "security-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::security::kick_expired_quarantine::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // Phases suivantes : lockdown/slowmode/automod necessitent
+    // persistance des PermissionOverwrites (~3-5j par feature).
+    // voice-afk + progression voice tick dependent du cache Discord
+    // (ne migrable que via une refonte des trackers).
 
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);

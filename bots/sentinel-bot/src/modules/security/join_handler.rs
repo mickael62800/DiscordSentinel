@@ -280,6 +280,23 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
                 .quarantine_user(ctx, guild_id, user.id, RoleId::new(role_id))
                 .await;
 
+            // Phase 5F — persiste la quarantaine en DB pour que le worker
+            // `kick_expired_quarantine` puisse la kicker meme si le bot
+            // redemarre. Le tracker RAM reste source de verite pour les
+            // roles a restaurer (la persistance ne couvre que le timer).
+            if let Some(base) = data.get::<ApiClientKey>() {
+                let captcha_timeout = data
+                    .get::<SecurityConfigKey>()
+                    .map(|c| c.captcha_timeout_secs)
+                    .unwrap_or(300);
+                let body = serde_json::json!({
+                    "guild_id": guild_id.to_string(),
+                    "user_id": user.id.to_string(),
+                    "timeout_secs": captcha_timeout as i64,
+                });
+                base.post_fire_and_forget("/api/security/quarantine", &body).await;
+            }
+
             if decision.send_captcha {
                 let guild_name = guild_id
                     .to_partial_guild(&ctx.http)

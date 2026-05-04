@@ -17,5 +17,6 @@ pub mod export;
 pub mod game_portal;
 pub mod moderation;
 pub mod monitoring;
+pub mod security;
 pub mod temp_roles;
 pub mod tickets;

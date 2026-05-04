@@ -1,52 +1,16 @@
-//! Background tasks du module security : captcha timeout / slowmode revert / lockdown revert.
+//! Background tasks du module security : slowmode revert / lockdown
+//! revert. Phase 5F — la quarantine kick a ete deplacee dans
+//! sentinel-worker (`security::kick_expired_quarantine`) ; le bot la
+//! consume via `quarantine_expired_consumer.rs`.
 
 use serenity::all::Context;
 
-use super::{CaptchaPendingKey, LockdownKey, QuarantineKey, SecurityConfigKey, SlowmodeKey};
+use super::{LockdownKey, SecurityConfigKey, SlowmodeKey};
 
-/// Spawn les background tasks security : captcha timeout / slowmode revert / lockdown revert.
+/// Spawn les background tasks security restantes : slowmode + lockdown
+/// revert (encore en RAM tant que les `PermissionOverwrite` originaux
+/// ne sont pas persistes en DB).
 pub fn spawn_background(ctx: Context) {
-    // 1. Captcha timeout + quarantine kick (30s loop)
-    let ctx_q = ctx.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-
-            let data = ctx_q.data.read().await;
-            let Some(quarantine) = data.get::<QuarantineKey>() else { continue };
-            let captcha_timeout = data
-                .get::<SecurityConfigKey>()
-                .map(|c| c.captcha_timeout_secs)
-                .unwrap_or(300);
-
-            if let Some(cp) = data.get::<CaptchaPendingKey>() {
-                cp.cleanup_expired();
-            }
-
-            let expired = quarantine.expired_users(captcha_timeout);
-            for (guild_id, user_id) in expired {
-                if let Err(e) = guild_id.kick(&ctx_q.http, user_id).await {
-                    tracing::warn!(
-                        error = %e,
-                        guild_id = %guild_id,
-                        user_id = %user_id,
-                        "Impossible de kick l'utilisateur (captcha timeout)"
-                    );
-                } else {
-                    tracing::info!(
-                        guild_id = %guild_id,
-                        user_id = %user_id,
-                        "Utilisateur kick (captcha timeout)"
-                    );
-                }
-                quarantine.remove_tracking(guild_id, user_id);
-                if let Some(cp) = data.get::<CaptchaPendingKey>() {
-                    cp.remove(guild_id, user_id);
-                }
-            }
-        }
-    });
-
     // 2. Slowmode revert (15s loop)
     let ctx_s = ctx.clone();
     tokio::spawn(async move {

@@ -107,6 +107,8 @@ impl EventHandler for Handler {
             modules::security::on_ready_sync(&ctx_sec, &guilds_for_sec).await;
         });
         modules::security::spawn_background(ctx.clone());
+        // Phase 5F — consumer Redis pour quarantine_expired (worker).
+        modules::security::quarantine_expired_consumer::spawn(ctx.clone());
 
         // Sync periodique des roles Discord vers l'API (5 min)
         let ctx_clone = ctx.clone();

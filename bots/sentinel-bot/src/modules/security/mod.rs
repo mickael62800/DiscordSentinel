@@ -9,6 +9,7 @@ mod captcha_handler;
 mod commands;
 pub mod detectors;
 mod join_handler;
+pub mod quarantine_expired_consumer;
 
 use chrono::DateTime;
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};
