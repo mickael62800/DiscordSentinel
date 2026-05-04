@@ -42,6 +42,8 @@ const props = defineProps<{
   modified?: boolean;
   hint?: string;
   hintSource?: string;
+  /** Si true, le champ est inactif (dependance non satisfaite). */
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -86,7 +88,8 @@ const mapDefaults = computed(() => {
 </script>
 
 <template>
-  <div class="field-row" :class="{ modified }">
+  <div class="field-row" :class="{ modified, 'field-disabled': disabled }"
+    :title="disabled ? 'Cette option depend d\'une autre desactivee' : undefined">
     <!-- 1. Label + hint a droite -->
     <div class="field-label-row">
       <label :for="field.key" class="field-label">
@@ -220,6 +223,12 @@ const mapDefaults = computed(() => {
 .field-row.modified {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.field-row.field-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.4);
 }
 
 .field-label-row {

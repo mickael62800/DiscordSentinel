@@ -75,6 +75,20 @@ function isFieldModified(key: string): boolean {
   return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
 }
 
+/**
+ * Une cle est "disabled" quand son `depends_on.key` n'a pas la valeur
+ * `equals` requise. Ex : tous les champs avec `depends_on:{key:"enabled",
+ * equals:"true"}` sont grises tant que `enabled` est OFF.
+ */
+function isFieldDisabled(field: ConfigField): boolean {
+  const dep = field.depends_on as { key: string; equals: string } | undefined;
+  if (!dep) return false;
+  const v = formValues.value[dep.key];
+  if (dep.equals === "true") return !(v === "true" || v === "1");
+  if (dep.equals === "false") return !(v === "false" || v === "0" || v === undefined || v === "");
+  return v !== dep.equals;
+}
+
 const hasChanges = computed(() =>
   configFields.value.some((f) => isFieldModified(f.key)),
 );
@@ -188,7 +202,8 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
             v-for="field in booleanFields"
             :key="field.key"
             class="toggle-card"
-            :class="{ modified: isFieldModified(field.key) }"
+            :class="{ modified: isFieldModified(field.key), 'field-disabled': isFieldDisabled(field) }"
+            :title="isFieldDisabled(field) ? 'Depend d\'une autre option desactivee' : undefined"
           >
             <div class="toggle-card-header">
               <span class="toggle-card-label" :title="field.label">{{ field.label }}</span>
@@ -238,6 +253,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
               :modified="isFieldModified(field.key)"
               :hint="fieldStatus(field).text"
               :hint-source="fieldStatus(field).source"
+              :disabled="isFieldDisabled(field)"
               @update:model-value="formValues[field.key] = $event"
             />
           </div>
@@ -380,6 +396,11 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   gap: 8px;
 }
 .toggle-card.modified { border-color: var(--accent); }
+.toggle-card.field-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.4);
+}
 .toggle-card-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .toggle-card-label {
   font-size: 11px;
