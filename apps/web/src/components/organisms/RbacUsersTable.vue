@@ -128,10 +128,10 @@ function roleVariant(role: RbacRole): BadgeVariant {
               </div>
             </td>
             <td>
-              <select
+              <AppSelect
                 v-if="canEdit"
-                :value="user.role"
-                @change="onRoleChange(user.discord_user_id, ($event.target as HTMLSelectElement).value as RbacRole)"
+                :model-value="user.role"
+                @change="(e: Event) => onRoleChange(user.discord_user_id, ((e.target as HTMLSelectElement).value as RbacRole))"
               >
                 <option v-for="role in ROLES" :key="role" :value="role">{{ role }}</option>
               </AppSelect>
