@@ -7,3 +7,4 @@ pub mod audit_cache;
 pub mod blackjack;
 pub mod cache;
 pub mod cleanup;
+pub mod monitoring;

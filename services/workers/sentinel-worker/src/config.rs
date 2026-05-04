@@ -33,6 +33,9 @@ const DEFAULT_AUDIT_CACHE_REFRESH_SECS: u64 = 60;
 // ── Defauts blackjack ──
 const DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS: u64 = 60;
 
+// ── Defauts monitoring ──
+const DEFAULT_MONITOR_CHECK_INTERVAL_SECS: u64 = 30;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -60,6 +63,10 @@ pub struct WorkerConfig {
 
     // ── Blackjack ──
     pub blackjack_scan_interval_secs: u64,
+
+    // ── Monitoring ──
+    pub api_key: String,
+    pub monitor_check_interval_secs: u64,
 }
 
 impl WorkerConfig {
@@ -116,6 +123,13 @@ impl WorkerConfig {
             blackjack_scan_interval_secs: load_env(
                 "BLACKJACK_CLEANUP_SCAN_INTERVAL",
                 DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS,
+            ),
+
+            // monitoring
+            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            monitor_check_interval_secs: load_env(
+                "MONITOR_CHECK_INTERVAL",
+                DEFAULT_MONITOR_CHECK_INTERVAL_SECS,
             ),
         }
     }
@@ -208,6 +222,14 @@ impl WorkerConfig {
             "blackjack_cleanup_scan_interval",
             "BLACKJACK_CLEANUP_SCAN_INTERVAL",
             DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS,
+        );
+
+        // monitoring
+        self.monitor_check_interval_secs = config_or_env(
+            db,
+            "monitor_check_interval",
+            "MONITOR_CHECK_INTERVAL",
+            DEFAULT_MONITOR_CHECK_INTERVAL_SECS,
         );
     }
 }

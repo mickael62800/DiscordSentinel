@@ -176,13 +176,13 @@ pub fn start(
     // Porte de l'ancien blackjack-cleanup-worker.
     // ─────────────────────────────────────────────────────────────
     {
-        let redis = redis_client;
+        let redis = redis_client.clone();
         spawn_periodic(
             "cleanup_afk_tables",
             config.blackjack_scan_interval_secs,
-            pool,
-            shutdown,
-            api_url,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
             "blackjack-cleanup-worker",
             move |pool| {
                 let redis = redis.clone();
@@ -193,7 +193,26 @@ pub fn start(
         );
     }
 
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : monitoring (surveillance bots/workers online)
+    // Porte de l'ancien monitoring-worker. Structure differente :
+    // boucle stateful (track previous_online), pas un simple
+    // spawn_periodic. On delegue a son propre `start()`.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let cfg = domains::monitoring::MonitorConfig {
+            api_url: api_url.clone(),
+            api_key: config.api_key.clone(),
+            check_interval_secs: config.monitor_check_interval_secs,
+        };
+        domains::monitoring::check_services::start(redis_client, cfg);
+    }
+
     // Phases suivantes : moderation, coude, analytics, temp-roles,
     // appeal-sla, announcement, export, game-portal, discord-audit-sync,
-    // monitoring, ai, + nouveaux jobs migres depuis le bot.
+    // ai, + nouveaux jobs migres depuis le bot.
+
+    // Variable inutilisee mais on la garde pour avoir un point d'attache
+    // ou les phases suivantes pourront s'accrocher.
+    let _ = (pool, shutdown, api_url);
 }
