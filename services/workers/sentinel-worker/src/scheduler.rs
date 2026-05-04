@@ -183,7 +183,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "blackjack",
+            "blackjack-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
