@@ -84,6 +84,9 @@ const DEFAULT_QUARANTINE_KICK_CHECK_SECS: u64 = 15;
 // d'origine cote bot).
 const DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS: u64 = 15;
 
+// Phase 5H — Slowmode security expire : tick 15s.
+const DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS: u64 = 15;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -157,6 +160,7 @@ pub struct WorkerConfig {
     // ── Security ──
     pub quarantine_kick_check_secs: u64,
     pub lockdown_expire_check_secs: u64,
+    pub slowmode_expire_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -306,6 +310,10 @@ impl WorkerConfig {
             lockdown_expire_check_secs: load_env(
                 "LOCKDOWN_EXPIRE_CHECK_SECS",
                 DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS,
+            ),
+            slowmode_expire_check_secs: load_env(
+                "SLOWMODE_EXPIRE_CHECK_SECS",
+                DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS,
             ),
         }
     }
@@ -553,6 +561,12 @@ impl WorkerConfig {
             "lockdown_expire_check_secs",
             "LOCKDOWN_EXPIRE_CHECK_SECS",
             DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS,
+        );
+        self.slowmode_expire_check_secs = config_or_env(
+            db,
+            "slowmode_expire_check_secs",
+            "SLOWMODE_EXPIRE_CHECK_SECS",
+            DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS,
         );
     }
 }

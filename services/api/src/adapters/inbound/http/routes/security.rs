@@ -29,6 +29,15 @@ fn security_inner() -> Router<AppState> {
             "/lockdown/{guild_id}",
             delete(handlers::system::lockdown::delete_lockdown),
         )
+        // Phase 5H — slowmode security auto-revert (worker).
+        .route(
+            "/slowmode",
+            post(handlers::system::slowmode::create_slowmode),
+        )
+        .route(
+            "/slowmode/{guild_id}",
+            delete(handlers::system::slowmode::delete_slowmode),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

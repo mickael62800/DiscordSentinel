@@ -596,9 +596,28 @@ pub fn start(
         );
     }
 
-    // Phases suivantes : slowmode security/automod (meme pattern,
-    // ~150 lignes chacun). voice-afk + progression voice tick
-    // dependent du cache Discord -> rester dans le bot.
+    // Phase 5H — Slowmode security auto-revert.
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "expire_slowmode",
+            config.slowmode_expire_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "security-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::security::expire_slowmode::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // Phases suivantes : slowmode automod (meme pattern, ~150 lignes).
+    // voice-afk + progression voice tick + tickets SLA dependent
+    // d'etat live populé par events Discord -> rester dans le bot.
 
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);

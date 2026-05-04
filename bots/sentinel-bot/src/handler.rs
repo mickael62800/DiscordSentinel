@@ -111,6 +111,8 @@ impl EventHandler for Handler {
         modules::security::quarantine_expired_consumer::spawn(ctx.clone());
         // Phase 5G — consumer Redis pour lockdown_expired (worker).
         modules::security::lockdown_expired_consumer::spawn(ctx.clone());
+        // Phase 5H — consumer Redis pour slowmode_expired (worker).
+        modules::security::slowmode_expired_consumer::spawn(ctx.clone());
 
         // Sync periodique des roles Discord vers l'API (5 min)
         let ctx_clone = ctx.clone();

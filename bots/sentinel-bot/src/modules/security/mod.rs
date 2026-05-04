@@ -11,6 +11,7 @@ pub mod detectors;
 mod join_handler;
 pub mod lockdown_expired_consumer;
 pub mod quarantine_expired_consumer;
+pub mod slowmode_expired_consumer;
 
 use chrono::DateTime;
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};

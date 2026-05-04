@@ -8,6 +8,7 @@ pub mod invitations;
 pub mod lockdown;
 pub mod quarantine;
 pub mod security;
+pub mod slowmode;
 pub mod server_events;
 pub mod exports;
 pub mod health;

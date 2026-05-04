@@ -7,6 +7,8 @@ use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tracing::{error, info};
 
+use sentinel_shared::heartbeat::ApiClientKey;
+
 /// Gere l'activation automatique du slowmode pendant un raid.
 pub struct SlowmodeManager {
     /// guild_id -> (timestamp d'activation, ancien slowmode par channel_id)
@@ -62,6 +64,28 @@ impl SlowmodeManager {
         }
 
         let count = previous_states.len();
+
+        // Phase 5H — persiste les previous_states en DB pour resilience
+        // au restart bot. Le worker `expire_slowmode` (sentinel-worker)
+        // detectera l'expiration et publiera l'event de restauration.
+        let states_json: Vec<serde_json::Value> = previous_states
+            .iter()
+            .map(|(ch, rate)| {
+                serde_json::json!({
+                    "channel_id": ch.to_string(),
+                    "rate": *rate as u64,
+                })
+            })
+            .collect();
+        if let Some(base) = ctx.data.read().await.get::<ApiClientKey>() {
+            let body = serde_json::json!({
+                "guild_id": guild_id.to_string(),
+                "previous_states": states_json,
+                "duration_secs": 300,
+            });
+            base.post_fire_and_forget("/api/security/slowmode", &body).await;
+        }
+
         self.active.insert(guild_id, (Instant::now(), previous_states));
 
         info!(
