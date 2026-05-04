@@ -529,6 +529,27 @@ pub fn start(
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Phase 5I — Tickets SLA escalation (toutes categories sauf
+    // appel_sanction qui est gere par appeal_sla::escalate_appeal_sla).
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "escalate_ticket_sla",
+            config.tickets_sla_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "ticket-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::tickets::escalate_sla::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Phase 5 — Domaine tickets : fermeture auto des tickets inactifs.
     // Avant : boucle 30min dans le bot. Maintenant : worker UPDATE
     // status='closed' + XADD event 'ticket_auto_closed' que le bot

@@ -242,26 +242,14 @@ pub async fn on_ready(ctx: &Context, _ready: &Ready) {
 
 // ── Background tasks ──
 
-/// Spawn les background tasks du module tickets :
-/// - escalade SLA (toutes les 5 min) — TODO migrer vers worker (etat
-///   in-memory non resilient)
-/// - consumer Redis : relay staff + ticket_auto_closed (Phase 5)
+/// Spawn les background tasks du module tickets : consumer Redis pour
+/// relay staff + ticket_auto_closed + ticket_sla_escalated.
 ///
-/// Phase 5 : la fermeture auto des tickets inactifs (30 min) a ete
-/// deplacee dans sentinel-worker (`tickets::close_inactive`). Le worker
-/// UPDATE status='closed' en DB et XADD un event que le bot consume
-/// ici pour le menage Discord (notification + delete channel).
+/// Phase 5 : ferme tickets inactifs (5E) + SLA escalation (5I) sont
+/// deplaces dans sentinel-worker. Le bot ne fait plus que consumer
+/// les events pour les actions Discord (post message dans channel).
 pub fn spawn_background(ctx: Context) {
-    // SLA escalation
-    let ctx_esc = ctx.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
-            check_escalations(&ctx_esc).await;
-        }
-    });
-
-    // Redis consumer (relay staff + ticket_auto_closed)
+    // Redis consumer (relay staff + ticket_auto_closed + ticket_sla_escalated)
     let ctx_redis = ctx.clone();
     tokio::spawn(async move {
         let consumer = sentinel_shared::event_bus::default_consumer_name();
@@ -660,6 +648,35 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
         Some(d) => d,
         None => return,
     };
+
+    // Phase 5I : SLA escalation declenchee par worker. Bot poste le
+    // message d'avertissement dans le channel.
+    if event_type == "ticket_sla_escalated" {
+        let channel_id_str = data
+            .get("channel_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let escalation_minutes = data
+            .get("escalation_minutes")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(60);
+        if channel_id_str.is_empty() {
+            return;
+        }
+        let ch_id = match channel_id_str.parse::<u64>() {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let channel_id = ChannelId::new(ch_id);
+        let msg = format!(
+            "**\u{26a0}\u{fe0f} Escalade automatique** — Ce ticket n'a pas recu de reponse depuis {}min. La priorite a ete augmentee.",
+            escalation_minutes
+        );
+        if let Err(e) = channel_id.say(&ctx.http, &msg).await {
+            warn!(error = %e, "Failed to send SLA escalation message");
+        }
+        return;
+    }
 
     // Phase 5 : ticket ferme automatiquement par sentinel-worker (job
     // close_inactive_tickets). Le bot fait le menage Discord :

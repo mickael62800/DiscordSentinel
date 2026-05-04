@@ -76,6 +76,9 @@ const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
 // l'ancienne boucle bot).
 const DEFAULT_TICKETS_CLOSE_INACTIVE_SECS: u64 = 1800;
 
+// Phase 5I — Tickets SLA escalation : tick 5 min.
+const DEFAULT_TICKETS_SLA_CHECK_SECS: u64 = 300;
+
 // Phase 5F — Quarantine kick : tick 15s (l'ancienne boucle etait a 30s
 // mais avec une fenetre captcha typique de 5min, 15s = bonne reactivite).
 const DEFAULT_QUARANTINE_KICK_CHECK_SECS: u64 = 15;
@@ -156,6 +159,7 @@ pub struct WorkerConfig {
 
     // ── Tickets ──
     pub tickets_close_inactive_secs: u64,
+    pub tickets_sla_check_secs: u64,
 
     // ── Security ──
     pub quarantine_kick_check_secs: u64,
@@ -300,6 +304,10 @@ impl WorkerConfig {
             tickets_close_inactive_secs: load_env(
                 "TICKETS_CLOSE_INACTIVE_SECS",
                 DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
+            ),
+            tickets_sla_check_secs: load_env(
+                "TICKETS_SLA_CHECK_SECS",
+                DEFAULT_TICKETS_SLA_CHECK_SECS,
             ),
 
             // security
@@ -547,6 +555,12 @@ impl WorkerConfig {
             "tickets_close_inactive_secs",
             "TICKETS_CLOSE_INACTIVE_SECS",
             DEFAULT_TICKETS_CLOSE_INACTIVE_SECS,
+        );
+        self.tickets_sla_check_secs = config_or_env(
+            db,
+            "tickets_sla_check_secs",
+            "TICKETS_SLA_CHECK_SECS",
+            DEFAULT_TICKETS_SLA_CHECK_SECS,
         );
 
         // security

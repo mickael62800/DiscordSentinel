@@ -9,3 +9,4 @@
 //! d'avertissement dans le salon et le supprime.
 
 pub mod close_inactive;
+pub mod escalate_sla;
