@@ -150,7 +150,7 @@ async function onSave() {
       </legend>
       <div class="grid" :class="{ 'grid--disabled': !draft.welcome_enabled }">
         <label>Salon
-          <ChannelSelect v-model="draft.welcome_channel_id" :guild-id="guildIdFilter" />
+          <ChannelSelect v-model="draft.welcome_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre embed
           <input v-model="draft.welcome_title" placeholder="Bienvenue !" />
@@ -204,10 +204,10 @@ async function onSave() {
       </p>
       <div class="grid" :class="{ 'grid--disabled': !draft.rules_enabled }">
         <label>Salon des règles
-          <ChannelSelect v-model="draft.rules_channel_id" :guild-id="guildIdFilter" />
+          <ChannelSelect v-model="draft.rules_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Rôle attribué
-          <RoleSelect v-model="draft.rules_role_id" :guild-id="guildIdFilter" />
+          <RoleSelect v-model="draft.rules_role_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Texte du bouton
           <input v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
@@ -228,7 +228,7 @@ async function onSave() {
       </legend>
       <div class="grid" :class="{ 'grid--disabled': !draft.counter_enabled }">
         <label>Salon
-          <ChannelSelect v-model="draft.counter_channel_id" :guild-id="guildIdFilter" />
+          <ChannelSelect v-model="draft.counter_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Format
           <input v-model="draft.counter_format" placeholder="👥 {count} membres" />
@@ -246,7 +246,7 @@ async function onSave() {
       </legend>
       <div class="grid" :class="{ 'grid--disabled': !draft.anniversary_enabled }">
         <label>Salon
-          <ChannelSelect v-model="draft.anniversary_channel_id" :guild-id="guildIdFilter" />
+          <ChannelSelect v-model="draft.anniversary_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre
           <input v-model="draft.anniversary_title" />
@@ -273,7 +273,7 @@ async function onSave() {
       </legend>
       <div class="grid" :class="{ 'grid--disabled': !draft.leave_enabled }">
         <label>Salon
-          <ChannelSelect v-model="draft.leave_channel_id" :guild-id="guildIdFilter" />
+          <ChannelSelect v-model="draft.leave_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Titre
           <input v-model="draft.leave_title" />

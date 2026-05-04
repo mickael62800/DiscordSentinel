@@ -85,7 +85,7 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
         <input v-model.number="draft.xp_cooldown_secs" type="number" min="0" />
       </label>
       <label>Salon level-up
-        <ChannelSelect v-model="draft.level_up_channel_id" :guild-id="guildIdFilter" />
+        <ChannelSelect v-model="draft.level_up_channel_id" :guild-id="guildIdFilter ?? null" />
       </label>
       <label class="full">Message level-up (variables {user}, {level})
         <input v-model="draft.level_up_message" />
@@ -93,7 +93,7 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
       <label class="full">Salons exclus
         <IdsListPickerField
           v-model="draft.excluded_channels"
-          :guild-id="guildIdFilter"
+          :guild-id="guildIdFilter ?? null"
           kind="channel"
         />
       </label>

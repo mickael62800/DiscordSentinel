@@ -116,7 +116,7 @@ const sortedRoles = computed(() =>
         </label>
         <label>
           Rôle *
-          <RoleSelect v-model="draft.role_id" :guild-id="guildIdFilter" />
+          <RoleSelect v-model="draft.role_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>
           Durée (heures) *
