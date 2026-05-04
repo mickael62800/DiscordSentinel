@@ -22,7 +22,7 @@ function onClose() {
 </script>
 
 <template>
-  <div class="page page--xs">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>🎙️ Thèmes voice channels</h1>
       <p class="lede">

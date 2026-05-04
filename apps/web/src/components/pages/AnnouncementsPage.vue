@@ -141,7 +141,7 @@ function fmtDate(iso: string | null): string {
 </script>
 
 <template>
-  <div class="announcements-page page--xs">
+  <div class="announcements-page page--constrained">
     <header class="page-head">
       <div>
         <h1>📣 Annonces planifiées</h1>

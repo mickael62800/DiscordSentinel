@@ -49,7 +49,7 @@ async function handlePurgeAll() {
 </script>
 
 <template>
-  <div class="blackjack-page page--sm">
+  <div class="blackjack-page page--constrained">
     <header class="hero">
       <div class="hero-text">
         <h1 class="hero-title">
