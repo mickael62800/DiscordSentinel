@@ -6,6 +6,7 @@ import { levelsService } from "@/services/levelsService";
 import type { LevelConfig } from "@/types";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
 import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -76,13 +77,13 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
         Système actif
       </label>
       <label>XP par message
-        <input v-model.number="draft.xp_per_message" type="number" min="0" />
+        <NumberInputWithUnit v-model.number="draft.xp_per_message" :min="0" unit="xp" />
       </label>
       <label>XP par minute vocale
-        <input v-model.number="draft.xp_per_voice_minute" type="number" min="0" />
+        <NumberInputWithUnit v-model.number="draft.xp_per_voice_minute" :min="0" unit="xp" />
       </label>
       <label>Cooldown XP (s)
-        <input v-model.number="draft.xp_cooldown_secs" type="number" min="0" />
+        <NumberInputWithUnit v-model.number="draft.xp_cooldown_secs" :min="0" unit="s" />
       </label>
       <label>Salon level-up
         <ChannelSelect v-model="draft.level_up_channel_id" :guild-id="guildIdFilter ?? null" />

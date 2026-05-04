@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { useVoiceThemes } from "@/composables/useVoiceThemes";
 import type { CreateThemePayload, VoiceChannelTheme } from "@/types/voice-extended";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -92,16 +93,16 @@ async function onSave() {
           </select>
         </label>
         <label>Limite de membres
-          <input v-model.number="draft.member_limit" type="number" min="0" placeholder="0 = illimité" />
+          <NumberInputWithUnit v-model.number="draft.member_limit" :min="0" placeholder="0 = illimité" />
         </label>
         <label>Bitrate (bps)
-          <input v-model.number="draft.bitrate" type="number" placeholder="64000" />
+          <NumberInputWithUnit v-model.number="draft.bitrate" unit="bps" placeholder="64000" />
         </label>
         <label>Slowmode (s)
-          <input v-model.number="draft.slowmode_secs" type="number" min="0" />
+          <NumberInputWithUnit v-model.number="draft.slowmode_secs" :min="0" unit="s" />
         </label>
         <label>Sort order
-          <input v-model.number="draft.sort_order" type="number" />
+          <NumberInputWithUnit v-model.number="draft.sort_order" />
         </label>
 
         <div class="flags-row full">

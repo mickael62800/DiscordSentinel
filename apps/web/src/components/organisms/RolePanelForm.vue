@@ -7,6 +7,7 @@ import { useToast } from "@/composables/useToast";
 import type { CreateRolePanelEntryPayload } from "@/services/rolePanelsService";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const router = useRouter();
 const { selectedGuildId } = useGuildSelector();
@@ -90,7 +91,7 @@ async function onSavePanel() {
         </select>
       </label>
       <label>Max rôles par user
-        <input v-model.number="draft.max_roles" type="number" min="1" placeholder="vide = illimité" />
+        <NumberInputWithUnit v-model.number="draft.max_roles" :min="1" placeholder="vide = illimité" />
       </label>
 
       <div class="entries-section full">

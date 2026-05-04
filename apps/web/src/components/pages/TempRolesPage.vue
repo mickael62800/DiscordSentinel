@@ -5,6 +5,7 @@ import { useToast } from "@/composables/useToast";
 import { tempRolesService } from "@/services/polishServices";
 import type { TempRole } from "@/types/polish";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -120,7 +121,7 @@ const sortedRoles = computed(() =>
         </label>
         <label>
           Durée (heures) *
-          <input v-model.number="draft.duration_hours" type="number" min="1" required />
+          <NumberInputWithUnit v-model.number="draft.duration_hours" :min="1" required unit="h" />
         </label>
         <div class="actions full">
           <button type="submit" class="btn-primary">Créer</button>

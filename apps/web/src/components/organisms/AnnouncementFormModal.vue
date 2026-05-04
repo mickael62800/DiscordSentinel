@@ -13,6 +13,7 @@ import type { DiscordTextChannel } from "@/services/guildsService";
 import type { DiscordRole } from "@/types";
 import AppModal from "../atoms/AppModal.vue";
 import AppButton from "../atoms/AppButton.vue";
+import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 
 const props = defineProps<{
   visible: boolean;
@@ -279,11 +280,11 @@ async function save() {
     <div class="grid-2">
       <label>
         Heure (UTC)
-        <input v-model.number="form.recurrence_hour" type="number" min="0" max="23" />
+        <NumberInputWithUnit v-model.number="form.recurrence_hour" :min="0" :max="23" />
       </label>
       <label>
         Minute
-        <input v-model.number="form.recurrence_minute" type="number" min="0" max="59" />
+        <NumberInputWithUnit v-model.number="form.recurrence_minute" :min="0" :max="59" />
       </label>
     </div>
 
@@ -296,7 +297,7 @@ async function save() {
 
     <label v-if="form.recurrence_type === 'monthly'">
       Jour du mois (1-31, clamp si mois plus court)
-      <input v-model.number="form.recurrence_day_of_month" type="number" min="1" max="31" />
+      <NumberInputWithUnit v-model.number="form.recurrence_day_of_month" :min="1" :max="31" />
     </label>
 
     <label v-if="form.recurrence_type === 'once'">

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAiDataset } from "@/composables/useAiDataset";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const {
   filterChannel, filterFrom, filterTo, minLen, limit, offset, loading, fetchData,
@@ -27,7 +28,7 @@ function search() {
     </div>
     <div class="filter">
       <label>Longueur min.</label>
-      <input v-model.number="minLen" type="number" min="0" />
+      <NumberInputWithUnit v-model.number="minLen" :min="0" />
     </div>
     <div class="filter">
       <label>Par page</label>

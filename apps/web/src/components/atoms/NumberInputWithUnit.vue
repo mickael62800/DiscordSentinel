@@ -2,13 +2,15 @@
 import { computed } from "vue";
 
 const props = defineProps<{
-  modelValue: string;
+  modelValue: string | number | null | undefined;
   id?: string;
   unit?: string;
   min?: number;
   max?: number;
   step?: number;
   placeholder?: string;
+  required?: boolean;
+  disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -75,11 +77,11 @@ function onInput(e: Event) {
 
 <template>
   <div class="num-input-wrap">
-    <div class="num-input-row" :class="{ 'out-of-range': outOfRange }">
+    <div class="num-input-row" :class="{ 'out-of-range': outOfRange, 'is-disabled': disabled }">
       <button
         type="button"
         class="num-btn num-btn-minus"
-        :disabled="!canDecrement"
+        :disabled="disabled || !canDecrement"
         tabindex="-1"
         aria-label="Diminuer"
         @click="decrement"
@@ -91,11 +93,14 @@ function onInput(e: Event) {
 
       <input
         :id="id"
-        :value="modelValue"
+        :value="modelValue ?? ''"
         type="number"
         :min="min"
         :max="max"
+        :step="step"
         :placeholder="placeholder"
+        :required="required"
+        :disabled="disabled"
         class="num-input"
         @input="onInput"
       />
@@ -105,7 +110,7 @@ function onInput(e: Event) {
       <button
         type="button"
         class="num-btn num-btn-plus"
-        :disabled="!canIncrement"
+        :disabled="disabled || !canIncrement"
         tabindex="-1"
         aria-label="Augmenter"
         @click="increment"
@@ -149,6 +154,11 @@ function onInput(e: Event) {
 
 .num-input-row.out-of-range {
   border-color: var(--danger, #ef4444);
+}
+
+.num-input-row.is-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .num-input {

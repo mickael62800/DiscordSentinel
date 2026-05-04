@@ -3,6 +3,7 @@ import { reactive, ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { levelsService, type AddXpPayload } from "@/services/levelsService";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -58,7 +59,7 @@ async function grant() {
         <input v-model="draft.username" placeholder="(optionnel)" />
       </label>
       <label>Montant *
-        <input v-model.number="draft.amount" type="number" required />
+        <NumberInputWithUnit v-model.number="draft.amount" required unit="xp" />
       </label>
       <label>Source
         <select v-model="draft.source">

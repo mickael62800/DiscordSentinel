@@ -8,6 +8,7 @@ import { safeImageUrl } from "../../utils/safeUrl";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppTabs from "../molecules/AppTabs.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
+import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 
 const { success, error: showError } = useToast();
 const { confirm: confirmDialog } = useConfirm();
@@ -636,7 +637,7 @@ function discordProfileUrl(userId: string): string {
           <div class="adjust-section">
             <h3>Ajuster les points</h3>
             <div class="adjust-form">
-              <input v-model.number="adjustAmount" type="number" min="1" max="12" class="adjust-input" />
+              <NumberInputWithUnit v-model.number="adjustAmount" :min="1" :max="12" class="adjust-input" />
               <input v-model="adjustReason" type="text" class="adjust-reason" placeholder="Raison..." />
               <button class="adjust-btn add" :disabled="adjusting || !adjustReason" @click="doAdjust(true)">+ Ajouter</button>
               <button class="adjust-btn remove" :disabled="adjusting || !adjustReason" @click="doAdjust(false)">- Retirer</button>

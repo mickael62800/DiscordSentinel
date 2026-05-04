@@ -3,6 +3,7 @@ import { reactive, watch } from "vue";
 import { useStrikes } from "@/composables/useStrikes";
 import type { StrikeThreshold } from "@/types/strikes";
 import AppToggle from "@/components/atoms/AppToggle.vue";
+import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 
 const { config, loadingConfig, saving, saveConfig } = useStrikes();
 
@@ -64,7 +65,7 @@ async function onSave() {
       </label>
       <label class="full">
         Fenêtre (secondes — au-delà, les strikes expirent)
-        <input v-model.number="draft.window_secs" type="number" min="60" />
+        <NumberInputWithUnit v-model.number="draft.window_secs" :min="60" unit="s" />
         <small class="muted">{{ formatDuration(draft.window_secs) }}</small>
       </label>
 
@@ -86,7 +87,7 @@ async function onSave() {
           <tbody>
             <tr v-for="(t, idx) in draft.thresholds" :key="idx">
               <td>
-                <input v-model.number="t.strikes" type="number" min="1" />
+                <NumberInputWithUnit v-model.number="t.strikes" :min="1" />
               </td>
               <td>
                 <select v-model="t.action">
@@ -95,9 +96,8 @@ async function onSave() {
               </td>
               <td>
                 <div class="cell-inline">
-                  <input
+                  <NumberInputWithUnit
                     v-model.number="t.duration"
-                    type="number"
                     placeholder="vide = permanent"
                     :disabled="t.action === 'warn' || t.action === 'kick'"
                   />
