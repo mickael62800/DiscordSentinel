@@ -77,7 +77,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move { domains::cache::warm_analytics::run(&pool, &redis).await })
@@ -91,7 +91,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move { domains::cache::warm_dashboard::run(&pool, &redis).await })
@@ -105,7 +105,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move { domains::cache::warm_voice_stats::run(&pool, &redis).await })
@@ -118,7 +118,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             |pool| {
                 Box::pin(async move {
                     domains::cache::refresh_leaderboards::run(&pool).await
@@ -132,7 +132,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             |pool| Box::pin(async move { domains::cache::sync_user_cache::run(&pool).await }),
         );
 
@@ -142,7 +142,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "cache-worker",
+            "cache",
             |pool| {
                 Box::pin(async move { domains::cache::manage_partitions::run(&pool).await })
             },
@@ -161,7 +161,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "audit-cache-worker",
+            "audit_cache",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -183,7 +183,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "blackjack-cleanup-worker",
+            "blackjack",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -218,7 +218,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "analytics-worker",
+        "analytics",
         |pool| Box::pin(async move { domains::analytics::daily_snapshot::run(&pool).await }),
     );
     spawn_periodic(
@@ -227,7 +227,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "analytics-worker",
+        "analytics",
         |pool| Box::pin(async move { domains::analytics::hourly_snapshot::run(&pool).await }),
     );
 
@@ -243,7 +243,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "temp-roles-worker",
+            "temp_roles",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -265,7 +265,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "appeal-sla-worker",
+            "appeal_sla",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -285,7 +285,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "export-worker",
+        "export",
         |pool| Box::pin(async move { domains::export::drain_export_jobs::run(&pool).await }),
     );
 
@@ -301,7 +301,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "discord-audit-sync-worker",
+            "discord_audit_sync",
             move |pool| {
                 let token = token.clone();
                 Box::pin(async move {
@@ -325,7 +325,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "ai-worker",
+            "ai",
             move |pool| {
                 let redis = redis.clone();
                 let api = api.clone();
@@ -359,7 +359,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation-worker",
+        "moderation",
         |pool| Box::pin(async move { domains::moderation::conduct_regen::run(&pool).await }),
     );
     spawn_periodic(
@@ -368,7 +368,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation-worker",
+        "moderation",
         |pool| Box::pin(async move { domains::moderation::cleanup_bans::run(&pool).await }),
     );
     spawn_periodic(
@@ -377,7 +377,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation-worker",
+        "moderation",
         |pool| {
             Box::pin(async move { domains::moderation::sync_ban_proposals::run(&pool).await })
         },
@@ -390,7 +390,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "moderation-worker",
+            "moderation",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -410,7 +410,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "coude-worker",
+        "coude",
         |pool| Box::pin(async move { domains::coude::expire_combats::run(&pool).await }),
     );
     {
@@ -422,7 +422,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude-worker",
+            "coude",
             move |pool| {
                 let api = api.clone();
                 let token = token.clone();
@@ -438,7 +438,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "coude-worker",
+        "coude",
         |pool| Box::pin(async move { domains::coude::hp_regen::run(&pool).await }),
     );
     {
@@ -449,7 +449,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude-worker",
+            "coude",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -466,7 +466,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude-worker",
+            "coude",
             move |pool| {
                 Box::pin(async move {
                     domains::coude::redistribute_cashbox::run(&pool, min_days).await
@@ -485,7 +485,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude-worker",
+            "coude",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -539,7 +539,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "ticket-bot",
+            "tickets",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -563,7 +563,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "ticket-bot",
+            "tickets",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -586,7 +586,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security-bot",
+            "security",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -607,7 +607,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security-bot",
+            "security",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -626,7 +626,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security-bot",
+            "security",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {

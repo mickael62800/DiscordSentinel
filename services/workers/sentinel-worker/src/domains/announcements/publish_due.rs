@@ -10,7 +10,7 @@ use tracing::{error, info, warn};
 
 use crate::common as common;
 
-const WORKER_NAME: &str = "announcement-worker";
+const WORKER_NAME: &str = "announcements";
 const STREAM_KEY: &str = "sentinel:events";
 const STREAM_MAXLEN: usize = 10_000;
 const FETCH_LIMIT: i64 = 50;

@@ -247,43 +247,47 @@ pub fn load_redis_url() -> String {
 
 // ── DB Config Loading ──
 
-/// Anciens noms de workers fusionnes dans sentinel-worker (avril 2026).
-/// On continue de lire leurs overrides config dans `bot_guild_config`
-/// pour ne pas perdre les valeurs personnalisees existantes (ex
-/// `combat_expiry_check_secs` mis sur `coude-worker`).
-const LEGACY_WORKER_NAMES: &[&str] = &[
-    "ai-worker",
-    "analytics-worker",
-    "announcement-worker",
-    "appeal-sla-worker",
-    "audit-cache-worker",
-    "blackjack-cleanup-worker",
-    "cache-worker",
-    "cleanup-worker",
-    "coude-worker",
-    "discord-audit-sync-worker",
-    "export-worker",
-    "game-portal-worker",
-    "moderation-worker",
-    "monitoring-worker",
-    "temp-roles-worker",
-    "ticket-bot",
-    "security-bot",
+/// Modules de worker — un par dossier `src/domains/{domain}/`.
+/// Le `bot_name` dans `bot_guild_config` utilise ces noms pour stocker
+/// la config de chaque domaine. La migration 204 renomme les anciens
+/// noms d'infrastructure (`coude-worker`, etc.) vers ces noms.
+const WORKER_MODULES: &[&str] = &[
+    "ai",
+    "analytics",
+    "announcements",
+    "appeal_sla",
+    "audit_cache",
+    "blackjack",
+    "cache",
+    "cleanup",
+    "coude",
+    "discord_audit_sync",
+    "export",
+    "game_portal",
+    "moderation",
+    "monitoring",
+    "security",
+    "temp_roles",
+    "tickets",
 ];
 
-/// Charge toute la config d'un worker depuis la table bot_guild_config.
-/// Retourne un HashMap<config_key, config_value>.
+/// Charge toute la config workers depuis `bot_guild_config`.
 ///
-/// Pour preserver les overrides existants apres la fusion des 15
-/// workers en `sentinel-worker`, on lit AUSSI les rows avec les
-/// anciens `bot_name` (cf `LEGACY_WORKER_NAMES`). L'ordre de priorite :
-///   1. Cle exacte sous `sentinel-worker` (la plus recente).
-///   2. Cle sous un ancien nom (compat retro).
-///   3. Defaut env var / hardcoded.
+/// Lit les rows ou `bot_name` est :
+///   - le nom du processus (`sentinel-worker`) pour la config globale,
+///   - un nom de module (`coude`, `cleanup`, ...) pour la config
+///     specifique a un domaine.
+///
+/// Priorite : nom du processus d'abord, puis modules. Decouple le
+/// nom de processus du nom de configuration : si on renomme le
+/// binaire plus tard, les configs ne bougent pas.
+///
+/// La migration 204 a converti les anciens noms (`coude-worker`,
+/// `ticket-bot`, etc.) vers ces noms de modules.
 pub async fn load_worker_config(pool: &PgPool, worker_name: &str) -> std::collections::HashMap<String, String> {
-    let mut all_names: Vec<&str> = Vec::with_capacity(1 + LEGACY_WORKER_NAMES.len());
+    let mut all_names: Vec<&str> = Vec::with_capacity(1 + WORKER_MODULES.len());
     all_names.push(worker_name);
-    all_names.extend_from_slice(LEGACY_WORKER_NAMES);
+    all_names.extend_from_slice(WORKER_MODULES);
 
     let rows: Vec<(String, String, String)> = sqlx::query_as(
         "SELECT bot_name, config_key, config_value \

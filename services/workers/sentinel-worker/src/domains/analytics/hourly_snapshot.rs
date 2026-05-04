@@ -24,7 +24,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     let mut count = 0u64;
 
     for guild in &guilds {
-        if !is_worker_enabled(pool, &guild.guild_id, "analytics-worker").await {
+        if !is_worker_enabled(pool, &guild.guild_id, "analytics").await {
             continue;
         }
 

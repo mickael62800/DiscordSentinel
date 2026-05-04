@@ -40,7 +40,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let mut count = 0u64;
 
     for guild in &guilds {
-        if !is_worker_enabled(pool, &guild.guild_id, "cache-worker").await {
+        if !is_worker_enabled(pool, &guild.guild_id, "cache").await {
             continue;
         }
 
