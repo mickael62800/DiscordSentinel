@@ -5,6 +5,7 @@ import { useToast } from "@/composables/useToast";
 import { levelsService } from "@/services/levelsService";
 import type { LevelConfig } from "@/types";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
+import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -89,8 +90,12 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
       <label class="full">Message level-up (variables {user}, {level})
         <input v-model="draft.level_up_message" />
       </label>
-      <label class="full">Salons exclus (IDs séparés par virgules)
-        <input v-model="draft.excluded_channels" placeholder="ID1,ID2,..." />
+      <label class="full">Salons exclus
+        <IdsListPickerField
+          v-model="draft.excluded_channels"
+          :guild-id="guildIdFilter"
+          kind="channel"
+        />
       </label>
       <div class="actions full">
         <button type="submit" class="btn-primary" :disabled="saving">
