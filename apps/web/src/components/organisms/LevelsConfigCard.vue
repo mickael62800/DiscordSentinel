@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { levelsService } from "@/services/levelsService";
 import type { LevelConfig } from "@/types";
+import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -82,8 +83,8 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
       <label>Cooldown XP (s)
         <input v-model.number="draft.xp_cooldown_secs" type="number" min="0" />
       </label>
-      <label>Salon level-up (ID)
-        <input v-model="draft.level_up_channel_id" placeholder="vide = pas d'annonce" />
+      <label>Salon level-up
+        <ChannelSelect v-model="draft.level_up_channel_id" :guild-id="guildIdFilter" />
       </label>
       <label class="full">Message level-up (variables {user}, {level})
         <input v-model="draft.level_up_message" />

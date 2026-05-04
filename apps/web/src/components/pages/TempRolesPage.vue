@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { tempRolesService } from "@/services/polishServices";
 import type { TempRole } from "@/types/polish";
+import RoleSelect from "@/components/atoms/RoleSelect.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -114,8 +115,8 @@ const sortedRoles = computed(() =>
           <input v-model="draft.user_id" required />
         </label>
         <label>
-          Role ID *
-          <input v-model="draft.role_id" required />
+          Rôle *
+          <RoleSelect v-model="draft.role_id" :guild-id="guildIdFilter" />
         </label>
         <label>
           Durée (heures) *

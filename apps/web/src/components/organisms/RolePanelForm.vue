@@ -5,6 +5,8 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useRolePanels } from "@/composables/useRolePanels";
 import { useToast } from "@/composables/useToast";
 import type { CreateRolePanelEntryPayload } from "@/services/rolePanelsService";
+import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
+import RoleSelect from "@/components/atoms/RoleSelect.vue";
 
 const router = useRouter();
 const { selectedGuildId } = useGuildSelector();
@@ -75,8 +77,8 @@ async function onSavePanel() {
       <label>Titre *
         <input v-model="draft.title" required placeholder="Ex. Notifications" />
       </label>
-      <label>ID du salon Discord *
-        <input v-model="draft.channel_id" required placeholder="123456789012345678" />
+      <label>Salon Discord *
+        <ChannelSelect v-model="draft.channel_id" :guild-id="selectedGuildId" />
       </label>
       <label class="full">Description
         <textarea v-model="draft.description" rows="2"></textarea>
@@ -103,8 +105,8 @@ async function onSavePanel() {
 
         <div v-else class="entry-list">
           <div v-for="(entry, idx) in draft.entries" :key="idx" class="entry-row">
-            <input v-model="entry.role_id" placeholder="Role ID" class="role-id" />
-            <input v-model="entry.role_name" placeholder="Nom" class="role-name" />
+            <RoleSelect v-model="entry.role_id" :guild-id="selectedGuildId" class="role-id" />
+            <input v-model="entry.role_name" placeholder="Nom (optionnel)" class="role-name" />
             <input v-model="entry.emoji" placeholder="🎮" class="emoji" maxlength="4" />
             <input v-model="entry.label" placeholder="Texte bouton" class="label" />
             <select v-model="entry.style" class="style">

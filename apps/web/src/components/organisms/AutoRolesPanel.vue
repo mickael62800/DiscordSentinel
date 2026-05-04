@@ -3,6 +3,7 @@ import { reactive } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useRolePanels } from "@/composables/useRolePanels";
 import { useToast } from "@/composables/useToast";
+import RoleSelect from "@/components/atoms/RoleSelect.vue";
 
 const { selectedGuildId } = useGuildSelector();
 const { autoRoles, addAutoRole, removeAutoRole } = useRolePanels();
@@ -57,8 +58,8 @@ async function onAdd() {
     </div>
 
     <div class="auto-role-form">
-      <input v-model="draft.role_id" placeholder="Role ID" />
-      <input v-model="draft.role_name" placeholder="Nom du rôle" />
+      <RoleSelect v-model="draft.role_id" :guild-id="selectedGuildId" />
+      <input v-model="draft.role_name" placeholder="Nom (optionnel)" />
       <input v-model.number="draft.delay_secs" type="number" min="0" placeholder="Délai (s)" />
       <button class="btn-primary" @click="onAdd">Ajouter</button>
     </div>
