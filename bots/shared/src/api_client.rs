@@ -366,15 +366,15 @@ impl BaseApiClient {
         let resp = self.auth(req)
             .send()
             .await
-            .map_err(|e| format!("Erreur reseau GET {path}: {e}"))?;
+            .map_err(|e| network_error_message("GET", path, &e.to_string()))?;
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(format!("Erreur API {status} GET {path}: {body}"));
+            return Err(friendly_api_error("GET", path, status, &body));
         }
         resp.json::<T>()
             .await
-            .map_err(|e| format!("Erreur parsing GET {path}: {e}"))
+            .map_err(|e| parse_error_message("GET", path, &e.to_string()))
     }
 
     /// POST JSON vers l'API. Retourne le body deserialise.
@@ -383,15 +383,15 @@ impl BaseApiClient {
         let resp = self.auth(req)
             .send()
             .await
-            .map_err(|e| format!("Erreur reseau POST {path}: {e}"))?;
+            .map_err(|e| network_error_message("POST", path, &e.to_string()))?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(format!("Erreur API {status} POST {path}: {text}"));
+            return Err(friendly_api_error("POST", path, status, &text));
         }
         resp.json::<T>()
             .await
-            .map_err(|e| format!("Erreur parsing POST {path}: {e}"))
+            .map_err(|e| parse_error_message("POST", path, &e.to_string()))
     }
 
     /// POST fire-and-forget vers l'API. Log l'erreur mais ne la propage pas.
@@ -416,15 +416,15 @@ impl BaseApiClient {
         let resp = self.auth(req)
             .send()
             .await
-            .map_err(|e| format!("Erreur reseau DELETE {path}: {e}"))?;
+            .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(format!("Erreur API {status} DELETE {path}: {body}"));
+            return Err(friendly_api_error("DELETE", path, status, &body));
         }
         resp.json::<T>()
             .await
-            .map_err(|e| format!("Erreur parsing DELETE {path}: {e}"))
+            .map_err(|e| parse_error_message("DELETE", path, &e.to_string()))
     }
 
     /// DELETE JSON avec body vers l'API. Retourne le body deserialise.
@@ -433,15 +433,15 @@ impl BaseApiClient {
         let resp = self.auth(req)
             .send()
             .await
-            .map_err(|e| format!("Erreur reseau DELETE {path}: {e}"))?;
+            .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
         if !resp.status().is_success() {
             let status = resp.status();
             let text = resp.text().await.unwrap_or_default();
-            return Err(format!("Erreur API {status} DELETE {path}: {text}"));
+            return Err(friendly_api_error("DELETE", path, status, &text));
         }
         resp.json::<T>()
             .await
-            .map_err(|e| format!("Erreur parsing DELETE {path}: {e}"))
+            .map_err(|e| parse_error_message("DELETE", path, &e.to_string()))
     }
 
     // ── Config Helpers ──
@@ -478,4 +478,76 @@ impl BaseApiClient {
             .map(|v| v == "true" || v == "1")
             .unwrap_or(default)
     }
+}
+
+// ── Erreurs user-friendly ───────────────────────────────────────────────
+//
+// Les erreurs API exposees aux utilisateurs Discord doivent etre lisibles
+// (sans status code, methode HTTP ou path). Ces helpers extraient le
+// message metier du body JSON quand c'est une 4xx, et renvoient un
+// message generique sinon. La version technique est loggee via tracing
+// pour le debug.
+
+/// Construit un message d'erreur lisible a partir d'une reponse HTTP non-2xx.
+/// - 4xx : tente de parser `{"error": "..."}` et retourne juste le message.
+/// - 5xx : retourne un message generique "service indisponible".
+/// - autre : fallback generique.
+fn friendly_api_error(method: &str, path: &str, status: reqwest::StatusCode, body: &str) -> String {
+    tracing::warn!(
+        method,
+        path,
+        status = %status,
+        body,
+        "Erreur API"
+    );
+
+    if status.is_client_error() {
+        if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+            if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
+                return strip_error_prefix(msg).to_string();
+            }
+            if let Some(msg) = v.get("message").and_then(|e| e.as_str()) {
+                return strip_error_prefix(msg).to_string();
+            }
+        }
+        if !body.is_empty() && body.len() < 300 {
+            return strip_error_prefix(body).to_string();
+        }
+        return "Requete refusee.".to_string();
+    }
+
+    if status.is_server_error() {
+        return "Service temporairement indisponible. Reessaie dans un instant.".to_string();
+    }
+
+    "Une erreur est survenue.".to_string()
+}
+
+/// Retire les prefixes techniques courants (`Donnees invalides : `, etc.)
+/// pour ne garder que le message metier.
+fn strip_error_prefix(msg: &str) -> &str {
+    const PREFIXES: &[&str] = &[
+        "Donnees invalides : ",
+        "Donnees invalides: ",
+        "Données invalides : ",
+        "Données invalides: ",
+        "Validation : ",
+        "Validation: ",
+    ];
+    for p in PREFIXES {
+        if let Some(rest) = msg.strip_prefix(p) {
+            return rest;
+        }
+    }
+    msg
+}
+
+fn network_error_message(method: &str, path: &str, detail: &str) -> String {
+    tracing::warn!(method, path, detail, "Erreur reseau API");
+    "Connexion a l'API impossible. Reessaie dans un instant.".to_string()
+}
+
+fn parse_error_message(method: &str, path: &str, detail: &str) -> String {
+    tracing::warn!(method, path, detail, "Erreur parsing reponse API");
+    "Reponse de l'API illisible. Reessaie dans un instant.".to_string()
 }

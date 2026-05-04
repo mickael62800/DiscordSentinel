@@ -57,7 +57,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
             .description("Administration des confessions (admin only)")
             .add_option(
                 CreateCommandOption::new(CommandOptionType::SubCommand, "deploy-panel",
-                    "Poste le bouton 'Submit a confession!' dans ce canal")
+                    "Poste le bouton 'Poster une confession' dans ce canal")
             )
             .add_option(
                 CreateCommandOption::new(CommandOptionType::SubCommand, "delete",
@@ -126,7 +126,7 @@ async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
         .color(0x5865f2);
     let row = CreateActionRow::Buttons(vec![
         CreateButton::new(CID_SUBMIT_BUTTON)
-            .label("Submit a confession!")
+            .label("Poster une confession")
             .style(ButtonStyle::Primary)
             .emoji('📝'),
     ]);
@@ -419,18 +419,18 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     // 3. Poste l'embed sur Discord
     let embed = CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(format!(
-            "Anonymous Confession (#{})",
+            "Confession anonyme (#{})",
             public_number
         )))
         .description(&content)
         .color(0xff5e5e);
     let row = CreateActionRow::Buttons(vec![
         CreateButton::new(format!("{}{}", CID_REPLY_BUTTON_PREFIX, id))
-            .label("Reply")
+            .label("Répondre")
             .style(ButtonStyle::Secondary)
             .emoji('💬'),
         CreateButton::new(format!("{}{}", CID_REPORT_BUTTON_PREFIX, id))
-            .label("Report")
+            .label("Signaler")
             .style(ButtonStyle::Secondary)
             .emoji('🚩'),
     ]);
@@ -520,7 +520,7 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
     };
     let embed = CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(format!(
-            "Anonymous Reply (#{})",
+            "Réponse anonyme (#{})",
             public_number
         )))
         .description(&content)
