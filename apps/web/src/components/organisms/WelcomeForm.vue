@@ -144,7 +144,7 @@ async function onSave() {
           <span>Message de bienvenue actif</span>
         </label>
       </legend>
-      <div class="grid">
+      <div class="grid" :class="{ 'grid--disabled': !draft.welcome_enabled }">
         <label>Salon
           <input v-model="draft.welcome_channel_id" placeholder="ID du salon" />
         </label>
@@ -158,7 +158,7 @@ async function onSave() {
           <input v-model="draft.welcome_image_url" placeholder="https://..." />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.welcome_message" rows="3"></textarea>
+          <textarea v-model="draft.welcome_message" rows="6"></textarea>
         </label>
         <label class="full">Footer
           <input v-model="draft.welcome_footer_text" />
@@ -172,7 +172,7 @@ async function onSave() {
           <span>Activer le DM</span>
         </label>
         <label class="full">Message DM
-          <textarea v-model="draft.welcome_dm_message" rows="3"></textarea>
+          <textarea v-model="draft.welcome_dm_message" rows="6"></textarea>
         </label>
       </details>
 
@@ -198,7 +198,7 @@ async function onSave() {
         Affiche un bouton « J'ai lu les règles » dans le salon dédié.
         Le rôle configuré est attribué après acceptation.
       </p>
-      <div class="grid">
+      <div class="grid" :class="{ 'grid--disabled': !draft.rules_enabled }">
         <label>Salon des règles
           <input v-model="draft.rules_channel_id" placeholder="ID du salon" />
         </label>
@@ -209,7 +209,7 @@ async function onSave() {
           <input v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.rules_message" rows="3"></textarea>
+          <textarea v-model="draft.rules_message" rows="6"></textarea>
         </label>
       </div>
     </fieldset>
@@ -222,7 +222,7 @@ async function onSave() {
           <span>🔢 Compteur de membres</span>
         </label>
       </legend>
-      <div class="grid">
+      <div class="grid" :class="{ 'grid--disabled': !draft.counter_enabled }">
         <label>Salon
           <input v-model="draft.counter_channel_id" placeholder="ID du salon" />
         </label>
@@ -240,7 +240,7 @@ async function onSave() {
           <span>🎂 Anniversaire d'arrivée</span>
         </label>
       </legend>
-      <div class="grid">
+      <div class="grid" :class="{ 'grid--disabled': !draft.anniversary_enabled }">
         <label>Salon
           <input v-model="draft.anniversary_channel_id" placeholder="ID du salon" />
         </label>
@@ -251,7 +251,7 @@ async function onSave() {
           <input v-model="draft.anniversary_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.anniversary_message" rows="3"></textarea>
+          <textarea v-model="draft.anniversary_message" rows="6"></textarea>
         </label>
         <label class="full">Footer
           <input v-model="draft.anniversary_footer_text" />
@@ -267,7 +267,7 @@ async function onSave() {
           <span>👋 Message de départ</span>
         </label>
       </legend>
-      <div class="grid">
+      <div class="grid" :class="{ 'grid--disabled': !draft.leave_enabled }">
         <label>Salon
           <input v-model="draft.leave_channel_id" placeholder="ID du salon" />
         </label>
@@ -278,7 +278,7 @@ async function onSave() {
           <input v-model="draft.leave_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.leave_message" rows="3"></textarea>
+          <textarea v-model="draft.leave_message" rows="6"></textarea>
         </label>
         <label class="full">Footer
           <input v-model="draft.leave_footer_text" />
@@ -301,7 +301,7 @@ async function onSave() {
           <input v-model="draft.rejoin_image_url" />
         </label>
         <label class="full">Message
-          <textarea v-model="draft.rejoin_message" rows="3"></textarea>
+          <textarea v-model="draft.rejoin_message" rows="6"></textarea>
         </label>
         <label class="full">Footer
           <input v-model="draft.rejoin_footer_text" />
@@ -392,7 +392,12 @@ async function onSave() {
 }
 .grid textarea {
   resize: vertical;
-  min-height: 70px;
+  min-height: 140px;
+}
+.grid--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+  filter: grayscale(0.3);
 }
 .grid input[type="color"] {
   height: 38px;
