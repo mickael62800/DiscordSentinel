@@ -4,6 +4,7 @@ import { useWelcome } from "@/composables/useWelcome";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppToggle from "@/components/atoms/AppToggle.vue";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
+import RoleSelect from "@/components/atoms/RoleSelect.vue";
 
 const { config, saving, saveConfig } = useWelcome();
 const { guildIdFilter } = useGuildSelector();
@@ -206,7 +207,7 @@ async function onSave() {
           <ChannelSelect v-model="draft.rules_channel_id" :guild-id="guildIdFilter" />
         </label>
         <label>Rôle attribué
-          <input v-model="draft.rules_role_id" placeholder="ID du rôle" />
+          <RoleSelect v-model="draft.rules_role_id" :guild-id="guildIdFilter" />
         </label>
         <label>Texte du bouton
           <input v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
