@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import AppSelect from "@/components/atoms/AppSelect.vue";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useLogs } from "@/composables/useLogs";
 import { useFormatDate } from "@/composables/useFormatDate";
 import { useConfirm } from "@/composables/useConfirm";
@@ -12,12 +12,25 @@ interface Props {
   category: string;
   /** Lignes par page (defaut 20). */
   pageSize?: number;
+  /** Niveau impose par le filtre global de la page parent. Si fourni et
+   *  different de 'all', remplace le filtre local de la colonne. */
+  forceLevel?: "all" | "info" | "warn" | "error";
 }
-const props = withDefaults(defineProps<Props>(), { pageSize: 20 });
+const props = withDefaults(defineProps<Props>(), { pageSize: 20, forceLevel: "all" });
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
 const { filteredLogs, loading, filterLevel, clearLogs } = useLogs(props.category);
+
+// Synchronise le filtre local avec le filtre global parent quand celui-ci
+// change. Garde la possibilite de surcharger localement par colonne.
+watch(
+  () => props.forceLevel,
+  (lv) => {
+    if (lv) filterLevel.value = lv;
+  },
+  { immediate: true },
+);
 
 const expandedId = ref<string | number | null>(null);
 function toggle(id: string | number) {

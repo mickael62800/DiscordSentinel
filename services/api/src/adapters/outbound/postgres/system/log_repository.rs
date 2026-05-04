@@ -79,6 +79,33 @@ impl LogRepository for PgLogRepository {
         Ok(rows.into_iter().map(LogEntry::from).collect())
     }
 
+    async fn find_filtered(
+        &self,
+        category: Option<&str>,
+        level: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<LogEntry>, DomainError> {
+        // Filtre dynamique : on construit la WHERE clause en fonction des
+        // filtres optionnels (category / level). Permet a la page Logs systeme
+        // de charger 200 lignes PAR colonne (bot, worker, api, websocket)
+        // au lieu de partager un seul pool de 200 toutes-categories.
+        let rows = sqlx::query_as::<_, LogRow>(
+            "SELECT id, timestamp, level, bot, server, message, category, details \
+             FROM logs \
+             WHERE ($1::text IS NULL OR category = $1) \
+               AND ($2::text IS NULL OR level = $2) \
+             ORDER BY timestamp DESC LIMIT $3",
+        )
+        .bind(category)
+        .bind(level)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(LogEntry::from).collect())
+    }
+
     async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError> {
         let result = sqlx::query("DELETE FROM logs WHERE category = $1")
             .bind(category)

@@ -53,7 +53,15 @@ export function useLogs(categoryFilter?: string) {
     loading.value = true;
     try {
       const guildId = isGuildScoped ? (guildIdFilter.value ?? null) : null;
-      logs.value = await logsService.getAll(guildId);
+      // On envoie aussi la categorie au backend pour que chaque colonne du
+      // panneau Logs systeme ait son propre quota de 200 lignes (sinon les
+      // logs "discord" noient les autres categories).
+      logs.value = await logsService.getAll(
+        guildId,
+        categoryFilter ?? null,
+        filterLevel.value === "all" ? null : filterLevel.value,
+        200,
+      );
     } catch (e) {
       console.error("Erreur lors du chargement des journaux :", e);
       showError("Erreur lors du chargement des journaux.");
@@ -64,6 +72,8 @@ export function useLogs(categoryFilter?: string) {
 
   onMounted(fetchLogs);
   if (isGuildScoped) watch(guildIdFilter, fetchLogs);
+  // Refetch quand le user change le filtre niveau (server-side maintenant).
+  watch(filterLevel, fetchLogs);
 
   async function clearLogs() {
     if (!categoryFilter || categoryFilter === "discord") return;

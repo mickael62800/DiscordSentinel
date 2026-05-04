@@ -240,6 +240,9 @@ pub struct RegisterGuildDto {
 #[derive(Debug, Deserialize)]
 pub struct GuildFilterParams {
     pub guild_id: Option<String>,
+    pub category: Option<String>,
+    pub level: Option<String>,
+    pub limit: Option<i64>,
 }
 
 #[cfg(test)]

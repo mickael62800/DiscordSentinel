@@ -29,12 +29,20 @@ pub async fn get_dashboard_stats(
     Ok(Json(DashboardStatsDto::from(stats)))
 }
 
-/// GET /api/logs — logs récents (filtrable par guild_id)
+/// GET /api/logs — logs récents (filtrable par guild_id, category, level)
 pub async fn get_logs(
     State(state): State<AppState>,
     Query(params): Query<GuildFilterParams>,
 ) -> Result<Json<Vec<LogEntryDto>>, ApiError> {
-    let logs = state.log_repo.find_all(200).await?;
+    let limit = params.limit.unwrap_or(200).clamp(1, 1000);
+    let logs = state
+        .log_repo
+        .find_filtered(
+            params.category.as_deref(),
+            params.level.as_deref(),
+            limit,
+        )
+        .await?;
     let filtered: Vec<LogEntryDto> = logs
         .into_iter()
         .filter(|l| params.guild_id.as_ref().is_none_or(|gid| l.server == *gid))
