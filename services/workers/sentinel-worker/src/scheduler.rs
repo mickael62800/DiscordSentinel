@@ -475,6 +475,26 @@ pub fn start(
         );
     }
 
+    // Phase 5 — expire_steals : claim les /voler dont la fenetre de
+    // defense est ecoulee + publie un event Redis pour le bot.
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "expire_steals",
+            config.steal_expiry_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "coude-worker",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::coude::expire_steals::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
     // daily_chaos : delai aleatoire 2-6h, pas un interval fixe -> on
     // spawn une task custom.
     {

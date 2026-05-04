@@ -68,6 +68,9 @@ const DEFAULT_BETTING_CHECK_SECS: u64 = 30;
 const DEFAULT_HP_REGEN_TICK_SECS: u64 = 300;
 const DEFAULT_CASHBOX_TICK_SECS: u64 = 3600;
 const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
+// Phase 5 — Vol /voler : tick frequent (5s) car la fenetre de defense
+// est de 60s, donc une latence max de 65s pour la resolution AFK.
+const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
 
 #[derive(Clone)]
 pub struct WorkerConfig {
@@ -134,6 +137,7 @@ pub struct WorkerConfig {
     pub hp_regen_tick_secs: u64,
     pub cashbox_tick_secs: u64,
     pub cashbox_min_days: u64,
+    pub steal_expiry_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -264,6 +268,10 @@ impl WorkerConfig {
             hp_regen_tick_secs: load_env("HP_REGEN_TICK_SECS", DEFAULT_HP_REGEN_TICK_SECS),
             cashbox_tick_secs: load_env("CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS),
             cashbox_min_days: load_env("CASHBOX_MIN_DAYS", DEFAULT_CASHBOX_MIN_DAYS),
+            steal_expiry_check_secs: load_env(
+                "STEAL_EXPIRY_CHECK_SECS",
+                DEFAULT_STEAL_EXPIRY_CHECK_SECS,
+            ),
         }
     }
 
@@ -482,6 +490,12 @@ impl WorkerConfig {
             "cashbox_min_days",
             "CASHBOX_MIN_DAYS",
             DEFAULT_CASHBOX_MIN_DAYS,
+        );
+        self.steal_expiry_check_secs = config_or_env(
+            db,
+            "steal_expiry_check_secs",
+            "STEAL_EXPIRY_CHECK_SECS",
+            DEFAULT_STEAL_EXPIRY_CHECK_SECS,
         );
     }
 }
