@@ -336,11 +336,24 @@ pub fn start(
         );
     }
 
-    // Phases suivantes : moderation, coude, announcement, game-portal,
-    // + nouveaux jobs migres depuis le bot.
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : announcements (publication horaire alignee)
+    // Porte de l'ancien announcement-worker. Structure custom (boucle
+    // alignee sur HH:00:00 UTC).
+    // ─────────────────────────────────────────────────────────────
+    domains::announcements::publish_due::start(api_url.clone(), redis_client.clone());
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : game_portal (4 jobs HTTP-triggered en parallele)
+    // Porte de l'ancien game-portal-worker.
+    // ─────────────────────────────────────────────────────────────
+    domains::game_portal::jobs::start(api_url.clone());
+
+    // Phases suivantes : moderation, coude, + nouveaux jobs migres
+    // depuis le bot.
 
     // Variables inutilisees a ce stade (les phases suivantes les
     // consommeront).
-    let _ = (pool, shutdown, redis_client);
+    let _ = (pool, shutdown, redis_client, api_url);
 }
 

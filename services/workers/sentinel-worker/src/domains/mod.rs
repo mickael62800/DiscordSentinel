@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod analytics;
+pub mod announcements;
 pub mod appeal_sla;
 pub mod audit_cache;
 pub mod blackjack;
@@ -12,5 +13,6 @@ pub mod cache;
 pub mod cleanup;
 pub mod discord_audit_sync;
 pub mod export;
+pub mod game_portal;
 pub mod monitoring;
 pub mod temp_roles;
