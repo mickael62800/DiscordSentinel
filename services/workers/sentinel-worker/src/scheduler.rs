@@ -205,14 +205,142 @@ pub fn start(
             api_key: config.api_key.clone(),
             check_interval_secs: config.monitor_check_interval_secs,
         };
-        domains::monitoring::check_services::start(redis_client, cfg);
+        domains::monitoring::check_services::start(redis_client.clone(), cfg);
     }
 
-    // Phases suivantes : moderation, coude, analytics, temp-roles,
-    // appeal-sla, announcement, export, game-portal, discord-audit-sync,
-    // ai, + nouveaux jobs migres depuis le bot.
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : analytics (snapshots quotidien + horaire)
+    // Porte de l'ancien analytics-worker.
+    // ─────────────────────────────────────────────────────────────
+    spawn_periodic(
+        "daily_snapshot",
+        config.daily_snapshot_interval_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "analytics-worker",
+        |pool| Box::pin(async move { domains::analytics::daily_snapshot::run(&pool).await }),
+    );
+    spawn_periodic(
+        "hourly_snapshot",
+        config.hourly_snapshot_interval_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "analytics-worker",
+        |pool| Box::pin(async move { domains::analytics::hourly_snapshot::run(&pool).await }),
+    );
 
-    // Variable inutilisee mais on la garde pour avoir un point d'attache
-    // ou les phases suivantes pourront s'accrocher.
-    let _ = (pool, shutdown, api_url);
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : temp_roles (expiration des roles temporaires)
+    // Porte de l'ancien temp-roles-worker.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "expire_temp_roles",
+            config.temp_roles_scan_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "temp-roles-worker",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::temp_roles::expire_temp_roles::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : appeal_sla (escalade des appels de sanction)
+    // Porte de l'ancien appeal-sla-worker.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "escalate_appeal_sla",
+            config.appeal_sla_scan_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "appeal-sla-worker",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::appeal_sla::escalate_appeal_sla::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : export (drain export_jobs)
+    // Porte de l'ancien export-worker.
+    // ─────────────────────────────────────────────────────────────
+    spawn_periodic(
+        "drain_export_jobs",
+        config.export_scan_interval_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "export-worker",
+        |pool| Box::pin(async move { domains::export::drain_export_jobs::run(&pool).await }),
+    );
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : discord_audit_sync (poll Discord audit-logs API)
+    // Porte de l'ancien discord-audit-sync-worker.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let token = config.discord_bot_token.clone();
+        spawn_periodic(
+            "sync_discord_audit_logs",
+            config.audit_sync_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "discord-audit-sync-worker",
+            move |pool| {
+                let token = token.clone();
+                Box::pin(async move {
+                    domains::discord_audit_sync::sync_discord_audit_logs::run(&pool, &token).await
+                })
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : ai (drain ai_jobs)
+    // Porte de l'ancien ai-worker.
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        let api = api_url.clone();
+        let timeout = config.ai_job_timeout_secs;
+        spawn_periodic(
+            "drain_ai_jobs",
+            config.ai_poll_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "ai-worker",
+            move |pool| {
+                let redis = redis.clone();
+                let api = api.clone();
+                Box::pin(async move {
+                    domains::ai::drain_ai_jobs::run(&pool, &redis, &api, timeout).await
+                })
+            },
+        );
+    }
+
+    // Phases suivantes : moderation, coude, announcement, game-portal,
+    // + nouveaux jobs migres depuis le bot.
+
+    // Variables inutilisees a ce stade (les phases suivantes les
+    // consommeront).
+    let _ = (pool, shutdown, redis_client);
 }
+

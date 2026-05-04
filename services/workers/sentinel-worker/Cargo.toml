@@ -17,6 +17,8 @@ dotenvy = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 sentinel-worker-common = { path = "../worker-common" }
+sentinel-proto = { path = "../../proto" }
+tonic = { workspace = true }
 
 # jemalloc en allocateur global (Linux/macOS uniquement).
 [target.'cfg(not(target_env = "msvc"))'.dependencies]

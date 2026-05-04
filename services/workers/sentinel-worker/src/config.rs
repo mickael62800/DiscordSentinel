@@ -36,6 +36,26 @@ const DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS: u64 = 60;
 // ── Defauts monitoring ──
 const DEFAULT_MONITOR_CHECK_INTERVAL_SECS: u64 = 30;
 
+// ── Defauts analytics ──
+const DEFAULT_DAILY_SNAPSHOT_HOURS: u64 = 1;
+const DEFAULT_HOURLY_SNAPSHOT_MINUTES: u64 = 60;
+
+// ── Defauts temp_roles ──
+const DEFAULT_TEMP_ROLES_SCAN_SECS: u64 = SECS_PER_MINUTE;
+
+// ── Defauts appeal_sla ──
+const DEFAULT_APPEAL_SLA_SCAN_SECS: u64 = 120;
+
+// ── Defauts export ──
+const DEFAULT_EXPORT_SCAN_SECS: u64 = 5;
+
+// ── Defauts discord_audit_sync ──
+const DEFAULT_AUDIT_SYNC_SECS: u64 = 300;
+
+// ── Defauts ai ──
+const DEFAULT_AI_POLL_SECS: u64 = 2;
+const DEFAULT_AI_JOB_TIMEOUT_SECS: u64 = 2 * SECS_PER_MINUTE;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -67,6 +87,27 @@ pub struct WorkerConfig {
     // ── Monitoring ──
     pub api_key: String,
     pub monitor_check_interval_secs: u64,
+
+    // ── Analytics ──
+    pub daily_snapshot_interval_secs: u64,
+    pub hourly_snapshot_interval_secs: u64,
+
+    // ── Temp roles ──
+    pub temp_roles_scan_interval_secs: u64,
+
+    // ── Appeal SLA ──
+    pub appeal_sla_scan_interval_secs: u64,
+
+    // ── Export ──
+    pub export_scan_interval_secs: u64,
+
+    // ── Discord audit sync ──
+    pub audit_sync_interval_secs: u64,
+    pub discord_bot_token: String,
+
+    // ── AI ──
+    pub ai_poll_interval_secs: u64,
+    pub ai_job_timeout_secs: u64,
 }
 
 impl WorkerConfig {
@@ -131,6 +172,44 @@ impl WorkerConfig {
                 "MONITOR_CHECK_INTERVAL",
                 DEFAULT_MONITOR_CHECK_INTERVAL_SECS,
             ),
+
+            // analytics
+            daily_snapshot_interval_secs: load_env::<u64>(
+                "DAILY_SNAPSHOT_INTERVAL",
+                DEFAULT_DAILY_SNAPSHOT_HOURS,
+            ) * SECS_PER_HOUR,
+            hourly_snapshot_interval_secs: load_env::<u64>(
+                "HOURLY_SNAPSHOT_INTERVAL",
+                DEFAULT_HOURLY_SNAPSHOT_MINUTES,
+            ) * SECS_PER_MINUTE,
+
+            // temp_roles
+            temp_roles_scan_interval_secs: load_env(
+                "TEMP_ROLES_SCAN_INTERVAL",
+                DEFAULT_TEMP_ROLES_SCAN_SECS,
+            ),
+
+            // appeal_sla
+            appeal_sla_scan_interval_secs: load_env(
+                "APPEAL_SLA_SCAN_INTERVAL",
+                DEFAULT_APPEAL_SLA_SCAN_SECS,
+            ),
+
+            // export
+            export_scan_interval_secs: load_env("EXPORT_SCAN_INTERVAL", DEFAULT_EXPORT_SCAN_SECS),
+
+            // discord_audit_sync
+            audit_sync_interval_secs: load_env(
+                "AUDIT_SYNC_INTERVAL",
+                DEFAULT_AUDIT_SYNC_SECS,
+            ),
+            discord_bot_token: std::env::var("SENTINEL_DISCORD_TOKEN")
+                .or_else(|_| std::env::var("DISCORD_TOKEN"))
+                .unwrap_or_default(),
+
+            // ai
+            ai_poll_interval_secs: load_env("AI_POLL_INTERVAL", DEFAULT_AI_POLL_SECS),
+            ai_job_timeout_secs: load_env("AI_JOB_TIMEOUT", DEFAULT_AI_JOB_TIMEOUT_SECS),
         }
     }
 
@@ -230,6 +309,64 @@ impl WorkerConfig {
             "monitor_check_interval",
             "MONITOR_CHECK_INTERVAL",
             DEFAULT_MONITOR_CHECK_INTERVAL_SECS,
+        );
+
+        // analytics
+        let daily_h: u64 = config_or_env(
+            db,
+            "daily_snapshot_interval",
+            "DAILY_SNAPSHOT_INTERVAL",
+            DEFAULT_DAILY_SNAPSHOT_HOURS,
+        );
+        self.daily_snapshot_interval_secs = daily_h * SECS_PER_HOUR;
+        let hourly_m: u64 = config_or_env(
+            db,
+            "hourly_snapshot_interval",
+            "HOURLY_SNAPSHOT_INTERVAL",
+            DEFAULT_HOURLY_SNAPSHOT_MINUTES,
+        );
+        self.hourly_snapshot_interval_secs = hourly_m * SECS_PER_MINUTE;
+
+        // temp_roles
+        self.temp_roles_scan_interval_secs = config_or_env(
+            db,
+            "temp_roles_scan_interval",
+            "TEMP_ROLES_SCAN_INTERVAL",
+            DEFAULT_TEMP_ROLES_SCAN_SECS,
+        );
+
+        // appeal_sla
+        self.appeal_sla_scan_interval_secs = config_or_env(
+            db,
+            "appeal_sla_scan_interval",
+            "APPEAL_SLA_SCAN_INTERVAL",
+            DEFAULT_APPEAL_SLA_SCAN_SECS,
+        );
+
+        // export
+        self.export_scan_interval_secs = config_or_env(
+            db,
+            "export_scan_interval",
+            "EXPORT_SCAN_INTERVAL",
+            DEFAULT_EXPORT_SCAN_SECS,
+        );
+
+        // discord_audit_sync
+        self.audit_sync_interval_secs = config_or_env(
+            db,
+            "audit_sync_interval",
+            "AUDIT_SYNC_INTERVAL",
+            DEFAULT_AUDIT_SYNC_SECS,
+        );
+
+        // ai
+        self.ai_poll_interval_secs =
+            config_or_env(db, "ai_poll_interval", "AI_POLL_INTERVAL", DEFAULT_AI_POLL_SECS);
+        self.ai_job_timeout_secs = config_or_env(
+            db,
+            "ai_job_timeout",
+            "AI_JOB_TIMEOUT",
+            DEFAULT_AI_JOB_TIMEOUT_SECS,
         );
     }
 }
