@@ -19,6 +19,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::outbound::system::redis_log_stream;
 use crate::domain::entities::system::log_entry::LogEntry;
 
 /// GET /api/stats — stats globales pour le dashboard desktop
@@ -29,20 +30,37 @@ pub async fn get_dashboard_stats(
     Ok(Json(DashboardStatsDto::from(stats)))
 }
 
-/// GET /api/logs — logs récents (filtrable par guild_id, category, level)
+/// GET /api/logs — logs récents (filtrable par guild_id, category, level).
+///
+/// Source de verite :
+/// - Avec `category` : on lit depuis la stream Redis `logs:{category}`
+///   (capacite STREAM_MAXLEN par cat). Beaucoup plus leger pour Postgres
+///   et evite que `discord` (volumineux) noie les autres categories.
+/// - Sans `category` : on retombe sur Postgres (warn/error uniquement
+///   sont persistes — voir create_log).
+///
+/// Le filtre `guild_id` reste applique post-fetch pour les deux sources.
 pub async fn get_logs(
     State(state): State<AppState>,
     Query(params): Query<GuildFilterParams>,
 ) -> Result<Json<Vec<LogEntryDto>>, ApiError> {
     let limit = params.limit.unwrap_or(200).clamp(1, 1000);
-    let logs = state
-        .log_repo
-        .find_filtered(
-            params.category.as_deref(),
+
+    let logs = if let Some(cat) = params.category.as_deref() {
+        redis_log_stream::xrevrange_logs(
+            &state.redis_client,
+            cat,
             params.level.as_deref(),
-            limit,
+            limit as usize,
         )
-        .await?;
+        .await
+    } else {
+        state
+            .log_repo
+            .find_filtered(None, params.level.as_deref(), limit)
+            .await?
+    };
+
     let filtered: Vec<LogEntryDto> = logs
         .into_iter()
         .filter(|l| params.guild_id.as_ref().is_none_or(|gid| l.server == *gid))
@@ -52,6 +70,7 @@ pub async fn get_logs(
 }
 
 /// DELETE /api/logs/{category} — supprimer tous les logs d'une categorie
+/// (vide la stream Redis + supprime les lignes Postgres correspondantes).
 pub async fn delete_logs_by_category(
     State(state): State<AppState>,
     Path(category): Path<String>,
@@ -61,11 +80,19 @@ pub async fn delete_logs_by_category(
             "Impossible de supprimer les journaux Discord".into(),
         )));
     }
+    redis_log_stream::delete_stream(&state.redis_client, &category).await;
     let count = state.log_repo.delete_by_category(&category).await?;
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
 
-/// POST /api/logs — écrire un log (utilisé par les bots)
+/// POST /api/logs — écrire un log (utilisé par les bots/workers).
+///
+/// Strategie de stockage :
+/// - **Toujours** XADD sur la stream Redis `logs:{category}` (capacite
+///   bornee par STREAM_MAXLEN, eviction auto). C'est la source pour la
+///   page "Logs systeme" du panneau web.
+/// - **Postgres** uniquement pour `warn` / `error` : forensics long terme,
+///   recherche par guild, persistance entre restarts Redis.
 pub async fn create_log(
     State(state): State<AppState>,
     Json(dto): Json<CreateLogDto>,
@@ -86,7 +113,14 @@ pub async fn create_log(
         category,
         details: dto.details.unwrap_or(serde_json::json!({})),
     };
-    state.log_repo.save(&entry).await?;
+
+    // Redis : toujours, avec MAXLEN auto (cap par categorie).
+    redis_log_stream::xadd_log(&state.redis_client, &entry).await;
+
+    // Postgres : uniquement warn/error pour la forensique long-terme.
+    if matches!(entry.level.as_str(), "warn" | "warning" | "error" | "fatal") {
+        state.log_repo.save(&entry).await?;
+    }
 
     state.broadcaster.broadcast(
         "log_entry_created",
