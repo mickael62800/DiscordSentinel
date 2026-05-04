@@ -42,7 +42,7 @@ function statusColor(s: string): string {
 </script>
 
 <template>
-  <div class="page page--wide">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>⏰ Reminders modération</h1>
       <p class="lede">

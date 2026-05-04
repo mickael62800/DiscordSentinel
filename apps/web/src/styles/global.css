@@ -494,13 +494,9 @@ input[type="checkbox"]:not(.toggle input):not([hidden]):disabled {
    - wide        : dashboards/tables/charts denses
    - narrow      : login / callback / reviews single-card
 */
-.page--narrow,
-.page--constrained,
-.page--wide {
+.page--constrained {
   width: 100%;
   margin-left: auto;
   margin-right: auto;
+  max-width: 1620px;
 }
-.page--narrow      { max-width: 480px;  }
-.page--constrained { max-width: 1280px; }
-.page--wide        { max-width: 1920px; }

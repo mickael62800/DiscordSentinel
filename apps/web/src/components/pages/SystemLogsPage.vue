@@ -3,7 +3,7 @@ import LogsColumn from "../organisms/LogsColumn.vue";
 </script>
 
 <template>
-  <div class="system-logs page--wide">
+  <div class="system-logs page--constrained">
     <h1 class="page-title">⚙️ Logs système</h1>
     <p class="page-hint">
       Logs des bots Discord, workers, requêtes API et WebSocket — affichés

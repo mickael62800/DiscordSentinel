@@ -20,7 +20,7 @@ async function handleRefresh() {
 </script>
 
 <template>
-  <div class="dashboard page--wide">
+  <div class="dashboard page--constrained">
     <div class="dashboard-header">
       <h1>Statistiques admin</h1>
       <div class="header-actions">

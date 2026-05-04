@@ -31,7 +31,7 @@ function closeEdit() {
 </script>
 
 <template>
-  <div class="discord-roles page--wide">
+  <div class="discord-roles page--constrained">
     <div class="header">
       <h1>Roles Discord</h1>
       <span class="role-count">{{ totalRoles }} roles</span>

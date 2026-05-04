@@ -57,7 +57,7 @@ function rolesCount(roles: unknown): number {
 </script>
 
 <template>
-  <div class="members-page page--wide">
+  <div class="members-page page--constrained">
     <div class="page-header-row">
       <h1>Membres</h1>
       <span v-if="!loading" class="member-count">{{ tabFilteredMembers.length }} membres</span>

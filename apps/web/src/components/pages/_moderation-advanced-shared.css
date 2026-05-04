@@ -1,6 +1,6 @@
 /* .page sert uniquement de hook pour les styles descendants partages
    (.card, .table, .lookup, .btn-*). Le sizing est gere par les classes
-   utilitaires .page--constrained / .page--wide / .page--narrow definies
+   utilitaires .page--constrained / .page--constrained / .page--constrained definies
    dans styles/global.css — a appliquer sur le meme element racine. */
 .page { /* no sizing here */ }
 .page-header {

@@ -60,7 +60,7 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="page page--narrow">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>🔍 Reviews modération</h1>
       <p class="lede">

@@ -137,7 +137,7 @@ const tabs = [
 </script>
 
 <template>
-  <div class="security-page page--wide">
+  <div class="security-page page--constrained">
     <div class="page-header">
       <div>
         <h1>🛡️ Sécurité serveur</h1>

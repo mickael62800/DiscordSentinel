@@ -7,7 +7,7 @@ const { sections } = useDashboardSections();
 </script>
 
 <template>
-  <div class="home page--wide">
+  <div class="home page--constrained">
     <DashboardHero />
 
     <div class="section-grid">

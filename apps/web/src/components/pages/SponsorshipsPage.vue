@@ -63,7 +63,7 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="page page--wide">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>🤝 Parrainages</h1>
       <p class="lede">

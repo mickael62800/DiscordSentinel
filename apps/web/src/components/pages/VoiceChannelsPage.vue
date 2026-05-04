@@ -50,7 +50,7 @@ function backToList() {
 </script>
 
 <template>
-  <div class="page page--wide">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>Salons vocaux</h1>
       <p class="page-subtitle">Salons vocaux temporaires actifs</p>

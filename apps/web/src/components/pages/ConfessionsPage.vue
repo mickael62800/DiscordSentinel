@@ -8,7 +8,7 @@ const { tab, showDeleted, confessions, reports, loading } = useConfessions();
 </script>
 
 <template>
-  <div class="confessions-page page--wide">
+  <div class="confessions-page page--constrained">
     <header class="page-head">
       <div>
         <h1>📝 Modération des confessions</h1>

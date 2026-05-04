@@ -96,7 +96,7 @@ const sortedRoles = computed(() =>
 </script>
 
 <template>
-  <div class="page page--wide">
+  <div class="page page--constrained">
     <header class="page-header">
       <h1>⏳ Rôles temporaires</h1>
       <p class="lede">
