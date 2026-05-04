@@ -161,7 +161,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "audit_cache",
+            "audit-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
