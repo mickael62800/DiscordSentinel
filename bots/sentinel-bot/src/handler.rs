@@ -283,6 +283,35 @@ impl EventHandler for Handler {
         modules::audit::on_role_update(&ctx, old, &new).await;
     }
 
+    /// Declenche quand le bot rejoint une nouvelle guild OU au re-sync au
+    /// demarrage (is_new=Some(false) dans ce cas). On enregistre les
+    /// slash commands + register cote API uniquement pour les vraies
+    /// nouvelles guilds, sinon on duplique le travail deja fait dans `ready`.
+    async fn guild_create(&self, ctx: Context, guild: Guild, is_new: Option<bool>) {
+        if is_new != Some(true) {
+            return;
+        }
+        info!(guild_id = %guild.id, name = %guild.name, "Bot ajoute a une nouvelle guild");
+
+        // 1. Register cote API (heartbeat / dashboard)
+        {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let member_count = guild.member_count as i32;
+                let owner_id = guild.owner_id.to_string();
+                if let Err(e) = api
+                    .register_guild(&guild.id.to_string(), &guild.name, member_count, Some(&owner_id))
+                    .await
+                {
+                    tracing::warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
+                }
+            }
+        }
+
+        // 2. Refresh slash commands pour cette guild
+        crate::command_registry::refresh_guild_commands(&ctx, guild.id).await;
+    }
+
     async fn guild_update(
         &self,
         ctx: Context,
