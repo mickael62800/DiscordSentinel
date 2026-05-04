@@ -81,9 +81,9 @@ pub async fn run(_pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), 
 async fn call_resolve_batch() -> Result<Vec<ResolvedBettingCombat>, String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier
+    // Delegue a crate::common::grpc::connect() pour beneficier
     // du mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
-    let channel: Channel = sentinel_worker_common::grpc::connect().await?;
+    let channel: Channel = crate::common::grpc::connect().await?;
 
     let auth: MetadataValue<_> = format!("Bearer {api_key}")
         .parse()

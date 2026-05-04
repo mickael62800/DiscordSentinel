@@ -10,7 +10,7 @@ use tracing::{debug, error, warn};
 
 use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceClient;
 use sentinel_proto::coude::v1::HpRegenTickRequest;
-use sentinel_worker_common::grpc;
+use crate::common::grpc;
 
 const DEFAULT_RATE_0_25: f64 = 100.0;
 const DEFAULT_RATE_25_50: f64 = 50.0;

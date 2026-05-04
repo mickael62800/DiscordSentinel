@@ -133,9 +133,9 @@ async fn call_export_api(
 ) -> Result<(String, usize), String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier
+    // Delegue a crate::common::grpc::connect() pour beneficier
     // du mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
-    let channel = sentinel_worker_common::grpc::connect().await?;
+    let channel = crate::common::grpc::connect().await?;
 
     let mut client = ExportServiceClient::new(channel);
     let mut req = Request::new(ExecuteExportRequest {

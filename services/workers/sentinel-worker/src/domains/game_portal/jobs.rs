@@ -12,7 +12,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use tracing::{error, info, warn};
 
-use sentinel_worker_common as common;
+use crate::common as common;
 
 const WORKER_NAME: &str = "game-portal-worker";
 

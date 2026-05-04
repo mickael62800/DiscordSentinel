@@ -145,9 +145,9 @@ async fn publish_taunts(
 }
 
 async fn connect_grpc(_api_url: &str) -> Result<Channel, String> {
-    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier du
+    // Delegue a crate::common::grpc::connect() pour beneficier du
     // mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
-    sentinel_worker_common::grpc::connect().await
+    crate::common::grpc::connect().await
 }
 
 async fn fetch_guild_ids(pool: &PgPool) -> Result<Vec<String>, String> {

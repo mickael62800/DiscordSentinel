@@ -19,9 +19,9 @@ use sentinel_proto::coude::v1::RedistributeDueRequest;
 pub async fn run(_pool: &PgPool, min_days: i64) -> Result<(), String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier
+    // Delegue a crate::common::grpc::connect() pour beneficier
     // du mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
-    let channel: Channel = sentinel_worker_common::grpc::connect().await?;
+    let channel: Channel = crate::common::grpc::connect().await?;
 
     let auth: MetadataValue<_> = format!("Bearer {api_key}")
         .parse()

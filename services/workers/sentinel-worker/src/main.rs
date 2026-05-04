@@ -24,6 +24,7 @@
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+mod common;
 mod config;
 mod domains;
 mod scheduler;
@@ -32,7 +33,6 @@ use tokio::sync::watch;
 use tracing::info;
 
 use crate::config::WorkerConfig;
-use sentinel_worker_common as common;
 
 const WORKER_NAME: &str = "sentinel-worker";
 

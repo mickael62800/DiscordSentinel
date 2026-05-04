@@ -49,7 +49,7 @@ pub fn init_tracing(default_filter: &str) {
     // des workers via #[tokio::main]). Si pas dans tokio, no-op silencieux.
     // METRICS_PORT defini par docker-compose (worker-env -> 9100).
     if tokio::runtime::Handle::try_current().is_ok() {
-        crate::metrics::init_observability("worker");
+        crate::common::metrics::init_observability("worker");
     }
 }
 

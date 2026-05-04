@@ -7,7 +7,7 @@
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
-use sentinel_worker_common::api;
+use crate::common::api;
 
 #[derive(serde::Deserialize)]
 struct SyncResp {

@@ -17,7 +17,7 @@ use sqlx::PgPool;
 use tokio::sync::watch;
 use tracing::info;
 
-use sentinel_worker_common::spawn_periodic;
+use crate::common::spawn_periodic;
 
 use crate::config::{CleanupConfig, WorkerConfig};
 use crate::domains;

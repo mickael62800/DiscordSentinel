@@ -1,7 +1,7 @@
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
-use sentinel_worker_common::is_worker_enabled;
+use crate::common::is_worker_enabled;
 
 #[derive(sqlx::FromRow)]
 struct GuildRow {

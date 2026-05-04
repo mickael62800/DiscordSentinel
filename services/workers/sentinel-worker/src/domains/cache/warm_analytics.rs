@@ -3,7 +3,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 use tracing::{info, warn};
 
-use sentinel_worker_common::is_worker_enabled;
+use crate::common::is_worker_enabled;
 
 const CACHE_TTL_SECS: u64 = 600; // 10 minutes
 const DAYS: i32 = 30;

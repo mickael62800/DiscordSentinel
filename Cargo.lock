@@ -3053,7 +3053,6 @@ dependencies = [
  "futures-util",
  "redis",
  "reqwest",
- "sentinel-worker-common",
  "serde",
  "serde_json",
  "subtle",
@@ -3097,43 +3096,25 @@ dependencies = [
 name = "sentinel-worker"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "chrono",
  "dotenvy",
+ "metrics",
+ "metrics-exporter-prometheus",
  "rand 0.8.6",
  "redis",
  "reqwest",
  "sentinel-proto",
- "sentinel-worker-common",
  "serde",
  "serde_json",
  "sqlx",
  "tikv-jemallocator",
  "tokio",
- "tonic",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "sentinel-worker-common"
-version = "0.1.0"
-dependencies = [
- "axum",
- "dotenvy",
- "metrics",
- "metrics-exporter-prometheus",
- "redis",
- "reqwest",
- "sentinel-proto",
- "serde",
- "serde_json",
- "sqlx",
- "tokio",
  "tokio-metrics",
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

@@ -7,7 +7,7 @@
 
 use std::collections::HashMap;
 
-use sentinel_worker_common::{
+use crate::common::{
     config_or_env, load_api_url, load_database_url, load_env, load_env_bool, load_redis_url,
     SECS_PER_HOUR, SECS_PER_MINUTE,
 };

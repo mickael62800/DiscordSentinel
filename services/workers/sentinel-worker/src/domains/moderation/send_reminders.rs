@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use sentinel_worker_common::is_worker_enabled;
+use crate::common::is_worker_enabled;
 
 /// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
 /// Doit rester synchronise avec `bots/shared/src/event_bus.rs`.

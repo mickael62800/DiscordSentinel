@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 
 use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
 use sentinel_proto::coude::v1::Empty as ProtoEmpty;
-use sentinel_worker_common::grpc;
+use crate::common::grpc;
 
 pub async fn run(_pool: &PgPool) -> Result<(), String> {
     let channel = grpc::connect().await?;

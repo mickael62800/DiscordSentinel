@@ -26,6 +26,32 @@ use crate::config::Config;
 use crate::handler::{ws_handler, GatewayState};
 use crate::logger::GatewayLogger;
 
+/// Attend Ctrl+C ou SIGTERM. Inline depuis l'ancien
+/// `sentinel_worker_common::shutdown_signal()` (la lib partagee a ete
+/// absorbee dans sentinel-worker).
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            tracing::error!(error = %e, "Impossible d'ecouter Ctrl+C");
+        }
+    };
+    #[cfg(unix)]
+    let terminate = async {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
+            Err(e) => tracing::error!(error = %e, "Impossible d'ecouter SIGTERM"),
+        }
+    };
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+    tokio::select! {
+        _ = ctrl_c => info!("Signal Ctrl+C recu"),
+        _ = terminate => info!("Signal SIGTERM recu"),
+    }
+}
+
 #[tokio::main]
 async fn main() {
     dotenvy::dotenv().ok();
@@ -143,7 +169,7 @@ async fn main() {
         listener,
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
-    .with_graceful_shutdown(sentinel_worker_common::shutdown_signal())
+    .with_graceful_shutdown(shutdown_signal())
     .await
     .expect("Erreur serveur");
 

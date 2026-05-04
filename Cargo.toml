@@ -9,10 +9,8 @@ members = [
     "services/api",
     "services/gateway",
 
-    # Workers — fusionnes en un seul binaire `sentinel-worker` (Phase 0-3
-    # de la fusion, avril 2026). Les anciens crates ont ete supprimes ;
-    # leurs jobs vivent desormais dans `sentinel-worker/src/domains/`.
-    "services/workers/worker-common",
+    # Worker unifie : tous les jobs periodiques + les helpers communs
+    # (ex worker-common absorbe dans src/common/) dans un binaire unique.
     "services/workers/sentinel-worker",
 
     # Bot Discord unifie

@@ -8,7 +8,7 @@ use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use sentinel_worker_common as common;
+use crate::common as common;
 
 const WORKER_NAME: &str = "announcement-worker";
 const STREAM_KEY: &str = "sentinel:events";
