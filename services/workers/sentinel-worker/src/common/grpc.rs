@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Helpers de connection gRPC vers l'API Sentinel.
 //!
 //! Centralise le boilerplate `Endpoint::from_shared + connect_timeout +

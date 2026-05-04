@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Helpers d'appel HTTP vers l'API Sentinel.
 //!
 //! Centralise le boilerplate `reqwest::Client::new() + bearer_auth(API_KEY)

@@ -4,6 +4,12 @@
 //! heartbeat, scheduler, pool creation, observabilité Prometheus,
 //! appels HTTP/gRPC vers l'API, init Redis client.
 
+// Bibliotheque utilitaire : certaines fonctions ne sont pas appelees
+// par les jobs actuels mais sont gardees pour les futurs jobs (ex
+// xadd_event, get_json HTTP, with_bearer pour grpc). Pas de dead code
+// metier ici.
+#![allow(dead_code)]
+
 pub mod api;
 pub mod grpc;
 pub mod metrics;

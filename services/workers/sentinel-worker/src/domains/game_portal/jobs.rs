@@ -17,6 +17,7 @@ use crate::common as common;
 const WORKER_NAME: &str = "game-portal-worker";
 
 #[derive(Debug, Deserialize, Default)]
+#[allow(dead_code)]
 struct JobReport {
     #[serde(default)]
     job: String,
