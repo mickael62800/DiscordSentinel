@@ -56,6 +56,19 @@ const DEFAULT_AUDIT_SYNC_SECS: u64 = 300;
 const DEFAULT_AI_POLL_SECS: u64 = 2;
 const DEFAULT_AI_JOB_TIMEOUT_SECS: u64 = 2 * SECS_PER_MINUTE;
 
+// ── Defauts moderation ──
+const DEFAULT_CONDUCT_REGEN_HOURS: u64 = 1;
+const DEFAULT_BAN_CLEANUP_MINUTES: u64 = 1;
+const DEFAULT_SYNC_BAN_PROPOSALS_MINUTES: u64 = 2;
+const DEFAULT_SEND_REMINDERS_SECS: u64 = 30;
+
+// ── Defauts coude ──
+const DEFAULT_COMBAT_EXPIRY_CHECK_SECS: u64 = 86400; // 24h (a baisser plus tard)
+const DEFAULT_BETTING_CHECK_SECS: u64 = 30;
+const DEFAULT_HP_REGEN_TICK_SECS: u64 = 300;
+const DEFAULT_CASHBOX_TICK_SECS: u64 = 3600;
+const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -108,6 +121,19 @@ pub struct WorkerConfig {
     // ── AI ──
     pub ai_poll_interval_secs: u64,
     pub ai_job_timeout_secs: u64,
+
+    // ── Moderation ──
+    pub conduct_regen_interval_secs: u64,
+    pub ban_cleanup_interval_secs: u64,
+    pub sync_ban_proposals_interval_secs: u64,
+    pub send_reminders_interval_secs: u64,
+
+    // ── Coude ──
+    pub combat_expiry_check_secs: u64,
+    pub betting_check_secs: u64,
+    pub hp_regen_tick_secs: u64,
+    pub cashbox_tick_secs: u64,
+    pub cashbox_min_days: u64,
 }
 
 impl WorkerConfig {
@@ -210,6 +236,34 @@ impl WorkerConfig {
             // ai
             ai_poll_interval_secs: load_env("AI_POLL_INTERVAL", DEFAULT_AI_POLL_SECS),
             ai_job_timeout_secs: load_env("AI_JOB_TIMEOUT", DEFAULT_AI_JOB_TIMEOUT_SECS),
+
+            // moderation
+            conduct_regen_interval_secs: load_env::<u64>(
+                "CONDUCT_REGEN_INTERVAL",
+                DEFAULT_CONDUCT_REGEN_HOURS,
+            ) * SECS_PER_HOUR,
+            ban_cleanup_interval_secs: load_env::<u64>(
+                "BAN_CLEANUP_INTERVAL",
+                DEFAULT_BAN_CLEANUP_MINUTES,
+            ) * SECS_PER_MINUTE,
+            sync_ban_proposals_interval_secs: load_env::<u64>(
+                "SYNC_BAN_PROPOSALS_INTERVAL",
+                DEFAULT_SYNC_BAN_PROPOSALS_MINUTES,
+            ) * SECS_PER_MINUTE,
+            send_reminders_interval_secs: load_env(
+                "SEND_REMINDERS_INTERVAL",
+                DEFAULT_SEND_REMINDERS_SECS,
+            ),
+
+            // coude
+            combat_expiry_check_secs: load_env(
+                "COMBAT_EXPIRY_CHECK_SECS",
+                DEFAULT_COMBAT_EXPIRY_CHECK_SECS,
+            ),
+            betting_check_secs: load_env("BETTING_CHECK_SECS", DEFAULT_BETTING_CHECK_SECS),
+            hp_regen_tick_secs: load_env("HP_REGEN_TICK_SECS", DEFAULT_HP_REGEN_TICK_SECS),
+            cashbox_tick_secs: load_env("CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS),
+            cashbox_min_days: load_env("CASHBOX_MIN_DAYS", DEFAULT_CASHBOX_MIN_DAYS),
         }
     }
 
@@ -367,6 +421,67 @@ impl WorkerConfig {
             "ai_job_timeout",
             "AI_JOB_TIMEOUT",
             DEFAULT_AI_JOB_TIMEOUT_SECS,
+        );
+
+        // moderation
+        let regen_h: u64 = config_or_env(
+            db,
+            "conduct_regen_interval",
+            "CONDUCT_REGEN_INTERVAL",
+            DEFAULT_CONDUCT_REGEN_HOURS,
+        );
+        self.conduct_regen_interval_secs = regen_h * SECS_PER_HOUR;
+        let cleanup_m: u64 = config_or_env(
+            db,
+            "ban_cleanup_interval",
+            "BAN_CLEANUP_INTERVAL",
+            DEFAULT_BAN_CLEANUP_MINUTES,
+        );
+        self.ban_cleanup_interval_secs = cleanup_m * SECS_PER_MINUTE;
+        let sync_m: u64 = config_or_env(
+            db,
+            "sync_ban_proposals_interval",
+            "SYNC_BAN_PROPOSALS_INTERVAL",
+            DEFAULT_SYNC_BAN_PROPOSALS_MINUTES,
+        );
+        self.sync_ban_proposals_interval_secs = sync_m * SECS_PER_MINUTE;
+        self.send_reminders_interval_secs = config_or_env(
+            db,
+            "send_reminders_interval",
+            "SEND_REMINDERS_INTERVAL",
+            DEFAULT_SEND_REMINDERS_SECS,
+        );
+
+        // coude
+        self.combat_expiry_check_secs = config_or_env(
+            db,
+            "combat_expiry_check_secs",
+            "COMBAT_EXPIRY_CHECK_SECS",
+            DEFAULT_COMBAT_EXPIRY_CHECK_SECS,
+        );
+        self.betting_check_secs = config_or_env(
+            db,
+            "betting_check_secs",
+            "BETTING_CHECK_SECS",
+            DEFAULT_BETTING_CHECK_SECS,
+        );
+        self.hp_regen_tick_secs = config_or_env(
+            db,
+            "hp_regen_tick_secs",
+            "HP_REGEN_TICK_SECS",
+            DEFAULT_HP_REGEN_TICK_SECS,
+        );
+        self.cashbox_tick_secs = config_or_env(
+            db,
+            "cashbox_tick_secs",
+            "CASHBOX_TICK_SECS",
+            DEFAULT_CASHBOX_TICK_SECS,
+        );
+        self.cashbox_min_days = config_or_env(
+            db,
+            "cashbox_min_days",
+            "CASHBOX_MIN_DAYS",
+            DEFAULT_CASHBOX_MIN_DAYS,
         );
     }
 }
