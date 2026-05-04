@@ -515,6 +515,7 @@ pub(in crate::modules::coude::api_client) use sentinel_shared::grpc_client::grpc
 mod heist;
 mod steal_protections;
 mod steal_boosts;
+mod steal_attempts;
 mod taunts;
 mod cashbox;
 mod bets;

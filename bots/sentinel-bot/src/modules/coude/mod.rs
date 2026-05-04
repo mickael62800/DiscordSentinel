@@ -13,6 +13,7 @@ pub mod ultimates;
 pub mod channel_check;
 pub mod commands;
 pub mod daily_chaos_events;
+pub mod steal_expired_events;
 pub mod guild_config;
 pub mod interaction_helper;
 pub mod prison_check;
@@ -257,6 +258,7 @@ pub async fn on_ready(ctx: &Context, guild_ids: Vec<GuildId>) {
 pub fn spawn_background(ctx: Context) {
     tournament_events::spawn(ctx.clone());
     daily_chaos_events::spawn(ctx.clone());
+    steal_expired_events::spawn(ctx.clone());
     spawn_combat_sync_listener(ctx);
 }
 

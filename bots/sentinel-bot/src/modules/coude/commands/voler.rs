@@ -4,7 +4,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, EditMessage,
 };
-use std::time::Duration;
+use uuid::Uuid;
 
 use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
@@ -212,10 +212,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Envoyer l'alerte publique (voleur anonyme) avec bouton de defense
+    // Envoyer l'alerte publique (voleur anonyme) avec bouton de defense.
+    // Phase 5 : on genere un attempt_id UUID client-side qu'on inclut
+    // dans le custom_id (5 segments au lieu de 4) pour pouvoir PATCH
+    // /defend facilement quand le bouton est clique.
+    let attempt_id = Uuid::new_v4();
     let custom_id = format!(
-        "steal_defend:{}:{}:{}",
-        thief_id, target_id_str, guild_id
+        "steal_defend:{}:{}:{}:{}",
+        attempt_id, thief_id, target_id_str, guild_id
     );
 
     let embed = CreateEmbed::new()
@@ -267,94 +271,25 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    // Spawn timeout task: after 60s, if no defend, auto-succeed
-    let ctx_clone = ctx.clone();
-    let msg_id = alert_msg.id;
-    let msg_channel_id = channel_id;
-    let thief_id_clone = thief_id.clone();
-    let target_id_clone = target_id_str.clone();
-    let guild_id_clone = guild_id.clone();
-    let failure_penalty_pct = config.steal_failure_penalty_pct();
-
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(60)).await;
-
-        // Try to edit the message — if button was already clicked, the custom_id
-        // won't match anymore (component removed), so we check if components still exist
-        let msg = match msg_channel_id.message(&ctx_clone.http, msg_id).await {
-            Ok(m) => m,
-            Err(_) => return,
-        };
-
-        // If components were removed, the defend button was clicked — do nothing
-        if msg.components.is_empty() {
-            return;
-        }
-
-        // Timeout : la victime est AFK. On simule un combat de vol comme
-        // si elle se defendait, mais avec un malus sur son roll. Les items
-        // anti-vol peuvent toujours declencher.
-        let data = ctx_clone.data.read().await;
-        let api = data.get::<GameApiKey>().unwrap();
-        let catalog_timeout = data.get::<CatalogCacheKey>().unwrap().clone();
-
-        let thief_player = match api
-            .get_or_create_player(&guild_id_clone, &thief_id_clone, "")
-            .await
-        {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "Echec API get_or_create_player thief (timeout vol)");
-                return;
-            }
-        };
-
-        let target_player = match api
-            .get_or_create_player(&guild_id_clone, &target_id_clone, "")
-            .await
-        {
-            Ok(p) => p,
-            Err(e) => {
-                tracing::warn!(error = %e, "Echec API get_or_create_player target (timeout vol)");
-                return;
-            }
-        };
-
-        let (result_embed, taunt_events) = resolve_steal_attempt(
-            api,
-            &catalog_timeout,
-            &guild_id_clone,
-            &thief_id_clone,
-            &target_id_clone,
-            &thief_player,
-            &target_player,
-            true, // AFK
-            failure_penalty_pct,
+    // Phase 5 — persistance de l'attempt en DB. Le worker `expire_steals`
+    // (sentinel-worker) scanne les pending expires et publie un event
+    // Redis `coude:steal_expired` que le consumer
+    // `steal_expired_events.rs` consomme pour declencher la resolution
+    // AFK. Plus de tokio::spawn fragile qui meurt avec le bot.
+    if let Err(e) = api
+        .create_steal_attempt(
+            attempt_id,
+            &guild_id,
+            &thief_id,
+            &target_id_str,
+            &alert_msg.id.to_string(),
+            &channel_id.to_string(),
+            60,
         )
-        .await;
-
-        // Edit the original alert message to show result (remove button)
-        if let Err(e) = msg_channel_id
-            .edit_message(
-                &ctx_clone.http,
-                msg_id,
-                EditMessage::new()
-                    .embed(result_embed)
-                    .components(vec![]),
-            )
-            .await
-        {
-            tracing::warn!(error = %e, "Echec edit_message (timeout vol)");
-        }
-
-        // Phase 9 Part D : dispatch les taunt events (IO pur).
-        if !taunt_events.is_empty() {
-            if let Ok(guild_id_u64) = guild_id_clone.parse::<u64>() {
-                let gid = serenity::all::GuildId::new(guild_id_u64);
-                crate::modules::coude::taunts_dispatch::dispatch_all(&ctx_clone, gid, &taunt_events).await;
-            }
-        }
-    });
+        .await
+    {
+        tracing::warn!(error = %e, "Echec create_steal_attempt API — la resolution AFK ne se declenchera pas");
+    }
 }
 
 /// Resout une tentative de vol. Centralise la logique pour les deux
@@ -366,7 +301,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 ///
 /// Dans les deux cas, les items anti-vol de la cible peuvent bloquer
 /// le vol apres le roll (un item tire sa chance et se consume au blocage).
-async fn resolve_steal_attempt(
+pub(crate) async fn resolve_steal_attempt(
     api: &ApiClient,
     catalog: &CatalogCache,
     guild_id: &str,
@@ -625,14 +560,17 @@ async fn resolve_steal_attempt(
 /// Handle the defend button click from a steal attempt.
 pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     let parts: Vec<&str> = component.data.custom_id.split(':').collect();
-    // Format: steal_defend:{thief_id}:{target_id}:{guild_id}
-    if parts.len() != 4 {
-        return;
-    }
-
-    let thief_id = parts[1];
-    let target_id = parts[2];
-    let guild_id = parts[3];
+    // Format Phase 5 : steal_defend:{attempt_id}:{thief_id}:{target_id}:{guild_id}
+    // Format legacy (avant Phase 5) : steal_defend:{thief_id}:{target_id}:{guild_id}
+    // On accepte les deux pour ne pas casser les boutons deja postes.
+    let (attempt_id_opt, thief_id, target_id, guild_id) = match parts.len() {
+        5 => {
+            let aid = Uuid::parse_str(parts[1]).ok();
+            (aid, parts[2], parts[3], parts[4])
+        }
+        4 => (None, parts[1], parts[2], parts[3]),
+        _ => return,
+    };
 
     // Only the target can click the defend button
     if component.user.id.to_string() != target_id {
@@ -667,6 +605,13 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
     let catalog_defend = data.get::<CatalogCacheKey>().unwrap().clone();
+
+    // Phase 5 — marque l'attempt 'defended' cote DB pour que le worker
+    // ne le passe pas en 'expired' apres coup. Fire-and-forget : meme
+    // si l'API rate, on continue la resolution active.
+    if let Some(attempt_id) = attempt_id_opt {
+        api.mark_steal_defended(attempt_id).await;
+    }
 
     // Fetch both players
     let thief_player = match api
