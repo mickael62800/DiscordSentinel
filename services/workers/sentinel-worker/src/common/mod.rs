@@ -260,7 +260,7 @@ const WORKER_MODULES: &[&str] = &[
     "blackjack",
     "cache",
     "cleanup",
-    "coude",
+    "coude-bot",
     "discord_audit_sync",
     "export",
     "game_portal",

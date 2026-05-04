@@ -410,7 +410,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "coude",
+        "coude-bot",
         |pool| Box::pin(async move { domains::coude::expire_combats::run(&pool).await }),
     );
     {
@@ -422,7 +422,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude",
+            "coude-bot",
             move |pool| {
                 let api = api.clone();
                 let token = token.clone();
@@ -438,7 +438,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "coude",
+        "coude-bot",
         |pool| Box::pin(async move { domains::coude::hp_regen::run(&pool).await }),
     );
     {
@@ -449,7 +449,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude",
+            "coude-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -466,7 +466,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude",
+            "coude-bot",
             move |pool| {
                 Box::pin(async move {
                     domains::coude::redistribute_cashbox::run(&pool, min_days).await
@@ -485,7 +485,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "coude",
+            "coude-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
