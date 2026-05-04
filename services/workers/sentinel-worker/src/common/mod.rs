@@ -257,7 +257,7 @@ const WORKER_MODULES: &[&str] = &[
     "announcements",
     "appeal_sla",
     "audit-bot",
-    "blackjack",
+    "blackjack-bot",
     "cache",
     "cleanup",
     "coude-bot",
