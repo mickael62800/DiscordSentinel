@@ -47,6 +47,21 @@ async fn main() {
     let pg_pool = common::create_pg_pool(&config.database_url).await;
     info!("PostgreSQL connecte");
 
+    let redis_client = match redis::Client::open(config.redis_url.as_str()) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::error!(error = %e, url = %config.redis_url, "URL Redis invalide");
+            std::process::exit(1);
+        }
+    };
+    match redis_client.get_multiplexed_async_connection().await {
+        Ok(_) => info!("Redis connecte"),
+        Err(e) => {
+            tracing::error!(error = %e, "Redis indisponible");
+            std::process::exit(1);
+        }
+    }
+
     // Surcharge eventuelle depuis bot_guild_config (config dynamique).
     let db_config = common::load_worker_config(&pg_pool, WORKER_NAME).await;
     if !db_config.is_empty() {
@@ -56,7 +71,7 @@ async fn main() {
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    scheduler::start(&config, pg_pool.clone(), shutdown_rx);
+    scheduler::start(&config, pg_pool.clone(), redis_client, shutdown_rx);
     common::start_heartbeat(config.api_url.clone(), WORKER_NAME);
 
     common::send_lifecycle_log(
