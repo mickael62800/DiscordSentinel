@@ -33,14 +33,14 @@ const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 30;
 
 // ── Init ──
 
-/// Initialise dotenvy + tracing avec un filtre par defaut, ET demarre le
-/// serveur HTTP `/metrics` (Prometheus) sur `METRICS_PORT` (defaut 9100)
-/// si un runtime tokio est dispo.
+/// Initialise dotenvy + tracing avec un filtre par defaut.
 ///
-/// Le serveur metrics est requis par le healthcheck Docker des workers
-/// (`wget /metrics`), sinon les containers restent flagged unhealthy.
-/// Avant ce fix, chaque worker devait appeler `metrics::init_observability`
-/// manuellement — aucun ne le faisait, d'ou l'unhealthy systematique.
+/// Le serveur metrics (`/metrics` sur METRICS_PORT, Prometheus) doit
+/// etre demarre explicitement par le main via
+/// `common::metrics::init_observability(WORKER_NAME)`. Avant la fusion
+/// `init_tracing` le faisait automatiquement, mais ca causait un
+/// double-bind quand le main appelait aussi explicitement
+/// init_observability (port 9100 deja pris -> erreur au boot).
 pub fn init_tracing(default_filter: &str) {
     dotenvy::dotenv().ok();
 
@@ -50,13 +50,6 @@ pub fn init_tracing(default_filter: &str) {
                 .unwrap_or_else(|_| default_filter.into()),
         )
         .init();
-
-    // Demarre /metrics auto si on est dans un runtime tokio (cas standard
-    // des workers via #[tokio::main]). Si pas dans tokio, no-op silencieux.
-    // METRICS_PORT defini par docker-compose (worker-env -> 9100).
-    if tokio::runtime::Handle::try_current().is_ok() {
-        crate::common::metrics::init_observability("worker");
-    }
 }
 
 // ── PostgreSQL ──
