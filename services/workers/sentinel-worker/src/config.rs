@@ -80,6 +80,10 @@ const DEFAULT_TICKETS_CLOSE_INACTIVE_SECS: u64 = 1800;
 // mais avec une fenetre captcha typique de 5min, 15s = bonne reactivite).
 const DEFAULT_QUARANTINE_KICK_CHECK_SECS: u64 = 15;
 
+// Phase 5G — Lockdown expire : tick 15s (meme cadence que la boucle
+// d'origine cote bot).
+const DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS: u64 = 15;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -152,6 +156,7 @@ pub struct WorkerConfig {
 
     // ── Security ──
     pub quarantine_kick_check_secs: u64,
+    pub lockdown_expire_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -297,6 +302,10 @@ impl WorkerConfig {
             quarantine_kick_check_secs: load_env(
                 "QUARANTINE_KICK_CHECK_SECS",
                 DEFAULT_QUARANTINE_KICK_CHECK_SECS,
+            ),
+            lockdown_expire_check_secs: load_env(
+                "LOCKDOWN_EXPIRE_CHECK_SECS",
+                DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS,
             ),
         }
     }
@@ -538,6 +547,12 @@ impl WorkerConfig {
             "quarantine_kick_check_secs",
             "QUARANTINE_KICK_CHECK_SECS",
             DEFAULT_QUARANTINE_KICK_CHECK_SECS,
+        );
+        self.lockdown_expire_check_secs = config_or_env(
+            db,
+            "lockdown_expire_check_secs",
+            "LOCKDOWN_EXPIRE_CHECK_SECS",
+            DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS,
         );
     }
 }

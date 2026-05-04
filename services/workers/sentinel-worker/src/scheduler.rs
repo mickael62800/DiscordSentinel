@@ -575,10 +575,30 @@ pub fn start(
         );
     }
 
-    // Phases suivantes : lockdown/slowmode/automod necessitent
-    // persistance des PermissionOverwrites (~3-5j par feature).
-    // voice-afk + progression voice tick dependent du cache Discord
-    // (ne migrable que via une refonte des trackers).
+    // Phase 5G — Lockdown auto-revert : worker scanne les expires
+    // et publie un event avec le JSON des saved_states. Le bot
+    // desserialise et restaure les permissions Discord.
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "expire_lockdown",
+            config.lockdown_expire_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "security-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move {
+                    domains::security::expire_lockdown::run(&pool, &redis).await
+                })
+            },
+        );
+    }
+
+    // Phases suivantes : slowmode security/automod (meme pattern,
+    // ~150 lignes chacun). voice-afk + progression voice tick
+    // dependent du cache Discord -> rester dans le bot.
 
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);

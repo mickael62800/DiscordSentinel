@@ -2,10 +2,58 @@ use std::time::Instant;
 
 use dashmap::DashMap;
 use serenity::model::channel::{ChannelType, PermissionOverwrite, PermissionOverwriteType};
-use serenity::model::id::GuildId;
+use serenity::model::id::{GuildId, RoleId, UserId};
 use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info};
+
+use sentinel_shared::heartbeat::ApiClientKey;
+
+/// Phase 5G — Serialise un PermissionOverwrite vers JSON pour persistance.
+fn serialize_overwrite(channel_id: u64, ow: &Option<PermissionOverwrite>) -> serde_json::Value {
+    match ow {
+        Some(ow) => {
+            let (kind, target_id) = match ow.kind {
+                PermissionOverwriteType::Role(r) => ("role", r.get()),
+                PermissionOverwriteType::Member(u) => ("member", u.get()),
+                _ => ("role", 0),
+            };
+            serde_json::json!({
+                "channel_id": channel_id.to_string(),
+                "had_original": true,
+                "allow": ow.allow.bits(),
+                "deny": ow.deny.bits(),
+                "kind": kind,
+                "target_id": target_id.to_string(),
+            })
+        }
+        None => serde_json::json!({
+            "channel_id": channel_id.to_string(),
+            "had_original": false,
+        }),
+    }
+}
+
+/// Desserialise un saved_state JSON. Retourne None si format invalide.
+pub fn deserialize_saved_state(
+    v: &serde_json::Value,
+) -> Option<(u64, Option<PermissionOverwrite>)> {
+    let channel_id: u64 = v.get("channel_id")?.as_str()?.parse().ok()?;
+    let had_original = v.get("had_original")?.as_bool()?;
+    if !had_original {
+        return Some((channel_id, None));
+    }
+    let allow = Permissions::from_bits_retain(v.get("allow")?.as_u64()?);
+    let deny = Permissions::from_bits_retain(v.get("deny")?.as_u64()?);
+    let kind_str = v.get("kind")?.as_str()?;
+    let target_id: u64 = v.get("target_id")?.as_str()?.parse().ok()?;
+    let kind = match kind_str {
+        "role" => PermissionOverwriteType::Role(RoleId::new(target_id)),
+        "member" => PermissionOverwriteType::Member(UserId::new(target_id)),
+        _ => return None,
+    };
+    Some((channel_id, Some(PermissionOverwrite { allow, deny, kind })))
+}
 
 /// Gere le lockdown automatique pendant un raid.
 /// Desactive SEND_MESSAGES pour @everyone sur tous les salons texte,
@@ -77,6 +125,23 @@ impl LockdownManager {
         }
 
         let count = saved_states.len();
+
+        // Phase 5G — persiste les saved_states en DB pour resilience
+        // au restart bot. Le worker `expire_lockdown` (sentinel-worker)
+        // detectera l'expiration et publiera l'event de restauration.
+        let saved_states_json: Vec<serde_json::Value> = saved_states
+            .iter()
+            .map(|(ch, ow)| serialize_overwrite(*ch, ow))
+            .collect();
+        if let Some(base) = ctx.data.read().await.get::<ApiClientKey>() {
+            let body = serde_json::json!({
+                "guild_id": guild_id.to_string(),
+                "saved_states": saved_states_json,
+                "duration_secs": 600,
+            });
+            base.post_fire_and_forget("/api/security/lockdown", &body).await;
+        }
+
         self.active.insert(guild_id, (Instant::now(), saved_states));
 
         info!(

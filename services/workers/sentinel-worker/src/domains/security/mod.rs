@@ -2,4 +2,5 @@
 //! Pour l'instant : kick des users en quarantaine dont le captcha
 //! a expire.
 
+pub mod expire_lockdown;
 pub mod kick_expired_quarantine;
