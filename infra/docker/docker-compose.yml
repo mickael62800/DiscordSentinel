@@ -294,11 +294,15 @@ services:
       # Cert Let's Encrypt en RO pour endpoint /api/security/tls-cert
       # (lecture de cert.pem pour afficher l'expiration sur la page Securite).
       - letsencrypt_etc:/etc/letsencrypt:ro
-      # Fail2ban status export (host) en RO pour /api/security/banned-ips.
-      # Genere par /usr/local/bin/fail2ban-export.sh via cron (toutes les 2 min).
-      # Si le fichier n'existe pas, l'endpoint retourne installed=false avec
-      # les instructions de setup.
-      - /var/lib/sentinel:/var/lib/sentinel:ro
+      # Fichiers host security (RW) :
+      # - Lecture : fail2ban-status.json, ssh-failures.json, disk-trend.json,
+      #   open-ports.json, file-integrity.json, etc. (genere par cron host).
+      # - Ecriture : bans-pending.txt / unbans-pending.txt (consomme par
+      #   sentinel-apply-bans.sh cron host) pour /api/security/ban-ip
+      #   et /api/security/unban-ip.
+      # Si le repertoire n'existe pas, les endpoints lecture retournent
+      # installed=false avec les instructions setup-host-security.sh.
+      - /var/lib/sentinel:/var/lib/sentinel
     depends_on:
       postgres:
         condition: service_healthy

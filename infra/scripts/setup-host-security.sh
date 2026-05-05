@@ -35,6 +35,10 @@ require_root() {
 
 ensure_data_dir() {
     mkdir -p "$SENTINEL_DATA_DIR"
+    # UID 1000 = user `sentinel` dans le conteneur api (cf. Dockerfile.rust-debian).
+    # L'API ecrit bans-pending.txt / unbans-pending.txt depuis /api/security/ban-ip.
+    # Sans cet ownership, le handler retourne 500 (permission denied).
+    chown 1000:1000 "$SENTINEL_DATA_DIR"
     chmod 755 "$SENTINEL_DATA_DIR"
 }
 
