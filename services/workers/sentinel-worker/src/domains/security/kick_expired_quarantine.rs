@@ -41,6 +41,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     let mut kicked = 0u32;
     for q in &candidates {
+        if !crate::common::is_worker_enabled(pool, &q.guild_id, "security-bot").await {
+            continue;
+        }
         // Claim atomique : DELETE avec garde sur expires_at. Si une
         // autre instance ou le bot a deja retire l'entree (validation
         // captcha entre-temps), rows_affected = 0, on skip.

@@ -63,6 +63,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let mut escalated = 0u32;
 
     for t in &candidates {
+        if !crate::common::is_worker_enabled(pool, &t.server, "ticket-bot").await {
+            continue;
+        }
         let escalation_minutes = timeouts
             .get(&t.server)
             .copied()

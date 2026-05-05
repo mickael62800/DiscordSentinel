@@ -53,6 +53,10 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     let mut closed = 0u32;
     for t in &candidates {
+        // Guard : si ticket-bot desactive pour cette guild, on saute.
+        if !crate::common::is_worker_enabled(pool, &t.server, "ticket-bot").await {
+            continue;
+        }
         let timeout_days = timeouts
             .get(&t.server)
             .copied()

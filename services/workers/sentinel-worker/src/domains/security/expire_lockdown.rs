@@ -41,6 +41,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     let mut reverted = 0u32;
     for lk in &candidates {
+        if !crate::common::is_worker_enabled(pool, &lk.guild_id, "security-bot").await {
+            continue;
+        }
         // Claim atomique : DELETE avec garde expires_at.
         let deleted = sqlx::query(
             "DELETE FROM security_lockdown_active \

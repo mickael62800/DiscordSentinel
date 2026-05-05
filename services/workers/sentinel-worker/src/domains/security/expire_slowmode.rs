@@ -37,6 +37,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     let mut reverted = 0u32;
     for s in &candidates {
+        if !crate::common::is_worker_enabled(pool, &s.guild_id, "security-bot").await {
+            continue;
+        }
         let deleted = sqlx::query(
             "DELETE FROM security_slowmode_active \
              WHERE guild_id = $1 AND expires_at < NOW()",

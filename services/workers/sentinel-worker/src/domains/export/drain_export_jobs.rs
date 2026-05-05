@@ -76,6 +76,21 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         "Export job claim"
     );
 
+    // Guard top-level : si la guild a desactive le module export, on
+    // marque le job comme 'dead' (le user devra reactiver pour rejouer).
+    if !crate::common::is_worker_enabled(pool, &job.guild_id, "export").await {
+        let _ = sqlx::query(
+            "UPDATE export_jobs SET status = 'dead', \
+                    error_message = 'module export disabled for guild', \
+                    started_at = NULL, completed_at = NOW() \
+             WHERE id = $1",
+        )
+        .bind(job.id)
+        .execute(pool)
+        .await;
+        return Ok(());
+    }
+
     // 3. Appel gRPC a l'API pour executer l'export (zero logique metier ici).
     let result = call_export_api(&job.guild_id, &job.job_type, &job.format, &job.filters).await;
 

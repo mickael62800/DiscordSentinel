@@ -58,6 +58,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let mut expired_count = 0u32;
 
     for att in &candidates {
+        if !crate::common::is_worker_enabled(pool, &att.guild_id, "coude-bot").await {
+            continue;
+        }
         // Claim atomique : passe pending -> expired. Si une autre instance
         // ou la victime a defense entre-temps, rows_affected = 0, on skip.
         let updated = sqlx::query(

@@ -80,6 +80,20 @@ pub async fn run(
     // 3. Traitement de chaque job
     for job in claimed {
         let job_id = job.id;
+        // Guard top-level : si la guild a desactive le module ai, on
+        // marque le job comme 'dead' au lieu de le traiter.
+        if !crate::common::is_worker_enabled(pool, &job.guild_id, "ai").await {
+            let _ = sqlx::query(
+                "UPDATE ai_jobs SET status = 'dead', \
+                        error_message = 'module ai disabled for guild', \
+                        started_at = NULL, completed_at = NOW() \
+                 WHERE id = $1",
+            )
+            .bind(job_id)
+            .execute(pool)
+            .await;
+            continue;
+        }
         let result = process_job(&http, api_url, &job).await;
 
         match result {
