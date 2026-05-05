@@ -6,6 +6,7 @@ import { useFormatDate } from "../../composables/useFormatDate";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 
 const { selectedGuildId } = useGuildSelector();
 const { current, history, loading, error, loadAll } = useTournaments();
@@ -22,14 +23,11 @@ watch(selectedGuildId, reload);
 </script>
 
 <template>
-  <section class="tournaments-page">
-    <header class="page-header">
-      <h1>Tournoi hebdomadaire</h1>
-      <p class="subtitle">
-        Classement des gains nets cette semaine (lundi 00h → dimanche 23:59 UTC).
-        Le joueur en tete decroche un pourcentage de la caisse communautaire.
-      </p>
-    </header>
+  <AdminPageShell title="Tournoi hebdomadaire">
+    <template #lede>
+      Classement des gains nets cette semaine (lundi 00h → dimanche 23:59 UTC).
+      Le joueur en tete decroche un pourcentage de la caisse communautaire.
+    </template>
 
     <LoadingState v-if="loading" />
     <ErrorState v-else-if="error" :message="error" @retry="reload" />
@@ -109,23 +107,10 @@ watch(selectedGuildId, reload);
         </table>
       </section>
     </template>
-  </section>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.tournaments-page {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-.page-header h1 {
-  margin: 0 0 0.25rem 0;
-}
-.subtitle {
-  color: var(--text-secondary);
-  margin: 0;
-}
 .current-card {
   background: var(--card-bg, #1b1e28);
   border: 1px solid var(--border, #2a2f3a);

@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 import VoiceChannelDetailPanel from "../organisms/VoiceChannelDetailPanel.vue";
 import VoiceChannelsActiveList from "../organisms/VoiceChannelsActiveList.vue";
 import VoiceChannelsHistoryList from "../organisms/VoiceChannelsHistoryList.vue";
@@ -50,11 +51,10 @@ function backToList() {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>Salons vocaux</h1>
-      <p class="page-subtitle">Salons vocaux temporaires actifs</p>
-    </header>
+  <AdminPageShell title="Salons vocaux">
+    <template #lede>
+      Salons vocaux temporaires actifs
+    </template>
 
     <div class="stats-row">
       <div class="stat-card">
@@ -84,24 +84,10 @@ function backToList() {
       <VoiceChannelsActiveList @select="selectChannel" />
       <VoiceChannelsHistoryList @select="selectChannel" />
     </template>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.page { padding: 24px; }
-
-.page-header { margin-bottom: 24px; }
-.page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-.page-subtitle {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
 .stats-row {
   display: flex;
   gap: 16px;
