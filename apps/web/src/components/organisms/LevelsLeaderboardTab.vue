@@ -338,4 +338,27 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
   font-size: 14px;
 }
 .modal-field input:focus { outline: none; border-color: var(--accent); }
+
+@media (max-width: 600px) {
+  .user-row {
+    padding: 10px 12px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .rank { width: 24px; }
+  .rank-number { font-size: 14px; }
+  .user-avatar-placeholder { width: 32px; height: 32px; font-size: 14px; }
+  .user-info { flex: 1 1 calc(100% - 100px); }
+  .progress-text { min-width: 0; font-size: 10px; }
+  .user-xp { min-width: 0; flex-shrink: 0; }
+  .xp-total { font-size: 13px; }
+  .user-actions {
+    flex-direction: row;
+    margin-left: 0;
+    flex: 0 0 100%;
+    justify-content: flex-end;
+  }
+  .action-btn { padding: 4px 8px; font-size: 10px; }
+  .mini-stats { gap: 4px; }
+}
 </style>

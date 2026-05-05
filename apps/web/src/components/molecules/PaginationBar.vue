@@ -150,4 +150,19 @@ const perPageOptions = [10, 25, 50, 100];
   font-size: 13px;
   cursor: pointer;
 }
+
+@media (max-width: 640px) {
+  .pagination-bar {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: var(--space-sm) var(--space-md);
+  }
+  .pagination-info { font-size: 12px; }
+  .pagination-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+    flex: 1 1 100%;
+  }
+  .pagination-btn { min-width: 28px; height: 28px; font-size: 12px; }
+}
 </style>
