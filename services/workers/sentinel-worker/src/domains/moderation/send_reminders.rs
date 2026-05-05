@@ -65,7 +65,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         .map_err(|e| format!("redis connect: {e}"))?;
 
     for reminder in &reminders {
-        if !is_worker_enabled(pool, &reminder.guild_id, "moderation").await {
+        if !is_worker_enabled(pool, &reminder.guild_id, "moderation-bot").await {
             continue;
         }
 

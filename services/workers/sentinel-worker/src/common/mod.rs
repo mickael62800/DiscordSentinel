@@ -264,7 +264,7 @@ const WORKER_MODULES: &[&str] = &[
     "discord_audit_sync",
     "export",
     "game_portal",
-    "moderation",
+    "moderation-bot",
     "monitoring",
     "security",
     "temp_roles",

@@ -359,7 +359,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation",
+        "moderation-bot",
         |pool| Box::pin(async move { domains::moderation::conduct_regen::run(&pool).await }),
     );
     spawn_periodic(
@@ -368,7 +368,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation",
+        "moderation-bot",
         |pool| Box::pin(async move { domains::moderation::cleanup_bans::run(&pool).await }),
     );
     spawn_periodic(
@@ -377,7 +377,7 @@ pub fn start(
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
-        "moderation",
+        "moderation-bot",
         |pool| {
             Box::pin(async move { domains::moderation::sync_ban_proposals::run(&pool).await })
         },
@@ -390,7 +390,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "moderation",
+            "moderation-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
