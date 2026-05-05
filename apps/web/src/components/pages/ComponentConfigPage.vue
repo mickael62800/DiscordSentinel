@@ -4,6 +4,7 @@ import { botConfigService } from "@/services/botConfigService";
 import type { BotDefinition, BotGuildConfig } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useBotDefinitions } from "../../composables/useBotDefinitions";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 import ComponentSelectorSection from "../organisms/ComponentSelectorSection.vue";
 import ComponentConfigForm from "../organisms/ComponentConfigForm.vue";
 import AutomodAnalysisHistory from "../organisms/AutomodAnalysisHistory.vue";
@@ -62,11 +63,10 @@ watch(selectedGuildId, () => {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>Configuration des composants</h1>
-      <p class="page-subtitle">Parametrer chaque composant pour le serveur selectionne</p>
-    </header>
+  <AdminPageShell title="Configuration des composants">
+    <template #lede>
+      Parametrer chaque composant pour le serveur selectionne
+    </template>
 
     <div v-if="!selectedGuildId" class="empty-state">
       <p>Selectionnez un serveur dans la barre laterale pour configurer les composants.</p>
@@ -106,24 +106,10 @@ watch(selectedGuildId, () => {
         :guild-id="selectedGuildId"
       />
     </template>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.page { padding: 24px; }
-
-.page-header { margin-bottom: 24px; }
-.page-header h1 {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-.page-subtitle {
-  color: var(--text-secondary);
-  font-size: 14px;
-  margin-top: 4px;
-}
-
 .empty-state {
   text-align: center;
   padding: 60px 20px;

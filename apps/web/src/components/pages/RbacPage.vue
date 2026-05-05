@@ -4,6 +4,7 @@ import { useRbac } from "@/composables/useRbac";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 import RbacUsersTable from "../organisms/RbacUsersTable.vue";
 import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
 import ComponentMinRoleGrid from "../organisms/ComponentMinRoleGrid.vue";
@@ -31,18 +32,17 @@ function roleVariant(role: RbacRole): BadgeVariant {
 </script>
 
 <template>
-  <div class="rbac-page page--constrained">
-    <header class="page-header">
-      <h1>🔐 Gestion RBAC</h1>
-      <p class="subtitle">
-        Gerez les roles applicatifs des utilisateurs pour
-        <strong>{{ selectedGuild?.name ?? "cette guild" }}</strong>
-      </p>
-      <div v-if="myRole" class="my-role">
+  <AdminPageShell title="Gestion RBAC" icon="🔐">
+    <template #lede>
+      Gerez les roles applicatifs des utilisateurs pour
+      <strong>{{ selectedGuild?.name ?? "cette guild" }}</strong>
+    </template>
+    <template v-if="myRole" #actions>
+      <span class="my-role">
         Votre role :
         <AppBadge :label="myRole.role" :variant="roleVariant(myRole.role)" />
-      </div>
-    </header>
+      </span>
+    </template>
 
     <div v-if="!selectedGuild" class="no-guild">
       Selectionnez une guild dans la barre laterale pour gerer les acces.
@@ -62,24 +62,21 @@ function roleVariant(role: RbacRole): BadgeVariant {
       <ComponentMinRoleGrid v-if="canEdit" />
       <ComponentVisibilityGrid v-if="canEdit" />
     </template>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.rbac-page { padding: 1.5rem; }
-.page-header h1 { margin: 0 0 0.25rem 0; }
-.subtitle {
-  color: var(--color-text-muted, #888);
-  margin: 0.25rem 0 1rem 0;
-}
 .my-role {
-  display: flex; align-items: center; gap: 0.5rem;
-  margin-bottom: 1.5rem; font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 .no-guild {
   padding: 2rem;
   text-align: center;
-  color: var(--color-text-muted, #888);
+  color: var(--text-secondary);
   font-style: italic;
 }
 </style>
