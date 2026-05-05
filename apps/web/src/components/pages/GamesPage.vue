@@ -6,6 +6,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppButton from "@/components/atoms/AppButton.vue";
 import EmptyState from "@/components/atoms/EmptyState.vue";
 import LoadingState from "@/components/atoms/LoadingState.vue";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import GamesTable from "@/components/organisms/GamesTable.vue";
 import GamePanelsList from "@/components/organisms/GamePanelsList.vue";
 import GameFormModal from "@/components/organisms/GameFormModal.vue";
@@ -50,24 +51,21 @@ const defaultCategory = computed(() =>
 </script>
 
 <template>
-  <div class="games-page page--constrained">
-    <div class="page-header">
-      <h1>Gestion des jeux</h1>
-      <div class="header-actions">
-        <select
-          v-model="selectedCategory"
-          class="category-select"
-          :disabled="!selectedGuildId"
-        >
-          <option value="__all__">Toutes les categories</option>
-          <option value="__none__">(Sans categorie)</option>
-          <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
-        </select>
-        <AppButton variant="primary" :disabled="!selectedGuildId" @click="openCreate">
-          + Ajouter un jeu
-        </AppButton>
-      </div>
-    </div>
+  <AdminPageShell title="Gestion des jeux">
+    <template #actions>
+      <select
+        v-model="selectedCategory"
+        class="category-select app-input-base"
+        :disabled="!selectedGuildId"
+      >
+        <option value="__all__">Toutes les categories</option>
+        <option value="__none__">(Sans categorie)</option>
+        <option v-for="c in categories" :key="c" :value="c">{{ c }}</option>
+      </select>
+      <AppButton variant="primary" :disabled="!selectedGuildId" @click="openCreate">
+        + Ajouter un jeu
+      </AppButton>
+    </template>
 
     <EmptyState
       v-if="!selectedGuildId"
@@ -90,34 +88,11 @@ const defaultCategory = computed(() =>
       :default-category="defaultCategory"
       @close="closeModal"
     />
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.games-page { padding: 4px 0; }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.header-actions {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
 .category-select {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  font-size: 13px;
   min-width: 200px;
 }
 </style>

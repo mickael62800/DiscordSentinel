@@ -10,6 +10,7 @@ import AppButton from "../atoms/AppButton.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 import WalletsTable from "../organisms/WalletsTable.vue";
 
 const { visible } = useComponentVisibility();
@@ -74,21 +75,15 @@ onMounted(fetchWallets);
 </script>
 
 <template>
-  <div class="wallet-page page--constrained">
-    <header class="hero">
-      <div class="hero-text">
-        <h1 class="hero-title">
-          <span class="hero-icon">💰</span>
-          Wallet
-        </h1>
-        <p class="hero-subtitle">
-          Monnaie partagee entre tous les jeux — Blackjack, Coude, Casino
-        </p>
-      </div>
+  <AdminPageShell title="Wallet" icon="💰">
+    <template #lede>
+      Monnaie partagee entre tous les jeux — Blackjack, Coude, Casino
+    </template>
+    <template #actions>
       <AppButton variant="secondary" @click="fetchWallets" :disabled="loading">
         ↻ Rafraichir
       </AppButton>
-    </header>
+    </template>
 
     <div class="kpi-grid">
       <div class="kpi-card kpi-players">
@@ -168,34 +163,10 @@ onMounted(fetchWallets);
       :guild-id="selectedGuildId ?? ''"
       @changed="fetchWallets"
     />
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.wallet-page {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* Hero */
-.hero {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-.hero-title {
-  display: flex; align-items: center; gap: 12px;
-  margin: 0 0 6px;
-  font-size: 2rem;
-  font-weight: 700;
-}
-.hero-icon { font-size: 2rem; }
-.hero-subtitle { margin: 0; color: var(--text-secondary); font-size: 0.95rem; }
-
 /* KPIs */
 .kpi-grid {
   display: grid;
@@ -303,8 +274,5 @@ onMounted(fetchWallets);
   .kpi-grid { gap: 10px; }
   .kpi-card { padding: 12px 14px; gap: 12px; }
   .kpi-icon { font-size: 1.5rem; width: 38px; height: 38px; }
-  .hero { padding: 14px 16px; }
-  .hero-title { font-size: 1.3rem; }
-  .hero-subtitle { font-size: 0.85rem; }
 }
 </style>

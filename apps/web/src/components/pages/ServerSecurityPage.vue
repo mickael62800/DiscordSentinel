@@ -13,6 +13,7 @@ import {
 import { useToast } from "@/composables/useToast";
 import { useMyRole } from "@/composables/useMyRole";
 import AppTabs from "@/components/molecules/AppTabs.vue";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import SecurityAttacksTab from "@/components/organisms/SecurityAttacksTab.vue";
 import SecurityNetworkTab from "@/components/organisms/SecurityNetworkTab.vue";
 import SecurityIntegrityTab from "@/components/organisms/SecurityIntegrityTab.vue";
@@ -138,19 +139,16 @@ const tabs = [
 </script>
 
 <template>
-  <div class="security-page page--constrained">
-    <div class="page-header">
-      <div>
-        <h1>🛡️ Sécurité serveur</h1>
-        <p class="muted small">Surveillance des attaques, intégrité et protections actives.</p>
-      </div>
-      <div class="header-actions">
-        <button v-if="canManage" class="btn-secondary danger" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</button>
-        <button class="btn-primary" :disabled="refreshing" @click="refreshAll">
-          {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
-        </button>
-      </div>
-    </div>
+  <AdminPageShell title="Sécurité serveur" icon="🛡️">
+    <template #lede>
+      Surveillance des attaques, intégrité et protections actives.
+    </template>
+    <template #actions>
+      <button v-if="canManage" class="btn-secondary danger" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</button>
+      <button class="btn-primary" :disabled="refreshing" @click="refreshAll">
+        {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
+      </button>
+    </template>
 
     <AppTabs
       :model-value="currentTab"
@@ -368,20 +366,13 @@ const tabs = [
         </div>
       </div>
     </div>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.security-page { padding: 16px; }
-.page-header {
-  display: flex; justify-content: space-between; align-items: flex-start;
-  flex-wrap: wrap; gap: 16px; margin-bottom: 16px;
-}
-.page-header h1 { margin: 0 0 4px; font-size: 1.6rem; }
 .muted { color: var(--text-secondary); margin: 0; }
 .muted.small, .small { font-size: 11px; }
 .mono { font-family: "JetBrains Mono", monospace; }
-.header-actions { display: flex; gap: 8px; align-items: center; }
 
 .btn-primary {
   padding: 7px 14px; border-radius: 8px; border: 1px solid var(--accent);
