@@ -5,6 +5,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { sponsorshipsService } from "@/services/polishServices";
 import type { Sponsorship } from "@/types/polish";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -64,15 +65,12 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🤝 Parrainages</h1>
-      <p class="lede">
-        Liens parrain → filleul enregistrés sur le serveur. Le système de
-        parrainage récompense le parrain quand son filleul atteint le niveau
-        configuré (cf. <code>community-bot</code> config).
-      </p>
-    </header>
+  <AdminPageShell title="Parrainages" icon="🤝">
+    <template #lede>
+      Liens parrain → filleul enregistrés sur le serveur. Le système de
+      parrainage récompense le parrain quand son filleul atteint le niveau
+      configuré (cf. <code>community-bot</code> config).
+    </template>
 
     <section class="card">
       <h2>Nouveau parrainage</h2>
@@ -114,7 +112,7 @@ function formatDate(iso: string): string {
         </tbody>
       </table>
     </section>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>

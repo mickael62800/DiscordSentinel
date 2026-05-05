@@ -6,6 +6,7 @@ import { useConfirm } from "../../composables/useConfirm";
 import { useToast } from "../../composables/useToast";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
 import AppButton from "../atoms/AppButton.vue";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
 import BlackjackTablesSection from "../organisms/BlackjackTablesSection.vue";
 import BlackjackGamesSection from "../organisms/BlackjackGamesSection.vue";
 
@@ -49,54 +50,29 @@ async function handlePurgeAll() {
 </script>
 
 <template>
-  <div class="blackjack-page page--constrained">
-    <header class="hero">
-      <div class="hero-text">
-        <h1 class="hero-title">
-          <span class="hero-icon">🎰</span>
-          Blackjack
-        </h1>
-        <p class="hero-subtitle">
-          Administration des parties — surveillance, historique, annulation avec remboursement
-        </p>
-      </div>
-      <div class="hero-actions">
-        <AppButton variant="secondary" @click="refreshAll">↻ Rafraichir</AppButton>
-        <button
-          v-if="visible('db.purge.blackjack')"
-          class="danger-btn"
-          :disabled="purging"
-          @click="handlePurgeAll"
-          title="Supprime DEFINITIVEMENT toutes les parties blackjack de cette guild (owner uniquement)"
-        >
-          {{ purging ? "Purge…" : "🗑 Reset total" }}
-        </button>
-      </div>
-    </header>
+  <AdminPageShell title="Blackjack" icon="🎰">
+    <template #lede>
+      Administration des parties — surveillance, historique, annulation avec remboursement
+    </template>
+    <template #actions>
+      <AppButton variant="secondary" @click="refreshAll">↻ Rafraichir</AppButton>
+      <button
+        v-if="visible('db.purge.blackjack')"
+        class="danger-btn"
+        :disabled="purging"
+        @click="handlePurgeAll"
+        title="Supprime DEFINITIVEMENT toutes les parties blackjack de cette guild (owner uniquement)"
+      >
+        {{ purging ? "Purge…" : "🗑 Reset total" }}
+      </button>
+    </template>
 
     <BlackjackTablesSection ref="tablesRef" />
     <BlackjackGamesSection ref="gamesRef" />
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-.blackjack-page {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.hero {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.hero-actions { display: flex; gap: 8px; align-items: center; }
-
 .danger-btn {
   background: transparent;
   color: var(--danger);
@@ -111,32 +87,4 @@ async function handlePurgeAll() {
 }
 .danger-btn:hover:not(:disabled) { background: var(--danger); color: white; }
 .danger-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.hero-title {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 0 0 6px;
-  font-size: 2rem;
-  font-weight: 700;
-}
-.hero-icon { font-size: 2rem; }
-.hero-subtitle {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-}
-
-@media (max-width: 768px) {
-  .hero {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  .hero-actions {
-    width: 100%;
-    flex-wrap: wrap;
-  }
-  .hero-actions > * { flex: 1; }
-}
 </style>

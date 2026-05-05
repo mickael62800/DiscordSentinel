@@ -7,6 +7,7 @@ import { tempRolesService } from "@/services/polishServices";
 import type { TempRole } from "@/types/polish";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -99,15 +100,12 @@ const sortedRoles = computed(() =>
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>⏳ Rôles temporaires</h1>
-      <p class="lede">
-        Rôles attribués pour une durée limitée (ex. abonnement Premium 30j,
-        promotion mod test 7j…). Le worker temp-roles supprime automatiquement
-        le rôle Discord à expiration.
-      </p>
-    </header>
+  <AdminPageShell title="Rôles temporaires" icon="⏳">
+    <template #lede>
+      Rôles attribués pour une durée limitée (ex. abonnement Premium 30j,
+      promotion mod test 7j…). Le worker temp-roles supprime automatiquement
+      le rôle Discord à expiration.
+    </template>
 
     <section class="card">
       <h2>Nouveau rôle temporaire</h2>
@@ -159,7 +157,7 @@ const sortedRoles = computed(() =>
         </tbody>
       </table>
     </section>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
