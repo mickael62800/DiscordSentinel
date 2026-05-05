@@ -616,7 +616,7 @@ while IFS= read -r line; do
     # XSS
     elif echo "$LURL" | grep -qE '(<script|javascript:|onerror=|onload=|alert\()' ; then CAT="xss"
     # Scanners (paths bien connus + UA)
-    elif echo "$LURL" | grep -qE '(/\.env|/\.git|/wp-admin|/wp-login|/phpmyadmin|/admin\.php|\.aspx|/vendor/phpunit|/cgi-bin|/owa/|/autodiscover|/\.aws|/\.ssh)' ; then CAT="scanner"
+    elif echo "$LURL" | grep -qE '(/\.env|/\.git|/\.svn|/\.aws|/\.ssh|/\.htaccess|/wp-admin|/wp-login|/wp-content|/wp-includes|/wp-json|/wordpress|/xmlrpc\.php|/phpmyadmin|/pma|/myadmin|/adminer|/laravel|/joomla|/drupal|/magento|/administrator|/admin\.php|\.php|\.aspx|\.jsp|/vendor/phpunit|/cgi-bin|/owa/|/autodiscover|/ecp/|/_ignition|/_profiler|/server-status|/server-info|/manager/html|/composer\.json)' ; then CAT="scanner"
     elif echo "$LUA" | grep -qE '(nmap|sqlmap|nikto|masscan|zgrab|nuclei|gobuster|dirbuster|wpscan|acunetix|nessus|openvas|hydra)' ; then CAT="scanner"
     fi
 
