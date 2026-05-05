@@ -154,6 +154,24 @@ function select(t: TabItem) {
   border-bottom-color: var(--accent);
 }
 
+/* ============ Mobile : scroll horizontal des onglets ============ */
+@media (max-width: 640px) {
+  .app-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
+  }
+  .app-tabs::-webkit-scrollbar { height: 4px; }
+  .app-tabs::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  .app-tab { flex-shrink: 0; white-space: nowrap; }
+  .app-tabs--polished .app-tab { padding: 8px 14px; font-size: 0.85rem; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app-tab,
   .app-tab::after {

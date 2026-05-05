@@ -203,4 +203,17 @@ watch(selectedGuildId, loadXpRoleMode, { immediate: true });
     width: 100%;
   }
 }
+
+@media (max-width: 480px) {
+  .config-bar {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+  .config-item {
+    padding: 8px 10px;
+    flex: initial;
+  }
+  .config-value { font-size: 14px; }
+  .config-label { font-size: 9px; }
+}
 </style>

@@ -208,7 +208,13 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
 }
 
 @media (max-width: 768px) {
-  .data-table { font-size: 12px; }
+  .data-table {
+    font-size: 12px;
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+  }
   .data-table th, .data-table td { padding: 6px 8px !important; }
 }
 </style>

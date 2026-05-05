@@ -241,6 +241,16 @@ function rolesCount(roles: unknown): number {
 .placeholder-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
 .detail-placeholder p { font-size: 14px; }
 
+@media (max-width: 900px) {
+  .content-layout { flex-direction: column; }
+  .members-list {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: none;
+  }
+}
+
 @media (max-width: 480px) {
   .sort-select { min-width: 0; width: 100%; }
   .search-input { width: 100%; }
