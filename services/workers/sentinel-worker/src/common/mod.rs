@@ -200,6 +200,37 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
     result.map(|v| v != "false").unwrap_or(true)
 }
 
+/// Verifie si une sous-feature d'un module est activee pour une guild.
+/// Lit la row `(guild_id, bot_name, feature_key)` dans bot_guild_config,
+/// fallback sur `default_value` si la row n'existe pas.
+///
+/// Pattern : pour les modules avec sub-toggles UI (chaos_enabled,
+/// monthly_report_enabled, vacuum_enabled, etc.) — chaque job lit son
+/// propre flag en plus du `is_worker_enabled` top-level.
+pub async fn is_feature_enabled(
+    pool: &PgPool,
+    guild_id: &str,
+    bot_name: &str,
+    feature_key: &str,
+    default_value: bool,
+) -> bool {
+    let result: Option<String> = sqlx::query_scalar(
+        "SELECT config_value FROM bot_guild_config \
+         WHERE guild_id = $1 AND bot_name = $2 AND config_key = $3",
+    )
+    .bind(guild_id)
+    .bind(bot_name)
+    .bind(feature_key)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    match result {
+        Some(v) => v == "true" || v == "1",
+        None => default_value,
+    }
+}
+
 /// Verifie si le worker est active pour au moins une guild.
 /// Retourne true si:
 /// - Aucune entree `enabled` trouvee (defaut = active)
