@@ -11,7 +11,7 @@ import { useGuildSelector } from "./useGuildSelector";
 export function useBotEnabledStatus() {
   const store = useBotEnabledStatusStore();
   const { guildIdFilter } = useGuildSelector();
-  const { disabledBots, disabledCount, loading, error } = storeToRefs(store);
+  const { disabledBots, disabledCount, loading, error, enabledMap } = storeToRefs(store);
 
   watch(
     guildIdFilter,
@@ -30,7 +30,12 @@ export function useBotEnabledStatus() {
   }
 
   return {
+    // Garde la fct (utilisee ailleurs) ET expose enabledMap pour
+    // permettre une utilisation directe en template — la fonction
+    // wrapper casse le tracking de reactivite Vue dans certains cas
+    // (Pinia setup store + closure).
     isBotEnabled: (name: string) => store.isBotEnabled(name),
+    enabledMap,
     disabledBots,
     disabledCount,
     loading,

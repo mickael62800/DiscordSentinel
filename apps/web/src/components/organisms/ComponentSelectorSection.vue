@@ -12,7 +12,15 @@ const emit = defineEmits<{
   (e: "select", name: string): void;
 }>();
 
-const { isBotEnabled } = useBotEnabledStatus();
+// On utilise enabledMap (ref reactif) directement plutot que la
+// fonction isBotEnabled, sinon Vue ne re-render pas le badge OFF
+// apres invalidation du store (la closure casse le tracking).
+const { enabledMap } = useBotEnabledStatus();
+
+function isOn(botName: string): boolean {
+  const v = enabledMap.value[botName];
+  return v === undefined ? true : v;
+}
 </script>
 
 <template>
@@ -28,13 +36,13 @@ const { isBotEnabled } = useBotEnabledStatus();
         class="component-card"
         :class="{
           active: selectedKey === def.bot_name,
-          'is-disabled': !isBotEnabled(def.bot_name),
+          'is-disabled': !isOn(def.bot_name),
         }"
         @click="emit('select', def.bot_name)"
       >
         <div class="component-card-header">
           <div class="component-name">{{ def.display_name }}</div>
-          <span v-if="!isBotEnabled(def.bot_name)" class="off-pill" title="Désactivé pour cette guild">OFF</span>
+          <span v-if="!isOn(def.bot_name)" class="off-pill" title="Désactivé pour cette guild">OFF</span>
         </div>
         <div class="component-desc">{{ def.description }}</div>
         <div class="component-params">
