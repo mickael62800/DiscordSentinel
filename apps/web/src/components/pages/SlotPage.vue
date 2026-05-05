@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { slotService } from "@/services/casinoService";
 import type { SlotSpin, SlotTopWinner, JackpotPool } from "@/types/casino";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { error: showError } = useToast();
@@ -62,14 +63,11 @@ const rtp = computed(() =>
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🎰 Slot Machine — analytics</h1>
-      <p class="lede">
-        30 dernières parties + leaderboard 7 jours. Le RTP affiché est calculé
-        sur les 30 dernières parties affichées.
-      </p>
-    </header>
+  <AdminPageShell title="Slot Machine — analytics" icon="🎰">
+    <template #lede>
+      30 dernières parties + leaderboard 7 jours. Le RTP affiché est calculé
+      sur les 30 dernières parties affichées.
+    </template>
 
     <section class="kpi-row">
       <div class="kpi-card jackpot">
@@ -152,7 +150,7 @@ const rtp = computed(() =>
         </table>
       </section>
     </div>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>

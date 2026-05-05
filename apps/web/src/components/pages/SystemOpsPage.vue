@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from "vue";
 import { useToast } from "@/composables/useToast";
 import { systemOpsService } from "@/services/polishServices";
 import type { CacheStats, ModelInfo } from "@/types/polish";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { success, error: showError } = useToast();
 
@@ -51,14 +52,11 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🛠️ System Operations</h1>
-      <p class="lede">
-        Surveillance des modèles IA chargés et statistiques du cache Redis.
-        Refresh auto toutes les 10s.
-      </p>
-    </header>
+  <AdminPageShell title="System Operations" icon="🛠️">
+    <template #lede>
+      Surveillance des modèles IA chargés et statistiques du cache Redis.
+      Refresh auto toutes les 10s.
+    </template>
 
     <div v-if="loading" class="loading">Chargement…</div>
 
@@ -133,7 +131,7 @@ onUnmounted(() => {
         </div>
       </section>
     </div>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>

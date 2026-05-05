@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { httpGet } from "@/api/http";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 interface NameHistoryEntry {
   id: string;
@@ -44,16 +45,13 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>📛 Historique des pseudos</h1>
-      <p class="lede">
-        Liste des changements de pseudo Discord d'un membre — utile pour
-        détecter les évasions, les usurpations d'identité ou simplement
-        suivre l'historique d'un compte. Les changements sont collectés
-        automatiquement par <code>audit-bot</code>.
-      </p>
-    </header>
+  <AdminPageShell title="Historique des pseudos" icon="📛">
+    <template #lede>
+      Liste des changements de pseudo Discord d'un membre — utile pour
+      détecter les évasions, les usurpations d'identité ou simplement
+      suivre l'historique d'un compte. Les changements sont collectés
+      automatiquement par <code>audit-bot</code>.
+    </template>
 
     <section class="card">
       <h2>Recherche</h2>
@@ -85,7 +83,7 @@ function formatDate(iso: string): string {
         </li>
       </ol>
     </section>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>

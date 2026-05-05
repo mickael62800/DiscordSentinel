@@ -67,6 +67,11 @@ withDefaults(
   font-family: "JetBrains Mono", monospace;
   color: var(--accent);
 }
+.admin-page-lede :deep(a) {
+  color: var(--accent);
+  text-decoration: none;
+}
+.admin-page-lede :deep(a:hover) { text-decoration: underline; }
 .admin-page-actions {
   display: flex;
   gap: 8px;

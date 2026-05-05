@@ -5,6 +5,7 @@ import { useToast } from "@/composables/useToast";
 import { reviewService } from "@/services/moderationAdvancedService";
 import type { ReviewQueueEntry } from "@/types/moderation-advanced";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { guildIdFilter } = useGuildSelector();
 const { success, error: showError } = useToast();
@@ -61,16 +62,13 @@ function formatDate(iso: string): string {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🔍 Reviews modération</h1>
-      <p class="lede">
-        File d'attente des actions de modération qui requièrent une seconde
-        opinion. Les modérateurs créent une review depuis Discord
-        (<code>/review add</code>), les seniors valident ici (Approved /
-        Rejected / Changed).
-      </p>
-    </header>
+  <AdminPageShell title="Reviews modération" icon="🔍">
+    <template #lede>
+      File d'attente des actions de modération qui requièrent une seconde
+      opinion. Les modérateurs créent une review depuis Discord
+      (<code>/review add</code>), les seniors valident ici (Approved /
+      Rejected / Changed).
+    </template>
 
     <section class="card">
       <h2>Reviews en attente</h2>
@@ -116,7 +114,7 @@ function formatDate(iso: string): string {
         </div>
       </div>
     </div>
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>

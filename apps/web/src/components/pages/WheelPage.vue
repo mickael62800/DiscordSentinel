@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import WheelKpiRow from "../organisms/WheelKpiRow.vue";
 import WheelDistributionTable from "../organisms/WheelDistributionTable.vue";
 import WheelTopWinnersTable from "../organisms/WheelTopWinnersTable.vue";
@@ -6,14 +7,11 @@ import WheelRecentSpinsTable from "../organisms/WheelRecentSpinsTable.vue";
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🪙 Roue du Destin — analytics</h1>
-      <p class="lede">
-        50 derniers spins (toutes guilds) + leaderboard 7 jours +
-        distribution des cases tombées sur les spins récents.
-      </p>
-    </header>
+  <AdminPageShell title="Roue du Destin — analytics" icon="🪙">
+    <template #lede>
+      50 derniers spins (toutes guilds) + leaderboard 7 jours +
+      distribution des cases tombées sur les spins récents.
+    </template>
 
     <WheelKpiRow />
 
@@ -23,11 +21,10 @@ import WheelRecentSpinsTable from "../organisms/WheelRecentSpinsTable.vue";
     </div>
 
     <WheelRecentSpinsTable />
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
-@import "./_admin-page-shared.css";
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

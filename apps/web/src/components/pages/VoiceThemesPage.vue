@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import VoiceThemesTable from "../organisms/VoiceThemesTable.vue";
 import VoiceThemeFormModal from "../organisms/VoiceThemeFormModal.vue";
 import type { VoiceChannelTheme } from "@/types/voice-extended";
@@ -22,20 +23,17 @@ function onClose() {
 </script>
 
 <template>
-  <div class="page page--constrained">
-    <header class="page-header">
-      <h1>🎙️ Thèmes voice channels</h1>
-      <p class="lede">
-        Gabarits de salons vocaux temporaires (nom, limite, bitrate, visibilité,
-        slowmode, queue, stage). Quand un membre rejoint le salon trigger
-        configuré, le bot crée un salon dérivé du thème par défaut.
-        Variables : <code>{username}</code>, <code>{theme}</code>.
-      </p>
-    </header>
+  <AdminPageShell title="Thèmes voice channels" icon="🎙️">
+    <template #lede>
+      Gabarits de salons vocaux temporaires (nom, limite, bitrate, visibilité,
+      slowmode, queue, stage). Quand un membre rejoint le salon trigger
+      configuré, le bot crée un salon dérivé du thème par défaut.
+      Variables : <code>{username}</code>, <code>{theme}</code>.
+    </template>
 
     <VoiceThemesTable @create="onCreate" @edit="onEdit" />
     <VoiceThemeFormModal :open="showForm" :editing="editing" @close="onClose" />
-  </div>
+  </AdminPageShell>
 </template>
 
 <style scoped>
