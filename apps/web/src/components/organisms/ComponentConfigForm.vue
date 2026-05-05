@@ -84,15 +84,34 @@ function isFieldModified(key: string): boolean {
  *  - `equals:""` (chaine vide) signifie "le parent a une valeur non-zero
  *    et non-vide" — utile pour les champs numeriques ou 0 = desactive
  *    (ex: scan interval depend de timeout > 0).
+ *
+ * Recursivite : si le parent est lui-meme disabled (chaine de depends_on
+ * type enabled -> monthly_report_enabled -> monthly_report_channel_id),
+ * l'enfant l'est aussi. On remonte la chaine jusqu'a un noeud sans
+ * depends_on. Detection des cycles via un Set de cles deja visitees.
  */
-function isFieldDisabled(field: ConfigField): boolean {
+function isFieldDisabled(field: ConfigField, visited: Set<string> = new Set()): boolean {
   const dep = field.depends_on as { key: string; equals: string } | undefined;
   if (!dep) return false;
+  if (visited.has(field.key)) return false; // garde-fou cycle
+  visited.add(field.key);
+
+  // 1) check direct sur la valeur du parent
   const v = formValues.value[dep.key];
-  if (dep.equals === "true") return !(v === "true" || v === "1");
-  if (dep.equals === "false") return !(v === "false" || v === "0" || v === undefined || v === "");
-  if (dep.equals === "") return v === undefined || v === "" || v === "0" || v === "false";
-  return v !== dep.equals;
+  let directlyDisabled: boolean;
+  if (dep.equals === "true") directlyDisabled = !(v === "true" || v === "1");
+  else if (dep.equals === "false") directlyDisabled = !(v === "false" || v === "0" || v === undefined || v === "");
+  else if (dep.equals === "") directlyDisabled = v === undefined || v === "" || v === "0" || v === "false";
+  else directlyDisabled = v !== dep.equals;
+
+  if (directlyDisabled) return true;
+
+  // 2) check transitif : si le parent est lui-meme disabled (cascade),
+  // on l'est aussi.
+  const parent = configFields.value.find((f) => f.key === dep.key);
+  if (parent && isFieldDisabled(parent, visited)) return true;
+
+  return false;
 }
 
 const hasChanges = computed(() =>
