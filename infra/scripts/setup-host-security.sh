@@ -692,6 +692,66 @@ EOF
     echo "  ✅ tls-errors configure (toutes les 15 min)"
 }
 
+# ── Module nginx-scanner (jail fail2ban) ────────────────────────────────
+# Bannit les IPs qui hit notre trap 444 (paths /laravel, /wp-admin, .env,
+# .php, etc. — cf. apps/web/nginx.conf "Anti-scanner"). Les requetes 444
+# sont logguees dans /var/log/nginx/sentinel/scanners.log via volume bind.
+# Pre-requis : fail2ban deja installe (module fail2ban).
+
+setup_nginx_scanner() {
+    echo "🚫 nginx-scanner (jail fail2ban)"
+
+    if ! command -v fail2ban-client &>/dev/null; then
+        echo "  ❌ fail2ban absent. Lance d'abord : sudo bash $0 fail2ban"
+        exit 1
+    fi
+
+    # 1. Repertoire host pour les logs scanner. UID 101 = user nginx
+    #    dans nginx:1.27-alpine (cf. apps/web/Dockerfile).
+    LOG_DIR=/var/log/sentinel-nginx
+    mkdir -p "$LOG_DIR"
+    chown 101:101 "$LOG_DIR"
+    chmod 755 "$LOG_DIR"
+    touch "$LOG_DIR/scanners.log"
+    chown 101:101 "$LOG_DIR/scanners.log"
+
+    # 2. Filtre fail2ban : matche les lignes nginx combined log avec status 444.
+    cat > /etc/fail2ban/filter.d/nginx-scanner.conf <<'EOF'
+# fail2ban filter for sentinel nginx scanner trap.
+# nginx ecrit dans scanners.log uniquement les requetes qui ont hit
+# une location "Anti-scanner" et recu 444 (return 444 dans nginx.conf).
+# Donc UNE entree dans ce log = UNE tentative scanner -> bannir direct.
+[Definition]
+failregex = ^<HOST> .* "(GET|POST|HEAD|PUT|DELETE|PATCH|OPTIONS) [^"]*" 444 .*$
+ignoreregex =
+EOF
+
+    # 3. Jail : 3 hits sur 1h -> ban 24h.
+    if grep -q "^\[nginx-scanner\]" /etc/fail2ban/jail.local 2>/dev/null; then
+        echo "  ℹ Jail nginx-scanner deja present dans jail.local — pas d'override."
+    else
+        cat >> /etc/fail2ban/jail.local <<EOF
+
+[nginx-scanner]
+enabled  = true
+filter   = nginx-scanner
+logpath  = $LOG_DIR/scanners.log
+maxretry = 3
+findtime = 1h
+bantime  = 24h
+banaction = ufw
+EOF
+    fi
+
+    systemctl restart fail2ban
+    sleep 1
+    if fail2ban-client status nginx-scanner &>/dev/null; then
+        echo "  ✅ jail nginx-scanner actif (3 hits/1h -> ban 24h)"
+    else
+        echo "  ⚠ jail nginx-scanner non charge — verifie 'systemctl status fail2ban'"
+    fi
+}
+
 # ── Dispatcher ──────────────────────────────────────────────────────────
 
 main() {
@@ -709,6 +769,7 @@ main() {
         file-integrity)    setup_file_integrity ;;
         outbound)          setup_outbound ;;
         nginx-suspicious)  setup_nginx_suspicious ;;
+        nginx-scanner)     setup_nginx_scanner ;;
         tls-errors)        setup_tls_errors ;;
         all)
             setup_fail2ban
@@ -721,6 +782,7 @@ main() {
             setup_file_integrity
             setup_outbound
             setup_nginx_suspicious
+            setup_nginx_scanner
             setup_tls_errors
             ;;
         help|--help|-h|*)
@@ -738,6 +800,7 @@ Modules :
   file-integrity SHA256 fichiers critiques -> file-integrity.json (30 min)
   outbound       Connexions sortantes -> outbound.json (3 min)
   nginx-suspicious Patterns SQLi/XSS/scanners nginx -> nginx-suspicious.json (10 min)
+  nginx-scanner  Jail fail2ban qui ban les IPs hit le trap 444 nginx
   tls-errors     Erreurs handshake TLS nginx -> tls-errors.json (15 min)
   all            Tous les modules
 

@@ -491,6 +491,11 @@ services:
     volumes:
       - letsencrypt_etc:/etc/letsencrypt
       - letsencrypt_www:/var/www/certbot
+      # Logs scanner (444 sur paths suspects) ecrits par nginx, lus par
+      # le jail fail2ban `nginx-scanner` cote host. Le repertoire host
+      # /var/log/sentinel-nginx doit appartenir a UID 101 (user nginx
+      # dans nginx:1.27-alpine) — gere par setup-host-security.sh.
+      - /var/log/sentinel-nginx:/var/log/nginx/sentinel
     healthcheck:
       # 127.0.0.1 explicit : evite que wget resolve localhost en IPv6 [::1]
       # alors que nginx ecoute en IPv4 -> faux positif "unhealthy".
