@@ -134,8 +134,8 @@ function eventIcon(type: string): string {
   margin-left: auto;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-secondary);
+  border-radius: 6px;
+  background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
   min-width: 240px;

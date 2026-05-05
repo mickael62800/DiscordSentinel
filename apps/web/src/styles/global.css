@@ -500,3 +500,27 @@ input[type="checkbox"]:not(.toggle input):not([hidden]):disabled {
   margin-right: auto;
   max-width: 1620px;
 }
+
+/* ── Input base ────────────────────────────────────────────────
+   Style standard des inputs/selects. Reference : ConfigFieldRow
+   .field-input. A appliquer comme classe partagee sur tout
+   <input>/<select>/<textarea> non specialise.
+*/
+.app-input-base {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+}
+.app-input-base:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+.app-input-base::placeholder {
+  color: var(--text-secondary);
+}

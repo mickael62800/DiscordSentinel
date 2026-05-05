@@ -219,7 +219,7 @@ async function onUnbanAll() {
   border-radius: 6px;
   padding: 8px 12px;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   outline: none;
   transition: border-color var(--transition-base);
 }
