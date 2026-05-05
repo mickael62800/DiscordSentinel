@@ -122,6 +122,7 @@ async fn get_or_fetch_user_guilds(
     let key_hash = short_hash(access_token);
     let live_key = format!("user_guilds:{}", key_hash);
     let stale_key = format!("user_guilds_stale:{}", key_hash);
+    let lock_key = format!("user_guilds_lock:{}", key_hash);
 
     // Tenter le cache live Redis
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
@@ -132,8 +133,43 @@ async fn get_or_fetch_user_guilds(
         }
     }
 
+    // Single-flight : evite que N requetes paralleles (cas typique du
+    // boot de l'app desktop ou 3 endpoints RBAC tapent en simultane) ne
+    // hit toutes Discord et se prennent un 429. Le premier acquiert le
+    // lock SETNX et fait l'appel ; les autres pollent le cache live.
+    let mut got_lock = false;
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        let res: Result<bool, _> = redis::cmd("SET")
+            .arg(&lock_key).arg("1").arg("NX").arg("EX").arg(5)
+            .query_async::<_, Option<String>>(&mut conn).await
+            .map(|v| v.is_some());
+        got_lock = res.unwrap_or(false);
+        if !got_lock {
+            // Un autre worker fait l'appel : poll le cache live ~2s.
+            for _ in 0..10 {
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                if let Ok(cached) = conn.get::<_, String>(&live_key).await {
+                    if let Ok(set) = serde_json::from_str::<HashSet<String>>(&cached) {
+                        return Ok(set);
+                    }
+                }
+            }
+            // Timeout : on tombe en pass-through et on fait l'appel
+            // Discord soi-meme (le lock holder a probablement crashe).
+        }
+    }
+
     // Fallback Discord API
-    match state.discord_api.get_user_guilds(access_token).await {
+    let discord_result = state.discord_api.get_user_guilds(access_token).await;
+
+    // Liberer le lock single-flight (best-effort).
+    if got_lock {
+        if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+            let _: Result<(), _> = conn.del(&lock_key).await;
+        }
+    }
+
+    match discord_result {
         Ok(guilds) => {
             let set: HashSet<String> = guilds.into_iter().map(|g| g.id).collect();
 
