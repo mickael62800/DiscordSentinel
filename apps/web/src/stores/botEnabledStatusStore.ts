@@ -40,8 +40,12 @@ export const useBotEnabledStatusStore = defineStore("botEnabledStatus", () => {
   const disabledCount = computed(() => disabledBots.value.length);
 
   async function load(guildId: string): Promise<void> {
+    // Deja charge pour cette guild ET aucun load en cours : rien a faire.
     if (lastLoadedGuild === guildId && !inFlight) return;
-    if (inFlight && lastLoadedGuild === guildId) return inFlight;
+    // Un load est en cours : on attend son resultat (peu importe la guild :
+    // au boot, plusieurs composants appellent load() en parallele AVANT que
+    // lastLoadedGuild soit set, et on doit dedupliquer pour eviter 4-5 GET).
+    if (inFlight) return inFlight;
 
     loading.value = true;
     error.value = null;
