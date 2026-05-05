@@ -24,6 +24,16 @@
 
 -- 1) Restaure les configs worker sous le bot_name du module
 -- (annule partiellement la migration 204 pour le seul cas coude).
+-- Supprime d'abord les doublons (cle worker == cle deja existante cote
+-- module, typiquement 'enabled') pour eviter une violation d'unicite.
+DELETE FROM bot_guild_config wkr
+    WHERE wkr.bot_name = 'coude'
+      AND EXISTS (
+          SELECT 1 FROM bot_guild_config m
+           WHERE m.bot_name = 'coude-bot'
+             AND m.guild_id = wkr.guild_id
+             AND m.config_key = wkr.config_key
+      );
 UPDATE bot_guild_config SET bot_name = 'coude-bot'
     WHERE bot_name = 'coude';
 

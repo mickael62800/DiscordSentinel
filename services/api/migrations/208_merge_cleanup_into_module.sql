@@ -18,6 +18,14 @@
 -- code Rust.
 
 -- 1) Migre les configs cleanup-bot (s'il y en a) vers le bot_name unifie.
+DELETE FROM bot_guild_config wkr
+    WHERE wkr.bot_name = 'cleanup-bot'
+      AND EXISTS (
+          SELECT 1 FROM bot_guild_config m
+           WHERE m.bot_name = 'cleanup'
+             AND m.guild_id = wkr.guild_id
+             AND m.config_key = wkr.config_key
+      );
 UPDATE bot_guild_config SET bot_name = 'cleanup'
     WHERE bot_name = 'cleanup-bot';
 

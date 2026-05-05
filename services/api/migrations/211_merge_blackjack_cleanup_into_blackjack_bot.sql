@@ -17,6 +17,14 @@
 
 -- 1) Restaure le bot_name='blackjack-bot' (mig 204 avait renomme
 -- blackjack-cleanup-worker -> blackjack).
+DELETE FROM bot_guild_config wkr
+    WHERE wkr.bot_name = 'blackjack'
+      AND EXISTS (
+          SELECT 1 FROM bot_guild_config m
+           WHERE m.bot_name = 'blackjack-bot'
+             AND m.guild_id = wkr.guild_id
+             AND m.config_key = wkr.config_key
+      );
 UPDATE bot_guild_config SET bot_name = 'blackjack-bot'
     WHERE bot_name = 'blackjack';
 

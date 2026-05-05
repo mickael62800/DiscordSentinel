@@ -6,6 +6,14 @@
 
 -- 1) Configs : remet le bot_name='audit-bot' (mig 204 avait
 -- renomme audit-cache-worker -> audit_cache).
+DELETE FROM bot_guild_config wkr
+    WHERE wkr.bot_name = 'audit_cache'
+      AND EXISTS (
+          SELECT 1 FROM bot_guild_config m
+           WHERE m.bot_name = 'audit-bot'
+             AND m.guild_id = wkr.guild_id
+             AND m.config_key = wkr.config_key
+      );
 UPDATE bot_guild_config SET bot_name = 'audit-bot'
     WHERE bot_name = 'audit_cache';
 
