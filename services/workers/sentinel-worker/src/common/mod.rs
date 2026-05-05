@@ -263,12 +263,12 @@ const WORKER_MODULES: &[&str] = &[
     "coude-bot",
     "discord_audit_sync",
     "export",
-    "game_portal",
+    "game-portal",
     "moderation-bot",
     "monitoring",
-    "security",
+    "security-bot",
     "temp_roles",
-    "tickets",
+    "ticket-bot",
 ];
 
 /// Charge toute la config workers depuis `bot_guild_config`.

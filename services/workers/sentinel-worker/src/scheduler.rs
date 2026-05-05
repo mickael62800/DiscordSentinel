@@ -539,7 +539,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "tickets",
+            "ticket-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -563,7 +563,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "tickets",
+            "ticket-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -586,7 +586,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security",
+            "security-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -607,7 +607,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security",
+            "security-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -626,7 +626,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "security",
+            "security-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {

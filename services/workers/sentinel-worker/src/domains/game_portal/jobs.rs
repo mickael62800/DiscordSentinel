@@ -14,7 +14,7 @@ use tracing::{error, info, warn};
 
 use crate::common as common;
 
-const WORKER_NAME: &str = "game_portal";
+const WORKER_NAME: &str = "game-portal";
 
 #[derive(Debug, Deserialize, Default)]
 #[allow(dead_code)]
