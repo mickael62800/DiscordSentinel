@@ -86,7 +86,7 @@ function isFieldModified(key: string): boolean {
  *    (ex: scan interval depend de timeout > 0).
  *
  * Recursivite : si le parent est lui-meme disabled (chaine de depends_on
- * type enabled -> monthly_report_enabled -> monthly_report_channel_id),
+ * type enabled -> sub_feature_enabled -> sub_feature_channel_id),
  * l'enfant l'est aussi. On remonte la chaine jusqu'a un noeud sans
  * depends_on. Detection des cycles via un Set de cles deja visitees.
  */
