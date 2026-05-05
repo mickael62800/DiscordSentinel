@@ -388,8 +388,13 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   gap: 8px;
   margin-top: 8px;
 }
+/* Empeche les cellules de s'etendre quand le label est long
+   (ex: "Mode review IA (insultes, spam, liens, phishing)") :
+   minmax(0, ...) force la taille intrinseque a 0, l'ellipsis du
+   label fait le reste. */
+.toggles-grid > .toggle-card { min-width: 0; }
 @media (min-width: 1900px) {
-  .toggles-grid { grid-template-columns: repeat(10, 1fr); }
+  .toggles-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); }
 }
 
 .toggle-card {
