@@ -79,6 +79,11 @@ function isFieldModified(key: string): boolean {
  * Une cle est "disabled" quand son `depends_on.key` n'a pas la valeur
  * `equals` requise. Ex : tous les champs avec `depends_on:{key:"enabled",
  * equals:"true"}` sont grises tant que `enabled` est OFF.
+ *
+ * Cas speciaux :
+ *  - `equals:""` (chaine vide) signifie "le parent a une valeur non-zero
+ *    et non-vide" — utile pour les champs numeriques ou 0 = desactive
+ *    (ex: scan interval depend de timeout > 0).
  */
 function isFieldDisabled(field: ConfigField): boolean {
   const dep = field.depends_on as { key: string; equals: string } | undefined;
@@ -86,6 +91,7 @@ function isFieldDisabled(field: ConfigField): boolean {
   const v = formValues.value[dep.key];
   if (dep.equals === "true") return !(v === "true" || v === "1");
   if (dep.equals === "false") return !(v === "false" || v === "0" || v === undefined || v === "");
+  if (dep.equals === "") return v === undefined || v === "" || v === "0" || v === "false";
   return v !== dep.equals;
 }
 

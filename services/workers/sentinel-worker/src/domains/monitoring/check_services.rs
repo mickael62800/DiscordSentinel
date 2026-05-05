@@ -64,7 +64,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "error",
-                            "bot": "monitoring-worker",
+                            "bot": "sentinel-worker",
                             "server": "",
                             "message": format!("{} hors ligne : {}", label, name),
                             "category": "worker",
@@ -100,7 +100,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "info",
-                            "bot": "monitoring-worker",
+                            "bot": "sentinel-worker",
                             "server": "",
                             "message": format!("{} en ligne : {}", label, name),
                             "category": "worker",

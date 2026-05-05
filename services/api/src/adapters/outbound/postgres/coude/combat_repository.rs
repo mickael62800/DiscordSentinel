@@ -243,7 +243,7 @@ impl CombatRepository for PgCombatRepository {
                    SELECT c.id FROM coude_combats c
                    LEFT JOIN bot_guild_config cfg
                        ON cfg.guild_id = c.guild_id
-                       AND cfg.bot_name = 'coude-worker'
+                       AND cfg.bot_name = 'coude-bot'
                        AND cfg.config_key = 'bet_delay_secs'
                    WHERE c.status = 'betting'
                      AND c.accepted_at < NOW() - (COALESCE(
@@ -277,7 +277,7 @@ impl CombatRepository for PgCombatRepository {
                    SELECT c.id FROM coude_combats c
                    LEFT JOIN bot_guild_config cfg
                        ON cfg.guild_id = c.guild_id
-                       AND cfg.bot_name = 'coude-worker'
+                       AND cfg.bot_name = 'coude-bot'
                        AND cfg.config_key = 'combat_expiry_hours'
                    WHERE c.status = 'pending'
                      AND c.created_at < NOW() - MAKE_INTERVAL(hours := COALESCE(
