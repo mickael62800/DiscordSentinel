@@ -14,6 +14,30 @@ const TABLES: &[&str] = &[
 ];
 
 pub async fn run(pool: &PgPool) -> Result<(), String> {
+    // Sub-feature gate : vacuum_enabled (toggle UI sous cleanup).
+    // VACUUM est global (DB-level, pas par guild), donc on regarde si
+    // AU MOINS une guild a vacuum_enabled=true. Si aucune n'a explicitement
+    // mis false ET la cle n'existe pas du tout -> on respecte le default
+    // (true) du schema.
+    let any_disabled: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM bot_guild_config \
+         WHERE bot_name = 'cleanup' AND config_key = 'vacuum_enabled' \
+           AND config_value IN ('true','1') LIMIT 1",
+    )
+    .fetch_optional(pool).await.unwrap_or(None);
+    let any_explicit_false: Option<i64> = sqlx::query_scalar(
+        "SELECT 1 FROM bot_guild_config \
+         WHERE bot_name = 'cleanup' AND config_key = 'vacuum_enabled' \
+           AND config_value IN ('false','0') LIMIT 1",
+    )
+    .fetch_optional(pool).await.unwrap_or(None);
+    // Si quelqu'un a actif -> run. Sinon si quelqu'un a explicit false et
+    // personne actif -> skip. Sinon (aucune row) -> default true.
+    if any_disabled.is_none() && any_explicit_false.is_some() {
+        info!("VACUUM skip : vacuum_enabled=false sur toutes les guilds");
+        return Ok(());
+    }
+
     let mut errors = Vec::new();
 
     for table in TABLES {
