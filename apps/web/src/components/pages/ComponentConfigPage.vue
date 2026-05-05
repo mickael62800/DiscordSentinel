@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
-import { botConfigService } from "@/services/botConfigService";
-import type { BotDefinition, BotGuildConfig } from "../../types";
+import { computed, onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
+import type { BotDefinition } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useBotDefinitions } from "../../composables/useBotDefinitions";
 import { useBotEnabledStatus } from "../../composables/useBotEnabledStatus";
+import { useBotEnabledStatusStore } from "@/stores/botEnabledStatusStore";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 import ComponentSelectorSection from "../organisms/ComponentSelectorSection.vue";
 import ComponentConfigForm from "../organisms/ComponentConfigForm.vue";
@@ -13,8 +14,13 @@ import AutomodAnalysisHistory from "../organisms/AutomodAnalysisHistory.vue";
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 const { fetchConfigs } = useBotEnabledStatus();
 
+// Une seule source de verite : le store. La page ne fait pas de
+// fetch separe. Le store est deja charge par useAppInit + le watch
+// dans useBotEnabledStatus a la selection de guild.
+const botEnabledStore = useBotEnabledStatusStore();
+const { configs } = storeToRefs(botEnabledStore);
+
 const definitions = ref<BotDefinition[]>([]);
-const configs = ref<BotGuildConfig[]>([]);
 const selectedComponent = ref<string | null>(null);
 
 function isWorker(botName: string): boolean {
@@ -41,30 +47,18 @@ async function fetchDefinitions() {
   }
 }
 
-async function fetchConfig() {
-  if (!selectedGuildId.value) return;
-  try {
-    configs.value = await botConfigService.getGuildConfig(selectedGuildId.value);
-    // Sync le store global qui drive les badges OFF/ON dans la liste
-    // de gauche : sans ca, on toggle OFF + save mais le badge reste
-    // bleu jusqu'au prochain reload de page.
-    await fetchConfigs();
-  } catch (e) {
-    console.error("Erreur chargement config:", e);
-  }
-}
-
 function selectComponent(name: string) {
   selectedComponent.value = name;
 }
 
+// fetchConfigs() invalide + recharge le store (la seule source).
+// Appele apres un save dans le formulaire.
+async function reloadAfterSave() {
+  await fetchConfigs();
+}
+
 onMounted(() => {
   fetchDefinitions();
-  if (selectedGuildId.value) fetchConfig();
-});
-
-watch(selectedGuildId, () => {
-  if (selectedGuildId.value) fetchConfig();
 });
 </script>
 
@@ -103,7 +97,7 @@ watch(selectedGuildId, () => {
         :definition="selectedDefinition"
         :configs="configs"
         :guild-id="selectedGuildId"
-        @saved="fetchConfig"
+        @saved="reloadAfterSave"
       />
 
       <!-- Vue debug temporaire : historique des analyses automod. -->
