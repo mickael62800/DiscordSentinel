@@ -32,6 +32,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let config = load_guild_config(ctx, &guild_id).await;
+    if !config.casino_enabled() {
+        reply_ephemeral(ctx, command, "Le casino est desactive pour ce serveur.").await;
+        return;
+    }
     if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
         return;
     }

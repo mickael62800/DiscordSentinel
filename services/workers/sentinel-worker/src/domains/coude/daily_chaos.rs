@@ -46,6 +46,15 @@ pub async fn run(_pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), S
     };
 
     for guild_id in &guild_ids {
+        // Sub-feature gate : chaos_enabled (top-level) +
+        // daily_chaos_enabled (sub-toggle). Default true pour les deux.
+        if !crate::common::is_feature_enabled(_pool, guild_id, "coude-bot", "chaos_enabled", true).await {
+            continue;
+        }
+        if !crate::common::is_feature_enabled(_pool, guild_id, "coude-bot", "daily_chaos_enabled", true).await {
+            continue;
+        }
+
         let mut client = CoudeSocialServiceClient::new(channel.clone());
         let mut req = Request::new(TriggerDailyChaosRequest {
             guild_id: guild_id.clone(),
