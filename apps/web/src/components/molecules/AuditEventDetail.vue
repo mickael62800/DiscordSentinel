@@ -196,6 +196,8 @@ const hasDetails = computed(() => Object.keys(props.details).length > 0);
 
 .mono {
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .detail-avatars {
