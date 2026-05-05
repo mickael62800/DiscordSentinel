@@ -27,7 +27,6 @@ function isOn(botName: string): boolean {
   <section class="component-section">
     <div class="section-header">
       <h2 class="section-heading">{{ title }}</h2>
-      <span class="section-count">{{ definitions.length }}</span>
     </div>
     <div class="component-grid">
       <div

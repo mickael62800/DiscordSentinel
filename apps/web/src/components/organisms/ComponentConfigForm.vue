@@ -438,16 +438,14 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .sections-flow {
   display: flex;
   flex-wrap: wrap;
-  gap: 24px;
-  margin-top: 16px;
+  gap: 12px;
+  margin-top: 12px;
 }
 .inputs-section {
-  margin-top: 24px;
-  margin-bottom: 16px;
+  margin: 0;
   display: flex;
   flex-direction: column;
 }
-.inputs-section + .inputs-section { margin-top: 32px; }
 .inputs-section.section-full { flex: 1 1 100%; min-width: 0; }
 .inputs-section.section-auto { flex: 1 1 360px; min-width: 0; max-width: 100%; }
 
