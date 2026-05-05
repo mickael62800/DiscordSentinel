@@ -20,5 +20,5 @@ const { lookupUserId, loading, lookup } = useCoudeSocial();
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 </style>

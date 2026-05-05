@@ -118,7 +118,7 @@ function formatDate(iso: string): string {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .form {
   display: grid;
   grid-template-columns: 1fr;

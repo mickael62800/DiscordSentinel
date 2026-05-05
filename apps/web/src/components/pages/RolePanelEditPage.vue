@@ -20,7 +20,7 @@ import AutoRolesPanel from "../organisms/AutoRolesPanel.vue";
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .back-link {
   display: inline-block;
   margin-top: 8px;

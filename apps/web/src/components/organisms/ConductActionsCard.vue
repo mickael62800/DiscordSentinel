@@ -54,7 +54,7 @@ async function syncBans() {
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .action-buttons { display: flex; flex-direction: column; gap: 8px; }
 .hint { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px; }
 </style>

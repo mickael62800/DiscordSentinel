@@ -65,7 +65,7 @@ async function onRemove(theme: VoiceChannelTheme) {
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .card-header {
   display: flex;
   justify-content: space-between;

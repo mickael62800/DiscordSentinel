@@ -89,7 +89,7 @@ function formatDate(iso: string): string {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .timeline {
   list-style: none;
   padding: 0;

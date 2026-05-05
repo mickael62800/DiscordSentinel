@@ -69,7 +69,7 @@ async function onAdd() {
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .hint { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px; }
 .auto-roles-list {
   display: flex; flex-direction: column;

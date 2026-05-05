@@ -39,5 +39,5 @@ function onClose() {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 </style>

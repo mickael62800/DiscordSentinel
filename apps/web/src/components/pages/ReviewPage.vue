@@ -120,7 +120,7 @@ function formatDate(iso: string): string {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .reviews-list {
   list-style: none;
   padding: 0;

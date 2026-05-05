@@ -25,7 +25,7 @@ import ConductActionsCard from "../organisms/ConductActionsCard.vue";
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 640px) {
   .grid { grid-template-columns: 1fr; gap: 12px; }

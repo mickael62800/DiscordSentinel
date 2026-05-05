@@ -88,7 +88,7 @@ watch(guildIdFilter, fetchCfg, { immediate: true });
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .form { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
 .form label.full { grid-column: span 2; }

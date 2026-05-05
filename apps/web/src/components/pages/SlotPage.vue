@@ -156,7 +156,7 @@ const rtp = computed(() =>
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

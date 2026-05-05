@@ -99,7 +99,7 @@ function statusColor(s: string): string {
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .kv {
   display: flex;

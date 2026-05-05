@@ -221,7 +221,7 @@ watch(lookupUserId, async (id) => {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 
 .row-selected {
   background-color: color-mix(in srgb, var(--accent) 15%, transparent);

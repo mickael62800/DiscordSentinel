@@ -1,7 +1,7 @@
-/* .page sert uniquement de hook pour les styles descendants partages
-   (.card, .table, .lookup, .btn-*). Le sizing est gere par les classes
-   utilitaires .page--constrained / .page--constrained / .page--constrained definies
-   dans styles/global.css — a appliquer sur le meme element racine. */
+/* Boilerplate CSS partage entre pages/organisms admin (cards, lookup,
+   table compacte, boutons CTA). Importe via @import dans <style scoped>.
+   Le sizing de page est gere par .page--constrained / .page--wide /
+   .page--narrow definis dans styles/global.css. */
 .page { /* no sizing here */ }
 .page-header {
   margin-bottom: 24px;

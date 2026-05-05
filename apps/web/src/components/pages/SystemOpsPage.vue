@@ -137,7 +137,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
-@import "./_moderation-advanced-shared.css";
+@import "./_admin-page-shared.css";
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

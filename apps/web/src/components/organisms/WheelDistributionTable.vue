@@ -34,5 +34,5 @@ const { distribution, totalSpins, loading } = useWheelAnalytics();
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 </style>

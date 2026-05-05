@@ -45,7 +45,7 @@ function formatDate(iso: string): string {
 </template>
 
 <style scoped>
-@import "../pages/_moderation-advanced-shared.css";
+@import "../pages/_admin-page-shared.css";
 .pos { color: #2ECC71; font-weight: 600; }
 .neg { color: #E74C3C; font-weight: 600; }
 </style>
