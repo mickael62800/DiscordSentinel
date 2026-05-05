@@ -265,7 +265,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "appeal_sla",
+            "ticket-bot",
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
@@ -301,7 +301,7 @@ pub fn start(
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),
-            "discord_audit_sync",
+            "audit-bot",
             move |pool| {
                 let token = token.clone();
                 Box::pin(async move {
