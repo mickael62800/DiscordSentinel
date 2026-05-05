@@ -126,6 +126,10 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
     };
 
     if let Some(alert) = alert_opt {
+        if !sentinel_shared::discord_helpers::is_feature_enabled(
+            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
+        ).await { return; }
+
         log(
             ctx,
             "error",

@@ -171,6 +171,16 @@ async fn handle_stats(ctx: &Context, command: &CommandInteraction) {
         None => return,
     };
 
+    // Sub-feature gate : weekly_report_enabled (toggle UI sous audit-bot).
+    if !sentinel_shared::discord_helpers::is_feature_enabled(
+        ctx, &guild_id.to_string(), "audit-bot", "weekly_report_enabled", true,
+    ).await {
+        let embed = info_embed("Audit -- Statistiques hebdomadaires")
+            .description("Le rapport hebdomadaire est desactive pour ce serveur.");
+        reply_ephemeral_embed(ctx, command, embed).await;
+        return;
+    }
+
     let data = ctx.data.read().await;
 
     let stats_text = if let Some(tracker) = data.get::<WeeklyTrackerKey>() {

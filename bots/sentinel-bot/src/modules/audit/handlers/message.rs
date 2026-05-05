@@ -115,6 +115,10 @@ pub async fn handle_delete(
             .and_then(|anomaly| anomaly.record(gid, "delete"))
     };
     if let Some(alert) = alert_opt {
+        if !sentinel_shared::discord_helpers::is_feature_enabled(
+            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
+        ).await { return; }
+
         log(
             ctx,
             "error",
@@ -289,6 +293,10 @@ pub async fn handle_delete_bulk(
     };
 
     if let Some(alert) = alert_opt {
+        if !sentinel_shared::discord_helpers::is_feature_enabled(
+            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
+        ).await { return; }
+
         log(
             ctx,
             "error",

@@ -93,6 +93,13 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
             .and_then(|anomaly| anomaly.record(guild_id, "kick"))
     };
     if let Some(alert) = alert_opt {
+        // Guard sub-feature : anomaly_enabled (defaut true). On a deja
+        // record l'event in-memory (gratuit), seul le post Discord est
+        // gate -> rare event, le HTTP call est OK.
+        if !sentinel_shared::discord_helpers::is_feature_enabled(
+            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
+        ).await { return; }
+
         log(
             ctx,
             "error",
@@ -160,6 +167,10 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
             .and_then(|anomaly| anomaly.record(guild_id, "ban"))
     };
     if let Some(alert) = alert_opt {
+        if !sentinel_shared::discord_helpers::is_feature_enabled(
+            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
+        ).await { return; }
+
         log(
             ctx,
             "error",

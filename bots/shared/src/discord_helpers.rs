@@ -252,6 +252,36 @@ pub async fn is_module_enabled(ctx: &Context, guild_id: &str, module_bot_name: &
     }
 }
 
+/// Lit une sous-feature booleenne d'un module (ex: anomaly_enabled,
+/// weekly_report_enabled, chaos_enabled). Cascade : si le module top-level
+/// est OFF, retourne false directement. Sinon, lit la cle `feature_key`
+/// dans la config guild + module, fallback sur `default_value`.
+///
+/// Pattern : pour un toggle UI sub-feature (depends_on enabled), ce helper
+/// applique la meme logique cote bot pour stopper le job correspondant.
+pub async fn is_feature_enabled(
+    ctx: &Context,
+    guild_id: &str,
+    module_bot_name: &str,
+    feature_key: &str,
+    default_value: bool,
+) -> bool {
+    if !is_module_enabled(ctx, guild_id, module_bot_name).await {
+        return false;
+    }
+    let data = ctx.data.read().await;
+    let api = match data.get::<crate::heartbeat::ApiClientKey>() {
+        Some(api) => std::sync::Arc::clone(api),
+        None => return default_value,
+    };
+    drop(data);
+    let config = match api.get_guild_config_for(guild_id, module_bot_name).await {
+        Ok(cfg) => cfg,
+        Err(_) => return default_value,
+    };
+    crate::api_client::BaseApiClient::config_bool(&config, feature_key, default_value)
+}
+
 /// Variante de `is_module_enabled` qui, si desactive, repond en ephemeral
 /// a la slash command et retourne false. Si actif, retourne true sans repondre.
 pub async fn is_module_enabled_or_reply_command(
