@@ -4,12 +4,14 @@ import { botConfigService } from "@/services/botConfigService";
 import type { BotDefinition, BotGuildConfig } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useBotDefinitions } from "../../composables/useBotDefinitions";
+import { useBotEnabledStatus } from "../../composables/useBotEnabledStatus";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 import ComponentSelectorSection from "../organisms/ComponentSelectorSection.vue";
 import ComponentConfigForm from "../organisms/ComponentConfigForm.vue";
 import AutomodAnalysisHistory from "../organisms/AutomodAnalysisHistory.vue";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
+const { fetchConfigs } = useBotEnabledStatus();
 
 const definitions = ref<BotDefinition[]>([]);
 const configs = ref<BotGuildConfig[]>([]);
@@ -43,6 +45,10 @@ async function fetchConfig() {
   if (!selectedGuildId.value) return;
   try {
     configs.value = await botConfigService.getGuildConfig(selectedGuildId.value);
+    // Sync le store global qui drive les badges OFF/ON dans la liste
+    // de gauche : sans ca, on toggle OFF + save mais le badge reste
+    // bleu jusqu'au prochain reload de page.
+    await fetchConfigs();
   } catch (e) {
     console.error("Erreur chargement config:", e);
   }
