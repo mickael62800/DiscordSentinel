@@ -268,6 +268,37 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         return;
     }
 
+    // Skip XP : message trop court (anti-spam "lol", emoji seul...).
+    let min_len = BaseApiClient::config_u64(&guild_config, "min_message_length", 3) as usize;
+    if msg.content.chars().count() < min_len {
+        return;
+    }
+
+    // Skip XP : salon dans la liste des salons ignores.
+    let ignored_channels_csv = BaseApiClient::config_or(&guild_config, "ignored_channels", "");
+    if !ignored_channels_csv.is_empty() {
+        let cid = msg.channel_id.get().to_string();
+        if ignored_channels_csv.split(',').any(|s| s.trim() == cid) {
+            return;
+        }
+    }
+
+    // Skip XP : user a au moins un role dans la liste des roles ignores.
+    let ignored_roles_csv = BaseApiClient::config_or(&guild_config, "ignored_roles", "");
+    if !ignored_roles_csv.is_empty() {
+        if let Some(member) = msg.member.as_ref() {
+            let user_role_ids: std::collections::HashSet<String> =
+                member.roles.iter().map(|r| r.get().to_string()).collect();
+            let has_ignored = ignored_roles_csv
+                .split(',')
+                .map(|s| s.trim())
+                .any(|s| user_role_ids.contains(s));
+            if has_ignored {
+                return;
+            }
+        }
+    }
+
     let data = ctx.data.read().await;
 
     // Track localement
@@ -397,20 +428,27 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         Ok(result) => {
             if result.leveled_up {
                 let level = result.user.level_text;
-                let embed = success_embed("\u{1f4dd} LEVEL UP Texte !")
-                    .description(format!(
-                        "<@{}> est maintenant **niveau {} en texte** !",
-                        msg.author.id, level
-                    ))
-                    .thumbnail(msg.author.face());
+                // Toggle annonce : levelup_announce_enabled (default true).
+                // Si OFF, on saute l'embed (les role rewards passent quand meme).
+                let announce_enabled = BaseApiClient::config_bool(
+                    &guild_config, "levelup_announce_enabled", true,
+                );
+                if announce_enabled {
+                    let embed = success_embed("\u{1f4dd} LEVEL UP Texte !")
+                        .description(format!(
+                            "<@{}> est maintenant **niveau {} en texte** !",
+                            msg.author.id, level
+                        ))
+                        .thumbnail(msg.author.face());
 
-                if let Some(ch_id) = level_channel::resolve_level_up_channel(&guild_config) {
-                    let target = ChannelId::new(ch_id);
-                    if let Err(e) = target.send_message(
-                        &ctx.http,
-                        CreateMessage::new().embed(embed),
-                    ).await {
-                        warn!(error = %e, "Failed to send text level-up message");
+                    if let Some(ch_id) = level_channel::resolve_level_up_channel(&guild_config) {
+                        let target = ChannelId::new(ch_id);
+                        if let Err(e) = target.send_message(
+                            &ctx.http,
+                            CreateMessage::new().embed(embed),
+                        ).await {
+                            warn!(error = %e, "Failed to send text level-up message");
+                        }
                     }
                 }
             }
