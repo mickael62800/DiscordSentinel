@@ -649,6 +649,30 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
         None => return,
     };
 
+    // SLA warning (avant escalation) : declenchee par worker quand un
+    // ticket non-repondu depasse sla_first_response_minutes. Bot poste
+    // un rappel dans le channel pour ping le staff.
+    if event_type == "ticket_sla_warned" {
+        let channel_id_str = data.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
+        let warn_minutes = data.get("warn_minutes").and_then(|v| v.as_i64()).unwrap_or(30);
+        if channel_id_str.is_empty() {
+            return;
+        }
+        let ch_id = match channel_id_str.parse::<u64>() {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+        let channel_id = ChannelId::new(ch_id);
+        let msg = format!(
+            "**\u{23f0} Rappel SLA** — Aucune reponse depuis {}min sur ce ticket. Merci d y repondre rapidement avant l escalation automatique.",
+            warn_minutes
+        );
+        if let Err(e) = channel_id.say(&ctx.http, &msg).await {
+            warn!(error = %e, "Failed to send SLA warning message");
+        }
+        return;
+    }
+
     // Phase 5I : SLA escalation declenchee par worker. Bot poste le
     // message d'avertissement dans le channel.
     if event_type == "ticket_sla_escalated" {

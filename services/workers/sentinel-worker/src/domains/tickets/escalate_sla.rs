@@ -20,6 +20,7 @@ const STREAM_KEY: &str = "sentinel:events";
 const STREAM_MAXLEN: usize = 10_000;
 const PAYLOAD_FIELD: &str = "payload";
 const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
+const DEFAULT_SLA_WARN_MINUTES: i64 = 30;
 
 #[derive(sqlx::FromRow)]
 struct CandidateTicket {
@@ -31,6 +32,13 @@ struct CandidateTicket {
 
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let timeouts = load_escalation_timeouts(pool).await;
+    let warn_thresholds = load_warn_thresholds(pool).await;
+
+    // ── Phase warning : tickets pas encore repondus ni warned, age >=
+    // sla_first_response_minutes -> publish ticket_sla_warned + UPDATE.
+    if let Err(e) = scan_and_warn(pool, redis, &warn_thresholds).await {
+        warn!(error = %e, "Erreur scan SLA warning");
+    }
 
     // Tickets pas encore repondus + pas encore escalades + categorie != appel.
     // Filtre grossier > 1 min, on affine par guild apres.
@@ -124,15 +132,105 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 }
 
 async fn load_escalation_timeouts(pool: &PgPool) -> HashMap<String, i64> {
+    load_int_config(pool, "sla_escalation_minutes").await
+}
+
+async fn load_warn_thresholds(pool: &PgPool) -> HashMap<String, i64> {
+    load_int_config(pool, "sla_first_response_minutes").await
+}
+
+async fn load_int_config(pool: &PgPool, key: &str) -> HashMap<String, i64> {
     let rows: Vec<(String, String)> = sqlx::query_as(
         "SELECT guild_id, config_value FROM bot_guild_config \
-         WHERE bot_name = 'ticket-bot' AND config_key = 'sla_escalation_minutes'",
+         WHERE bot_name = 'ticket-bot' AND config_key = $1",
     )
+    .bind(key)
     .fetch_all(pool)
     .await
     .unwrap_or_default();
-
     rows.into_iter()
         .filter_map(|(g, v)| v.parse::<i64>().ok().map(|n| (g, n)))
         .collect()
+}
+
+async fn scan_and_warn(
+    pool: &PgPool,
+    redis: &redis::Client,
+    thresholds: &HashMap<String, i64>,
+) -> Result<(), String> {
+    let candidates: Vec<CandidateTicket> = sqlx::query_as(
+        "SELECT id, server, channel_id, created_at \
+         FROM tickets \
+         WHERE category != 'appel_sanction' \
+           AND status IN ('open', 'assigned') \
+           AND first_response_at IS NULL \
+           AND sla_warned_at IS NULL \
+           AND escalated_at IS NULL \
+           AND created_at < NOW() - INTERVAL '1 minute' \
+         ORDER BY created_at ASC \
+         LIMIT 100",
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("query warn candidates: {e}"))?;
+
+    if candidates.is_empty() {
+        return Ok(());
+    }
+    let mut conn = redis
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|e| format!("redis connect: {e}"))?;
+    let now = Utc::now();
+    let mut warned = 0u32;
+    for t in &candidates {
+        if !crate::common::is_worker_enabled(pool, &t.server, "ticket-bot").await {
+            continue;
+        }
+        let warn_minutes = thresholds
+            .get(&t.server)
+            .copied()
+            .unwrap_or(DEFAULT_SLA_WARN_MINUTES);
+        if warn_minutes <= 0 {
+            continue;
+        }
+        let age_minutes = (now - t.created_at).num_minutes();
+        if age_minutes < warn_minutes {
+            continue;
+        }
+        // Claim atomique : marque sla_warned_at avec garde.
+        let updated = sqlx::query(
+            "UPDATE tickets SET sla_warned_at = NOW(), updated_at = NOW() \
+             WHERE id = $1 AND sla_warned_at IS NULL AND first_response_at IS NULL",
+        )
+        .bind(t.id)
+        .execute(pool)
+        .await
+        .map_err(|e| format!("mark warned: {e}"))?;
+        if updated.rows_affected() == 0 {
+            continue;
+        }
+        let payload = serde_json::json!({
+            "event": "ticket_sla_warned",
+            "data": {
+                "ticket_id": t.id.to_string(),
+                "guild_id": t.server,
+                "channel_id": t.channel_id,
+                "age_minutes": age_minutes,
+                "warn_minutes": warn_minutes,
+            }
+        });
+        let res: redis::RedisResult<String> = redis::cmd("XADD")
+            .arg(STREAM_KEY).arg("MAXLEN").arg("~").arg(STREAM_MAXLEN)
+            .arg("*").arg(PAYLOAD_FIELD).arg(payload.to_string())
+            .query_async(&mut conn).await;
+        if let Err(e) = res {
+            warn!(error = %e, ticket_id = %t.id, "XADD ticket_sla_warned echoue");
+        }
+        warned += 1;
+    }
+    if warned > 0 {
+        info!(warned, "Tickets SLA warned -> events publies");
+    }
+    Ok(())
 }

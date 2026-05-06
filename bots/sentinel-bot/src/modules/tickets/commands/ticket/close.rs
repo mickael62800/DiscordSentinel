@@ -7,10 +7,105 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use crate::modules::tickets::api_client::ApiClient;
+use crate::modules::tickets::api_client::{ApiClient, TicketMessage};
 
 use super::constants::*;
 use super::helpers::*;
+
+/// Genere le transcript selon le format demande (text / markdown / html).
+/// markdown = format actuel (messages Discord supportent **bold** et > quote).
+/// text     = strip ** et > pour rendu plat (mail, sms, etc.).
+/// html     = document HTML standalone, envoye comme attachment .html.
+fn build_transcript(
+    format: &str,
+    short_id: &str,
+    title: &str,
+    category: &str,
+    messages: &[TicketMessage],
+) -> String {
+    match format {
+        "html" => {
+            let mut s = format!(
+                "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title>Transcript ticket #{}</title>\
+                 <style>body{{font-family:system-ui,sans-serif;max-width:800px;margin:2em auto;padding:0 1em}}\
+                 .msg{{margin:1em 0;padding:0.5em 1em;border-left:3px solid #5865f2;background:#f8f9fa}}\
+                 .role{{font-weight:bold;color:#5865f2}}</style></head><body>\
+                 <h1>Transcript du ticket #{}</h1>\
+                 <p><b>Sujet :</b> {}</p>\
+                 <p><b>Type :</b> {}</p>\
+                 <p><b>Statut :</b> Ferme</p><hr>",
+                escape_html(short_id),
+                escape_html(short_id),
+                escape_html(title),
+                escape_html(category),
+            );
+            if messages.is_empty() {
+                s.push_str("<p><i>Aucun message dans ce ticket.</i></p>");
+            } else {
+                for m in messages {
+                    s.push_str(&format!(
+                        "<div class=\"msg\"><div class=\"role\">[{}] {}</div><div>{}</div></div>",
+                        escape_html(&m.author_role),
+                        escape_html(&m.author_name),
+                        escape_html(&m.content).replace('\n', "<br>"),
+                    ));
+                }
+            }
+            s.push_str("</body></html>");
+            s
+        }
+        "text" => {
+            let mut s = format!(
+                "Transcript du ticket #{}\n\
+                 Sujet : {}\n\
+                 Type : {}\n\
+                 Statut : Ferme\n\
+                 ----------------------------------------\n\n",
+                short_id, title, category,
+            );
+            if messages.is_empty() {
+                s.push_str("(Aucun message dans ce ticket.)\n");
+            } else {
+                for m in messages {
+                    s.push_str(&format!(
+                        "[{}] {} : {}\n\n",
+                        m.author_role, m.author_name, m.content,
+                    ));
+                }
+            }
+            s
+        }
+        _ => {
+            // markdown (default)
+            let mut s = format!(
+                "**Transcript du ticket #{}**\n\
+                 **Sujet :** {}\n\
+                 **Type :** {}\n\
+                 **Statut :** Ferme\n\
+                 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n",
+                short_id, title, category,
+            );
+            if messages.is_empty() {
+                s.push_str("_Aucun message dans ce ticket._\n");
+            } else {
+                for m in messages {
+                    s.push_str(&format!(
+                        "**[{}]** {} :\n> {}\n\n",
+                        m.author_role, m.author_name, m.content,
+                    ));
+                }
+            }
+            s
+        }
+    }
+}
+
+fn escape_html(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
 
 /// Bouton "Fermer le ticket"
 pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction) {
@@ -214,6 +309,20 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
         }
     };
 
+    let transcript_format = {
+        let data2 = ctx.data.read().await;
+        if let Some(base) = data2.get::<ApiClientKey>() {
+            let gc = base
+                .get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_or(&gc, "transcript_format", "markdown")
+                .to_string()
+        } else {
+            "markdown".to_string()
+        }
+    };
+
     if transcript_enabled {
     if let Some(ref id) = ticket_id {
         let data2 = ctx.data.read().await;
@@ -226,44 +335,51 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                 if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
                     let user_id = serenity::model::id::UserId::new(author_id);
                     if let Ok(dm_channel) = user_id.create_dm_channel(&ctx.http).await {
-                        let mut transcript = format!(
-                            "**Transcript du ticket #{short_id}**\n\
-                             **Sujet :** {title}\n\
-                             **Type :** {category}\n\
-                             **Statut :** Ferme\n\
-                             ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n",
-                            short_id = &id[..8.min(id.len())],
-                            title = detail.ticket.title,
-                            category = detail.ticket.category,
+                        let short_id = &id[..8.min(id.len())];
+                        let transcript = build_transcript(
+                            &transcript_format,
+                            short_id,
+                            &detail.ticket.title,
+                            &detail.ticket.category,
+                            &detail.messages,
                         );
 
-                        for msg in &detail.messages {
-                            transcript.push_str(&format!(
-                                "**[{}]** {} :\n> {}\n\n",
-                                msg.author_role, msg.author_name, msg.content
-                            ));
-                        }
-
-                        if detail.messages.is_empty() {
-                            transcript.push_str("_Aucun message dans ce ticket._\n");
-                        }
-
-                        let mut buf = String::new();
-                        let mut char_count = 0usize;
-                        for ch in transcript.chars() {
-                            if char_count + 1 > 1900 {
+                        if transcript_format == "html" {
+                            // HTML : envoye comme fichier attache (.html).
+                            let attachment = serenity::builder::CreateAttachment::bytes(
+                                transcript.into_bytes(),
+                                format!("ticket-{}.html", short_id),
+                            );
+                            if let Err(e) = dm_channel
+                                .send_files(
+                                    &ctx.http,
+                                    [attachment],
+                                    serenity::builder::CreateMessage::new()
+                                        .content(format!("Transcript du ticket #{} (HTML).", short_id)),
+                                )
+                                .await
+                            {
+                                warn!(error = %e, "Failed to send HTML transcript attachment");
+                            }
+                        } else {
+                            // text / markdown : message inline en chunks de 1900 chars.
+                            let mut buf = String::new();
+                            let mut char_count = 0usize;
+                            for ch in transcript.chars() {
+                                if char_count + 1 > 1900 {
+                                    if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
+                                        warn!(error = %e, "Failed to send transcript DM chunk");
+                                    }
+                                    buf.clear();
+                                    char_count = 0;
+                                }
+                                buf.push(ch);
+                                char_count += 1;
+                            }
+                            if !buf.is_empty() {
                                 if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
                                     warn!(error = %e, "Failed to send transcript DM chunk");
                                 }
-                                buf.clear();
-                                char_count = 0;
-                            }
-                            buf.push(ch);
-                            char_count += 1;
-                        }
-                        if !buf.is_empty() {
-                            if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
-                                warn!(error = %e, "Failed to send transcript DM chunk");
                             }
                         }
 
