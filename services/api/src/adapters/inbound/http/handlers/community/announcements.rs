@@ -19,8 +19,72 @@ use crate::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
 
+const ANNOUNCEMENTS_BOT: &str = "announcements";
+
 fn map_validation_string<T>(r: Result<T, String>) -> Result<T, ApiError> {
     r.map_err(|m| ApiError(DomainError::ValidationError(m)))
+}
+
+// ── Helpers config ──────────────────────────────────────────────────────
+
+async fn read_cfg(state: &AppState, guild_id: &str, key: &str) -> Option<String> {
+    let cfgs = state
+        .bot_config_repo
+        .get_config(guild_id, ANNOUNCEMENTS_BOT)
+        .await
+        .ok()?;
+    cfgs.into_iter()
+        .find(|c| c.config_key == key)
+        .map(|c| c.config_value)
+}
+
+fn parse_i64(v: Option<String>, default: i64) -> i64 {
+    v.and_then(|s| s.parse().ok()).unwrap_or(default)
+}
+
+/// Parse "#5865f2" ou "5865f2" → 0x5865f2 (i32). Renvoie None si invalide.
+fn parse_hex_color(s: &str) -> Option<i32> {
+    let s = s.trim().trim_start_matches('#');
+    if s.len() != 6 {
+        return None;
+    }
+    i32::from_str_radix(s, 16).ok()
+}
+
+/// Poste un embed de log dans `log_channel_id` (best-effort, ne fait rien
+/// si pas de salon configure ni de bot token).
+async fn try_post_log_embed(
+    state: &AppState,
+    guild_id: &str,
+    title: &str,
+    description: &str,
+    color: i32,
+) {
+    if state.discord_bot_token.is_empty() {
+        return;
+    }
+    let channel_id = match read_cfg(state, guild_id, "log_channel_id").await {
+        Some(s) if !s.is_empty() => s,
+        _ => return,
+    };
+    let url = format!("https://discord.com/api/v10/channels/{channel_id}/messages");
+    let payload = serde_json::json!({
+        "embeds": [{
+            "title": title,
+            "description": description,
+            "color": color,
+            "timestamp": Utc::now().to_rfc3339(),
+        }]
+    });
+    let res = reqwest::Client::new()
+        .post(&url)
+        .header("Authorization", format!("Bot {}", state.discord_bot_token))
+        .json(&payload)
+        .send()
+        .await;
+    if let Err(e) = res {
+        tracing::warn!(error = %e, guild = %guild_id, "log_channel_id post echec");
+    }
 }
 
 pub async fn create_announcement(
@@ -30,10 +94,36 @@ pub async fn create_announcement(
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
 
+    // ── Cap par guild (max_announcements_per_guild) ───────────────────
+    let max_per_guild = parse_i64(
+        read_cfg(&state, &dto.guild_id, "max_announcements_per_guild").await,
+        100,
+    );
+    let existing = state
+        .announcements_uc
+        .list_by_guild(&dto.guild_id)
+        .await?
+        .len() as i64;
+    if existing >= max_per_guild {
+        return Err(ApiError(DomainError::Conflict(format!(
+            "Limite d'annonces atteinte pour ce serveur ({existing}/{max_per_guild}). Supprimez-en avant d'en creer une nouvelle."
+        ))));
+    }
+
+    // ── Couleur par defaut (default_color_hex) ────────────────────────
+    let embed_color = match dto.embed_color {
+        Some(c) => Some(c),
+        None => read_cfg(&state, &dto.guild_id, "default_color_hex")
+            .await
+            .as_deref()
+            .and_then(parse_hex_color),
+    };
+
     // TODO RBAC : verifier que l'auteur est admin+ pour cette guild via
     // require_role(...) si on extrait le RoleContext de la request.
     let created_by = "web".to_string();
 
+    let guild_id_for_log = dto.guild_id.clone();
     let cmd = CreateAnnouncementCommand {
         guild_id: dto.guild_id,
         name: dto.name,
@@ -47,7 +137,7 @@ pub async fn create_announcement(
         content_type,
         content_text: dto.content_text,
         embed_title: dto.embed_title,
-        embed_color: dto.embed_color,
+        embed_color,
         embed_image_url: dto.embed_image_url,
         embed_thumbnail_url: dto.embed_thumbnail_url,
         mention_everyone: dto.mention_everyone,
@@ -59,6 +149,21 @@ pub async fn create_announcement(
         created_by,
     };
     let ann = state.announcements_uc.create(cmd).await?;
+
+    // Log best-effort (log_channel_id)
+    try_post_log_embed(
+        &state,
+        &guild_id_for_log,
+        "Annonce creee",
+        &format!(
+            "**{}** — prochaine execution : {}",
+            ann.name,
+            ann.next_run_at.format("%Y-%m-%d %H:%M UTC")
+        ),
+        0x57F287,
+    )
+    .await;
+
     Ok(single_dto(ann))
 }
 
@@ -163,16 +268,107 @@ pub struct FetchDueQuery {
 /// Retourne les annonces dues, cree les runs (status=pending) et avance
 /// next_run_at de chaque annonce. Le bot consume ensuite via Redis stream
 /// et appelle /runs/{id}/result une fois le post fait.
+///
+/// Post-traitement : pour chaque embed sans couleur explicite, applique
+/// la couleur par defaut du guild (`default_color_hex`).
 pub async fn fetch_due(
     State(state): State<AppState>,
     Query(params): Query<FetchDueQuery>,
 ) -> Result<Json<Vec<RenderedAnnouncement>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(200);
-    let payloads = state
+    let mut payloads = state
         .announcements_uc
         .fetch_due_and_prepare(Utc::now(), limit)
         .await?;
+
+    // Cache des defaults par guild pour eviter N requetes config.
+    use std::collections::HashMap;
+    let mut color_by_guild: HashMap<String, Option<i32>> = HashMap::new();
+    for p in payloads.iter_mut() {
+        let needs_color = p.embed.as_ref().is_some_and(|e| e.color.is_none());
+        if !needs_color {
+            continue;
+        }
+        let default = match color_by_guild.get(&p.guild_id) {
+            Some(c) => *c,
+            None => {
+                let c = read_cfg(&state, &p.guild_id, "default_color_hex")
+                    .await
+                    .as_deref()
+                    .and_then(parse_hex_color);
+                color_by_guild.insert(p.guild_id.clone(), c);
+                c
+            }
+        };
+        if let (Some(embed), Some(c)) = (p.embed.as_mut(), default) {
+            embed.color = Some(c);
+        }
+    }
+
     Ok(Json(payloads))
+}
+
+/// POST /api/announcements/internal/retention-cleanup — appele par le
+/// sentinel-worker (job analytics_retention) pour purger les `announcement_runs`
+/// plus vieux que `history_retention_days` (defaut 90j) par guild. Si la
+/// cle est 0, la guild est skip (illimite).
+pub async fn retention_cleanup_all(
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let guilds: Vec<(String,)> =
+        sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
+            .fetch_all(&state.pg_pool)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+
+    let mut processed = 0u64;
+    let mut skipped = 0u64;
+    let mut deleted_total: i64 = 0;
+
+    for (guild_id,) in &guilds {
+        // Module actif ?
+        let enabled = read_cfg(&state, guild_id, "enabled").await;
+        let active = match enabled.as_deref() {
+            Some("false") | Some("0") => false,
+            _ => true,
+        };
+        if !active {
+            skipped += 1;
+            continue;
+        }
+        let retention = parse_i64(
+            read_cfg(&state, guild_id, "history_retention_days").await,
+            90,
+        );
+        if retention <= 0 {
+            skipped += 1;
+            continue;
+        }
+        let r = retention as i32;
+        let res = sqlx::query(
+            "DELETE FROM announcement_runs WHERE guild_id = $1 AND ran_at < NOW() - ($2::int * INTERVAL '1 day')"
+        )
+            .bind(guild_id)
+            .bind(r)
+            .execute(&state.pg_pool)
+            .await;
+        match res {
+            Ok(r) => {
+                deleted_total += r.rows_affected() as i64;
+                processed += 1;
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, guild = %guild_id, "retention announcement_runs echec");
+            }
+        }
+    }
+
+    Ok(Json(serde_json::json!({
+        "guilds_processed": processed,
+        "guilds_skipped": skipped,
+        "rows_deleted": deleted_total,
+        "status": "ok",
+    })))
 }
 
 /// POST /api/announcements/internal/runs/{run_id}/result — appele par

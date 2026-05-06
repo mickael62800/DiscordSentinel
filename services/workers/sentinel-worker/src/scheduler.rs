@@ -230,6 +230,24 @@ pub fn start(
         "analytics",
         |pool| Box::pin(async move { domains::analytics::hourly_snapshot::run(&pool).await }),
     );
+    spawn_periodic(
+        "analytics_retention_cleanup",
+        config.analytics_retention_check_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "analytics",
+        |pool| Box::pin(async move { domains::analytics::retention_cleanup::run(&pool).await }),
+    );
+    spawn_periodic(
+        "publish_top_users",
+        config.top_users_publish_check_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "analytics",
+        |pool| Box::pin(async move { domains::analytics::publish_top_users::run(&pool).await }),
+    );
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : temp_roles (expiration des roles temporaires)
@@ -342,6 +360,15 @@ pub fn start(
     // alignee sur HH:00:00 UTC).
     // ─────────────────────────────────────────────────────────────
     domains::announcements::publish_due::start(api_url.clone(), redis_client.clone());
+    spawn_periodic(
+        "announcements_retention_cleanup",
+        config.announcements_retention_check_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "announcements",
+        |pool| Box::pin(async move { domains::announcements::retention_cleanup::run(&pool).await }),
+    );
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : game_portal (4 jobs HTTP-triggered en parallele)

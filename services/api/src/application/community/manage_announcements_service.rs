@@ -14,14 +14,39 @@ use crate::ports::inbound::community::manage_announcements::{
     UpdateAnnouncementCommand,
 };
 use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+const ANNOUNCEMENTS_BOT: &str = "announcements";
+const DEFAULT_FETCH_LIMIT_PER_GUILD: i64 = 50;
 
 pub struct ManageAnnouncementsService {
     repo: Arc<dyn AnnouncementRepository>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ManageAnnouncementsService {
-    pub fn new(repo: Arc<dyn AnnouncementRepository>) -> Self {
-        Self { repo }
+    pub fn new(
+        repo: Arc<dyn AnnouncementRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        Self { repo, bot_config_repo }
+    }
+
+    /// Lit `fetch_limit` du guild dans bot_guild_config
+    /// (bot_name='announcements'). Defaut : 50. Clamp [1, 500].
+    async fn fetch_limit_for_guild(&self, guild_id: &str) -> i64 {
+        let cap = self
+            .bot_config_repo
+            .get_config(guild_id, ANNOUNCEMENTS_BOT)
+            .await
+            .ok()
+            .and_then(|cfgs| {
+                cfgs.into_iter()
+                    .find(|c| c.config_key == "fetch_limit")
+                    .and_then(|c| c.config_value.parse::<i64>().ok())
+            })
+            .unwrap_or(DEFAULT_FETCH_LIMIT_PER_GUILD);
+        cap.clamp(1, 500)
     }
 
     fn validate_create(&self, cmd: &CreateAnnouncementCommand) -> Result<(), DomainError> {
@@ -252,9 +277,37 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         now: DateTime<Utc>,
         limit: i64,
     ) -> Result<Vec<RenderedAnnouncement>, DomainError> {
+        // 1) Fetch global avec une borne haute (limit du caller : ceiling
+        //    pour ne pas exploser la memoire si toutes les guilds ont
+        //    plein d'annonces dues le meme tick).
         let due = self.repo.list_due(now, limit).await?;
-        let mut rendered = Vec::with_capacity(due.len());
+
+        // 2) Group par guild + cap par-guild via `fetch_limit` config.
+        //    Skip les annonces au-dela du cap (elles seront re-piquees au
+        //    prochain tick — leur next_run_at n'est pas avance).
+        use std::collections::HashMap;
+        let mut counts: HashMap<String, i64> = HashMap::new();
+        let mut guild_caps: HashMap<String, i64> = HashMap::new();
+        let mut kept: Vec<&ScheduledAnnouncement> = Vec::with_capacity(due.len());
         for a in &due {
+            let cap = match guild_caps.get(&a.guild_id) {
+                Some(c) => *c,
+                None => {
+                    let c = self.fetch_limit_for_guild(&a.guild_id).await;
+                    guild_caps.insert(a.guild_id.clone(), c);
+                    c
+                }
+            };
+            let count = counts.entry(a.guild_id.clone()).or_insert(0);
+            if *count >= cap {
+                continue;
+            }
+            *count += 1;
+            kept.push(a);
+        }
+
+        let mut rendered = Vec::with_capacity(kept.len());
+        for &a in &kept {
             let run = AnnouncementRun {
                 id: Uuid::new_v4(),
                 announcement_id: a.id,

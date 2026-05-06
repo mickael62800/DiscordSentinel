@@ -39,6 +39,14 @@ const DEFAULT_MONITOR_CHECK_INTERVAL_SECS: u64 = 30;
 // ── Defauts analytics ──
 const DEFAULT_DAILY_SNAPSHOT_HOURS: u64 = 1;
 const DEFAULT_HOURLY_SNAPSHOT_MINUTES: u64 = 60;
+/// Retention announcement_runs : 1x/jour.
+const DEFAULT_ANNOUNCEMENTS_RETENTION_SECS: u64 = 24 * SECS_PER_HOUR;
+/// Retention cleanup tick : 1x/jour est largement suffisant pour purger
+/// les snapshots > data_retention_days (cote API).
+const DEFAULT_RETENTION_CLEANUP_SECS: u64 = 24 * SECS_PER_HOUR;
+/// Top users publish tick : 1x/heure. L'API ne publie reellement que si
+/// `top_users_publish_interval_days` est ecoule depuis le dernier post.
+const DEFAULT_TOP_USERS_PUBLISH_CHECK_SECS: u64 = SECS_PER_HOUR;
 
 // ── Defauts temp_roles ──
 const DEFAULT_TEMP_ROLES_SCAN_SECS: u64 = SECS_PER_MINUTE;
@@ -125,6 +133,9 @@ pub struct WorkerConfig {
     // ── Analytics ──
     pub daily_snapshot_interval_secs: u64,
     pub hourly_snapshot_interval_secs: u64,
+    pub analytics_retention_check_secs: u64,
+    pub top_users_publish_check_secs: u64,
+    pub announcements_retention_check_secs: u64,
 
     // ── Temp roles ──
     pub temp_roles_scan_interval_secs: u64,
@@ -239,6 +250,18 @@ impl WorkerConfig {
                 "HOURLY_SNAPSHOT_INTERVAL",
                 DEFAULT_HOURLY_SNAPSHOT_MINUTES,
             ) * SECS_PER_MINUTE,
+            analytics_retention_check_secs: load_env(
+                "ANALYTICS_RETENTION_CHECK",
+                DEFAULT_RETENTION_CLEANUP_SECS,
+            ),
+            top_users_publish_check_secs: load_env(
+                "TOP_USERS_PUBLISH_CHECK",
+                DEFAULT_TOP_USERS_PUBLISH_CHECK_SECS,
+            ),
+            announcements_retention_check_secs: load_env(
+                "ANNOUNCEMENTS_RETENTION_CHECK",
+                DEFAULT_ANNOUNCEMENTS_RETENTION_SECS,
+            ),
 
             // temp_roles
             temp_roles_scan_interval_secs: load_env(
@@ -439,6 +462,24 @@ impl WorkerConfig {
             DEFAULT_HOURLY_SNAPSHOT_MINUTES,
         );
         self.hourly_snapshot_interval_secs = hourly_m * SECS_PER_MINUTE;
+        self.analytics_retention_check_secs = config_or_env(
+            db,
+            "analytics_retention_check",
+            "ANALYTICS_RETENTION_CHECK",
+            DEFAULT_RETENTION_CLEANUP_SECS,
+        );
+        self.top_users_publish_check_secs = config_or_env(
+            db,
+            "top_users_publish_check",
+            "TOP_USERS_PUBLISH_CHECK",
+            DEFAULT_TOP_USERS_PUBLISH_CHECK_SECS,
+        );
+        self.announcements_retention_check_secs = config_or_env(
+            db,
+            "announcements_retention_check",
+            "ANNOUNCEMENTS_RETENTION_CHECK",
+            DEFAULT_ANNOUNCEMENTS_RETENTION_SECS,
+        );
 
         // temp_roles
         self.temp_roles_scan_interval_secs = config_or_env(

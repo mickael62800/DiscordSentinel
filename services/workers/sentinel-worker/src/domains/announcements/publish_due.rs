@@ -13,7 +13,18 @@ use crate::common as common;
 const WORKER_NAME: &str = "announcements";
 const STREAM_KEY: &str = "sentinel:events";
 const STREAM_MAXLEN: usize = 10_000;
-const FETCH_LIMIT: i64 = 50;
+/// Plafond global passe a `/api/announcements/internal/due`. L'API
+/// applique ensuite le cap par-guild via la cle config `fetch_limit`.
+/// Override possible via env `ANNOUNCEMENTS_FETCH_LIMIT_GLOBAL` si on
+/// veut throttle l'ensemble du tick.
+const DEFAULT_FETCH_LIMIT_GLOBAL: i64 = 200;
+
+fn fetch_limit_global() -> i64 {
+    std::env::var("ANNOUNCEMENTS_FETCH_LIMIT_GLOBAL")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(DEFAULT_FETCH_LIMIT_GLOBAL)
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct RenderedEmbed {
@@ -97,7 +108,10 @@ async fn run_one_tick(
     api_key: &str,
     redis_client: &redis::Client,
 ) -> Result<(), String> {
-    let url = format!("{api_url}/api/announcements/internal/due?limit={FETCH_LIMIT}");
+    let url = format!(
+        "{api_url}/api/announcements/internal/due?limit={}",
+        fetch_limit_global()
+    );
     let mut req = http.get(&url);
     if !api_key.is_empty() {
         req = req.bearer_auth(api_key);

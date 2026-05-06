@@ -11,6 +11,7 @@ import {
   type ContentType,
   type AnnouncementButton,
 } from "@/services/announcementsService";
+import { botConfigService } from "@/services/botConfigService";
 import type { DiscordTextChannel } from "@/services/guildsService";
 import type { DiscordRole } from "@/types";
 import AppModal from "../atoms/AppModal.vue";
@@ -123,9 +124,33 @@ watch(
       };
     } else {
       form.value = emptyForm();
+      // Mode "create" : applique les defauts de la config guild
+      // (default_color_hex, default_mention_everyone) lus dans
+      // bot_guild_config sous bot_name='announcements'.
+      void applyGuildDefaults();
     }
   },
 );
+
+async function applyGuildDefaults() {
+  try {
+    const cfgs = await botConfigService.getGuildConfig(props.guildId);
+    const ann = cfgs.filter((c) => c.bot_name === "announcements");
+    const color = ann.find((c) => c.config_key === "default_color_hex")?.config_value;
+    if (color && /^#?[0-9a-fA-F]{6}$/.test(color)) {
+      form.value.embed_color_hex = color.startsWith("#") ? color : `#${color}`;
+    }
+    const mentionEveryone = ann.find((c) => c.config_key === "default_mention_everyone")?.config_value;
+    if (mentionEveryone === "true" || mentionEveryone === "1") {
+      form.value.mention_everyone = true;
+    }
+  } catch (e) {
+    // Garde les defauts hardcodes du `emptyForm()` mais previens
+    // l'utilisateur que les defauts du serveur n'ont pas pu etre lus.
+    const msg = e instanceof Error ? e.message : String(e);
+    toastErr(`Impossible de charger les defauts du serveur : ${msg}`);
+  }
+}
 
 const availableChannels = computed(() => {
   const selected = new Set(form.value.selected_channel_ids);

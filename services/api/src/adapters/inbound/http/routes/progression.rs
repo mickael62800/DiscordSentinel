@@ -82,6 +82,10 @@ fn announcement_inner() -> Router<AppState> {
             "/internal/button-click",
             post(handlers::community::announcements::record_button_click),
         )
+        .route(
+            "/internal/retention-cleanup",
+            post(handlers::community::announcements::retention_cleanup_all),
+        )
 }
 
 fn confession_inner() -> Router<AppState> {
