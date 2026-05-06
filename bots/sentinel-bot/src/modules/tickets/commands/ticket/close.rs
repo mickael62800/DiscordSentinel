@@ -335,6 +335,9 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                 if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
                     let user_id = serenity::model::id::UserId::new(author_id);
                     if let Ok(dm_channel) = user_id.create_dm_channel(&ctx.http).await {
+                        // On retient le ChannelId pour les sends post-transcript
+                        // (send_files consomme dm_channel donc on stocke l'id avant).
+                        let dm_channel_id = dm_channel.id;
                         let short_id = &id[..8.min(id.len())];
                         let transcript = build_transcript(
                             &transcript_format,
@@ -367,7 +370,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                             let mut char_count = 0usize;
                             for ch in transcript.chars() {
                                 if char_count + 1 > 1900 {
-                                    if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
+                                    if let Err(e) = dm_channel_id.say(&ctx.http, &buf).await {
                                         warn!(error = %e, "Failed to send transcript DM chunk");
                                     }
                                     buf.clear();
@@ -377,7 +380,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                                 char_count += 1;
                             }
                             if !buf.is_empty() {
-                                if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
+                                if let Err(e) = dm_channel_id.say(&ctx.http, &buf).await {
                                     warn!(error = %e, "Failed to send transcript DM chunk");
                                 }
                             }
@@ -386,7 +389,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                         // Survey satisfaction (1-5 etoiles) si enable.
                         if satisfaction_enabled {
                             let survey = crate::modules::tickets::satisfaction::build_survey_message(id);
-                            if let Err(e) = dm_channel.send_message(&ctx.http, survey).await {
+                            if let Err(e) = dm_channel_id.send_message(&ctx.http, survey).await {
                                 warn!(error = %e, "Failed to send satisfaction survey DM");
                             }
                         }

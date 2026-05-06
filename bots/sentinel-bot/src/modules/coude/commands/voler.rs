@@ -2,7 +2,7 @@ use serenity::all::{
     ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType,
     ComponentInteraction, Context, CreateActionRow, CreateButton, CreateCommand,
     CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage, EditMessage,
+    CreateInteractionResponseMessage, CreateMessage,
 };
 use uuid::Uuid;
 
