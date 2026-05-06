@@ -55,9 +55,9 @@ export interface DiscordChannelInfo {
   id: string;
   name: string;
   position?: number;
-  /** "text" | "announcement" | "voice" | "stage" — defaut "text" pour
-   *  retro-compat avec les anciens endpoints qui ne retournent pas le kind. */
-  kind?: "text" | "announcement" | "voice" | "stage";
+  /** "text" | "announcement" | "voice" | "category" | "stage" — defaut
+   *  "text" pour retro-compat avec les anciens endpoints. */
+  kind?: "text" | "announcement" | "voice" | "category" | "stage";
 }
 
 export interface BotGuildConfig {

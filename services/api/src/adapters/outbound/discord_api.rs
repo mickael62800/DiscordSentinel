@@ -213,6 +213,7 @@ impl DiscordApi for DiscordApiService {
             0 => Some("text"),
             5 => Some("announcement"),
             2 => Some("voice"),
+            4 => Some("category"),
             13 => Some("stage"),
             _ => None,
         })

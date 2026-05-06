@@ -5,6 +5,7 @@ import FieldDescription from "../atoms/FieldDescription.vue";
 import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 import EnumSelect from "../atoms/EnumSelect.vue";
 import ChannelSelect from "../atoms/ChannelSelect.vue";
+import CategorySelect from "../atoms/CategorySelect.vue";
 import RoleSelect from "../atoms/RoleSelect.vue";
 import IdMultiplierMapField from "./IdMultiplierMapField.vue";
 import IdsListPickerField from "./IdsListPickerField.vue";
@@ -131,6 +132,14 @@ const mapDefaults = computed(() => {
 
     <ChannelSelect
       v-else-if="field.type === 'channel'"
+      :id="field.key"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      @update:model-value="update"
+    />
+
+    <CategorySelect
+      v-else-if="field.type === 'category'"
       :id="field.key"
       :model-value="modelValue"
       :guild-id="guildId"
