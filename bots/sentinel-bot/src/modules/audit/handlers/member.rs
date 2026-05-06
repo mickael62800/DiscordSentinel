@@ -86,11 +86,12 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
         None, None, None, serde_json::json!({}),
     ).await;
 
-    // Anomaly detection (kick pattern)
+    // Anomaly detection (kick pattern). Thresholds per-guild.
+    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
     let alert_opt = {
         let data = ctx.data.read().await;
         data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(guild_id, "kick"))
+            .and_then(|anomaly| anomaly.record(guild_id, "kick", Some(&thresholds)))
     };
     if let Some(alert) = alert_opt {
         // Guard sub-feature : anomaly_enabled (defaut true). On a deja
@@ -160,11 +161,12 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
     )
     .await;
 
-    // Anomaly detection (ban pattern)
+    // Anomaly detection (ban pattern). Thresholds per-guild.
+    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
     let alert_opt = {
         let data = ctx.data.read().await;
         data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(guild_id, "ban"))
+            .and_then(|anomaly| anomaly.record(guild_id, "ban", Some(&thresholds)))
     };
     if let Some(alert) = alert_opt {
         if !sentinel_shared::discord_helpers::is_feature_enabled(

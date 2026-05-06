@@ -108,11 +108,13 @@ pub async fn handle_delete(
     }
     drop(data);
 
-    // Anomaly detection (on release le lock data d'abord pour pouvoir poster)
+    // Anomaly detection (on release le lock data d'abord pour pouvoir poster).
+    // Thresholds per-guild.
+    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
     let alert_opt = {
         let data = ctx.data.read().await;
         data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(gid, "delete"))
+            .and_then(|anomaly| anomaly.record(gid, "delete", Some(&thresholds)))
     };
     if let Some(alert) = alert_opt {
         if !sentinel_shared::discord_helpers::is_feature_enabled(
@@ -277,13 +279,14 @@ pub async fn handle_delete_bulk(
     .await;
 
     // Anomaly : compter comme N deletes, capturer l'alerte eventuelle sans
-    // tenir le lock pendant l'envoi Discord.
+    // tenir le lock pendant l'envoi Discord. Thresholds per-guild.
+    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
     let alert_opt = {
         let data = ctx.data.read().await;
         let mut found = None;
         if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
             for _ in 0..count {
-                if let Some(alert) = anomaly.record(gid, "delete") {
+                if let Some(alert) = anomaly.record(gid, "delete", Some(&thresholds)) {
                     found = Some(alert);
                     break;
                 }

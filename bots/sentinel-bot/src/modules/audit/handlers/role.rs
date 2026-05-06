@@ -118,11 +118,12 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
     )
     .await;
 
-    // Anomaly detection (release le lock avant l'envoi Discord)
+    // Anomaly detection. Thresholds per-guild.
+    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
     let alert_opt = {
         let data = ctx.data.read().await;
         data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(gid, "role_change"))
+            .and_then(|anomaly| anomaly.record(gid, "role_change", Some(&thresholds)))
     };
 
     if let Some(alert) = alert_opt {

@@ -139,6 +139,37 @@ pub async fn send_event(ctx: &Context, event: AuditEvent) {
     }
 }
 
+/// Charge les seuils anomaly per-guild depuis bot_guild_config. Si une cle
+/// est absente, fallback sur le default global (env-driven).
+pub async fn anomaly_thresholds_for(ctx: &Context, guild_id: &str) -> anomaly::AnomalyThresholds {
+    let default = {
+        let data = ctx.data.read().await;
+        data.get::<ConfigKey>().map(|c| anomaly::AnomalyThresholds {
+            mass_ban: c.anomaly_mass_ban_threshold,
+            mass_delete: c.anomaly_mass_delete_threshold,
+            mass_role_change: c.anomaly_mass_role_threshold,
+        }).unwrap_or_default()
+    };
+    let cfg = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(api) => api.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default(),
+            None => return default,
+        }
+    };
+    anomaly::AnomalyThresholds {
+        mass_ban: cfg.get("anomaly_mass_ban_threshold")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default.mass_ban),
+        mass_delete: cfg.get("anomaly_mass_delete_threshold")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default.mass_delete),
+        mass_role_change: cfg.get("anomaly_mass_role_threshold")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(default.mass_role_change),
+    }
+}
+
 /// Pousse un log structure dans la queue d'envoi de l'API client.
 pub async fn log(ctx: &Context, level: &str, guild_id: &str, message: &str) {
     let data = ctx.data.read().await;

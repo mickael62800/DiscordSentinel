@@ -30,24 +30,32 @@ pub struct AnomalyAlert {
 }
 
 /// Detecteur d'anomalies base sur des compteurs a fenetre glissante.
+/// Les seuils sont passes a chaque record() pour permettre un override
+/// per-guild (lus depuis bot_guild_config par les handlers).
 pub struct AnomalyDetector {
     counters: DashMap<(GuildId, String), Vec<Instant>>,
     window: Duration,
-    thresholds: AnomalyThresholds,
+    default_thresholds: AnomalyThresholds,
 }
 
 impl AnomalyDetector {
-    pub fn new(window_secs: u64, thresholds: AnomalyThresholds) -> Self {
+    pub fn new(window_secs: u64, default_thresholds: AnomalyThresholds) -> Self {
         Self {
             counters: DashMap::new(),
             window: Duration::from_secs(window_secs),
-            thresholds,
+            default_thresholds,
         }
     }
 
     /// Enregistre un evenement et retourne une alerte si le seuil est atteint.
     /// Categories : "ban", "delete", "role_change", "kick"
-    pub fn record(&self, guild_id: GuildId, category: &str) -> Option<AnomalyAlert> {
+    /// `thresholds` : si None, utilise les seuils par defaut du detecteur.
+    pub fn record(
+        &self,
+        guild_id: GuildId,
+        category: &str,
+        thresholds: Option<&AnomalyThresholds>,
+    ) -> Option<AnomalyAlert> {
         let now = Instant::now();
         let key = (guild_id, category.to_string());
         let mut entry = self.counters.entry(key).or_default();
@@ -62,7 +70,13 @@ impl AnomalyDetector {
         timestamps.push(now);
 
         let count = timestamps.len();
-        let threshold = self.threshold_for(category);
+        let effective = thresholds.unwrap_or(&self.default_thresholds);
+        let threshold = match category {
+            "ban" | "kick" => effective.mass_ban,
+            "delete" => effective.mass_delete,
+            "role_change" => effective.mass_role_change,
+            _ => usize::MAX,
+        };
 
         if count >= threshold {
             // Reset pour eviter les alertes en boucle
@@ -75,15 +89,6 @@ impl AnomalyDetector {
             })
         } else {
             None
-        }
-    }
-
-    fn threshold_for(&self, category: &str) -> usize {
-        match category {
-            "ban" | "kick" => self.thresholds.mass_ban,
-            "delete" => self.thresholds.mass_delete,
-            "role_change" => self.thresholds.mass_role_change,
-            _ => usize::MAX,
         }
     }
 }
@@ -108,8 +113,8 @@ mod tests {
         let detector = make_detector();
         let guild = GuildId::new(1);
 
-        assert!(detector.record(guild, "ban").is_none());
-        assert!(detector.record(guild, "ban").is_none());
+        assert!(detector.record(guild, "ban", None).is_none());
+        assert!(detector.record(guild, "ban", None).is_none());
     }
 
     #[test]
@@ -117,9 +122,9 @@ mod tests {
         let detector = make_detector();
         let guild = GuildId::new(1);
 
-        assert!(detector.record(guild, "ban").is_none());
-        assert!(detector.record(guild, "ban").is_none());
-        let alert = detector.record(guild, "ban");
+        assert!(detector.record(guild, "ban", None).is_none());
+        assert!(detector.record(guild, "ban", None).is_none());
+        let alert = detector.record(guild, "ban", None);
         assert!(alert.is_some());
 
         let alert = alert.unwrap();
@@ -134,14 +139,14 @@ mod tests {
         let guild = GuildId::new(1);
 
         // Declencher l'alerte
-        detector.record(guild, "ban");
-        detector.record(guild, "ban");
-        assert!(detector.record(guild, "ban").is_some());
+        detector.record(guild, "ban", None);
+        detector.record(guild, "ban", None);
+        assert!(detector.record(guild, "ban", None).is_some());
 
         // Apres reset, il faut a nouveau atteindre le seuil
-        assert!(detector.record(guild, "ban").is_none());
-        assert!(detector.record(guild, "ban").is_none());
-        assert!(detector.record(guild, "ban").is_some());
+        assert!(detector.record(guild, "ban", None).is_none());
+        assert!(detector.record(guild, "ban", None).is_none());
+        assert!(detector.record(guild, "ban", None).is_some());
     }
 
     #[test]
@@ -149,10 +154,10 @@ mod tests {
         let detector = make_detector();
         let guild = GuildId::new(1);
 
-        detector.record(guild, "ban");
-        detector.record(guild, "ban");
-        detector.record(guild, "delete");
-        detector.record(guild, "delete");
+        detector.record(guild, "ban", None);
+        detector.record(guild, "ban", None);
+        detector.record(guild, "delete", None);
+        detector.record(guild, "delete", None);
 
         // Ban n'a pas encore atteint son seuil (2/3)
         // Delete non plus (2/5)
@@ -165,13 +170,13 @@ mod tests {
         let guild_a = GuildId::new(1);
         let guild_b = GuildId::new(2);
 
-        detector.record(guild_a, "ban");
-        detector.record(guild_a, "ban");
-        detector.record(guild_b, "ban");
+        detector.record(guild_a, "ban", None);
+        detector.record(guild_a, "ban", None);
+        detector.record(guild_b, "ban", None);
 
         // Guild A a 2 bans, guild B a 1 — aucune alerte
-        assert!(detector.record(guild_b, "ban").is_none()); // B = 2
-        assert!(detector.record(guild_a, "ban").is_some()); // A = 3 -> alerte
+        assert!(detector.record(guild_b, "ban", None).is_none()); // B = 2
+        assert!(detector.record(guild_a, "ban", None).is_some()); // A = 3 -> alerte
     }
 
     #[test]
@@ -180,9 +185,9 @@ mod tests {
         let guild = GuildId::new(1);
 
         for _ in 0..4 {
-            assert!(detector.record(guild, "delete").is_none());
+            assert!(detector.record(guild, "delete", None).is_none());
         }
-        assert!(detector.record(guild, "delete").is_some());
+        assert!(detector.record(guild, "delete", None).is_some());
     }
 
     #[test]
@@ -191,9 +196,9 @@ mod tests {
         let guild = GuildId::new(1);
 
         for _ in 0..3 {
-            assert!(detector.record(guild, "role_change").is_none());
+            assert!(detector.record(guild, "role_change", None).is_none());
         }
-        assert!(detector.record(guild, "role_change").is_some());
+        assert!(detector.record(guild, "role_change", None).is_some());
     }
 
     #[test]
@@ -201,9 +206,9 @@ mod tests {
         let detector = make_detector();
         let guild = GuildId::new(1);
 
-        detector.record(guild, "kick");
-        detector.record(guild, "kick");
-        assert!(detector.record(guild, "kick").is_some());
+        detector.record(guild, "kick", None);
+        detector.record(guild, "kick", None);
+        assert!(detector.record(guild, "kick", None).is_some());
     }
 
     #[test]
@@ -212,7 +217,7 @@ mod tests {
         let guild = GuildId::new(1);
 
         for _ in 0..100 {
-            assert!(detector.record(guild, "unknown").is_none());
+            assert!(detector.record(guild, "unknown", None).is_none());
         }
     }
 }
