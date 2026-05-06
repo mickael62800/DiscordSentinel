@@ -7,16 +7,22 @@ use sentinel_shared::discord_helpers::reply_ephemeral as reply;
 
 /// Verifie que la commande est utilisee dans le bon salon.
 /// Retourne `true` si OK, `false` si bloque (reponse ephemerale deja envoyee).
+///
+/// Comportement :
+///   - allowed_channel = None  -> on laisse passer (default permissif).
+///     Le module reste utilisable meme si l'admin n'a pas (encore)
+///     configure les channels coude. Avant ce changement, ~30 commandes
+///     bloquaient toutes silencieusement avec "non configuree".
+///   - allowed_channel = Some  -> on exige que l'utilisateur soit dans ce
+///     salon precis (sinon redirection ephemerale).
 pub async fn check_channel(
     ctx: &Context,
     command: &CommandInteraction,
     allowed_channel: Option<String>,
 ) -> bool {
     match allowed_channel {
-        None => {
-            reply(ctx, command, "Cette commande n'est pas configuree sur ce serveur.").await;
-            false
-        }
+        None => true, // pas de restriction -> on autorise dans le salon courant
+        Some(ref channel_id) if channel_id.is_empty() => true, // empty string = no restriction
         Some(ref channel_id) => {
             if command.channel_id.to_string() == *channel_id {
                 true
