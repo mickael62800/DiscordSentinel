@@ -4,3 +4,11 @@
 *.sh text eol=lf
 docker-entrypoint.sh text eol=lf
 Dockerfile text eol=lf
+
+# Force LF sur les migrations SQL : sqlx::migrate calcule un checksum du
+# fichier et le compare avec celui stocke en DB. Si CRLF/LF differe entre
+# environnements (clone Windows -> deploy Linux), la migration deja
+# appliquee panique avec VersionMismatch.
+*.sql text eol=lf
+*.rs text eol=lf
+*.toml text eol=lf
