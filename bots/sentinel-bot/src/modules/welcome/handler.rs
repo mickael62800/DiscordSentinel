@@ -25,6 +25,12 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
         let guild_id = new_member.guild_id;
         let user_id = new_member.user.id;
 
+        // Master switch : si le module est desactive, on saute tout
+        // (welcome embed, DM, counter, etc.). Default true.
+        if !is_module_enabled(&ctx, &guild_id.to_string(), crate::modules::welcome::MODULE_BOT_NAME).await {
+            return;
+        }
+
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(b) => Arc::clone(b),
@@ -174,6 +180,12 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
 pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
         let ctx = ctx.clone();
         let user = user.clone();
+
+        // Master switch : si le module est desactive, on saute le message de depart.
+        if !is_module_enabled(&ctx, &guild_id.to_string(), crate::modules::welcome::MODULE_BOT_NAME).await {
+            return;
+        }
+
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(b) => Arc::clone(b),
