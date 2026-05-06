@@ -138,6 +138,78 @@ pub async fn on_ready(ctx: &Context, ready: &serenity::model::gateway::Ready) {
 /// Spawn le tick periodique (toutes les 5 min) qui credit le temps actif
 /// accumule dans les sessions vocales, pour que les users connectes en
 /// permanence gagnent de l'XP sans attendre de quitter le salon.
+/// Helper level-up : applique max_level cap, custom template, toggle
+/// announce, toggle DM. Appele pour text et voice level-ups.
+///
+/// Variables disponibles dans `levelup_message` :
+///   {user}     -> mention <@id>
+///   {level}    -> niveau atteint
+///   {kind}     -> "texte" ou "vocal"
+async fn announce_level_up(
+    ctx: &Context,
+    guild_config: &HashMap<String, String>,
+    user_id: u64,
+    level: i32,
+    kind: &str,        // "texte" | "vocal"
+    title_emoji: &str, // emoji du title
+) {
+    // 1. Cap max_level (si > 0) — pas d'annonce au-dela.
+    let max_level = BaseApiClient::config_u64(guild_config, "max_level", 0) as i32;
+    if max_level > 0 && level > max_level {
+        return;
+    }
+
+    // 2. Template custom ou default. Variables : {user}, {level}, {kind}.
+    let template = BaseApiClient::config_or(guild_config, "levelup_message", "");
+    let description = if template.is_empty() {
+        format!("<@{}> est maintenant **niveau {} en {}** !", user_id, level, kind)
+    } else {
+        template
+            .replace("{user}", &format!("<@{}>", user_id))
+            .replace("{level}", &level.to_string())
+            .replace("{kind}", kind)
+    };
+
+    let embed = success_embed(format!("{} LEVEL UP {} !", title_emoji, capitalize(kind)))
+        .description(&description);
+
+    // 3. Annonce dans le salon (si toggle ON).
+    let announce_enabled = BaseApiClient::config_bool(guild_config, "levelup_announce_enabled", true);
+    if announce_enabled {
+        if let Some(ch_id) = level_channel::resolve_level_up_channel(guild_config) {
+            let target = ChannelId::new(ch_id);
+            if let Err(e) = target
+                .send_message(&ctx.http, CreateMessage::new().embed(embed.clone()))
+                .await
+            {
+                warn!(error = %e, kind, "Failed to send level-up channel message");
+            }
+        }
+    }
+
+    // 4. DM au user (si toggle ON, default false).
+    let dm_enabled = BaseApiClient::config_bool(guild_config, "levelup_dm_enabled", false);
+    if dm_enabled {
+        let user = serenity::model::id::UserId::new(user_id);
+        if let Ok(dm) = user.create_dm_channel(&ctx.http).await {
+            if let Err(e) = dm
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                .await
+            {
+                warn!(error = %e, kind, "Failed to send level-up DM");
+            }
+        }
+    }
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        Some(first) => first.to_uppercase().chain(c).collect(),
+        None => String::new(),
+    }
+}
+
 pub fn spawn_voice_tick(ctx: Context) {
     use tokio::time::{interval, Duration};
     tokio::spawn(async move {
@@ -427,30 +499,15 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     {
         Ok(result) => {
             if result.leveled_up {
-                let level = result.user.level_text;
-                // Toggle annonce : levelup_announce_enabled (default true).
-                // Si OFF, on saute l'embed (les role rewards passent quand meme).
-                let announce_enabled = BaseApiClient::config_bool(
-                    &guild_config, "levelup_announce_enabled", true,
-                );
-                if announce_enabled {
-                    let embed = success_embed("\u{1f4dd} LEVEL UP Texte !")
-                        .description(format!(
-                            "<@{}> est maintenant **niveau {} en texte** !",
-                            msg.author.id, level
-                        ))
-                        .thumbnail(msg.author.face());
-
-                    if let Some(ch_id) = level_channel::resolve_level_up_channel(&guild_config) {
-                        let target = ChannelId::new(ch_id);
-                        if let Err(e) = target.send_message(
-                            &ctx.http,
-                            CreateMessage::new().embed(embed),
-                        ).await {
-                            warn!(error = %e, "Failed to send text level-up message");
-                        }
-                    }
-                }
+                announce_level_up(
+                    ctx,
+                    &guild_config,
+                    msg.author.id.get(),
+                    result.user.level_text,
+                    "texte",
+                    "\u{1f4dd}",
+                )
+                .await;
             }
 
             let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_text > 0);
@@ -600,25 +657,20 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             {
                                 Ok(result) => {
                                     if result.leveled_up {
-                                        let level = result.user.level_voice;
-                                        let embed = success_embed("\u{1f3a4} LEVEL UP Vocal !")
-                                            .description(format!(
-                                                "<@{}> est maintenant **niveau {} en vocal** !",
-                                                user_id, level
-                                            ));
-
                                         let voice_guild_config = if let Some(base) = data.get::<ApiClientKey>() {
                                             base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default()
                                         } else {
                                             HashMap::new()
                                         };
-
-                                        if let Some(ch_id) = level_channel::resolve_level_up_channel(&voice_guild_config) {
-                                            let ch = ChannelId::new(ch_id);
-                                            if let Err(e) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
-                                                warn!(error = %e, "Failed to send voice level-up message");
-                                            }
-                                        }
+                                        announce_level_up(
+                                            ctx,
+                                            &voice_guild_config,
+                                            user_id.get(),
+                                            result.user.level_voice,
+                                            "vocal",
+                                            "\u{1f3a4}",
+                                        )
+                                        .await;
                                     }
 
                                     let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_voice > 0);
