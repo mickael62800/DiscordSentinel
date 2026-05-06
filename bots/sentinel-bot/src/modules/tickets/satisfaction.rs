@@ -3,7 +3,6 @@ use serenity::builder::{CreateActionRow, CreateButton, CreateEmbed, CreateMessag
 pub const SATISFACTION_PREFIX: &str = "sentinel_ticket_satisfaction_";
 
 /// Construit le message de sondage satisfaction avec 5 boutons etoiles.
-#[allow(dead_code)]
 pub fn build_survey_message(ticket_id: &str) -> CreateMessage {
     let buttons: Vec<CreateButton> = (1..=5)
         .map(|rating| {

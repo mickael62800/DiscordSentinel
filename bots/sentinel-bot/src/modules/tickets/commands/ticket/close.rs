@@ -201,6 +201,19 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
         }
     };
 
+    let satisfaction_enabled = {
+        let data2 = ctx.data.read().await;
+        if let Some(base) = data2.get::<ApiClientKey>() {
+            let gc = base
+                .get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_bool(&gc, "satisfaction_enabled", true)
+        } else {
+            true
+        }
+    };
+
     if transcript_enabled {
     if let Some(ref id) = ticket_id {
         let data2 = ctx.data.read().await;
@@ -251,6 +264,14 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                         if !buf.is_empty() {
                             if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
                                 warn!(error = %e, "Failed to send transcript DM chunk");
+                            }
+                        }
+
+                        // Survey satisfaction (1-5 etoiles) si enable.
+                        if satisfaction_enabled {
+                            let survey = crate::modules::tickets::satisfaction::build_survey_message(id);
+                            if let Err(e) = dm_channel.send_message(&ctx.http, survey).await {
+                                warn!(error = %e, "Failed to send satisfaction survey DM");
                             }
                         }
                     }
