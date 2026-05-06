@@ -217,9 +217,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // dans le custom_id (5 segments au lieu de 4) pour pouvoir PATCH
     // /defend facilement quand le bouton est clique.
     let attempt_id = Uuid::new_v4();
+    // Discord limite custom_id a 100 chars. Format Phase 5 (UUID dashes
+    // + 3 snowflakes 19c + 4 ":") = ~110c -> overflow. Solution : on
+    // strip les dashes du UUID (32c au lieu de 36) et on omet guild_id
+    // (component.guild_id est dispo dans handle_defend). Format reduit :
+    //   steal_defend:{uuid_no_dash}:{thief_id}:{target_id}
+    // = 13 + 32 + 19 + 19 + 3 = ~86c, sous la limite.
+    let attempt_id_compact = attempt_id.simple().to_string();
     let custom_id = format!(
-        "steal_defend:{}:{}:{}:{}",
-        attempt_id, thief_id, target_id_str, guild_id
+        "steal_defend:{}:{}:{}",
+        attempt_id_compact, thief_id, target_id_str
     );
 
     let embed = CreateEmbed::new()
@@ -560,17 +567,45 @@ pub(crate) async fn resolve_steal_attempt(
 /// Handle the defend button click from a steal attempt.
 pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     let parts: Vec<&str> = component.data.custom_id.split(':').collect();
-    // Format Phase 5 : steal_defend:{attempt_id}:{thief_id}:{target_id}:{guild_id}
-    // Format legacy (avant Phase 5) : steal_defend:{thief_id}:{target_id}:{guild_id}
-    // On accepte les deux pour ne pas casser les boutons deja postes.
-    let (attempt_id_opt, thief_id, target_id, guild_id) = match parts.len() {
-        5 => {
-            let aid = Uuid::parse_str(parts[1]).ok();
-            (aid, parts[2], parts[3], parts[4])
-        }
-        4 => (None, parts[1], parts[2], parts[3]),
-        _ => return,
-    };
+    // Format Phase 5b (compact, custom_id < 100c) :
+    //   steal_defend:{uuid_no_dash}:{thief_id}:{target_id}
+    //   guild_id lu via component.guild_id.
+    // Format Phase 5 (deprecated, > 100c) :
+    //   steal_defend:{attempt_id}:{thief_id}:{target_id}:{guild_id}
+    // Format legacy (avant Phase 5) :
+    //   steal_defend:{thief_id}:{target_id}:{guild_id}
+    let component_guild_id_str = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    // Detection format :
+    //   - 4 parts + guild context + parts[1] est un UUID -> Phase 5b compact
+    //   - 4 parts sans UUID -> legacy (sans attempt_id)
+    //   - 5 parts -> Phase 5 deprecated (guild_id en dernier)
+    let (attempt_id_opt, thief_id, target_id, guild_id): (Option<Uuid>, String, String, String) =
+        match parts.len() {
+            4 => {
+                if let Ok(aid) = Uuid::parse_str(parts[1]) {
+                    // Phase 5b compact : steal_defend:{uuid}:{thief}:{target}
+                    if component_guild_id_str.is_empty() {
+                        return;
+                    }
+                    (Some(aid), parts[2].to_string(), parts[3].to_string(), component_guild_id_str)
+                } else {
+                    // Legacy : steal_defend:{thief}:{target}:{guild}
+                    (None, parts[1].to_string(), parts[2].to_string(), parts[3].to_string())
+                }
+            }
+            5 => {
+                // Phase 5 deprecated : steal_defend:{uuid}:{thief}:{target}:{guild}
+                let aid = Uuid::parse_str(parts[1]).ok();
+                (aid, parts[2].to_string(), parts[3].to_string(), parts[4].to_string())
+            }
+            _ => return,
+        };
+    let thief_id = thief_id.as_str();
+    let target_id = target_id.as_str();
+    let guild_id = guild_id.as_str();
 
     // Only the target can click the defend button
     if component.user.id.to_string() != target_id {
