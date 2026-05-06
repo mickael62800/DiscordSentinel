@@ -87,27 +87,48 @@ pub async fn handle_open_machine(ctx: &Context, component: &ComponentInteraction
         component.user.name.chars().take(15).collect::<String>().to_lowercase()
     );
 
+    // Categorie ou regrouper les salons slot temp (config slot_category_id).
+    let category_id: Option<u64> = {
+        let api_arc = {
+            let data = ctx.data.read().await;
+            data.get::<sentinel_shared::heartbeat::ApiClientKey>()
+                .map(std::sync::Arc::clone)
+        };
+        match api_arc {
+            Some(api) => {
+                let cfg = api
+                    .get_guild_config_for(&guild_id.to_string(), super::MODULE_BOT_NAME)
+                    .await
+                    .unwrap_or_default();
+                cfg.get("slot_category_id").and_then(|v| v.parse::<u64>().ok())
+            }
+            None => None,
+        }
+    };
+
+    let mut channel_builder = CreateChannel::new(&channel_name)
+        .kind(ChannelType::Text)
+        .topic(format!("[slot:{}]", user_id))
+        .permissions(vec![
+            PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: PermissionOverwriteType::Role(everyone_role),
+            },
+            PermissionOverwrite {
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
+                deny: Permissions::empty(),
+                kind: PermissionOverwriteType::Member(user_id),
+            },
+        ]);
+    if let Some(cat) = category_id {
+        channel_builder = channel_builder.category(ChannelId::new(cat));
+    }
+
     let channel = match guild_id
-        .create_channel(
-            &ctx.http,
-            CreateChannel::new(&channel_name)
-                .kind(ChannelType::Text)
-                .topic(format!("[slot:{}]", user_id))
-                .permissions(vec![
-                    PermissionOverwrite {
-                        allow: Permissions::empty(),
-                        deny: Permissions::VIEW_CHANNEL,
-                        kind: PermissionOverwriteType::Role(everyone_role),
-                    },
-                    PermissionOverwrite {
-                        allow: Permissions::VIEW_CHANNEL
-                            | Permissions::SEND_MESSAGES
-                            | Permissions::READ_MESSAGE_HISTORY,
-                        deny: Permissions::empty(),
-                        kind: PermissionOverwriteType::Member(user_id),
-                    },
-                ]),
-        )
+        .create_channel(&ctx.http, channel_builder)
         .await
     {
         Ok(ch) => ch,
