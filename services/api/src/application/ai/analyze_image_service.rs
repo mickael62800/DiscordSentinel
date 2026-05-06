@@ -59,26 +59,39 @@ impl AnalyzeImageService {
     }
 }
 
-/// Parse les cles vision (`vision_enabled`, `vision_threshold`,
-/// `vision_channel_thresholds`) depuis la config automod-bot.
-/// Defaut : enabled=true, threshold=0.5, no per-channel override.
-///
-/// `vision_channel_thresholds` format : CSV "channel_id:threshold,channel_id:threshold".
+/// Config vision parse depuis automod-bot.
+struct VisionConfig {
+    enabled: bool,
+    threshold: f32,
+    per_channel_threshold: std::collections::HashMap<String, f32>,
+    hash_cache_enabled: bool,
+    hash_cache_ttl_secs: u64,
+}
+
+/// Defaut TTL cache : 24h. Une image identique repostee dans la fenetre
+/// reutilise le verdict precedent au lieu de relancer une inference.
+const DEFAULT_HASH_CACHE_TTL_SECS: u64 = 86_400;
+
+/// Parse les cles vision depuis la config automod-bot.
 fn parse_vision_config(
     entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
-) -> (bool, f32, std::collections::HashMap<String, f32>) {
-    let mut enabled = true;
-    let mut threshold = DEFAULT_VISION_THRESHOLD;
-    let mut per_channel = std::collections::HashMap::new();
+) -> VisionConfig {
+    let mut cfg = VisionConfig {
+        enabled: true,
+        threshold: DEFAULT_VISION_THRESHOLD,
+        per_channel_threshold: std::collections::HashMap::new(),
+        hash_cache_enabled: true,
+        hash_cache_ttl_secs: DEFAULT_HASH_CACHE_TTL_SECS,
+    };
     for e in entries {
         match e.config_key.as_str() {
             "vision_enabled" => {
                 let v = e.config_value.to_ascii_lowercase();
-                enabled = matches!(v.as_str(), "true" | "1" | "yes");
+                cfg.enabled = matches!(v.as_str(), "true" | "1" | "yes");
             }
             "vision_threshold" => {
                 if let Ok(n) = e.config_value.parse::<f32>() {
-                    threshold = n.clamp(0.0, 1.0);
+                    cfg.threshold = n.clamp(0.0, 1.0);
                 }
             }
             "vision_channel_thresholds" => {
@@ -86,15 +99,43 @@ fn parse_vision_config(
                     let part = part.trim();
                     if let Some((cid, val)) = part.split_once(':') {
                         if let Ok(n) = val.trim().parse::<f32>() {
-                            per_channel.insert(cid.trim().to_string(), n.clamp(0.0, 1.0));
+                            cfg.per_channel_threshold
+                                .insert(cid.trim().to_string(), n.clamp(0.0, 1.0));
                         }
                     }
+                }
+            }
+            "vision_hash_cache_enabled" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.hash_cache_enabled = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "vision_hash_cache_ttl_secs" => {
+                if let Ok(n) = e.config_value.parse::<u64>() {
+                    cfg.hash_cache_ttl_secs = n.clamp(60, 7 * 86_400);
                 }
             }
             _ => {}
         }
     }
-    (enabled, threshold, per_channel)
+    cfg
+}
+
+/// Hash siphash des bytes de l'image. Cle stable pour deduper les analyses
+/// d'une meme image repostee. Non-crypto suffit (collision = cache miss
+/// inoffensif, on relance juste l'inference).
+fn image_hash(bytes: &[u8]) -> String {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
+}
+
+/// Resultat cache d'une analyse vision (sans le champ infraction qui n'a pas
+/// de sens pour une image partagee entre plusieurs guilds/users).
+#[derive(serde::Serialize, serde::Deserialize)]
+struct CachedVisionResult {
+    classifications: Vec<(String, f32)>,
+    detected_labels: Vec<String>, // ["nsfw", "illicit"]
 }
 
 #[async_trait]
@@ -109,15 +150,16 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
                 vec![]
             }
         };
-        let (vision_enabled, global_threshold, per_channel) = parse_vision_config(&automod_entries);
+        let vcfg = parse_vision_config(&automod_entries);
         // Override par salon si configure : channel_id -> threshold.
-        let vision_threshold = per_channel
+        let vision_threshold = vcfg
+            .per_channel_threshold
             .get(cmd.channel_id.as_str())
             .copied()
-            .unwrap_or(global_threshold);
+            .unwrap_or(vcfg.threshold);
 
         // 1. Verifier que le modele vision est disponible et active
-        if !vision_enabled || !self.inference.vision_available() {
+        if !vcfg.enabled || !self.inference.vision_available() {
             return Ok(ImageAnalysis {
                 action: Action::None,
                 reason: "Modele vision non disponible".to_string(),
@@ -127,14 +169,54 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             });
         }
 
-        // 2. Preprocesser l'image (decode, resize, normalize)
-        let image_tensor = preprocess_image(&cmd.image_bytes)
-            .map_err(|e| DomainError::Internal(format!("Erreur preprocessing image: {e}")))?;
+        // 2a. Cache hit : si vision_hash_cache_enabled et qu'on a deja
+        //     analyse cette image (meme bytes -> meme SHA-256), reutilise
+        //     les classifications stockees. Evite de relancer l'inference
+        //     sur des images repostees (memes/tendances/repost-bot).
+        let img_hash = if vcfg.hash_cache_enabled { Some(image_hash(&cmd.image_bytes)) } else { None };
+        let cache_key = img_hash.as_ref().map(|h| format!("vision_hash:{h}"));
+        let classifications = if let Some(key) = &cache_key {
+            match self.cache.get_json(key).await {
+                Ok(Some(json)) => match serde_json::from_str::<CachedVisionResult>(&json) {
+                    Ok(cached) => {
+                        tracing::debug!(hash = %img_hash.as_ref().unwrap(), "vision: cache HIT");
+                        Some(cached.classifications.into_iter().map(|(label, confidence)| {
+                            crate::adapters::outbound::inference_service::InferenceClassification {
+                                label, confidence,
+                            }
+                        }).collect::<Vec<_>>())
+                    }
+                    Err(_) => None,
+                },
+                _ => None,
+            }
+        } else { None };
 
-        // 3. Inference ONNX (rate limited)
-        let _permit = self.inference_limiter.acquire().await?;
-        let classifications = self.inference.classify_image(image_tensor)
-            .map_err(|e| DomainError::Internal(format!("Erreur inference: {e}")))?;
+        let classifications = match classifications {
+            Some(c) => c,
+            None => {
+                // 2b. Preprocesser l'image (decode, resize, normalize)
+                let image_tensor = preprocess_image(&cmd.image_bytes)
+                    .map_err(|e| DomainError::Internal(format!("Erreur preprocessing image: {e}")))?;
+
+                // 3. Inference ONNX (rate limited)
+                let _permit = self.inference_limiter.acquire().await?;
+                let classifs = self.inference.classify_image(image_tensor)
+                    .map_err(|e| DomainError::Internal(format!("Erreur inference: {e}")))?;
+
+                // Persist cache (best-effort).
+                if let Some(key) = &cache_key {
+                    let cached = CachedVisionResult {
+                        classifications: classifs.iter().map(|c| (c.label.clone(), c.confidence)).collect(),
+                        detected_labels: vec![], // pas utilise au cache miss, on recalcule
+                    };
+                    if let Ok(json) = serde_json::to_string(&cached) {
+                        let _ = self.cache.set_json(key, &json, vcfg.hash_cache_ttl_secs).await;
+                    }
+                }
+                classifs
+            }
+        };
 
         info!(
             classifications = ?classifications.iter().map(|c| format!("{}:{:.2}", c.label, c.confidence)).collect::<Vec<_>>(),
