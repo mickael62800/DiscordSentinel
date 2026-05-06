@@ -117,6 +117,18 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
                 warn!(error = %e, "Failed to send appeal success response");
             }
             info!(user = %component.user.name, action_id = action_id, "Appel de sanction cree via bouton DM");
+
+            // Notifie le salon d'appels (si configure) que le ticket a ete
+            // cree -- permet aux mods de voir l'appel directement dans
+            // Discord sans surveiller la dashboard tickets.
+            let notif_embed = sentinel_shared::embeds::info_embed("Nouvel appel de sanction")
+                .description(format!(
+                    "<@{}> conteste sa sanction.\n**Action ID :** `{}`\nUn ticket a ete cree (categorie `appel_sanction`).",
+                    component.user.id,
+                    &action_id[..16.min(action_id.len())],
+                ))
+                .timestamp(serenity::model::Timestamp::now());
+            crate::modules::moderation::post_to_appeal_channel(ctx, &found_guild, notif_embed).await;
         }
         _ => {
             let response = CreateInteractionResponse::Message(
