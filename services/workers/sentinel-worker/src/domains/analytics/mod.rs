@@ -1,6 +1,11 @@
 //! Domaine analytics : snapshots quotidien et horaire (calculs
-//! d'agregats long terme : daily_activity, hourly_activity).
-//! Porte de analytics-worker (Phase 2 fusion).
+//! d'agregats long terme : daily_activity, hourly_activity), retention
+//! et publication automatique du Top users sur Discord.
+//!
+//! Tout le metier est dans l'API — les jobs ici sont des tickers qui
+//! POST vers les endpoints `/api/analytics/*`.
 
 pub mod daily_snapshot;
 pub mod hourly_snapshot;
+pub mod retention_cleanup;
+pub mod publish_top_users;

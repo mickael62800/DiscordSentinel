@@ -1,61 +1,24 @@
+//! Snapshot horaire : delegation a l'API (cf. daily_snapshot).
+
 use sqlx::PgPool;
-use tracing::{debug, info, warn};
+use tracing::info;
 
-use crate::common::is_worker_enabled;
+use crate::common::api;
 
-#[derive(sqlx::FromRow)]
-struct GuildRow {
-    guild_id: String,
+#[derive(serde::Deserialize)]
+struct JobReport {
+    guilds_processed: usize,
+    guilds_skipped: usize,
 }
 
-/// Enregistre un snapshot d'activite horaire pour chaque guild
-pub async fn run(pool: &PgPool) -> Result<(), String> {
-    let guilds: Vec<GuildRow> =
-        sqlx::query_as::<_, GuildRow>("SELECT guild_id FROM guilds ORDER BY name")
-            .fetch_all(pool)
-            .await
-            .map_err(|e| format!("Query guilds: {e}"))?;
-
-    if guilds.is_empty() {
-        debug!("Aucune guild, snapshot horaire ignore");
-        return Ok(());
+pub async fn run(_pool: &PgPool) -> Result<(), String> {
+    let report: JobReport = api::post_empty("/api/analytics/snapshot/hourly").await?;
+    if report.guilds_processed > 0 || report.guilds_skipped > 0 {
+        info!(
+            processed = report.guilds_processed,
+            skipped = report.guilds_skipped,
+            "Snapshot horaire delegue API"
+        );
     }
-
-    let mut count = 0u64;
-
-    for guild in &guilds {
-        if !is_worker_enabled(pool, &guild.guild_id, "analytics").await {
-            continue;
-        }
-
-        let result = sqlx::query(
-            "INSERT INTO hourly_activity (guild_id, day, hour, messages, infractions) \
-             SELECT \
-               $1, \
-               CURRENT_DATE, \
-               EXTRACT(HOUR FROM NOW())::smallint, \
-               COALESCE((SELECT COUNT(DISTINCT user_id) FROM user_stats \
-                 WHERE guild_id = $1 AND updated_at >= date_trunc('hour', NOW())), 0)::bigint, \
-               COALESCE((SELECT COUNT(*) FROM infractions \
-                 WHERE guild_id = $1 AND created_at >= date_trunc('hour', NOW()))::integer, 0) \
-             ON CONFLICT (guild_id, day, hour) DO UPDATE SET \
-               messages = EXCLUDED.messages, \
-               infractions = EXCLUDED.infractions",
-        )
-        .bind(&guild.guild_id)
-        .execute(pool)
-        .await;
-
-        if result.is_ok() {
-            count += 1;
-        } else if let Err(e) = result {
-            warn!(error = %e, guild = %guild.guild_id, "Erreur snapshot horaire");
-        }
-    }
-
-    if count > 0 {
-        info!(guilds = count, "Snapshots horaires enregistres");
-    }
-
     Ok(())
 }

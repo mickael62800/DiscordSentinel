@@ -121,11 +121,39 @@ pub async fn get_action_distribution(
 }
 
 /// GET /api/analytics/top-infractors (cache 5min)
+///
+/// Si `limit` n'est pas fourni en query et qu'un `guild_id` est specifie,
+/// fallback sur la cle `top_users_count` de bot_guild_config (module
+/// `analytics`). Sinon defaut hardcode 10.
 pub async fn get_top_infractors(
     State(state): State<AppState>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<TopInfractorDto>>, ApiError> {
-    let key = cache_key("infractors", params.guild_id.as_deref(), params.days(), Some(params.limit()));
+    let effective_limit = match params.limit {
+        Some(_) => params.limit(),
+        None => {
+            // Pas de limit explicite : tente la cle top_users_count du guild.
+            if let Some(gid) = params.guild_id.as_deref() {
+                if let Ok(cfgs) = state.bot_config_repo.get_config(gid, "analytics").await {
+                    if let Some(v) = cfgs
+                        .iter()
+                        .find(|c| c.config_key == "top_users_count")
+                        .and_then(|c| c.config_value.parse::<i64>().ok())
+                    {
+                        v.clamp(1, 100)
+                    } else {
+                        params.limit()
+                    }
+                } else {
+                    params.limit()
+                }
+            } else {
+                params.limit()
+            }
+        }
+    };
+
+    let key = cache_key("infractors", params.guild_id.as_deref(), params.days(), Some(effective_limit));
 
     if let Some(cached) = try_cache_get::<Vec<TopInfractorDto>>(&state, &key).await {
         return Ok(Json(cached));
@@ -133,7 +161,7 @@ pub async fn get_top_infractors(
 
     let data = state
         .analytics_repo
-        .get_top_infractors(params.guild_id.as_deref(), params.days(), params.limit())
+        .get_top_infractors(params.guild_id.as_deref(), params.days(), effective_limit)
         .await?;
     let dtos: Vec<TopInfractorDto> = data.into_iter().map(Into::into).collect();
 

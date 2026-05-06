@@ -1,4 +1,5 @@
 pub mod analytics;
+pub mod snapshots;
 pub mod audit_logs;
 pub mod dashboard;
 pub mod dashboard_charts;
