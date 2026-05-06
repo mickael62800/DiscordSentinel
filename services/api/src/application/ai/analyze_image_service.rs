@@ -59,13 +59,17 @@ impl AnalyzeImageService {
     }
 }
 
-/// Parse les cles vision (`vision_enabled`, `vision_threshold`) depuis la
-/// config automod-bot. Defaut : enabled=true, threshold=0.5.
+/// Parse les cles vision (`vision_enabled`, `vision_threshold`,
+/// `vision_channel_thresholds`) depuis la config automod-bot.
+/// Defaut : enabled=true, threshold=0.5, no per-channel override.
+///
+/// `vision_channel_thresholds` format : CSV "channel_id:threshold,channel_id:threshold".
 fn parse_vision_config(
     entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
-) -> (bool, f32) {
+) -> (bool, f32, std::collections::HashMap<String, f32>) {
     let mut enabled = true;
     let mut threshold = DEFAULT_VISION_THRESHOLD;
+    let mut per_channel = std::collections::HashMap::new();
     for e in entries {
         match e.config_key.as_str() {
             "vision_enabled" => {
@@ -77,10 +81,20 @@ fn parse_vision_config(
                     threshold = n.clamp(0.0, 1.0);
                 }
             }
+            "vision_channel_thresholds" => {
+                for part in e.config_value.split(',') {
+                    let part = part.trim();
+                    if let Some((cid, val)) = part.split_once(':') {
+                        if let Ok(n) = val.trim().parse::<f32>() {
+                            per_channel.insert(cid.trim().to_string(), n.clamp(0.0, 1.0));
+                        }
+                    }
+                }
+            }
             _ => {}
         }
     }
-    (enabled, threshold)
+    (enabled, threshold, per_channel)
 }
 
 #[async_trait]
@@ -95,7 +109,12 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
                 vec![]
             }
         };
-        let (vision_enabled, vision_threshold) = parse_vision_config(&automod_entries);
+        let (vision_enabled, global_threshold, per_channel) = parse_vision_config(&automod_entries);
+        // Override par salon si configure : channel_id -> threshold.
+        let vision_threshold = per_channel
+            .get(cmd.channel_id.as_str())
+            .copied()
+            .unwrap_or(global_threshold);
 
         // 1. Verifier que le modele vision est disponible et active
         if !vision_enabled || !self.inference.vision_available() {

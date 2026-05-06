@@ -316,6 +316,15 @@ pub(super) async fn analyze_message_images(
         ctx, &guild_id, crate::modules::automod::MODULE_BOT_NAME,
     ).await;
 
+    // vision_queue_enabled : kill switch pour la file async ai_jobs.
+    // Si false, on skip toute l'analyse (meme si vision_enabled est true).
+    let queue_enabled = sentinel_shared::api_client::BaseApiClient::config_bool(
+        &config, "vision_queue_enabled", true,
+    );
+    if !queue_enabled {
+        return;
+    }
+
     let max_image_size_mb = sentinel_shared::api_client::BaseApiClient::config_u64(
         &config, "vision_max_image_size_mb", 14,
     );

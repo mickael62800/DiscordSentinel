@@ -68,7 +68,7 @@ fn cfg(key: &str, value: &str) -> BotGuildConfig {
 
 #[test]
 fn parse_vision_config_defaults_when_no_entries() {
-    let (enabled, threshold) = parse_vision_config(&[]);
+    let (enabled, threshold, _) = parse_vision_config(&[]);
     assert!(enabled);
     assert!((threshold - 0.5).abs() < 1e-6);
 }
@@ -76,7 +76,7 @@ fn parse_vision_config_defaults_when_no_entries() {
 #[test]
 fn parse_vision_config_reads_enabled_truthy_variants() {
     for v in ["true", "1", "yes", "TRUE", "Yes"] {
-        let (e, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
+        let (e, _, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
         assert!(e, "expected enabled for {v}");
     }
 }
@@ -84,30 +84,30 @@ fn parse_vision_config_reads_enabled_truthy_variants() {
 #[test]
 fn parse_vision_config_enabled_false_for_other_values() {
     for v in ["false", "0", "no", "off", ""] {
-        let (e, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
+        let (e, _, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
         assert!(!e, "expected disabled for {v}");
     }
 }
 
 #[test]
 fn parse_vision_config_threshold_clamps_to_0_1() {
-    let (_, t1) = parse_vision_config(&[cfg("vision_threshold", "2.5")]);
+    let (_, t1, _) = parse_vision_config(&[cfg("vision_threshold", "2.5")]);
     assert_eq!(t1, 1.0);
-    let (_, t2) = parse_vision_config(&[cfg("vision_threshold", "-0.3")]);
+    let (_, t2, _) = parse_vision_config(&[cfg("vision_threshold", "-0.3")]);
     assert_eq!(t2, 0.0);
-    let (_, t3) = parse_vision_config(&[cfg("vision_threshold", "0.75")]);
+    let (_, t3, _) = parse_vision_config(&[cfg("vision_threshold", "0.75")]);
     assert!((t3 - 0.75).abs() < 1e-6);
 }
 
 #[test]
 fn parse_vision_config_ignores_invalid_threshold() {
-    let (_, t) = parse_vision_config(&[cfg("vision_threshold", "not_a_number")]);
+    let (_, t, _) = parse_vision_config(&[cfg("vision_threshold", "not_a_number")]);
     assert!((t - 0.5).abs() < 1e-6);
 }
 
 #[test]
 fn parse_vision_config_ignores_unknown_keys() {
-    let (e, t) = parse_vision_config(&[cfg("some_other_key", "true")]);
+    let (e, t, _) = parse_vision_config(&[cfg("some_other_key", "true")]);
     assert!(e);
     assert!((t - 0.5).abs() < 1e-6);
 }
