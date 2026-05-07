@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
+use crate::ports::uow::DbTx;
 
 #[async_trait]
 pub trait WalletRepository: Send + Sync {
@@ -37,4 +38,30 @@ pub trait WalletRepository: Send + Sync {
     async fn reset_wallet(&self, guild_id: &str, user_id: &str, new_balance: i64) -> Result<Wallet, DomainError>;
     /// Reset tous les wallets d'un serveur a `new_balance`. Retourne le nombre de comptes reset.
     async fn reset_all_wallets(&self, guild_id: &str, new_balance: i64) -> Result<u64, DomainError>;
+
+    /// Credit dans une tx en cours : SELECT FOR UPDATE + UPDATE coins +
+    /// INSERT wallet_transactions, sans commit. Retourne (previous, after).
+    /// Erreur NotFound si le wallet n'existe pas.
+    async fn credit_in_tx(
+        &self,
+        tx: &mut dyn DbTx,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(i64, i64), DomainError>;
+
+    /// Debit dans une tx en cours. Verifie le solde, met a jour coins +
+    /// total_spent, log la wallet_transaction. Retourne (previous, after).
+    /// Erreur NotFound si le wallet n'existe pas, ValidationError si solde insuffisant.
+    async fn debit_in_tx(
+        &self,
+        tx: &mut dyn DbTx,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(i64, i64), DomainError>;
 }

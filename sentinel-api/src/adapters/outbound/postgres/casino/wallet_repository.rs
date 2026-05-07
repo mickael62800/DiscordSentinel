@@ -9,6 +9,8 @@ use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use sentinel_core::ports::uow::DbTx;
+use super::super::uow::as_pg;
 
 pub struct PgWalletRepository {
     pool: PgPool,
@@ -514,5 +516,85 @@ impl WalletRepository for PgWalletRepository {
 
         info!(guild_id, affected, new_balance, "Wallets bulk reset");
         Ok(affected)
+    }
+
+    async fn credit_in_tx(
+        &self,
+        tx: &mut dyn DbTx,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        if amount <= 0 {
+            return Err(DomainError::ValidationError("Montant credit doit etre positif".into()));
+        }
+        let tx = as_pg(tx);
+        let previous: Option<i64> = sqlx::query_scalar(
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+        )
+        .bind(guild_id).bind(user_id)
+        .fetch_optional(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("credit_in_tx select: {e}")))?;
+        let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
+        let after: i64 = sqlx::query_scalar(
+            "UPDATE user_wallets SET coins = coins + $1, total_earned = total_earned + $1, updated_at = NOW() \
+             WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
+        )
+        .bind(amount).bind(guild_id).bind(user_id)
+        .fetch_one(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("credit_in_tx update: {e}")))?;
+        sqlx::query(
+            "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
+        )
+        .bind(Uuid::new_v4()).bind(guild_id).bind(user_id).bind(amount).bind(after).bind(source).bind(description)
+        .execute(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("insert wallet_transactions: {e}")))?;
+        Ok((previous, after))
+    }
+
+    async fn debit_in_tx(
+        &self,
+        tx: &mut dyn DbTx,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        if amount <= 0 {
+            return Err(DomainError::ValidationError("Montant debit doit etre positif".into()));
+        }
+        let tx = as_pg(tx);
+        let previous: Option<i64> = sqlx::query_scalar(
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+        )
+        .bind(guild_id).bind(user_id)
+        .fetch_optional(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("debit_in_tx select: {e}")))?;
+        let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
+        if previous < amount {
+            return Err(DomainError::ValidationError(format!(
+                "Solde insuffisant : tu as {} coins, il en faut {} (manque {}).",
+                previous, amount, amount - previous
+            )));
+        }
+        let after: i64 = sqlx::query_scalar(
+            "UPDATE user_wallets SET coins = coins - $1, total_spent = total_spent + $1, updated_at = NOW() \
+             WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
+        )
+        .bind(amount).bind(guild_id).bind(user_id)
+        .fetch_one(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("debit_in_tx update: {e}")))?;
+        sqlx::query(
+            "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
+        )
+        .bind(Uuid::new_v4()).bind(guild_id).bind(user_id).bind(-amount).bind(after).bind(source).bind(description)
+        .execute(&mut **tx).await
+        .map_err(|e| DomainError::Internal(format!("insert wallet_transactions: {e}")))?;
+        Ok((previous, after))
     }
 }

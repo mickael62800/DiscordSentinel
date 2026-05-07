@@ -30,12 +30,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sqlx::Postgres;
-use sqlx::Transaction;
-use uuid::Uuid;
-
 use sentinel_core::ports::uow::DbTx;
-use crate::adapters::outbound::postgres::uow::as_pg;
 
 use sentinel_core::domain::entities::casino::wallet::resolve_reset_balance;
 use sentinel_core::domain::entities::casino::wallet::resolve_starting_coins;
@@ -73,33 +68,6 @@ impl ManageWalletService {
             .map(|w| w.coins)
             .unwrap_or(0))
     }
-}
-
-/// Ecrit une ligne dans `wallet_transactions` au sein de la tx fournie.
-async fn insert_wallet_tx(
-    tx: &mut Transaction<'_, Postgres>,
-    guild_id: &str,
-    user_id: &str,
-    signed_amount: i64,
-    balance_after: i64,
-    source: &str,
-    description: &str,
-) -> Result<(), DomainError> {
-    sqlx::query(
-        "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
-    )
-    .bind(Uuid::new_v4())
-    .bind(guild_id)
-    .bind(user_id)
-    .bind(signed_amount)
-    .bind(balance_after)
-    .bind(source)
-    .bind(description)
-    .execute(&mut **tx)
-    .await
-    .map_err(|e| DomainError::Internal(format!("insert wallet_transactions: {e}")))?;
-    Ok(())
 }
 
 #[async_trait]
@@ -238,44 +206,11 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<TxWalletMutation, DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Montant credit doit etre positif".into(),
-            ));
-        }
-        let tx = as_pg(tx);
-
-        // Lock le wallet et lit le solde actuel dans la tx. On fait un
-        // SELECT FOR UPDATE prealable pour exposer `previous_balance`
-        // fiable (utile pour detection jackpot meme si on pourrait s'en
-        // passer sur un simple credit).
-        let previous: Option<i64> = sqlx::query_scalar(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(|e| DomainError::Internal(format!("credit_tx select: {e}")))?;
-
-        let previous = previous
-            .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
-
-        let balance_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins + $1, total_earned = total_earned + $1, updated_at = NOW() \
-             WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
-        )
-        .bind(amount)
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(|e| DomainError::Internal(format!("credit_tx update: {e}")))?;
-
-        insert_wallet_tx(tx, guild_id, user_id, amount, balance_after, source, description).await?;
-
+        let (previous, after) = self.repo
+            .credit_in_tx(tx, guild_id, user_id, amount, source, description)
+            .await?;
         Ok(TxWalletMutation {
-            new_balance: balance_after,
+            new_balance: after,
             previous_balance: previous,
             maybe_bankruptcy: false,
             maybe_jackpot_amount: Some(amount),
@@ -291,52 +226,13 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<TxWalletMutation, DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Montant debit doit etre positif".into(),
-            ));
-        }
-        let tx = as_pg(tx);
-
-        // Lock + verifie solde suffisant.
-        let previous: Option<i64> = sqlx::query_scalar(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_optional(&mut **tx)
-        .await
-        .map_err(|e| DomainError::Internal(format!("debit_tx select: {e}")))?;
-
-        let previous = previous
-            .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
-
-        if previous < amount {
-            return Err(DomainError::ValidationError(format!(
-                "Solde insuffisant : tu as {} coins, il en faut {} (manque {}).",
-                previous,
-                amount,
-                amount - previous
-            )));
-        }
-
-        let balance_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins - $1, total_spent = total_spent + $1, updated_at = NOW() \
-             WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
-        )
-        .bind(amount)
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_one(&mut **tx)
-        .await
-        .map_err(|e| DomainError::Internal(format!("debit_tx update: {e}")))?;
-
-        insert_wallet_tx(tx, guild_id, user_id, -amount, balance_after, source, description).await?;
-
+        let (previous, after) = self.repo
+            .debit_in_tx(tx, guild_id, user_id, amount, source, description)
+            .await?;
         Ok(TxWalletMutation {
-            new_balance: balance_after,
+            new_balance: after,
             previous_balance: previous,
-            maybe_bankruptcy: previous > 0 && balance_after == 0,
+            maybe_bankruptcy: previous > 0 && after == 0,
             maybe_jackpot_amount: None,
         })
     }
