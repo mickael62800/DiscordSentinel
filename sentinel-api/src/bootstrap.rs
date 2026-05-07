@@ -355,11 +355,13 @@ pub async fn build_app_state(
     );
     // Note : la creation de moderation_uc est differee plus bas pour pouvoir
     // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
+    let service_registry: Arc<dyn sentinel_core::ports::outbound::system::service_registry::ServiceRegistry> =
+        Arc::new(crate::adapters::outbound::redis_service_registry::RedisServiceRegistry::new(redis_client.clone()));
     let stats_uc = Arc::new(ManageStatsService::new(
         stats_repo.clone(),
         infraction_repo.clone(),
         cache.clone(),
-        redis_client.clone(),
+        service_registry,
     ));
     let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(
         voice_channel_repo.clone(),
@@ -849,7 +851,9 @@ pub async fn build_app_state(
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
         automod_reviews_uc,
-        export_uc: Arc::new(ExportService::new(pg_pool.clone())),
+        export_uc: Arc::new(ExportService::new(Arc::new(
+            crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
+        ))),
         evidence_repo: Arc::new(PgEvidenceRepository::new(pg_pool.clone())),
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),
         modstats_repo: Arc::new(PgModstatsRepository::new(pg_pool.clone())),

@@ -5,20 +5,20 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::application::audit::manage_stats_service::ManageStatsService;
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
-use sentinel_core::domain::entities::audit::user_stats::VoiceSessionStats;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
-use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_core::ports::outbound::system::cache::CachePort;
-use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
-use sentinel_core::domain::entities::system::rule::Rule;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
+use crate::domain::errors::DomainError;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::domain::entities::system::rule::Rule;
 
 // ── MockStatsRepo ──
 

@@ -4,19 +4,20 @@ use async_trait::async_trait;
 
 use tracing::warn;
 
-use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
-use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
-use sentinel_core::ports::outbound::system::cache::CachePort;
-use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::ports::outbound::system::cache_helpers::cached_json;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::ports::outbound::system::service_registry::ServiceRegistry;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 const OVERVIEW_TTL: u64 = 60; // 1 minute
 
@@ -24,7 +25,7 @@ pub struct ManageStatsService {
     stats_repo: Arc<dyn StatsRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
-    redis_client: redis::Client,
+    service_registry: Arc<dyn ServiceRegistry>,
 }
 
 impl ManageStatsService {
@@ -32,54 +33,14 @@ impl ManageStatsService {
         stats_repo: Arc<dyn StatsRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
-        redis_client: redis::Client,
+        service_registry: Arc<dyn ServiceRegistry>,
     ) -> Self {
-        Self { stats_repo, infraction_repo, cache, redis_client }
+        Self { stats_repo, infraction_repo, cache, service_registry }
     }
 
     async fn count_services(&self) -> (u32, u32, u32, u32) {
-        let mut conn = match self.redis_client.get_multiplexed_async_connection().await {
-            Ok(c) => c,
-            Err(e) => {
-                warn!(error = %e, "Redis indisponible pour count_services — dashboard affichera 0");
-                return (0, 0, 0, 0);
-            }
-        };
-
-        use redis::AsyncCommands;
-        let known: Vec<String> = match conn.smembers("bots:known").await {
-            Ok(k) => k,
-            Err(e) => {
-                warn!(error = %e, "Echec Redis SMEMBERS bots:known");
-                return (0, 0, 0, 0);
-            }
-        };
-
-        let mut bots_online = 0u32;
-        let mut bots_total = 0u32;
-        let mut workers_online = 0u32;
-        let mut workers_total = 0u32;
-
-        for name in &known {
-            let is_worker = sentinel_core::domain::entities::system::config_parsers::is_worker_service(name);
-            let exists: bool = match conn.exists(format!("bot:online:{}", name)).await {
-                Ok(v) => v,
-                Err(e) => {
-                    warn!(error = %e, bot = %name, "Echec Redis EXISTS bot:online");
-                    false
-                }
-            };
-
-            if is_worker {
-                workers_total += 1;
-                if exists { workers_online += 1; }
-            } else {
-                bots_total += 1;
-                if exists { bots_online += 1; }
-            }
-        }
-
-        (bots_online, bots_total, workers_online, workers_total)
+        let c = self.service_registry.count_services().await;
+        (c.bots_online, c.bots_total, c.workers_online, c.workers_total)
     }
 }
 
@@ -197,23 +158,8 @@ impl ManageStatsUseCase for ManageStatsService {
         // Check PostgreSQL
         let postgres_online = self.stats_repo.count_distinct_guilds().await.is_ok();
 
-        // Check Redis
-        let redis_online = match self.redis_client.get_multiplexed_async_connection().await {
-            Ok(mut conn) => {
-                use redis::AsyncCommands;
-                match conn.get::<_, Option<String>>("ping_test").await {
-                    Ok(_) => true,
-                    Err(e) => {
-                        warn!(error = %e, "Redis ping_test echoue");
-                        false
-                    }
-                }
-            }
-            Err(e) => {
-                warn!(error = %e, "Redis indisponible pour health check");
-                false
-            }
-        };
+        // Check Redis (via ServiceRegistry)
+        let redis_online = self.service_registry.ping().await;
 
         Ok(DashboardStats {
             total_servers,
