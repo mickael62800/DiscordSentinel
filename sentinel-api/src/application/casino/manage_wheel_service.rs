@@ -29,21 +29,21 @@ use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
-use crate::adapters::outbound::postgres::uow::PgTx;
+use sentinel_core::ports::uow::UnitOfWork;
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     curses_repo: Option<Arc<dyn CursesRepository>>,
-    pg_pool: sqlx::PgPool,
+    uow: Arc<dyn UnitOfWork>,
 }
 
 impl ManageWheelService {
     pub fn new(
         repo: Arc<dyn WheelRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
-        pg_pool: sqlx::PgPool,
+        uow: Arc<dyn UnitOfWork>,
     ) -> Self {
-        Self { repo, wallet_uc, curses_repo: None, pg_pool }
+        Self { repo, wallet_uc, curses_repo: None, uow }
     }
 
     /// Branche le repo des maledictions pour activer "Heartbreak"
@@ -87,15 +87,14 @@ impl ManageWheelUseCase for ManageWheelService {
         let payout = outcome.case.payout;
 
         // 3. Tx atomique.
-        let mut tx = PgTx(self.pg_pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("begin tx wheel: {e}")))?);
+        let mut tx = self.uow.begin().await?;
 
         let mut taunt_mutations = Vec::new();
 
         // Wallet : credit ou debit selon le signe du payout.
         if payout > 0 {
             let m = self.wallet_uc
-                .credit_tx(&mut tx, &cmd.guild_id, &cmd.user_id, payout, "wheel_payout",
+                .credit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, payout, "wheel_payout",
                     &format!("Roue du Destin : {}", outcome.case.label))
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), m));
@@ -105,7 +104,7 @@ impl ManageWheelUseCase for ManageWheelService {
             let actual_debit = (-payout).min(balance);
             if actual_debit > 0 {
                 let m = self.wallet_uc
-                    .debit_tx(&mut tx, &cmd.guild_id, &cmd.user_id, actual_debit, "wheel_loss",
+                    .debit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, actual_debit, "wheel_loss",
                         &format!("Roue du Destin : {}", outcome.case.label))
                     .await?;
                 taunt_mutations.push((cmd.user_id.clone(), m));
@@ -123,12 +122,12 @@ impl ManageWheelUseCase for ManageWheelService {
             payout,
             created_at: Utc::now(),
         };
-        self.repo.log_spin_in_tx(&mut tx, &spin).await?;
+        self.repo.log_spin_in_tx(&mut *tx, &spin).await?;
 
         // Mark daily.
-        self.repo.mark_claimed_in_tx(&mut tx, &cmd.guild_id, &cmd.user_id).await?;
+        self.repo.mark_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id).await?;
 
-        tx.0.commit().await.map_err(|e| DomainError::Internal(format!("commit tx wheel: {e}")))?;
+        self.uow.commit(tx).await?;
 
         // 4. Post-commit taunts.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();

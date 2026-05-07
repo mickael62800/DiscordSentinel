@@ -238,6 +238,9 @@ pub async fn build_app_state(
     redis_client: redis::Client,
 ) -> AppState {
     // ── Adapters sortants ──
+    let uow: Arc<dyn sentinel_core::ports::uow::UnitOfWork> = Arc::new(
+        crate::adapters::outbound::postgres::uow::PgUnitOfWork::new(pg_pool.clone()),
+    );
     let rule_repo = Arc::new(PgRuleRepository::new(pg_pool.clone()));
     let infraction_repo = Arc::new(PgInfractionRepository::new(pg_pool.clone()));
     let ticket_repo = Arc::new(PgTicketRepository::new(pg_pool.clone()));
@@ -481,7 +484,7 @@ pub async fn build_app_state(
             slot_repo,
             bot_config_repo.clone(),
             wallet_uc.clone(),
-            pg_pool.clone(),
+            uow.clone(),
         ));
 
     // Roue du Destin — Sprint 2 sign'ature (migration 158).
@@ -491,7 +494,7 @@ pub async fn build_app_state(
             crate::application::casino::manage_wheel_service::ManageWheelService::new(
                 wheel_repo,
                 wallet_uc.clone(),
-                pg_pool.clone(),
+                uow.clone(),
             )
             .with_curses_repo(coude_curses_repo.clone()),
         );

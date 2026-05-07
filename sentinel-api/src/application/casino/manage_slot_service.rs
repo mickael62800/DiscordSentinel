@@ -37,14 +37,14 @@ use crate::ports::inbound::casino::manage_slot::SpinResult;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::casino::slot_repository::SlotRepository;
-use crate::adapters::outbound::postgres::uow::PgTx;
+use sentinel_core::ports::uow::UnitOfWork;
 const MODULE_BOT_NAME: &str = "slot-bot";
 
 pub struct ManageSlotService {
     repo: Arc<dyn SlotRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
-    pg_pool: sqlx::PgPool,
+    uow: Arc<dyn UnitOfWork>,
 }
 
 impl ManageSlotService {
@@ -52,9 +52,9 @@ impl ManageSlotService {
         repo: Arc<dyn SlotRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
-        pg_pool: sqlx::PgPool,
+        uow: Arc<dyn UnitOfWork>,
     ) -> Self {
-        Self { repo, bot_config_repo, wallet_uc, pg_pool }
+        Self { repo, bot_config_repo, wallet_uc, uow }
     }
 
     /// Charge la config du bot 'slot-bot' pour la guild et la decode en
@@ -132,15 +132,14 @@ impl ManageSlotService {
             .collect();
 
         // Tx atomique.
-        let mut tx = PgTx(self.pg_pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("begin tx slot: {e}")))?);
+        let mut tx = self.uow.begin().await?;
 
         let mut taunt_mutations = Vec::new();
 
         // 1. Debit la mise (sauf daily bonus) en utilisant wallet_uc dans la tx.
         if !cmd.is_daily && mise > 0 {
             let dm = self.wallet_uc
-                .debit_tx(&mut tx, &cmd.guild_id, &cmd.user_id, mise, "slot_bet",
+                .debit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, mise, "slot_bet",
                     "Mise slot-machine")
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), dm));
@@ -151,7 +150,7 @@ impl ManageSlotService {
         let jackpot_contribution = compute_jackpot_contribution(mise, cfg.jackpot_pool_share_pct);
         let pool_after_contribution = if jackpot_contribution > 0 {
             self.repo.add_to_jackpot_pool_in_tx(
-                &mut tx, &cmd.guild_id, jackpot_contribution, cfg.jackpot_starting_pool,
+                &mut *tx, &cmd.guild_id, jackpot_contribution, cfg.jackpot_starting_pool,
             ).await?
         } else {
             self.repo.get_jackpot_pool(&cmd.guild_id).await?
@@ -173,7 +172,7 @@ impl ManageSlotService {
         let mut jackpot_pool_after = pool_after_contribution;
         if is_jackpot {
             self.repo.claim_jackpot_pool_in_tx(
-                &mut tx, &cmd.guild_id, &cmd.user_id,
+                &mut *tx, &cmd.guild_id, &cmd.user_id,
                 pool_after_contribution, cfg.jackpot_starting_pool,
             ).await?;
             jackpot_pool_after = cfg.jackpot_starting_pool;
@@ -182,7 +181,7 @@ impl ManageSlotService {
         // 5. Credit du payout (si > 0).
         if payout > 0 {
             let cm = self.wallet_uc
-                .credit_tx(&mut tx, &cmd.guild_id, &cmd.user_id, payout, "slot_payout",
+                .credit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, payout, "slot_payout",
                     &format!("Gain slot-machine ({}x)", multiplier))
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), cm));
@@ -202,14 +201,14 @@ impl ManageSlotService {
             is_free: cmd.is_daily,
             created_at: Utc::now(),
         };
-        self.repo.log_spin_in_tx(&mut tx, &spin).await?;
+        self.repo.log_spin_in_tx(&mut *tx, &spin).await?;
 
         // 7. Mark daily claimed si applicable.
         if cmd.is_daily {
-            self.repo.mark_daily_claimed_in_tx(&mut tx, &cmd.guild_id, &cmd.user_id).await?;
+            self.repo.mark_daily_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id).await?;
         }
 
-        tx.0.commit().await.map_err(|e| DomainError::Internal(format!("commit tx slot: {e}")))?;
+        self.uow.commit(tx).await?;
 
         // 8. Post-commit : taunts faillite/jackpot eco.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();
