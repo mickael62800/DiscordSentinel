@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package sentinel.blackjack.v1;
+
+// Service blackjack v1 : partie solo (start/hit/stand/double/active) + wallet.
+// Les tables multijoueur restent en HTTP pour cette iteration.
+//
+// Migration wallet unifie : StartGame/Hit/Stand/DoubleDown retournent
+// maintenant `BlackjackGameResult` qui enveloppe la partie + la liste des
+// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
+// Le bot est responsable de dispatcher ces taunts. Voir
+// sentinel-bot/src/modules/blackjack/game_logic.rs.
+service BlackjackService {
+  rpc StartGame(StartGameRequest) returns (BlackjackGameResult);
+  rpc Hit(GameIdRequest) returns (BlackjackGameResult);
+  rpc Stand(GameIdRequest) returns (BlackjackGameResult);
+  rpc DoubleDown(GameIdRequest) returns (BlackjackGameResult);
+  rpc GetActive(GetActiveRequest) returns (GetActiveResponse);
+  rpc GetWallet(GetWalletRequest) returns (Wallet);
+}
+
+message StartGameRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  int64 bet = 4;
+}
+
+message GameIdRequest {
+  string game_id = 1;
+}
+
+message GetActiveRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message GetActiveResponse {
+  optional BlackjackGame game = 1;
+}
+
+message GetWalletRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message Card {
+  string rank = 1;
+  string suit = 2;
+  string filename = 3;
+}
+
+message BlackjackGame {
+  string id = 1;
+  string guild_id = 2;
+  string user_id = 3;
+  string username = 4;
+  int64 bet = 5;
+  repeated Card player_hand = 6;
+  repeated Card dealer_hand = 7;
+  string status = 8;
+  int32 player_score = 9;
+  int32 dealer_score = 10;
+  bool doubled = 11;
+  int64 payout = 12;
+  // RFC3339
+  string created_at = 13;
+  optional string finished_at = 14;
+}
+
+message Wallet {
+  string id = 1;
+  string guild_id = 2;
+  string user_id = 3;
+  string username = 4;
+  int64 coins = 5;
+  int64 total_earned = 6;
+  int64 total_spent = 7;
+}
+
+// Duplique depuis coude.proto pour eviter un couplage cross-package.
+// Voir sentinel-bot/src/modules/blackjack/api_client.rs qui fait le
+// meme choix cote bot.
+message TauntEvent {
+  string channel_id = 1;
+  string target_user_id = 2;
+  string message = 3;
+  string nickname_suffix = 4;
+  string streak_kind = 5;
+  int32 streak_value = 6;
+}
+
+// Resultat d'une action de jeu : la partie mise a jour + les eventuels
+// TauntEvent declenches par les mutations wallet (faillite cote joueur si
+// mise > solde restant, jackpot sur un gros gain).
+message BlackjackGameResult {
+  BlackjackGame game = 1;
+  repeated TauntEvent taunt_events = 2;
+  // Solde du joueur apres l action (apres debit mise / credit gain).
+  // Affiche dans l embed pour que le joueur voie combien il peut miser.
+  int64 wallet_balance = 3;
+}

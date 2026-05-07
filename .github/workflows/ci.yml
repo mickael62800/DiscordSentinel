@@ -76,7 +76,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/web
+        working-directory: sentinel-web
     steps:
       - uses: actions/checkout@v4
 
@@ -85,7 +85,7 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: apps/web/package-lock.json
+          cache-dependency-path: sentinel-web/package-lock.json
 
       - name: Install
         run: npm ci
@@ -108,4 +108,4 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Bake all images (no push)
-        run: docker buildx bake -f infra/docker/docker-bake.hcl --set "*.cache-from=type=gha" --set "*.cache-to=type=gha,mode=max"
+        run: docker buildx bake -f sentinel-infrastructure/docker/docker-bake.hcl --set "*.cache-from=type=gha" --set "*.cache-to=type=gha,mode=max"

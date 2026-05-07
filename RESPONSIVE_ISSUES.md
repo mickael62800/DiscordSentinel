@@ -16,7 +16,7 @@
 
 ### `AdminPageShell` (commits `ede4821e` → `a8a3cb45`)
 
-Composant `apps/web/src/components/layouts/AdminPageShell.vue` factorise le boilerplate header/lede/actions partagé par toutes les pages admin.
+Composant `sentinel-web/src/components/layouts/AdminPageShell.vue` factorise le boilerplate header/lede/actions partagé par toutes les pages admin.
 
 **API** :
 - props : `title` (string), `icon` (emoji optionnel), `width` (`constrained` | `wide` | `narrow`)

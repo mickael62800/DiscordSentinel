@@ -1,6 +1,6 @@
 # DiscordSentinel
 
-Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **13 workers** périodiques (ai, analytics, appeal-sla, audit-cache, blackjack-cleanup, cache, cleanup, coude, discord-audit-sync, export, moderation, monitoring, temp-roles), **inférence ONNX** embarquée.
+Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **un worker unifié `sentinel-worker`** (scheduler regroupant 17 domaines périodiques), **inférence ONNX** embarquée.
 
 ---
 
@@ -11,19 +11,20 @@ Discord Messages / Events / Images
        │
        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│      Bot Discord unifié (Serenity 0.12)  — bots/sentinel-bot │
-│   15 modules : audit · automod · blackjack · cleanup ·       │
-│   community · coude · games · moderation · progression ·     │
-│   security · slot · tickets · voice · welcome · wheel        │
+│      Bot Discord unifié (Serenity 0.12)  — sentinel-bot │
+│   17 modules : announcements · audit · automod · blackjack · │
+│   cleanup · community · confessions · coude · games ·        │
+│   moderation · progression · security · slot · tickets ·     │
+│   voice · welcome · wheel                                    │
 └────────────┬─────────────────────────────────┬──────────────┘
              │ HTTP (BaseApiClient keep-alive)  │ Redis pub/sub
              ▼                                  ▼
 ┌─────────────────────────┐         ┌──────────────────────────┐
 │  API backend (Axum 0.8) │◄────────┤  Gateway WebSocket       │
-│  services/api           │         │  services/gateway        │
-│  - 150 migrations       │         │  (relay Redis → clients) │
+│  sentinel-api           │         │  sentinel-gateway        │
+│  - 225 migrations       │         │  (relay Redis → clients) │
 │  - ONNX inference       │         └─────────┬────────────────┘
-│  - ~40 handlers HTTP    │                   │
+│  - ~140 handlers HTTP   │                   │
 │  - Hexagonal            │                   │
 │  - guild_auth multi-    │                   │
 │    tenant (OAuth2)      │                   │
@@ -33,7 +34,7 @@ Discord Messages / Events / Images
        │ PostgreSQL   │ Redis                 │
        ▼              ▼                       ▼
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
-│ Postgres  │  │  Redis    │        │ apps/web (Vue 3)       │
+│ Postgres  │  │  Redis    │        │ sentinel-web (Vue 3)       │
 │(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
 │ 150 migs  │  │  pub/sub) │        └────────────────────────┘
 └─────┬─────┘  └─────┬─────┘
@@ -41,12 +42,17 @@ Discord Messages / Events / Images
       └──────┬───────┘
              ▼
 ┌─────────────────────────────────────────┐
-│ 13 Workers périodiques (Tokio)          │
-│ ai · analytics · appeal-sla · audit-    │
-│ cache · blackjack-cleanup · cache ·     │
-│ cleanup · coude · discord-audit-sync ·  │
-│ export · moderation · monitoring ·      │
-│ temp-roles                              │
+│ 9 Workers (Tokio)                       │
+│ Spécialisés : ai · analytics · cache ·  │
+│ cleanup · coude · moderation ·          │
+│ monitoring · temp-roles                 │
+│ Meta : sentinel-worker (17 domaines :   │
+│ ai · analytics · announcements ·        │
+│ appeal_sla · audit_cache · blackjack ·  │
+│ cache · cleanup · coude ·               │
+│ discord_audit_sync · export ·           │
+│ game_portal · moderation · monitoring · │
+│ security · temp_roles · tickets)        │
 └─────────────────────────────────────────┘
 ```
 
@@ -58,15 +64,15 @@ Discord Messages / Events / Images
 
 | Composant | Technologie | Détails |
 |---|---|---|
-| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~40 handlers, 150 migrations, ONNX inference, OAuth Discord |
+| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~140 handlers, 225 migrations, ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis pub/sub | Service dédié temps réel, auto-reconnect exponential backoff |
-| Bot Discord unifié | Rust / Serenity 0.12 / lib `sentinel-shared` | Process unique, 15 modules chargés dynamiquement selon config per-guild |
-| 13 Workers | Rust / Tokio / sqlx / lib `worker-common` | `spawn_periodic` + heartbeat + métriques Prometheus |
-| gRPC (Phase 7) | `tonic` 0.12 + `prost` 0.13 | Crate `services/proto` (amorce scaling horizontal) |
-| PostgreSQL | Postgres 16 + **PgBouncer** | 150 migrations, partitionnement RANGE mensuel, vues matérialisées |
+| Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 17 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
+| 9 Workers | Rust / Tokio / sqlx / lib `worker-common` | 8 binaires spécialisés + 1 meta `sentinel-worker` (scheduler 17 domaines), heartbeat + métriques Prometheus |
+| gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (amorce scaling horizontal) |
+| PostgreSQL | Postgres 16 + **PgBouncer** | 225 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache | Redis 7 | `maxmemory=2gb allkeys-lru`, pub/sub events, cache `user_guilds` multi-tenant |
-| Inférence IA | ONNX Runtime 2.0 / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
-| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `apps/web` — servi par Nginx (Dockerfile + nginx.conf) |
+| Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
+| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `sentinel-web` — servi par Nginx (Dockerfile + nginx.conf) |
 | Observabilité | Prometheus + Grafana + tokio-metrics | Middleware Axum metrics, dashboards provisionnés |
 | Containerisation | Docker Alpine multi-stage + Compose | Infra + API + gateway + bot + workers + web + monitoring |
 
@@ -78,51 +84,31 @@ Discord Messages / Events / Images
 
 ```
 DiscordSentinel/
-├── apps/
-│   └── web/                     # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
+├── sentinel-web/                # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
 │
-├── bots/
-│   ├── sentinel-bot/            # Bot Discord unifié (single process)
-│   │   └── src/modules/         # audit · automod · blackjack · cleanup · community ·
-│   │                            # coude · games · moderation · progression · security ·
-│   │                            # slot · tickets · voice · welcome · wheel (15 modules)
-│   └── shared/                  # Lib `sentinel-shared` (api_client, cache_settings, embeds, ...)
+├── sentinel-bot/                # Bot Discord unifié (single process, 17 modules)
+│   └── src/
+│       ├── modules/             # announcements · audit · automod · blackjack · cleanup ·
+│       │                        # community · confessions · coude · games · moderation ·
+│       │                        # progression · security · slot · tickets · voice ·
+│       │                        # welcome · wheel
+│       └── shared/              # Helpers communs (api_client, cache_settings, embeds, grpc_client, ...)
 │
-├── services/
-│   ├── api/
-│   │   ├── src/
-│   │   │   ├── adapters/inbound/http/   # handlers, middlewares (auth, guild_auth, rate_limit, api_logger, metrics)
-│   │   │   ├── adapters/outbound/       # repositories postgres, redis_cache
-│   │   │   ├── application/             # use case services
-│   │   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
-│   │   │   └── ports/                   # traits inbound/outbound
-│   │   └── migrations/                  # 001 → 150 (partitions, MV, enums, ai_jobs, welcome rich embeds, ...)
-│   │
-│   ├── gateway/                 # WebSocket relay (Redis pub/sub → clients)
-│   ├── proto/                   # Définitions gRPC (Phase 7 — `tonic` + `prost`)
-│   │
-│   └── workers/
-│       ├── worker-common/       # Lib partagée (pg_pool, spawn_periodic, heartbeat, observability)
-│       ├── ai-worker/           # Queue async IA (drain ai_jobs → API → Redis)
-│       ├── analytics-worker/    # Snapshots quotidiens/horaires
-│       ├── appeal-sla-worker/   # SLA appels de sanction
-│       ├── audit-cache-worker/  # Cache des audit-logs Discord
-│       ├── blackjack-cleanup-worker/  # Nettoyage tables blackjack
-│       ├── cache-worker/        # Warm caches + refresh MV + sync user_cache + manage_partitions
-│       ├── cleanup-worker/      # Rétention DB + VACUUM
-│       ├── coude-worker/        # Expiration combats + résolution paris
-│       ├── discord-audit-sync-worker/  # Ingest continu des audit-logs Discord
-│       ├── export-worker/       # Exports asynchrones (CSV, JSON, ...)
-│       ├── moderation-worker/   # Conduct regen + cleanup bans + rappels sanctions
-│       ├── monitoring-worker/   # Détection offline/online via Redis
-│       └── temp-roles-worker/   # Scan temp_roles → publish Redis
+├── sentinel-api/                # API backend (Axum 0.8) — hexagonal
+│   ├── src/
+│   │   ├── adapters/inbound/http/   # handlers, middlewares (auth, guild_auth, rate_limit, api_logger, metrics)
+│   │   ├── adapters/outbound/       # repositories postgres, redis_cache
+│   │   ├── application/             # use case services
+│   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
+│   │   └── ports/                   # traits inbound/outbound
+│   └── migrations/                  # 001 → 225
 │
-├── ai/                          # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
+├── sentinel-gateway/            # WebSocket relay (Redis pub/sub → clients)
+├── sentinel-proto/              # Définitions gRPC (`tonic` + `prost`)
+├── sentinel-worker/             # Meta-scheduler unifié — 17 domaines périodiques
 │
-├── infra/                       # prometheus.yml + grafana provisioning + scripts/ (build-all, dev, health-check, seed-rules, start-all, run-tests, tls-issue)
-├── docs/                        # COUP_DE_COUDE_*.md, commandes-utilisateur.md, cmd_discord/, amélioration/
-│
-├── infra/docker/                # docker-compose.yml + docker-compose.test.yml
+├── sentinel-ml/                          # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
+├── sentinel-infrastructure/                       # docker/ (compose + Dockerfiles), prometheus.yml, grafana, scripts/ (build-all, dev, health-check, ...)
 ├── Cargo.toml                   # Workspace Rust (20+ membres)
 └── README.md                    # ← ce fichier
 ```
@@ -131,7 +117,7 @@ DiscordSentinel/
 
 ## Base de données
 
-**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **150 migrations** versionnées (`services/api/migrations/001 → 150`).
+**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **225 migrations** versionnées (`sentinel-api/migrations/001 → 225`).
 
 ### Optimisations structurelles
 
@@ -174,7 +160,7 @@ DiscordSentinel/
 
 ## Endpoints API (résumé)
 
-**Authentification** : `Authorization: Bearer <API_KEY>` obligatoire (sauf `/health` et `/metrics`). Le middleware `guild_auth_middleware` filtre en plus par `X-Discord-Token` si présent (multi-tenant OAuth2).
+**Authentification** : `Authorization: Bearer <API_KEY>` obligatoire (sauf `/health` et `/metrics`). Le middleware `guild_auth_middleware` filtre en plus par `X-Discord-Token` si présent (multi-tenant OAuth2). ~140 endpoints répartis sur 18 fichiers de routes.
 
 | Préfixe | Handler | Description |
 |---|---|---|
@@ -222,7 +208,7 @@ DiscordSentinel/
 | Input | Tokens (max 256) + attention mask |
 | Tokenizer | HuggingFace tokenizers (Rust) |
 
-Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatique si absents (scoring règles seulement). Les configs d'entraînement vivent dans `ai/training/{text,vision}/configs/`, les exports ONNX sont attendus dans `ai/training/{text,vision}/exports/` (montés en `/models/*` par `docker-compose.yml`). Le pipeline d'entraînement lui-même est externe au repo.
+Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatique si absents (scoring règles seulement). Les configs d'entraînement vivent dans `sentinel-ml/{text,vision}/configs/`, les exports ONNX sont attendus dans `sentinel-ml/{text,vision}/exports/` (montés en `/models/*` par `docker-compose.yml`). Le pipeline d'entraînement lui-même est externe au repo.
 
 ### Config IA per-guild
 
@@ -283,7 +269,7 @@ Request
 ## Observabilité
 
 - **Prometheus** — endpoint `/metrics` sur l'API et chaque worker (port 9100). Compteurs `http_requests_total{route,method,status}`, histogrammes `http_request_duration_seconds`, gauges `tokio_busy_ratio`, `tokio_live_tasks_count`, `tokio_global_queue_depth`.
-- **Grafana** — dashboards auto-provisionnés dans `infra/grafana/`. Démarrage : `docker compose -f infra/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
+- **Grafana** — dashboards auto-provisionnés dans `sentinel-infrastructure/grafana/`. Démarrage : `docker compose -f sentinel-infrastructure/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
 - **pg_stat_statements** — extension activée (migration 099). `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC`.
 - **Tracing structuré** — `tracing-subscriber` JSON en prod, correlation IDs `X-Request-ID` propagés via `tower_http::request_id`.
 
@@ -294,11 +280,11 @@ Request
 ### Docker Compose
 
 ```bash
-# Stack complète (infra + API + bot unifié + 13 workers + gateway + web)
-docker compose -f infra/docker/docker-compose.yml up -d
+# Stack complète (infra + API + bot unifié + 9 workers + gateway + web)
+docker compose -f sentinel-infrastructure/docker/docker-compose.yml up -d
 
 # Avec Prometheus + Grafana
-docker compose -f infra/docker/docker-compose.yml --profile monitoring up -d
+docker compose -f sentinel-infrastructure/docker/docker-compose.yml --profile monitoring up -d
 ```
 
 **Services infra** : `postgres` (tuning RAM : `shared_buffers=4GB`, `work_mem=64MB`, WAL tuning), `pgbouncer` (transaction pooling), `redis` (`maxmemory=2gb allkeys-lru`).
@@ -333,17 +319,17 @@ VOICE_LOG_CHANNEL_ID=...
 ### Développement local
 
 ```bash
-bash infra/scripts/dev.sh              # Lance API + bot + web
-bash infra/scripts/build-all.sh        # Build release de tous les crates
-bash infra/scripts/health-check.sh     # Vérifie que tous les services répondent
-bash infra/scripts/seed-rules.sh       # Seed de règles de dev
-bash infra/scripts/start-all.sh        # Démarre la stack complète
+bash sentinel-infrastructure/scripts/dev.sh              # Lance API + bot + web
+bash sentinel-infrastructure/scripts/build-all.sh        # Build release de tous les crates
+bash sentinel-infrastructure/scripts/health-check.sh     # Vérifie que tous les services répondent
+bash sentinel-infrastructure/scripts/seed-rules.sh       # Seed de règles de dev
+bash sentinel-infrastructure/scripts/start-all.sh        # Démarre la stack complète
 
 # Ou composant par composant :
-cd services/api && cargo run
+cd sentinel-api && cargo run
 cd services/workers/ai-worker && cargo run
-cd bots/sentinel-bot && cargo run
-cd apps/web && npm run dev
+cd sentinel-bot && cargo run
+cd sentinel-web && npm run dev
 ```
 
 ---
@@ -357,7 +343,7 @@ Tests `cargo test --lib` côté API + unitaires workers/modules bot. Couverture 
 - **Workers** : helpers `worker-common`.
 - **Gateway** : broadcaster.
 
-Stack de tests dédiée via `infra/docker/docker-compose.test.yml`.
+Stack de tests dédiée via `sentinel-infrastructure/docker/docker-compose.test.yml`.
 
 ---
 
@@ -365,7 +351,7 @@ Stack de tests dédiée via `infra/docker/docker-compose.test.yml`.
 
 - **Bot = interface légère** — logique métier centralisée dans l'API, jamais dans les modules du bot.
 - **Architecture hexagonale** côté API — séparation stricte domain / ports / adapters.
-- **Workers = jobs périodiques DB-bound** — via `spawn_periodic` + Redis pub/sub, pas de Discord gateway direct (sauf `discord-audit-sync-worker` qui utilise le token bot pour lire les audit-logs).
+- **Workers = jobs périodiques DB-bound** — via `spawn_periodic` + Redis pub/sub, pas de Discord gateway direct (sauf le domaine `discord_audit_sync` du `sentinel-worker` qui utilise le token bot pour lire les audit-logs).
 - **Gateway découplé** — absorbe les bursts WebSocket indépendamment de l'API.
 - **Inférence IA gracieuse** — si modèles absents, fallback scoring règles.
 - **Multi-tenant** — filtre `guild_auth` avec pass-through pour appels internes.

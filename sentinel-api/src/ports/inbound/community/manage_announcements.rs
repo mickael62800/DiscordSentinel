@@ -1,0 +1,132 @@
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+use sentinel_core::domain::entities::community::announcement::{
+    AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
+    RecurrenceType, ScheduledAnnouncement,
+};
+use sentinel_core::domain::errors::DomainError;
+
+pub struct CreateAnnouncementCommand {
+    pub guild_id: String,
+    pub name: String,
+    pub recurrence_type: RecurrenceType,
+    pub recurrence_hour: u8,
+    pub recurrence_minute: u8,
+    pub recurrence_day_of_week: Option<u8>,
+    pub recurrence_day_of_month: Option<u8>,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+    pub content_type: ContentType,
+    pub content_text: String,
+    pub embed_title: Option<String>,
+    pub embed_color: Option<i32>,
+    pub embed_image_url: Option<String>,
+    pub embed_thumbnail_url: Option<String>,
+    pub mention_everyone: bool,
+    pub mention_here: bool,
+    pub mention_role_ids: Vec<String>,
+    pub channel_ids: Vec<String>,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
+    pub created_by: String,
+}
+
+pub struct UpdateAnnouncementCommand {
+    pub id: Uuid,
+    pub name: String,
+    pub recurrence_type: RecurrenceType,
+    pub recurrence_hour: u8,
+    pub recurrence_minute: u8,
+    pub recurrence_day_of_week: Option<u8>,
+    pub recurrence_day_of_month: Option<u8>,
+    pub scheduled_at: Option<DateTime<Utc>>,
+    pub end_date: Option<DateTime<Utc>>,
+    pub content_type: ContentType,
+    pub content_text: String,
+    pub embed_title: Option<String>,
+    pub embed_color: Option<i32>,
+    pub embed_image_url: Option<String>,
+    pub embed_thumbnail_url: Option<String>,
+    pub mention_everyone: bool,
+    pub mention_here: bool,
+    pub mention_role_ids: Vec<String>,
+    pub channel_ids: Vec<String>,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
+}
+
+/// Payload pret a etre envoye au bot Discord pour publication.
+/// Variables deja interpolees, mentions formattees.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RenderedAnnouncement {
+    pub announcement_id: Uuid,
+    pub run_id: Uuid,
+    pub guild_id: String,
+    pub channel_ids: Vec<String>,
+    pub content_text: String,
+    pub embed: Option<RenderedEmbed>,
+    /// Texte de mentions a prepend au message (ex: "@everyone <@&role_id>").
+    pub mentions_prefix: String,
+    pub buttons: Vec<AnnouncementButton>,
+    pub auto_reactions: Vec<String>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct RenderedEmbed {
+    pub title: Option<String>,
+    pub description: String,
+    pub color: Option<i32>,
+    pub image_url: Option<String>,
+    pub thumbnail_url: Option<String>,
+}
+
+#[async_trait]
+pub trait ManageAnnouncementsUseCase: Send + Sync {
+    async fn create(&self, cmd: CreateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError>;
+    async fn update(&self, cmd: UpdateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError>;
+    async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
+    async fn get(&self, id: Uuid) -> Result<ScheduledAnnouncement, DomainError>;
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<ScheduledAnnouncement>, DomainError>;
+    async fn toggle(&self, id: Uuid, enabled: bool) -> Result<bool, DomainError>;
+
+    /// Pour les workers : recupere les annonces dues + cree un run pending +
+    /// retourne les payloads prets a publier (variables interpolees).
+    async fn fetch_due_and_prepare(
+        &self,
+        now: DateTime<Utc>,
+        limit: i64,
+    ) -> Result<Vec<RenderedAnnouncement>, DomainError>;
+
+    /// Apres publication par le bot : enregistre le resultat de chaque
+    /// channel + calcule next_run_at.
+    async fn record_run_result(
+        &self,
+        run_id: Uuid,
+        channels_posted: Vec<ChannelPostResult>,
+    ) -> Result<(), DomainError>;
+
+    /// Aperçu : retourne le rendu sans poster ni creer de run.
+    async fn preview(&self, id: Uuid) -> Result<RenderedAnnouncement, DomainError>;
+
+    async fn list_runs(&self, announcement_id: Uuid, limit: i64) -> Result<Vec<AnnouncementRun>, DomainError>;
+
+    /// Enregistre un clic sur un bouton (appele par le bot apres
+    /// interaction Discord).
+    async fn record_button_interaction(
+        &self,
+        announcement_id: Uuid,
+        run_id: Option<Uuid>,
+        user_id: String,
+        user_name: Option<String>,
+        button_custom_id: String,
+        button_label: Option<String>,
+    ) -> Result<(), DomainError>;
+
+    async fn list_button_interactions(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<ButtonInteraction>, DomainError>;
+}

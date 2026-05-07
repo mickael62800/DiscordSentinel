@@ -45,19 +45,19 @@ coverage-html/
 .env.test
 
 # AI artifacts (montes en volume au runtime, pas builds-in)
-ai/training/checkpoints/
-ai/training/*/checkpoints/
-ai/training/*/datasets/
+sentinel-ml/checkpoints/
+sentinel-ml/*/checkpoints/
+sentinel-ml/*/datasets/
 
 # Docker meta (les Dockerfiles eux-memes ne servent a rien dans le contexte)
 docker-compose.yml
 docker-compose.*.yml
-infra/docker/docker-compose*.yml
+sentinel-infrastructure/docker/docker-compose*.yml
 **/Dockerfile
 
 # Logos / assets non-builds
 *.ico
 *.png
-!apps/web/public/**
-!bots/sentinel-bot/assets/**
-!infra/docker/empty-assets/**
+!sentinel-web/public/**
+!sentinel-bot/assets/**
+!sentinel-infrastructure/docker/empty-assets/**

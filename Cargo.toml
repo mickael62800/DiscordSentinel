@@ -1,20 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    # Partagé
-    "services/proto",
-    "bots/shared",
-
-    # Backend
-    "services/api",
-    "services/gateway",
-
-    # Worker unifie : tous les jobs periodiques + les helpers communs
-    # (ex worker-common absorbe dans src/common/) dans un binaire unique.
-    "services/workers/sentinel-worker",
-
-    # Bot Discord unifie
-    "bots/sentinel-bot",
+    "sentinel-proto",
+    "sentinel-core",
+    "sentinel-api",
+    "sentinel-gateway",
+    "sentinel-worker",
+    "sentinel-bot",
 ]
 
 [workspace.package]
@@ -72,8 +64,8 @@ redis = { version = "0.27", features = ["tokio-comp", "aio", "streams"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json", "macros", "migrate"] }
 
 # Internes (paths)
-sentinel-proto = { path = "services/proto" }
-sentinel-shared = { path = "bots/shared" }
+sentinel-proto = { path = "sentinel-proto" }
+sentinel-core = { path = "sentinel-core" }
 
 # ── Lints partagés (à activer dans chaque crate via `[lints] workspace = true`) ──
 [workspace.lints.clippy]

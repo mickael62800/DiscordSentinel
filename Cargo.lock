@@ -2991,6 +2991,7 @@ dependencies = [
  "rand 0.8.6",
  "redis",
  "reqwest",
+ "sentinel-core",
  "sentinel-proto",
  "serde",
  "serde_json",
@@ -3025,21 +3026,36 @@ dependencies = [
  "futures-util",
  "image",
  "once_cell",
+ "prost",
  "rand 0.8.6",
  "redis",
  "regex",
  "reqwest",
  "sentinel-proto",
- "sentinel-shared",
  "serde",
  "serde_json",
  "serenity",
+ "thiserror 2.0.18",
  "tikv-jemallocator",
  "time",
  "tokio",
  "tonic",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "sentinel-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rand 0.8.6",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -3072,24 +3088,6 @@ dependencies = [
  "protoc-bin-vendored",
  "tonic",
  "tonic-build",
-]
-
-[[package]]
-name = "sentinel-shared"
-version = "0.1.0"
-dependencies = [
- "futures-util",
- "prost",
- "redis",
- "reqwest",
- "sentinel-proto",
- "serde",
- "serde_json",
- "serenity",
- "thiserror 2.0.18",
- "tokio",
- "tonic",
- "tracing",
 ]
 
 [[package]]

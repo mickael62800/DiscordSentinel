@@ -1,0 +1,37 @@
+# Docker Compose pour les tests d'integration.
+# Usage : docker compose -f sentinel-infrastructure/docker/docker-compose.test.yml up -d
+#         ./sentinel-infrastructure/scripts/run-tests.sh
+#         docker compose -f sentinel-infrastructure/docker/docker-compose.test.yml down -v
+
+# Project name dedie pour eviter toute collision avec le stack prod
+# (`discordsentinel`).
+name: discordsentinel-test
+
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: sentinel-test-postgres
+    environment:
+      POSTGRES_USER: sentinel_test
+      POSTGRES_PASSWORD: sentinel_test
+      POSTGRES_DB: sentinel_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: sentinel-test-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 10

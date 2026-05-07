@@ -1,0 +1,63 @@
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
+use sentinel_core::domain::entities::coude::social::Season;
+use sentinel_core::domain::entities::coude::social::Event;
+use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
+use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_core::domain::entities::coude::social::NewDailyChaos;
+use sentinel_core::domain::errors::DomainError;
+
+/// Repository pour les fonctionnalités "sociales" Coup de Coude :
+/// cooldowns, classements, événements serveur, daily chaos, saisons.
+#[async_trait]
+pub trait SocialRepository: Send + Sync {
+    // ── Cooldowns ──
+
+    /// Retourne la date d'expiration du cooldown actif (`> NOW()`), ou `None`
+    /// si aucun n'est en cours.
+    async fn get_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        action: &str,
+    ) -> Result<Option<DateTime<Utc>>, DomainError>;
+
+    /// Upsert un cooldown : `expires_at = NOW() + duration_secs`.
+    async fn set_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        action: &str,
+        duration_secs: i64,
+    ) -> Result<(), DomainError>;
+
+    // ── Leaderboard ──
+
+    async fn leaderboard(
+        &self,
+        guild_id: &str,
+        category: LeaderboardCategory,
+        limit: i64,
+    ) -> Result<Vec<LeaderboardEntry>, DomainError>;
+
+    // ── Événements ──
+
+    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<Event>, DomainError>;
+
+    // ── Daily chaos ──
+
+    async fn log_daily_chaos(&self, chaos: NewDailyChaos) -> Result<(), DomainError>;
+
+    /// Nombre de chaos deja emis aujourd'hui pour cette guild.
+    async fn count_daily_chaos_today(&self, guild_id: &str) -> Result<i64, DomainError>;
+
+    // ── Saison ──
+
+    /// Renvoie la saison active du guild. Bootstrap automatique si aucune
+    /// saison n'existe : insertion de la saison suivante (numéro incrémenté).
+    async fn get_or_bootstrap_current_season(
+        &self,
+        guild_id: &str,
+    ) -> Result<Season, DomainError>;
+}

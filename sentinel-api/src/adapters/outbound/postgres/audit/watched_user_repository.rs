@@ -1,0 +1,177 @@
+use async_trait::async_trait;
+use sqlx::PgPool;
+
+use sentinel_core::domain::entities::audit::watched_user::classify_risk_level;
+use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
+use sentinel_core::domain::errors::DomainError;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
+
+pub struct PgWatchedUserRepository {
+    pool: PgPool,
+}
+
+impl PgWatchedUserRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct WatchedUserRow {
+    user_id: String,
+    username: String,
+    guild_id: String,
+    guild_name: String,
+    total_warns: i64,
+    total_mutes: i64,
+    total_bans: i64,
+    conduct_points: Option<i32>,
+    max_conduct_points: Option<i32>,
+    last_incident_at: Option<chrono::DateTime<chrono::Utc>>,
+    security_events_count: i64,
+    first_seen_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<WatchedUserRow> for WatchedUser {
+    fn from(row: WatchedUserRow) -> Self {
+        // La regle de classification de risque est en `domain/entities/watched_user.rs`.
+        // Cet adapter se contente de mapper row → entity + appel de la fn pure.
+        let risk_level = classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
+
+        Self {
+            user_id: row.user_id.into(),
+            username: row.username,
+            guild_id: row.guild_id.into(),
+            guild_name: row.guild_name,
+            risk_level,
+            total_warns: row.total_warns,
+            total_mutes: row.total_mutes,
+            total_bans: row.total_bans,
+            conduct_points: row.conduct_points,
+            max_conduct_points: row.max_conduct_points,
+            last_incident_at: row.last_incident_at,
+            security_events_count: row.security_events_count,
+            first_seen_at: row.first_seen_at,
+        }
+    }
+}
+
+#[async_trait]
+impl WatchedUserRepository for PgWatchedUserRepository {
+    async fn find_watched_users(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<WatchedUser>, DomainError> {
+        // Phase X — surveillance purement MANUELLE : avant, la requete
+        // faisait un UNION entre tous les users avec infractions (auto) et
+        // les users dans manual_watched_users. Consequence : impossible de
+        // retirer un user avec des infractions (il revenait via la branche
+        // auto), et impossible d'ajouter un user deja auto-tracke (il etait
+        // deja "watched"). On ne retourne maintenant QUE les entrees
+        // manual_watched_users, enrichies avec leurs stats d'infractions.
+        let query = r#"
+            SELECT
+                mw.user_id,
+                mw.username,
+                mw.guild_id,
+                COALESCE(g.name, mw.guild_id) AS guild_name,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'warn'
+                ), 0) AS total_warns,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'mute'
+                ), 0) AS total_mutes,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'ban'
+                ), 0) AS total_bans,
+                ucp.points AS conduct_points,
+                cc.max_points AS max_conduct_points,
+                (
+                    SELECT MAX(i.created_at) FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id
+                ) AS last_incident_at,
+                COALESCE((
+                    SELECT COUNT(*)::bigint
+                    FROM security_events se,
+                         jsonb_array_elements_text(se.user_ids) AS u(user_id)
+                    WHERE se.guild_id = mw.guild_id AND u.user_id = mw.user_id
+                ), 0) AS security_events_count,
+                mw.created_at AS first_seen_at
+            FROM manual_watched_users mw
+            LEFT JOIN guilds g ON g.guild_id = mw.guild_id
+            LEFT JOIN user_conduct_points ucp
+                ON ucp.guild_id = mw.guild_id AND ucp.user_id = mw.user_id
+            LEFT JOIN conduct_config cc ON cc.guild_id = mw.guild_id
+            WHERE ($1::text IS NULL OR mw.guild_id = $1)
+            ORDER BY mw.created_at DESC
+            LIMIT $2 OFFSET $3
+        "#;
+
+        let rows = sqlx::query_as::<_, WatchedUserRow>(query)
+            .bind(guild_id)
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(WatchedUser::from).collect())
+    }
+
+    async fn add_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        reason: &str,
+        added_by: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"
+            INSERT INTO manual_watched_users (guild_id, user_id, username, reason, added_by)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                username = EXCLUDED.username,
+                reason = EXCLUDED.reason
+            "#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(username)
+        .bind(reason)
+        .bind(added_by)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn remove_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+#[path = "tests/watched_user_repository.rs"]
+mod tests;
