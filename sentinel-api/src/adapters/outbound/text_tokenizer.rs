@@ -4,6 +4,8 @@ use ndarray::Array2;
 use tokenizers::Tokenizer;
 use tracing::info;
 use tracing::warn;
+
+pub use sentinel_core::ports::outbound::ai::text_tokenizer::TextTokenizer as TextTokenizerPort;
 /// Wrapper autour du tokenizer HuggingFace pour preparer les inputs du modele text ONNX.
 pub struct TextTokenizer {
     tokenizer: Option<Tokenizer>,
@@ -76,6 +78,13 @@ impl TextTokenizer {
             encoding.get_attention_mask(),
             self.max_length,
         ))
+    }
+}
+
+impl TextTokenizerPort for TextTokenizer {
+    fn available(&self) -> bool { TextTokenizer::available(self) }
+    fn tokenize(&self, text: &str) -> Result<(Array2<i64>, Array2<i64>), String> {
+        TextTokenizer::tokenize(self, text)
     }
 }
 

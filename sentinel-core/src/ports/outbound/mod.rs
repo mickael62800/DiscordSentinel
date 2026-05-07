@@ -7,3 +7,4 @@ pub mod game;
 pub mod moderation;
 pub mod system;
 pub mod discord_api;
+pub mod ai;

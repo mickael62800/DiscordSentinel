@@ -7,12 +7,10 @@ use ort::session::Session;
 use ort::value::Value;
 use tracing::info;
 use tracing::warn;
-/// Classification produite par un modele ONNX.
-#[derive(Debug, Clone)]
-pub struct InferenceClassification {
-    pub label: String,
-    pub confidence: f32,
-}
+
+pub use sentinel_core::ports::outbound::ai::inference_service::{
+    InferenceClassification, InferenceService as InferenceServicePort,
+};
 
 /// Service d'inference ONNX — charge les modeles au demarrage.
 /// Les sessions sont protegees par Mutex car `session.run()` requiert `&mut`.
@@ -100,7 +98,20 @@ impl InferenceService {
     pub fn text_available(&self) -> bool {
         self.text_session.read().map(|s| s.is_some()).unwrap_or(false)
     }
+}
 
+impl InferenceServicePort for InferenceService {
+    fn vision_available(&self) -> bool { InferenceService::vision_available(self) }
+    fn text_available(&self) -> bool { InferenceService::text_available(self) }
+    fn classify_image(&self, t: Array4<f32>) -> Result<Vec<InferenceClassification>, String> {
+        InferenceService::classify_image(self, t)
+    }
+    fn classify_text(&self, ids: Array2<i64>, mask: Array2<i64>) -> Result<Vec<InferenceClassification>, String> {
+        InferenceService::classify_text(self, ids, mask)
+    }
+}
+
+impl InferenceService {
     /// Inference vision : prend une image preprocessee (1, 3, 224, 224) normalisee.
     pub fn classify_image(&self, image_tensor: Array4<f32>) -> Result<Vec<InferenceClassification>, String> {
         let guard = self.vision_session.read().map_err(|e| format!("RwLock error: {e}"))?;

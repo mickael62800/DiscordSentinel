@@ -8,8 +8,8 @@ use uuid::Uuid;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::errors::DomainError;
-use crate::adapters::outbound::inference_service::InferenceService;
-use crate::adapters::outbound::text_tokenizer::TextTokenizer;
+use sentinel_core::ports::outbound::ai::inference_service::InferenceService;
+use sentinel_core::ports::outbound::ai::text_tokenizer::TextTokenizer;
 use sentinel_core::domain::services::moderation::channel_tension::ChannelTensionBuffer;
 use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use sentinel_core::domain::services::moderation::scoring_service::ScoringService;
@@ -39,8 +39,8 @@ pub struct AnalyzeMessageService {
     /// dediee `ia_config` ; fusion dans automod-bot via migration 146.
     bot_config_repo: Arc<dyn BotConfigRepository>,
     inference_limiter: Arc<InferenceRateLimiter>,
-    inference: Option<Arc<InferenceService>>,
-    tokenizer: Option<Arc<TextTokenizer>>,
+    inference: Option<Arc<dyn InferenceService>>,
+    tokenizer: Option<Arc<dyn TextTokenizer>>,
     /// Buffer in-memory pour la "tension de salon" (option : si None, la
     /// feature est desactivee quel que soit le contenu de la config).
     tension_buffer: Option<Arc<ChannelTensionBuffer>>,
@@ -71,8 +71,8 @@ impl AnalyzeMessageService {
     /// Ajoute l'inference text IA au service d'analyse.
     pub fn with_text_inference(
         mut self,
-        inference: Arc<InferenceService>,
-        tokenizer: Arc<TextTokenizer>,
+        inference: Arc<dyn InferenceService>,
+        tokenizer: Arc<dyn TextTokenizer>,
     ) -> Self {
         self.inference = Some(inference);
         self.tokenizer = Some(tokenizer);
@@ -479,7 +479,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
 pub fn score_classifications(
-    classifications: &[crate::adapters::outbound::inference_service::InferenceClassification],
+    classifications: &[sentinel_core::ports::outbound::ai::inference_service::InferenceClassification],
     rules: &[sentinel_core::domain::entities::system::rule::Rule],
     threshold: f32,
 ) -> Option<(f64, Vec<FlagType>, String)> {

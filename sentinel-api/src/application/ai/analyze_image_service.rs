@@ -8,7 +8,7 @@ use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::errors::DomainError;
-use crate::adapters::outbound::inference_service::InferenceService;
+use sentinel_core::ports::outbound::ai::inference_service::InferenceService;
 use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
@@ -25,7 +25,7 @@ use crate::ports::outbound::moderation::rule_repository::RuleRepository;
 const DEFAULT_VISION_THRESHOLD: f32 = 0.5;
 
 pub struct AnalyzeImageService {
-    inference: Arc<InferenceService>,
+    inference: Arc<dyn InferenceService>,
     rule_repo: Arc<dyn RuleRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
@@ -39,7 +39,7 @@ pub struct AnalyzeImageService {
 
 impl AnalyzeImageService {
     pub fn new(
-        inference: Arc<InferenceService>,
+        inference: Arc<dyn InferenceService>,
         rule_repo: Arc<dyn RuleRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
@@ -181,7 +181,7 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
                     Ok(cached) => {
                         tracing::debug!(hash = %img_hash.as_ref().unwrap(), "vision: cache HIT");
                         Some(cached.classifications.into_iter().map(|(label, confidence)| {
-                            crate::adapters::outbound::inference_service::InferenceClassification {
+                            sentinel_core::ports::outbound::ai::inference_service::InferenceClassification {
                                 label, confidence,
                             }
                         }).collect::<Vec<_>>())
