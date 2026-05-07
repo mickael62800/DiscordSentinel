@@ -37,6 +37,7 @@ use crate::ports::inbound::casino::manage_slot::SpinResult;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::casino::slot_repository::SlotRepository;
+use crate::adapters::outbound::postgres::uow::PgTx;
 const MODULE_BOT_NAME: &str = "slot-bot";
 
 pub struct ManageSlotService {
@@ -131,8 +132,8 @@ impl ManageSlotService {
             .collect();
 
         // Tx atomique.
-        let mut tx = self.pg_pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("begin tx slot: {e}")))?;
+        let mut tx = PgTx(self.pg_pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("begin tx slot: {e}")))?);
 
         let mut taunt_mutations = Vec::new();
 
@@ -208,7 +209,7 @@ impl ManageSlotService {
             self.repo.mark_daily_claimed_in_tx(&mut tx, &cmd.guild_id, &cmd.user_id).await?;
         }
 
-        tx.commit().await.map_err(|e| DomainError::Internal(format!("commit tx slot: {e}")))?;
+        tx.0.commit().await.map_err(|e| DomainError::Internal(format!("commit tx slot: {e}")))?;
 
         // 8. Post-commit : taunts faillite/jackpot eco.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();

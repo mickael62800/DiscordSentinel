@@ -29,6 +29,7 @@ use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
+use crate::adapters::outbound::postgres::uow::PgTx;
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
@@ -86,8 +87,8 @@ impl ManageWheelUseCase for ManageWheelService {
         let payout = outcome.case.payout;
 
         // 3. Tx atomique.
-        let mut tx = self.pg_pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("begin tx wheel: {e}")))?;
+        let mut tx = PgTx(self.pg_pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("begin tx wheel: {e}")))?);
 
         let mut taunt_mutations = Vec::new();
 
@@ -127,7 +128,7 @@ impl ManageWheelUseCase for ManageWheelService {
         // Mark daily.
         self.repo.mark_claimed_in_tx(&mut tx, &cmd.guild_id, &cmd.user_id).await?;
 
-        tx.commit().await.map_err(|e| DomainError::Internal(format!("commit tx wheel: {e}")))?;
+        tx.0.commit().await.map_err(|e| DomainError::Internal(format!("commit tx wheel: {e}")))?;
 
         // 4. Post-commit taunts.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();

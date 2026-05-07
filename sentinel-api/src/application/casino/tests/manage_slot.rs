@@ -48,13 +48,13 @@ impl SlotRepository for MockSlotRepo {
         Ok(())
     }
     async fn add_to_jackpot_pool_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &str, _: i64, _: i64,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: i64, _: i64,
     ) -> Result<i64, DomainError> { unimplemented!() }
     async fn claim_jackpot_pool_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: i64,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: i64,
     ) -> Result<(), DomainError> { unimplemented!() }
     async fn log_spin_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &SlotSpin,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &SlotSpin,
     ) -> Result<(), DomainError> { unimplemented!() }
     async fn last_spin_at(&self, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> {
         Ok(*self.last_spin.lock().unwrap())
@@ -63,7 +63,7 @@ impl SlotRepository for MockSlotRepo {
         Ok(*self.has_claimed.lock().unwrap())
     }
     async fn mark_daily_claimed_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str,
     ) -> Result<(), DomainError> { unimplemented!() }
     async fn recent_spins(&self, _: &str, _: i64) -> Result<Vec<SlotSpin>, DomainError> {
         Ok(self.recent_returns.lock().unwrap().clone())
@@ -101,8 +101,8 @@ impl ManageWalletUseCase for MockWalletUc {
     async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
 }
 

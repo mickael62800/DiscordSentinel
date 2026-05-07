@@ -2,8 +2,7 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
-use sqlx::Postgres;
-use sqlx::Transaction;
+use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::slot::SlotJackpotPool;
 use sentinel_core::domain::entities::casino::slot::SlotSpin;
 use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
@@ -11,6 +10,7 @@ use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::casino::slot_repository::SlotRepository;
 
 use super::super::pg_err;
+use super::super::uow::as_pg;
 
 pub struct PgSlotRepository {
     pool: PgPool,
@@ -60,11 +60,12 @@ impl SlotRepository for PgSlotRepository {
 
     async fn add_to_jackpot_pool_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         amount: i64,
         starting: i64,
     ) -> Result<i64, DomainError> {
+        let tx = as_pg(tx);
         let new_total: i64 = sqlx::query_scalar(
             "INSERT INTO slot_jackpot_pool (guild_id, current_pool)
              VALUES ($1, $2 + $3)
@@ -84,12 +85,13 @@ impl SlotRepository for PgSlotRepository {
 
     async fn claim_jackpot_pool_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         winner_id: &str,
         won_amount: i64,
         reset_to: i64,
     ) -> Result<(), DomainError> {
+        let tx = as_pg(tx);
         sqlx::query(
             "UPDATE slot_jackpot_pool
              SET current_pool = $2,
@@ -111,9 +113,10 @@ impl SlotRepository for PgSlotRepository {
 
     async fn log_spin_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         spin: &SlotSpin,
     ) -> Result<(), DomainError> {
+        let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO slot_spin_log
              (id, guild_id, user_id, username, mise, symbols, payout, multiplier, is_jackpot, is_free, created_at)
@@ -174,10 +177,11 @@ impl SlotRepository for PgSlotRepository {
 
     async fn mark_daily_claimed_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError> {
+        let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO slot_daily_claims (guild_id, user_id, day)
              VALUES ($1, $2, CURRENT_DATE)

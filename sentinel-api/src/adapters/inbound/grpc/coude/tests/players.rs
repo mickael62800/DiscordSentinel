@@ -104,8 +104,8 @@ impl ManageWalletUseCase for MockWalletUc {
     }
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { Ok(vec![]) }
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
 }
 

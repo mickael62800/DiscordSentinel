@@ -168,9 +168,9 @@ impl ManageWalletUseCase for MockWallet {
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.balance_to_return.lock().unwrap())
     }
-    async fn credit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str)
+    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str)
         -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str)
+    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str)
         -> Result<TxWalletMutation, DomainError> { unimplemented!() }
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
 }

@@ -36,10 +36,10 @@ impl WheelRepository for MockWheelRepo {
         Ok(*self.has_claimed.lock().unwrap())
     }
     async fn log_spin_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &WheelSpin,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &WheelSpin,
     ) -> Result<(), DomainError> { unimplemented!() }
     async fn mark_claimed_in_tx(
-        &self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str,
+        &self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str,
     ) -> Result<(), DomainError> { unimplemented!() }
     async fn recent_spins(&self, _g: &str, _l: i64) -> Result<Vec<WheelSpin>, DomainError> {
         Ok(self.recent_returns.lock().unwrap().clone())
@@ -59,8 +59,8 @@ impl ManageWalletUseCase for MockWalletUc {
     async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
 }
 

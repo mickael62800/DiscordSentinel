@@ -14,6 +14,7 @@ use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 
 use super::super::pg_err;
+use super::super::uow::PgTx;
 use crate::ports::outbound::coude::bet_repository::BetRepository;
 
 /// Refund "neutre" dans une tx en cours : credite les coins sans toucher
@@ -129,7 +130,7 @@ impl BetRepository for PgBetRepository {
     }
 
     async fn place(&self, new: NewCoudeBet) -> Result<Vec<TauntEvent>, DomainError> {
-        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let mut tx = PgTx(self.pool.begin().await.map_err(pg_err)?);
 
         // Lock la row combat et re-verifie le status AVANT tout debit. Evite
         // la race : service-layer check, puis worker passe en 'resolving',
@@ -141,7 +142,7 @@ impl BetRepository for PgBetRepository {
             "SELECT status FROM coude_combats WHERE id = $1 FOR UPDATE",
         )
         .bind(new.combat_id)
-        .fetch_optional(&mut *tx)
+        .fetch_optional(&mut *tx.0)
         .await
         .map_err(pg_err)?;
         let combat_status = combat_status
@@ -174,11 +175,11 @@ impl BetRepository for PgBetRepository {
         .bind(&new.bettor_name)
         .bind(&new.backed_id)
         .bind(new.amount)
-        .execute(&mut *tx)
+        .execute(&mut *tx.0)
         .await
         .map_err(pg_err)?;
 
-        tx.commit().await.map_err(pg_err)?;
+        tx.0.commit().await.map_err(pg_err)?;
 
         // Taunts declenches apres commit (faillite si solde a zero).
         let taunts = self
@@ -193,7 +194,7 @@ impl BetRepository for PgBetRepository {
         guild_id: &str,
         plan: BetResolutionPlan,
     ) -> Result<Vec<TauntEvent>, DomainError> {
-        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let mut tx = PgTx(self.pool.begin().await.map_err(pg_err)?);
 
         // On collecte (user_id, TxWalletMutation) pour detecter les taunts
         // APRES commit (jackpot credit sur gros payout).
@@ -212,13 +213,13 @@ impl BetRepository for PgBetRepository {
                         .credit_tx(&mut tx, guild_id, &payout.bettor_id, amount, "coude_bet_win", &desc)
                         .await?;
                     pending_taunts.push((payout.bettor_id.clone(), m));
-                    bump_player_earned_in_tx(&mut tx, guild_id, &payout.bettor_id, amount).await?;
+                    bump_player_earned_in_tx(&mut tx.0, guild_id, &payout.bettor_id, amount).await?;
                 }
                 BetPayoutOutcome::Refund { amount } => {
                     // Egalite : credit sans total_earned, pas de taunt.
                     let desc = format!("Pari egalite - remboursement combat {}", payout.bet_id);
                     refund_wallet_in_tx(
-                        &mut tx,
+                        &mut tx.0,
                         guild_id,
                         &payout.bettor_id,
                         amount,
@@ -236,7 +237,7 @@ impl BetRepository for PgBetRepository {
                 .bind(payout.bet_id)
                 .bind(payout.won)
                 .bind(payout.payout)
-                .execute(&mut *tx)
+                .execute(&mut *tx.0)
                 .await
                 .map_err(pg_err)?;
         }
@@ -255,7 +256,7 @@ impl BetRepository for PgBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.winner_id.clone(), m));
-                bump_player_earned_in_tx(&mut tx, guild_id, &bonus.winner_id, bonus.winner_bonus).await?;
+                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.winner_id, bonus.winner_bonus).await?;
             }
             if bonus.loser_bonus > 0 {
                 let m = self
@@ -270,11 +271,11 @@ impl BetRepository for PgBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.loser_id.clone(), m));
-                bump_player_earned_in_tx(&mut tx, guild_id, &bonus.loser_id, bonus.loser_bonus).await?;
+                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.loser_id, bonus.loser_bonus).await?;
             }
         }
 
-        tx.commit().await.map_err(pg_err)?;
+        tx.0.commit().await.map_err(pg_err)?;
 
         // Taunts apres commit (jackpot detecte par wallet_uc si amount > seuil).
         let mut taunts = Vec::new();
@@ -293,14 +294,14 @@ impl BetRepository for PgBetRepository {
         guild_id: &str,
         combat_id: Uuid,
     ) -> Result<RefundSummary, DomainError> {
-        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let mut tx = PgTx(self.pool.begin().await.map_err(pg_err)?);
 
         let bets: Vec<(Uuid, String, i64)> = sqlx::query_as(
             "SELECT id, bettor_id, amount FROM coude_bets
              WHERE combat_id = $1 AND won IS NULL",
         )
         .bind(combat_id)
-        .fetch_all(&mut *tx)
+        .fetch_all(&mut *tx.0)
         .await
         .map_err(pg_err)?;
 
@@ -310,7 +311,7 @@ impl BetRepository for PgBetRepository {
             // pas de taunt. Helper partage avec apply_resolution (cas egalite).
             let desc = format!("Remboursement pari combat {}", combat_id);
             refund_wallet_in_tx(
-                &mut tx,
+                &mut tx.0,
                 guild_id,
                 bettor_id,
                 *amount,
@@ -322,14 +323,14 @@ impl BetRepository for PgBetRepository {
             sqlx::query("UPDATE coude_bets SET won = false, payout = $2 WHERE id = $1")
                 .bind(bet_id)
                 .bind(*amount)
-                .execute(&mut *tx)
+                .execute(&mut *tx.0)
                 .await
                 .map_err(pg_err)?;
 
             refunded_total += amount;
         }
 
-        tx.commit().await.map_err(pg_err)?;
+        tx.0.commit().await.map_err(pg_err)?;
         Ok(RefundSummary {
             refunded_count: bets.len(),
             refunded_total,

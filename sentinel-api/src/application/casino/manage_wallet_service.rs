@@ -34,6 +34,9 @@ use sqlx::Postgres;
 use sqlx::Transaction;
 use uuid::Uuid;
 
+use sentinel_core::ports::uow::DbTx;
+use crate::adapters::outbound::postgres::uow::as_pg;
+
 use sentinel_core::domain::entities::casino::wallet::resolve_reset_balance;
 use sentinel_core::domain::entities::casino::wallet::resolve_starting_coins;
 use sentinel_core::domain::entities::coude::taunt::TauntEvent;
@@ -228,7 +231,7 @@ impl ManageWalletUseCase for ManageWalletService {
 
     async fn credit_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
         amount: i64,
@@ -240,6 +243,7 @@ impl ManageWalletUseCase for ManageWalletService {
                 "Montant credit doit etre positif".into(),
             ));
         }
+        let tx = as_pg(tx);
 
         // Lock le wallet et lit le solde actuel dans la tx. On fait un
         // SELECT FOR UPDATE prealable pour exposer `previous_balance`
@@ -280,7 +284,7 @@ impl ManageWalletUseCase for ManageWalletService {
 
     async fn debit_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
         amount: i64,
@@ -292,6 +296,7 @@ impl ManageWalletUseCase for ManageWalletService {
                 "Montant debit doit etre positif".into(),
             ));
         }
+        let tx = as_pg(tx);
 
         // Lock + verifie solde suffisant.
         let previous: Option<i64> = sqlx::query_scalar(

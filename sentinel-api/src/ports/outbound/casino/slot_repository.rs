@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use sqlx::Postgres;
-use sqlx::Transaction;
+use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::slot::SlotJackpotPool;
 use sentinel_core::domain::entities::casino::slot::SlotSpin;
 use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
@@ -21,7 +20,7 @@ pub trait SlotRepository: Send + Sync {
     /// Si la row n existe pas, elle est creee a `starting + amount`.
     async fn add_to_jackpot_pool_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         amount: i64,
         starting: i64,
@@ -31,7 +30,7 @@ pub trait SlotRepository: Send + Sync {
     /// Met a jour les champs last_won_*.
     async fn claim_jackpot_pool_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         winner_id: &str,
         won_amount: i64,
@@ -42,7 +41,7 @@ pub trait SlotRepository: Send + Sync {
     /// debit wallet + spin log + jackpot ops dans la meme tx).
     async fn log_spin_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         spin: &SlotSpin,
     ) -> Result<(), DomainError>;
 
@@ -66,7 +65,7 @@ pub trait SlotRepository: Send + Sync {
     /// ON CONFLICT DO NOTHING : idempotent.
     async fn mark_daily_claimed_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError>;

@@ -2,14 +2,14 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
-use sqlx::Postgres;
-use sqlx::Transaction;
+use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::wheel::WheelSpin;
 use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 
 use super::super::pg_err;
+use super::super::uow::as_pg;
 
 pub struct PgWheelRepository {
     pool: PgPool,
@@ -39,9 +39,10 @@ impl WheelRepository for PgWheelRepository {
 
     async fn log_spin_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         spin: &WheelSpin,
     ) -> Result<(), DomainError> {
+        let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO wheel_spin_log
              (id, guild_id, user_id, username, case_key, case_label, payout, created_at)
@@ -63,10 +64,11 @@ impl WheelRepository for PgWheelRepository {
 
     async fn mark_claimed_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError> {
+        let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO wheel_daily_claims (guild_id, user_id, day)
              VALUES ($1, $2, CURRENT_DATE)

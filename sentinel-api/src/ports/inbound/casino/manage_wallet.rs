@@ -17,8 +17,7 @@
 //! Voir `application/manage_wallet_service.rs` pour l'implementation.
 
 use async_trait::async_trait;
-use sqlx::Postgres;
-use sqlx::Transaction;
+use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
@@ -108,7 +107,7 @@ pub trait ManageWalletUseCase: Send + Sync {
     /// wallet_transactions sur la tx fournie, sans commit.
     async fn credit_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
         amount: i64,
@@ -120,7 +119,7 @@ pub trait ManageWalletUseCase: Send + Sync {
     /// met a jour user_wallets + log wallet_transactions, sans commit.
     async fn debit_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
         amount: i64,

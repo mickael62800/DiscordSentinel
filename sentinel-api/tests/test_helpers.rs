@@ -669,8 +669,8 @@ pub struct StubWalletUc;
     async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::WalletMutation, DomainError> { unimplemented!() }
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
-    async fn credit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
+    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
+    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &manage_wallet::TxWalletMutation) -> Vec<TauntEvent> { unimplemented!() }
 }
 

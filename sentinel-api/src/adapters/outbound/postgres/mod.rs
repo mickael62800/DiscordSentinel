@@ -2,6 +2,7 @@ use sentinel_core::domain::errors::DomainError;
 
 // Wrappers Pg* pour les enums du domaine (sqlx::Type vit ici, pas dans core).
 pub mod types;
+pub mod uow;
 
 // Bounded contexts (mirror de ports/outbound/).
 pub mod audit;

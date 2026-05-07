@@ -1,6 +1,5 @@
 use async_trait::async_trait;
-use sqlx::Postgres;
-use sqlx::Transaction;
+use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::wheel::WheelSpin;
 use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
 use sentinel_core::domain::errors::DomainError;
@@ -11,13 +10,13 @@ pub trait WheelRepository: Send + Sync {
 
     async fn log_spin_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         spin: &WheelSpin,
     ) -> Result<(), DomainError>;
 
     async fn mark_claimed_in_tx(
         &self,
-        tx: &mut Transaction<'_, Postgres>,
+        tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError>;
