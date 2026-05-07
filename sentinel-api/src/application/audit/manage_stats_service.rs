@@ -9,14 +9,14 @@ use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
-use crate::ports::outbound::system::cache::CachePort;
-use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use crate::ports::outbound::audit::stats_repository::StatsRepository;
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::outbound::system::cache::CachePort;
+use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 const OVERVIEW_TTL: u64 = 60; // 1 minute
 
