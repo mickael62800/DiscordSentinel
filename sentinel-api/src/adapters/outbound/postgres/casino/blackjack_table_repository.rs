@@ -15,12 +15,13 @@ impl PgBlackjackTableRepository {
 #[async_trait]
 impl BlackjackTableRepository for PgBlackjackTableRepository {
     async fn create(&self, guild_id: &str, channel_id: &str, owner_id: &str, owner_name: &str, deck_json: &serde_json::Value) -> Result<BlackjackTable, sentinel_core::domain::errors::DomainError> {
-        let table: BlackjackTable = sqlx::query_as(
+        let row: (String, String, String, String, String, String, String) = sqlx::query_as(
             "INSERT INTO blackjack_tables (guild_id, channel_id, owner_id, owner_name, deck) \
              VALUES ($1, $2, $3, $4, $5) \
              RETURNING id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text",
         ).bind(guild_id).bind(channel_id).bind(owner_id).bind(owner_name).bind(deck_json)
         .fetch_one(&self.pool).await.map_err(pg_err)?;
+        let table = BlackjackTable { id: row.0, guild_id: row.1, channel_id: row.2, owner_id: row.3, owner_name: row.4, status: row.5, created_at: row.6 };
         // Owner = auto-joueur
         sqlx::query("INSERT INTO blackjack_table_players (table_id, user_id, user_name) VALUES ($1::uuid, $2, $3) ON CONFLICT DO NOTHING")
             .bind(&table.id).bind(owner_id).bind(owner_name)
@@ -79,18 +80,18 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
     }
 
     async fn list_players(&self, table_id: &str) -> Result<Vec<BlackjackTablePlayer>, sentinel_core::domain::errors::DomainError> {
-        let rows: Vec<BlackjackTablePlayer> = sqlx::query_as(
+        let rows: Vec<(String, String, String)> = sqlx::query_as(
             "SELECT user_id, user_name, joined_at::text FROM blackjack_table_players WHERE table_id = $1::uuid ORDER BY joined_at",
         ).bind(table_id).fetch_all(&self.pool).await.map_err(pg_err)?;
-        Ok(rows)
+        Ok(rows.into_iter().map(|(user_id, user_name, joined_at)| BlackjackTablePlayer { user_id, user_name, joined_at }).collect())
     }
 
     async fn find_open_by_channel(&self, channel_id: &str) -> Result<Option<BlackjackTable>, sentinel_core::domain::errors::DomainError> {
-        let row: Option<BlackjackTable> = sqlx::query_as(
+        let row: Option<(String, String, String, String, String, String, String)> = sqlx::query_as(
             "SELECT id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text \
              FROM blackjack_tables WHERE channel_id = $1 AND status = 'open'",
         ).bind(channel_id).fetch_optional(&self.pool).await.map_err(pg_err)?;
-        Ok(row)
+        Ok(row.map(|r| BlackjackTable { id: r.0, guild_id: r.1, channel_id: r.2, owner_id: r.3, owner_name: r.4, status: r.5, created_at: r.6 }))
     }
 
     async fn get_guild_id(&self, table_id: &str) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
@@ -118,7 +119,7 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
         &self,
         guild_id: &str,
     ) -> Result<Vec<BlackjackTable>, sentinel_core::domain::errors::DomainError> {
-        let tables: Vec<BlackjackTable> = sqlx::query_as(
+        let rows: Vec<(String, String, String, String, String, String, String)> = sqlx::query_as(
             "SELECT id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text \
              FROM blackjack_tables \
              WHERE guild_id = $1 AND status = 'open' \
@@ -128,6 +129,6 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(tables)
+        Ok(rows.into_iter().map(|r| BlackjackTable { id: r.0, guild_id: r.1, channel_id: r.2, owner_id: r.3, owner_name: r.4, status: r.5, created_at: r.6 }).collect())
     }
 }
