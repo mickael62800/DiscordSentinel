@@ -185,7 +185,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
     // comme SERVING. Permet `grpc_health_probe -addr=:50051` dans le healthcheck.
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    let (health_reporter, health_service) = tonic_health::server::health_reporter();
     health_reporter
         .set_serving::<ProgressionServiceServer<ProgressionGrpc>>()
         .await;

@@ -6,7 +6,6 @@ use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgAuditLogRepository {
     pool: PgPool,
@@ -65,7 +64,7 @@ impl AuditLogRepository for PgAuditLogRepository {
         .bind(&log.actor_name)
         .bind(log.target_id.as_deref())
         .bind(&log.target_name)
-        .bind(log.channel_id.as_str())
+        .bind(log.channel_id.as_deref())
         .bind(&log.channel_name)
         .bind(&log.details)
         .bind(log.created_at)

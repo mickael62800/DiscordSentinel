@@ -4,7 +4,6 @@ use sqlx::PgPool;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,
 }

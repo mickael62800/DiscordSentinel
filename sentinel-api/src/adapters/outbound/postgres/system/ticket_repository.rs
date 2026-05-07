@@ -180,7 +180,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(&ticket.server)
         .bind(&ticket.category)
         .bind(&ticket.ticket_type)
-        .bind(ticket.channel_id.as_str())
+        .bind(ticket.channel_id.as_deref())
         .bind(&ticket.voice_channel_id)
         .bind(&ticket.invited_user_id)
         .bind(ticket.created_at)

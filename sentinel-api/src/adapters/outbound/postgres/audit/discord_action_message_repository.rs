@@ -40,7 +40,7 @@ impl DiscordActionMessageRepository for PgDiscordActionMessageRepository {
         .bind(&msg.kind)
         .bind(msg.guild_id.as_str())
         .bind(msg.channel_id.as_str())
-        .bind(msg.message_id.as_deref())
+        .bind(msg.message_id.as_str())
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;

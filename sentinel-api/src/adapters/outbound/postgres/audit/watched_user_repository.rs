@@ -5,8 +5,6 @@ use sentinel_core::domain::entities::audit::watched_user::classify_risk_level;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,

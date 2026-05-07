@@ -332,7 +332,7 @@ impl CombatRepository for PgCombatRepository {
         );
         let row: CombatRow = sqlx::query_as(&sql)
             .bind(new.guild_id.as_str())
-            .bind(new.channel_id.as_str())
+            .bind(new.channel_id.as_deref())
             .bind(new.attacker_id.as_str())
             .bind(&new.attacker_name)
             .bind(&new.defender_id)

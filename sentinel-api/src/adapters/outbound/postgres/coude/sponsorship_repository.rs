@@ -4,7 +4,6 @@ use sqlx::PgPool;
 use crate::ports::outbound::coude::sponsorship_repository::Sponsorship;
 use crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use super::super::pg_err;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgSponsorshipRepository { pool: PgPool }
 

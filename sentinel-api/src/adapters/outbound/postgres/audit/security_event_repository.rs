@@ -5,7 +5,6 @@ use uuid::Uuid;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgSecurityEventRepository {
     pool: PgPool,

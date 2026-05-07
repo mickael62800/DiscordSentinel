@@ -6,7 +6,6 @@ use sentinel_core::domain::entities::system::bot_config::BotDefinition;
 use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgBotConfigRepository {
     pool: PgPool,

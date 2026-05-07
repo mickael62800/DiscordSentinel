@@ -6,7 +6,6 @@ use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgRuleRepository {
     pool: PgPool,
