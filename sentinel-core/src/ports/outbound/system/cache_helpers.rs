@@ -17,7 +17,7 @@ use std::sync::Arc;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use sentinel_core::domain::errors::DomainError;
+use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::cache::CachePort;
 
 /// Pattern cache-aside : lit depuis le cache, sinon execute `fetch` et ecrit
@@ -60,3 +60,4 @@ where
 #[cfg(test)]
 #[path = "tests/cache_helpers.rs"]
 mod tests;
+

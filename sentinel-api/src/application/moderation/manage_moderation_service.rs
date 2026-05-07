@@ -17,7 +17,7 @@ use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCas
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use tracing::warn;
 
-use crate::adapters::outbound::cache_helpers::cached_json;
+use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;

@@ -12,7 +12,7 @@ use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use crate::adapters::outbound::cache_helpers::cached_json;
+use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use crate::ports::outbound::audit::stats_repository::StatsRepository;

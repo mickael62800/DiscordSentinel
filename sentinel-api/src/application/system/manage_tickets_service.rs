@@ -14,7 +14,7 @@ use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use tracing::warn;
 
-use crate::adapters::outbound::cache_helpers::cached_json;
+use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::system::ticket_repository::TicketRepository;
 const TICKETS_LIST_TTL: u64 = 60; // 1 minute

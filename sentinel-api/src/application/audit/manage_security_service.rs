@@ -18,7 +18,7 @@ use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 use crate::ports::inbound::audit::manage_security::SecurityDecision;
-use crate::adapters::outbound::cache_helpers::cached_json;
+use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;

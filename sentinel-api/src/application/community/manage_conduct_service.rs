@@ -5,7 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::adapters::outbound::discord_api::DiscordApi;
+use sentinel_core::ports::outbound::discord_api::DiscordApi;
 use sentinel_core::domain::entities::community::conduct::apply_conduct_penalty;
 use sentinel_core::domain::entities::community::conduct::apply_conduct_regen;
 use sentinel_core::domain::entities::community::conduct::ConductConfig;

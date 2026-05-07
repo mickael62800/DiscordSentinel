@@ -1,7 +1,7 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::adapters::outbound::cache_helpers::cached_json;
+use sentinel_core::ports::outbound::system::cache_helpers::cached_json;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
 use sentinel_core::domain::errors::DomainError;
