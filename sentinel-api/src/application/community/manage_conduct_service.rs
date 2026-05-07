@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use sentinel_core::ports::outbound::system::event_broadcaster::EventBroadcaster;
 use sentinel_core::ports::outbound::discord_api::DiscordApi;
 use sentinel_core::domain::entities::community::conduct::apply_conduct_penalty;
 use sentinel_core::domain::entities::community::conduct::apply_conduct_regen;
@@ -29,7 +29,7 @@ mod tests;
 pub struct ManageConductService {
     repo: Arc<dyn ConductRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
-    broadcaster: Arc<EventBroadcaster>,
+    broadcaster: Arc<dyn EventBroadcaster>,
     discord_api: Arc<dyn DiscordApi>,
 }
 
@@ -37,7 +37,7 @@ impl ManageConductService {
     pub fn new(
         repo: Arc<dyn ConductRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
-        broadcaster: Arc<EventBroadcaster>,
+        broadcaster: Arc<dyn EventBroadcaster>,
         discord_api: Arc<dyn DiscordApi>,
     ) -> Self {
         Self { repo, infraction_repo, broadcaster, discord_api }

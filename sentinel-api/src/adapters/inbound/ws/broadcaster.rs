@@ -2,16 +2,9 @@
 #[path = "tests/broadcaster.rs"]
 mod tests;
 
-use serde::Serialize;
 use tracing::warn;
 
-#[derive(Debug, Clone, Serialize)]
-pub struct WsEvent {
-    pub event: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub guild_id: Option<String>,
-    pub data: serde_json::Value,
-}
+pub use sentinel_core::ports::outbound::system::event_broadcaster::{EventBroadcaster as EventBroadcasterPort, WsEvent};
 
 /// Nom de la stream Redis partagee par tous les producers.
 /// Phase 5B : doit rester synchronise avec `sentinel-bot/src/shared/event_bus.rs` (STREAM_KEY).
@@ -87,5 +80,11 @@ impl EventBroadcaster {
                 }
             });
         }
+    }
+}
+
+impl EventBroadcasterPort for EventBroadcaster {
+    fn broadcast(&self, event: &str, data: serde_json::Value) {
+        EventBroadcaster::broadcast(self, event, data)
     }
 }
