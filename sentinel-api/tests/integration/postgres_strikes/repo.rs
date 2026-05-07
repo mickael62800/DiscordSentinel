@@ -159,7 +159,7 @@ async fn save_and_get_config_roundtrip() {
     let guild = fresh_id();
 
     let cfg = StrikeConfig {
-        guild_id: guild.clone(),
+        guild_id: guild.clone().into(),
         window_secs: 3600,
         thresholds: vec![
             StrikeThreshold { strikes: 3, action: "warn".into(), duration: None },
@@ -186,7 +186,7 @@ async fn save_config_is_upsert_on_guild_id() {
     let guild = fresh_id();
 
     let mut cfg = StrikeConfig {
-        guild_id: guild.clone(),
+        guild_id: guild.clone().into(),
         window_secs: 3600,
         thresholds: vec![],
         enabled: true,

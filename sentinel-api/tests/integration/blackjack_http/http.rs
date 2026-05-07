@@ -82,7 +82,7 @@ impl BlackjackTableRepository for MockTableRepo {
         Ok(self.players.lock().unwrap().iter()
             .filter(|(t, _, _)| t == table_id)
             .map(|(_, uid, uname)| BlackjackTablePlayer {
-                user_id: uid.clone(),
+                user_id: uid.clone().into(),
                 user_name: uname.clone(),
                 joined_at: Utc::now().to_rfc3339(),
             })

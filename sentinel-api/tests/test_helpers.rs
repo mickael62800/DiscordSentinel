@@ -254,16 +254,16 @@ impl ManageLevelsUseCase for StubLevels {
 #[allow(dead_code)]
 pub struct StubAnnouncements;
 #[async_trait]
-impl crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase for StubAnnouncements {
-    async fn create(&self, _: crate::ports::inbound::community::manage_announcements::CreateAnnouncementCommand) -> Result<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
-    async fn update(&self, _: crate::ports::inbound::community::manage_announcements::UpdateAnnouncementCommand) -> Result<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
+impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase for StubAnnouncements {
+    async fn create(&self, _: sentinel_api::ports::inbound::community::manage_announcements::CreateAnnouncementCommand) -> Result<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
+    async fn update(&self, _: sentinel_api::ports::inbound::community::manage_announcements::UpdateAnnouncementCommand) -> Result<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
     async fn delete(&self, _: uuid::Uuid) -> Result<(), DomainError> { unimplemented!() }
     async fn get(&self, _: uuid::Uuid) -> Result<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement, DomainError> { unimplemented!() }
     async fn list_by_guild(&self, _: &str) -> Result<Vec<sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement>, DomainError> { unimplemented!() }
     async fn toggle(&self, _: uuid::Uuid, _: bool) -> Result<bool, DomainError> { unimplemented!() }
-    async fn fetch_due_and_prepare(&self, _: chrono::DateTime<chrono::Utc>, _: i64) -> Result<Vec<crate::ports::inbound::community::manage_announcements::RenderedAnnouncement>, DomainError> { unimplemented!() }
+    async fn fetch_due_and_prepare(&self, _: chrono::DateTime<chrono::Utc>, _: i64) -> Result<Vec<sentinel_api::ports::inbound::community::manage_announcements::RenderedAnnouncement>, DomainError> { unimplemented!() }
     async fn record_run_result(&self, _: uuid::Uuid, _: Vec<sentinel_core::domain::entities::community::announcement::ChannelPostResult>) -> Result<(), DomainError> { unimplemented!() }
-    async fn preview(&self, _: uuid::Uuid) -> Result<crate::ports::inbound::community::manage_announcements::RenderedAnnouncement, DomainError> { unimplemented!() }
+    async fn preview(&self, _: uuid::Uuid) -> Result<sentinel_api::ports::inbound::community::manage_announcements::RenderedAnnouncement, DomainError> { unimplemented!() }
     async fn list_runs(&self, _: uuid::Uuid, _: i64) -> Result<Vec<sentinel_core::domain::entities::community::announcement::AnnouncementRun>, DomainError> { unimplemented!() }
     async fn record_button_interaction(&self, _: uuid::Uuid, _: Option<uuid::Uuid>, _: String, _: Option<String>, _: String, _: Option<String>) -> Result<(), DomainError> { unimplemented!() }
     async fn list_button_interactions(&self, _: uuid::Uuid, _: i64) -> Result<Vec<sentinel_core::domain::entities::community::announcement::ButtonInteraction>, DomainError> { unimplemented!() }
@@ -272,8 +272,8 @@ impl crate::ports::inbound::community::manage_announcements::ManageAnnouncements
 #[allow(dead_code)]
 pub struct StubConfessions;
 #[async_trait]
-impl crate::ports::inbound::community::manage_confessions::ManageConfessionsUseCase for StubConfessions {
-    async fn create(&self, _: crate::ports::inbound::community::manage_confessions::CreateConfessionCommand) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
+impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessionsUseCase for StubConfessions {
+    async fn create(&self, _: sentinel_api::ports::inbound::community::manage_confessions::CreateConfessionCommand) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
     async fn update_message_refs(&self, _: uuid::Uuid, _: String, _: String, _: Option<String>) -> Result<(), DomainError> { unimplemented!() }
     async fn edit_content(&self, _: uuid::Uuid, _: &str, _: String) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
     async fn delete(&self, _: uuid::Uuid, _: String, _: Option<String>) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
@@ -281,11 +281,11 @@ impl crate::ports::inbound::community::manage_confessions::ManageConfessionsUseC
     async fn get_by_message_id(&self, _: &str) -> Result<Option<sentinel_core::domain::entities::community::confession::Confession>, DomainError> { unimplemented!() }
     async fn get_by_public_number(&self, _: &str, _: i32) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError> { unimplemented!() }
     async fn list(&self, _: &str, _: i64, _: bool) -> Result<Vec<sentinel_core::domain::entities::community::confession::Confession>, DomainError> { unimplemented!() }
-    async fn create_reply(&self, _: crate::ports::inbound::community::manage_confessions::CreateReplyCommand) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReply, DomainError> { unimplemented!() }
+    async fn create_reply(&self, _: sentinel_api::ports::inbound::community::manage_confessions::CreateReplyCommand) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReply, DomainError> { unimplemented!() }
     async fn update_reply_message_id(&self, _: uuid::Uuid, _: String) -> Result<(), DomainError> { unimplemented!() }
     async fn delete_reply(&self, _: uuid::Uuid, _: String) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReply, DomainError> { unimplemented!() }
     async fn list_replies(&self, _: uuid::Uuid) -> Result<Vec<sentinel_core::domain::entities::community::confession::ConfessionReply>, DomainError> { unimplemented!() }
-    async fn create_report(&self, _: crate::ports::inbound::community::manage_confessions::CreateReportCommand) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReport, DomainError> { unimplemented!() }
+    async fn create_report(&self, _: sentinel_api::ports::inbound::community::manage_confessions::CreateReportCommand) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReport, DomainError> { unimplemented!() }
     async fn list_reports(&self, _: &str, _: Option<sentinel_core::domain::entities::community::confession::ReportStatus>, _: i64) -> Result<Vec<sentinel_core::domain::entities::community::confession::ConfessionReport>, DomainError> { unimplemented!() }
     async fn resolve_report(&self, _: uuid::Uuid, _: sentinel_core::domain::entities::community::confession::ReportStatus, _: String) -> Result<(), DomainError> { unimplemented!() }
     async fn get_config(&self, _: &str) -> Result<sentinel_core::domain::entities::community::confession::ConfessionConfig, DomainError> { unimplemented!() }

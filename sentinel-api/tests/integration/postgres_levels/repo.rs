@@ -146,7 +146,7 @@ async fn rewards_upsert_get_and_delete() {
     let repo = PgLevelRepository::new(pool().await);
     let g = fresh_id();
     let reward = LevelReward {
-        id: Uuid::new_v4(), guild_id: g.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(),
         level: 5, role_id: "role1".into(), source: XpSource::Text,
     };
     repo.upsert_reward(&reward).await.unwrap();
@@ -169,10 +169,10 @@ async fn rewards_upsert_updates_existing_level_role() {
     let g = fresh_id();
     let id = Uuid::new_v4();
     repo.upsert_reward(&LevelReward {
-        id, guild_id: g.clone(), level: 10, role_id: "oldRole".into(), source: XpSource::Voice,
+        id, guild_id: g.clone().into(), level: 10, role_id: "oldRole".into(), source: XpSource::Voice,
     }).await.unwrap();
     repo.upsert_reward(&LevelReward {
-        id, guild_id: g.clone(), level: 10, role_id: "newRole".into(), source: XpSource::Voice,
+        id, guild_id: g.clone().into(), level: 10, role_id: "newRole".into(), source: XpSource::Voice,
     }).await.unwrap();
     let got = repo.get_rewards(&g).await.unwrap();
     // Upsert sur (guild, level, source) : une seule entry reste.

@@ -674,7 +674,7 @@ async fn resolve_review_with_rbac_admin_succeeds() {
     let review = Arc::new(MockReviewRepo::default());
     review.items.lock().unwrap().push(ReviewEntry {
         id: review_id, action_id: Uuid::new_v4(),
-        guild_id: guild_id.clone(),
+        guild_id: guild_id.clone().into(),
         added_by: "u".into(), added_by_name: "X".into(),
         reason: None, status: "pending".into(),
         reviewer_id: None, reviewer_name: None, reviewer_notes: None,

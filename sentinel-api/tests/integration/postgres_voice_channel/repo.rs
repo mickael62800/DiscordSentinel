@@ -189,7 +189,7 @@ async fn whitelist_add_find_remove() {
     let g = fresh_id();
     let owner = fresh_id();
     let entry = VoiceChannelWhitelistEntry {
-        id: Uuid::new_v4(), guild_id: g.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(),
         owner_id: owner.clone(), target_id: "t1".into(),
         target_name: "Target".into(), created_at: Utc::now(),
     };
@@ -283,7 +283,7 @@ async fn theme_save_find_update_delete() {
     let repo = PgVoiceChannelRepository::new(pool().await);
     let g = fresh_id();
     let theme = VoiceChannelTheme {
-        id: Uuid::new_v4(), guild_id: g.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(),
         name: "Gaming".into(), emoji: Some("game".into()),
         channel_name_template: "🎮-{user}".into(),
         member_limit: Some(5), visibility: "public".into(),
@@ -313,7 +313,7 @@ async fn clear_default_themes_unsets_is_default() {
     let repo = PgVoiceChannelRepository::new(pool().await);
     let g = fresh_id();
     let mut t = VoiceChannelTheme {
-        id: Uuid::new_v4(), guild_id: g.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(),
         name: "Default".into(), emoji: None,
         channel_name_template: "{user}".into(),
         member_limit: None, visibility: "public".into(),

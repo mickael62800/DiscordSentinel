@@ -54,7 +54,7 @@ async fn save_config_persists_and_get_returns_it() {
     let svc = build().await;
     let g = fresh_id();
     svc.save_config(SaveConductConfigCommand {
-        guild_id: g.clone(), max_points: 30,
+        guild_id: g.clone().into(), max_points: 30,
         regen_amount: 3, regen_interval: "monthly".into(),
         penalty_warn: 2, penalty_delete: 4, penalty_mute: 6, penalty_ban: 15,
     }).await.unwrap();
@@ -71,7 +71,7 @@ async fn deduct_points_warn_reduces_by_1() {
     let g = fresh_id();
     let u = fresh_id();
     let out = svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(),
         action: "warn".into(),
     }).await.unwrap();
     assert_eq!(out.points, 11); // 12 - 1
@@ -104,14 +104,14 @@ async fn deduct_points_ban_reduces_by_6_then_zero_triggers_mute_path() {
     let u = fresh_id();
     // 1er ban : 12 - 6 = 6
     let out = svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(),
         action: "ban".into(),
     }).await.unwrap();
     assert_eq!(out.points, 6);
 
     // 2eme ban : 6 - 6 = 0 → mute_user short-circuit (token vide) + infraction auto-ban saved
     let out = svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(),
         action: "ban".into(),
     }).await.unwrap();
     assert_eq!(out.points, 0);
@@ -148,7 +148,7 @@ async fn add_points_from_depressed_state_increments() {
     let u = fresh_id();
     // Deduct pour baisser le solde
     svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "A".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "A".into(),
         action: "ban".into(),
     }).await.unwrap();
     // Add 2
@@ -166,11 +166,11 @@ async fn get_leaderboard_returns_users_with_points() {
     let g = fresh_id();
     // Cree deux users
     svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "A".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "A".into(),
         action: "warn".into(),
     }).await.unwrap();
     svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "B".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "B".into(),
         action: "mute".into(),
     }).await.unwrap();
     let lb = svc.get_leaderboard(&g, 10).await.unwrap();
@@ -183,11 +183,11 @@ async fn get_points_log_returns_entries_after_deduct() {
     let g = fresh_id();
     let u = fresh_id();
     svc.deduct_points(DeductPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "A".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "A".into(),
         action: "warn".into(),
     }).await.unwrap();
     svc.add_points(AddPointsCommand {
-        guild_id: g.clone(), user_id: u.clone(),
+        guild_id: g.clone().into(), user_id: u.clone().into(),
         amount: 1, reason: "bonus".into(),
     }).await.unwrap();
     let logs = svc.get_points_log(&g, &u, 10).await.unwrap();

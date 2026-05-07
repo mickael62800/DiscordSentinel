@@ -77,7 +77,7 @@ async fn prime_create_and_list_active() {
     let placer = fresh_id();
     seed_wallet(&p, &g, &placer, 10000).await;
     let prime = repo.create_prime(NewCoudePrime {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         target_id: target.clone(), target_name: "Target".into(),
         placed_by_id: placer.clone(), placed_by_name: "Placer".into(),
         amount: 500,
@@ -100,12 +100,12 @@ async fn prime_claim_returns_total() {
     seed_wallet(&p, &g, &claimer, 0).await;
     seed_player(&p, &g, &claimer).await;
     repo.create_prime(NewCoudePrime {
-        guild_id: g.clone(), target_id: target.clone(),
+        guild_id: g.clone().into(), target_id: target.clone(),
         target_name: "T".into(), placed_by_id: placer.clone(),
         placed_by_name: "P".into(), amount: 300,
     }).await.unwrap();
     repo.create_prime(NewCoudePrime {
-        guild_id: g.clone(), target_id: target.clone(),
+        guild_id: g.clone().into(), target_id: target.clone(),
         target_name: "T".into(), placed_by_id: placer,
         placed_by_name: "P".into(), amount: 200,
     }).await.unwrap();

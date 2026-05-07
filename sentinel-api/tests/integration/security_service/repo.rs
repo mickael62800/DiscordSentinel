@@ -89,7 +89,7 @@ async fn report_event_persists_in_db() {
     let (svc, p) = build().await;
     let g = fresh_id();
     let event = svc.report_event(ReportSecurityEventCommand {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         event_type: "raid".into(),
         severity: "high".into(),
         description: "pattern".into(),
@@ -109,7 +109,7 @@ async fn list_events_with_guild_returns_reported() {
     let (svc, _) = build().await;
     let g = fresh_id();
     svc.report_event(ReportSecurityEventCommand {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         event_type: "scan".into(), severity: "low".into(),
         description: "".into(), user_ids: vec![fresh_id()],
     }).await.unwrap();
@@ -123,7 +123,7 @@ async fn list_events_without_guild_returns_all() {
     let (svc, _) = build().await;
     let g = fresh_id();
     svc.report_event(ReportSecurityEventCommand {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         event_type: "raid".into(), severity: "high".into(),
         description: "".into(), user_ids: vec![],
     }).await.unwrap();
@@ -146,7 +146,7 @@ async fn analyze_new_member_alt_detection_flags_similar_username() {
     seed_ban(&p, &g, "alice_bad").await;
 
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "alice_bad2".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "alice_bad2".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
         is_bot: false, recent_joins: vec![],
@@ -166,7 +166,7 @@ async fn analyze_new_member_alt_detection_no_match_when_names_differ() {
     seed_ban(&p, &g, "totally_different_name").await;
 
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "alice".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "alice".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
         is_bot: false, recent_joins: vec![],
@@ -187,7 +187,7 @@ async fn analyze_new_member_alt_detection_skipped_when_raid() {
 
     let now = chrono::Utc::now().timestamp();
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "alice".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "alice".into(),
         has_avatar: false,
         account_created_timestamp: now - 3600,
         is_bot: false,
@@ -211,7 +211,7 @@ async fn analyze_new_member_no_bans_still_runs_alt_path() {
     set_config(&p, &g, "min_account_age_secs", "0").await;
     // Pas de bans → load_recent_ban_usernames retourne [] → pas de match possible
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "bob".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "bob".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400,
         is_bot: false, recent_joins: vec![],

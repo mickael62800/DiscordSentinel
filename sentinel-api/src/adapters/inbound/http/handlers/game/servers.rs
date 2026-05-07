@@ -52,7 +52,7 @@ pub async fn create_server(
     .await?;
 
     let cmd = CreateGameServerCommand {
-        guild_id: guild_id.clone(),
+        guild_id: guild_id.clone().into(),
         template_slug: dto.template_slug,
         name: dto.name,
         allocated_memory_mb: dto.memory_mb,

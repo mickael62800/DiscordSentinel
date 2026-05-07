@@ -185,7 +185,7 @@ async fn full_analyze_spam_creates_infraction() {
 
     // Analyze a spam message
     let cmd = AnalyzeMessageCommand {
-        guild_id: gid.clone(),
+        guild_id: gid.clone().into(),
         channel_id: "555555555555555555".into(),
         user_id: "444444444444444444".into(),
         username: "Spammer".into(),
@@ -224,7 +224,7 @@ async fn full_analyze_spam_plus_insult_escalates() {
     let service = build_analyze_service(pool.clone());
 
     let cmd = AnalyzeMessageCommand {
-        guild_id: gid.clone(),
+        guild_id: gid.clone().into(),
         channel_id: "555555555555555555".into(),
         user_id: "444444444444444444".into(),
         username: "BadUser".into(),
@@ -255,7 +255,7 @@ async fn full_analyze_no_flags_returns_none() {
     let service = build_analyze_service(pool.clone());
 
     let cmd = AnalyzeMessageCommand {
-        guild_id: gid.clone(),
+        guild_id: gid.clone().into(),
         channel_id: "555555555555555555".into(),
         user_id: "444444444444444444".into(),
         username: "NormalUser".into(),
@@ -283,7 +283,7 @@ async fn full_analyze_with_context_messages() {
     let service = build_analyze_service(pool.clone());
 
     let cmd = AnalyzeMessageCommand {
-        guild_id: gid.clone(),
+        guild_id: gid.clone().into(),
         channel_id: "555555555555555555".into(),
         user_id: "444444444444444444".into(),
         username: "User".into(),

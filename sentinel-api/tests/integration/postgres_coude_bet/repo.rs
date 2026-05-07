@@ -101,7 +101,7 @@ async fn place_debits_wallet_and_inserts_bet() {
     let combat_id = seed_combat(&p, &g, &att, &def, "betting").await;
 
     let taunts = repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: bettor.clone(), bettor_name: "Bettor".into(),
         backed_id: att.clone(), amount: 300,
     }).await.unwrap();
@@ -129,7 +129,7 @@ async fn place_fails_when_insufficient_balance() {
     let combat_id = seed_combat(&p, &g, &att, &def, "betting").await;
 
     let err = repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: bettor.clone(), bettor_name: "B".into(),
         backed_id: att, amount: 500,
     }).await;
@@ -154,12 +154,12 @@ async fn place_multiple_bets_on_same_combat() {
     seed_wallet(&p, &g, &b2, 500).await;
 
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b1, bettor_name: "B1".into(),
         backed_id: att.clone(), amount: 100,
     }).await.unwrap();
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b2, bettor_name: "B2".into(),
         backed_id: def, amount: 200,
     }).await.unwrap();
@@ -191,7 +191,7 @@ async fn refund_unresolved_credits_back_bettors() {
     seed_wallet(&p, &g, &b1, 1000).await;
 
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b1.clone(), bettor_name: "B".into(),
         backed_id: att, amount: 300,
     }).await.unwrap();
@@ -224,12 +224,12 @@ async fn apply_resolution_winner_gets_payout_draw_refunds() {
     seed_wallet(&p, &g, &att, 0).await;
     seed_wallet(&p, &g, &def, 0).await;
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b1.clone(), bettor_name: "B1".into(),
         backed_id: att.clone(), amount: 200,
     }).await.unwrap();
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b2.clone(), bettor_name: "B2".into(),
         backed_id: def.clone(), amount: 100,
     }).await.unwrap();
@@ -267,7 +267,7 @@ async fn apply_resolution_draw_refunds_everyone() {
     seed_wallet(&p, &g, &att, 0).await;
     seed_wallet(&p, &g, &def, 0).await;
     repo.place(NewCoudeBet {
-        guild_id: g.clone(), combat_id,
+        guild_id: g.clone().into(), combat_id,
         bettor_id: b1.clone(), bettor_name: "B1".into(),
         backed_id: att.clone(), amount: 300,
     }).await.unwrap();

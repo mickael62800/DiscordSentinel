@@ -138,7 +138,7 @@ async fn auto_role_save_find_delete() {
     let repo = PgRolePanelRepository::new(pool().await);
     let g = fresh_id();
     let ar = AutoRole {
-        id: Uuid::new_v4(), guild_id: g.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(),
         role_id: "role1".into(), role_name: "Welcome".into(),
         delay_secs: 60, enabled: true,
     };

@@ -109,7 +109,7 @@ async fn discord_role_preserves_all_fields() {
     let g = fresh_id();
     let rid = fresh_id();
     let r = DiscordRole {
-        id: rid.clone(), guild_id: g.clone(), name: "Special".into(),
+        id: rid.clone(), guild_id: g.clone().into(), name: "Special".into(),
         color: 0xFF0000, position: 42, permissions: 0x8, // ADMINISTRATOR
         mentionable: false, managed: true,
         icon: Some("icon_hash".into()),

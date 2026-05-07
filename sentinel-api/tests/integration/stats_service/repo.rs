@@ -62,7 +62,7 @@ async fn record_messages_increments_count() {
     let g = fresh_id();
     let u = fresh_id();
     svc.record_messages(RecordMessagesCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(), count: 5,
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(), count: 5,
     }).await.unwrap();
     let stats = svc.get_user_stats(&g, &u).await.unwrap().unwrap();
     assert_eq!(stats.message_count, 5);
@@ -74,7 +74,7 @@ async fn record_voice_accumulates_seconds_with_session() {
     let g = fresh_id();
     let u = fresh_id();
     svc.record_voice(RecordVoiceCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(),
         channel_id: "c1".into(), channel_name: "Voice 1".into(),
         seconds: 120,
     }).await.unwrap();
@@ -89,7 +89,7 @@ async fn record_voice_without_channel_id_skips_session() {
     let u = fresh_id();
     // channel_id vide -> skip save_voice_session
     svc.record_voice(RecordVoiceCommand {
-        guild_id: g.clone(), user_id: u.clone(), username: "Alice".into(),
+        guild_id: g.clone().into(), user_id: u.clone().into(), username: "Alice".into(),
         channel_id: "".into(), channel_name: "".into(),
         seconds: 60,
     }).await.unwrap();
@@ -110,10 +110,10 @@ async fn get_leaderboard_returns_users() {
     let svc = build().await;
     let g = fresh_id();
     svc.record_messages(RecordMessagesCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "A".into(), count: 10,
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "A".into(), count: 10,
     }).await.unwrap();
     svc.record_messages(RecordMessagesCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "B".into(), count: 20,
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "B".into(), count: 20,
     }).await.unwrap();
     let lb = svc.get_leaderboard(&g, 10).await.unwrap();
     assert_eq!(lb.len(), 2);
@@ -124,10 +124,10 @@ async fn get_guild_overview_aggregates_stats() {
     let svc = build().await;
     let g = fresh_id();
     svc.record_messages(RecordMessagesCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "A".into(), count: 10,
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "A".into(), count: 10,
     }).await.unwrap();
     svc.record_voice(RecordVoiceCommand {
-        guild_id: g.clone(), user_id: fresh_id(), username: "B".into(),
+        guild_id: g.clone().into(), user_id: fresh_id(), username: "B".into(),
         channel_id: "c1".into(), channel_name: "v".into(), seconds: 300,
     }).await.unwrap();
     let overview = svc.get_guild_overview(&g).await.unwrap();
@@ -165,7 +165,7 @@ async fn get_guild_voice_stats_with_sessions() {
     let g = fresh_id();
     for i in 0..3 {
         svc.record_voice(RecordVoiceCommand {
-            guild_id: g.clone(), user_id: fresh_id(), username: format!("u{i}"),
+            guild_id: g.clone().into(), user_id: fresh_id(), username: format!("u{i}"),
             channel_id: format!("c{i}"), channel_name: format!("ch{i}"),
             seconds: 100 * (i as u64 + 1),
         }).await.unwrap();

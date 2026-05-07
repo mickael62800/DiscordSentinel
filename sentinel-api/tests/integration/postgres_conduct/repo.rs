@@ -143,12 +143,12 @@ async fn log_save_and_get_ordered_desc() {
     let g = fresh_id(); let u = fresh_id();
     let now = Utc::now();
     repo.save_log(&ConductPointsLog {
-        id: Uuid::new_v4(), guild_id: g.clone(), user_id: u.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(), user_id: u.clone().into(),
         delta: -5, reason: "warn".into(), points_before: 100, points_after: 95,
         created_at: now - chrono::Duration::hours(2),
     }).await.unwrap();
     repo.save_log(&ConductPointsLog {
-        id: Uuid::new_v4(), guild_id: g.clone(), user_id: u.clone(),
+        id: Uuid::new_v4(), guild_id: g.clone().into(), user_id: u.clone().into(),
         delta: -10, reason: "delete".into(), points_before: 95, points_after: 85,
         created_at: now - chrono::Duration::hours(1),
     }).await.unwrap();

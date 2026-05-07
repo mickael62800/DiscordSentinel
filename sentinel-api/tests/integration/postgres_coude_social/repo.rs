@@ -105,14 +105,14 @@ async fn log_daily_chaos_and_count() {
     let g = fresh_id();
     assert_eq!(repo.count_daily_chaos_today(&g).await.unwrap(), 0);
     repo.log_daily_chaos(NewDailyChaos {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         loser_id: fresh_id(), loser_name: "Loser".into(),
         winner_id: fresh_id(), winner_name: "Winner".into(),
         amount: 100,
     }).await.unwrap();
     assert_eq!(repo.count_daily_chaos_today(&g).await.unwrap(), 1);
     repo.log_daily_chaos(NewDailyChaos {
-        guild_id: g.clone(),
+        guild_id: g.clone().into(),
         loser_id: fresh_id(), loser_name: "L2".into(),
         winner_id: fresh_id(), winner_name: "W2".into(),
         amount: 50,

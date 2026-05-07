@@ -200,7 +200,7 @@ async fn update_channel_applies_visibility() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         visibility: Some("private".into()),
         locked: None,
         queue_enabled: None,
@@ -225,7 +225,7 @@ async fn update_channel_applies_locked_and_queue_flags() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         visibility: None,
         locked: Some(true),
         queue_enabled: Some(true),
@@ -281,7 +281,7 @@ async fn transfer_ownership_updates_owner() {
 
     let new_owner = fresh_id();
     svc.transfer_ownership(TransferOwnershipCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         new_owner_id: new_owner.clone(),
         new_owner_name: "NewBoss".into(),
     })
@@ -319,7 +319,7 @@ async fn update_channel_applies_name_status_limit_stage_queue_ch() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         visibility: None,
         locked: None,
         queue_enabled: None,
@@ -348,7 +348,7 @@ async fn update_channel_clears_member_limit_with_some_none() {
 
     // D'abord mettre un limit
     svc.update_channel(UpdateVoiceChannelCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         visibility: None, locked: None, queue_enabled: None, stage_enabled: None,
         name: None,
         member_limit: Some(Some(5)),
@@ -358,7 +358,7 @@ async fn update_channel_clears_member_limit_with_some_none() {
 
     // Puis le clear (Some(None))
     svc.update_channel(UpdateVoiceChannelCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         visibility: None, locked: None, queue_enabled: None, stage_enabled: None,
         name: None,
         member_limit: Some(None),
@@ -407,7 +407,7 @@ async fn whitelist_add_list_remove_flow() {
     let owner = fresh_id();
     let target = fresh_id();
     svc.add_to_whitelist(ManageWhitelistCommand {
-        guild_id: g.clone(), owner_id: owner.clone(),
+        guild_id: g.clone().into(), owner_id: owner.clone(),
         target_id: target.clone(), target_name: "Friend".into(),
     }).await.unwrap();
     let wl = svc.get_whitelist(&g, &owner).await.unwrap();
@@ -438,8 +438,8 @@ async fn ban_from_channel_persists_and_is_banned_returns_true() {
 
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
-        channel_id: ch.clone(),
-        user_id: target.clone(),
+        channel_id: ch.clone().into(),
+        user_id: target.clone().into(),
         user_name: "BadGuy".into(),
         banned_by: "owner".into(),
         reason: Some("spam".into()),
@@ -459,8 +459,8 @@ async fn ban_permanent_without_expires() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
-        channel_id: ch.clone(),
-        user_id: target.clone(),
+        channel_id: ch.clone().into(),
+        user_id: target.clone().into(),
         user_name: "X".into(),
         banned_by: "owner".into(),
         reason: None,
@@ -477,7 +477,7 @@ async fn unban_removes_ban() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
-        channel_id: ch.clone(), user_id: target.clone(), user_name: "X".into(),
+        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "X".into(),
         banned_by: "o".into(), reason: None, duration_secs: Some(3600),
     }).await.unwrap();
     svc.unban_from_channel(&ch, &target).await.unwrap();
@@ -513,7 +513,7 @@ async fn add_co_admin_persists_in_detail() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let target = fresh_id();
     svc.add_co_admin(ManageCoAdminCommand {
-        channel_id: ch.clone(), user_id: target.clone(), user_name: "CoMod".into(),
+        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "CoMod".into(),
     }).await.unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
     assert!(d.co_admins.iter().any(|c| c.user_id == target));
@@ -527,7 +527,7 @@ async fn remove_co_admin_clears_entry() {
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let target = fresh_id();
     svc.add_co_admin(ManageCoAdminCommand {
-        channel_id: ch.clone(), user_id: target.clone(), user_name: "X".into(),
+        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "X".into(),
     }).await.unwrap();
     svc.remove_co_admin(&ch, &target).await.unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
@@ -554,7 +554,7 @@ async fn create_invite_link_generates_code_and_list_returns_it() {
     let ch = fresh_id();
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         created_by: "owner".into(), created_by_name: "Owner".into(),
         duration_secs: Some(3600), max_uses: Some(5),
     }).await.unwrap();
@@ -571,7 +571,7 @@ async fn create_invite_link_defaults_when_fields_absent() {
     let ch = fresh_id();
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         created_by: "o".into(), created_by_name: "O".into(),
         duration_secs: None, max_uses: None,
     }).await.unwrap();
@@ -586,13 +586,13 @@ async fn use_invite_link_increments_and_whitelists() {
     let owner = fresh_id();
     svc.create_channel(sample_cmd(&g, &ch, &owner)).await.unwrap();
     let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         created_by: owner.clone(), created_by_name: "O".into(),
         duration_secs: Some(3600), max_uses: Some(3),
     }).await.unwrap();
     let user = fresh_id();
     let used = svc.use_invite_link(UseInviteLinkCommand {
-        code: link.code.clone(), user_id: user.clone(), user_name: "Visitor".into(),
+        code: link.code.clone(), user_id: user.clone().into(), user_name: "Visitor".into(),
     }).await.unwrap();
     assert_eq!(used.current_uses, 1);
     // Whitelist automatique
@@ -616,7 +616,7 @@ async fn use_invite_link_rejects_when_max_uses_reached() {
     let ch = fresh_id();
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         created_by: "o".into(), created_by_name: "O".into(),
         duration_secs: Some(3600), max_uses: Some(1),
     }).await.unwrap();
@@ -638,7 +638,7 @@ async fn revoke_invite_link_removes_it() {
     let ch = fresh_id();
     svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
     let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone(),
+        channel_id: ch.clone().into(),
         created_by: "o".into(), created_by_name: "O".into(),
         duration_secs: Some(3600), max_uses: Some(5),
     }).await.unwrap();

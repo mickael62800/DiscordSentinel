@@ -116,7 +116,7 @@ pub async fn log_action(
                 }
             };
             if let Err(e) = state.reminders_uc.create_reminder(CreateReminderCommand {
-                guild_id: guild_id.clone(),
+                guild_id: guild_id.clone().into(),
                 moderator_id,
                 moderator_name: moderator_name.clone(),
                 target_id: target_id.clone(),
