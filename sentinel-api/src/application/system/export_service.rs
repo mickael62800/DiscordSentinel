@@ -10,9 +10,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 /// Resultat d'un export : donnees serialisees + nombre de lignes.
 #[derive(Debug)]
@@ -67,7 +64,7 @@ impl ExecuteExportUseCase for ExportService {
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct InfractionRow {
-    id: Uuid, guild_id: GuildId, channel_id: ChannelId, user_id: UserId,
+    id: Uuid, guild_id: String, channel_id: String, user_id: String,
     username: String, message_id: String, content: String, score: f64,
     action: String, reason: String, duration: Option<i64>, created_at: DateTime<Utc>,
 }
@@ -83,7 +80,7 @@ async fn export_infractions(pool: &PgPool, guild_id: &str, format: &str, max_row
     .map_err(|e| DomainError::Internal(format!("query infractions: {e}")))?;
 
     serialize_rows(&rows, format, |r| vec![
-        r.id.to_string(), r.channel_id.clone().into(), r.user_id.clone().into(), r.username.clone(),
+        r.id.to_string(), r.channel_id.clone(), r.user_id.clone(), r.username.clone(),
         r.message_id.clone(), r.content.clone(), format!("{:.3}", r.score), r.action.clone(),
         r.reason.clone(), r.duration.map(|d| d.to_string()).unwrap_or_default(), r.created_at.to_rfc3339(),
     ], &["id","channel_id","user_id","username","message_id","content","score","action","reason","duration_secs","created_at"])
@@ -91,7 +88,7 @@ async fn export_infractions(pool: &PgPool, guild_id: &str, format: &str, max_row
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct AuditLogRow {
-    id: Uuid, guild_id: GuildId, event_type: String,
+    id: Uuid, guild_id: String, event_type: String,
     actor_id: Option<String>, actor_name: Option<String>,
     target_id: Option<String>, target_name: Option<String>,
     channel_id: Option<String>, channel_name: Option<String>,
@@ -119,7 +116,7 @@ async fn export_audit_logs(pool: &PgPool, guild_id: &str, format: &str, max_rows
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct ModerationActionRow {
-    id: Uuid, guild_id: GuildId, moderator_id: String, moderator_name: String,
+    id: Uuid, guild_id: String, moderator_id: String, moderator_name: String,
     target_id: String, target_name: String, action_type: String,
     reason: String, duration: Option<i64>, created_at: DateTime<Utc>,
 }

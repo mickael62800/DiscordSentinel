@@ -1,15 +1,12 @@
 use async_trait::async_trait;
 
 use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct BlackjackTable {
     pub id: String,
-    pub guild_id: GuildId,
-    pub channel_id: ChannelId,
+    pub guild_id: String,
+    pub channel_id: String,
     pub owner_id: String,
     pub owner_name: String,
     pub status: String,
@@ -18,7 +15,7 @@ pub struct BlackjackTable {
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct BlackjackTablePlayer {
-    pub user_id: UserId,
+    pub user_id: String,
     pub user_name: String,
     pub joined_at: String,
 }

@@ -295,7 +295,7 @@ pub async fn register_guild(
              ON CONFLICT (discord_user_id, guild_id) DO NOTHING",
         )
         .bind(&owner)
-        .bind(&guild_id)
+        .bind(guild_id.as_str())
         .execute(&state.pg_pool)
         .await
         {

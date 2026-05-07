@@ -32,13 +32,45 @@ impl PendingActionRepository for PgPendingActionRepository {
     }
 
     async fn list_pending(&self, guild_id: &str) -> Result<Vec<PendingAction>, sentinel_core::domain::errors::DomainError> {
-        let rows: Vec<PendingAction> = sqlx::query_as(
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            id: Uuid,
+            guild_id: String,
+            moderator_id: String,
+            moderator_name: String,
+            target_id: String,
+            target_name: String,
+            action_type: String,
+            reason: String,
+            gravity: Option<String>,
+            duration: Option<i64>,
+            status: String,
+            reviewed_by: Option<String>,
+            created_at: chrono::DateTime<chrono::Utc>,
+            updated_at: chrono::DateTime<chrono::Utc>,
+        }
+        let rows: Vec<Row> = sqlx::query_as(
             "SELECT id, guild_id, moderator_id, moderator_name, target_id, target_name, \
              action_type, reason, gravity, duration, status, reviewed_by, created_at, updated_at \
              FROM pending_mod_actions WHERE guild_id = $1 AND status = 'pending' \
              ORDER BY created_at DESC",
         ).bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
-        Ok(rows)
+        Ok(rows.into_iter().map(|r| PendingAction {
+            id: r.id,
+            guild_id: r.guild_id.into(),
+            moderator_id: r.moderator_id,
+            moderator_name: r.moderator_name,
+            target_id: r.target_id,
+            target_name: r.target_name,
+            action_type: r.action_type,
+            reason: r.reason,
+            gravity: r.gravity,
+            duration: r.duration,
+            status: r.status,
+            reviewed_by: r.reviewed_by,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }).collect())
     }
 
     async fn get_guild_id(&self, id: Uuid) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {

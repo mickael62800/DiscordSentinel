@@ -48,7 +48,7 @@ pub struct ExportJobCreatedDto {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct ExportJobStatusDto {
     pub id: Uuid,
-    pub guild_id: GuildId,
+    pub guild_id: String,
     pub requested_by: String,
     pub job_type: String,
     pub format: String,
@@ -101,7 +101,7 @@ pub async fn create_export_job(
         "INSERT INTO export_jobs (guild_id, requested_by, job_type, format, filters) \
          VALUES ($1, $2, $3, $4, $5) RETURNING id",
     )
-    .bind(&dto.guild_id)
+    .bind(dto.guild_id.as_str())
     .bind(&dto.requested_by)
     .bind(&dto.job_type)
     .bind(&dto.format)

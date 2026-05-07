@@ -41,7 +41,7 @@ async fn flush_audit_logs(pool: &PgPool, batch: Vec<AuditLog>) -> Result<(), Str
     );
     qb.push_values(batch.iter(), |mut b, log| {
         b.push_bind(log.id)
-            .push_bind(&log.guild_id)
+            .push_bind(log.guild_id.as_str())
             .push_bind(&log.event_type)
             .push_bind(&log.actor_id)
             .push_bind(&log.actor_name)
