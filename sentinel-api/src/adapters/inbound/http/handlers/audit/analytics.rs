@@ -214,6 +214,39 @@ pub async fn get_peak_hours(
     Ok(Json(dtos))
 }
 
+/// POST /api/analytics/reset?guild_id=X
+///
+/// Reset les compteurs d'activite (hourly_activity + daily_activity) pour
+/// la guild specifiee. NE TOUCHE PAS aux infractions/audit_logs (donnees
+/// d'audit reelles, conservees pour la chaine de moderation).
+/// Flush egalement le cache Redis analytics:* pour la guild.
+#[derive(serde::Serialize)]
+pub struct ResetAnalyticsResponse {
+    pub deleted_rows: u64,
+}
+
+pub async fn reset_analytics(
+    State(state): State<AppState>,
+    Query(params): Query<AnalyticsQuery>,
+) -> Result<Json<ResetAnalyticsResponse>, ApiError> {
+    let guild_id = params.guild_id.as_deref()
+        .ok_or_else(|| ApiError::from(sentinel_core::domain::errors::DomainError::ValidationError("guild_id requis".into())))?;
+
+    let deleted_rows = state.analytics_repo.reset_activity(guild_id).await?;
+
+    // Flush du cache Redis (toutes les cles analytics:*:<guild_id>:*).
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        let pattern = format!("analytics:*:{guild_id}:*");
+        if let Ok(keys) = conn.keys::<_, Vec<String>>(pattern).await {
+            if !keys.is_empty() {
+                let _: Result<(), _> = conn.del(keys).await;
+            }
+        }
+    }
+
+    Ok(Json(ResetAnalyticsResponse { deleted_rows }))
+}
+
 #[cfg(test)]
 #[path = "tests/analytics.rs"]
 mod tests;

@@ -50,4 +50,10 @@ pub trait AnalyticsRepository: Send + Sync {
         messages: i64,
         infractions: i32,
     ) -> Result<(), DomainError>;
+
+    /// Reset les compteurs d'activite (hourly_activity + daily_activity)
+    /// pour une guild. NE TOUCHE PAS aux infractions/audit_logs (donnees
+    /// d'audit reelles, conservees pour la chaine de moderation).
+    /// Retourne le nombre total de lignes supprimees.
+    async fn reset_activity(&self, guild_id: &str) -> Result<u64, DomainError>;
 }

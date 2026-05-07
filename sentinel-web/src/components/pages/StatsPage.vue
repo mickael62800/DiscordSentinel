@@ -2,6 +2,8 @@
 import { ref, computed } from "vue";
 import DashboardChartsSection from "../organisms/DashboardChartsSection.vue";
 import { registerChartJs } from "@/utils/chartjs";
+import { analyticsService } from "@/services/analyticsService";
+import { useGuildSelectorStore } from "@/stores/guildSelectorStore";
 
 registerChartJs();
 
@@ -10,6 +12,8 @@ const days = ref(30);
 const chartsRef = ref<InstanceType<typeof DashboardChartsSection> | null>(null);
 
 const refreshing = ref(false);
+const resetting = ref(false);
+const guildStore = useGuildSelectorStore();
 
 async function handleRefresh() {
   refreshing.value = true;
@@ -17,6 +21,31 @@ async function handleRefresh() {
     await chartsRef.value?.refresh();
   } finally {
     refreshing.value = false;
+  }
+}
+
+async function handleReset() {
+  const gid = guildStore.selectedGuildId;
+  if (!gid) {
+    alert("Selectionne d'abord un serveur.");
+    return;
+  }
+  const ok = window.confirm(
+    "Vider toutes les statistiques d'activite (heatmap, pics horaires, etc.) pour ce serveur ?\n\n" +
+      "Les infractions et logs d'audit seront CONSERVES — seuls les compteurs d'activite (hourly_activity / daily_activity) seront remis a zero.\n\n" +
+      "Action irreversible.",
+  );
+  if (!ok) return;
+  resetting.value = true;
+  try {
+    const res = await analyticsService.reset(gid);
+    alert(`Analytics remises a zero : ${res.deleted_rows} lignes supprimees.`);
+    await chartsRef.value?.refresh();
+  } catch (e) {
+    console.error("Reset analytics echoue", e);
+    alert("Echec du reset. Voir la console pour les details.");
+  } finally {
+    resetting.value = false;
   }
 }
 
@@ -59,6 +88,28 @@ const periods = computed(() => [7, 14, 30, 90]);
             <path d="M3 21v-5h5" />
           </svg>
           <span>Actualiser</span>
+        </button>
+        <button
+          class="reset-btn"
+          :disabled="resetting"
+          :title="resetting ? 'Reset en cours…' : 'Vider les compteurs d\'activite (irreversible)'"
+          @click="handleReset"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            width="14"
+            height="14"
+          >
+            <path d="M3 6h18" />
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+            <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          <span>{{ resetting ? "Reset…" : "Remettre a zero" }}</span>
         </button>
       </div>
     </div>
@@ -238,6 +289,44 @@ const periods = computed(() => [7, 14, 30, 90]);
 }
 
 .refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Reset button — destructif (rouge), confirmation requise ─────── */
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, #dc2626 8%, var(--bg-card)),
+    var(--bg-card));
+  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--border));
+  color: color-mix(in srgb, #dc2626 80%, var(--text-secondary));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.25s ease, border-color 0.2s ease, box-shadow 0.25s ease;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+}
+
+.reset-btn:hover:not(:disabled) {
+  color: white;
+  border-color: #dc2626;
+  background: linear-gradient(180deg, #ef4444, #dc2626);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 25%, transparent),
+    0 4px 12px color-mix(in srgb, #dc2626 30%, transparent);
+}
+
+.reset-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
+}
+
+.reset-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

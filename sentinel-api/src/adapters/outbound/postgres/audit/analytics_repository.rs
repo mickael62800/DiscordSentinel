@@ -26,7 +26,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             sqlx::query_as(
                 "SELECT hour, EXTRACT(ISODOW FROM day)::float8 - 1 AS day_of_week, \
                  SUM(messages)::bigint AS messages, SUM(infractions)::bigint AS infractions \
-                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer\
+                 FROM hourly_activity WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer \
                  GROUP BY hour, EXTRACT(ISODOW FROM day) ORDER BY day_of_week, hour",
             )
             .bind(gid)
@@ -37,7 +37,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             sqlx::query_as(
                 "SELECT hour, EXTRACT(ISODOW FROM day)::float8 - 1 AS day_of_week, \
                  SUM(messages)::bigint AS messages, SUM(infractions)::bigint AS infractions \
-                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1::integer\
+                 FROM hourly_activity WHERE day >= CURRENT_DATE - $1::integer \
                  GROUP BY hour, EXTRACT(ISODOW FROM day) ORDER BY day_of_week, hour",
             )
             .bind(days)
@@ -265,5 +265,23 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(())
+    }
+
+    async fn reset_activity(&self, guild_id: &str) -> Result<u64, DomainError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("reset_activity begin: {e}")))?;
+        let h = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&mut *tx).await
+            .map_err(|e| DomainError::Internal(format!("reset hourly_activity: {e}")))?
+            .rows_affected();
+        let d = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&mut *tx).await
+            .map_err(|e| DomainError::Internal(format!("reset daily_activity: {e}")))?
+            .rows_affected();
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("reset_activity commit: {e}")))?;
+        Ok(h + d)
     }
 }

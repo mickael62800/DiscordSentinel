@@ -15,6 +15,7 @@ pub fn inner() -> Router<AppState> {
         .route("/top-infractors", get(handlers::audit::analytics::get_top_infractors))
         .route("/moderation-trend", get(handlers::audit::analytics::get_moderation_trend))
         .route("/peak-hours", get(handlers::audit::analytics::get_peak_hours))
+        .route("/reset", post(handlers::audit::analytics::reset_analytics))
         // Jobs declenches par sentinel-worker.
         .route("/snapshot/daily", post(handlers::audit::snapshots::snapshot_daily_all))
         .route("/snapshot/hourly", post(handlers::audit::snapshots::snapshot_hourly_all))
