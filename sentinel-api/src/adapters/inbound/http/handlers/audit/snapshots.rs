@@ -82,6 +82,15 @@ async fn list_guild_ids(state: &AppState) -> Result<Vec<String>, ApiError> {
 // ── Jobs ────────────────────────────────────────────────────────────────
 
 /// POST /api/analytics/snapshot/daily
+///
+/// Calcule l'activité journaliere via une **baseline** : on snapshot le
+/// `total_user_stats` au début de chaque "jour analytics" (configurable via
+/// `analytics.baseline_anchor_hour`, défaut 0 = minuit UTC). Le delta devient
+/// `daily_activity[D].messages = total_now - baseline[D].total_messages`.
+///
+/// Avantage vs ancienne version : daily_activity[D] reste correct meme si
+/// le job rate un tick. La baseline d'un jour donne reste figee une fois
+/// captee, donc le calcul ne diverge plus jour apres jour.
 pub async fn snapshot_daily_all(
     State(state): State<AppState>,
 ) -> Result<Json<JobReport>, ApiError> {
@@ -98,30 +107,67 @@ pub async fn snapshot_daily_all(
             parse_bool(read_cfg(&state, guild_id, "track_voice_stats").await, true);
         let track_msg =
             parse_bool(read_cfg(&state, guild_id, "track_message_stats").await, true);
+        // Heure UTC à laquelle la baseline change (0-23). Permet aux admins
+        // qui veulent un "jour" qui finit ailleurs qu'à minuit UTC.
+        let anchor_hour = parse_i64(read_cfg(&state, guild_id, "baseline_anchor_hour").await, 0)
+            .clamp(0, 23);
 
+        // Le "stat day" courant : si l'heure UTC >= anchor, on est dans le
+        // jour courant ; sinon on est encore dans le jour précédent (la
+        // baseline n'a pas encore tourne).
+        let stat_day_expr = format!(
+            "CASE WHEN EXTRACT(HOUR FROM NOW())::int >= {anchor_hour} \
+             THEN CURRENT_DATE ELSE CURRENT_DATE - 1 END"
+        );
+
+        // Step 1 : ON CONFLICT DO NOTHING -> on n'écrase JAMAIS une baseline
+        // déjà capturée pour ce jour. Premier tick du jour -> baseline figée
+        // avec le total cumulatif courant. Ticks suivants -> no-op.
+        let baseline_sql = format!(
+            "INSERT INTO analytics_daily_baseline (guild_id, day, total_messages, total_voice_seconds) \
+             SELECT $1, ({stat_day_expr}), \
+                    COALESCE((SELECT SUM(message_count) FROM user_stats WHERE guild_id = $1), 0), \
+                    COALESCE((SELECT SUM(voice_seconds) FROM user_stats WHERE guild_id = $1), 0) \
+             ON CONFLICT (guild_id, day) DO NOTHING"
+        );
+        if let Err(e) = sqlx::query(&baseline_sql).bind(guild_id).execute(&state.pg_pool).await {
+            tracing::warn!(error = %e, guild = %guild_id, "snapshot_daily baseline insert echec");
+            continue;
+        }
+
+        // Step 2 : delta = total_now - baseline[stat_day].total_*
         let msg_expr = if track_msg {
-            "GREATEST(COALESCE((SELECT SUM(message_count) FROM user_stats WHERE guild_id = $1), 0) - COALESCE((SELECT messages FROM daily_activity WHERE guild_id = $1 AND day = CURRENT_DATE - 1), 0), 0)"
+            format!(
+                "GREATEST(COALESCE((SELECT SUM(message_count) FROM user_stats WHERE guild_id = $1), 0) \
+                 - COALESCE((SELECT total_messages FROM analytics_daily_baseline WHERE guild_id = $1 AND day = ({stat_day_expr})), 0), 0)"
+            )
         } else {
-            "0"
+            "0".to_string()
         };
         let voice_expr = if track_voice {
-            "GREATEST(COALESCE((SELECT SUM(voice_seconds) / 60 FROM user_stats WHERE guild_id = $1), 0) - COALESCE((SELECT voice_minutes FROM daily_activity WHERE guild_id = $1 AND day = CURRENT_DATE - 1), 0), 0)"
+            format!(
+                "GREATEST(COALESCE((SELECT SUM(voice_seconds) / 60 FROM user_stats WHERE guild_id = $1), 0) \
+                 - COALESCE((SELECT total_voice_seconds / 60 FROM analytics_daily_baseline WHERE guild_id = $1 AND day = ({stat_day_expr})), 0), 0)"
+            )
         } else {
-            "0"
+            "0".to_string()
         };
 
+        // Les colonnes "active_members / new_members / leaves / infractions /
+        // warns / mutes / bans" sont calculees telles quelles — elles sont
+        // basées sur des compteurs absolus du jour, pas sur user_stats cumulatif.
         let sql = format!(
             "INSERT INTO daily_activity (guild_id, day, messages, voice_minutes, active_members, new_members, leaves, infractions, warns, mutes, bans) \
-             SELECT $1, CURRENT_DATE, \
+             SELECT $1, ({stat_day_expr}), \
                {msg_expr}, \
                {voice_expr}, \
-               COALESCE((SELECT COUNT(DISTINCT user_id) FROM user_stats WHERE guild_id = $1 AND updated_at >= CURRENT_DATE), 0)::integer, \
-               COALESCE((SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'member_join' AND created_at >= CURRENT_DATE)::integer, 0), \
-               COALESCE((SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'member_leave' AND created_at >= CURRENT_DATE)::integer, 0), \
-               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= CURRENT_DATE)::integer, 0), \
-               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= CURRENT_DATE AND action = 'warn')::integer, 0), \
-               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= CURRENT_DATE AND action = 'mute')::integer, 0), \
-               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= CURRENT_DATE AND action = 'ban')::integer, 0) \
+               COALESCE((SELECT COUNT(DISTINCT user_id) FROM user_stats WHERE guild_id = $1 AND updated_at >= ({stat_day_expr})), 0)::integer, \
+               COALESCE((SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'member_join' AND created_at >= ({stat_day_expr}))::integer, 0), \
+               COALESCE((SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'member_leave' AND created_at >= ({stat_day_expr}))::integer, 0), \
+               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= ({stat_day_expr}))::integer, 0), \
+               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= ({stat_day_expr}) AND action = 'warn')::integer, 0), \
+               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= ({stat_day_expr}) AND action = 'mute')::integer, 0), \
+               COALESCE((SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= ({stat_day_expr}) AND action = 'ban')::integer, 0) \
              ON CONFLICT (guild_id, day) DO UPDATE SET \
                messages = EXCLUDED.messages, voice_minutes = EXCLUDED.voice_minutes, \
                active_members = EXCLUDED.active_members, new_members = EXCLUDED.new_members, \

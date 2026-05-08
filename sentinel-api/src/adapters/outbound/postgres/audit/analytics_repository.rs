@@ -280,8 +280,15 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .execute(&mut *tx).await
             .map_err(|e| DomainError::Internal(format!("reset daily_activity: {e}")))?
             .rows_affected();
+        // Vide aussi la baseline : sans ça, le prochain snapshot calculerait un
+        // delta basé sur l'ancienne baseline et reproduirait des chiffres faux.
+        let b = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&mut *tx).await
+            .map_err(|e| DomainError::Internal(format!("reset analytics_daily_baseline: {e}")))?
+            .rows_affected();
         tx.commit().await
             .map_err(|e| DomainError::Internal(format!("reset_activity commit: {e}")))?;
-        Ok(h + d)
+        Ok(h + d + b)
     }
 }
