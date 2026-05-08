@@ -173,4 +173,18 @@ impl MemberRepository for PgMemberRepository {
             .map_err(|e| DomainError::Internal(format!("update_last_seen: {e}")))?;
         Ok(())
     }
+
+    async fn is_left(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
+        // Only true if a row exists AND left_at is set. Pas de ligne -> false (actif).
+        let row: Option<(bool,)> = sqlx::query_as(
+            "SELECT (left_at IS NOT NULL) FROM guild_members \
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("is_left: {e}")))?;
+        Ok(row.map(|(b,)| b).unwrap_or(false))
+    }
 }

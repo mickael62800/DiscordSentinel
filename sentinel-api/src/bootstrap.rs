@@ -450,6 +450,7 @@ pub async fn build_app_state(
         Arc::new(ManageWalletService::new(
             wallet_repo.clone(),
             coude_taunts_uc.clone(),
+            member_repo.clone(),
         ));
 
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir

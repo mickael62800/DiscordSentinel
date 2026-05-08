@@ -11,4 +11,9 @@ pub trait MemberRepository: Send + Sync {
     async fn upsert_many(&self, members: &[GuildMember]) -> Result<u64, DomainError>;
     async fn delete(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
     async fn update_last_seen(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+
+    /// True si le user est marque comme parti (guild_members.left_at IS NOT NULL).
+    /// False si actif OU si pas de ligne dans guild_members (jamais sync,
+    /// par defaut on considere actif pour ne pas bloquer les anciens players).
+    async fn is_left(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 }

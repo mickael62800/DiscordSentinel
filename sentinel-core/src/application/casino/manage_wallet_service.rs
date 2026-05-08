@@ -43,18 +43,31 @@ use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::community::member_repository::MemberRepository;
 
 pub struct ManageWalletService {
     repo: Arc<dyn WalletRepository>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+    member_repo: Arc<dyn MemberRepository>,
 }
 
 impl ManageWalletService {
     pub fn new(
         repo: Arc<dyn WalletRepository>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+        member_repo: Arc<dyn MemberRepository>,
     ) -> Self {
-        Self { repo, taunts_uc }
+        Self { repo, taunts_uc, member_repo }
+    }
+
+    /// Renvoie une erreur si le user est marque comme parti (left_at IS NOT NULL).
+    async fn ensure_active(&self, guild_id: &str, user_id: &str, role: &str) -> Result<(), DomainError> {
+        if self.member_repo.is_left(guild_id, user_id).await? {
+            return Err(DomainError::ValidationError(format!(
+                "{role} a quitte le serveur — operation impossible"
+            )));
+        }
+        Ok(())
     }
 
     /// Lit le solde courant. Propage les erreurs DB plutot que de retourner
@@ -166,6 +179,11 @@ impl ManageWalletUseCase for ManageWalletService {
                 "Impossible de se transferer a soi-meme".into(),
             ));
         }
+        // Bloque si emetteur OU destinataire a quitte le serveur.
+        // Pas la peine de bloquer credit/debit standalone : l'emetteur ne peut
+        // pas declencher d'action s'il est parti (pas dans Discord).
+        self.ensure_active(guild_id, from_user, "Emetteur").await?;
+        self.ensure_active(guild_id, to_user, "Destinataire").await?;
 
         let sender_before = self.read_balance(guild_id, from_user).await?;
 
