@@ -205,6 +205,15 @@ impl EventHandler for Handler {
         modules::progression::assign_default_role(&ctx, &new_member).await;
         modules::community::on_member_add(&ctx, &new_member).await;
         modules::security::on_member_add(&ctx, &new_member).await;
+        // Lifecycle : clear left_at + reset joined_at cote API. Le user
+        // peut rejouer (wallet repart de zero, gere cote serveur).
+        let guild_id = new_member.guild_id.to_string();
+        let user_id = new_member.user.id.to_string();
+        let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
+        if let Some(api) = api {
+            let path = format!("/api/members/{guild_id}/{user_id}/rejoin");
+            api.post_fire_and_forget(&path, &serde_json::json!({})).await;
+        }
     }
 
     async fn guild_member_removal(
@@ -217,6 +226,16 @@ impl EventHandler for Handler {
         modules::audit::on_member_remove(&ctx, guild_id, &user).await;
         modules::welcome::on_member_remove(&ctx, guild_id, &user).await;
         modules::security::on_member_remove(&ctx, guild_id, &user).await;
+        // Lifecycle : set left_at + reset wallet a 0. Le user n'apparaitra
+        // plus dans les listes de jeu (filtrage cote query) mais ses donnees
+        // non-jeu (infractions, audit, stats) sont conservees.
+        let g = guild_id.to_string();
+        let u = user.id.to_string();
+        let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
+        if let Some(api) = api {
+            let path = format!("/api/members/{g}/{u}/leave");
+            api.post_fire_and_forget(&path, &serde_json::json!({})).await;
+        }
     }
 
     async fn guild_member_update(

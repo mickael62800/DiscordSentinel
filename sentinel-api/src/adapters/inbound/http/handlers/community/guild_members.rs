@@ -230,6 +230,84 @@ pub struct UpdateMemberPayload {
     pub roles: Option<serde_json::Value>,
 }
 
+/// POST /api/members/{guild_id}/{user_id}/leave
+///
+/// Marque un membre comme parti :
+/// - guild_members.left_at = NOW() (idempotent : ne reset pas si deja parti)
+/// - user_wallets.coins = 0 (empeche d'etre cible de vols / paris)
+///
+/// Les autres donnees (infractions, audit_logs, stats, conduct, tickets)
+/// sont conservees pour la chaine de moderation et l'historique.
+/// Au retour (rejoin), le user repart de zero cote jeu mais garde ses
+/// donnees non-jeu liees a son user_id Discord.
+///
+/// Endpoint appele par sentinel-bot sur GuildMemberRemove. Idempotent.
+pub async fn leave_member(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let mut tx = state.pg_pool.begin().await
+        .map_err(|e| ApiError(DomainError::Internal(format!("leave_member begin: {e}"))))?;
+
+    // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
+    let res = sqlx::query(
+        "UPDATE guild_members SET left_at = COALESCE(left_at, NOW()) \
+         WHERE guild_id = $1 AND user_id = $2"
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .execute(&mut *tx).await
+    .map_err(|e| ApiError(DomainError::Internal(format!("leave_member update: {e}"))))?;
+
+    // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
+    let _ = sqlx::query(
+        "UPDATE user_wallets SET coins = 0, total_spent = total_spent + coins, updated_at = NOW() \
+         WHERE guild_id = $1 AND user_id = $2 AND coins > 0"
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .execute(&mut *tx).await
+    .map_err(|e| ApiError(DomainError::Internal(format!("leave_member wallet reset: {e}"))))?;
+
+    tx.commit().await
+        .map_err(|e| ApiError(DomainError::Internal(format!("leave_member commit: {e}"))))?;
+
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "rows_affected": res.rows_affected(),
+    })))
+}
+
+/// POST /api/members/{guild_id}/{user_id}/rejoin
+///
+/// Marque un membre comme revenu :
+/// - guild_members.left_at = NULL
+/// - guild_members.joined_at = NOW()
+///
+/// Le wallet reste a 0 (le user repart de zero cote jeu).
+/// Les donnees non-jeu (infractions, etc.) sont automatiquement re-attachees
+/// via l'ID Discord stable, pas besoin de re-importer.
+///
+/// Endpoint appele par sentinel-bot sur GuildMemberAdd. Idempotent.
+pub async fn rejoin_member(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let res = sqlx::query(
+        "UPDATE guild_members SET left_at = NULL, joined_at = NOW(), last_seen_at = NOW() \
+         WHERE guild_id = $1 AND user_id = $2"
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .execute(&state.pg_pool).await
+    .map_err(|e| ApiError(DomainError::Internal(format!("rejoin_member update: {e}"))))?;
+
+    Ok(Json(serde_json::json!({
+        "ok": true,
+        "rows_affected": res.rows_affected(),
+    })))
+}
+
 #[cfg(test)]
 #[path = "tests/guild_members.rs"]
 mod tests;
