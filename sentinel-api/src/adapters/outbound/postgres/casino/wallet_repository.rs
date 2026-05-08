@@ -396,9 +396,15 @@ impl WalletRepository for PgWalletRepository {
         // donc l'ORDER BY est un index scan O(N) sur (guild_id, rank). Gain
         // typique : 100-1000x sur les hits hot. La staleness max de 5 min est
         // acceptable pour une UI de leaderboard.
+        // Filtre les membres partis (left_at NOT NULL dans guild_members).
+        // NOT EXISTS plutot que JOIN : preserve les users qui n'ont jamais
+        // ete syncs dans guild_members (pas filtres par accident).
         let rows = sqlx::query_as::<_, WalletRow>(
             "SELECT id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at
-             FROM mv_wallet_leaderboard WHERE guild_id = $1
+             FROM mv_wallet_leaderboard w WHERE guild_id = $1
+             AND NOT EXISTS (SELECT 1 FROM guild_members gm
+                             WHERE gm.guild_id = w.guild_id AND gm.user_id = w.user_id
+                             AND gm.left_at IS NOT NULL)
              ORDER BY rank
              LIMIT $2",
         )
@@ -431,7 +437,10 @@ impl WalletRepository for PgWalletRepository {
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Wallet>, DomainError> {
         let rows = sqlx::query_as::<_, WalletRow>(
             "SELECT id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at
-             FROM user_wallets WHERE guild_id = $1
+             FROM user_wallets w WHERE guild_id = $1
+             AND NOT EXISTS (SELECT 1 FROM guild_members gm
+                             WHERE gm.guild_id = w.guild_id AND gm.user_id = w.user_id
+                             AND gm.left_at IS NOT NULL)
              ORDER BY coins DESC, updated_at DESC",
         )
         .bind(guild_id)

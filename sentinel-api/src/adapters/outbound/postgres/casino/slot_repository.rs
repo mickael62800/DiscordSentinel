@@ -242,9 +242,12 @@ impl SlotRepository for PgSlotRepository {
                     COALESCE(SUM(payout), 0)::bigint AS total_payout,
                     COUNT(*) FILTER (WHERE is_jackpot)::bigint AS jackpot_count,
                     COUNT(*)::bigint AS spin_count
-             FROM slot_spin_log
+             FROM slot_spin_log s
              WHERE guild_id = $1
                AND created_at >= NOW() - ($2 || ' days')::interval
+               AND NOT EXISTS (SELECT 1 FROM guild_members gm
+                               WHERE gm.guild_id = s.guild_id AND gm.user_id = s.user_id
+                               AND gm.left_at IS NOT NULL)
              GROUP BY user_id
              ORDER BY total_payout DESC
              LIMIT $3",

@@ -124,9 +124,12 @@ impl WheelRepository for PgWheelRepository {
                     COALESCE(MAX(username), user_id) AS username,
                     COALESCE(SUM(payout), 0)::bigint AS total_payout,
                     COUNT(*)::bigint AS spin_count
-             FROM wheel_spin_log
+             FROM wheel_spin_log w
              WHERE guild_id = $1
                AND created_at >= NOW() - ($2 || ' days')::interval
+               AND NOT EXISTS (SELECT 1 FROM guild_members gm
+                               WHERE gm.guild_id = w.guild_id AND gm.user_id = w.user_id
+                               AND gm.left_at IS NOT NULL)
              GROUP BY user_id
              ORDER BY total_payout DESC
              LIMIT $3",

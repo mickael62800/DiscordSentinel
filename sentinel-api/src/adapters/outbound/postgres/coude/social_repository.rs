@@ -122,40 +122,41 @@ impl SocialRepository for PgSocialRepository {
     ) -> Result<Vec<LeaderboardEntry>, DomainError> {
         // Un SELECT par catégorie — l'enum garantit que rien d'autre ne passe
         // (pas d'interpolation de strings arbitraires).
+        // Filtre commun : exclut les users dont guild_members.left_at est set.
+        // NOT EXISTS preserve les users qui n'ont jamais ete syncs dans
+        // guild_members (pas filtres par accident).
+        let active_filter =
+            "AND NOT EXISTS (SELECT 1 FROM guild_members gm \
+             WHERE gm.guild_id = $1 AND gm.user_id = cp.user_id \
+             AND gm.left_at IS NOT NULL)";
         let sql = match category {
-            LeaderboardCategory::Richest => {
-                // Depuis la migration 080, `coude_players.coins` est une
-                // colonne legacy frozen. Le solde reel vit dans
-                // `user_wallets` (wallet partage entre jeux). On JOIN pour
-                // ne remonter que les joueurs Coude actifs, triees par
-                // leur solde wallet.
+            LeaderboardCategory::Richest => format!(
                 "SELECT cp.user_id, cp.username, w.coins AS value \
                  FROM coude_players cp \
                  INNER JOIN user_wallets w \
                    ON w.guild_id = cp.guild_id AND w.user_id = cp.user_id \
-                 WHERE cp.guild_id = $1 \
-                 ORDER BY w.coins DESC \
-                 LIMIT $2"
-            }
-            LeaderboardCategory::Thieves => {
-                "SELECT user_id, username, total_stolen AS value FROM coude_players \
-                 WHERE guild_id = $1 ORDER BY total_stolen DESC LIMIT $2"
-            }
-            LeaderboardCategory::Cowards => {
-                "SELECT user_id, username, cowardice_count::BIGINT AS value FROM coude_players \
-                 WHERE guild_id = $1 ORDER BY cowardice_count DESC LIMIT $2"
-            }
-            LeaderboardCategory::Chaos => {
-                "SELECT user_id, username, chaos_events::BIGINT AS value FROM coude_players \
-                 WHERE guild_id = $1 ORDER BY chaos_events DESC LIMIT $2"
-            }
-            LeaderboardCategory::Level => {
-                "SELECT user_id, username, level::BIGINT AS value FROM coude_players \
-                 WHERE guild_id = $1 ORDER BY level DESC, xp DESC LIMIT $2"
-            }
+                 WHERE cp.guild_id = $1 {active_filter} \
+                 ORDER BY w.coins DESC LIMIT $2"
+            ),
+            LeaderboardCategory::Thieves => format!(
+                "SELECT cp.user_id, cp.username, cp.total_stolen AS value FROM coude_players cp \
+                 WHERE cp.guild_id = $1 {active_filter} ORDER BY cp.total_stolen DESC LIMIT $2"
+            ),
+            LeaderboardCategory::Cowards => format!(
+                "SELECT cp.user_id, cp.username, cp.cowardice_count::BIGINT AS value FROM coude_players cp \
+                 WHERE cp.guild_id = $1 {active_filter} ORDER BY cp.cowardice_count DESC LIMIT $2"
+            ),
+            LeaderboardCategory::Chaos => format!(
+                "SELECT cp.user_id, cp.username, cp.chaos_events::BIGINT AS value FROM coude_players cp \
+                 WHERE cp.guild_id = $1 {active_filter} ORDER BY cp.chaos_events DESC LIMIT $2"
+            ),
+            LeaderboardCategory::Level => format!(
+                "SELECT cp.user_id, cp.username, cp.level::BIGINT AS value FROM coude_players cp \
+                 WHERE cp.guild_id = $1 {active_filter} ORDER BY cp.level DESC, cp.xp DESC LIMIT $2"
+            ),
         };
 
-        let rows: Vec<LeaderboardRow> = sqlx::query_as(sql)
+        let rows: Vec<LeaderboardRow> = sqlx::query_as(&sql)
             .bind(guild_id)
             .bind(limit)
             .fetch_all(&self.pool)
