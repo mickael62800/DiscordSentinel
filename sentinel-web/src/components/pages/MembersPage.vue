@@ -7,6 +7,7 @@ import { useGuildSelector } from "../../composables/useGuildSelector";
 import { usePagination } from "../../composables/usePagination";
 import ErrorState from "../atoms/ErrorState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import MemberStatusBadge from "../atoms/MemberStatusBadge.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import MemberDetailDrawer from "../organisms/MemberDetailDrawer.vue";
 
@@ -99,6 +100,7 @@ function rolesCount(roles: unknown): number {
               </div>
             </div>
             <div class="member-badges">
+              <MemberStatusBadge :left-at="member.left_at" />
               <AppBadge v-if="isWatched(member.user_id)" label="SURVEILLE" variant="warning" />
             </div>
           </div>

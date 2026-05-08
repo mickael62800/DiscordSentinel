@@ -584,6 +584,8 @@ export interface Member {
   account_created: string | null;
   is_bot: boolean;
   last_seen_at: string | null;
+  /** Set quand le membre a quitte le serveur. NULL = encore actif. */
+  left_at?: string | null;
 }
 
 export interface MemberConduct {

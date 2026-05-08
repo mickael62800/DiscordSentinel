@@ -150,6 +150,9 @@ fn proto_to_member(p: proto::GuildMember) -> Result<GuildMember, Status> {
         account_created: parse_rfc3339(p.account_created)?,
         is_bot: p.is_bot,
         last_seen_at: parse_rfc3339(p.last_seen_at)?,
+        // gRPC proto n'expose pas left_at (interne API ↔ web). On le considere
+        // toujours actif depuis le bot (qui call ensuite /leave si applicable).
+        left_at: None,
     })
 }
 

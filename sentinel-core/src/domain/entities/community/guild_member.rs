@@ -16,6 +16,12 @@ pub struct GuildMember {
     pub account_created: Option<DateTime<Utc>>,
     pub is_bot: bool,
     pub last_seen_at: Option<DateTime<Utc>>,
+    /// NULL = membre actif sur le serveur. Set par le hook GuildMemberRemove
+    /// du bot. Reset au retour (GuildMemberAdd) via /api/members/:g/:u/rejoin.
+    /// Utilise pour afficher un badge "parti" cote front et filtrer les listes
+    /// de jeu.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub left_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

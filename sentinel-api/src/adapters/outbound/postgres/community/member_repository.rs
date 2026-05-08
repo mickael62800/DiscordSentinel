@@ -29,6 +29,7 @@ struct MemberRow {
     account_created: Option<DateTime<Utc>>,
     is_bot: Option<bool>,
     last_seen_at: Option<DateTime<Utc>>,
+    left_at: Option<DateTime<Utc>>,
 }
 
 impl From<MemberRow> for GuildMember {
@@ -44,6 +45,7 @@ impl From<MemberRow> for GuildMember {
             account_created: r.account_created,
             is_bot: r.is_bot.unwrap_or(false),
             last_seen_at: r.last_seen_at,
+            left_at: r.left_at,
         }
     }
 }
@@ -52,7 +54,7 @@ impl From<MemberRow> for GuildMember {
 impl MemberRepository for PgMemberRepository {
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<GuildMember>, DomainError> {
         let rows = sqlx::query_as::<_, MemberRow>(
-            "SELECT guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at
+            "SELECT guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at, left_at
              FROM guild_members WHERE guild_id = $1 ORDER BY username ASC"
         )
         .bind(guild_id)
@@ -65,7 +67,7 @@ impl MemberRepository for PgMemberRepository {
 
     async fn find_one(&self, guild_id: &str, user_id: &str) -> Result<Option<GuildMember>, DomainError> {
         let row = sqlx::query_as::<_, MemberRow>(
-            "SELECT guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at
+            "SELECT guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at, left_at
              FROM guild_members WHERE guild_id = $1 AND user_id = $2"
         )
         .bind(guild_id)
