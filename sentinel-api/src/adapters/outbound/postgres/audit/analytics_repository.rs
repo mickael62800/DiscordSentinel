@@ -108,7 +108,11 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         guild_id: Option<&str>,
         days: i32,
         limit: i64,
+        min_total: i64,
     ) -> Result<Vec<TopInfractor>, DomainError> {
+        // HAVING COUNT(*) >= min_total filtre les users en dessous du seuil.
+        // min_total <= 0 -> on passe 0, donc filtre inactif (tout le monde passe).
+        let min = min_total.max(0);
         let rows: Vec<(String, String, Option<i64>, Option<i64>, Option<i64>, Option<i64>, Option<i64>)> =
             if let Some(gid) = guild_id {
                 sqlx::query_as(
@@ -118,11 +122,14 @@ impl AnalyticsRepository for PgAnalyticsRepository {
                      COUNT(*) FILTER (WHERE action = 'mute')::bigint AS mutes, \
                      COUNT(*) FILTER (WHERE action = 'ban')::bigint AS bans \
                      FROM infractions WHERE guild_id = $1 AND created_at >= NOW() - make_interval(days => $2) \
-                     AND action != 'none' GROUP BY user_id, username ORDER BY total DESC LIMIT $3",
+                     AND action != 'none' GROUP BY user_id, username \
+                     HAVING COUNT(*) >= $4 \
+                     ORDER BY total DESC LIMIT $3",
                 )
                 .bind(gid)
                 .bind(days)
                 .bind(limit)
+                .bind(min)
                 .fetch_all(&self.pool)
                 .await
             } else {
@@ -133,10 +140,13 @@ impl AnalyticsRepository for PgAnalyticsRepository {
                      COUNT(*) FILTER (WHERE action = 'mute')::bigint AS mutes, \
                      COUNT(*) FILTER (WHERE action = 'ban')::bigint AS bans \
                      FROM infractions WHERE created_at >= NOW() - make_interval(days => $1) \
-                     AND action != 'none' GROUP BY user_id, username ORDER BY total DESC LIMIT $2",
+                     AND action != 'none' GROUP BY user_id, username \
+                     HAVING COUNT(*) >= $3 \
+                     ORDER BY total DESC LIMIT $2",
                 )
                 .bind(days)
                 .bind(limit)
+                .bind(min)
                 .fetch_all(&self.pool)
                 .await
             }

@@ -21,11 +21,13 @@ pub trait AnalyticsRepository: Send + Sync {
     ) -> Result<Vec<ActionDistribution>, DomainError>;
 
     /// Top infracteurs.
+    /// `min_total` : seuil minimal d'infractions pour apparaître (0 = pas de filtre).
     async fn get_top_infractors(
         &self,
         guild_id: Option<&str>,
         days: i32,
         limit: i64,
+        min_total: i64,
     ) -> Result<Vec<TopInfractor>, DomainError>;
 
     /// Trend moderation par jour.

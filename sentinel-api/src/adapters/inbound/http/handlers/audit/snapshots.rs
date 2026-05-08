@@ -236,27 +236,45 @@ pub async fn retention_cleanup_all(
             skipped += 1;
             continue;
         }
-        let retention =
+        // Retention configurable :
+        // - data_retention_days  : daily_activity + analytics_daily_baseline (defaut 90j)
+        // - hourly_retention_days : hourly_activity (defaut 30j car volumineuse — 24 lignes/jour/guild)
+        // 0 ou negatif = illimite, on ne purge pas cette dimension.
+        let daily_retention =
             parse_i64(read_cfg(&state, guild_id, "data_retention_days").await, 90);
-        if retention <= 0 {
-            // 0 = illimite : ne purge rien
+        let hourly_retention =
+            parse_i64(read_cfg(&state, guild_id, "hourly_retention_days").await, 30);
+
+        if daily_retention <= 0 && hourly_retention <= 0 {
+            // tout illimite : on skip
             skipped += 1;
             continue;
         }
 
-        let r = retention as i32;
-        let _ = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
-            .bind(guild_id)
-            .bind(r)
-            .execute(&state.pg_pool)
-            .await
-            .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention daily echec"));
-        let _ = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
-            .bind(guild_id)
-            .bind(r)
-            .execute(&state.pg_pool)
-            .await
-            .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention hourly echec"));
+        if daily_retention > 0 {
+            let r = daily_retention as i32;
+            let _ = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
+                .bind(guild_id)
+                .bind(r)
+                .execute(&state.pg_pool)
+                .await
+                .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention daily echec"));
+            let _ = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
+                .bind(guild_id)
+                .bind(r)
+                .execute(&state.pg_pool)
+                .await
+                .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention baseline echec"));
+        }
+        if hourly_retention > 0 {
+            let r = hourly_retention as i32;
+            let _ = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
+                .bind(guild_id)
+                .bind(r)
+                .execute(&state.pg_pool)
+                .await
+                .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention hourly echec"));
+        }
         processed += 1;
     }
 
@@ -317,9 +335,10 @@ pub async fn publish_top_users_all(
         }
 
         let count = parse_i64(read_cfg(&state, guild_id, "top_users_count").await, 10);
+        let min_total = parse_i64(read_cfg(&state, guild_id, "low_activity_filter").await, 0).max(0);
         let top = match state
             .analytics_repo
-            .get_top_infractors(Some(guild_id), 30, count)
+            .get_top_infractors(Some(guild_id), 30, count, min_total)
             .await
         {
             Ok(v) => v,
