@@ -128,6 +128,10 @@ pub fn routes() -> Router<AppState> {
             "/api/security/unban-ip",
             post(handlers::system::security::unban_ip),
         )
+        .route(
+            "/api/security/manual-bans",
+            get(handlers::system::security::manual_bans),
+        )
         // RBAC component visibility (overrides UI par role)
         .route(
             "/api/rbac/component-visibility/{guild_id}",

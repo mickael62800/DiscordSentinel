@@ -5,6 +5,7 @@ import {
   serverSecurityService,
   type AuthFailureEntry,
   type BannedIpsResponse,
+  type ManualBanEntry,
   type ServerEventDto,
   type SuccessfulLoginEntry,
   type TlsCertInfo,
@@ -34,6 +35,7 @@ const showCleanupModal = ref(false);
 const overviewTopIps = ref<TopIpEntry[]>([]);
 const overviewAuthFailures = ref<AuthFailureEntry[]>([]);
 const banned = ref<BannedIpsResponse | null>(null);
+const manualBans = ref<ManualBanEntry[]>([]);
 const tls = ref<TlsCertInfo | null>(null);
 const lastLogins = ref<SuccessfulLoginEntry[]>([]);
 const serverEvents = ref<ServerEventDto[]>([]);
@@ -55,6 +57,10 @@ async function loadBanned() {
   try { banned.value = await serverSecurityService.bannedIps(); }
   catch (e: any) { showError(`Bans : ${e?.message ?? e}`); }
 }
+async function loadManualBans() {
+  try { manualBans.value = await serverSecurityService.manualBans(); }
+  catch (e: any) { showError(`Bans manuels : ${e?.message ?? e}`); }
+}
 async function loadLastLogins() {
   try { lastLogins.value = await serverSecurityService.lastLogins(20); }
   catch (e: any) { showError(`Logins : ${e?.message ?? e}`); }
@@ -72,6 +78,7 @@ async function unbanIp(ip: string) {
     const r = await serverSecurityService.unbanIp(ip, "unban manuel via panel sécurité");
     alert(`✅ ${r.message}`);
     await loadBanned();
+    await loadManualBans();
     await loadServerEvents();
   } catch (e: any) { showError(`Echec unban : ${e?.message ?? e}`); }
 }
@@ -81,6 +88,7 @@ async function refreshAll() {
   await Promise.allSettled([
     loadOverviewKpis(),
     loadBanned(),
+    loadManualBans(),
     loadLastLogins(),
     loadServerEvents(),
     attacksRef.value?.refresh(),
@@ -226,6 +234,35 @@ const tabs = [
           </div>
         </div>
         <div v-else class="empty-state">fail2ban actif mais aucune jail configurée.</div>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>🛑 Bans manuels ({{ manualBans.length }})</h2>
+          <button class="btn-secondary xs" @click="loadManualBans">↻</button>
+        </div>
+        <p class="muted small">
+          IPs bannies depuis le panel sécurité. À chaque ban, les logs API
+          liés à l'IP sont purgés et l'IP est filtrée des patterns nginx
+          suspects.
+        </p>
+        <table v-if="manualBans.length > 0" class="data-table">
+          <thead>
+            <tr><th>IP</th><th>Quand</th><th>Par</th><th>Raison</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="b in manualBans" :key="b.ip">
+              <td class="mono"><code>{{ b.ip }}</code></td>
+              <td class="small muted">{{ fmtDate(b.banned_at) }}</td>
+              <td class="small mono">{{ b.banned_by ?? "—" }}</td>
+              <td class="small">{{ b.reason ?? "—" }}</td>
+              <td>
+                <button v-if="canManage" class="btn-secondary xs" @click="unbanIp(b.ip)">↻ Débannir</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty-state">Aucun ban manuel actif.</div>
       </section>
 
       <section class="card">

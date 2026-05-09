@@ -423,6 +423,38 @@ pub async fn ban_ip(
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
+
+    // Persist en table manual_ip_bans (source de verite UI). Reactive un
+    // ancien ban en remettant unbanned_at a NULL si l'IP existe deja.
+    if let Err(e) = sqlx::query(
+        "INSERT INTO manual_ip_bans (ip, banned_at, banned_by, reason, unbanned_at, unbanned_by) \
+         VALUES ($1, NOW(), $2, $3, NULL, NULL) \
+         ON CONFLICT (ip) DO UPDATE SET banned_at = NOW(), banned_by = EXCLUDED.banned_by, \
+            reason = EXCLUDED.reason, unbanned_at = NULL, unbanned_by = NULL",
+    )
+    .bind(ip)
+    .bind(&actor)
+    .bind(dto.reason.as_deref())
+    .execute(&state.pg_pool)
+    .await
+    {
+        tracing::warn!(error = %e, ip = ip, "INSERT manual_ip_bans");
+    }
+
+    // Cleanup des logs API lies a cette IP (l'IP est bannie, les traces
+    // ne servent plus). Best-effort : on n'echoue pas si ca rate.
+    let deleted_logs: u64 = sqlx::query(
+        "DELETE FROM logs WHERE category = 'api' AND details->>'client_ip' = $1",
+    )
+    .bind(ip)
+    .execute(&state.pg_pool)
+    .await
+    .map(|r| r.rows_affected())
+    .unwrap_or_else(|e| {
+        tracing::warn!(error = %e, ip = ip, "DELETE logs apres ban");
+        0
+    });
+
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
         &state.pg_pool,
         &actor,
@@ -430,15 +462,15 @@ pub async fn ban_ip(
         "security.ban_ip",
         Some(ip),
         "warn",
-        serde_json::json!({ "reason": dto.reason, "ip": ip }),
+        serde_json::json!({ "reason": dto.reason, "ip": ip, "deleted_logs": deleted_logs }),
     )
     .await;
 
     Ok(Json(BanIpResponse {
         ok: true,
         message: format!(
-            "IP {} ajoutee a la blocklist (sera appliquee au prochain tick du cron host)",
-            ip
+            "IP {} bannie ({} logs purges, sera applique au prochain tick du cron host)",
+            ip, deleted_logs
         ),
     }))
 }
@@ -486,6 +518,20 @@ pub async fn unban_ip(
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
+
+    // Marque le ban comme leve dans manual_ip_bans (best-effort : l'IP peut
+    // venir uniquement de fail2ban, auquel cas il n'y a pas de row a updater).
+    if let Err(e) = sqlx::query(
+        "UPDATE manual_ip_bans SET unbanned_at = NOW(), unbanned_by = $2 WHERE ip = $1 AND unbanned_at IS NULL",
+    )
+    .bind(ip)
+    .bind(&actor)
+    .execute(&state.pg_pool)
+    .await
+    {
+        tracing::warn!(error = %e, ip = ip, "UPDATE manual_ip_bans unban");
+    }
+
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
         &state.pg_pool,
         &actor,
@@ -756,8 +802,62 @@ pub async fn nginx_suspicious(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<SuspiciousResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: SuspiciousResponse = read_host_json("/var/lib/sentinel/nginx-suspicious.json", "nginx-suspicious")?;
+    let mut data: SuspiciousResponse = read_host_json("/var/lib/sentinel/nginx-suspicious.json", "nginx-suspicious")?;
+
+    // Filtre les entries dont l'IP est actuellement bannie manuellement.
+    // Le fichier JSON est regenere par cron host depuis access.log et ne
+    // tient pas compte des bans, donc on filtre ici. Les compteurs
+    // (total_24h, by_category) sont rafraichis a partir des entries
+    // restantes pour rester coherents avec ce que l'admin voit.
+    let banned: Vec<String> = sqlx::query_scalar(
+        "SELECT ip FROM manual_ip_bans WHERE unbanned_at IS NULL",
+    )
+    .fetch_all(&state.pg_pool)
+    .await
+    .unwrap_or_default();
+
+    if !banned.is_empty() {
+        let banset: std::collections::HashSet<&str> = banned.iter().map(|s| s.as_str()).collect();
+        data.entries.retain(|e| !banset.contains(e.ip.as_str()));
+        data.total_24h = data.entries.len() as i64;
+        let mut by_cat = std::collections::HashMap::<String, i64>::new();
+        for e in &data.entries {
+            *by_cat.entry(e.category.clone()).or_insert(0) += 1;
+        }
+        data.by_category = serde_json::to_value(by_cat).unwrap_or(serde_json::json!({}));
+    }
+
     Ok(Json(data))
+}
+
+// ── Manual bans : liste des bans declenches via panel ──────────────────
+
+#[derive(Debug, Serialize)]
+pub struct ManualBanEntry {
+    pub ip: String,
+    pub banned_at: String,
+    pub banned_by: Option<String>,
+    pub reason: Option<String>,
+}
+
+pub async fn manual_bans(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let rows: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
+        "SELECT ip, to_char(banned_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), banned_by, reason \
+         FROM manual_ip_bans WHERE unbanned_at IS NULL ORDER BY banned_at DESC",
+    )
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("query manual_bans: {e}"))))?;
+
+    Ok(Json(
+        rows.into_iter()
+            .map(|(ip, banned_at, banned_by, reason)| ManualBanEntry { ip, banned_at, banned_by, reason })
+            .collect(),
+    ))
 }
 
 // TLS handshake errors

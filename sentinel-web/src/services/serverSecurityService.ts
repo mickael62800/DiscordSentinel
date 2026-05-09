@@ -252,6 +252,13 @@ export interface TrafficTrendResponse {
   alert_reason: string | null;
 }
 
+export interface ManualBanEntry {
+  ip: string;
+  banned_at: string;
+  banned_by: string | null;
+  reason: string | null;
+}
+
 export interface CleanupResponse {
   deleted_api_logs: number;
   deleted_audit_logs: number;
@@ -322,6 +329,9 @@ export const serverSecurityService = {
   },
   unbanIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/unban-ip", { ip, reason });
+  },
+  manualBans(): Promise<ManualBanEntry[]> {
+    return httpGet("/api/security/manual-bans");
   },
   serverEvents(params: { action_prefix?: string; severity?: string; limit?: number } = {}): Promise<ServerEventDto[]> {
     const u = new URLSearchParams();
