@@ -262,6 +262,9 @@ export interface ManualBanEntry {
 export interface CleanupResponse {
   deleted_api_logs: number;
   deleted_audit_logs: number;
+  deleted_server_events: number;
+  deleted_successful_logins: number;
+  deleted_manual_bans: number;
   message: string;
 }
 
@@ -340,10 +343,21 @@ export const serverSecurityService = {
     u.set("limit", String(params.limit ?? 100));
     return httpGet(`/api/security/server-events?${u.toString()}`);
   },
-  cleanup(opts: { older_than_days?: number; include_audit_logs?: boolean } = {}): Promise<CleanupResponse> {
+  cleanup(opts: {
+    older_than_days?: number;
+    include_api_logs?: boolean;
+    include_audit_logs?: boolean;
+    include_server_events?: boolean;
+    include_successful_logins?: boolean;
+    include_manual_bans?: boolean;
+  } = {}): Promise<CleanupResponse> {
     const u = new URLSearchParams();
     if (opts.older_than_days !== undefined) u.set("older_than_days", String(opts.older_than_days));
+    if (opts.include_api_logs !== undefined) u.set("include_api_logs", String(opts.include_api_logs));
     if (opts.include_audit_logs !== undefined) u.set("include_audit_logs", String(opts.include_audit_logs));
+    if (opts.include_server_events !== undefined) u.set("include_server_events", String(opts.include_server_events));
+    if (opts.include_successful_logins !== undefined) u.set("include_successful_logins", String(opts.include_successful_logins));
+    if (opts.include_manual_bans !== undefined) u.set("include_manual_bans", String(opts.include_manual_bans));
     const qs = u.toString();
     return httpDelete(`/api/security/cleanup${qs ? `?${qs}` : ""}`);
   },

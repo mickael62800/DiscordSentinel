@@ -1082,15 +1082,30 @@ pub struct CleanupQuery {
     /// Nb de jours a garder. 0 = tout supprimer. Defaut 0.
     #[serde(default)]
     pub older_than_days: Option<i64>,
+    /// True = purger les logs API (Top IPs, auth failures). Defaut true.
+    #[serde(default)]
+    pub include_api_logs: Option<bool>,
     /// True = purger aussi audit_logs (events Discord). Defaut false.
     #[serde(default)]
     pub include_audit_logs: Option<bool>,
+    /// Purge `server_events` (audit infra : ban-ip, docker, rbac).
+    #[serde(default)]
+    pub include_server_events: Option<bool>,
+    /// Purge `successful_logins` (derniers logins OAuth Discord).
+    #[serde(default)]
+    pub include_successful_logins: Option<bool>,
+    /// Purge `manual_ip_bans` (historique des bans, incl. ceux deja leves).
+    #[serde(default)]
+    pub include_manual_bans: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct CleanupResponse {
     pub deleted_api_logs: i64,
     pub deleted_audit_logs: i64,
+    pub deleted_server_events: i64,
+    pub deleted_successful_logins: i64,
+    pub deleted_manual_bans: i64,
     pub message: String,
 }
 
@@ -1110,8 +1125,14 @@ pub async fn cleanup_security_logs(
     require_superadmin(&state, ctx).map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
     let days = q.older_than_days.unwrap_or(0).max(0);
     let include_audit = q.include_audit_logs.unwrap_or(false);
+    let include_events = q.include_server_events.unwrap_or(false);
+    let include_logins = q.include_successful_logins.unwrap_or(false);
+    let include_bans = q.include_manual_bans.unwrap_or(false);
 
-    let api_logs_deleted: u64 = if days == 0 {
+    let include_api = q.include_api_logs.unwrap_or(true);
+    let api_logs_deleted: u64 = if !include_api {
+        0
+    } else if days == 0 {
         sqlx::query("DELETE FROM logs WHERE category = 'api'")
             .execute(&state.pg_pool)
             .await
@@ -1147,6 +1168,39 @@ pub async fn cleanup_security_logs(
         0
     };
 
+    // Helper : DELETE avec ou sans filtre temporel sur la colonne donnee.
+    async fn purge_table(
+        pool: &sqlx::PgPool,
+        table: &str,
+        ts_col: &str,
+        days: i64,
+    ) -> u64 {
+        let sql = if days == 0 {
+            format!("DELETE FROM {table}")
+        } else {
+            format!("DELETE FROM {table} WHERE {ts_col} < NOW() - INTERVAL '{days} days'")
+        };
+        sqlx::query(&sql)
+            .execute(pool)
+            .await
+            .map(|r| r.rows_affected())
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, table = table, "purge table");
+                0
+            })
+    }
+
+    let server_events_deleted = if include_events {
+        purge_table(&state.pg_pool, "server_events", "timestamp", days).await
+    } else { 0 };
+    let logins_deleted = if include_logins {
+        purge_table(&state.pg_pool, "successful_logins", "logged_at", days).await
+    } else { 0 };
+    let bans_deleted = if include_bans {
+        // Pour manual_ip_bans, days=0 -> tout, sinon on filtre sur banned_at
+        purge_table(&state.pg_pool, "manual_ip_bans", "banned_at", days).await
+    } else { 0 };
+
     let actor = rbac
         .as_ref()
         .map(|r| r.0.discord_user_id.as_str())
@@ -1156,6 +1210,9 @@ pub async fn cleanup_security_logs(
         actor = actor,
         api_logs = api_logs_deleted,
         audit_logs = audit_deleted,
+        server_events = server_events_deleted,
+        successful_logins = logins_deleted,
+        manual_bans = bans_deleted,
         days_kept = days,
         "security cleanup executed"
     );
@@ -1169,8 +1226,10 @@ pub async fn cleanup_security_logs(
         serde_json::json!({
             "deleted_api_logs": api_logs_deleted,
             "deleted_audit_logs": audit_deleted,
+            "deleted_server_events": server_events_deleted,
+            "deleted_successful_logins": logins_deleted,
+            "deleted_manual_bans": bans_deleted,
             "days_kept": days,
-            "include_audit": include_audit,
         }),
     )
     .await;
@@ -1178,9 +1237,12 @@ pub async fn cleanup_security_logs(
     Ok(Json(CleanupResponse {
         deleted_api_logs: api_logs_deleted as i64,
         deleted_audit_logs: audit_deleted as i64,
+        deleted_server_events: server_events_deleted as i64,
+        deleted_successful_logins: logins_deleted as i64,
+        deleted_manual_bans: bans_deleted as i64,
         message: format!(
-            "{} logs API + {} audit logs supprimes",
-            api_logs_deleted, audit_deleted
+            "{} logs API, {} audit, {} events, {} logins, {} bans manuels supprimes",
+            api_logs_deleted, audit_deleted, server_events_deleted, logins_deleted, bans_deleted
         ),
     }))
 }

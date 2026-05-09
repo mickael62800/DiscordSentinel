@@ -28,7 +28,14 @@ type TabKey = "overview" | "attacks" | "bans" | "network" | "integrity" | "audit
 const currentTab = ref<TabKey>("overview");
 const refreshing = ref(false);
 const cleaning = ref(false);
-const cleanupOpts = ref({ days: 0, includeAudit: true });
+const cleanupOpts = ref({
+  days: 0,
+  includeApiLogs: true,
+  includeAudit: true,
+  includeServerEvents: true,
+  includeLogins: false,
+  includeManualBans: false,
+});
 const showCleanupModal = ref(false);
 
 // Data inline pour Overview/Bans/Audit (les 3 onglets non extraits + Overview)
@@ -103,14 +110,21 @@ async function runCleanup() {
   try {
     const r = await serverSecurityService.cleanup({
       older_than_days: cleanupOpts.value.days,
+      include_api_logs: cleanupOpts.value.includeApiLogs,
       include_audit_logs: cleanupOpts.value.includeAudit,
+      include_server_events: cleanupOpts.value.includeServerEvents,
+      include_successful_logins: cleanupOpts.value.includeLogins,
+      include_manual_bans: cleanupOpts.value.includeManualBans,
     });
     showCleanupModal.value = false;
     await refreshAll();
     alert(
       `✅ Nettoyage terminé\n\n` +
-      `• Logs API supprimés : ${r.deleted_api_logs}\n` +
-      `• Audit logs Discord supprimés : ${r.deleted_audit_logs}\n\n` +
+      `• Logs API : ${r.deleted_api_logs}\n` +
+      `• Audit logs Discord : ${r.deleted_audit_logs}\n` +
+      `• Events serveur : ${r.deleted_server_events}\n` +
+      `• Logins OAuth : ${r.deleted_successful_logins}\n` +
+      `• Bans manuels : ${r.deleted_manual_bans}\n\n` +
       `${r.message}`,
     );
   } catch (e: any) { showError(`Echec cleanup : ${e?.message ?? e}`); }
@@ -375,13 +389,16 @@ const tabs = [
       <div class="modal-card">
         <h3>🗑 Nettoyer les logs de sécurité</h3>
         <p class="muted">
-          Vide la table <code>logs</code> (Top IPs + Échecs auth) selon le délai
-          choisi, et optionnellement la table <code>audit_logs</code> (events Discord).
-          <strong>0 jours = tout supprimer.</strong>
+          Selectionne les tables a purger. <strong>0 jours = tout supprimer</strong>,
+          sinon on ne supprime que les entrees plus anciennes que N jours.
+        </p>
+        <p class="muted small">
+          Note : les fichiers JSON host (nginx-suspicious, ssh-failures, disk-trend, etc.)
+          ne sont pas dans la BDD ; ils sont regeneres par le cron host depuis les sources.
         </p>
         <div class="modal-form">
           <label>
-            Ne garder que les logs de moins de :
+            Ne garder que les entrees de moins de :
             <AppSelect v-model.number="cleanupOpts.days">
               <option :value="0">0 jours (TOUT supprimer)</option>
               <option :value="1">1 jour</option>
@@ -391,8 +408,24 @@ const tabs = [
             </AppSelect>
           </label>
           <label class="checkbox">
+            <input type="checkbox" v-model="cleanupOpts.includeApiLogs" />
+            Logs API (Top IPs, échecs auth, trafic)
+          </label>
+          <label class="checkbox">
             <input type="checkbox" v-model="cleanupOpts.includeAudit" />
-            Inclure aussi les audit logs Discord (member_join, etc.)
+            Audit logs Discord (member_join, etc.)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" v-model="cleanupOpts.includeServerEvents" />
+            Events serveur (ban-ip, docker, RBAC — onglet Audit)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" v-model="cleanupOpts.includeLogins" />
+            Logins OAuth Discord (onglet Bans → derniers logins)
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" v-model="cleanupOpts.includeManualBans" />
+            Historique des bans manuels (n'unban pas l'host, juste l'historique BDD)
           </label>
         </div>
         <div class="modal-actions">
