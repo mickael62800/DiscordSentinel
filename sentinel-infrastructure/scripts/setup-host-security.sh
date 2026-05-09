@@ -735,6 +735,8 @@ EOF
 [nginx-scanner]
 enabled  = true
 filter   = nginx-scanner
+# polling : sinon defaults-debian.conf force backend=systemd et le logpath est ignore.
+backend  = polling
 logpath  = $LOG_DIR/scanners.log
 maxretry = 3
 findtime = 1h
@@ -743,12 +745,58 @@ banaction = ufw
 EOF
     fi
 
+    # Patch retroactif si le bloc existe deja sans backend (installations < 2026-05).
+    if grep -q "^\[nginx-scanner\]" /etc/fail2ban/jail.local 2>/dev/null \
+       && ! awk '/^\[nginx-scanner\]/,/^\[/' /etc/fail2ban/jail.local | grep -q "^backend"; then
+        sed -i '/^\[nginx-scanner\]/a backend  = polling' /etc/fail2ban/jail.local
+        echo "  🔧 backend=polling ajoute au jail existant"
+    fi
+
     systemctl restart fail2ban
     sleep 1
     if fail2ban-client status nginx-scanner &>/dev/null; then
         echo "  ✅ jail nginx-scanner actif (3 hits/1h -> ban 24h)"
     else
         echo "  ⚠ jail nginx-scanner non charge — verifie 'systemctl status fail2ban'"
+    fi
+}
+
+# ── Module recidive (jail fail2ban meta) ────────────────────────────────
+# Bannit 1 semaine toute IP deja bannie 3x dans /var/log/fail2ban.log
+# (par n'importe quel jail). Complement de nginx-scanner pour les scanners
+# persistants qui reviennent apres expiration du ban 24h.
+
+setup_recidive() {
+    echo "🔁 recidive (jail fail2ban meta)"
+
+    if ! command -v fail2ban-client &>/dev/null; then
+        echo "  ❌ fail2ban absent. Lance d'abord : sudo bash $0 fail2ban"
+        exit 1
+    fi
+
+    if grep -q "^\[recidive\]" /etc/fail2ban/jail.local 2>/dev/null; then
+        echo "  ℹ Jail recidive deja present dans jail.local — pas d'override."
+    else
+        cat >> /etc/fail2ban/jail.local <<'EOF'
+
+[recidive]
+enabled  = true
+filter   = recidive
+backend  = polling
+logpath  = /var/log/fail2ban.log
+maxretry = 3
+findtime = 1d
+bantime  = 1w
+banaction = ufw
+EOF
+    fi
+
+    systemctl restart fail2ban
+    sleep 1
+    if fail2ban-client status recidive &>/dev/null; then
+        echo "  ✅ jail recidive actif (3 bans/24h -> ban 1 semaine)"
+    else
+        echo "  ⚠ jail recidive non charge — verifie 'systemctl status fail2ban'"
     fi
 }
 
@@ -770,6 +818,7 @@ main() {
         outbound)          setup_outbound ;;
         nginx-suspicious)  setup_nginx_suspicious ;;
         nginx-scanner)     setup_nginx_scanner ;;
+        recidive)          setup_recidive ;;
         tls-errors)        setup_tls_errors ;;
         all)
             setup_fail2ban
@@ -783,6 +832,7 @@ main() {
             setup_outbound
             setup_nginx_suspicious
             setup_nginx_scanner
+            setup_recidive
             setup_tls_errors
             ;;
         help|--help|-h|*)
@@ -801,6 +851,7 @@ Modules :
   outbound       Connexions sortantes -> outbound.json (3 min)
   nginx-suspicious Patterns SQLi/XSS/scanners nginx -> nginx-suspicious.json (10 min)
   nginx-scanner  Jail fail2ban qui ban les IPs hit le trap 444 nginx
+  recidive       Jail meta : ban 1 semaine les IPs deja bannies 3x/24h
   tls-errors     Erreurs handshake TLS nginx -> tls-errors.json (15 min)
   all            Tous les modules
 
