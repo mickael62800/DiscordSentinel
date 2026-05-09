@@ -11,7 +11,7 @@ const { tab, showDeleted, confessions, reports, loading } = useConfessions();
   <div class="confessions-page page--constrained">
     <header class="page-head">
       <div>
-        <h1>📝 Modération des confessions</h1>
+        <h1 class="page-title">📝 Modération des confessions</h1>
         <p class="muted small">
           Confessions anonymes postées via /confess. Seul le owner voit l'auteur réel.
         </p>

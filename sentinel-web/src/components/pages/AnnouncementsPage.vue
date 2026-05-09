@@ -144,7 +144,7 @@ function fmtDate(iso: string | null): string {
   <div class="announcements-page page--constrained">
     <header class="page-head">
       <div>
-        <h1>📣 Annonces planifiées</h1>
+        <h1 class="page-title">📣 Annonces planifiées</h1>
         <p class="muted small">
           Messages Discord postés automatiquement (ponctuel, quotidien, hebdo, mensuel).
         </p>

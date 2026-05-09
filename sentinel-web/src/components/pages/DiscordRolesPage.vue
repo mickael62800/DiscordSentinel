@@ -33,7 +33,7 @@ function closeEdit() {
 <template>
   <div class="discord-roles page--constrained">
     <div class="header">
-      <h1>Roles Discord</h1>
+      <h1 class="page-title">Roles Discord</h1>
       <span class="role-count">{{ totalRoles }} roles</span>
       <router-link to="/role-panels" class="cross-link">&larr; Panels de roles</router-link>
     </div>

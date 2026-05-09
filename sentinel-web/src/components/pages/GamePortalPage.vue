@@ -283,7 +283,7 @@ watch(selectedServerId, async (sid) => {
       <div class="brand">
         <span class="logo">🎮</span>
         <div>
-          <h1>Game Portal</h1>
+          <h1 class="page-title">Game Portal</h1>
           <p class="sub">Gestionnaire de serveurs de jeux Docker</p>
         </div>
       </div>

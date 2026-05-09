@@ -34,7 +34,7 @@ function handleOpenNotesEvidence(userId: string) {
 
 <template>
   <div class="moderation-hub page--constrained">
-    <h1>Moderation</h1>
+    <h1 class="page-title">Moderation</h1>
 
     <AppTabs
       :model-value="activeTab"

@@ -542,7 +542,8 @@ input[type="checkbox"]:not(.toggle input):not([hidden]):disabled {
    Evidence, Members, Notes, RolePanels). Meme animation que
    .admin-page-title pour rester coherent. ───────────────────────── */
 .dashboard-header > h1,
-.page-header > h1 {
+.page-header > h1,
+h1.page-title {
   background: linear-gradient(
     90deg,
     var(--text-primary) 0%,

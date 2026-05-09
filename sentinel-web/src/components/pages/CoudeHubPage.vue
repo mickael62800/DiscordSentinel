@@ -16,7 +16,7 @@ const tabs: Array<{ key: SubTab; label: string; icon: string }> = [
 
 <template>
   <div class="coude-hub page--constrained">
-    <h1>⚔️ Coup de Coude</h1>
+    <h1 class="page-title">⚔️ Coup de Coude</h1>
 
     <div class="hub-tabs">
       <button

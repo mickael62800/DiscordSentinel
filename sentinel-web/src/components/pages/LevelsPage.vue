@@ -54,7 +54,7 @@ watch(selectedGuildId, loadXpRoleMode, { immediate: true });
 
 <template>
   <div class="levels page--constrained">
-    <h1>Niveaux & XP</h1>
+    <h1 class="page-title">Niveaux &amp; XP</h1>
 
     <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAll" />
     <div v-else-if="loading" class="loading">Chargement...</div>

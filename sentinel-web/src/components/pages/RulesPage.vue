@@ -32,7 +32,7 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 <template>
   <div class="rules page--constrained">
-    <h1>Regles de moderation</h1>
+    <h1 class="page-title">Regles de moderation</h1>
 
     <div v-if="loading" class="loading">Chargement...</div>
     <div v-else-if="!selectedGuildId" class="empty">
