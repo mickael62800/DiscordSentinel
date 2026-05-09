@@ -75,17 +75,13 @@ pub async fn list_messages(
     let mut sql = String::from(
         "SELECT id::text, user_id, channel_id, channel_name, content, \
                 to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') \
-         FROM user_activity_log \
+         FROM ai_dataset_messages \
          WHERE guild_id = $1 \
-           AND event_type = 'message_sent' \
-           AND content IS NOT NULL \
            AND length(content) >= $2",
     );
     let mut count_sql = String::from(
-        "SELECT COUNT(*)::bigint FROM user_activity_log \
+        "SELECT COUNT(*)::bigint FROM ai_dataset_messages \
          WHERE guild_id = $1 \
-           AND event_type = 'message_sent' \
-           AND content IS NOT NULL \
            AND length(content) >= $2",
     );
     let mut idx = 3;
@@ -196,9 +192,8 @@ pub async fn bulk_delete(
         .map_err(|e| ApiError(DomainError::ValidationError(format!("uuid invalide: {}", e))))?;
 
     let res = sqlx::query(
-        "DELETE FROM user_activity_log \
+        "DELETE FROM ai_dataset_messages \
          WHERE guild_id = $1 \
-           AND event_type = 'message_sent' \
            AND id = ANY($2)",
     )
     .bind(&guild_id)
@@ -210,4 +205,48 @@ pub async fn bulk_delete(
     Ok(Json(BulkDeleteResponse {
         deleted: res.rows_affected() as i64,
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CollectMessageDto {
+    pub guild_id: String,
+    pub channel_id: Option<String>,
+    pub channel_name: Option<String>,
+    pub user_id: String,
+    pub content: String,
+}
+
+/// POST /api/ai-dataset/collect
+/// Endpoint appele par le bot pour chaque message texte, quand le module
+/// `ai-dataset-bot` est active sur la guild. Pas de gate RBAC : c'est un
+/// endpoint d'ingestion bot-to-API protege par le bearer interne du bot
+/// (meme pattern que /api/user-activity). Best-effort : on ne bloque pas
+/// la chaine si l'insert echoue.
+pub async fn collect_message(
+    State(state): State<AppState>,
+    Json(dto): Json<CollectMessageDto>,
+) -> Result<StatusCode, ApiError> {
+    if dto.guild_id.trim().is_empty() || dto.user_id.trim().is_empty() {
+        return Err(ApiError(DomainError::ValidationError(
+            "guild_id et user_id requis".into(),
+        )));
+    }
+    if dto.content.trim().is_empty() {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+
+    sqlx::query(
+        "INSERT INTO ai_dataset_messages (guild_id, channel_id, channel_name, user_id, content) \
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(&dto.guild_id)
+    .bind(dto.channel_id.as_deref())
+    .bind(dto.channel_name.as_deref())
+    .bind(&dto.user_id)
+    .bind(&dto.content)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("insert ai_dataset: {}", e))))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }

@@ -167,6 +167,7 @@ impl EventHandler for Handler {
         modules::progression::on_message(&ctx, &msg).await;
         modules::voice::on_message(&ctx, &msg).await;
         modules::tickets::on_message(&ctx, &msg).await;
+        modules::ai_dataset::on_message(&ctx, &msg).await;
     }
 
     async fn message_delete(
