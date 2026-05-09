@@ -303,11 +303,39 @@ pub async fn register_guild(
         }
     }
 
-    // Invalider le cache guilds
+    // Seed des regles de moderation par defaut. Idempotent via
+    // ON CONFLICT (guild_id, flag_type) DO NOTHING : les regles deja
+    // presentes (eventuellement modifiees par l'admin) ne sont pas
+    // ecrasees. Couvre nouvelles guilds + retro-seed des anciennes au
+    // prochain bot startup.
+    if let Err(e) = sqlx::query(
+        "INSERT INTO rules (id, guild_id, flag_type, weight, threshold_warn, threshold_delete, threshold_mute, threshold_ban, enabled) \
+         VALUES \
+            (gen_random_uuid(), $1, 'spam',       2.0, 2.0, 4.0, 6.0, 9.0, true), \
+            (gen_random_uuid(), $1, 'insult',     2.0, 2.0, 4.0, 6.0, 8.0, true), \
+            (gen_random_uuid(), $1, 'link',       1.0, 3.0, 5.0, 7.0, 9.0, true), \
+            (gen_random_uuid(), $1, 'phishing',   3.5, 1.0, 2.5, 4.0, 6.0, true), \
+            (gen_random_uuid(), $1, 'nsfw',       3.0, 1.5, 3.0, 5.0, 8.0, true), \
+            (gen_random_uuid(), $1, 'illicit',    3.5, 1.0, 2.5, 4.0, 6.0, true), \
+            (gen_random_uuid(), $1, 'threat',     3.5, 1.0, 2.0, 4.0, 6.0, true), \
+            (gen_random_uuid(), $1, 'rage',       2.5, 2.0, 3.5, 5.0, 7.0, true), \
+            (gen_random_uuid(), $1, 'anger',      2.0, 2.5, 4.0, 6.0, 8.0, true), \
+            (gen_random_uuid(), $1, 'harassment', 3.0, 1.5, 2.5, 4.5, 7.0, true) \
+         ON CONFLICT (guild_id, flag_type) DO NOTHING",
+    )
+    .bind(guild_id.as_str())
+    .execute(&state.pg_pool)
+    .await
+    {
+        warn!(error = %e, guild_id = %guild_id, "Echec seed rules par defaut");
+    }
+
+    // Invalider le cache guilds + cache rules de cette guild
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Err(e) = conn.del::<_, ()>("guilds:all").await {
             warn!(error = %e, "Echec invalidation cache guilds:all");
         }
+        let _: Result<(), _> = conn.del(format!("rules:{guild_id}")).await;
     }
 
     Ok(StatusCode::NO_CONTENT)
