@@ -50,4 +50,12 @@ pub async fn register_guilds(
             }
         }
     }
+
+    // Reconciliation : purge les serveurs dont le bot ne fait plus partie
+    // (retire pendant qu'il etait hors ligne -> pas d'event guild_delete recu).
+    // La garde "liste vide -> no-op" est cote API.
+    let current_ids: Vec<String> = ready.guilds.iter().map(|g| g.id.to_string()).collect();
+    if let Err(e) = api.reconcile_guilds(&current_ids).await {
+        tracing::warn!(error = %e, "Erreur reconciliation guilds");
+    }
 }

@@ -79,6 +79,19 @@ impl GuildRepository for MockGuildRepo {
     async fn find_by_id(&self, id: &str) -> Result<Option<Guild>, DomainError> {
         Ok(self.guilds.lock().unwrap().iter().find(|g| g.guild_id == id).cloned())
     }
+    async fn delete(&self, id: &str) -> Result<(), DomainError> {
+        self.guilds.lock().unwrap().retain(|g| g.guild_id != id);
+        Ok(())
+    }
+    async fn delete_absent(&self, keep_ids: &[String]) -> Result<u64, DomainError> {
+        if keep_ids.is_empty() {
+            return Ok(0);
+        }
+        let mut gs = self.guilds.lock().unwrap();
+        let before = gs.len();
+        gs.retain(|g| keep_ids.iter().any(|k| k.as_str() == g.guild_id.as_str()));
+        Ok((before - gs.len()) as u64)
+    }
 }
 
 fn sample_log(category: &str, server: &str) -> LogEntry {

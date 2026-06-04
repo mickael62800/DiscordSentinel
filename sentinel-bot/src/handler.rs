@@ -338,6 +338,31 @@ impl EventHandler for Handler {
         crate::command_registry::refresh_guild_commands(&ctx, guild.id).await;
     }
 
+    /// Declenche quand le bot est retire d'une guild (kick/ban/serveur
+    /// supprime) OU lors d'une indisponibilite temporaire Discord (outage).
+    /// On distingue les deux via `incomplete.unavailable` : si true, c'est un
+    /// outage -> on ne supprime PAS (le serveur reviendra). Si false, le bot a
+    /// reellement quitte -> on purge cote API pour que le selecteur web cesse
+    /// d'afficher un serveur fantome.
+    async fn guild_delete(
+        &self,
+        ctx: Context,
+        incomplete: serenity::model::guild::UnavailableGuild,
+        _full: Option<Guild>,
+    ) {
+        if incomplete.unavailable {
+            // Outage Discord : indisponibilite temporaire, pas un retrait.
+            return;
+        }
+        info!(guild_id = %incomplete.id, "Bot retire d'une guild");
+        let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
+        if let Some(api) = api {
+            if let Err(e) = api.delete_guild(&incomplete.id.to_string()).await {
+                tracing::warn!(error = %e, guild_id = %incomplete.id, "Erreur suppression guild");
+            }
+        }
+    }
+
     async fn guild_update(
         &self,
         ctx: Context,

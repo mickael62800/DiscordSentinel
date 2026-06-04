@@ -13,6 +13,8 @@ fn dashboard_inner() -> Router<AppState> {
     Router::new()
         .route("/guilds", get(handlers::audit::dashboard::list_guilds))
         .route("/guilds/register", post(handlers::audit::dashboard::register_guild))
+        .route("/guilds/reconcile", post(handlers::audit::dashboard::reconcile_guilds))
+        .route("/guilds/{guild_id}", delete(handlers::audit::dashboard::delete_guild))
         .route("/logs", get(handlers::audit::dashboard::get_logs).post(handlers::audit::dashboard::create_log))
         .route("/logs/{category}", delete(handlers::audit::dashboard::delete_logs_by_category))
         .route("/infractions", get(handlers::audit::dashboard::get_all_infractions))

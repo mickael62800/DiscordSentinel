@@ -189,6 +189,43 @@ impl BaseApiClient {
         Ok(())
     }
 
+    /// DELETE /api/guilds/{guild_id} — signale que le bot a ete retire d'un
+    /// serveur (event `guild_delete`). Le selecteur web cesse de l'afficher.
+    pub async fn delete_guild(&self, guild_id: &str) -> Result<(), String> {
+        let req = self
+            .client
+            .delete(format!("{}/api/guilds/{}", self.base_url, guild_id));
+
+        self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Guild delete failed: {e}"))?;
+
+        Ok(())
+    }
+
+    /// POST /api/guilds/reconcile — envoie la liste complete des serveurs dont
+    /// le bot fait partie (au demarrage). L'API supprime les serveurs absents
+    /// (retraits survenus pendant que le bot etait hors ligne).
+    pub async fn reconcile_guilds(&self, guild_ids: &[String]) -> Result<(), String> {
+        #[derive(Serialize)]
+        struct Payload<'a> {
+            guild_ids: &'a [String],
+        }
+
+        let req = self
+            .client
+            .post(format!("{}/api/guilds/reconcile", self.base_url))
+            .json(&Payload { guild_ids });
+
+        self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Guild reconcile failed: {e}"))?;
+
+        Ok(())
+    }
+
     // ── Event Publishing (Redis temps reel) ──
 
     /// Publie un event temps reel via Redis pour le Gateway → desktop app.

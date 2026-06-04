@@ -85,4 +85,31 @@ impl GuildRepository for PgGuildRepository {
 
         Ok(row.map(Guild::from))
     }
+
+    async fn delete(&self, guild_id: &str) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM guilds WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn delete_absent(&self, keep_ids: &[String]) -> Result<u64, DomainError> {
+        // Garde de securite : une liste vide signifierait "le bot n'est dans
+        // aucune guild", ce qui est presque toujours un faux signal (gateway
+        // pas encore pret). On refuse de tout supprimer dans ce cas.
+        if keep_ids.is_empty() {
+            return Ok(0);
+        }
+
+        let result = sqlx::query("DELETE FROM guilds WHERE guild_id <> ALL($1)")
+            .bind(keep_ids)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(result.rows_affected())
+    }
 }

@@ -403,6 +403,8 @@ impl GuildRepository for StubGuildRepo {
     async fn upsert(&self, _: &Guild) -> Result<(), DomainError> { unimplemented!() }
     async fn find_all(&self) -> Result<Vec<Guild>, DomainError> { unimplemented!() }
     async fn find_by_id(&self, _: &str) -> Result<Option<Guild>, DomainError> { unimplemented!() }
+    async fn delete(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn delete_absent(&self, _: &[String]) -> Result<u64, DomainError> { unimplemented!() }
 }
 
 pub struct StubBotConfigRepo;

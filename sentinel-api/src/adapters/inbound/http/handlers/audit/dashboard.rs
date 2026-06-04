@@ -341,6 +341,46 @@ pub async fn register_guild(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// DELETE /api/guilds/{guild_id} — le bot a ete retire d'un serveur.
+/// Supprime la ligne et invalide le cache pour que le selecteur web
+/// cesse d'afficher un serveur fantome.
+pub async fn delete_guild(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    state.guild_repo.delete(&guild_id).await?;
+    invalidate_guilds_cache(&state).await;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// POST /api/guilds/reconcile — le bot envoie au demarrage la liste complete
+/// des serveurs dont il fait partie. On supprime tous les autres (cas d'un
+/// retrait survenu pendant que le bot etait hors ligne, ou jamais nettoye).
+pub async fn reconcile_guilds(
+    State(state): State<AppState>,
+    Json(dto): Json<ReconcileGuildsDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let deleted = state.guild_repo.delete_absent(&dto.guild_ids).await?;
+    if deleted > 0 {
+        invalidate_guilds_cache(&state).await;
+    }
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
+}
+
+#[derive(serde::Deserialize)]
+pub struct ReconcileGuildsDto {
+    pub guild_ids: Vec<String>,
+}
+
+/// Invalide le cache Redis `guilds:all`.
+async fn invalidate_guilds_cache(state: &AppState) {
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        if let Err(e) = conn.del::<_, ()>("guilds:all").await {
+            warn!(error = %e, "Echec invalidation cache guilds:all");
+        }
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/dashboard.rs"]
 mod tests;
