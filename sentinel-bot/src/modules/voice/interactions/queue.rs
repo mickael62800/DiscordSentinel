@@ -98,8 +98,17 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
         super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **desactivee**.").await;
         info!(voice = %voice_channel_id, "File d'attente desactivee");
     } else {
-        // Enable queue: create a queue voice channel in the same category
-        let category_id = ch.category_id.as_ref().and_then(|s| s.parse::<u64>().ok());
+        // Enable queue: create the queue voice channel dans la MEME categorie
+        // que le vocal principal. On lit le parent_id REEL du salon (cache)
+        // plutot que ch.category_id (persiste a None en DB cote bot), sinon la
+        // file se cree a la racine du serveur (tout en haut) au lieu d'etre
+        // ancree sous la categorie selectionnee.
+        let category_id = ctx
+            .cache
+            .guild(guild_id)
+            .and_then(|g| g.channels.get(&voice_channel_id).and_then(|c| c.parent_id))
+            .map(|p| p.get())
+            .or_else(|| ch.category_id.as_ref().and_then(|s| s.parse::<u64>().ok()));
 
         let queue_name = format!("File d'attente - {}", ch.channel_name);
         let mut queue_builder = CreateChannel::new(&queue_name)
