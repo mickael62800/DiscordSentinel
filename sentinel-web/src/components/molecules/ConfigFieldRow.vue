@@ -5,6 +5,7 @@ import FieldDescription from "../atoms/FieldDescription.vue";
 import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 import EnumSelect from "../atoms/EnumSelect.vue";
 import ChannelSelect from "../atoms/ChannelSelect.vue";
+import VoiceChannelSelect from "../atoms/VoiceChannelSelect.vue";
 import CategorySelect from "../atoms/CategorySelect.vue";
 import RoleSelect from "../atoms/RoleSelect.vue";
 import IdMultiplierMapField from "./IdMultiplierMapField.vue";
@@ -34,6 +35,16 @@ const ROLE_LIST_KEYS = new Set<string>([
   "whitelist_roles",
   "exempt_roles",
   "double_xp_roles",
+]);
+
+// Champs type="channel" qui doivent lister des salons VOCAUX (et non
+// textuels) : salons lobby creators + salon AFK du voice-bot. Sans ca, le
+// dropdown affiche les salons textuels, inutilisables ici.
+const VOICE_CHANNEL_KEYS = new Set<string>([
+  "public_creator_channel_id",
+  "private_creator_channel_id",
+  "game_creator_channel_id",
+  "afk_channel_id",
 ]);
 
 const props = defineProps<{
@@ -70,6 +81,9 @@ const isChannelList = computed(
 );
 const isRoleList = computed(
   () => props.field.type === "text" && ROLE_LIST_KEYS.has(props.field.key),
+);
+const isVoiceChannel = computed(
+  () => props.field.type === "channel" && VOICE_CHANNEL_KEYS.has(props.field.key),
 );
 
 const mapDefaults = computed(() => {
@@ -127,6 +141,14 @@ const mapDefaults = computed(() => {
       :model-value="modelValue"
       :options="field.options"
       :placeholder="field.default !== undefined ? String(field.default) : '—'"
+      @update:model-value="update"
+    />
+
+    <VoiceChannelSelect
+      v-else-if="isVoiceChannel"
+      :id="field.key"
+      :model-value="modelValue"
+      :guild-id="guildId"
       @update:model-value="update"
     />
 
