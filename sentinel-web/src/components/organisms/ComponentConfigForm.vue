@@ -34,6 +34,7 @@ const configFields = computed<ConfigField[]>(() => {
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
 const numberFields = computed(() => configFields.value.filter((f) => f.type === "number"));
 const channelFields = computed(() => configFields.value.filter((f) => f.type === "channel"));
+const categoryFields = computed(() => configFields.value.filter((f) => f.type === "category"));
 const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));
 const enumFields = computed(() => configFields.value.filter((f) => f.type === "enum"));
 
@@ -52,6 +53,7 @@ const visibleSections = computed(() => {
     { title: "Valeurs", fields: numberFields.value, wide: false },
     { title: "Choix", fields: enumFields.value, wide: false },
     { title: "Salons", fields: channelFields.value, wide: false },
+    { title: "Categories", fields: categoryFields.value, wide: false },
     { title: "Roles", fields: roleFields.value, wide: false },
     { title: "Textes courts", fields: shortTextFields.value, wide: false },
     { title: "Textes longs", fields: longTextFields.value, wide: true },
