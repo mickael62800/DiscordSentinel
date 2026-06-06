@@ -9,12 +9,12 @@ use serenity::all::{
 };
 use serenity::model::application::ComponentInteraction;
 use serenity::model::channel::ChannelType;
-use serenity::model::id::RoleId;
+use serenity::model::id::{ChannelId, RoleId};
 use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::{ChannelManagerKey, GameApiKey, BET_PREFIX, CLOSE_TABLE_ID, INVITE_BUTTON_ID, JOIN_BUTTON_ID};
+use super::{ChannelManagerKey, GameApiKey, MODULE_BOT_NAME, BET_PREFIX, CLOSE_TABLE_ID, INVITE_BUTTON_ID, JOIN_BUTTON_ID};
 
 /// Handler Redis : `blackjack_table_closed` depuis web -> edit l'embed
 /// Discord pour signaler la fermeture (gris + retire boutons).
@@ -179,27 +179,48 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
             .to_lowercase()
     );
 
+    // Categorie d'ancrage : les tables sont creees DANS category_blackjack
+    // (Discord les place en bas de la categorie). Sans ca, le salon remonte
+    // tout en haut du serveur.
+    let anchor_category_id: Option<u64> = {
+        let lock = ctx.data.read().await;
+        if let Some(api) = lock.get::<crate::shared::heartbeat::ApiClientKey>() {
+            api.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+                .await
+                .ok()
+                .and_then(|cfg| {
+                    cfg.get("category_blackjack")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .filter(|id| *id > 0)
+                })
+        } else {
+            None
+        }
+    };
+
+    let mut builder = CreateChannel::new(&channel_name)
+        .kind(ChannelType::Text)
+        .topic(format!("[blackjack:{}]", user_id))
+        .permissions(vec![
+            PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: PermissionOverwriteType::Role(everyone_role),
+            },
+            PermissionOverwrite {
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
+                deny: Permissions::empty(),
+                kind: PermissionOverwriteType::Member(user_id),
+            },
+        ]);
+    if let Some(cat_id) = anchor_category_id {
+        builder = builder.category(ChannelId::new(cat_id));
+    }
+
     let channel = match guild_id
-        .create_channel(
-            &ctx.http,
-            CreateChannel::new(&channel_name)
-                .kind(ChannelType::Text)
-                .topic(format!("[blackjack:{}]", user_id))
-                .permissions(vec![
-                    PermissionOverwrite {
-                        allow: Permissions::empty(),
-                        deny: Permissions::VIEW_CHANNEL,
-                        kind: PermissionOverwriteType::Role(everyone_role),
-                    },
-                    PermissionOverwrite {
-                        allow: Permissions::VIEW_CHANNEL
-                            | Permissions::SEND_MESSAGES
-                            | Permissions::READ_MESSAGE_HISTORY,
-                        deny: Permissions::empty(),
-                        kind: PermissionOverwriteType::Member(user_id),
-                    },
-                ]),
-        )
+        .create_channel(&ctx.http, builder)
         .await
     {
         Ok(ch) => ch,
