@@ -1,6 +1,5 @@
-import { httpGet, httpPost, httpDelete } from "@/api/http";
-import type { LevelConfig, UserLevel, LevelReward } from "@/types";
-import { q } from "./_query";
+import { httpGet, httpPost } from "@/api/http";
+import type { LevelConfig, UserLevel } from "@/types";
 
 export interface SaveLevelConfigPayload {
   guild_id: string;
@@ -33,15 +32,6 @@ export const levelsService = {
   },
   getLeaderboard(guildId: string): Promise<UserLevel[]> {
     return httpGet(`/api/levels/${guildId}/leaderboard`);
-  },
-  getRewards(guildId: string): Promise<LevelReward[]> {
-    return httpGet(`/api/levels/rewards/${guildId}`);
-  },
-  setReward(guildId: string, level: number, roleId: string, source: string): Promise<unknown> {
-    return httpPost("/api/levels/rewards", { guild_id: guildId, level, role_id: roleId, source });
-  },
-  deleteReward(guildId: string, level: number, source: string): Promise<unknown> {
-    return httpDelete(`/api/levels/rewards/${guildId}/${level}${q({ source })}`);
   },
   /** Admin override : set valeur exacte XP texte/voix (champs Option). */
   setUserXp(body: {

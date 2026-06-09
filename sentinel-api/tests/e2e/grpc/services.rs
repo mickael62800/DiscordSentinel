@@ -56,7 +56,6 @@ use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
@@ -559,7 +558,7 @@ impl ManageLevelsUseCase for MockLevelsUc {
             user_level,
             leveled_up: cmd.amount >= 100,
             old_level: 1,
-            reward_role_id: None,
+            old_level_global: 1,
             source: cmd.source,
         })
     }
@@ -572,21 +571,11 @@ impl ManageLevelsUseCase for MockLevelsUc {
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
         Ok((0..limit.min(3)).map(|i| sample_user_level(guild_id, &format!("u{i}"), 1000 - i * 100)).collect())
     }
-    async fn get_rewards(&self, _: &str) -> Result<Vec<LevelReward>, DomainError> {
-        Ok(vec![LevelReward {
-            id: Uuid::nil(),
-            guild_id: "g".into(),
-            level: 5,
-            role_id: "role5".into(),
-            source: XpSource::Text,
-        }])
-    }
     async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> { unimplemented!() }
     async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> { unimplemented!() }
     async fn get_leaderboard_by_source(&self, _: &str, _: XpSource, _: i64) -> Result<Vec<UserLevel>, DomainError> { Ok(vec![]) }
-    async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { Ok(vec![]) }
-    async fn set_reward(&self, _: &str, _: i32, _: &str, _: XpSource) -> Result<LevelReward, DomainError> { unimplemented!() }
-    async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { unimplemented!() }
+    async fn set_user_xp(&self, _: sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
+    async fn reset_user_xp(&self, _: &str, _: &str, _: sentinel_api::ports::inbound::community::manage_levels::ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
 }
 
 fn sample_user_level(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
@@ -647,13 +636,6 @@ async fn progression_add_xp_and_get_level_round_trip() {
         guild_id: "g".into(), limit: 10, source: 0,
     }).await.unwrap().into_inner();
     assert_eq!(lb.users.len(), 3);
-
-    // Rewards
-    let rewards = client.get_rewards(prog_proto::GetRewardsRequest {
-        guild_id: "g".into(),
-    }).await.unwrap().into_inner();
-    assert_eq!(rewards.rewards.len(), 1);
-    assert_eq!(rewards.rewards[0].level, 5);
 
     let _ = shutdown.send(());
 }

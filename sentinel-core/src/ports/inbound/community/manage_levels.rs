@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::community::level::LevelConfig;
-use crate::domain::entities::community::level::LevelReward;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
@@ -29,9 +28,14 @@ pub struct AddXpCommand {
 
 pub struct AddXpResult {
     pub user_level: UserLevel,
+    /// `true` si le niveau de la source (texte ou vocal) a augmente.
     pub leveled_up: bool,
+    /// Ancien niveau de la source declenchante (texte ou vocal).
     pub old_level: i32,
-    pub reward_role_id: Option<String>,
+    /// Ancien niveau global (= level_from_xp(xp_text + xp_voice) avant l'ajout).
+    /// Sert au bot pour declencher le renommage `[NN]Pseudo` uniquement
+    /// quand le niveau total change reellement.
+    pub old_level_global: i32,
     pub source: XpSource,
 }
 
@@ -60,10 +64,6 @@ pub trait ManageLevelsUseCase: Send + Sync {
     async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError>;
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
     async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
-    async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError>;
-    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError>;
-    async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError>;
-    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError>;
     /// Set valeur exacte XP texte/voix (admin override). Recalcule les niveaux.
     async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError>;
     /// Reset XP a 0 sur la cible (text / voice / all). Recalcule les niveaux.

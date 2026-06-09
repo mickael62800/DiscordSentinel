@@ -449,14 +449,6 @@ export interface UserLevel {
   last_xp_at: string;
 }
 
-export interface LevelReward {
-  id: string;
-  guild_id: string;
-  level: number;
-  role_id: string;
-  source: string;
-}
-
 // ── Audit Logs ──
 
 export interface AuditLog {

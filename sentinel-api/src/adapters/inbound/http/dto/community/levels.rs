@@ -2,11 +2,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use sentinel_core::domain::entities::community::level::xp_progress;
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
-use sentinel_core::domain::entities::system::discord_ids::RoleId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 // ── Request DTOs ──
@@ -68,16 +66,6 @@ pub struct ResetUserXpDto {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SetRewardDto {
-    pub guild_id: GuildId,
-    pub level: i32,
-    pub role_id: RoleId,
-    /// "text" ou "voice" (defaut: "text")
-    #[serde(default = "default_source")]
-    pub source: String,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct LevelLeaderboardParams {
     pub limit: Option<i64>,
     /// "text", "voice" ou absent (= total)
@@ -120,20 +108,11 @@ pub struct UserLevelDto {
 }
 
 #[derive(Debug, Serialize)]
-pub struct LevelRewardDto {
-    pub id: String,
-    pub guild_id: GuildId,
-    pub level: i32,
-    pub role_id: RoleId,
-    pub source: String,
-}
-
-#[derive(Debug, Serialize)]
 pub struct AddXpResponseDto {
     pub user: UserLevelDto,
     pub leveled_up: bool,
     pub old_level: i32,
-    pub reward_role_id: Option<String>,
+    pub old_level_global: i32,
     pub source: String,
 }
 
@@ -196,25 +175,13 @@ impl From<UserLevel> for UserLevelDto {
     }
 }
 
-impl From<LevelReward> for LevelRewardDto {
-    fn from(r: LevelReward) -> Self {
-        Self {
-            id: r.id.to_string(),
-            guild_id: r.guild_id,
-            level: r.level,
-            role_id: r.role_id,
-            source: r.source.as_str().to_string(),
-        }
-    }
-}
-
 impl From<AddXpResult> for AddXpResponseDto {
     fn from(r: AddXpResult) -> Self {
         Self {
             user: UserLevelDto::from(r.user_level),
             leveled_up: r.leveled_up,
             old_level: r.old_level,
-            reward_role_id: r.reward_role_id,
+            old_level_global: r.old_level_global,
             source: r.source.as_str().to_string(),
         }
     }

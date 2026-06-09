@@ -1,35 +1,11 @@
 //! Client API specifique au progression-bot.
 //!
-//! Phase 7A — Migration gRPC pilote :
-//! - Les endpoints **levels** (`add_xp`, `get_user_level`, `get_level_leaderboard`,
-//!   `get_all_rewards`) et **stats** (`record_messages`, `record_voice`,
-//!   `get_user_stats`, `get_guild_overview`, `get_leaderboard`) passent
-//!   desormais par gRPC via `SentinelGrpcClient`.
+//! - Les endpoints **levels** (`add_xp`, `get_user_level`, `get_level_leaderboard`)
+//!   et **stats** (`record_messages`, `record_voice`, `get_user_stats`,
+//!   `get_guild_overview`, `get_leaderboard`) passent par gRPC via
+//!   `SentinelGrpcClient`.
 //! - Les endpoints sans equivalent proto (`get_streak`, `update_streak`,
-//!   `get_infractions`) restent sur `BaseApiClient` HTTP — ils seront migres
-//!   dans une iteration ulterieure.
-//!
-//! Le surface publique (noms de methodes + types de retour) est inchangee :
-//! handler.rs et commands/* n'ont pas a etre touches.
-//!
-//! ## Comportement en cas de panne API
-//!
-//! Tous les appels gRPC sont wrappes dans `SentinelGrpcClient::guarded()` :
-//! - apres 5 echecs consecutifs (`Unavailable` / `DeadlineExceeded` / `Internal`)
-//!   le circuit breaker s'ouvre pendant 10 s ;
-//! - les appels suivants renvoient `Err("API indisponible...")` immediatement,
-//!   sans charger l'API ni faire trainer les commandes Discord ;
-//! - apres le cooldown, un appel test est autorise (half-open) ;
-//! - succes -> referme, echec -> nouveau cooldown.
-//!
-//! Concretement :
-//! - `add_xp` echoue silencieusement (l'XP du message courant est perdu, ce
-//!   n'est pas critique — les messages suivants reprendront quand l'API revient).
-//! - Les commandes slash `/level`, `/stats`, `/top` repondent
-//!   « API indisponible, reessayez dans quelques instants ».
-//! - `record_messages`/`record_voice` (fire-and-forget) sont aussi
-//!   court-circuites — les compteurs in-memory du `StatsTracker` continuent
-//!   d'accumuler localement et seront flushes au prochain tick.
+//!   `get_infractions`) restent sur `BaseApiClient` HTTP.
 
 use std::sync::Arc;
 
@@ -134,25 +110,14 @@ pub struct AddXpResponse {
     pub user: UserLevelResponse,
     pub leveled_up: bool,
     pub old_level: i32,
-    pub reward_role_id: Option<String>,
+    #[serde(default)]
+    pub old_level_global: i32,
     #[serde(default)]
     pub source: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-pub struct RewardEntry {
-    pub id: String,
-    pub guild_id: String,
-    pub level: i32,
-    pub role_id: String,
-    pub source: String,
-}
-
 // ── Client ──
 
-/// Client API du progression-bot. gRPC en priorite, HTTP pour les endpoints
-/// non encore portes (streaks, infractions).
 pub struct ApiClient {
     base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
@@ -365,38 +330,8 @@ impl ApiClient {
             .collect())
     }
 
-    pub async fn get_all_rewards(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<RewardEntry>, String> {
-        let req = proto_prog::GetRewardsRequest {
-            guild_id: guild_id.to_string(),
-        };
-        let mut client = self.grpc.progression();
-        let list = self
-            .grpc
-            .guarded(|| async move {
-                client.get_rewards(req).await.map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
-        Ok(list
-            .rewards
-            .into_iter()
-            .map(|r| RewardEntry {
-                id: r.id,
-                guild_id: r.guild_id,
-                level: r.level,
-                role_id: r.role_id,
-                source: proto_xp_source_to_string(r.source),
-            })
-            .collect())
-    }
+    // ── HTTP legacy ──
 
-    // ── HTTP legacy (pas encore migre en proto) ──
-
-    /// Charge les donnees de streak d'un utilisateur. Reste sur HTTP : pas
-    /// d'equivalent gRPC dans v1 du proto progression.
     pub async fn get_streak(
         &self,
         guild_id: &str,
@@ -407,7 +342,6 @@ impl ApiClient {
             .await
     }
 
-    /// Persiste les donnees de streak. Reste sur HTTP (cf. get_streak).
     pub async fn update_streak(
         &self,
         guild_id: &str,
@@ -430,8 +364,6 @@ impl ApiClient {
             .await;
     }
 
-    /// Recupere les infractions d'un serveur. Reste sur HTTP (domaine
-    /// moderation, pas migre dans cette iteration).
     pub async fn get_infractions(&self, guild_id: &str) -> Result<Vec<Infraction>, String> {
         self.base
             .get_json(&format!("/infractions/{guild_id}"))
@@ -471,8 +403,6 @@ fn proto_user_level_to_response(u: proto_prog::UserLevel) -> UserLevelResponse {
         level_voice: u.level_voice,
         xp_voice_current: u.xp_voice_current,
         xp_voice_needed: u.xp_voice_needed,
-        // Streaks ne sont pas dans le proto v1 — restent None ici, le bot
-        // les recupere via `get_streak` HTTP en complement.
         streak_current: None,
         streak_best: None,
     }
@@ -480,6 +410,7 @@ fn proto_user_level_to_response(u: proto_prog::UserLevel) -> UserLevelResponse {
 
 fn proto_add_xp_to_response(r: proto_prog::AddXpResponse) -> AddXpResponse {
     AddXpResponse {
+        old_level_global: r.old_level_global,
         user: r
             .user
             .map(proto_user_level_to_response)
@@ -503,7 +434,6 @@ fn proto_add_xp_to_response(r: proto_prog::AddXpResponse) -> AddXpResponse {
             }),
         leveled_up: r.leveled_up,
         old_level: r.old_level,
-        reward_role_id: r.reward_role_id,
         source: Some(proto_xp_source_to_string(r.source)),
     }
 }
@@ -521,4 +451,3 @@ fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse 
 }
 
 use crate::shared::grpc_client::grpc_err_to_string;
-

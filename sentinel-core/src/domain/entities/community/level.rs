@@ -1,7 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
 
@@ -10,7 +9,6 @@ use crate::domain::entities::system::discord_ids::GuildId;
 pub enum XpSource {
     Text,
     Voice,
-    Days,
 }
 
 impl XpSource {
@@ -18,7 +16,6 @@ impl XpSource {
         match self {
             XpSource::Text => "text",
             XpSource::Voice => "voice",
-            XpSource::Days => "days",
         }
     }
 
@@ -26,7 +23,6 @@ impl XpSource {
     pub fn from_str(s: &str) -> Self {
         match s {
             "voice" => XpSource::Voice,
-            "days" => XpSource::Days,
             _ => XpSource::Text,
         }
     }
@@ -63,15 +59,6 @@ pub struct UserLevel {
     pub last_xp_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-pub struct LevelReward {
-    pub id: Uuid,
-    pub guild_id: GuildId,
-    pub level: i32,
-    pub role_id: RoleId,
-    pub source: XpSource,
 }
 
 /// XP requis pour atteindre un niveau donne (progression exponentielle).

@@ -5,7 +5,6 @@ use chrono::Utc;
 
 use crate::domain::entities::community::level::level_from_xp;
 use crate::domain::entities::community::level::LevelConfig;
-use crate::domain::entities::community::level::LevelReward;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
@@ -103,6 +102,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         // Anciens niveaux = ceux retournes par RETURNING (non touches par l'UPDATE).
         let old_level_text = user_level_pre.level_text;
         let old_level_voice = user_level_pre.level_voice;
+        let old_level_global = user_level_pre.level;
 
         // Recalculer les niveaux depuis le nouvel XP.
         let mut user_level = user_level_pre;
@@ -127,25 +127,15 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let (old_source_level, new_source_level) = match cmd.source {
             XpSource::Text => (old_level_text, user_level.level_text),
             XpSource::Voice => (old_level_voice, user_level.level_voice),
-            XpSource::Days => (0, 0),
         };
 
         let leveled_up = new_source_level > old_source_level;
-        let reward_role_id = if leveled_up {
-            let rewards = self.repo.get_rewards_by_source(&cmd.guild_id, cmd.source).await?;
-            rewards
-                .iter()
-                .find(|r| r.level == new_source_level)
-                .map(|r| r.role_id.clone())
-        } else {
-            None
-        };
 
         Ok(AddXpResult {
             user_level,
             leveled_up,
             old_level: old_source_level,
-            reward_role_id: reward_role_id.map(Into::into),
+            old_level_global,
             source: cmd.source,
         })
     }
@@ -165,32 +155,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         self.repo.get_leaderboard_by_source(guild_id, source, limit).await
     }
 
-    async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError> {
-        self.repo.get_rewards(guild_id).await
-    }
-
-    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError> {
-        self.repo.get_rewards_by_source(guild_id, source).await
-    }
-
-    async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError> {
-        let reward = LevelReward {
-            id: uuid::Uuid::new_v4(),
-            guild_id: guild_id.to_string().into(),
-            level,
-            role_id: role_id.into(),
-            source,
-        };
-        self.repo.upsert_reward(&reward).await?;
-        Ok(reward)
-    }
-
-    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError> {
-        self.repo.delete_reward(guild_id, level, source).await
-    }
-
     async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError> {
-        // Charge l'existant (404 si pas trouve : on force a passer par add_xp avant pour creer la ligne)
         let mut user = self
             .repo
             .get_user_level(cmd.guild_id.as_ref(), cmd.user_id.as_ref())
@@ -214,14 +179,11 @@ impl ManageLevelsUseCase for ManageLevelsService {
             user.xp_voice = xp_v;
             user.level_voice = level_from_xp(xp_v);
         }
-        // Recalcule le total a partir des deux sources.
         user.xp = user.xp_text + user.xp_voice;
         user.level = level_from_xp(user.xp);
         user.updated_at = Utc::now();
 
         self.repo.upsert_user_level(&user).await?;
-        // Force la MV a jour pour que le leaderboard "global" voie la
-        // nouvelle valeur immediatement (sinon staleness ~5min).
         let _ = self.repo.refresh_leaderboard_view().await;
         Ok(user)
     }

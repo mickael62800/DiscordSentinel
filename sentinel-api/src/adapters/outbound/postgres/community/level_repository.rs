@@ -3,7 +3,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
@@ -50,15 +49,6 @@ struct UserLevelRow {
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[derive(sqlx::FromRow)]
-struct LevelRewardRow {
-    id: Uuid,
-    guild_id: String,
-    level: i32,
-    role_id: String,
-    source: String,
-}
-
 impl From<LevelConfigRow> for LevelConfig {
     fn from(r: LevelConfigRow) -> Self {
         Self {
@@ -92,18 +82,6 @@ impl From<UserLevelRow> for UserLevel {
             last_xp_at: r.last_xp_at,
             created_at: r.created_at,
             updated_at: r.updated_at,
-        }
-    }
-}
-
-impl From<LevelRewardRow> for LevelReward {
-    fn from(r: LevelRewardRow) -> Self {
-        Self {
-            id: r.id,
-            guild_id: r.guild_id.into(),
-            level: r.level,
-            role_id: r.role_id.into(),
-            source: XpSource::from_str(&r.source),
         }
     }
 }
@@ -186,19 +164,13 @@ impl LevelRepository for PgLevelRepository {
     }
 
     async fn add_xp_atomic(&self, guild_id: &str, user_id: &str, username: &str, amount: i64, source: XpSource) -> Result<UserLevel, DomainError> {
-        // Determine quelles colonnes incrementer selon la source
-        // SECURITE : xp_col est strictement controle par le match ci-dessous (jamais d'input utilisateur)
-        let (xp_col, _level_col) = match source {
-            XpSource::Text => ("xp_text", "level_text"),
-            XpSource::Voice => ("xp_voice", "level_voice"),
-            XpSource::Days => return Err(DomainError::ValidationError("Days source cannot gain XP".into())),
+        // Determine quelles colonnes incrementer selon la source.
+        // SECURITE : xp_col est strictement controle par le match (jamais d'input utilisateur).
+        let xp_col = match source {
+            XpSource::Text => "xp_text",
+            XpSource::Voice => "xp_voice",
         };
-        debug_assert!(
-            xp_col == "xp_text" || xp_col == "xp_voice",
-            "xp_col invalide: {xp_col}"
-        );
 
-        // INSERT ou UPDATE atomique : XP total + XP source en une seule requete
         let query = format!(
             r#"INSERT INTO user_levels (id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, updated_at)
                VALUES (gen_random_uuid(), $1, $2, $3, $4, 0,
@@ -230,7 +202,6 @@ impl LevelRepository for PgLevelRepository {
 
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
         // Phase 2 A.2 — Lit depuis `mv_level_leaderboard` (5 min staleness max).
-        // Voir wallet_repository::leaderboard pour la rationale complete.
         let rows = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM mv_level_leaderboard WHERE guild_id = $1 ORDER BY rank LIMIT $2",
         )
@@ -247,7 +218,6 @@ impl LevelRepository for PgLevelRepository {
         let order_col = match source {
             XpSource::Text => "xp_text",
             XpSource::Voice => "xp_voice",
-            XpSource::Days => "created_at",
         };
         let query = format!(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY {} DESC LIMIT $2",
@@ -263,64 +233,7 @@ impl LevelRepository for PgLevelRepository {
         Ok(rows.into_iter().map(UserLevel::from).collect())
     }
 
-    async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError> {
-        let rows = sqlx::query_as::<_, LevelRewardRow>(
-            "SELECT id, guild_id, level, role_id, source FROM level_rewards WHERE guild_id = $1 ORDER BY source, level ASC",
-        )
-        .bind(guild_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
-
-        Ok(rows.into_iter().map(LevelReward::from).collect())
-    }
-
-    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError> {
-        let rows = sqlx::query_as::<_, LevelRewardRow>(
-            "SELECT id, guild_id, level, role_id, source FROM level_rewards WHERE guild_id = $1 AND source = $2 ORDER BY level ASC",
-        )
-        .bind(guild_id)
-        .bind(source.as_str())
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
-
-        Ok(rows.into_iter().map(LevelReward::from).collect())
-    }
-
-    async fn upsert_reward(&self, reward: &LevelReward) -> Result<(), DomainError> {
-        sqlx::query(
-            r#"INSERT INTO level_rewards (id, guild_id, level, role_id, source)
-               VALUES ($1, $2, $3, $4, $5)
-               ON CONFLICT (guild_id, level, source) DO UPDATE SET role_id = $4"#,
-        )
-        .bind(reward.id)
-        .bind(reward.guild_id.as_str())
-        .bind(reward.level)
-        .bind(reward.role_id.as_str())
-        .bind(reward.source.as_str())
-        .execute(&self.pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
-
-        Ok(())
-    }
-
-    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError> {
-        sqlx::query("DELETE FROM level_rewards WHERE guild_id = $1 AND level = $2 AND source = $3")
-            .bind(guild_id)
-            .bind(level)
-            .bind(source.as_str())
-            .execute(&self.pool)
-            .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
-
-        Ok(())
-    }
-
     async fn refresh_leaderboard_view(&self) -> Result<(), DomainError> {
-        // CONCURRENTLY pour ne pas bloquer les lectures en cours.
-        // Necessite un index UNIQUE sur la MV (deja en place : (guild_id, user_id)).
         sqlx::query("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_level_leaderboard")
             .execute(&self.pool)
             .await

@@ -4,13 +4,12 @@ package sentinel.progression.v1;
 
 import "common.proto";
 
-// Service progression : XP, niveaux, leaderboards, recompenses.
+// Service progression : XP, niveaux, leaderboards.
 // Wrappe les use-cases ManageLevelsService cote API.
 service ProgressionService {
   rpc AddXp(AddXpRequest) returns (AddXpResponse);
   rpc GetUserLevel(GetUserLevelRequest) returns (UserLevel);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (Leaderboard);
-  rpc GetRewards(GetRewardsRequest) returns (RewardList);
 }
 
 message AddXpRequest {
@@ -25,8 +24,10 @@ message AddXpResponse {
   UserLevel user = 1;
   bool leveled_up = 2;
   int32 old_level = 3;
-  optional string reward_role_id = 4;
   sentinel.common.v1.XpSource source = 5;
+  // Niveau global (level_from_xp(xp_text + xp_voice)) AVANT cet ajout.
+  // Le client compare avec user.level pour detecter un level-up global.
+  int32 old_level_global = 6;
 }
 
 message GetUserLevelRequest {
@@ -39,10 +40,6 @@ message GetLeaderboardRequest {
   int64 limit = 2;
   // Si UNSPECIFIED, retourne le leaderboard total (texte+voice).
   sentinel.common.v1.XpSource source = 3;
-}
-
-message GetRewardsRequest {
-  string guild_id = 1;
 }
 
 message UserLevel {
@@ -68,16 +65,4 @@ message UserLevel {
 
 message Leaderboard {
   repeated UserLevel users = 1;
-}
-
-message LevelReward {
-  string id = 1;
-  string guild_id = 2;
-  int32 level = 3;
-  string role_id = 4;
-  sentinel.common.v1.XpSource source = 5;
-}
-
-message RewardList {
-  repeated LevelReward rewards = 1;
 }

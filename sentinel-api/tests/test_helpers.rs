@@ -243,10 +243,6 @@ impl ManageLevelsUseCase for StubLevels {
     async fn get_user_level(&self, _: &str, _: &str) -> Result<UserLevel, DomainError> { unimplemented!() }
     async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserLevel>, DomainError> { unimplemented!() }
     async fn get_leaderboard_by_source(&self, _: &str, _: XpSource, _: i64) -> Result<Vec<UserLevel>, DomainError> { unimplemented!() }
-    async fn get_rewards(&self, _: &str) -> Result<Vec<LevelReward>, DomainError> { unimplemented!() }
-    async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { unimplemented!() }
-    async fn set_reward(&self, _: &str, _: i32, _: &str, _: XpSource) -> Result<LevelReward, DomainError> { unimplemented!() }
-    async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { unimplemented!() }
     async fn set_user_xp(&self, _: manage_levels::SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
     async fn reset_user_xp(&self, _: &str, _: &str, _: manage_levels::ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
 }

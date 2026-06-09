@@ -31,9 +31,6 @@ fn level_inner() -> Router<AppState> {
         .route("/xp", post(handlers::community::levels::add_xp))
         .route("/{guild_id}/{user_id}", get(handlers::community::levels::get_user_level))
         .route("/{guild_id}/leaderboard", get(handlers::community::levels::get_leaderboard))
-        .route("/rewards/{guild_id}", get(handlers::community::levels::get_rewards))
-        .route("/rewards", post(handlers::community::levels::set_reward))
-        .route("/rewards/{guild_id}/{level}", delete(handlers::community::levels::delete_reward))
         // Admin overrides : set valeur exacte XP texte/voix, reset 0.
         .route("/admin/set-xp", post(handlers::community::levels::set_user_xp))
         .route("/admin/reset-xp", post(handlers::community::levels::reset_user_xp))

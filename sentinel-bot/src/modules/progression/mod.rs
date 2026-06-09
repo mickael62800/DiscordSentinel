@@ -6,6 +6,7 @@ pub mod api_client;
 pub mod level_channel;
 pub mod level_cmd;
 pub mod multipliers;
+pub mod nickname;
 pub mod resync_cmd;
 pub mod stats_cmd;
 pub mod streaks;
@@ -14,13 +15,11 @@ pub mod xp_cooldown;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Instant;
 
-use dashmap::DashMap;
 use serenity::all::{CommandInteraction, Context, CreateCommand, CreateMessage};
 use serenity::model::channel::Message;
 use serenity::model::guild::Member;
-use serenity::model::id::{ChannelId, RoleId, UserId, GuildId};
+use serenity::model::id::{ChannelId, RoleId, UserId};
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::{info, warn};
@@ -32,7 +31,7 @@ use crate::shared::discord_helpers::{
 use crate::shared::embeds::success_embed;
 use crate::shared::heartbeat::ApiClientKey;
 
-use api_client::{ApiClient, RewardEntry};
+use api_client::ApiClient;
 use streaks::StreakTracker;
 use tracker::StatsTracker;
 use xp_cooldown::XpCooldown;
@@ -59,37 +58,6 @@ impl TypeMapKey for StreakTrackerKey {
     type Value = StreakTracker;
 }
 
-pub struct RewardsCacheKey;
-impl TypeMapKey for RewardsCacheKey {
-    type Value = Arc<RewardsCache>;
-}
-
-// ── RewardsCache ──
-
-pub struct RewardsCache {
-    cache: DashMap<String, (Vec<RewardEntry>, Instant)>,
-}
-
-impl RewardsCache {
-    pub fn new() -> Self {
-        Self { cache: DashMap::new() }
-    }
-
-    pub fn get(&self, guild_id: &str) -> Option<Vec<RewardEntry>> {
-        self.cache.get(guild_id).and_then(|entry| {
-            if entry.1.elapsed().as_secs() < 300 {
-                Some(entry.0.clone())
-            } else {
-                None
-            }
-        })
-    }
-
-    pub fn set(&self, guild_id: &str, rewards: Vec<RewardEntry>) {
-        self.cache.insert(guild_id.to_string(), (rewards, Instant::now()));
-    }
-}
-
 // ── Init TypeMapKeys ──
 
 /// Insere les TypeMapKeys du module progression dans le TypeMap partage.
@@ -102,7 +70,6 @@ pub fn init_typemap(
     data.insert::<TrackerKey>(tracker::StatsTracker::new());
     data.insert::<XpCooldownKey>(xp_cooldown::XpCooldown::new());
     data.insert::<StreakTrackerKey>(streaks::StreakTracker::new());
-    data.insert::<RewardsCacheKey>(Arc::new(RewardsCache::new()));
 }
 
 /// Hydrate les sessions vocales depuis les voice_states Discord apres le boot.
@@ -116,7 +83,6 @@ pub async fn on_ready(ctx: &Context, ready: &serenity::model::gateway::Ready) {
 
     let mut hydrated = 0usize;
     for guild in &ready.guilds {
-        // Collecter hors du guard cache (CacheRef non-Send)
         let entries: Vec<(u64, u64, bool)> = match ctx.cache.guild(guild.id) {
             Some(g) => g
                 .voice_states
@@ -135,9 +101,6 @@ pub async fn on_ready(ctx: &Context, ready: &serenity::model::gateway::Ready) {
     info!(hydrated, "progression: sessions vocales hydratees au ready");
 }
 
-/// Spawn le tick periodique (toutes les 5 min) qui credit le temps actif
-/// accumule dans les sessions vocales, pour que les users connectes en
-/// permanence gagnent de l'XP sans attendre de quitter le salon.
 /// Helper level-up : applique max_level cap, custom template, toggle
 /// announce, toggle DM. Appele pour text et voice level-ups.
 ///
@@ -153,13 +116,11 @@ async fn announce_level_up(
     kind: &str,        // "texte" | "vocal"
     title_emoji: &str, // emoji du title
 ) {
-    // 1. Cap max_level (si > 0) — pas d'annonce au-dela.
     let max_level = BaseApiClient::config_u64(guild_config, "max_level", 0) as i32;
     if max_level > 0 && level > max_level {
         return;
     }
 
-    // 2. Template custom ou default. Variables : {user}, {level}, {kind}.
     let template = BaseApiClient::config_or(guild_config, "levelup_message", "");
     let description = if template.is_empty() {
         format!("<@{}> est maintenant **niveau {} en {}** !", user_id, level, kind)
@@ -173,7 +134,6 @@ async fn announce_level_up(
     let embed = success_embed(format!("{} LEVEL UP {} !", title_emoji, capitalize(kind)))
         .description(&description);
 
-    // 3. Annonce dans le salon (si toggle ON).
     let announce_enabled = BaseApiClient::config_bool(guild_config, "levelup_announce_enabled", true);
     if announce_enabled {
         if let Some(ch_id) = level_channel::resolve_level_up_channel(guild_config) {
@@ -187,7 +147,6 @@ async fn announce_level_up(
         }
     }
 
-    // 4. DM au user (si toggle ON, default false).
     let dm_enabled = BaseApiClient::config_bool(guild_config, "levelup_dm_enabled", false);
     if dm_enabled {
         let user = serenity::model::id::UserId::new(user_id);
@@ -225,7 +184,6 @@ pub fn spawn_voice_tick(ctx: Context) {
 }
 
 async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
-    // Etape 1 : recupere tracker + base API (Arc cloneable), credite les sessions.
     let (credits, base) = {
         let data = ctx.data.read().await;
         let Some(tracker) = data.get::<TrackerKey>().cloned() else {
@@ -242,7 +200,6 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
         return Ok(());
     }
 
-    // Etape 2 : pour chaque credit, re-acquire data brievement pour appeler api.add_xp.
     for (guild_id, user_id, seconds, channel_id) in credits {
         let gc = base
             .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
@@ -253,7 +210,6 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
         }
         let xp_per_minute = BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
 
-        // Multiplicateurs (channel + role) — meme formule que le texte.
         let channel_mults = multipliers::parse_multipliers(
             &BaseApiClient::config_or(&gc, "xp_channel_multipliers", ""),
         );
@@ -262,7 +218,6 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
         );
         let channel_mult = multipliers::get_channel_multiplier(&channel_mults, channel_id);
 
-        // Roles : on lit le member depuis le cache (best-effort).
         let user_roles: Vec<u64> = ctx
             .cache
             .guild(serenity::model::id::GuildId::new(guild_id))
@@ -333,20 +288,17 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    // Charger la config guild (helper partage : data.read() + get_guild_config)
     let guild_config =
         guild_config_or_default(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await;
     if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
         return;
     }
 
-    // Skip XP : message trop court (anti-spam "lol", emoji seul...).
     let min_len = BaseApiClient::config_u64(&guild_config, "min_message_length", 3) as usize;
     if msg.content.chars().count() < min_len {
         return;
     }
 
-    // Skip XP : salon dans la liste des salons ignores.
     let ignored_channels_csv = BaseApiClient::config_or(&guild_config, "ignored_channels", "");
     if !ignored_channels_csv.is_empty() {
         let cid = msg.channel_id.get().to_string();
@@ -355,7 +307,6 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         }
     }
 
-    // Skip XP : user a au moins un role dans la liste des roles ignores.
     let ignored_roles_csv = BaseApiClient::config_or(&guild_config, "ignored_roles", "");
     if !ignored_roles_csv.is_empty() {
         if let Some(member) = msg.member.as_ref() {
@@ -373,12 +324,10 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     let data = ctx.data.read().await;
 
-    // Track localement
     if let Some(tracker) = data.get::<TrackerKey>() {
         tracker.record_message(guild_id.get(), msg.author.id.get()).await;
     }
 
-    // Envoyer au backend
     let api = match data.get::<StatsApiKey>() {
         Some(a) => a,
         None => return,
@@ -411,7 +360,6 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         cooldown.record_xp(guild_id.get(), msg.author.id.get());
     }
 
-    // Streak tracking
     let streak_enabled = BaseApiClient::config_bool(&guild_config, "streak_enabled", true);
     let streak_mult = if streak_enabled {
         if let Some(streak_tracker) = data.get::<StreakTrackerKey>() {
@@ -465,7 +413,6 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         1.0
     };
 
-    // Channel & role multipliers
     let channel_mults = multipliers::parse_multipliers(
         &BaseApiClient::config_or(&guild_config, "xp_channel_multipliers", ""),
     );
@@ -509,14 +456,16 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                 )
                 .await;
             }
-
-            let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_text > 0);
-            if needs_role_check {
-                let lt = result.user.level_text;
-                let lv = result.user.level_voice;
-                let lg = result.user.level;
+            // Renommage `[NN]Pseudo` uniquement quand le niveau global change.
+            if result.user.level > result.old_level_global {
                 drop(data);
-                check_and_assign_all_roles(ctx, guild_id, msg.author.id, lt, lv, lg).await;
+                nickname::apply_level_prefix(
+                    ctx,
+                    guild_id,
+                    msg.author.id,
+                    result.user.level,
+                )
+                .await;
             }
         }
         Err(e) => {
@@ -562,7 +511,6 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
             }
         }
         (true, true) => {
-            // Bascule AFK
             if was_afk != is_afk_now {
                 if let Some(tracker) = tracker {
                     tracker
@@ -570,7 +518,6 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                         .await;
                 }
             }
-            // Changement de channel (move)
             let old_ch = old.as_ref().and_then(|s| s.channel_id);
             if old_ch != new.channel_id {
                 if let Some(tracker) = tracker {
@@ -672,14 +619,17 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                         )
                                         .await;
                                     }
-
-                                    let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_voice > 0);
-                                    if needs_role_check {
-                                        let lt = result.user.level_text;
-                                        let lv = result.user.level_voice;
-                                        let lg = result.user.level;
+                                    if result.user.level > result.old_level_global {
+                                        let new_level = result.user.level;
                                         drop(data);
-                                        check_and_assign_all_roles(ctx, guild_id, user_id, lt, lv, lg).await;
+                                        nickname::apply_level_prefix(
+                                            ctx,
+                                            guild_id,
+                                            user_id,
+                                            new_level,
+                                        )
+                                        .await;
+                                        return;
                                     }
                                 }
                                 Err(e) => {
@@ -727,193 +677,4 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
             Err(e) => warn!(guild=%guild_id, user=%new_member.user.id, error=%e, "Echec attribution role par defaut"),
         }
     }
-}
-
-// ── Helper interne ──
-
-/// Bilan d une synchronisation de roles pour un membre. Utilise par la
-/// commande `/progression-resync` pour reporter ce qui a change.
-#[derive(Debug, Default, Clone)]
-pub struct RoleSyncReport {
-    pub added_roles: Vec<u64>,
-    pub removed_roles: Vec<u64>,
-    pub errors: Vec<String>,
-    /// `true` si on n a pas pu charger member/rewards (skip silencieux).
-    pub skipped: bool,
-}
-
-/// Verifie TOUS les rewards (texte, vocal, jours) et attribue les roles manquants.
-async fn check_and_assign_all_roles(
-    ctx: &Context,
-    guild_id: GuildId,
-    user_id: UserId,
-    level_text: i32,
-    level_voice: i32,
-    level_global: i32,
-) {
-    let _ = sync_member_roles(ctx, guild_id, user_id, level_text, level_voice, level_global).await;
-}
-
-/// Variante publique avec rapport — meme logique que
-/// `check_and_assign_all_roles` mais retourne ce qui a ete ajoute / retire
-/// pour permettre a la commande de resync d afficher un bilan.
-pub async fn sync_member_roles(
-    ctx: &Context,
-    guild_id: GuildId,
-    user_id: UserId,
-    level_text: i32,
-    level_voice: i32,
-    level_global: i32,
-) -> RoleSyncReport {
-    let mut report = RoleSyncReport::default();
-    let member = match guild_id.member(&ctx.http, user_id).await {
-        Ok(m) => m,
-        Err(e) => {
-            report.skipped = true;
-            report.errors.push(format!("member fetch: {e}"));
-            return report;
-        }
-    };
-
-    let member_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
-
-    let days_since_join = member.joined_at
-        .map(|ts| {
-            let now = serenity::model::Timestamp::now();
-            (now.unix_timestamp() - ts.unix_timestamp()) / 86400
-        })
-        .unwrap_or(0);
-
-    let data = ctx.data.read().await;
-
-    let xp_role_mode = if let Some(base) = data.get::<ApiClientKey>() {
-        let config = match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                HashMap::new()
-            }
-        };
-        BaseApiClient::config_or(&config, "xp_role_mode", "separate").to_string()
-    } else {
-        "separate".to_string()
-    };
-
-    let (effective_text, effective_voice) = match xp_role_mode.as_str() {
-        "max" => {
-            let max_level = level_text.max(level_voice);
-            (max_level, max_level)
-        }
-        "total" => (level_global, level_global),
-        _ => (level_text, level_voice),
-    };
-
-    let guild_str = guild_id.to_string();
-    let rewards_cache = data.get::<RewardsCacheKey>().cloned();
-    let rewards = if let Some(ref cache) = rewards_cache {
-        if let Some(cached) = cache.get(&guild_str) {
-            cached
-        } else if let Some(api) = data.get::<StatsApiKey>() {
-            match api.get_all_rewards(&guild_str).await {
-                Ok(r) => { cache.set(&guild_str, r.clone()); r }
-                Err(e) => {
-                    report.skipped = true;
-                    report.errors.push(format!("get_all_rewards: {e}"));
-                    return report;
-                }
-            }
-        } else {
-            report.skipped = true;
-            return report;
-        }
-    } else if let Some(api) = data.get::<StatsApiKey>() {
-        match api.get_all_rewards(&guild_str).await {
-            Ok(r) => r,
-            Err(e) => {
-                report.skipped = true;
-                report.errors.push(format!("get_all_rewards: {e}"));
-                return report;
-            }
-        }
-    } else {
-        report.skipped = true;
-        return report;
-    };
-
-    if rewards.is_empty() {
-        return report;
-    }
-
-    let sources = ["text", "voice", "days"];
-
-    for source in &sources {
-        let mut source_rewards: Vec<&RewardEntry> = rewards
-            .iter()
-            .filter(|r| r.source == *source)
-            .collect();
-        source_rewards.sort_by(|a, b| b.level.cmp(&a.level));
-
-        let effective_level = match *source {
-            "text" => effective_text,
-            "voice" => effective_voice,
-            "days" => days_since_join as i32,
-            _ => 0,
-        };
-
-        let best_reward = source_rewards.iter().find(|r| effective_level >= r.level);
-
-        let all_source_role_ids: Vec<u64> = source_rewards
-            .iter()
-            .filter_map(|r| r.role_id.parse::<u64>().ok())
-            .collect();
-
-        match best_reward {
-            Some(reward) => {
-                if let Ok(best_role_id) = reward.role_id.parse::<u64>() {
-                    if !member_roles.contains(&best_role_id) {
-                        match member.add_role(&ctx.http, RoleId::new(best_role_id)).await {
-                            Ok(_) => {
-                                info!(guild=%guild_id, user=%user_id, role=%best_role_id, source=%source, "Role attribue");
-                                report.added_roles.push(best_role_id);
-                            }
-                            Err(e) => {
-                                warn!(guild=%guild_id, user=%user_id, role=%best_role_id, error=%e, "Echec attribution role");
-                                report.errors.push(format!("add_role {best_role_id} ({source}): {e}"));
-                            }
-                        }
-                    }
-
-                    for role_id in &all_source_role_ids {
-                        if *role_id != best_role_id && member_roles.contains(role_id) {
-                            match member.remove_role(&ctx.http, RoleId::new(*role_id)).await {
-                                Ok(_) => {
-                                    info!(guild=%guild_id, user=%user_id, role=%role_id, source=%source, "Ancien role retire");
-                                    report.removed_roles.push(*role_id);
-                                }
-                                Err(e) => {
-                                    warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec retrait ancien role");
-                                    report.errors.push(format!("remove_role {role_id} ({source}): {e}"));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            None => {
-                for role_id in &all_source_role_ids {
-                    if member_roles.contains(role_id) {
-                        match member.remove_role(&ctx.http, RoleId::new(*role_id)).await {
-                            Ok(_) => report.removed_roles.push(*role_id),
-                            Err(e) => {
-                                warn!(error = %e, "Failed to remove unqualified role");
-                                report.errors.push(format!("remove_role {role_id} (under-qualified, {source}): {e}"));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    report
 }

@@ -1,19 +1,12 @@
-//! Slash command `/progression-resync` — force la verification et
-//! reapplication des roles de niveau (text / voice / days) pour un
-//! membre ou pour tout le serveur.
+//! Slash command `/progression-resync` — re-synchronise les pseudos
+//! `[NN]Pseudo` apres changement de niveau ou en backfill suite a un
+//! deploiement.
 //!
-//! Utile quand :
-//! - Un admin a ajoute / modifie un reward apres coup (cache 5 min ou
-//!   role manque a des users existants).
-//! - Le mode `xp_role_mode` (separate / max / total) a ete change.
-//! - Une attribution Discord a foire (rate limit, perms manquantes au
-//!   moment du level-up).
-//!
-//! Sub-commands :
-//! - `/progression-resync user @cible`  — re-applique pour 1 user
-//! - `/progression-resync me`           — re-applique pour soi-meme
-//! - `/progression-resync all`          — re-applique pour les top N
-//!   joueurs du leaderboard global (admin only, MANAGE_GUILD).
+//! Sous-commandes :
+//! - `/progression-resync user @cible`  — rename 1 membre
+//! - `/progression-resync me`           — rename soi-meme
+//! - `/progression-resync all`          — rename les top N du leaderboard
+//!   global (admin only, MANAGE_GUILD).
 
 use std::time::Duration;
 
@@ -27,52 +20,50 @@ use tracing::warn;
 
 use crate::shared::discord_helpers::reply_ephemeral;
 
-use super::{sync_member_roles, RoleSyncReport, StatsApiKey};
+use super::nickname::{apply_level_prefix, ResyncOutcome};
+use super::StatsApiKey;
 
 /// Throttle entre 2 syncs en mode `all` : evite de cogner le rate limit
-/// Discord (5 reqs/s par bot, 1 sync = jusqu a ~6 calls add/remove role).
+/// Discord.
 const RESYNC_ALL_INTERVAL_MS: u64 = 250;
-/// Plafond de users traites par `all` : protege contre les serveurs
-/// massifs ou la commande tournerait en boucle pendant des minutes.
+/// Plafond de users traites par `all`.
 const RESYNC_ALL_MAX_USERS: u32 = 200;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("progression-resync")
-        .description("Force la verification des roles de niveau (texte/vocal/jours)")
+        .description("Re-synchronise les pseudos [NN]Pseudo selon le niveau global")
         .default_member_permissions(Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 "user",
-                "Re-verifie un membre precis",
+                "Re-applique le prefixe sur un membre precis",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::User,
                     "target",
-                    "Membre a re-verifier",
+                    "Membre a re-synchroniser",
                 )
                 .required(true),
             ),
         )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "me",
-                "Re-verifie tes propres roles",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "me",
+            "Re-applique le prefixe sur ton propre pseudo",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 "all",
-                "Re-verifie les top N joueurs du serveur (long, admin only)",
+                "Re-applique le prefixe sur les top N joueurs (admin only)",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Integer,
                     "limit",
-                    "Nombre max de joueurs a traiter (defaut 50, max 200)",
+                    "Nombre max de joueurs (defaut 50, max 200)",
                 )
                 .min_int_value(1)
                 .max_int_value(RESYNC_ALL_MAX_USERS as u64),
@@ -147,25 +138,16 @@ async fn handle_single(
         return;
     }
 
-    let levels = match fetch_levels(ctx, &guild_id.to_string(), &target.to_string()).await {
-        Ok(l) => l,
+    let level = match fetch_level(ctx, &guild_id.to_string(), &target.to_string()).await {
+        Ok(lvl) => lvl,
         Err(msg) => {
             followup(ctx, command, &msg).await;
             return;
         }
     };
 
-    let report = sync_member_roles(
-        ctx,
-        guild_id,
-        target,
-        levels.0,
-        levels.1,
-        levels.2,
-    )
-    .await;
-
-    let embed = build_single_embed(target, &report, levels);
+    let outcome = apply_level_prefix(ctx, guild_id, target, level).await;
+    let embed = build_single_embed(target, level, &outcome);
     if let Err(e) = command
         .create_followup(
             &ctx.http,
@@ -199,9 +181,6 @@ async fn handle_all(
                 return;
             }
         };
-        // get_level_leaderboard renvoie les N joueurs ayant le plus d'XP
-        // global. C'est l'ensemble pertinent — un user a 0 XP n'a aucun
-        // role de niveau a synchroniser de toute facon.
         match api.get_level_leaderboard(&guild_str, limit, None).await {
             Ok(list) => list,
             Err(e) => {
@@ -218,11 +197,10 @@ async fn handle_all(
     }
 
     let total = leaderboard.len();
-    let mut total_added = 0usize;
-    let mut total_removed = 0usize;
-    let mut total_errors = 0usize;
+    let mut renamed = 0usize;
+    let mut already_ok = 0usize;
     let mut skipped = 0usize;
-    let mut affected_users = 0usize;
+    let mut errors = 0usize;
 
     for entry in leaderboard.into_iter() {
         let user_id = match entry.user_id.parse::<u64>() {
@@ -232,41 +210,25 @@ async fn handle_all(
                 continue;
             }
         };
-
-        let report = sync_member_roles(
-            ctx,
-            guild_id,
-            user_id,
-            entry.level_text,
-            entry.level_voice,
-            entry.level,
-        )
-        .await;
-
-        if report.skipped {
-            skipped += 1;
-        } else if !report.added_roles.is_empty() || !report.removed_roles.is_empty() {
-            affected_users += 1;
+        match apply_level_prefix(ctx, guild_id, user_id, entry.level).await {
+            ResyncOutcome::Renamed => renamed += 1,
+            ResyncOutcome::AlreadyOk => already_ok += 1,
+            ResyncOutcome::Skipped => skipped += 1,
+            ResyncOutcome::Error(_) => errors += 1,
         }
-        total_added += report.added_roles.len();
-        total_removed += report.removed_roles.len();
-        total_errors += report.errors.len();
-
         sleep(Duration::from_millis(RESYNC_ALL_INTERVAL_MS)).await;
     }
 
     let embed = CreateEmbed::new()
-        .title("\u{1f504} Resync de progression — termine")
+        .title("\u{1f504} Resync des pseudos — termine")
         .description(format!(
-            "**{}** joueurs traites (top XP global).\n\n\
-             - \u{2795} Roles attribues : **{}**\n\
-             - \u{2796} Roles retires : **{}**\n\
-             - \u{1f465} Membres modifies : **{}**\n\
-             - \u{23ed}\u{fe0f} Skipped (parti du serveur, API HS, etc.) : **{}**\n\
-             - \u{26a0}\u{fe0f} Erreurs Discord (perms / rate limit) : **{}**",
-            total, total_added, total_removed, affected_users, skipped, total_errors
+            "**{total}** joueurs traites (top XP global).\n\n\
+             - \u{270f}\u{fe0f} Renommes : **{renamed}**\n\
+             - \u{2705} Deja a jour : **{already_ok}**\n\
+             - \u{23ed}\u{fe0f} Skipped (owner, parti, etc.) : **{skipped}**\n\
+             - \u{26a0}\u{fe0f} Erreurs Discord : **{errors}**"
         ))
-        .color(if total_errors > 0 { 0xF1C40F } else { 0x57F287 });
+        .color(if errors > 0 { 0xF1C40F } else { 0x57F287 });
 
     if let Err(e) = command
         .create_followup(
@@ -279,70 +241,35 @@ async fn handle_all(
     }
 }
 
-/// Recupere les 3 niveaux (text, voice, global) du joueur via l API.
-async fn fetch_levels(
-    ctx: &Context,
-    guild_id: &str,
-    user_id: &str,
-) -> Result<(i32, i32, i32), String> {
+/// Recupere le niveau global du joueur via l'API.
+async fn fetch_level(ctx: &Context, guild_id: &str, user_id: &str) -> Result<i32, String> {
     let data = ctx.data.read().await;
     let api = data.get::<StatsApiKey>().ok_or_else(|| "API indisponible".to_string())?;
     match api.get_user_level(guild_id, user_id).await {
-        Ok(Some(u)) => Ok((u.level_text, u.level_voice, u.level)),
+        Ok(Some(u)) => Ok(u.level),
         Ok(None) => Err("Ce membre n'a pas encore d'XP.".to_string()),
         Err(e) => Err(format!("Erreur API : {e}")),
     }
 }
 
-fn build_single_embed(
-    user_id: UserId,
-    report: &RoleSyncReport,
-    levels: (i32, i32, i32),
-) -> CreateEmbed {
-    let (lt, lv, lg) = levels;
-    let added_line = if report.added_roles.is_empty() {
-        "_aucun_".to_string()
-    } else {
-        report.added_roles.iter().map(|id| format!("<@&{id}>")).collect::<Vec<_>>().join(", ")
-    };
-    let removed_line = if report.removed_roles.is_empty() {
-        "_aucun_".to_string()
-    } else {
-        report.removed_roles.iter().map(|id| format!("<@&{id}>")).collect::<Vec<_>>().join(", ")
-    };
-    let errors_line = if report.errors.is_empty() {
-        "_aucune_".to_string()
-    } else {
-        report.errors.join("\n")
-    };
-
-    let color = if !report.errors.is_empty() {
-        0xE74C3C
-    } else if report.skipped {
-        0x95A5A6
-    } else if !report.added_roles.is_empty() || !report.removed_roles.is_empty() {
-        0x3498DB
-    } else {
-        0x57F287
-    };
-
-    let status = if report.skipped {
-        "\u{23ed}\u{fe0f} Skipped (member ou API indisponible)"
-    } else if !report.added_roles.is_empty() || !report.removed_roles.is_empty() {
-        "\u{2705} Roles re-synchronises"
-    } else {
-        "\u{2705} Deja a jour"
+fn build_single_embed(user_id: UserId, level: i32, outcome: &ResyncOutcome) -> CreateEmbed {
+    let (status, color) = match outcome {
+        ResyncOutcome::Renamed => ("\u{270f}\u{fe0f} Pseudo mis a jour", 0x3498DB),
+        ResyncOutcome::AlreadyOk => ("\u{2705} Deja a jour", 0x57F287),
+        ResyncOutcome::Skipped => ("\u{23ed}\u{fe0f} Skipped (owner / member introuvable)", 0x95A5A6),
+        ResyncOutcome::Error(msg) => {
+            return CreateEmbed::new()
+                .title("\u{1f504} Resync pseudo")
+                .description(format!(
+                    "<@{user_id}> — niveau **{level}**\n\n\u{26a0}\u{fe0f} Erreur Discord : {msg}"
+                ))
+                .color(0xE74C3C);
+        }
     };
 
     CreateEmbed::new()
-        .title("\u{1f504} Resync de progression")
-        .description(format!(
-            "<@{}> — niv. texte **{}** | vocal **{}** | global **{}**\n\n{}",
-            user_id, lt, lv, lg, status
-        ))
-        .field("\u{2795} Ajoutes", added_line, false)
-        .field("\u{2796} Retires", removed_line, false)
-        .field("\u{26a0}\u{fe0f} Erreurs", errors_line, false)
+        .title("\u{1f504} Resync pseudo")
+        .description(format!("<@{user_id}> — niveau **{level}**\n\n{status}"))
         .color(color)
 }
 

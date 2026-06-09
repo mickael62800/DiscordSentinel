@@ -14,7 +14,7 @@
 //!
 //! ## Comportement si l'API tombe
 //!
-//! - **Reads** (`get_user_level`, `get_leaderboard`, `get_rewards`) : retournent
+//! - **Reads** (`get_user_level`, `get_leaderboard`) : retournent
 //!   `Err(GrpcCallError::Unavailable)` apres N echecs consecutifs, le circuit
 //!   breaker s'ouvre pendant `cooldown` puis tente une requete (half-open).
 //!   Les commandes slash doivent traduire ca en message « API indisponible,

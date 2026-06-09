@@ -1,6 +1,5 @@
 use super::*;
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use chrono::Utc;
@@ -77,7 +76,6 @@ fn user_level(xp: i64, xp_text: i64, xp_voice: i64) -> UserLevel {
 
 #[test]
 fn user_level_dto_computes_xp_progress_for_each_source() {
-    // xp_progress(200) = (200-155, 220) = (45, 220) selon level.rs test
     let dto: UserLevelDto = user_level(200, 200, 200).into();
     assert_eq!(dto.xp_current, 45);
     assert_eq!(dto.xp_needed, 220);
@@ -89,29 +87,13 @@ fn user_level_dto_computes_xp_progress_for_each_source() {
 fn user_level_dto_zero_xp_returns_zero_progress() {
     let dto: UserLevelDto = user_level(0, 0, 0).into();
     assert_eq!(dto.xp_current, 0);
-    // xp_needed pour niveau 0+1 = 155 (voir tests level.rs)
     assert_eq!(dto.xp_needed, 155);
 }
 
 #[test]
 fn user_level_dto_independent_sources() {
     let dto: UserLevelDto = user_level(1000, 500, 500).into();
-    // Les sources text/voice sont calculees independamment.
     assert_ne!(dto.xp_current, dto.xp_text_current);
-}
-
-#[test]
-fn level_reward_dto_source_as_str() {
-    let r = LevelReward {
-        id: Uuid::new_v4(),
-        guild_id: "g".into(),
-        level: 5,
-        role_id: "role".into(),
-        source: XpSource::Voice,
-    };
-    let dto: LevelRewardDto = r.into();
-    assert_eq!(dto.source, "voice");
-    assert_eq!(dto.level, 5);
 }
 
 use crate::ports::inbound::community::manage_levels::AddXpResult;
@@ -165,15 +147,6 @@ fn add_xp_dto_with_voice_source() {
 }
 
 #[test]
-fn set_reward_dto_defaults_source_to_text() {
-    let dto: SetRewardDto = serde_json::from_value(serde_json::json!({
-        "guild_id": "g", "level": 10, "role_id": "role-1"
-    })).unwrap();
-    assert_eq!(dto.source, "text");
-    assert_eq!(dto.level, 10);
-}
-
-#[test]
 fn level_leaderboard_params_all_optional() {
     let p: LevelLeaderboardParams = serde_json::from_str("{}").unwrap();
     assert!(p.limit.is_none());
@@ -190,26 +163,6 @@ fn level_leaderboard_params_with_source() {
 }
 
 #[test]
-fn level_reward_text_source_maps_correctly() {
-    let r = LevelReward {
-        id: Uuid::new_v4(), guild_id: "g".into(),
-        level: 5, role_id: "r".into(), source: XpSource::Text,
-    };
-    let dto: LevelRewardDto = r.into();
-    assert_eq!(dto.source, "text");
-}
-
-#[test]
-fn level_reward_days_source_maps_correctly() {
-    let r = LevelReward {
-        id: Uuid::new_v4(), guild_id: "g".into(),
-        level: 5, role_id: "r".into(), source: XpSource::Days,
-    };
-    let dto: LevelRewardDto = r.into();
-    assert_eq!(dto.source, "days");
-}
-
-#[test]
 fn add_xp_response_dto_from_result_with_level_up() {
     let now = Utc::now();
     let result = AddXpResult {
@@ -223,19 +176,18 @@ fn add_xp_response_dto_from_result_with_level_up() {
         },
         leveled_up: true,
         old_level: 2,
-        reward_role_id: Some("role-level-3".into()),
+        old_level_global: 2,
         source: XpSource::Text,
     };
     let dto: AddXpResponseDto = result.into();
     assert!(dto.leveled_up);
     assert_eq!(dto.old_level, 2);
-    assert_eq!(dto.reward_role_id.as_deref(), Some("role-level-3"));
     assert_eq!(dto.source, "text");
     assert_eq!(dto.user.xp, 500);
 }
 
 #[test]
-fn add_xp_response_dto_no_level_up_no_reward() {
+fn add_xp_response_dto_no_level_up() {
     let now = Utc::now();
     let result = AddXpResult {
         user_level: UserLevel {
@@ -247,11 +199,10 @@ fn add_xp_response_dto_no_level_up_no_reward() {
         },
         leveled_up: false,
         old_level: 0,
-        reward_role_id: None,
+        old_level_global: 0,
         source: XpSource::Voice,
     };
     let dto: AddXpResponseDto = result.into();
     assert!(!dto.leveled_up);
-    assert!(dto.reward_role_id.is_none());
     assert_eq!(dto.source, "voice");
 }

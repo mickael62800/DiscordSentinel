@@ -1,5 +1,4 @@
 use super::*;
-use crate::domain::entities::community::level::LevelReward;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
@@ -26,7 +25,6 @@ impl LevelRepository for MockRepo {
         let (xp_text, xp_voice) = match source {
             XpSource::Text => (amount, 0),
             XpSource::Voice => (0, amount),
-            XpSource::Days => (0, 0),
         };
         Ok(UserLevel {
             id: uuid::Uuid::new_v4(),
@@ -53,10 +51,6 @@ impl LevelRepository for MockRepo {
     }
     async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserLevel>, DomainError> { Ok(vec![]) }
     async fn get_leaderboard_by_source(&self, _: &str, _: XpSource, _: i64) -> Result<Vec<UserLevel>, DomainError> { Ok(vec![]) }
-    async fn get_rewards(&self, _: &str) -> Result<Vec<LevelReward>, DomainError> { Ok(vec![]) }
-    async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { Ok(vec![]) }
-    async fn upsert_reward(&self, _: &LevelReward) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { Ok(()) }
     async fn refresh_leaderboard_view(&self) -> Result<(), DomainError> { Ok(()) }
 }
 
@@ -156,14 +150,8 @@ async fn add_xp_boundary_10000_accepted() {
     }).await.is_ok());
 }
 
-// ══════════════════════════════════════════════════════════
-// get_config / get_user_level : NotFound
-// ══════════════════════════════════════════════════════════
-
 #[tokio::test]
 async fn get_config_returns_defaults_when_repo_empty() {
-    // Comportement : pas de 404 sur une guild jamais sauve, on retourne
-    // les valeurs par defaut pour eviter de polluer la console frontend.
     let svc = make_svc();
     let cfg = svc.get_config("ghost").await.unwrap();
     assert_eq!(cfg.xp_per_message, 15);
@@ -193,10 +181,6 @@ async fn get_user_level_found_after_add_xp() {
     assert_eq!(ul.xp_text, 50);
 }
 
-// ══════════════════════════════════════════════════════════
-// Delegates : leaderboard, rewards
-// ══════════════════════════════════════════════════════════
-
 #[tokio::test]
 async fn get_leaderboard_passes_through_repo() {
     let svc = make_svc();
@@ -210,44 +194,6 @@ async fn get_leaderboard_by_source_voice() {
     let res = svc.get_leaderboard_by_source("g", XpSource::Voice, 5).await.unwrap();
     assert!(res.is_empty());
 }
-
-#[tokio::test]
-async fn get_rewards_passes_through() {
-    let svc = make_svc();
-    assert!(svc.get_rewards("g").await.unwrap().is_empty());
-}
-
-#[tokio::test]
-async fn get_rewards_by_source_passes_through() {
-    let svc = make_svc();
-    assert!(svc.get_rewards_by_source("g", XpSource::Text).await.unwrap().is_empty());
-}
-
-// ══════════════════════════════════════════════════════════
-// set_reward / delete_reward
-// ══════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn set_reward_returns_constructed_reward() {
-    let svc = make_svc();
-    let r = svc.set_reward("g1", 10, "role-42", XpSource::Text).await.unwrap();
-    assert_eq!(r.guild_id, "g1");
-    assert_eq!(r.level, 10);
-    assert_eq!(r.role_id, "role-42");
-    assert_eq!(r.source, XpSource::Text);
-    // UUID fresh généré
-    assert_ne!(r.id, uuid::Uuid::nil());
-}
-
-#[tokio::test]
-async fn delete_reward_passes_through() {
-    let svc = make_svc();
-    assert!(svc.delete_reward("g", 5, XpSource::Voice).await.is_ok());
-}
-
-// ══════════════════════════════════════════════════════════
-// add_xp avec level-up : source mapping
-// ══════════════════════════════════════════════════════════
 
 #[tokio::test]
 async fn add_xp_text_source_updates_only_xp_text() {
@@ -271,20 +217,4 @@ async fn add_xp_voice_source_updates_only_xp_voice() {
     assert_eq!(res.user_level.xp_text, 0);
     assert_eq!(res.user_level.xp_voice, 300);
     assert_eq!(res.source, XpSource::Voice);
-}
-
-#[tokio::test]
-async fn add_xp_days_source_leaves_both_zero() {
-    // Days n'a pas de colonne dédiée → xp_text et xp_voice restent 0.
-    // Source None pour leveled_up (return (0, 0) case).
-    let svc = make_svc();
-    let res = svc.add_xp(AddXpCommand {
-        guild_id: "g".into(), user_id: "u".into(), username: "u".into(),
-        amount: 500, source: XpSource::Days,
-    }).await.unwrap();
-    assert_eq!(res.user_level.xp_text, 0);
-    assert_eq!(res.user_level.xp_voice, 0);
-    assert_eq!(res.user_level.xp, 500); // xp global mis a jour
-    assert!(!res.leveled_up);
-    assert_eq!(res.old_level, 0);
 }

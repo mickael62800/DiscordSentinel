@@ -17,7 +17,6 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
@@ -25,24 +24,20 @@ use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand;
+use sentinel_api::ports::inbound::community::manage_levels::ResetTarget;
 use test_helpers::build_test_state_levels;
-
-// ══════════════════════════════════════════════════════════
-// Mock
-// ══════════════════════════════════════════════════════════
 
 #[derive(Default)]
 struct MockLevelsUC {
     config: Mutex<Option<LevelConfig>>,
     users: Mutex<Vec<UserLevel>>,
-    rewards: Mutex<Vec<LevelReward>>,
     last_source: Mutex<Option<XpSource>>,
 }
 
 impl MockLevelsUC {
     fn new() -> Self { Self::default() }
     fn with_user(self, u: UserLevel) -> Self { self.users.lock().unwrap().push(u); self }
-    fn with_reward(self, r: LevelReward) -> Self { self.rewards.lock().unwrap().push(r); self }
 }
 
 fn default_config(guild_id: &str) -> LevelConfig {
@@ -108,7 +103,7 @@ impl ManageLevelsUseCase for MockLevelsUC {
             user_level,
             leveled_up: cmd.amount >= 100,
             old_level: 0,
-            reward_role_id: None,
+            old_level_global: 0,
             source: cmd.source,
         })
     }
@@ -128,29 +123,8 @@ impl ManageLevelsUseCase for MockLevelsUC {
         *self.last_source.lock().unwrap() = Some(source);
         self.get_leaderboard(guild_id, limit).await
     }
-    async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError> {
-        Ok(self.rewards.lock().unwrap().iter().filter(|r| r.guild_id == guild_id).cloned().collect())
-    }
-    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError> {
-        Ok(self.rewards.lock().unwrap().iter()
-            .filter(|r| r.guild_id == guild_id && r.source == source)
-            .cloned().collect())
-    }
-    async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError> {
-        let reward = LevelReward {
-            id: Uuid::new_v4(),
-            guild_id: guild_id.into(),
-            level,
-            role_id: role_id.into(),
-            source,
-        };
-        self.rewards.lock().unwrap().push(reward.clone());
-        Ok(reward)
-    }
-    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError> {
-        self.rewards.lock().unwrap().retain(|r| !(r.guild_id == guild_id && r.level == level && r.source == source));
-        Ok(())
-    }
+    async fn set_user_xp(&self, _: SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
+    async fn reset_user_xp(&self, _: &str, _: &str, _: ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
 }
 
 fn build_app(uc: Arc<MockLevelsUC>) -> axum::Router {
@@ -174,18 +148,6 @@ async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (St
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
 }
-
-async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
-    let resp = app.oneshot(req).await.unwrap();
-    let status = resp.status();
-    let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
-}
-
-// ══════════════════════════════════════════════════════════
-// Config
-// ══════════════════════════════════════════════════════════
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_config_default() {
@@ -224,10 +186,6 @@ async fn save_config_custom_values() {
     assert_eq!(json["excluded_channels"].as_array().unwrap().len(), 2);
 }
 
-// ══════════════════════════════════════════════════════════
-// XP / user_level
-// ══════════════════════════════════════════════════════════
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_xp_returns_user_and_leveled_up_flag() {
     let app = build_app(Arc::new(MockLevelsUC::new()));
@@ -264,10 +222,6 @@ async fn get_user_level_returns_stored() {
     assert_eq!(json["xp"], 500);
     assert_eq!(json["user_id"], "u1");
 }
-
-// ══════════════════════════════════════════════════════════
-// Leaderboard
-// ══════════════════════════════════════════════════════════
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn leaderboard_sorted_desc_by_xp() {
@@ -309,59 +263,4 @@ async fn leaderboard_source_none_calls_total_path() {
     let (status, _) = get(app, "/api/levels/111111111111111111/leaderboard").await;
     assert_eq!(status, StatusCode::OK);
     assert!(uc.last_source.lock().unwrap().is_none());
-}
-
-// ══════════════════════════════════════════════════════════
-// Rewards
-// ══════════════════════════════════════════════════════════
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn get_rewards_empty() {
-    let app = build_app(Arc::new(MockLevelsUC::new()));
-    let (status, json) = get(app, "/api/levels/rewards/111111111111111111").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json.as_array().unwrap().len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn set_reward_success() {
-    let app = build_app(Arc::new(MockLevelsUC::new()));
-    let body = serde_json::json!({
-        "guild_id": "111111111111111111", "level": 5, "role_id": "r1", "source": "text"
-    });
-    let (status, json) = post_json(app, "/api/levels/rewards", body).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["level"], 5);
-    assert_eq!(json["role_id"], "r1");
-    assert_eq!(json["source"], "text");
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_reward_success() {
-    let uc = Arc::new(MockLevelsUC::new().with_reward(LevelReward {
-        id: Uuid::new_v4(),
-        guild_id: "111111111111111111".into(),
-        level: 10,
-        role_id: "r1".into(),
-        source: XpSource::Text,
-    }));
-    let app = build_app(uc.clone());
-    let (status, _) = delete(app, "/api/levels/rewards/111111111111111111/10?source=text").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(uc.rewards.lock().unwrap().len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_reward_defaults_source_to_text() {
-    let uc = Arc::new(MockLevelsUC::new().with_reward(LevelReward {
-        id: Uuid::new_v4(),
-        guild_id: "111111111111111111".into(),
-        level: 10,
-        role_id: "r1".into(),
-        source: XpSource::Text,
-    }));
-    let app = build_app(uc.clone());
-    let (status, _) = delete(app, "/api/levels/rewards/111111111111111111/10").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(uc.rewards.lock().unwrap().len(), 0);
 }

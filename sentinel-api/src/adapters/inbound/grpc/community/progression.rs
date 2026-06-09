@@ -14,7 +14,6 @@ use sentinel_proto::progression::v1::progression_service_server::ProgressionServ
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_core::domain::entities::community::level::xp_progress;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
@@ -49,8 +48,6 @@ impl ProgressionService for ProgressionGrpc {
             .await
             .map_err(domain_to_status)?;
 
-        // Meme broadcast WS que l'endpoint HTTP — les clients dashboard
-        // continuent de recevoir les events live sans changement.
         self.broadcaster.broadcast(
             "xp_gained",
             serde_json::json!({
@@ -99,21 +96,6 @@ impl ProgressionService for ProgressionGrpc {
             users: users.into_iter().map(user_level_to_proto).collect(),
         }))
     }
-
-    async fn get_rewards(
-        &self,
-        request: Request<proto::GetRewardsRequest>,
-    ) -> Result<Response<proto::RewardList>, Status> {
-        let req = request.into_inner();
-        let rewards = self
-            .levels_uc
-            .get_rewards(&req.guild_id)
-            .await
-            .map_err(domain_to_status)?;
-        Ok(Response::new(proto::RewardList {
-            rewards: rewards.into_iter().map(level_reward_to_proto).collect(),
-        }))
-    }
 }
 
 // ── Conversions domain <-> proto ──
@@ -121,7 +103,7 @@ impl ProgressionService for ProgressionGrpc {
 fn xp_source_from_proto(value: i32) -> XpSource {
     match proto_common::XpSource::try_from(value).unwrap_or(proto_common::XpSource::Unspecified) {
         proto_common::XpSource::Voice => XpSource::Voice,
-        // UNSPECIFIED ou TEXT -> Text (default cohérent avec l'API HTTP).
+        // UNSPECIFIED ou TEXT -> Text (default coherent avec l'API HTTP).
         _ => XpSource::Text,
     }
 }
@@ -138,8 +120,6 @@ fn xp_source_to_proto(source: XpSource) -> i32 {
     match source {
         XpSource::Text => proto_common::XpSource::Text as i32,
         XpSource::Voice => proto_common::XpSource::Voice as i32,
-        // Days n'est pas exposé en proto v1 — fallback Text pour rester compatible.
-        XpSource::Days => proto_common::XpSource::Text as i32,
     }
 }
 
@@ -168,22 +148,12 @@ fn user_level_to_proto(u: UserLevel) -> proto::UserLevel {
     }
 }
 
-fn level_reward_to_proto(r: LevelReward) -> proto::LevelReward {
-    proto::LevelReward {
-        id: r.id.to_string(),
-        guild_id: r.guild_id.into(),
-        level: r.level,
-        role_id: r.role_id.into(),
-        source: xp_source_to_proto(r.source),
-    }
-}
-
 fn add_xp_result_to_proto(r: AddXpResult) -> proto::AddXpResponse {
     proto::AddXpResponse {
         user: Some(user_level_to_proto(r.user_level)),
         leveled_up: r.leveled_up,
         old_level: r.old_level,
-        reward_role_id: r.reward_role_id,
+        old_level_global: r.old_level_global,
         source: xp_source_to_proto(r.source),
     }
 }

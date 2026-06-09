@@ -6,7 +6,6 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
 use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::level::LevelReward;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_api::ports::outbound::community::level_repository::LevelRepository;
@@ -141,41 +140,3 @@ async fn leaderboard_by_source_text_uses_xp_text_column() {
     assert_eq!(by_text[0].xp_text, 300);
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn rewards_upsert_get_and_delete() {
-    let repo = PgLevelRepository::new(pool().await);
-    let g = fresh_id();
-    let reward = LevelReward {
-        id: Uuid::new_v4(), guild_id: g.clone().into(),
-        level: 5, role_id: "role1".into(), source: XpSource::Text,
-    };
-    repo.upsert_reward(&reward).await.unwrap();
-    let got = repo.get_rewards(&g).await.unwrap();
-    assert_eq!(got.len(), 1);
-    assert_eq!(got[0].level, 5);
-
-    let filtered = repo.get_rewards_by_source(&g, XpSource::Text).await.unwrap();
-    assert_eq!(filtered.len(), 1);
-    let voice_filtered = repo.get_rewards_by_source(&g, XpSource::Voice).await.unwrap();
-    assert_eq!(voice_filtered.len(), 0);
-
-    repo.delete_reward(&g, 5, XpSource::Text).await.unwrap();
-    assert_eq!(repo.get_rewards(&g).await.unwrap().len(), 0);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn rewards_upsert_updates_existing_level_role() {
-    let repo = PgLevelRepository::new(pool().await);
-    let g = fresh_id();
-    let id = Uuid::new_v4();
-    repo.upsert_reward(&LevelReward {
-        id, guild_id: g.clone().into(), level: 10, role_id: "oldRole".into(), source: XpSource::Voice,
-    }).await.unwrap();
-    repo.upsert_reward(&LevelReward {
-        id, guild_id: g.clone().into(), level: 10, role_id: "newRole".into(), source: XpSource::Voice,
-    }).await.unwrap();
-    let got = repo.get_rewards(&g).await.unwrap();
-    // Upsert sur (guild, level, source) : une seule entry reste.
-    assert_eq!(got.len(), 1);
-    assert_eq!(got[0].role_id, "newRole");
-}

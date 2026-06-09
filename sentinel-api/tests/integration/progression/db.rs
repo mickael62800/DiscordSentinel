@@ -1,5 +1,5 @@
 //! Tests d'integration REELS pour progression-bot (avec PostgreSQL).
-//! Couvre : user_levels, level_rewards, user_stats, streaks.
+//! Couvre : user_levels, user_stats, streaks.
 
 use sqlx::PgPool;
 
@@ -107,41 +107,6 @@ async fn streak_persisted_in_user_levels() {
     assert_eq!(row.1, 15);
     assert_eq!(row.2, 100);
     assert_eq!(row.3, 2025);
-}
-
-// ══════════════════════════════════════════════════════════
-//  Level rewards
-// ══════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn level_reward_create() {
-    let p = pool().await;
-    let gid = ugid();
-    sqlx::query("INSERT INTO level_rewards (guild_id, level, role_id, source) VALUES ($1, 5, '111', 'text')")
-        .bind(&gid).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO level_rewards (guild_id, level, role_id, source) VALUES ($1, 10, '222', 'voice')")
-        .bind(&gid).execute(&p).await.unwrap();
-
-    let rewards = sqlx::query_as::<_, (i32, String, String)>(
-        "SELECT level, role_id, source FROM level_rewards WHERE guild_id = $1 ORDER BY level",
-    ).bind(&gid).fetch_all(&p).await.unwrap();
-
-    assert_eq!(rewards.len(), 2);
-    assert_eq!(rewards[0].0, 5);
-    assert_eq!(rewards[0].2, "text");
-    assert_eq!(rewards[1].0, 10);
-    assert_eq!(rewards[1].2, "voice");
-}
-
-#[tokio::test]
-async fn level_reward_unique_per_level_source() {
-    let p = pool().await;
-    let gid = ugid();
-    sqlx::query("INSERT INTO level_rewards (guild_id, level, role_id, source) VALUES ($1, 5, '111', 'text')")
-        .bind(&gid).execute(&p).await.unwrap();
-    let dup = sqlx::query("INSERT INTO level_rewards (guild_id, level, role_id, source) VALUES ($1, 5, '222', 'text')")
-        .bind(&gid).execute(&p).await;
-    assert!(dup.is_err(), "Duplicate guild+level+source doit etre rejete");
 }
 
 // ══════════════════════════════════════════════════════════
