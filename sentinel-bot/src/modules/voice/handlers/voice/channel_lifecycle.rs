@@ -259,7 +259,7 @@ pub(super) async fn create_temp_channel(
             .unwrap_or_else(|_| user_id.to_string());
         format!("{} (`{}`)", name, user_id)
     };
-    embeds::create_session_card(ctx, voice_channel_id, &creator_label, kind).await;
+    embeds::create_session_card(ctx, guild_id, voice_channel_id, &creator_label, kind).await;
 }
 
 /// Detecte si un salon temporaire est maintenant vide et, le cas echeant,

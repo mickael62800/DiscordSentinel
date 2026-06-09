@@ -1,8 +1,9 @@
-use serenity::model::id::ChannelId;
+use serenity::model::id::{ChannelId, GuildId};
 use serenity::prelude::*;
 
 use super::{ConfigKey, SessionCardKey};
 use super::session_card::SessionCard;
+use crate::shared::heartbeat::ApiClientKey;
 
 /// Si le clone a obtenu un log_message_id (renvoi initial), le reecrit dans le DashMap.
 async fn sync_message_id(ctx: &Context, voice_channel_id: ChannelId, card: &SessionCard) {
@@ -23,19 +24,40 @@ fn get_log_channel(data: &tokio::sync::RwLockReadGuard<'_, TypeMap>) -> Option<C
         .and_then(|config| config.log_channel_id)
 }
 
+/// Resout le salon de logs vocaux : priorite a la config guild
+/// (`log_channel_id` dans bot_guild_config, configurable depuis la page
+/// Composants), fallback sur la variable d'env VOICE_LOG_CHANNEL_ID.
+async fn resolve_log_channel(ctx: &Context, guild_id: GuildId) -> Option<ChannelId> {
+    let data = ctx.data.read().await;
+    if let Some(api) = data.get::<ApiClientKey>() {
+        if let Ok(cfg) = api
+            .get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME)
+            .await
+        {
+            if let Some(id) = cfg
+                .get("log_channel_id")
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|id| *id > 0)
+            {
+                return Some(ChannelId::new(id));
+            }
+        }
+    }
+    // Fallback env (retro-compat).
+    get_log_channel(&data)
+}
+
 /// Cree et envoie une nouvelle carte de session dans le salon de logs.
 pub async fn create_session_card(
     ctx: &Context,
+    guild_id: GuildId,
     voice_channel_id: ChannelId,
     creator_name: &str,
     channel_type: &str,
 ) {
-    let log_channel = {
-        let data = ctx.data.read().await;
-        match get_log_channel(&data) {
-            Some(ch) => ch,
-            None => return,
-        }
+    let log_channel = match resolve_log_channel(ctx, guild_id).await {
+        Some(ch) => ch,
+        None => return,
     };
 
     let mut card = SessionCard::new(
