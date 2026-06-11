@@ -55,6 +55,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
             .description("Poste une confession anonyme dans le canal configure"),
         CreateCommand::new("confess-admin")
             .description("Administration des confessions (admin only)")
+            .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
             .add_option(
                 CreateCommandOption::new(CommandOptionType::SubCommand, "deploy-panel",
                     "Poste le bouton 'Poster une confession' dans ce canal")
@@ -90,6 +91,15 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if name != "confess-admin" {
         return;
     }
+    // SECURITE : default_member_permissions n'est qu'un hint UI (override par
+    // les params de guild ou une interaction forgee). On revalide MANAGE_GUILD
+    // explicitement, sinon n'importe qui pourrait /confess-admin reveal et
+    // de-anonymiser une confession (cf. revue securite).
+    if !confess_admin_allowed(command) {
+        reply_ephemeral(ctx, command, "Permission MANAGE_GUILD requise pour /confess-admin.").await;
+        warn!(user = %command.user.name, user_id = %command.user.id, "Tentative /confess-admin sans permission");
+        return;
+    }
     // Sub-command
     let sub = command.data.options.first();
     let sub_name = sub.map(|o| o.name.as_str()).unwrap_or("");
@@ -99,6 +109,20 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "reveal" => admin_reveal(ctx, command).await,
         _ => reply_ephemeral(ctx, command, "Sous-commande inconnue").await,
     }
+}
+
+/// Revalide la permission serveur pour /confess-admin (le flag
+/// default_member_permissions est juste un hint UI Discord).
+fn confess_admin_allowed(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MANAGE_GUILD)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false)
 }
 
 async fn open_submit_modal(ctx: &Context, command: &CommandInteraction) {

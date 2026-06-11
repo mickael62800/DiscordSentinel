@@ -224,7 +224,7 @@ impl BlackjackService {
             .await?;
         taunt_events.extend(debit_mut.triggered_taunts);
 
-        game.bet *= 2;
+        game.bet = game.bet.saturating_mul(2);
         game.doubled = true;
 
         // Tirer exactement une carte
@@ -319,10 +319,10 @@ impl BlackjackService {
 
         if game.dealer_score > 21 {
             game.status = "dealer_bust".to_string();
-            game.payout = game.bet * 2;
+            game.payout = game.bet.saturating_mul(2);
         } else if game.player_score > game.dealer_score {
             game.status = "player_win".to_string();
-            game.payout = game.bet * 2;
+            game.payout = game.bet.saturating_mul(2);
         } else if game.player_score < game.dealer_score {
             game.status = "dealer_win".to_string();
             game.payout = 0;

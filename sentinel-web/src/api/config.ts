@@ -27,12 +27,25 @@ export function setDiscordUser(u: DiscordUser | null) {
 }
 
 interface BotTokens { [name: string]: string }
+// SECURITE : les tokens de bots sont des secrets. On les garde en
+// sessionStorage (et non localStorage) pour limiter l'exfiltration en cas de
+// XSS persistant (purge a la fermeture du tab). Migration douce : on rapatrie
+// l'ancienne valeur localStorage une fois, puis on la supprime.
+function migrateBotTokensFromLocalStorage(): void {
+  const legacy = localStorage.getItem(K_BOT_TOKENS);
+  if (legacy && !sessionStorage.getItem(K_BOT_TOKENS)) {
+    sessionStorage.setItem(K_BOT_TOKENS, legacy);
+  }
+  if (legacy) localStorage.removeItem(K_BOT_TOKENS);
+}
 function readBotTokens(): BotTokens {
-  const raw = localStorage.getItem(K_BOT_TOKENS);
+  migrateBotTokensFromLocalStorage();
+  const raw = sessionStorage.getItem(K_BOT_TOKENS);
   return raw ? JSON.parse(raw) : {};
 }
 function writeBotTokens(t: BotTokens) {
-  localStorage.setItem(K_BOT_TOKENS, JSON.stringify(t));
+  sessionStorage.setItem(K_BOT_TOKENS, JSON.stringify(t));
+  localStorage.removeItem(K_BOT_TOKENS);
 }
 export function saveBotToken(name: string, token: string) {
   const t = readBotTokens();

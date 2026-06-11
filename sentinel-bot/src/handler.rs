@@ -417,7 +417,14 @@ impl EventHandler for Handler {
                 let user_name = command.user.name.clone();
                 let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
+                // ANONYMAT : /confess ne doit JAMAIS lier l'auteur au module
+                // confessions dans les logs (cf. revue securite). On coupe toute
+                // telemetrie pour cette commande. (confess-admin reste loggue
+                // pour la tracabilite des actions de moderation.)
+                let log_telemetry = name != "confess";
+
                 if let Some(ref api) = api {
+                  if log_telemetry {
                     api.send_bot_log_with_details(
                         "info",
                         &format!("Commande invoquée : {full_cmd} (par @{user_name})"),
@@ -430,6 +437,7 @@ impl EventHandler for Handler {
                             "guild_id": guild_id,
                         }),
                     );
+                  }
                 }
 
                 let start = std::time::Instant::now();
@@ -466,6 +474,7 @@ impl EventHandler for Handler {
                 let elapsed_ms = start.elapsed().as_millis() as u64;
 
                 if let Some(ref api) = api {
+                    if log_telemetry {
                     match dispatch {
                         Ok(()) => api.send_bot_log_with_details(
                             "info",
@@ -494,6 +503,7 @@ impl EventHandler for Handler {
                                 "kind": "panic",
                             }),
                         ),
+                    }
                     }
                 }
             }

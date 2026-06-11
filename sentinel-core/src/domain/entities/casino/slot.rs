@@ -199,7 +199,8 @@ pub fn compute_payout(mise: i64, outcome: &SpinOutcome, current_jackpot_pool: i6
             ((mise as f64) * multiplier).round() as i64
         }
         SpinOutcome::Jackpot { multiplier } => {
-            ((mise as f64) * multiplier).round() as i64 + current_jackpot_pool
+            // saturating_add : evite un wrap i64 si payout + pool depasse i64::MAX.
+            (((mise as f64) * multiplier).round() as i64).saturating_add(current_jackpot_pool)
         }
     }
 }

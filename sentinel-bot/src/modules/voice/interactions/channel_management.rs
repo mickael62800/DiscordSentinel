@@ -245,6 +245,26 @@ async fn handle_limit_modal(ctx: &Context, component: &ComponentInteraction) {
     }
 }
 
+/// SECURITE : re-verifie que l'auteur de la SOUMISSION du modal est bien le
+/// proprietaire du salon. Les custom_id de modal sont statiques donc
+/// forgeables : le check fait par le bouton qui ouvre le modal ne suffit pas,
+/// un non-proprietaire pourrait soumettre un modal forge pour modifier le
+/// salon d'autrui (cf. revue securite).
+async fn modal_submitter_is_owner(
+    ctx: &Context,
+    voice_channel_id: serenity::model::id::ChannelId,
+    user_id: serenity::model::id::UserId,
+) -> bool {
+    let data = ctx.data.read().await;
+    let Some(api) = ApiClient::from_data(&data) else {
+        return false;
+    };
+    matches!(
+        api.get_channel(&voice_channel_id.get().to_string()).await,
+        Ok(Some(ch)) if ch.owner_id == user_id.get().to_string()
+    )
+}
+
 async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
     let text_channel_id = modal.channel_id;
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
@@ -253,6 +273,11 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
         super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
         return;
     };
+
+    if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        return;
+    }
 
     let raw = modal
         .data
@@ -419,6 +444,11 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
         return;
     };
 
+    if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        return;
+    }
+
     let new_name = modal
         .data
         .components
@@ -494,6 +524,11 @@ async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
         super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
         return;
     };
+
+    if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        return;
+    }
 
     let new_status = modal
         .data

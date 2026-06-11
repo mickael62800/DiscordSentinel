@@ -328,7 +328,15 @@ fn build_auth_interceptor(
             return Ok(req);
         };
         match req.metadata().get("authorization") {
-            Some(token) if token == expected.as_ref() => Ok(req),
+            // Comparaison constant-time (comme le chemin HTTP auth.rs) pour
+            // eviter une timing attack sur l'API key via gRPC.
+            Some(token)
+                if bool::from(
+                    subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()),
+                ) =>
+            {
+                Ok(req)
+            }
             _ => Err(Status::unauthenticated("API key invalide ou manquante")),
         }
     }

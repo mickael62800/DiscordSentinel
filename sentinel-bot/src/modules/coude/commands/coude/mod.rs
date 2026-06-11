@@ -583,6 +583,29 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
 
     let config = load_guild_config(ctx, &guild_id).await;
 
+    // SECURITE : la mise vient du custom_id du bouton (forgeable / rejouable).
+    // build_preconfirm_payload valide min/max a la creation, mais ce handler
+    // de confirmation ne re-checkait que `coins < mise` — une mise NEGATIVE
+    // ou hors bornes passait. On re-valide ici (cf. revue securite).
+    if mise < config.min_bet() {
+        edit_component_message(
+            ctx,
+            component,
+            &format!("La mise minimum est de {} coins.", config.min_bet()),
+        )
+        .await;
+        return;
+    }
+    if mise > config.max_bet() {
+        edit_component_message(
+            ctx,
+            component,
+            &format!("La mise maximum est de {} coins.", config.max_bet()),
+        )
+        .await;
+        return;
+    }
+
     let target_id = match target_id_str.parse::<u64>() {
         Ok(v) => UserId::new(v),
         Err(_) => {
