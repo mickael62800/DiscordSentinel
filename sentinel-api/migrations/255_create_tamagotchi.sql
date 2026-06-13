@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS pets (
     -- Etat de sante : healthy | sick | dead.
     status TEXT NOT NULL DEFAULT 'healthy'
         CHECK (status IN ('healthy','sick','dead')),
+    -- Depuis quand la faim est a 0 (pour le delai avant maladie).
+    hunger_zero_since TIMESTAMPTZ,
     -- Depuis quand le compagnon est malade (pour le delai avant mort).
     sick_since TIMESTAMPTZ,
     died_at TIMESTAMPTZ,
