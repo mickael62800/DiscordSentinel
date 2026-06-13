@@ -20,6 +20,8 @@ pub const BUY_PREFIX: &str = "tama_buy:";
 pub const SHOP_OPEN_ID: &str = "tama_shop";
 pub const VISIT_OPEN_ID: &str = "tama_visit";
 pub const VISIT_SELECT_ID: &str = "tama_visit_sel";
+pub const COMBAT_OPEN_ID: &str = "tama_combat";
+pub const COMBAT_SELECT_ID: &str = "tama_combat_sel";
 pub const CLOSE_ID: &str = "tama_close";
 pub const HIST_ID: &str = "tama_hist";
 
@@ -407,6 +409,85 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
     }
 }
 
+pub async fn handle_combat_open(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let menu = CreateSelectMenu::new(COMBAT_SELECT_ID, CreateSelectMenuKind::User { default_users: None })
+        .placeholder("Choisis un adversaire");
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("⚔️ **Combat** — choisis l'adversaire :")
+                    .components(vec![CreateActionRow::SelectMenu(menu)])
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+}
+
+pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let target = match &component.data.kind {
+        serenity::model::application::ComponentInteractionDataKind::UserSelect { values } => values.first().copied(),
+        _ => None,
+    };
+    let target = match target { Some(t) => t, None => return };
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let n = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
+
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "attacker_id": component.user.id.to_string(),
+        "attacker_name": component.user.name,
+        "target_id": target.to_string(),
+        "energy_cost": n("combat_energy_cost", 20) as i32,
+        "cooldown_secs": n("combat_cooldown_secs", 3600),
+        "elo_k": n("combat_elo_k", 32) as i32,
+        "xp_win": n("combat_xp_win", 50),
+        "xp_loss": n("combat_xp_loss", 15),
+        "w_str": n("combat_w_str", 3) as i32,
+        "w_vit": n("combat_w_vit", 2) as i32,
+        "w_agi": n("combat_w_agi", 2) as i32,
+        "random_max": n("combat_random_max", 30) as i32,
+    });
+
+    #[derive(serde::Deserialize)]
+    struct CombatResultDto {
+        attacker_won: bool,
+        attacker_power: i64,
+        defender_power: i64,
+        defender_name: String,
+        attacker_new_elo: i32,
+        attacker_elo_delta: i32,
+    }
+    match api.post_json::<_, CombatResultDto>("/api/tamagotchi/combat", &body).await {
+        Ok(r) => {
+            let issue = if r.attacker_won { "🏆 **Victoire !**" } else { "💀 **Défaite...**" };
+            let sign = if r.attacker_elo_delta >= 0 { "+" } else { "" };
+            reply_ephemeral(
+                ctx,
+                component,
+                &format!(
+                    "{issue} contre **{}**\nPuissance : {} vs {}\nELO : {} ({sign}{})",
+                    r.defender_name, r.attacker_power, r.defender_power, r.attacker_new_elo, r.attacker_elo_delta
+                ),
+            )
+            .await;
+        }
+        Err(e) => {
+            warn!(error = %e, "Echec combat");
+            reply_ephemeral(ctx, component, "Combat impossible (épuisé, cooldown, ou ce joueur n'a pas de compagnon).").await;
+        }
+    }
+}
+
 pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
@@ -486,6 +567,7 @@ fn care_buttons() -> Vec<CreateActionRow> {
         ]),
         CreateActionRow::Buttons(vec![
             CreateButton::new(VISIT_OPEN_ID).label("Visiter").emoji('👋').style(ButtonStyle::Primary),
+            CreateButton::new(COMBAT_OPEN_ID).label("Combat").emoji('⚔').style(ButtonStyle::Danger),
             CreateButton::new(HIST_ID).label("Historique").style(ButtonStyle::Secondary),
             CreateButton::new(CLOSE_ID).label("Fermer salon").style(ButtonStyle::Danger),
         ]),

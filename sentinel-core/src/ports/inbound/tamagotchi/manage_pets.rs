@@ -61,6 +61,35 @@ pub struct VisitResult {
     pub coins_reward: i64,
 }
 
+/// Combat PvP asynchrone entre compagnons.
+#[derive(Debug, Clone)]
+pub struct CombatCommand {
+    pub guild_id: String,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub target_id: String,
+    pub energy_cost: i32,
+    pub cooldown_secs: i64,
+    pub elo_k: i32,
+    pub xp_win: i64,
+    pub xp_loss: i64,
+    pub w_str: i32,
+    pub w_vit: i32,
+    pub w_agi: i32,
+    pub random_max: i32,
+}
+
+/// Resultat d'un combat (pour le message).
+#[derive(Debug, Clone)]
+pub struct CombatResult {
+    pub attacker_won: bool,
+    pub attacker_power: i64,
+    pub defender_power: i64,
+    pub defender_name: String,
+    pub attacker_new_elo: i32,
+    pub attacker_elo_delta: i32,
+}
+
 /// Entrainement d'une stat de combat.
 #[derive(Debug, Clone)]
 pub struct TrainCommand {
@@ -87,6 +116,9 @@ pub trait ManagePetsUseCase: Send + Sync {
     /// Rend visite au compagnon d'un autre joueur (recompense le visite en
     /// XP + coins ; cooldown + limite/jour cote visiteur).
     async fn visit(&self, cmd: VisitCommand) -> Result<VisitResult, DomainError>;
+
+    /// Combat asynchrone contre le compagnon d'un autre joueur (ELO + XP).
+    async fn combat(&self, cmd: CombatCommand) -> Result<CombatResult, DomainError>;
 
     /// Compagnons vivants a faire decroitre (job worker, via l'API).
     async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError>;

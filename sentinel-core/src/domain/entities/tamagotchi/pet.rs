@@ -249,6 +249,26 @@ pub struct PetEvent {
     pub created_at: DateTime<Utc>,
 }
 
+/// Puissance de combat = stats ponderees + bonus aleatoire (`roll`).
+/// `roll` est fourni par l'appelant (testabilite / pas de RNG dans le core).
+pub fn combat_power(str_: i32, vit: i32, agi: i32, w_str: i32, w_vit: i32, w_agi: i32, roll: i32) -> i64 {
+    (str_.max(0) as i64) * w_str.max(0) as i64
+        + (vit.max(0) as i64) * w_vit.max(0) as i64
+        + (agi.max(0) as i64) * w_agi.max(0) as i64
+        + roll.max(0) as i64
+}
+
+/// Mise a jour ELO classique (Elo). Retourne (nouvel_elo_gagnant,
+/// nouvel_elo_perdant). `k` = amplitude (32 par defaut).
+pub fn elo_update(winner_elo: i32, loser_elo: i32, k: i32) -> (i32, i32) {
+    let k = k.max(1) as f64;
+    let expected_w = 1.0 / (1.0 + 10f64.powf((loser_elo - winner_elo) as f64 / 400.0));
+    let expected_l = 1.0 - expected_w;
+    let new_w = winner_elo as f64 + k * (1.0 - expected_w);
+    let new_l = loser_elo as f64 + k * (0.0 - expected_l);
+    (new_w.round() as i32, new_l.round() as i32)
+}
+
 /// Niveau atteint pour un XP cumule donne. Courbe : il faut
 /// `100 * n` XP pour passer du niveau n au niveau n+1 (cumulatif).
 pub fn level_from_xp(xp: i64) -> i32 {

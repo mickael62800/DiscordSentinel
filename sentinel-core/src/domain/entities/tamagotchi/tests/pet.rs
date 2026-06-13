@@ -117,6 +117,28 @@ fn dead_pet_unchanged() {
 }
 
 #[test]
+fn combat_power_weighted() {
+    // str16,vit10,agi4 ; poids 3/2/2 ; roll 5 => 48+20+8+5 = 81
+    assert_eq!(combat_power(16, 10, 4, 3, 2, 2, 5), 81);
+}
+
+#[test]
+fn elo_symmetric_for_equal_ratings() {
+    // ELO egaux -> expected 0.5 -> +k/2 / -k/2.
+    let (w, l) = elo_update(1000, 1000, 32);
+    assert_eq!(w, 1016);
+    assert_eq!(l, 984);
+}
+
+#[test]
+fn elo_underdog_gains_more() {
+    // Un gagnant moins bien classe gagne plus de points.
+    let (w_under, _) = elo_update(900, 1100, 32);
+    let (w_fav, _) = elo_update(1100, 900, 32);
+    assert!(w_under - 900 > w_fav - 1100);
+}
+
+#[test]
 fn level_curve() {
     assert_eq!(level_from_xp(0), 1);
     assert_eq!(level_from_xp(99), 1);

@@ -37,6 +37,8 @@ pub fn handles_component(cid: &str) -> bool {
         || cid == panel::SHOP_OPEN_ID
         || cid == panel::VISIT_OPEN_ID
         || cid == panel::VISIT_SELECT_ID
+        || cid == panel::COMBAT_OPEN_ID
+        || cid == panel::COMBAT_SELECT_ID
         || cid.starts_with(panel::PICK_PREFIX)
         || cid.starts_with(panel::ACT_PREFIX)
         || cid.starts_with(panel::TRAIN_PREFIX)
@@ -64,6 +66,10 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         panel::handle_visit_open(ctx, component).await;
     } else if cid == panel::VISIT_SELECT_ID {
         panel::handle_visit_select(ctx, component).await;
+    } else if cid == panel::COMBAT_OPEN_ID {
+        panel::handle_combat_open(ctx, component).await;
+    } else if cid == panel::COMBAT_SELECT_ID {
+        panel::handle_combat_select(ctx, component).await;
     } else if cid == panel::HIST_ID {
         panel::handle_history(ctx, component).await;
     } else if cid == panel::CLOSE_ID {

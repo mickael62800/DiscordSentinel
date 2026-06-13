@@ -309,6 +309,66 @@ pub async fn visit(
     }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CombatBody {
+    pub guild_id: String,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub target_id: String,
+    #[serde(default)] pub energy_cost: i32,
+    #[serde(default)] pub cooldown_secs: i64,
+    #[serde(default)] pub elo_k: i32,
+    #[serde(default)] pub xp_win: i64,
+    #[serde(default)] pub xp_loss: i64,
+    #[serde(default)] pub w_str: i32,
+    #[serde(default)] pub w_vit: i32,
+    #[serde(default)] pub w_agi: i32,
+    #[serde(default)] pub random_max: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CombatResultDto {
+    pub attacker_won: bool,
+    pub attacker_power: i64,
+    pub defender_power: i64,
+    pub defender_name: String,
+    pub attacker_new_elo: i32,
+    pub attacker_elo_delta: i32,
+}
+
+/// POST /api/tamagotchi/combat
+pub async fn combat(
+    State(state): State<AppState>,
+    Json(body): Json<CombatBody>,
+) -> Result<Json<CombatResultDto>, ApiError> {
+    let r = state
+        .pets_uc
+        .combat(crate::ports::inbound::tamagotchi::manage_pets::CombatCommand {
+            guild_id: body.guild_id,
+            attacker_id: body.attacker_id,
+            attacker_name: body.attacker_name,
+            target_id: body.target_id,
+            energy_cost: body.energy_cost,
+            cooldown_secs: body.cooldown_secs,
+            elo_k: body.elo_k,
+            xp_win: body.xp_win,
+            xp_loss: body.xp_loss,
+            w_str: body.w_str,
+            w_vit: body.w_vit,
+            w_agi: body.w_agi,
+            random_max: body.random_max,
+        })
+        .await?;
+    Ok(Json(CombatResultDto {
+        attacker_won: r.attacker_won,
+        attacker_power: r.attacker_power,
+        defender_power: r.defender_power,
+        defender_name: r.defender_name,
+        attacker_new_elo: r.attacker_new_elo,
+        attacker_elo_delta: r.attacker_elo_delta,
+    }))
+}
+
 async fn load_events(state: &AppState, pet_id: Uuid) -> Vec<PetEventDto> {
     state
         .pets_uc

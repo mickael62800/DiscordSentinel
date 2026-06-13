@@ -12,6 +12,7 @@ fn inner() -> Router<AppState> {
         .route("/pets/{pet_id}/care", post(handlers::tamagotchi::pets::care_pet))
         .route("/pets/{pet_id}/train", post(handlers::tamagotchi::pets::train_pet))
         .route("/visit", post(handlers::tamagotchi::pets::visit))
+        .route("/combat", post(handlers::tamagotchi::pets::combat))
         .route("/tick", post(handlers::tamagotchi::pets::tick_all))
         .route("/{guild_id}/{owner_id}", get(handlers::tamagotchi::pets::get_pet))
 }

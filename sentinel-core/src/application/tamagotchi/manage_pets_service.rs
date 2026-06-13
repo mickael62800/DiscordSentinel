@@ -7,13 +7,14 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::entities::tamagotchi::pet::{
-    Health, NewPet, Pet, PetEvent, TickConfig, TickOutcome,
+    combat_power, elo_update, Health, NewPet, Pet, PetEvent, TickConfig, TickOutcome,
 };
 use crate::domain::entities::tamagotchi::species::Species;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::tamagotchi::manage_pets::{
-    CareCommand, CreatePetCommand, ManagePetsUseCase, TrainCommand, VisitCommand, VisitResult,
+    CareCommand, CombatCommand, CombatResult, CreatePetCommand, ManagePetsUseCase, TrainCommand,
+    VisitCommand, VisitResult,
 };
 use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 
@@ -248,6 +249,91 @@ impl ManagePetsUseCase for ManagePetsService {
             target_name: target.name,
             xp_reward: cmd.xp_reward,
             coins_reward: cmd.coins_reward,
+        })
+    }
+
+    async fn combat(&self, cmd: CombatCommand) -> Result<CombatResult, DomainError> {
+        if cmd.attacker_id == cmd.target_id {
+            return Err(DomainError::ValidationError("tu ne peux pas te combattre toi-meme".into()));
+        }
+        let mut att = self
+            .repo
+            .get_by_owner(&cmd.guild_id, &cmd.attacker_id)
+            .await?
+            .ok_or_else(|| DomainError::Conflict("tu n'as pas de compagnon".into()))?;
+        if att.status == Health::Dead {
+            return Err(DomainError::Conflict("ton compagnon est mort".into()));
+        }
+        let now = Utc::now();
+        let remaining = att.cooldown_remaining_secs("combat", now, cmd.cooldown_secs);
+        if remaining > 0 {
+            return Err(DomainError::Conflict(format!("combat en cooldown ({remaining}s restantes)")));
+        }
+        if att.energy < cmd.energy_cost {
+            return Err(DomainError::Conflict("ton compagnon est epuise".into()));
+        }
+        let mut def = self
+            .repo
+            .get_by_owner(&cmd.guild_id, &cmd.target_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("ce joueur n'a pas de compagnon".into()))?;
+        if def.status == Health::Dead {
+            return Err(DomainError::Conflict("le compagnon de ce joueur est mort".into()));
+        }
+
+        // Rolls (RNG genere avant tout await, non maintenu a travers).
+        let (roll_a, roll_d) = {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            let max = cmd.random_max.max(0);
+            let hi = if max == 0 { 0 } else { rng.gen_range(0..=max) };
+            let lo = if max == 0 { 0 } else { rng.gen_range(0..=max) };
+            (hi, lo)
+        };
+        let power_a = combat_power(att.str_, att.vit, att.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_a);
+        let power_d = combat_power(def.str_, def.vit, def.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_d);
+        let attacker_won = power_a >= power_d;
+
+        att.energy = clamp_gauge(att.energy - cmd.energy_cost);
+        let old_att_elo = att.elo;
+
+        if attacker_won {
+            let (nw, nl) = elo_update(att.elo, def.elo, cmd.elo_k);
+            att.elo = nw;
+            def.elo = nl;
+            att.wins += 1;
+            def.losses += 1;
+            att.xp += cmd.xp_win;
+            def.xp += cmd.xp_loss;
+        } else {
+            let (nw, nl) = elo_update(def.elo, att.elo, cmd.elo_k);
+            def.elo = nw;
+            att.elo = nl;
+            att.losses += 1;
+            def.wins += 1;
+            att.xp += cmd.xp_loss;
+            def.xp += cmd.xp_win;
+        }
+        att.refresh_level();
+        def.refresh_level();
+        att.set_cooldown("combat", now);
+
+        self.repo.save(&att).await?;
+        self.repo.save(&def).await?;
+        let verb = if attacker_won { "a battu" } else { "a perdu contre" };
+        let _ = self.repo.add_event(att.id, "combat", &format!("{} {} {}", att.name, verb, def.name)).await;
+        let _ = self
+            .repo
+            .add_event(def.id, "combat", &format!("{} a affronte {}", def.name, cmd.attacker_name))
+            .await;
+
+        Ok(CombatResult {
+            attacker_won,
+            attacker_power: power_a,
+            defender_power: power_d,
+            defender_name: def.name,
+            attacker_new_elo: att.elo,
+            attacker_elo_delta: att.elo - old_att_elo,
         })
     }
 
