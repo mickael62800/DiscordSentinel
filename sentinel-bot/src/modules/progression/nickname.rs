@@ -81,9 +81,17 @@ pub async fn apply_level_prefix(
         }
     };
 
+    // Base = ce qui est REELLEMENT affiche, pour ne faire qu'ajouter le
+    // prefixe sans ecraser le nom du membre :
+    //   1. pseudo serveur (`nick`) s'il existe,
+    //   2. sinon le nom d'affichage global Discord (`global_name`),
+    //   3. sinon le nom de compte (`name`).
+    // Avant, on sautait `global_name` -> les membres sans pseudo serveur
+    // voyaient leur nom affiche remplace par leur @username brut.
     let current = member
         .nick
         .clone()
+        .or_else(|| member.user.global_name.clone())
         .unwrap_or_else(|| member.user.name.clone());
     let base = strip_level_prefix(&current);
     let new_nick = build_nickname(base, level);
