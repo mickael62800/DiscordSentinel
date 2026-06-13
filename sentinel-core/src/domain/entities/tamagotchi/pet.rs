@@ -61,7 +61,48 @@ pub struct Pet {
     pub wins: i32,
     pub losses: i32,
 
+    /// Cooldowns par action : objet JSON { "feed": "<rfc3339>", ... }.
+    pub cooldowns: serde_json::Value,
+
     pub last_decay_at: DateTime<Utc>,
+}
+
+impl Pet {
+    /// Secondes restantes avant que `action` soit de nouveau disponible.
+    /// 0 si pas de cooldown actif.
+    pub fn cooldown_remaining_secs(&self, action: &str, now: DateTime<Utc>, cd_secs: i64) -> i64 {
+        if cd_secs <= 0 {
+            return 0;
+        }
+        let last = self
+            .cooldowns
+            .get(action)
+            .and_then(|v| v.as_str())
+            .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+            .map(|d| d.with_timezone(&Utc));
+        match last {
+            Some(last) => {
+                let elapsed = now.signed_duration_since(last).num_seconds();
+                (cd_secs - elapsed).max(0)
+            }
+            None => 0,
+        }
+    }
+
+    /// Enregistre l'instant `now` comme dernier usage de `action`.
+    pub fn set_cooldown(&mut self, action: &str, now: DateTime<Utc>) {
+        if !self.cooldowns.is_object() {
+            self.cooldowns = serde_json::json!({});
+        }
+        if let Some(map) = self.cooldowns.as_object_mut() {
+            map.insert(action.to_string(), serde_json::Value::String(now.to_rfc3339()));
+        }
+    }
+
+    /// Recalcule le niveau a partir de l'XP.
+    pub fn refresh_level(&mut self) {
+        self.level = level_from_xp(self.xp);
+    }
 }
 
 /// Parametres de cycle de vie (issus de la config guild, en secondes).
@@ -163,6 +204,26 @@ impl Pet {
 
         outcome
     }
+}
+
+/// Donnees de creation d'un compagnon.
+#[derive(Debug, Clone)]
+pub struct NewPet {
+    pub guild_id: String,
+    pub owner_id: String,
+    pub name: String,
+    pub species: String,
+    pub str_: i32,
+    pub vit: i32,
+    pub agi: i32,
+}
+
+/// Entree du journal d'actions (carte "Dernieres actions").
+#[derive(Debug, Clone)]
+pub struct PetEvent {
+    pub kind: String,
+    pub detail: String,
+    pub created_at: DateTime<Utc>,
 }
 
 /// Niveau atteint pour un XP cumule donne. Courbe : il faut

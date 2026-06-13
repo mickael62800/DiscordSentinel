@@ -48,6 +48,9 @@ CREATE TABLE IF NOT EXISTS pets (
     wins INT NOT NULL DEFAULT 0,
     losses INT NOT NULL DEFAULT 0,
 
+    -- Cooldowns par action : { "feed": "<rfc3339>", "sleep": ... }.
+    cooldowns JSONB NOT NULL DEFAULT '{}'::jsonb,
+
     -- Dernier tick de decroissance applique (idempotence du worker).
     last_decay_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 

@@ -26,6 +26,7 @@ fn base_pet(now: chrono::DateTime<Utc>) -> Pet {
         elo: 1000,
         wins: 0,
         losses: 0,
+        cooldowns: serde_json::json!({}),
         last_decay_at: now,
     }
 }

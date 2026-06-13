@@ -7,3 +7,4 @@ pub mod coude;
 pub mod game;
 pub mod moderation;
 pub mod system;
+pub mod tamagotchi;

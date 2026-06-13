@@ -85,6 +85,19 @@ pub fn start(
         },
     );
 
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : tamagotchi — tick de cycle de vie (decroissance/maladie/mort)
+    // ─────────────────────────────────────────────────────────────
+    spawn_periodic(
+        "tamagotchi_tick",
+        300,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "tamagotchi-bot",
+        move |pool| Box::pin(async move { domains::tamagotchi::tick::run(&pool).await }),
+    );
+
     {
         let redis = redis_client.clone();
         spawn_periodic(

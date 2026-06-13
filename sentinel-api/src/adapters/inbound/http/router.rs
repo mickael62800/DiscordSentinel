@@ -89,6 +89,7 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::members::routes())
         // Coup de coude
         .merge(routes::coude::routes())
+        .merge(routes::tamagotchi::routes())
         // Games (Discord game roles / panels)
         .merge(routes::games::routes())
         // Game Portal (serveurs de jeux Docker)

@@ -453,6 +453,15 @@ pub async fn build_app_state(
             member_repo.clone(),
         ));
 
+    // Tamagotchi : repo + use case (debite les coins via le wallet partage).
+    let pet_repo: Arc<dyn crate::ports::outbound::tamagotchi::pet_repository::PetRepository> =
+        Arc::new(crate::adapters::outbound::postgres::tamagotchi::pet_repository::PgPetRepository::new(pg_pool.clone()));
+    let pets_uc: Arc<dyn crate::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase> =
+        Arc::new(sentinel_core::application::tamagotchi::manage_pets_service::ManagePetsService::new(
+            pet_repo.clone(),
+            wallet_uc.clone(),
+        ));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -852,6 +861,7 @@ pub async fn build_app_state(
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
         automod_reviews_uc,
+        pets_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

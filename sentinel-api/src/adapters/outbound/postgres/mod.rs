@@ -12,6 +12,7 @@ pub mod coude;
 pub mod game;
 pub mod moderation;
 pub mod system;
+pub mod tamagotchi;
 
 /// Helper centralise : convertit une erreur sqlx en DomainError::Internal.
 /// Utilise par tous les repositories Postgres.

@@ -19,5 +19,6 @@ pub mod game_portal;
 pub mod moderation;
 pub mod monitoring;
 pub mod security;
+pub mod tamagotchi;
 pub mod temp_roles;
 pub mod tickets;

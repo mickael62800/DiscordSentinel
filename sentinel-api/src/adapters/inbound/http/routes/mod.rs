@@ -18,5 +18,6 @@ pub mod progression;
 pub mod security;
 pub mod stats;
 pub mod system;
+pub mod tamagotchi;
 pub mod ticket;
 pub mod voice_channels;

@@ -115,6 +115,7 @@ pub struct AppState {
     pub user_activity_repo: Arc<dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository>,
     pub welcome_config_uc: Arc<dyn crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase>,
     pub automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase>,
+    pub pets_uc: Arc<dyn crate::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase>,
     pub export_uc: Arc<dyn crate::application::system::export_service::ExecuteExportUseCase>,
     pub evidence_repo: Arc<dyn crate::ports::outbound::moderation::evidence_repository::EvidenceRepository>,
     pub review_repo: Arc<dyn crate::ports::outbound::moderation::review_repository::ReviewRepository>,
