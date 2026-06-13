@@ -14,8 +14,6 @@
 //!      (source=discord) + execution de la sanction Discord. L'admin
 //!      confirme meme un refus (verdict 'ignore' = clore sans sanction).
 
-use std::collections::HashMap;
-
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
@@ -122,7 +120,7 @@ pub(super) async fn post_vote_card(
     // 2. Construire la carte.
     let embed = vote_embed(
         &user_id, &msg.author.name, &channel_id, score, &content_preview, reason, flags,
-        suggested_str, &deadline, &HashMap::new(),
+        suggested_str, &deadline, &[],
     );
     let row = vote_buttons(&review_id);
 
@@ -179,7 +177,7 @@ fn vote_embed(
     flags: &detectors::DetectionFlags,
     suggested: &str,
     deadline: &chrono::DateTime<chrono::Utc>,
-    tally: &HashMap<String, usize>,
+    votes: &[VoteDto],
 ) -> serenity::builder::CreateEmbed {
     let mut flag_parts = Vec::new();
     if flags.spam { flag_parts.push("Spam"); }
@@ -199,37 +197,49 @@ fn vote_embed(
         .field("Flags", &flags_str, true)
         .field("Suggestion IA", action_label(suggested), true)
         .field("Cloture", format!("<t:{}:R>", deadline.timestamp()), true)
-        .field("Votes", render_tally(tally), false)
+        .field(VOTES_FIELD, render_votes(votes), false)
         .footer(serenity::builder::CreateEmbedFooter::new(
             "Votez la sanction. A l'echeance, un admin finalise.",
         ))
         .timestamp(serenity::model::Timestamp::now())
 }
 
-fn render_tally(tally: &HashMap<String, usize>) -> String {
+/// Nom du champ embed qui contient le decompte des votes (sert a le
+/// retrouver/remplacer lors d'un nouveau vote).
+const VOTES_FIELD: &str = "Votes";
+
+/// Rendu nominatif des votes, groupes par sanction :
+/// `Avertissement (2) : Alice, Bob`.
+fn render_votes(votes: &[VoteDto]) -> String {
+    if votes.is_empty() {
+        return "_Aucun vote pour l'instant._".to_string();
+    }
     let order = ["warn", "delete", "mute", "ban", "ignore"];
-    let parts: Vec<String> = order
-        .iter()
-        .map(|a| format!("{} : **{}**", action_label(a), tally.get(*a).copied().unwrap_or(0)))
-        .collect();
-    parts.join("\n")
+    let mut lines = Vec::new();
+    for a in order {
+        let voters: Vec<&str> = votes
+            .iter()
+            .filter(|v| v.vote_action == a)
+            .map(|v| v.voter_name.as_str())
+            .collect();
+        if voters.is_empty() {
+            continue;
+        }
+        lines.push(format!("**{}** ({}) : {}", action_label(a), voters.len(), voters.join(", ")));
+    }
+    if lines.is_empty() {
+        "_Aucun vote pour l'instant._".to_string()
+    } else {
+        lines.join("\n")
+    }
 }
 
 #[derive(serde::Deserialize)]
 struct VoteDto {
     #[allow(dead_code)]
     voter_id: String,
-    #[allow(dead_code)]
     voter_name: String,
     vote_action: String,
-}
-
-fn tally_from(votes: &[VoteDto]) -> HashMap<String, usize> {
-    let mut m = HashMap::new();
-    for v in votes {
-        *m.entry(v.vote_action.clone()).or_insert(0) += 1;
-    }
-    m
 }
 
 /// Verifie qu'un membre a le droit de voter : role configure si defini,
@@ -321,19 +331,32 @@ pub(super) async fn handle_vote_button(ctx: &Context, component: &serenity::mode
         }
     };
 
-    // Met a jour le champ Votes de la carte (l'embed existant) sans tout reconstruire.
-    let tally = tally_from(&votes);
+    // Reconstruit proprement la carte : on recopie tous les champs existants
+    // SAUF l'ancien champ "Votes", puis on ajoute le decompte nominatif a jour.
     if let Some(existing) = component.message.embeds.first() {
-        let updated = serenity::builder::CreateEmbed::from(existing.clone());
-        // On reconstruit uniquement le champ Votes via un nouvel embed base sur l'ancien.
-        // Serenity ne permet pas d'editer un field isole -> on re-set tous les fields
-        // est complexe ; on prefere ajouter le tally en description courte.
-        let updated = updated.field("Votes (maj)", render_tally(&tally), false);
+        let mut rebuilt = serenity::builder::CreateEmbed::new()
+            .color(existing.colour.map(|c| c.0).unwrap_or(0x5865f2))
+            .timestamp(serenity::model::Timestamp::now());
+        if let Some(title) = &existing.title {
+            rebuilt = rebuilt.title(title.clone());
+        }
+        if let Some(thumb) = &existing.thumbnail {
+            rebuilt = rebuilt.thumbnail(thumb.url.clone());
+        }
+        if let Some(footer) = &existing.footer {
+            rebuilt = rebuilt.footer(serenity::builder::CreateEmbedFooter::new(footer.text.clone()));
+        }
+        for f in &existing.fields {
+            if f.name != VOTES_FIELD {
+                rebuilt = rebuilt.field(f.name.clone(), f.value.clone(), f.inline);
+            }
+        }
+        rebuilt = rebuilt.field(VOTES_FIELD, render_votes(&votes), false);
         let _ = component
             .create_response(
                 &ctx.http,
                 serenity::builder::CreateInteractionResponse::UpdateMessage(
-                    serenity::builder::CreateInteractionResponseMessage::new().embed(updated),
+                    serenity::builder::CreateInteractionResponseMessage::new().embed(rebuilt),
                 ),
             )
             .await;
@@ -426,9 +449,11 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // Recupere la review (verdict + cible) depuis l'API.
     #[derive(serde::Deserialize)]
     struct ReviewDto {
+        guild_id: String,
         channel_id: String,
         message_id: String,
         user_id: String,
+        user_name: String,
         decided_action: Option<String>,
         status: String,
     }
@@ -462,7 +487,14 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         return;
     }
 
-    // Execute la sanction Discord.
+    // Verdict warn : on cree une vraie infraction via le module moderation
+    // (gRPC log_action, comme /warn) pour qu'elle compte dans l'historique /
+    // l'escalade. Les autres sanctions Discord sont gerees par execute_sanction.
+    if decided == "warn" {
+        log_warn_to_moderation(ctx, component, &review.guild_id, &review.user_id, &review.user_name).await;
+    }
+
+    // Execute la sanction Discord (delete/mute/ban ; warn deja loggue ci-dessus).
     let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", super::DEFAULT_MUTE_DURATION_SECS);
     execute_sanction(ctx, component, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;
 
@@ -485,6 +517,46 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         )
         .await;
     info!(review_id, action = %decided, admin = %component.user.name, "Vote automod finalise");
+}
+
+/// Enregistre une infraction warn via le module moderation (gRPC log_action),
+/// de sorte que le warn issu d'un vote compte dans l'historique et l'escalade
+/// au meme titre qu'un /warn manuel. L'admin qui finalise est le "moderateur".
+async fn log_warn_to_moderation(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+    guild_id: &str,
+    target_id: &str,
+    target_name: &str,
+) {
+    use crate::modules::moderation::api_client::ModerationAction;
+    use crate::modules::moderation::ModerationApiKey;
+
+    let mod_api = {
+        let data = ctx.data.read().await;
+        match data.get::<ModerationApiKey>() {
+            Some(a) => a.clone(),
+            None => {
+                warn!("ModerationApiKey absent : warn vote non enregistre");
+                return;
+            }
+        }
+    };
+    let action = ModerationAction {
+        guild_id: guild_id.to_string(),
+        channel_id: component.channel_id.to_string(),
+        moderator_id: component.user.id.to_string(),
+        moderator_name: component.user.name.clone(),
+        target_id: target_id.to_string(),
+        target_name: target_name.to_string(),
+        action_type: "warn".to_string(),
+        reason: "Sanction validee par vote des moderateurs (AutoMod)".to_string(),
+        gravity: Some("medium".to_string()),
+        duration: None,
+    };
+    if let Err(e) = mod_api.log_action(&action).await {
+        warn!(error = %e, target = target_id, "Echec enregistrement warn (vote) cote moderation");
+    }
 }
 
 /// Execute la sanction Discord decidee (warn/delete/mute/ban/ignore).
