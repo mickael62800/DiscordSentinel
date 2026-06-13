@@ -261,6 +261,54 @@ async fn load_tick_config(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct VisitBody {
+    pub guild_id: String,
+    pub visitor_id: String,
+    pub visitor_name: String,
+    pub target_id: String,
+    #[serde(default)]
+    pub xp_reward: i64,
+    #[serde(default)]
+    pub coins_reward: i64,
+    #[serde(default)]
+    pub cooldown_secs: i64,
+    #[serde(default)]
+    pub max_per_day: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VisitResultDto {
+    pub target_name: String,
+    pub xp_reward: i64,
+    pub coins_reward: i64,
+}
+
+/// POST /api/tamagotchi/visit
+pub async fn visit(
+    State(state): State<AppState>,
+    Json(body): Json<VisitBody>,
+) -> Result<Json<VisitResultDto>, ApiError> {
+    let r = state
+        .pets_uc
+        .visit(crate::ports::inbound::tamagotchi::manage_pets::VisitCommand {
+            guild_id: body.guild_id,
+            visitor_id: body.visitor_id,
+            visitor_name: body.visitor_name,
+            target_id: body.target_id,
+            xp_reward: body.xp_reward,
+            coins_reward: body.coins_reward,
+            cooldown_secs: body.cooldown_secs,
+            max_per_day: body.max_per_day,
+        })
+        .await?;
+    Ok(Json(VisitResultDto {
+        target_name: r.target_name,
+        xp_reward: r.xp_reward,
+        coins_reward: r.coins_reward,
+    }))
+}
+
 async fn load_events(state: &AppState, pet_id: Uuid) -> Vec<PetEventDto> {
     state
         .pets_uc

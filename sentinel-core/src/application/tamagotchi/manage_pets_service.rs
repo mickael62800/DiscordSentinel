@@ -13,7 +13,7 @@ use crate::domain::entities::tamagotchi::species::Species;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::tamagotchi::manage_pets::{
-    CareCommand, CreatePetCommand, ManagePetsUseCase, TrainCommand,
+    CareCommand, CreatePetCommand, ManagePetsUseCase, TrainCommand, VisitCommand, VisitResult,
 };
 use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 
@@ -178,6 +178,77 @@ impl ManagePetsUseCase for ManagePetsService {
             .add_event(saved.id, "train", &format!("Entrainement : +{} {}", cmd.stat_gain, cmd.stat))
             .await;
         Ok(saved)
+    }
+
+    async fn visit(&self, cmd: VisitCommand) -> Result<VisitResult, DomainError> {
+        if cmd.visitor_id == cmd.target_id {
+            return Err(DomainError::ValidationError("tu ne peux pas te visiter toi-meme".into()));
+        }
+        // Compagnon du visiteur (pour cooldown + limite/jour).
+        let mut visitor = self
+            .repo
+            .get_by_owner(&cmd.guild_id, &cmd.visitor_id)
+            .await?
+            .ok_or_else(|| DomainError::Conflict("tu n'as pas de compagnon".into()))?;
+
+        let now = Utc::now();
+        let remaining = visitor.cooldown_remaining_secs("visit", now, cmd.cooldown_secs);
+        if remaining > 0 {
+            return Err(DomainError::Conflict(format!(
+                "visite en cooldown ({remaining}s restantes)"
+            )));
+        }
+        let today = now.format("%Y-%m-%d").to_string();
+        if cmd.max_per_day > 0 && visitor.daily_counter("visit", &today) >= cmd.max_per_day {
+            return Err(DomainError::Conflict(format!(
+                "limite de {} visites par jour atteinte",
+                cmd.max_per_day
+            )));
+        }
+
+        // Compagnon du visite.
+        let mut target = self
+            .repo
+            .get_by_owner(&cmd.guild_id, &cmd.target_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("ce joueur n'a pas de compagnon".into()))?;
+        if target.status == Health::Dead {
+            return Err(DomainError::Conflict("le compagnon de ce joueur est mort".into()));
+        }
+
+        // Recompense le visite : coins (wallet) + XP.
+        if cmd.coins_reward > 0 {
+            self.wallet
+                .credit(&cmd.guild_id, &cmd.target_id, cmd.coins_reward, "tamagotchi", "Visite recue")
+                .await?;
+        }
+        if cmd.xp_reward > 0 {
+            target.xp += cmd.xp_reward;
+            target.refresh_level();
+            self.repo.save(&target).await?;
+        }
+        let _ = self
+            .repo
+            .add_event(
+                target.id,
+                "visit",
+                &format!(
+                    "{} a recu une visite de {} (+{} XP +{} coins)",
+                    target.name, cmd.visitor_name, cmd.xp_reward, cmd.coins_reward
+                ),
+            )
+            .await;
+
+        // Cooldown + compteur cote visiteur.
+        visitor.set_cooldown("visit", now);
+        visitor.bump_daily_counter("visit", &today);
+        self.repo.save(&visitor).await?;
+
+        Ok(VisitResult {
+            target_name: target.name,
+            xp_reward: cmd.xp_reward,
+            coins_reward: cmd.coins_reward,
+        })
     }
 
     async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError> {

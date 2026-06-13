@@ -40,6 +40,27 @@ pub struct CareCommand {
     pub cure: bool,
 }
 
+/// Visite du compagnon d'un autre joueur (recompense le visite).
+#[derive(Debug, Clone)]
+pub struct VisitCommand {
+    pub guild_id: String,
+    pub visitor_id: String,
+    pub visitor_name: String,
+    pub target_id: String,
+    pub xp_reward: i64,
+    pub coins_reward: i64,
+    pub cooldown_secs: i64,
+    pub max_per_day: i64,
+}
+
+/// Resultat d'une visite (pour le message de confirmation).
+#[derive(Debug, Clone)]
+pub struct VisitResult {
+    pub target_name: String,
+    pub xp_reward: i64,
+    pub coins_reward: i64,
+}
+
 /// Entrainement d'une stat de combat.
 #[derive(Debug, Clone)]
 pub struct TrainCommand {
@@ -62,6 +83,10 @@ pub trait ManagePetsUseCase: Send + Sync {
 
     /// Entraine une stat de combat (consomme energie + cooldown).
     async fn train(&self, cmd: TrainCommand) -> Result<Pet, DomainError>;
+
+    /// Rend visite au compagnon d'un autre joueur (recompense le visite en
+    /// XP + coins ; cooldown + limite/jour cote visiteur).
+    async fn visit(&self, cmd: VisitCommand) -> Result<VisitResult, DomainError>;
 
     /// Compagnons vivants a faire decroitre (job worker, via l'API).
     async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError>;

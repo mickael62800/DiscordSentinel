@@ -3,8 +3,8 @@
 use serenity::all::{
     ButtonStyle, ChannelId, ChannelType, ComponentInteraction, Context, CreateActionRow,
     CreateButton, CreateChannel, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage, EditInteractionResponse, PermissionOverwrite,
-    PermissionOverwriteType, Permissions, RoleId,
+    CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
+    EditInteractionResponse, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId,
 };
 use tracing::{error, warn};
 
@@ -18,6 +18,8 @@ pub const ACT_PREFIX: &str = "tama_act:";
 pub const TRAIN_PREFIX: &str = "tama_train:";
 pub const BUY_PREFIX: &str = "tama_buy:";
 pub const SHOP_OPEN_ID: &str = "tama_shop";
+pub const VISIT_OPEN_ID: &str = "tama_visit";
+pub const VISIT_SELECT_ID: &str = "tama_visit_sel";
 pub const CLOSE_ID: &str = "tama_close";
 pub const HIST_ID: &str = "tama_hist";
 
@@ -342,6 +344,69 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     }
 }
 
+pub async fn handle_visit_open(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let menu = CreateSelectMenu::new(VISIT_SELECT_ID, CreateSelectMenuKind::User { default_users: None })
+        .placeholder("Choisis un joueur a visiter");
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("👋 **Visite** — son compagnon gagnera un peu d'XP et de coins :")
+                    .components(vec![CreateActionRow::SelectMenu(menu)])
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+}
+
+pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let target = match &component.data.kind {
+        serenity::model::application::ComponentInteractionDataKind::UserSelect { values } => {
+            values.first().copied()
+        }
+        _ => None,
+    };
+    let target = match target { Some(t) => t, None => return };
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "visitor_id": component.user.id.to_string(),
+        "visitor_name": component.user.name,
+        "target_id": target.to_string(),
+        "xp_reward": BaseApiClient::config_u64(&cfg, "visit_xp_reward", 5) as i64,
+        "coins_reward": BaseApiClient::config_u64(&cfg, "visit_coins_reward", 5) as i64,
+        "cooldown_secs": BaseApiClient::config_u64(&cfg, "visit_cooldown_secs", 6600) as i64,
+        "max_per_day": BaseApiClient::config_u64(&cfg, "visit_max_per_day", 10) as i64,
+    });
+
+    #[derive(serde::Deserialize)]
+    struct VisitResultDto { target_name: String, xp_reward: i64, coins_reward: i64 }
+    match api.post_json::<_, VisitResultDto>("/api/tamagotchi/visit", &body).await {
+        Ok(r) => {
+            reply_ephemeral(
+                ctx,
+                component,
+                &format!("👋 Tu as rendu visite a **{}** ! Son compagnon gagne +{} XP et +{} coins.", r.target_name, r.xp_reward, r.coins_reward),
+            )
+            .await;
+        }
+        Err(e) => {
+            warn!(error = %e, "Echec visite");
+            reply_ephemeral(ctx, component, "Visite impossible (cooldown, limite/jour, ou ce joueur n'a pas de compagnon).").await;
+        }
+    }
+}
+
 pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
@@ -420,6 +485,7 @@ fn care_buttons() -> Vec<CreateActionRow> {
             CreateButton::new(SHOP_OPEN_ID).label("Boutique").emoji('🛒').style(ButtonStyle::Primary),
         ]),
         CreateActionRow::Buttons(vec![
+            CreateButton::new(VISIT_OPEN_ID).label("Visiter").emoji('👋').style(ButtonStyle::Primary),
             CreateButton::new(HIST_ID).label("Historique").style(ButtonStyle::Secondary),
             CreateButton::new(CLOSE_ID).label("Fermer salon").style(ButtonStyle::Danger),
         ]),

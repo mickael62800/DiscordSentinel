@@ -103,6 +103,29 @@ impl Pet {
     pub fn refresh_level(&mut self) {
         self.level = level_from_xp(self.xp);
     }
+
+    /// Compteur journalier stocke dans `cooldowns` ({key}_date / {key}_count).
+    /// Retourne le compteur du jour `today` (0 si le jour a change).
+    pub fn daily_counter(&self, key: &str, today: &str) -> i64 {
+        let date = self.cooldowns.get(format!("{key}_date")).and_then(|v| v.as_str());
+        if date == Some(today) {
+            self.cooldowns.get(format!("{key}_count")).and_then(|v| v.as_i64()).unwrap_or(0)
+        } else {
+            0
+        }
+    }
+
+    /// Incremente le compteur journalier `key` pour le jour `today`.
+    pub fn bump_daily_counter(&mut self, key: &str, today: &str) {
+        let next = self.daily_counter(key, today) + 1;
+        if !self.cooldowns.is_object() {
+            self.cooldowns = serde_json::json!({});
+        }
+        if let Some(map) = self.cooldowns.as_object_mut() {
+            map.insert(format!("{key}_date"), serde_json::Value::String(today.to_string()));
+            map.insert(format!("{key}_count"), serde_json::Value::from(next));
+        }
+    }
 }
 
 /// Parametres de cycle de vie (issus de la config guild, en secondes).
