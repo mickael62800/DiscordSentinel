@@ -57,11 +57,20 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
             .map(|g| g.name.clone())
             .unwrap_or_else(|_| "Serveur".into());
 
-        let member_count = guild_id
-            .to_partial_guild_with_counts(&ctx.http)
-            .await
-            .map(|g| g.approximate_member_count.unwrap_or(0))
-            .unwrap_or(0);
+        // Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur
+        // le compte approximatif Discord (qui inclut les bots) si cache vide.
+        let human_count = ctx
+            .cache
+            .guild(guild_id)
+            .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
+        let member_count = match human_count {
+            Some(n) if n > 0 => n,
+            _ => guild_id
+                .to_partial_guild_with_counts(&ctx.http)
+                .await
+                .map(|g| g.approximate_member_count.unwrap_or(0))
+                .unwrap_or(0),
+        };
 
         // ── Detecter si c'est un retour (membre deja connu) ──
         let is_rejoin = api.is_known_member(&guild_id.to_string(), &user_id.to_string()).await;
@@ -223,11 +232,20 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             .map(|g| g.name.clone())
             .unwrap_or_else(|_| "Serveur".into());
 
-        let member_count = guild_id
-            .to_partial_guild_with_counts(&ctx.http)
-            .await
-            .map(|g| g.approximate_member_count.unwrap_or(0))
-            .unwrap_or(0);
+        // Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur
+        // le compte approximatif Discord (qui inclut les bots) si cache vide.
+        let human_count = ctx
+            .cache
+            .guild(guild_id)
+            .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
+        let member_count = match human_count {
+            Some(n) if n > 0 => n,
+            _ => guild_id
+                .to_partial_guild_with_counts(&ctx.http)
+                .await
+                .map(|g| g.approximate_member_count.unwrap_or(0))
+                .unwrap_or(0),
+        };
 
         let text = template::render(
             &config.leave_message,
