@@ -35,6 +35,21 @@ pub struct CareCommand {
     pub xp_gain: i64,
     /// Cooldown a appliquer (secondes).
     pub cooldown_secs: i64,
+    /// Si true, guerit la maladie (potion de soin) : statut -> healthy.
+    #[allow(dead_code)]
+    pub cure: bool,
+}
+
+/// Entrainement d'une stat de combat.
+#[derive(Debug, Clone)]
+pub struct TrainCommand {
+    pub pet_id: Uuid,
+    /// "str" | "vit" | "agi".
+    pub stat: String,
+    pub energy_cost: i32,
+    pub coin_cost: i64,
+    pub stat_gain: i32,
+    pub cooldown_secs: i64,
 }
 
 #[async_trait]
@@ -44,6 +59,9 @@ pub trait ManagePetsUseCase: Send + Sync {
     async fn recent_events(&self, pet_id: Uuid, limit: i64) -> Result<Vec<PetEvent>, DomainError>;
     /// Applique une action de soin (cooldown + debit coins + effet + XP).
     async fn care(&self, cmd: CareCommand) -> Result<Pet, DomainError>;
+
+    /// Entraine une stat de combat (consomme energie + cooldown).
+    async fn train(&self, cmd: TrainCommand) -> Result<Pet, DomainError>;
 
     /// Compagnons vivants a faire decroitre (job worker, via l'API).
     async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError>;

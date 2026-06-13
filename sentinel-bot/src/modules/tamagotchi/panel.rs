@@ -15,6 +15,9 @@ use super::MODULE_BOT_NAME;
 
 pub const PICK_PREFIX: &str = "tama_pick:";
 pub const ACT_PREFIX: &str = "tama_act:";
+pub const TRAIN_PREFIX: &str = "tama_train:";
+pub const BUY_PREFIX: &str = "tama_buy:";
+pub const SHOP_OPEN_ID: &str = "tama_shop";
 pub const CLOSE_ID: &str = "tama_close";
 pub const HIST_ID: &str = "tama_hist";
 
@@ -252,6 +255,93 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
     }
 }
 
+pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let stat = component.data.custom_id.strip_prefix(TRAIN_PREFIX).unwrap_or("").to_string();
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let user_id = component.user.id.to_string();
+    let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let pet_id = match fetch_pet_id(&api, &guild_id, &user_id).await { Some(id) => id, None => return };
+    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let body = serde_json::json!({
+        "stat": stat,
+        "energy_cost": BaseApiClient::config_u64(&cfg, "train_energy_cost", 25) as i32,
+        "coin_cost": BaseApiClient::config_u64(&cfg, "train_cost", 0) as i64,
+        "stat_gain": BaseApiClient::config_u64(&cfg, "train_stat_gain", 1) as i32,
+        "cooldown_secs": BaseApiClient::config_u64(&cfg, "train_cooldown_secs", 7200) as i64,
+    });
+    match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/train"), &body).await {
+        Ok(p) => { let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(update_from_card(&p))).await; }
+        Err(e) => { warn!(error = %e, "Echec entrainement"); reply_ephemeral(ctx, component, "Entrainement impossible (epuise, cooldown ou coins).").await; }
+    }
+}
+
+pub async fn handle_shop_open(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d);
+    let buttons = vec![
+        CreateButton::new(format!("{BUY_PREFIX}croquettes")).label(format!("Croquettes ({}c)", price("shop_croquettes_price", 15))).style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}repas")).label(format!("Repas ({}c)", price("shop_repas_price", 40))).style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}boisson")).label(format!("Boisson ({}c)", price("shop_boisson_price", 25))).style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}jouet")).label(format!("Jouet ({}c)", price("shop_jouet_price", 20))).style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}potion")).label(format!("Potion soin ({}c)", price("shop_potion_price", 100))).style(ButtonStyle::Success),
+    ];
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("🛒 **Boutique** — achete un objet :")
+                    .components(vec![CreateActionRow::Buttons(buttons)])
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+}
+
+pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
+    let item = component.data.custom_id.strip_prefix(BUY_PREFIX).unwrap_or("").to_string();
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let user_id = component.user.id.to_string();
+    let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let pet_id = match fetch_pet_id(&api, &guild_id, &user_id).await { Some(id) => id, None => return };
+    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
+
+    // Effets hardcodes, prix configurables.
+    let (cost, hunger, happiness, energy, cure, label) = match item.as_str() {
+        "croquettes" => (price("shop_croquettes_price", 15), 25, 0, 0, false, "Croquettes"),
+        "repas" => (price("shop_repas_price", 40), 60, 0, 0, false, "Repas premium"),
+        "boisson" => (price("shop_boisson_price", 25), 0, 0, 40, false, "Boisson energisante"),
+        "jouet" => (price("shop_jouet_price", 20), 0, 35, 0, false, "Jouet"),
+        "potion" => (price("shop_potion_price", 100), 10, 10, 10, true, "Potion de soin"),
+        _ => return,
+    };
+    let body = serde_json::json!({
+        "action": format!("buy_{item}"),
+        "coin_cost": cost,
+        "hunger_delta": hunger,
+        "happiness_delta": happiness,
+        "energy_delta": energy,
+        "cure": cure,
+        "cooldown_secs": 0,
+    });
+    match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
+        Ok(_) => reply_ephemeral(ctx, component, &format!("✅ {label} achete et utilise !")).await,
+        Err(e) => { warn!(error = %e, item, "Echec achat"); reply_ephemeral(ctx, component, "Achat impossible (coins insuffisants ?).").await; }
+    }
+}
+
 pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
@@ -322,6 +412,12 @@ fn care_buttons() -> Vec<CreateActionRow> {
             CreateButton::new(format!("{ACT_PREFIX}play")).label("Jouer").emoji('🎲').style(ButtonStyle::Primary),
             CreateButton::new(format!("{ACT_PREFIX}sleep")).label("Dormir").emoji('💤').style(ButtonStyle::Secondary),
             CreateButton::new(format!("{ACT_PREFIX}cuddle")).label("Caliner").emoji('🤗').style(ButtonStyle::Secondary),
+        ]),
+        CreateActionRow::Buttons(vec![
+            CreateButton::new(format!("{TRAIN_PREFIX}str")).label("Force").emoji('💪').style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{TRAIN_PREFIX}vit")).label("Vitalite").emoji('🛡').style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{TRAIN_PREFIX}agi")).label("Agilite").emoji('🏃').style(ButtonStyle::Secondary),
+            CreateButton::new(SHOP_OPEN_ID).label("Boutique").emoji('🛒').style(ButtonStyle::Primary),
         ]),
         CreateActionRow::Buttons(vec![
             CreateButton::new(HIST_ID).label("Historique").style(ButtonStyle::Secondary),

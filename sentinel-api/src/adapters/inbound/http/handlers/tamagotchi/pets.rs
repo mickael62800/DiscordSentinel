@@ -129,6 +129,8 @@ pub struct CareBody {
     pub xp_gain: i64,
     #[serde(default)]
     pub cooldown_secs: i64,
+    #[serde(default)]
+    pub cure: bool,
 }
 
 /// POST /api/tamagotchi/pets/{pet_id}/care
@@ -149,6 +151,44 @@ pub async fn care_pet(
             happiness_delta: body.happiness_delta,
             energy_delta: body.energy_delta,
             xp_gain: body.xp_gain,
+            cooldown_secs: body.cooldown_secs,
+            cure: body.cure,
+        })
+        .await?;
+    let events = load_events(&state, pet.id).await;
+    Ok(Json(PetDto::from(pet, events)))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TrainBody {
+    /// "str" | "vit" | "agi".
+    pub stat: String,
+    #[serde(default)]
+    pub energy_cost: i32,
+    #[serde(default)]
+    pub coin_cost: i64,
+    #[serde(default)]
+    pub stat_gain: i32,
+    #[serde(default)]
+    pub cooldown_secs: i64,
+}
+
+/// POST /api/tamagotchi/pets/{pet_id}/train
+pub async fn train_pet(
+    State(state): State<AppState>,
+    Path(pet_id): Path<String>,
+    Json(body): Json<TrainBody>,
+) -> Result<Json<PetDto>, ApiError> {
+    let id = Uuid::parse_str(&pet_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("pet_id invalide".into())))?;
+    let pet = state
+        .pets_uc
+        .train(crate::ports::inbound::tamagotchi::manage_pets::TrainCommand {
+            pet_id: id,
+            stat: body.stat,
+            energy_cost: body.energy_cost,
+            coin_cost: body.coin_cost,
+            stat_gain: body.stat_gain,
             cooldown_secs: body.cooldown_secs,
         })
         .await?;

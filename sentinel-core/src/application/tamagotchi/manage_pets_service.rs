@@ -13,7 +13,7 @@ use crate::domain::entities::tamagotchi::species::Species;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::tamagotchi::manage_pets::{
-    CareCommand, CreatePetCommand, ManagePetsUseCase,
+    CareCommand, CreatePetCommand, ManagePetsUseCase, TrainCommand,
 };
 use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 
@@ -120,12 +120,62 @@ impl ManagePetsUseCase for ManagePetsService {
             pet.xp += cmd.xp_gain;
             pet.refresh_level();
         }
-        pet.set_cooldown(&cmd.action, now);
+        // Potion de soin : guerit la maladie.
+        if cmd.cure && pet.status == Health::Sick {
+            pet.status = Health::Healthy;
+            pet.sick_since = None;
+        }
+        if pet.hunger > 0 {
+            pet.hunger_zero_since = None;
+        }
+        if cmd.cooldown_secs > 0 {
+            pet.set_cooldown(&cmd.action, now);
+        }
 
         let saved = self.repo.save(&pet).await?;
         let _ = self
             .repo
             .add_event(saved.id, &cmd.action, &format!("Action : {}", cmd.action))
+            .await;
+        Ok(saved)
+    }
+
+    async fn train(&self, cmd: TrainCommand) -> Result<Pet, DomainError> {
+        let mut pet = self
+            .repo
+            .get(cmd.pet_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("compagnon introuvable".into()))?;
+        if pet.status == Health::Dead {
+            return Err(DomainError::Conflict("ton compagnon est mort".into()));
+        }
+        let now = Utc::now();
+        let remaining = pet.cooldown_remaining_secs("train", now, cmd.cooldown_secs);
+        if remaining > 0 {
+            return Err(DomainError::Conflict(format!(
+                "entrainement en cooldown ({remaining}s restantes)"
+            )));
+        }
+        if pet.energy < cmd.energy_cost {
+            return Err(DomainError::Conflict("ton compagnon est epuise".into()));
+        }
+        if cmd.coin_cost > 0 {
+            self.wallet
+                .debit(&pet.guild_id, &pet.owner_id, cmd.coin_cost, "tamagotchi", "Tamagotchi : entrainement")
+                .await?;
+        }
+        pet.energy = clamp_gauge(pet.energy - cmd.energy_cost);
+        match cmd.stat.as_str() {
+            "str" => pet.str_ += cmd.stat_gain,
+            "vit" => pet.vit += cmd.stat_gain,
+            "agi" => pet.agi += cmd.stat_gain,
+            _ => return Err(DomainError::ValidationError("stat invalide (str|vit|agi)".into())),
+        }
+        pet.set_cooldown("train", now);
+        let saved = self.repo.save(&pet).await?;
+        let _ = self
+            .repo
+            .add_event(saved.id, "train", &format!("Entrainement : +{} {}", cmd.stat_gain, cmd.stat))
             .await;
         Ok(saved)
     }
