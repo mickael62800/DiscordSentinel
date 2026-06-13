@@ -93,6 +93,116 @@ pub struct AutomodReview {
     pub resolved_source: Option<String>,
     pub created_at: DateTime<Utc>,
     pub resolved_at: Option<DateTime<Utc>>,
+    // ── Systeme de vote (cf. migration 251) ──
+    /// Echeance du vote (statut 'voting'). None si review hors mode vote.
+    pub voting_deadline: Option<DateTime<Utc>>,
+    /// Sanction retenue apres depouillement (statut 'decided'+).
+    pub decided_action: Option<String>,
+    /// Le quorum minimum de votes a-t-il ete atteint ?
+    pub quorum_met: bool,
+    /// Horodatage du depouillement.
+    pub decided_at: Option<DateTime<Utc>>,
+}
+
+// ── Vote des moderateurs ──────────────────────────────────────────────
+
+/// Sanction qu'un moderateur peut voter (identique a AppliedAction, mais
+/// nommee distinctement pour exprimer l'intention "vote").
+pub type VoteAction = AppliedAction;
+
+impl AppliedAction {
+    /// Rang de severite : sert au tie-break (plus clemente / plus severe).
+    /// ignore (0) < warn (1) < delete (2) < mute (3) < ban (4).
+    pub fn severity(&self) -> u8 {
+        match self {
+            Self::Ignore => 0,
+            Self::Warn => 1,
+            Self::Delete => 2,
+            Self::Mute => 3,
+            Self::Ban => 4,
+        }
+    }
+}
+
+/// Un vote individuel persiste (table automod_review_votes).
+#[derive(Debug, Clone)]
+pub struct ReviewVote {
+    pub id: Uuid,
+    pub review_id: Uuid,
+    pub voter_id: String,
+    pub voter_name: String,
+    pub vote_action: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Strategie de departage en cas d'egalite de voix.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TieAction {
+    /// Aucune sanction.
+    Ignore,
+    /// La sanction la plus clemente parmi les ex-aequo.
+    Clemente,
+    /// La sanction la plus severe parmi les ex-aequo.
+    Severe,
+}
+
+impl TieAction {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "clemente" => Self::Clemente,
+            "severe" => Self::Severe,
+            _ => Self::Ignore,
+        }
+    }
+}
+
+/// Resultat d'un depouillement.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TallyResult {
+    /// Sanction retenue. `Ignore` = aucune sanction (refus, quorum non
+    /// atteint, ou egalite resolue en ignore).
+    pub decided: AppliedAction,
+    /// Le quorum a-t-il ete atteint ?
+    pub quorum_met: bool,
+    /// Nombre total de votes exprimes.
+    pub total_votes: usize,
+}
+
+/// Depouille les votes : majorite des voix, quorum minimum, tie-break.
+///
+/// - Si `total < quorum` -> Ignore, quorum_met=false (alerte ignoree).
+/// - Sinon la sanction avec le plus de voix gagne.
+/// - En cas d'egalite entre plusieurs sanctions, applique `tie`.
+pub fn tally_votes(votes: &[VoteAction], quorum: usize, tie: TieAction) -> TallyResult {
+    let total = votes.len();
+    if total == 0 || total < quorum.max(1) {
+        return TallyResult { decided: AppliedAction::Ignore, quorum_met: false, total_votes: total };
+    }
+
+    // Comptage par action.
+    let mut counts: std::collections::HashMap<u8, (AppliedAction, usize)> = std::collections::HashMap::new();
+    for v in votes {
+        let entry = counts.entry(v.severity()).or_insert((v.clone(), 0));
+        entry.1 += 1;
+    }
+
+    let max_count = counts.values().map(|(_, c)| *c).max().unwrap_or(0);
+    let mut leaders: Vec<AppliedAction> =
+        counts.values().filter(|(_, c)| *c == max_count).map(|(a, _)| a.clone()).collect();
+
+    let decided = if leaders.len() == 1 {
+        leaders.remove(0)
+    } else {
+        // Egalite : departage.
+        match tie {
+            TieAction::Ignore => AppliedAction::Ignore,
+            TieAction::Clemente => leaders.into_iter().min_by_key(|a| a.severity()).unwrap(),
+            TieAction::Severe => leaders.into_iter().max_by_key(|a| a.severity()).unwrap(),
+        }
+    };
+
+    TallyResult { decided, quorum_met: true, total_votes: total }
 }
 
 #[derive(Debug, Clone)]
@@ -107,4 +217,7 @@ pub struct NewAutomodReview {
     pub score: f64,
     pub reason: String,
     pub flags: serde_json::Value,
+    /// Si Some, la review naît en mode VOTE (statut 'voting') avec cette
+    /// echeance. Si None, comportement historique (statut 'pending').
+    pub voting_deadline: Option<DateTime<Utc>>,
 }

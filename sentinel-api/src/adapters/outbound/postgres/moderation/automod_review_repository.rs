@@ -7,6 +7,7 @@ use uuid::Uuid;
 use super::super::pg_err_ctx;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
+use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
@@ -33,6 +34,11 @@ struct Row {
     resolved_source: Option<String>,
     created_at: DateTime<Utc>,
     resolved_at: Option<DateTime<Utc>>,
+    voting_deadline: Option<DateTime<Utc>>,
+    decided_action: Option<String>,
+    #[sqlx(default)]
+    quorum_met: bool,
+    decided_at: Option<DateTime<Utc>>,
 }
 
 impl From<Row> for AutomodReview {
@@ -56,6 +62,35 @@ impl From<Row> for AutomodReview {
             resolved_source: r.resolved_source,
             created_at: r.created_at,
             resolved_at: r.resolved_at,
+            voting_deadline: r.voting_deadline,
+            decided_action: r.decided_action,
+            quorum_met: r.quorum_met,
+            decided_at: r.decided_at,
+        }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct VoteRow {
+    id: Uuid,
+    review_id: Uuid,
+    voter_id: String,
+    voter_name: String,
+    vote_action: String,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+}
+
+impl From<VoteRow> for ReviewVote {
+    fn from(r: VoteRow) -> Self {
+        Self {
+            id: r.id,
+            review_id: r.review_id,
+            voter_id: r.voter_id,
+            voter_name: r.voter_name,
+            vote_action: r.vote_action,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
         }
     }
 }
@@ -71,11 +106,13 @@ impl PgAutomodReviewRepository {
 #[async_trait]
 impl AutomodReviewRepository for PgAutomodReviewRepository {
     async fn create(&self, r: NewAutomodReview) -> Result<AutomodReview, DomainError> {
+        // Mode vote si une echeance est fournie : statut 'voting'.
+        let status = if r.voting_deadline.is_some() { "voting" } else { "pending" };
         let row: Row = sqlx::query_as(
             "INSERT INTO automod_reviews \
                 (guild_id, channel_id, message_id, user_id, user_name, content_preview, \
-                 suggested_action, score, reason, flags) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) \
+                 suggested_action, score, reason, flags, status, voting_deadline) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) \
              RETURNING *",
         )
         .bind(r.guild_id.as_str())
@@ -88,6 +125,8 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .bind(r.score)
         .bind(&r.reason)
         .bind(&r.flags)
+        .bind(status)
+        .bind(r.voting_deadline)
         .fetch_one(&self.pool)
         .await
         .map_err(pg_err)?;
@@ -152,7 +191,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             "UPDATE automod_reviews SET \
                 status = $1, applied_action = $2, resolved_by_id = $3, \
                 resolved_by_name = $4, resolved_source = $5, resolved_at = NOW() \
-             WHERE id = $6 AND status = 'pending' \
+             WHERE id = $6 AND status IN ('pending','decided') \
              RETURNING *",
         )
         .bind(new_status)
@@ -183,5 +222,106 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 }
             }
         }
+    }
+
+    async fn upsert_vote(
+        &self,
+        review_id: Uuid,
+        voter_id: &str,
+        voter_name: &str,
+        vote_action: &str,
+    ) -> Result<(), DomainError> {
+        // Refuse le vote si la review n'est plus ouverte.
+        let status: Option<(String,)> =
+            sqlx::query_as("SELECT status FROM automod_reviews WHERE id = $1")
+                .bind(review_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
+        match status {
+            None => return Err(DomainError::NotFound(format!("review {review_id} introuvable"))),
+            Some((s,)) if s != "voting" => {
+                return Err(DomainError::Conflict(format!("vote ferme (status={s})")))
+            }
+            _ => {}
+        }
+
+        sqlx::query(
+            "INSERT INTO automod_review_votes (review_id, voter_id, voter_name, vote_action) \
+             VALUES ($1,$2,$3,$4) \
+             ON CONFLICT (review_id, voter_id) \
+             DO UPDATE SET vote_action = EXCLUDED.vote_action, \
+                           voter_name = EXCLUDED.voter_name, updated_at = NOW()",
+        )
+        .bind(review_id)
+        .bind(voter_id)
+        .bind(voter_name)
+        .bind(vote_action)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn list_votes(&self, review_id: Uuid) -> Result<Vec<ReviewVote>, DomainError> {
+        let rows: Vec<VoteRow> = sqlx::query_as(
+            "SELECT * FROM automod_review_votes WHERE review_id = $1 ORDER BY created_at",
+        )
+        .bind(review_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn decide(
+        &self,
+        id: Uuid,
+        decided_action: &str,
+        quorum_met: bool,
+    ) -> Result<AutomodReview, DomainError> {
+        let row: Option<Row> = sqlx::query_as(
+            "UPDATE automod_reviews SET \
+                status = 'decided', decided_action = $1, quorum_met = $2, decided_at = NOW() \
+             WHERE id = $3 AND status = 'voting' \
+             RETURNING *",
+        )
+        .bind(decided_action)
+        .bind(quorum_met)
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        match row {
+            Some(r) => Ok(r.into()),
+            None => {
+                let exists: Option<(String,)> =
+                    sqlx::query_as("SELECT status FROM automod_reviews WHERE id = $1")
+                        .bind(id)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .map_err(pg_err)?;
+                match exists {
+                    None => Err(DomainError::NotFound(format!("review {id} introuvable"))),
+                    Some((s,)) => Err(DomainError::Conflict(format!(
+                        "vote deja cloture (status={s})"
+                    ))),
+                }
+            }
+        }
+    }
+
+    async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError> {
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT * FROM automod_reviews \
+             WHERE status = 'voting' AND voting_deadline IS NOT NULL AND voting_deadline < NOW() \
+             ORDER BY voting_deadline ASC LIMIT $1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
     }
 }

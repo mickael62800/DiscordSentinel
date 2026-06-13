@@ -84,6 +84,10 @@ pub struct AutomodReviewDto {
     pub resolved_source: Option<String>,
     pub created_at: String,
     pub resolved_at: Option<String>,
+    pub voting_deadline: Option<String>,
+    pub decided_action: Option<String>,
+    pub quorum_met: bool,
+    pub decided_at: Option<String>,
 }
 
 impl From<AutomodReview> for AutomodReviewDto {
@@ -107,7 +111,25 @@ impl From<AutomodReview> for AutomodReviewDto {
             resolved_source: r.resolved_source,
             created_at: r.created_at.to_rfc3339(),
             resolved_at: r.resolved_at.map(|d| d.to_rfc3339()),
+            voting_deadline: r.voting_deadline.map(|d| d.to_rfc3339()),
+            decided_action: r.decided_action,
+            quorum_met: r.quorum_met,
+            decided_at: r.decided_at.map(|d| d.to_rfc3339()),
         }
+    }
+}
+
+/// DTO d'un vote individuel.
+#[derive(Debug, Serialize)]
+pub struct ReviewVoteDto {
+    pub voter_id: String,
+    pub voter_name: String,
+    pub vote_action: String,
+}
+
+impl From<sentinel_core::domain::entities::moderation::review::automod::ReviewVote> for ReviewVoteDto {
+    fn from(v: sentinel_core::domain::entities::moderation::review::automod::ReviewVote) -> Self {
+        Self { voter_id: v.voter_id, voter_name: v.voter_name, vote_action: v.vote_action }
     }
 }
 
@@ -146,6 +168,8 @@ pub struct CreateReviewBody {
     pub score: f64,
     pub reason: String,
     pub flags: Option<serde_json::Value>,
+    /// Si fourni (RFC3339), ouvre la review en mode VOTE avec cette echeance.
+    pub voting_deadline: Option<String>,
 }
 
 /// POST /api/automod/reviews
@@ -177,6 +201,11 @@ pub async fn create_review(
             score: body.score,
             reason: body.reason,
             flags: body.flags.unwrap_or(serde_json::json!({})),
+            voting_deadline: body
+                .voting_deadline
+                .as_deref()
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|d| d.with_timezone(&chrono::Utc)),
         })
         .await?;
 
@@ -199,6 +228,8 @@ pub struct ResolveReviewBody {
     pub applied_action: String,
     pub resolved_by_id: String,
     pub resolved_by_name: String,
+    /// "web" (defaut) ou "discord" (finalisation via bouton admin du bot).
+    pub source: Option<String>,
 }
 
 /// POST /api/automod/reviews/{review_id}/resolve
@@ -215,6 +246,10 @@ pub async fn resolve_review(
     let id = Uuid::parse_str(&review_id)
         .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
 
+    let source = match body.source.as_deref() {
+        Some("discord") => "discord",
+        _ => "web",
+    };
     let review = state
         .automod_reviews_uc
         .resolve(ResolveAutomodReviewCommand {
@@ -222,7 +257,7 @@ pub async fn resolve_review(
             applied_action: body.applied_action.clone(),
             resolved_by_id: body.resolved_by_id.clone(),
             resolved_by_name: body.resolved_by_name.clone(),
-            resolved_source: "web".into(),
+            resolved_source: source.into(),
         })
         .await?;
 
@@ -236,12 +271,90 @@ pub async fn resolve_review(
             "user_id": &review.user_id,
             "applied_action": &body.applied_action,
             "actor": {
-                "source": "web",
+                "source": source,
                 "id": &body.resolved_by_id,
                 "name": &body.resolved_by_name,
             },
         }),
     );
 
+    Ok(Json(review.into()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CastVoteBody {
+    pub voter_id: String,
+    pub voter_name: String,
+    /// "warn" | "delete" | "mute" | "ban" | "ignore".
+    pub vote_action: String,
+}
+
+/// POST /api/automod/reviews/{review_id}/vote
+pub async fn vote_review(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<CastVoteBody>,
+) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let votes = state
+        .automod_reviews_uc
+        .cast_vote(crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
+            review_id: id,
+            voter_id: body.voter_id.clone(),
+            voter_name: body.voter_name.clone(),
+            vote_action: body.vote_action.clone(),
+        })
+        .await?;
+    state.broadcaster.broadcast(
+        "automod_review_voted",
+        serde_json::json!({ "review_id": review_id, "votes": votes.len() }),
+    );
+    Ok(Json(votes.into_iter().map(Into::into).collect()))
+}
+
+/// GET /api/automod/reviews/{review_id}/votes
+pub async fn list_review_votes(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let votes = state.automod_reviews_uc.list_votes(id).await?;
+    Ok(Json(votes.into_iter().map(Into::into).collect()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DecideReviewBody {
+    pub quorum: i64,
+    /// "ignore" | "clemente" | "severe".
+    pub tie_action: String,
+}
+
+/// POST /api/automod/reviews/{review_id}/decide
+///
+/// Cloture le vote (appele par le worker a l'echeance). Depouille et passe
+/// la review en 'decided'. Publie `automod_review_decided` pour que le bot
+/// edite la carte et revele le bouton admin de finalisation.
+pub async fn decide_review(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<DecideReviewBody>,
+) -> Result<Json<AutomodReviewDto>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let quorum = body.quorum.clamp(1, 100) as usize;
+    let (review, tally) = state.automod_reviews_uc.decide(id, quorum, &body.tie_action).await?;
+    state.broadcaster.broadcast(
+        "automod_review_decided",
+        serde_json::json!({
+            "review_id": review.id.to_string(),
+            "action_id": review.id.to_string(),
+            "guild_id": &review.guild_id,
+            "decided_action": &review.decided_action,
+            "quorum_met": tally.quorum_met,
+            "total_votes": tally.total_votes,
+        }),
+    );
     Ok(Json(review.into()))
 }
