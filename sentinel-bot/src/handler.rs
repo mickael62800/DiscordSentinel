@@ -31,6 +31,7 @@ fn command_module(name: &str) -> &'static str {
         "blackjack-setup" => "blackjack",
         "slot-setup" => "slot",
         "wheel-setup" => "wheel",
+        "tama-setup" => "tamagotchi",
         "security" => "security",
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
@@ -452,6 +453,7 @@ impl EventHandler for Handler {
                         "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
                         "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
                         "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
+                        "tama-setup" => modules::tamagotchi::handle_command(&ctx, &command).await,
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
@@ -523,6 +525,8 @@ impl EventHandler for Handler {
                     modules::blackjack::on_component(&ctx, &component).await;
                 } else if modules::slot::handles_component(cid) {
                     modules::slot::on_component(&ctx, &component).await;
+                } else if modules::tamagotchi::handles_component(cid) {
+                    modules::tamagotchi::on_component(&ctx, &component).await;
                 } else if modules::wheel::handles_component(cid) {
                     modules::wheel::on_component(&ctx, &component).await;
                 } else if modules::security::handles_component(cid) {

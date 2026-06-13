@@ -14,6 +14,7 @@ pub mod moderation;
 pub mod progression;
 pub mod security;
 pub mod slot;
+pub mod tamagotchi;
 pub mod tickets;
 pub mod voice;
 pub mod welcome;

@@ -1,0 +1,57 @@
+//! Module Tamagotchi (compagnon virtuel).
+//!
+//! Jeu independant (coins partages). Panel global -> salon prive par joueur
+//! (comme la machine a sous). Dans le salon : choix d'espece a la naissance,
+//! puis carte du compagnon avec boutons de soin (Nourrir/Jouer/Dormir/Caliner).
+//! Le combat, l'entrainement, la boutique, la tenue et la visite viendront en
+//! jalons ulterieurs.
+
+pub const MODULE_BOT_NAME: &str = "tamagotchi-bot";
+
+mod panel;
+mod setup;
+
+use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};
+
+use crate::shared::discord_helpers::{
+    is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
+};
+
+pub fn register_commands() -> Vec<CreateCommand> {
+    vec![setup::register()]
+}
+
+pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
+    }
+    if command.data.name == "tama-setup" {
+        setup::handle(ctx, command).await;
+    }
+}
+
+pub fn handles_component(cid: &str) -> bool {
+    cid == setup::PANEL_OPEN_ID
+        || cid == panel::CLOSE_ID
+        || cid == panel::HIST_ID
+        || cid.starts_with(panel::PICK_PREFIX)
+        || cid.starts_with(panel::ACT_PREFIX)
+}
+
+pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
+    }
+    let cid = component.data.custom_id.as_str();
+    if cid == setup::PANEL_OPEN_ID {
+        panel::handle_open(ctx, component).await;
+    } else if cid.starts_with(panel::PICK_PREFIX) {
+        panel::handle_pick(ctx, component).await;
+    } else if cid.starts_with(panel::ACT_PREFIX) {
+        panel::handle_action(ctx, component).await;
+    } else if cid == panel::HIST_ID {
+        panel::handle_history(ctx, component).await;
+    } else if cid == panel::CLOSE_ID {
+        panel::handle_close(ctx, component).await;
+    }
+}
