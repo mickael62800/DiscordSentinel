@@ -5,6 +5,7 @@
 
 pub mod ai;
 pub mod analytics;
+pub mod automod;
 pub mod announcements;
 pub mod appeal_sla;
 pub mod audit_cache;

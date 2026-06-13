@@ -69,6 +69,22 @@ pub fn start(
     // Domaine : cache (warm Redis pour analytics, dashboard, voice)
     // Porte de l'ancien cache-worker.
     // ─────────────────────────────────────────────────────────────
+
+    // ─────────────────────────────────────────────────────────────
+    // Domaine : automod — cloture des votes de moderation a echeance
+    // ─────────────────────────────────────────────────────────────
+    spawn_periodic(
+        "automod_close_votes",
+        60,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "automod-bot",
+        move |pool| {
+            Box::pin(async move { domains::automod::close_votes::run(&pool).await })
+        },
+    );
+
     {
         let redis = redis_client.clone();
         spawn_periodic(
