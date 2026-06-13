@@ -91,7 +91,7 @@ fn execute_ban_dto_deserializes() {
     let dto: ExecuteBanDto = serde_json::from_str(
         r#"{"guild_id":"g","user_id":"u","reason":"spam"}"#
     ).unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.reason, "spam");
 }
 
@@ -101,7 +101,7 @@ fn execute_mute_dto_default_duration() {
         r#"{"guild_id":"g","user_id":"u","reason":"r"}"#
     ).unwrap();
     // duration a un default → doit etre present meme si absent du JSON
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
 }
 
 #[test]
@@ -109,7 +109,7 @@ fn execute_unban_dto_deserializes() {
     let dto: ExecuteUnbanDto = serde_json::from_str(
         r#"{"guild_id":"g","user_id":"u"}"#
     ).unwrap();
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
 }
 
 #[test]

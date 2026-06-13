@@ -13,7 +13,7 @@ fn taunt_event_dto_from_domain() {
         streak_value: 5,
     };
     let dto = TauntEventDto::from(e);
-    assert_eq!(dto.channel_id, "c1");
+    assert_eq!(dto.channel_id, "c1".into());
     assert_eq!(dto.target_user_id, "u1");
     assert_eq!(dto.message, "mocking");
     assert_eq!(dto.nickname_suffix, "le naze");

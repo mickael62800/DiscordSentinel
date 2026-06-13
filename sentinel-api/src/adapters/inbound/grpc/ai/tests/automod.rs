@@ -140,7 +140,7 @@ use super::*;
 
         let calls = uc.calls.lock().unwrap();
         assert_eq!(calls.len(), 1);
-        assert_eq!(calls[0].guild_id, "g1");
+        assert_eq!(calls[0].guild_id, "g1".into());
         assert_eq!(calls[0].content, "message content");
     }
 

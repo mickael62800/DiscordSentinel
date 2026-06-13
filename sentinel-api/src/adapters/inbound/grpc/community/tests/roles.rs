@@ -251,7 +251,7 @@ use super::*;
         })).await.unwrap();
         let calls = uc.set_msg_calls.lock().unwrap();
         assert_eq!(calls[0].panel_id, "p1");
-        assert_eq!(calls[0].message_id, "m1");
+        assert_eq!(calls[0].message_id, "m1".into());
     }
 
     #[tokio::test]

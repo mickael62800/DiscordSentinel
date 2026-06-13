@@ -31,7 +31,7 @@ fn slot_spin_dto_from_entity() {
     let spin = sample_spin();
     let dto = SlotSpinDto::from(spin.clone());
     assert_eq!(dto.id, spin.id.to_string());
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.username, "Alice");
     assert_eq!(dto.mise, 100);
     assert_eq!(dto.symbols, vec!["🍒".to_string(), "🍒".to_string(), "🍋".to_string()]);
@@ -100,7 +100,7 @@ fn top_winner_dto_from_entity() {
         spin_count: 25,
     };
     let dto = SlotTopWinnerDto::from(w);
-    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.user_id, "u1".into());
     assert_eq!(dto.username, "Alice");
     assert_eq!(dto.total_payout, 5000);
     assert_eq!(dto.jackpot_count, 2);

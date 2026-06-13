@@ -14,6 +14,7 @@ fn sample_action() -> ModerationAction {
         moderator_name: "Mod".into(),
         target_id: "u".into(),
         target_name: "Alice".into(),
+        target_display_name: None,
         action_type: "ban_temp".into(),
         reason: "spam".into(),
         gravity: Some(ModerationGravity::High),

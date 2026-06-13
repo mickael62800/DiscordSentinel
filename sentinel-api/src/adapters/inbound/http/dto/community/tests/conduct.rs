@@ -36,7 +36,7 @@ fn save_config_dto_to_command() {
         penalty_ban: 10,
     };
     let cmd: SaveConductConfigCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
+    assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.max_points, 20);
     assert_eq!(cmd.regen_interval, "daily");
     assert_eq!(cmd.penalty_ban, 10);
@@ -46,7 +46,7 @@ fn save_config_dto_to_command() {
 fn config_dto_from_entity_preserves_all_fields() {
     let c = ConductConfig::default_for_guild("g1");
     let dto: ConductConfigDto = c.into();
-    assert_eq!(dto.guild_id, "g1");
+    assert_eq!(dto.guild_id, "g1".into());
     assert_eq!(dto.max_points, 12);
     assert_eq!(dto.penalty_ban, 6);
 }

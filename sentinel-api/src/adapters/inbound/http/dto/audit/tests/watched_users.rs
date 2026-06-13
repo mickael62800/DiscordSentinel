@@ -25,7 +25,7 @@ fn sample_user(last: Option<chrono::DateTime<Utc>>) -> WatchedUser {
 fn from_watched_user_preserves_fields_and_formats_dates() {
     let last = Utc.with_ymd_and_hms(2024, 6, 15, 12, 30, 0).unwrap();
     let dto = WatchedUserResponseDto::from(sample_user(Some(last)));
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.username, "alice");
     assert_eq!(dto.risk_level, "high");
     assert_eq!(dto.total_mutes, 2);
@@ -52,7 +52,7 @@ fn from_user_dossier_maps_empty_collections() {
         notes: vec![],
     };
     let dto = UserDossierResponseDto::from(dossier);
-    assert_eq!(dto.user.user_id, "u");
+    assert_eq!(dto.user.user_id, "u".into());
     assert!(dto.infractions.is_empty());
     assert!(dto.moderation_actions.is_empty());
     assert!(dto.security_events.is_empty());

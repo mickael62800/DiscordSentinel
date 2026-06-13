@@ -19,6 +19,7 @@ use super::*;
             account_created: Some(ts()),
             is_bot: false,
             last_seen_at: Some(ts()),
+            left_at: None,
         }
     }
 
@@ -70,6 +71,7 @@ use super::*;
             guild_id: "g".into(),
             user_id: "u".into(),
             username: "x".into(),
+            display_name: None,
             avatar: None,
             roles_json: "not a json".into(),
             joined_at: None,

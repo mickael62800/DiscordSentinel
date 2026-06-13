@@ -43,7 +43,7 @@ fn from_dto_empty_uuid_falls_back_to_nil() {
 fn from_dto_preserves_all_fields() {
     let dto = make_dto("550e8400-e29b-41d4-a716-446655440000");
     let cmd: crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
+    assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.moderator_id, "m");
     assert_eq!(cmd.target_id, "t");
     assert_eq!(cmd.action_type, "warn");

@@ -44,7 +44,7 @@ fn sample_data() -> WelcomeConfigData {
 #[test]
 fn from_data_maps_all_fields() {
     let dto: WelcomeConfigDto = sample_data().into();
-    assert_eq!(dto.guild_id, "g1");
+    assert_eq!(dto.guild_id, "g1".into());
     assert!(dto.welcome_enabled);
     assert_eq!(dto.welcome_channel_id.as_deref(), Some("c-w"));
     assert_eq!(dto.welcome_message, "Bienvenue {user}");

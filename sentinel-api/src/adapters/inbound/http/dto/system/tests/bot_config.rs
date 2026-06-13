@@ -30,7 +30,7 @@ fn from_bot_guild_config_drops_id_and_timestamp() {
         updated_at: Utc::now(),
     };
     let dto = BotGuildConfigDto::from(c);
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.bot_name, "b");
     assert_eq!(dto.config_key, "k");
     assert_eq!(dto.config_value, "v");
@@ -42,7 +42,7 @@ fn set_config_deserializes() {
         "guild_id": "g", "bot_name": "b", "config_key": "k", "config_value": "v"
     }))
     .unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.config_value, "v");
 }
 

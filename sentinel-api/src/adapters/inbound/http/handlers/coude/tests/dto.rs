@@ -35,7 +35,7 @@ fn sample_player() -> Player {
 fn player_dto_from_ref_maps_all_fields() {
     let p = sample_player();
     let dto = PlayerDto::from(&p);
-    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.user_id, "u1".into());
     assert_eq!(dto.username, "alice");
     assert_eq!(dto.coins, 500);
     assert_eq!(dto.total_wins, 5);
@@ -71,7 +71,7 @@ fn player_dto_serializes_to_json() {
 fn get_or_create_player_deserializes() {
     let raw = r#"{"user_id":"u1","username":"Alice"}"#;
     let dto: GetOrCreatePlayerDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.user_id, "u1".into());
     assert_eq!(dto.username, "Alice");
 }
 
@@ -268,7 +268,7 @@ fn event_dto_from_domain() {
     };
     let dto = EventDto::from(e);
     assert_eq!(dto.id, id.to_string());
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert!(dto.active);
 }
 
@@ -293,8 +293,8 @@ fn current_season_dto_from_domain() {
 fn full_player_dto_from_domain_maps_all_fields() {
     let p = sample_player();
     let dto = FullPlayerDto::from(p);
-    assert_eq!(dto.guild_id, "g");
-    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.guild_id, "g".into());
+    assert_eq!(dto.user_id, "u1".into());
     assert_eq!(dto.class.as_deref(), Some("tank"));
     assert_eq!(dto.hp_current, 80);
     assert_eq!(dto.hp_max, 100);
@@ -421,7 +421,7 @@ fn leaderboard_entry_from_domain() {
         user_id: "u".into(), username: "Alice".into(), value: 12345,
     };
     let dto: LeaderboardEntry = e.into();
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.value, 12345);
 }
 
@@ -505,7 +505,7 @@ fn buy_insurance_dto_default_duration_zero() {
     let dto: BuyInsuranceDto = serde_json::from_value(
         serde_json::json!({"user_id": "u", "is_scam": true})
     ).unwrap();
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
     assert!(dto.is_scam);
     // Default est 0 avec #[serde(default)] (i64::default()).
     assert_eq!(dto.duration_seconds, 0);
@@ -566,7 +566,7 @@ fn set_betting_dto_deserializes() {
     let dto: SetBettingDto = serde_json::from_value(
         serde_json::json!({"message_id": "123"})
     ).unwrap();
-    assert_eq!(dto.message_id, "123");
+    assert_eq!(dto.message_id, "123".into());
 }
 
 #[test]

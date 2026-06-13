@@ -208,7 +208,7 @@ fn discord_user_with_null_avatar_in_json() {
 
 #[test]
 fn discord_channel_serializes_roundtrip() {
-    let c = DiscordChannel { id: "c".into(), name: "general".into(), position: 5 };
+    let c = DiscordChannel { id: "c".into(), name: "general".into(), position: 5, kind: "text".to_string() };
     let json = serde_json::to_value(&c).unwrap();
     let back: DiscordChannel = serde_json::from_value(json).unwrap();
     assert_eq!(back.position, 5);

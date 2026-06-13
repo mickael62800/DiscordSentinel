@@ -8,6 +8,7 @@ fn row_with_flags(flags: serde_json::Value) -> InfractionRow {
         channel_id: "c".into(),
         user_id: "u".into(),
         username: "alice".into(),
+        display_name: None,
         message_id: "m".into(),
         content: "hello".into(),
         flags,

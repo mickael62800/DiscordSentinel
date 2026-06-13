@@ -42,7 +42,7 @@ fn role_dto_handles_huge_permissions_bitfield() {
 fn role_dto_preserves_all_scalar_fields() {
     let dto = DiscordRoleDto::from(sample_role());
     assert_eq!(dto.id, "role-123");
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.name, "Admin");
     assert_eq!(dto.color, 0xFF0000);
     assert_eq!(dto.position, 5);

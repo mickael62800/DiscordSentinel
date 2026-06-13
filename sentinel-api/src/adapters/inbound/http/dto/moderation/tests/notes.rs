@@ -19,8 +19,8 @@ fn add_note_dto_to_command_preserves_fields() {
         category: "security".into(),
     };
     let cmd: AddNoteCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
-    assert_eq!(cmd.user_id, "u");
+    assert_eq!(cmd.guild_id, "g".into());
+    assert_eq!(cmd.user_id, "u".into());
     assert_eq!(cmd.content, "some note");
     assert_eq!(cmd.category, "security");
 }
@@ -77,8 +77,8 @@ fn add_note_dto_preserves_all_fields_into_command() {
         category: "watch".into(),
     };
     let cmd: AddNoteCommand = dto.into();
-    assert_eq!(cmd.guild_id, "guild-42");
-    assert_eq!(cmd.user_id, "user-99");
+    assert_eq!(cmd.guild_id, "guild-42".into());
+    assert_eq!(cmd.user_id, "user-99".into());
     assert_eq!(cmd.author_id, "mod-7");
     assert_eq!(cmd.content, "multiline\ncontent\nwith\nbreaks");
     assert_eq!(cmd.category, "watch");

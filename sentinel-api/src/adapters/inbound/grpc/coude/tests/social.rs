@@ -355,7 +355,7 @@ async fn log_daily_chaos_delegates_fields() {
         amount: 100,
     })).await.unwrap();
     let calls = s.log_chaos_calls.lock().unwrap();
-    assert_eq!(calls[0].guild_id, "g");
+    assert_eq!(calls[0].guild_id, "g".into());
     assert_eq!(calls[0].loser_id, "l");
     assert_eq!(calls[0].winner_name, "W");
     assert_eq!(calls[0].amount, 100);

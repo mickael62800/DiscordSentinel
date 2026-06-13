@@ -56,11 +56,11 @@ fn from_dto_truncation_counts_chars_not_bytes() {
 fn from_dto_copies_ids_and_flags() {
     let dto = make_dto("hi".into(), 0);
     let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
-    assert_eq!(cmd.channel_id, "c");
-    assert_eq!(cmd.user_id, "u");
+    assert_eq!(cmd.guild_id, "g".into());
+    assert_eq!(cmd.channel_id, "c".into());
+    assert_eq!(cmd.user_id, "u".into());
     assert_eq!(cmd.username, "alice");
-    assert_eq!(cmd.message_id, "m1");
+    assert_eq!(cmd.message_id, "m1".into());
     assert_eq!(cmd.timestamp, "2026-01-01T00:00:00Z");
 }
 

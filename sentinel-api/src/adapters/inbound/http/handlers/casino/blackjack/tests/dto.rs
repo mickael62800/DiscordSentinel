@@ -123,8 +123,8 @@ fn to_dto_player_hand_always_visible() {
 fn to_dto_preserves_scalar_fields() {
     let dto = to_dto(&sample_game("push"));
     assert_eq!(dto.id, Uuid::nil().to_string());
-    assert_eq!(dto.guild_id, "g1");
-    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.guild_id, "g1".into());
+    assert_eq!(dto.user_id, "u1".into());
     assert_eq!(dto.username, "alice");
     assert_eq!(dto.bet, 100);
     assert_eq!(dto.payout, 150);
@@ -147,7 +147,7 @@ fn to_dto_unfinished_at_none_preserved() {
 fn start_game_dto_deserializes() {
     let raw = r#"{"guild_id":"g","user_id":"u","username":"a","bet":100}"#;
     let dto: StartGameDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.bet, 100);
 }
 
@@ -155,7 +155,7 @@ fn start_game_dto_deserializes() {
 fn create_table_dto_deserializes() {
     let raw = r#"{"guild_id":"g","channel_id":"c","owner_id":"o","owner_name":"O"}"#;
     let dto: CreateTableDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.channel_id, "c");
+    assert_eq!(dto.channel_id, "c".into());
     assert_eq!(dto.owner_name, "O");
 }
 
@@ -163,5 +163,5 @@ fn create_table_dto_deserializes() {
 fn join_table_dto_deserializes() {
     let raw = r#"{"user_id":"u","user_name":"U"}"#;
     let dto: JoinTableDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
 }

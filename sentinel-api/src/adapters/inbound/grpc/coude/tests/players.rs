@@ -11,6 +11,7 @@ use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::entities::coude::player::XpProgress;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
+use sentinel_core::domain::entities::system::discord_ids::{GuildId, UserId};
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
@@ -45,7 +46,7 @@ fn make_player() -> Player {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayersUc {
-    async fn get_or_create(&self, g: String, u: String, name: String) -> Result<Player, DomainError> {
+    async fn get_or_create(&self, g: GuildId, u: UserId, name: String) -> Result<Player, DomainError> {
         let mut p = make_player();
         p.guild_id = g;
         p.user_id = u;

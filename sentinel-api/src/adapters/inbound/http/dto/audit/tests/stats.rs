@@ -152,10 +152,10 @@ fn record_voice_dto_to_command() {
         user_id: "u".into(),
         username: "alice".into(),
         seconds: 600,
-        channel_id: "c".into(),
+        channel_id: Some("c".into()),
         channel_name: "Voice".into(),
     };
     let cmd: RecordVoiceCommand = dto.into();
     assert_eq!(cmd.seconds, 600);
-    assert_eq!(cmd.channel_id, "c");
+    assert_eq!(cmd.channel_id, "c".into());
 }

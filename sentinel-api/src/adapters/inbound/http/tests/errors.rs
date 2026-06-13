@@ -37,9 +37,11 @@ async fn ticket_not_found_maps_to_404() {
 }
 
 #[tokio::test]
-async fn invalid_rule_maps_to_400() {
+async fn invalid_rule_maps_to_422() {
+    // Une regle invalide est une erreur de validation -> 422 (la variante
+    // dediee historique a ete fusionnee dans DomainError::ValidationError).
     let (status, _) = response_parts(ApiError(DomainError::ValidationError("x".into()))).await;
-    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
 #[tokio::test]

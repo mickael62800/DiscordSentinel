@@ -32,7 +32,7 @@ fn sample_spin() -> WheelSpin {
 fn spin_log_dto_from_entity() {
     let s = sample_spin();
     let dto = WheelSpinLogDto::from(s.clone());
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.username, "Alice");
     assert_eq!(dto.case_key, "jackpot");
     assert_eq!(dto.payout, 5000);

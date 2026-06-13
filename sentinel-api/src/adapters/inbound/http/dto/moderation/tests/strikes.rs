@@ -38,8 +38,8 @@ fn add_strike_no_infraction_id_stays_none() {
 #[test]
 fn add_strike_copies_all_fields() {
     let cmd: AddStrikeCommand = base_add_dto(None).into();
-    assert_eq!(cmd.guild_id, "g");
-    assert_eq!(cmd.user_id, "u");
+    assert_eq!(cmd.guild_id, "g".into());
+    assert_eq!(cmd.user_id, "u".into());
     assert_eq!(cmd.reason, "spam");
     assert_eq!(cmd.source, "automod");
 }
@@ -70,7 +70,7 @@ fn save_config_dto_into_command_preserves_thresholds() {
         enabled: true,
     };
     let cmd = dto.into_command("g1".into());
-    assert_eq!(cmd.guild_id, "g1");
+    assert_eq!(cmd.guild_id, "g1".into());
     assert_eq!(cmd.window_secs, 3600);
     assert_eq!(cmd.thresholds.len(), 3);
     assert_eq!(cmd.thresholds[0].strikes, 1);
@@ -101,7 +101,7 @@ fn strike_config_dto_from_domain() {
         updated_at: chrono::Utc::now(),
     };
     let dto: StrikeConfigDto = config.into();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.window_secs, 7200);
     assert_eq!(dto.thresholds.len(), 1);
     assert!(dto.enabled);

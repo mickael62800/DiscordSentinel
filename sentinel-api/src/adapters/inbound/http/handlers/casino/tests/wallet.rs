@@ -13,7 +13,7 @@ fn credit_debit_dto_deserializes() {
 fn transfer_dto_deserializes() {
     let raw = r#"{"guild_id":"g","from_user_id":"u1","to_user_id":"u2","amount":100,"source":"don","description":"cadeau"}"#;
     let dto: TransferDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.from_user_id, "u1");
     assert_eq!(dto.to_user_id, "u2");
     assert_eq!(dto.amount, 100);

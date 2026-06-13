@@ -28,7 +28,7 @@ fn create_dto_to_command_preserves_all_fields() {
         details: serde_json::json!({"from": "x"}),
     };
     let cmd: CreateAuditLogCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
+    assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.event_type, "role.update");
     assert_eq!(cmd.actor_name.as_deref(), Some("Admin"));
     assert_eq!(cmd.details["from"], "x");

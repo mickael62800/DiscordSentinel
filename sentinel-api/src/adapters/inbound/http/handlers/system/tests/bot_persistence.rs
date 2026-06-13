@@ -57,7 +57,7 @@ fn create_sponsorship_dto_deserializes() {
 fn create_temp_role_dto_deserializes() {
     let raw = r#"{"guild_id":"g","user_id":"u","role_id":"r","expires_at":"2026-12-31T23:59:59Z"}"#;
     let dto: CreateTempRoleDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.role_id, "r");
+    assert_eq!(dto.role_id, "r".into());
     assert_eq!(dto.expires_at, "2026-12-31T23:59:59Z");
 }
 

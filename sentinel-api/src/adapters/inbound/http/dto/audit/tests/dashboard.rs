@@ -25,6 +25,7 @@ fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
         user_id: "u".into(),
         username: "alice".into(),
         message_id: "m".into(),
+        display_name: None,
         content: "hi".into(),
         flags: flags(),
         score: 0.5,
@@ -44,6 +45,7 @@ fn sample_action() -> ModerationAction {
         moderator_name: "Mod".into(),
         target_id: "u".into(),
         target_name: "alice".into(),
+        target_display_name: None,
         action_type: "ban".into(),
         reason: "r".into(),
         gravity: Some(ModerationGravity::High),
@@ -204,7 +206,7 @@ fn guild_dto_preserves_fields() {
         registered_at: Utc::now(), updated_at: Utc::now(),
     };
     let dto = GuildDto::from(g);
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.member_count, 42);
     assert_eq!(dto.icon.as_deref(), Some("i"));
 }

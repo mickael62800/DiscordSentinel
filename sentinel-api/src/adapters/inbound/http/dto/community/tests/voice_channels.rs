@@ -74,7 +74,7 @@ use super::*;
         let id = ch.id;
         let dto = VoiceChannelResponseDto::from(ch);
         assert_eq!(dto.id, id.to_string());
-        assert_eq!(dto.guild_id, "guild1");
+        assert_eq!(dto.guild_id, "guild1".into());
         assert_eq!(dto.kind, "private");
         assert_eq!(dto.member_limit, Some(10));
         assert!(!dto.stage_enabled);
@@ -162,7 +162,7 @@ use super::*;
             sort_order: 0,
         };
         let cmd: CreateThemeCommand = dto.into();
-        assert_eq!(cmd.guild_id, ""); // set by handler
+        assert_eq!(cmd.guild_id, "".into()); // set by handler
         assert_eq!(cmd.name, "Test");
     }
 
@@ -225,7 +225,7 @@ use super::*;
             queue_enabled: true, stage_enabled: true,
         };
         let cmd: CreateVoiceChannelCommand = dto.into();
-        assert_eq!(cmd.guild_id, "g");
+        assert_eq!(cmd.guild_id, "g".into());
         assert_eq!(cmd.kind, "private");
         assert!(cmd.queue_enabled);
         assert!(cmd.stage_enabled);
@@ -280,7 +280,7 @@ use super::*;
         let dto: AddCoAdminDto = serde_json::from_value(
             serde_json::json!({"user_id": "u", "user_name": "U"})
         ).unwrap();
-        assert_eq!(dto.user_id, "u");
+        assert_eq!(dto.user_id, "u".into());
     }
 
     #[test]
@@ -321,7 +321,7 @@ use super::*;
             max_uses: Some(5),
         };
         let cmd: CreateInviteLinkCommand = dto.into();
-        assert_eq!(cmd.channel_id, ""); // set by handler
+        assert_eq!(cmd.channel_id, "".into()); // set by handler
         assert_eq!(cmd.duration_secs, Some(1800));
         assert_eq!(cmd.max_uses, Some(5));
     }
@@ -331,7 +331,7 @@ use super::*;
         let dto: UseInviteLinkDto = serde_json::from_value(
             serde_json::json!({"user_id": "u", "user_name": "U"})
         ).unwrap();
-        assert_eq!(dto.user_id, "u");
+        assert_eq!(dto.user_id, "u".into());
     }
 
     // ── CoAdmin / Whitelist / Ban response DTOs ──
@@ -346,7 +346,7 @@ use super::*;
             granted_at: Utc::now(),
         };
         let dto: CoAdminResponseDto = ca.into();
-        assert_eq!(dto.user_id, "u");
+        assert_eq!(dto.user_id, "u".into());
         assert_eq!(dto.user_name, "Name");
         assert!(dto.granted_at.contains("T"));
     }
@@ -379,7 +379,7 @@ use super::*;
             created_at: Utc::now(),
         };
         let dto: BanResponseDto = b.into();
-        assert_eq!(dto.user_id, "bad");
+        assert_eq!(dto.user_id, "bad".into());
         assert_eq!(dto.reason.as_deref(), Some("toxic"));
         assert!(dto.expires_at.is_some());
     }

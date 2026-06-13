@@ -25,7 +25,7 @@ fn report_event_to_command() {
         user_ids: vec!["u1".into(), "u2".into()],
     };
     let cmd: ReportSecurityEventCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
+    assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.event_type, "raid");
     assert_eq!(cmd.severity, "high");
     assert_eq!(cmd.description, "d");
@@ -46,7 +46,7 @@ fn from_security_event_maps_all_fields() {
     let id = ev.id.to_string();
     let dto = SecurityEventResponseDto::from(ev);
     assert_eq!(dto.id, id);
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.user_ids, vec!["u".to_string()]);
     assert!(dto.created_at.contains('T'));
 }

@@ -12,6 +12,7 @@ fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
         channel_id: "c".into(),
         user_id: "u".into(),
         username: "alice".into(),
+        display_name: None,
         message_id: "m".into(),
         content: "hello".into(),
         flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },

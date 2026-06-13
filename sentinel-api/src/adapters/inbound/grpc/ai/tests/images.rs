@@ -106,7 +106,7 @@ use super::*;
         assert_eq!(inner.classifications.len(), 1);
 
         let calls = uc.calls.lock().unwrap();
-        assert_eq!(calls[0].guild_id, "g");
+        assert_eq!(calls[0].guild_id, "g".into());
         assert_eq!(calls[0].filename, "pic.png");
         assert_eq!(calls[0].content_type, "image/png");
         assert_eq!(calls[0].image_bytes.len(), 4);

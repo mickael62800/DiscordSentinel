@@ -81,7 +81,7 @@ fn set_message_id_dto_to_command() {
     let dto = SetMessageIdDto { panel_id: "p".into(), message_id: "m".into() };
     let cmd: SetMessageIdCommand = dto.into();
     assert_eq!(cmd.panel_id, "p");
-    assert_eq!(cmd.message_id, "m");
+    assert_eq!(cmd.message_id, "m".into());
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn create_auto_role_dto_to_command_default_delay() {
     })).unwrap();
     assert_eq!(dto.delay_secs, 0);
     let cmd: CreateAutoRoleCommand = dto.into();
-    assert_eq!(cmd.guild_id, "g");
+    assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.delay_secs, 0);
 }
 
@@ -114,7 +114,7 @@ fn from_role_panel_entry_preserves_fields() {
     let id = entry.id.to_string();
     let dto = RolePanelEntryDto::from(entry);
     assert_eq!(dto.id, id);
-    assert_eq!(dto.role_id, "r1");
+    assert_eq!(dto.role_id, "r1".into());
     assert_eq!(dto.position, 7);
     assert_eq!(dto.emoji.as_deref(), Some("🎮"));
 }
@@ -130,7 +130,7 @@ fn from_role_panel_detail_aggregates() {
     let dto = RolePanelDetailDto::from(detail);
     assert_eq!(dto.entries.len(), 2);
     assert_eq!(dto.entries[1].position, 1);
-    assert_eq!(dto.panel.guild_id, "g");
+    assert_eq!(dto.panel.guild_id, "g".into());
 }
 
 #[test]

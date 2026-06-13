@@ -334,7 +334,7 @@ use super::*;
         let _ = VoiceChannelBan {
             id: Uuid::new_v4(),
             voice_channel_id: Uuid::new_v4(),
-            user_id: String::new(), user_name: String::new(),
+            user_id: String::new().into(), user_name: String::new(),
             banned_by: String::new(), reason: None,
             expires_at: None, created_at: Utc::now(),
         };

@@ -37,6 +37,6 @@ fn update_member_payload_full() {
 fn sync_members_payload_empty_array() {
     let raw = r#"{"guild_id":"g","members":[]}"#;
     let p: SyncMembersPayload = serde_json::from_str(raw).unwrap();
-    assert_eq!(p.guild_id, "g");
+    assert_eq!(p.guild_id, "g".into());
     assert!(p.members.is_empty());
 }

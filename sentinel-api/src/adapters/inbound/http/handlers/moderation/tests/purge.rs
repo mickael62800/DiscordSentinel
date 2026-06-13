@@ -4,7 +4,7 @@ use super::*;
 fn purge_by_days_dto_deserializes() {
     let raw = r#"{"guild_id":"g","days":30}"#;
     let dto: PurgeByDaysDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.days, 30);
 }
 

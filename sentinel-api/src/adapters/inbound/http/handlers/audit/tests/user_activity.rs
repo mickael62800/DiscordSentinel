@@ -19,7 +19,7 @@ fn create_activity_dto_deserialize_with_all_fields() {
         "metadata": {"foo": "bar"}
     }"#;
     let dto: CreateActivityDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.guild_id, "g1");
+    assert_eq!(dto.guild_id, "g1".into());
     assert_eq!(dto.event_type, "message");
     assert_eq!(dto.channel_id.as_deref(), Some("c1"));
     assert_eq!(dto.content.as_deref(), Some("hello world"));

@@ -70,7 +70,7 @@ fn request_deserializes_all_fields() {
         "filename": "pic.png"
     });
     let dto: AnalyzeImageRequestDto = serde_json::from_value(raw).unwrap();
-    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.image_data, "aGVsbG8=");
     assert_eq!(dto.content_type, "image/png");
     assert_eq!(dto.filename, "pic.png");

@@ -45,7 +45,7 @@ fn set_role_id_dto_with_value() {
 fn save_panel_dto_minimal() {
     let raw = r#"{"channel_id":"c","message_id":"m"}"#;
     let dto: SavePanelDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.channel_id, "c");
+    assert_eq!(dto.channel_id, "c".into());
     assert!(dto.category.is_none());
 }
 

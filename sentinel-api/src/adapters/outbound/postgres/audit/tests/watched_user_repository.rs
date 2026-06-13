@@ -94,7 +94,7 @@ fn risk_level_mute_upgrades_low_to_high() {
 fn fields_are_copied_unchanged() {
     let r = row(3, 1, 0);
     let w: WatchedUser = r.into();
-    assert_eq!(w.user_id, "u");
+    assert_eq!(w.user_id, "u".into());
     assert_eq!(w.username, "alice");
     assert_eq!(w.total_warns, 3);
     assert_eq!(w.total_mutes, 1);

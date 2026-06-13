@@ -25,8 +25,8 @@ fn watched_users_query_full() {
 fn add_watch_dto_default_reason_empty() {
     let raw = r#"{"guild_id":"g","user_id":"u","username":"Alice"}"#;
     let dto: AddWatchDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.guild_id, "g");
-    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.guild_id, "g".into());
+    assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.username, "Alice");
     assert!(dto.reason.is_empty());
 }
