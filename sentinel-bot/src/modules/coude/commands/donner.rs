@@ -76,7 +76,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         })
         .unwrap_or_default();
 
-    let quantite = command
+    let quantite_opt: Option<i64> = command
         .data
         .options
         .iter()
@@ -84,8 +84,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value {
             CommandDataOptionValue::Integer(v) => Some(*v),
             _ => None,
-        })
-        .unwrap_or(1);
+        });
+    // Defaut 1 pour les items ; pour les coins on exige explicitement le champ.
+    let quantite = quantite_opt.unwrap_or(1);
 
     let donor_id = command.user.id.to_string();
     let target_id_str = target_id.to_string();
@@ -134,7 +135,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if don_type == "coins" {
         // ── Don de coins (avec taxe 10%, cooldown 1h) ──
-        let amount = quantite;
+        // Le montant DOIT venir du champ `quantite`. S'il est absent, on
+        // l'explique clairement au lieu du trompeur "don minimum 10".
+        let amount = match quantite_opt {
+            Some(v) => v,
+            None => {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    "Indique le montant du don dans le champ **quantite** (ex : quantite: 50).",
+                )
+                .await;
+                return;
+            }
+        };
 
         if amount < config.gift_min_coins() {
             reply_ephemeral(
