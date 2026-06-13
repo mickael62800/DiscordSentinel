@@ -36,9 +36,12 @@ pub(super) async fn send_review_card(
             let cfg = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
             if BaseApiClient::config_bool(&cfg, "vote_enabled", false) {
                 let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
+                let context_before = BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8;
+                let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
                 drop(data);
                 super::vote::post_vote_card(
-                    ctx, msg, suggested_action, reason, score, flags, review_channel_id, deadline_hours,
+                    ctx, msg, suggested_action, reason, score, flags, review_channel_id,
+                    deadline_hours, context_before, thread_enabled,
                 )
                 .await;
                 return;

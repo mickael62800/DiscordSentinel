@@ -69,6 +69,8 @@ pub(super) async fn post_vote_card(
     flags: &detectors::DetectionFlags,
     review_channel_id: u64,
     deadline_hours: i64,
+    context_before: u8,
+    thread_enabled: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -117,16 +119,30 @@ pub(super) async fn post_vote_card(
         }
     };
 
-    // 2. Construire la carte.
-    let embed = vote_embed(
+    // 2. Recuperer le contexte (N messages avant) pour aider les moderateurs.
+    let context = fetch_context_before(ctx, msg, context_before).await;
+
+    // 3. Construire la carte.
+    let mut embed = vote_embed(
         &user_id, &msg.author.name, &channel_id, score, &content_preview, reason, flags,
         suggested_str, &deadline, &[],
     );
-    let row = vote_buttons(&review_id);
+    if !context.is_empty() {
+        embed = embed.field("Contexte (messages precedents)", context, false);
+    }
+
+    // Bouton lien : clic -> saute directement sur le message dans le salon.
+    let msg_url = format!(
+        "https://discord.com/channels/{}/{}/{}",
+        guild_id, channel_id, message_id
+    );
+    let link_row = serenity::builder::CreateActionRow::Buttons(vec![
+        serenity::builder::CreateButton::new_link(msg_url).label("Aller au message"),
+    ]);
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
-        .components(vec![row]);
+        .components(vec![vote_buttons(&review_id), link_row]);
 
     let posted = match serenity::model::id::ChannelId::new(review_channel_id)
         .send_message(&ctx.http, builder)
@@ -151,7 +167,69 @@ pub(super) async fn post_vote_card(
         )
         .await;
     }
+    // Fil de discussion attache a la carte (debat des moderateurs).
+    if thread_enabled {
+        let thread_name = format!("Vote — {}", msg.author.name);
+        let thread_name: String = thread_name.chars().take(90).collect();
+        if let Err(e) = posted
+            .channel_id
+            .create_thread_from_message(
+                &ctx.http,
+                posted.id,
+                serenity::builder::CreateThread::new(thread_name)
+                    .auto_archive_duration(serenity::model::channel::AutoArchiveDuration::ThreeDays),
+            )
+            .await
+        {
+            warn!(error = %e, "Echec creation fil de discussion sur la carte de vote (permission CREATE_PUBLIC_THREADS ?)");
+        }
+    }
+
     info!(review_id, "Carte de vote automod postee");
+}
+
+/// Recupere jusqu'a `n` messages precedant le message signale et les rend
+/// en bloc chronologique (du plus ancien au plus recent). Tronque pour
+/// respecter la limite d'un field embed (1024 caracteres).
+async fn fetch_context_before(ctx: &Context, msg: &Message, n: u8) -> String {
+    if n == 0 {
+        return String::new();
+    }
+    let limit = n.min(25);
+    let before = match msg
+        .channel_id
+        .messages(
+            &ctx.http,
+            serenity::builder::GetMessages::new().before(msg.id).limit(limit),
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec recuperation contexte (messages avant)");
+            return String::new();
+        }
+    };
+    // L'API renvoie du plus recent au plus ancien -> on inverse.
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for m in before.iter().rev() {
+        let content = super::review::sanitize_embed_content(&m.content, 120);
+        let content = if content.trim().is_empty() {
+            "*(pièce jointe / embed)*".to_string()
+        } else {
+            content
+        };
+        let line = format!("**{}** : {}", m.author.name, content);
+        // Limite field embed = 1024 ; on garde une marge.
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
 }
 
 fn vote_buttons(review_id: &str) -> serenity::builder::CreateActionRow {
