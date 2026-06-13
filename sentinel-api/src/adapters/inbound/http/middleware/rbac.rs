@@ -57,17 +57,19 @@ pub struct RoleContext {
 
 pub async fn rbac_middleware(
     State(state): State<AppState>,
-    mut request: Request<Body>,
+    request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    let (mut parts, body) = request.into_parts();
+
     // 1. Recuperer le token Discord. Absent ⇒ pass-through (appel bot/internal).
-    let discord_token = match request
-        .headers()
+    let discord_token = match parts
+        .headers
         .get(DISCORD_TOKEN_HEADER)
         .and_then(|v| v.to_str().ok())
     {
         Some(t) if !t.is_empty() => t.to_string(),
-        _ => return Ok(next.run(request).await),
+        _ => return Ok(next.run(Request::from_parts(parts, body)).await),
     };
 
     // 2. Fetch user_id (cache Redis + fallback Discord API)
@@ -79,9 +81,13 @@ pub async fn rbac_middleware(
         }
     };
 
-    // 3. Extraire guild_id depuis l'URI (heuristique identique a guild_auth)
-    let path = request.uri().path().to_string();
-    let guild_id = extract_guild_id_from_path(&path);
+    // 3. Extraire guild_id. Source autoritaire : le parametre de route
+    // `{guild_id}` matche par axum ; fallback heuristique sinon (identique a
+    // guild_auth, meme logique de resolution).
+    let path = parts.uri.path().to_string();
+    let guild_id = super::guild_auth::guild_id_from_route_param(&mut parts, &state)
+        .await
+        .or_else(|| extract_guild_id_from_path(&path));
 
     // 4. Role pour cette (user, guild). Si pas de guild, on passe sans role.
     //
@@ -114,12 +120,13 @@ pub async fn rbac_middleware(
     };
 
     // 5. Injection dans les extensions
-    request.extensions_mut().insert(RoleContext {
+    parts.extensions.insert(RoleContext {
         discord_user_id: user_id,
         role,
         guild_id,
     });
 
+    let request = Request::from_parts(parts, body);
     Ok(next.run(request).await)
 }
 

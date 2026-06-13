@@ -38,19 +38,27 @@ pub async fn guild_auth_middleware(
     request: Request<Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
+    let (mut parts, body) = request.into_parts();
+
     // 1. Recuperer le token Discord. Absent ⇒ pas un appel desktop ⇒ pass-through.
-    let discord_token = match request
-        .headers()
+    let discord_token = match parts
+        .headers
         .get(DISCORD_TOKEN_HEADER)
         .and_then(|v| v.to_str().ok())
     {
         Some(t) if !t.is_empty() => t.to_string(),
-        _ => return Ok(next.run(request).await),
+        _ => return Ok(next.run(Request::from_parts(parts, body)).await),
     };
 
-    // 2. Extraire le guild_id depuis l'URI. Si absent ⇒ endpoint global ⇒ pass.
-    let path = request.uri().path();
-    let guild_id = match extract_guild_id_from_path(path) {
+    // 2. Extraire le guild_id. Source AUTORITAIRE : le parametre de route
+    // `{guild_id}` reellement matche par axum (pas de devinette). Fallback
+    // sur l'ancienne heuristique uniquement si la route n'a pas ce parametre.
+    let path = parts.uri.path().to_string();
+    let guild_id = guild_id_from_route_param(&mut parts, &state)
+        .await
+        .or_else(|| extract_guild_id_from_path(&path));
+    let request = Request::from_parts(parts, body);
+    let guild_id = match guild_id {
         Some(g) => g,
         None => return Ok(next.run(request).await),
     };
@@ -74,6 +82,23 @@ pub async fn guild_auth_middleware(
     }
 
     Ok(next.run(request).await)
+}
+
+/// Extrait la valeur du parametre de route nomme exactement `guild_id` tel
+/// que matche par le routeur axum. Robuste (pas de devinette) : ne renvoie
+/// une valeur que si la route declare reellement un `{guild_id}`. Pour les
+/// routes sans ce parametre (ex: `/api/games/servers/{server_id}`), renvoie
+/// None et on retombe sur l'heuristique historique.
+pub(crate) async fn guild_id_from_route_param(
+    parts: &mut axum::http::request::Parts,
+    state: &AppState,
+) -> Option<String> {
+    use axum::extract::{FromRequestParts, RawPathParams};
+    let params = RawPathParams::from_request_parts(parts, state).await.ok()?;
+    params
+        .iter()
+        .find(|(k, _)| *k == "guild_id")
+        .map(|(_, v)| v.to_string())
 }
 
 /// Cherche `{guild_id}` dans le path. Heuristique : on prend le premier
