@@ -313,6 +313,19 @@ pub async fn vote_review(
     Ok(Json(votes.into_iter().map(Into::into).collect()))
 }
 
+/// GET /api/automod/reviews/{review_id}
+pub async fn get_review(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+) -> Result<Json<AutomodReviewDto>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    match state.automod_reviews_uc.get(id).await? {
+        Some(r) => Ok(Json(r.into())),
+        None => Err(ApiError::from(DomainError::NotFound(format!("review {review_id} introuvable")))),
+    }
+}
+
 /// GET /api/automod/reviews/{review_id}/votes
 pub async fn list_review_votes(
     State(state): State<AppState>,

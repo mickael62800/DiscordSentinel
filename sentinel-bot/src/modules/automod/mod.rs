@@ -11,6 +11,7 @@ mod config;
 pub mod detectors;
 mod message_handler;
 mod review;
+mod vote;
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -78,14 +79,23 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 /// Returns true if the component custom_id belongs to automod review buttons.
 pub fn handles_component(custom_id: &str) -> bool {
     custom_id.starts_with(AM_PREFIX)
+        || custom_id.starts_with(vote::VOTE_PREFIX)
+        || custom_id.starts_with(vote::FINALIZE_PREFIX)
 }
 
-/// Handle a component interaction (review button click).
+/// Handle a component interaction (review/vote button click).
 pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
     if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
         return;
     }
-    review::handle_review_button(ctx, component).await;
+    let cid = component.data.custom_id.as_str();
+    if cid.starts_with(vote::VOTE_PREFIX) {
+        vote::handle_vote_button(ctx, component).await;
+    } else if cid.starts_with(vote::FINALIZE_PREFIX) {
+        vote::handle_finalize_button(ctx, component).await;
+    } else {
+        review::handle_review_button(ctx, component).await;
+    }
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -129,6 +139,7 @@ pub fn spawn_background_tasks(ctx: &Context) {
                 let ctx = ctx_redis.clone();
                 async move {
                     review::handle_redis_event(&ctx, &payload).await;
+                    vote::handle_decided_event(&ctx, &payload).await;
                 }
             },
         )

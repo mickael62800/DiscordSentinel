@@ -28,6 +28,10 @@ fn automod_inner() -> Router<AppState> {
             post(handlers::moderation::automod::resolve_review),
         )
         .route(
+            "/reviews/{review_id}",
+            get(handlers::moderation::automod::get_review),
+        )
+        .route(
             "/reviews/{review_id}/vote",
             post(handlers::moderation::automod::vote_review),
         )

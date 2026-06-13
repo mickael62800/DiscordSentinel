@@ -27,6 +27,25 @@ pub(super) async fn send_review_card(
     colors: &EmbedColors,
 ) {
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+    // Mode VOTE : si vote_enabled, on delegue a la carte de vote des
+    // moderateurs (au lieu de la validation 1-clic).
+    {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            let cfg = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
+            if BaseApiClient::config_bool(&cfg, "vote_enabled", false) {
+                let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
+                drop(data);
+                super::vote::post_vote_card(
+                    ctx, msg, suggested_action, reason, score, flags, review_channel_id, deadline_hours,
+                )
+                .await;
+                return;
+            }
+        }
+    }
+
     let channel_id = msg.channel_id.to_string();
     let message_id = msg.id.to_string();
     let user_id = msg.author.id.to_string();
