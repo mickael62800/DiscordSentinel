@@ -58,6 +58,35 @@ async fn get_api(ctx: &Context) -> Option<std::sync::Arc<BaseApiClient>> {
     data.get::<ApiClientKey>().map(std::sync::Arc::clone)
 }
 
+/// Lit l'ID du proprietaire depuis le topic du salon (`[tama:<id>]`).
+async fn channel_owner_id(ctx: &Context, channel_id: ChannelId) -> Option<u64> {
+    let topic = match channel_id.to_channel(&ctx.http).await {
+        Ok(serenity::model::channel::Channel::Guild(gc)) => gc.topic,
+        _ => None,
+    }?;
+    let start = topic.find("[tama:")? + "[tama:".len();
+    let end = topic[start..].find(']')? + start;
+    topic[start..end].parse::<u64>().ok()
+}
+
+/// Verifie que l'auteur du clic est bien le proprietaire du salon. Repond un
+/// message ephemere et retourne false sinon. SECURITE : empeche un autre
+/// membre d'agir sur le compagnon (choix d'espece, soins) dans ce salon.
+async fn ensure_owner(ctx: &Context, component: &ComponentInteraction) -> bool {
+    match channel_owner_id(ctx, component.channel_id).await {
+        Some(owner) if owner == component.user.id.get() => true,
+        Some(_) => {
+            reply_ephemeral(ctx, component, "Ce n'est pas ton compagnon — ouvre le tien via le panneau.").await;
+            false
+        }
+        // Pas de topic exploitable : on n'autorise pas (fail-closed).
+        None => {
+            reply_ephemeral(ctx, component, "Salon invalide.").await;
+            false
+        }
+    }
+}
+
 // ── Ouverture du salon prive ──
 
 pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
@@ -127,6 +156,9 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
 // ── Choix d'espece (naissance) ──
 
 pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
     let species = component.data.custom_id.strip_prefix(PICK_PREFIX).unwrap_or("").to_string();
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
@@ -158,6 +190,9 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
 // ── Actions de soin ──
 
 pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
     let action = component.data.custom_id.strip_prefix(ACT_PREFIX).unwrap_or("").to_string();
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = component.user.id.to_string();
@@ -218,6 +253,9 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
 }
 
 pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
     let pet = fetch_pet(&api, &guild_id, &component.user.id.to_string()).await;
@@ -231,6 +269,9 @@ pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
 }
 
 pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_owner(ctx, component).await {
+        return;
+    }
     // Supprime le salon prive.
     if let Err(e) = component.channel_id.delete(&ctx.http).await {
         warn!(error = %e, "Echec suppression salon tamagotchi");
