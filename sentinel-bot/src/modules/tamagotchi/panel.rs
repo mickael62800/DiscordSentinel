@@ -2,10 +2,13 @@
 
 use serenity::all::{
     ButtonStyle, ChannelId, ChannelType, ComponentInteraction, Context, CreateActionRow,
-    CreateButton, CreateChannel, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
-    EditInteractionResponse, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId,
+    CreateAttachment, CreateButton, CreateChannel, CreateEmbed, CreateEmbedFooter,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu,
+    CreateSelectMenuKind, EditInteractionResponse, PermissionOverwrite, PermissionOverwriteType,
+    Permissions, RoleId,
 };
+
+use super::card_render::{render_card_png, CardData};
 use tracing::{error, warn};
 
 use crate::shared::api_client::BaseApiClient;
@@ -43,6 +46,8 @@ struct PetEventDto {
 struct PetDto {
     name: String,
     species: String,
+    #[serde(default)]
+    born_at: String,
     level: i32,
     xp_in_level: i64,
     xp_for_level: i64,
@@ -150,7 +155,9 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     // Pet existant ?
     let pet = fetch_pet(&api, &guild_id.to_string(), &user_id.to_string()).await;
     let msg = match pet {
-        Some(p) if p.status != "dead" => card_message(&p),
+        Some(p) if p.status != "dead" => {
+            card_message(&api, &guild_id.to_string(), &user_id.to_string(), &p).await
+        }
         _ => species_choice_message(),
     };
     let _ = channel.id.send_message(&ctx.http, msg).await;
@@ -178,13 +185,9 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
     });
     match api.post_json::<_, PetDto>("/api/tamagotchi/pets", &body).await {
         Ok(pet) => {
+            let resp = update_from_card(&api, &guild_id, &component.user.id.to_string(), &pet).await;
             let _ = component
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::UpdateMessage(
-                        update_from_card(&pet),
-                    ),
-                )
+                .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
                 .await;
         }
         Err(e) => {
@@ -248,8 +251,9 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
 
     match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
         Ok(updated) => {
+            let resp = update_from_card(&api, &guild_id, &user_id, &updated).await;
             let _ = component
-                .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(update_from_card(&updated)))
+                .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
                 .await;
         }
         Err(e) => {
@@ -277,7 +281,10 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
         "cooldown_secs": BaseApiClient::config_u64(&cfg, "train_cooldown_secs", 7200) as i64,
     });
     match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/train"), &body).await {
-        Ok(p) => { let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(update_from_card(&p))).await; }
+        Ok(p) => {
+            let resp = update_from_card(&api, &guild_id, &user_id, &p).await;
+            let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp)).await;
+        }
         Err(e) => { warn!(error = %e, "Echec entrainement"); reply_ephemeral(ctx, component, "Entrainement impossible (epuise, cooldown ou coins).").await; }
     }
 }
@@ -574,12 +581,78 @@ fn care_buttons() -> Vec<CreateActionRow> {
     ]
 }
 
-fn card_message(p: &PetDto) -> CreateMessage {
-    CreateMessage::new().embed(card_embed(p)).components(care_buttons())
+/// Couleur d'accent (hex sans #) par espece, pour le placeholder avatar.
+fn species_color(key: &str) -> &'static str {
+    match key {
+        "sanglier" => "8a5a3c",
+        "renard" => "e07b39",
+        "tortue" => "3c8a5a",
+        "loup" => "5a6a8a",
+        "lapin" => "c9a0c9",
+        "ours" => "6b4a2f",
+        _ => "5865f2",
+    }
 }
 
-fn update_from_card(p: &PetDto) -> CreateInteractionResponseMessage {
-    CreateInteractionResponseMessage::new().embed(card_embed(p)).components(care_buttons())
+fn age_days(born_at_rfc3339: &str) -> i64 {
+    chrono::DateTime::parse_from_rfc3339(born_at_rfc3339)
+        .map(|d| (chrono::Utc::now() - d.with_timezone(&chrono::Utc)).num_days().max(0))
+        .unwrap_or(0)
+}
+
+async fn fetch_coins(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> i64 {
+    #[derive(serde::Deserialize)]
+    struct W { coins: i64 }
+    api.get_json::<W>(&format!("/api/wallet/{guild_id}/{owner_id}"))
+        .await
+        .map(|w| w.coins)
+        .unwrap_or(0)
+}
+
+/// Construit les donnees + rend le PNG de la carte (None si rendu echoue).
+async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> Option<Vec<u8>> {
+    let data = CardData {
+        name: p.name.clone(),
+        species_label: species_display(&p.species).to_string(),
+        specialization: None,
+        age_days: age_days(&p.born_at),
+        level: p.level,
+        xp_in_level: p.xp_in_level,
+        xp_for_level: p.xp_for_level,
+        hunger: p.hunger,
+        happiness: p.happiness,
+        energy: p.energy,
+        str_: p.str,
+        vit: p.vit,
+        agi: p.agi,
+        elo: p.elo,
+        wins: p.wins,
+        losses: p.losses,
+        coins: fetch_coins(api, guild_id, owner_id).await,
+        status: p.status.clone(),
+        species_color: species_color(&p.species).to_string(),
+    };
+    render_card_png(&data)
+}
+
+async fn card_message(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> CreateMessage {
+    match render_card(api, guild_id, owner_id, p).await {
+        Some(png) => CreateMessage::new()
+            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .add_file(CreateAttachment::bytes(png, "card.png"))
+            .components(care_buttons()),
+        None => CreateMessage::new().embed(card_embed(p)).components(care_buttons()),
+    }
+}
+
+async fn update_from_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> CreateInteractionResponseMessage {
+    match render_card(api, guild_id, owner_id, p).await {
+        Some(png) => CreateInteractionResponseMessage::new()
+            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .add_file(CreateAttachment::bytes(png, "card.png"))
+            .components(care_buttons()),
+        None => CreateInteractionResponseMessage::new().embed(card_embed(p)).components(care_buttons()),
+    }
 }
 
 fn species_choice_message() -> CreateMessage {

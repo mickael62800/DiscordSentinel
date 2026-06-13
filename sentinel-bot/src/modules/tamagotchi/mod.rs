@@ -8,6 +8,7 @@
 
 pub const MODULE_BOT_NAME: &str = "tamagotchi-bot";
 
+mod card_render;
 mod panel;
 mod setup;
 
