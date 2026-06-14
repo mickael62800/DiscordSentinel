@@ -6,6 +6,7 @@ import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 import EnumSelect from "../atoms/EnumSelect.vue";
 import ChannelSelect from "../atoms/ChannelSelect.vue";
 import VoiceChannelSelect from "../atoms/VoiceChannelSelect.vue";
+import AnyChannelSelect from "../atoms/AnyChannelSelect.vue";
 import CategorySelect from "../atoms/CategorySelect.vue";
 import RoleSelect from "../atoms/RoleSelect.vue";
 import IdMultiplierMapField from "./IdMultiplierMapField.vue";
@@ -47,6 +48,13 @@ const VOICE_CHANNEL_KEYS = new Set<string>([
   "afk_channel_id",
 ]);
 
+// Champs type="channel" qui doivent lister TOUS les salons (textuel + vocal +
+// categorie). Ex : le compteur de membres se met souvent sur un salon VOCAL ou
+// une CATEGORIE (les seuls a accepter espaces/majuscules/":" dans le nom).
+const ANY_CHANNEL_KEYS = new Set<string>([
+  "counter_channel_id",
+]);
+
 const props = defineProps<{
   field: ConfigField;
   modelValue: string;
@@ -84,6 +92,9 @@ const isRoleList = computed(
 );
 const isVoiceChannel = computed(
   () => props.field.type === "channel" && VOICE_CHANNEL_KEYS.has(props.field.key),
+);
+const isAnyChannel = computed(
+  () => props.field.type === "channel" && ANY_CHANNEL_KEYS.has(props.field.key),
 );
 
 const mapDefaults = computed(() => {
@@ -146,6 +157,14 @@ const mapDefaults = computed(() => {
 
     <VoiceChannelSelect
       v-else-if="isVoiceChannel"
+      :id="field.key"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      @update:model-value="update"
+    />
+
+    <AnyChannelSelect
+      v-else-if="isAnyChannel"
       :id="field.key"
       :model-value="modelValue"
       :guild-id="guildId"

@@ -22,18 +22,22 @@ pub const RULES_ACCEPT_ID: &str = "sentinel_rules_accept";
 /// Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur le
 /// compte approximatif Discord (qui inclut les bots) si le cache est vide.
 async fn human_member_count(ctx: &Context, guild_id: GuildId) -> u64 {
-    let human = ctx
-        .cache
-        .guild(guild_id)
-        .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
-    match human {
-        Some(n) if n > 0 => n,
-        _ => guild_id
-            .to_partial_guild_with_counts(&ctx.http)
-            .await
-            .map(|g| g.approximate_member_count.unwrap_or(0))
-            .unwrap_or(0),
+    // On se base sur le TOTAL fiable de Discord (`member_count`, maintenu par
+    // serenity sur add/remove) auquel on retranche les bots vus dans le cache.
+    // Compter directement les humains du cache donnait des resultats faux ("1")
+    // quand le cache n'est pas entierement peuple. Les bots, eux, sont quasi
+    // toujours en cache -> total - bots ≈ humains exacts.
+    if let Some(g) = ctx.cache.guild(guild_id) {
+        let total = g.member_count;
+        let bots = g.members.values().filter(|m| m.user.bot).count() as u64;
+        return total.saturating_sub(bots);
     }
+    // Pas de cache : repli sur le compte approximatif (inclut les bots).
+    guild_id
+        .to_partial_guild_with_counts(&ctx.http)
+        .await
+        .map(|g| g.approximate_member_count.unwrap_or(0))
+        .unwrap_or(0)
 }
 
 /// Renomme le salon compteur avec le nombre de membres. Independant des
