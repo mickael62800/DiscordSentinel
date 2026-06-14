@@ -2,12 +2,19 @@
 //! Persistance uniquement : l'orchestration Discord est cote bot.
 
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::component_gates::check_component_role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::admin_rotation::RotationState;
+
+/// Cle RBAC partagee avec le bouton dashboard (rotation.dashboard). Les
+/// appels internes (bot, sans X-Discord-Token) passent ; les utilisateurs
+/// web doivent avoir le role minimal configure.
+const RBAC_KEY: &str = "rotation.dashboard";
 
 fn parse_dt(s: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
     s.as_deref()
@@ -64,8 +71,10 @@ impl RotationStateDto {
 /// GET /api/rotation/{guild_id}
 pub async fn get_state(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<RotationStateDto>, ApiError> {
+    check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     let s = state.rotation_uc.get_state(&guild_id).await?;
     Ok(Json(s.into()))
 }
@@ -73,9 +82,11 @@ pub async fn get_state(
 /// PUT /api/rotation/{guild_id}
 pub async fn save_state(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(mut body): Json<RotationStateDto>,
 ) -> Result<Json<RotationStateDto>, ApiError> {
+    check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     body.guild_id = guild_id;
     let domain = body.into_domain();
     state.rotation_uc.save_state(domain.clone()).await?;
@@ -90,9 +101,11 @@ pub struct ServedBody {
 /// POST /api/rotation/{guild_id}/served
 pub async fn record_served(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(body): Json<ServedBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     state.rotation_uc.record_served(&guild_id, &body.user_id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -106,8 +119,10 @@ pub struct ServedEntryDto {
 /// GET /api/rotation/{guild_id}/history
 pub async fn history(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<ServedEntryDto>>, ApiError> {
+    check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     let entries = state.rotation_uc.served_entries(&guild_id).await?;
     Ok(Json(
         entries
