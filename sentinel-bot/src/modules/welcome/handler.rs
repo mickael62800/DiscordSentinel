@@ -19,6 +19,43 @@ use super::template;
 pub const RULES_ACCEPT_ID: &str = "sentinel_rules_accept";
 
 /// Appele quand un nouveau membre rejoint.
+/// Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur le
+/// compte approximatif Discord (qui inclut les bots) si le cache est vide.
+async fn human_member_count(ctx: &Context, guild_id: GuildId) -> u64 {
+    let human = ctx
+        .cache
+        .guild(guild_id)
+        .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
+    match human {
+        Some(n) if n > 0 => n,
+        _ => guild_id
+            .to_partial_guild_with_counts(&ctx.http)
+            .await
+            .map(|g| g.approximate_member_count.unwrap_or(0))
+            .unwrap_or(0),
+    }
+}
+
+/// Renomme le salon compteur avec le nombre de membres. Independant des
+/// messages welcome/leave : ne depend que de `counter_enabled`.
+async fn update_counter(
+    ctx: &Context,
+    counter_enabled: bool,
+    counter_channel_id: Option<&String>,
+    counter_format: &str,
+    member_count: u64,
+) {
+    if !counter_enabled {
+        return;
+    }
+    let Some(ch_id) = counter_channel_id else { return };
+    let Ok(ch) = ch_id.parse::<u64>() else { return };
+    let name = counter_format.replace("{count}", &member_count.to_string());
+    if let Err(e) = ChannelId::new(ch).edit(&ctx.http, EditChannel::new().name(&name)).await {
+        warn!(error = %e, "Echec mise a jour compteur membres");
+    }
+}
+
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
         let ctx = ctx.clone();
         let new_member = new_member.clone();
@@ -57,20 +94,7 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
             .map(|g| g.name.clone())
             .unwrap_or_else(|_| "Serveur".into());
 
-        // Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur
-        // le compte approximatif Discord (qui inclut les bots) si cache vide.
-        let human_count = ctx
-            .cache
-            .guild(guild_id)
-            .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
-        let member_count = match human_count {
-            Some(n) if n > 0 => n,
-            _ => guild_id
-                .to_partial_guild_with_counts(&ctx.http)
-                .await
-                .map(|g| g.approximate_member_count.unwrap_or(0))
-                .unwrap_or(0),
-        };
+        let member_count = human_member_count(&ctx, guild_id).await;
 
         // ── Detecter si c'est un retour (membre deja connu) ──
         let is_rejoin = api.is_known_member(&guild_id.to_string(), &user_id.to_string()).await;
@@ -167,17 +191,14 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
         }
 
         // ── Compteur de membres ──
-        if config.counter_enabled {
-            if let Some(ch_id) = &config.counter_channel_id {
-                if let Ok(ch) = ch_id.parse::<u64>() {
-                    let name = config.counter_format.replace("{count}", &member_count.to_string());
-                    let edit = EditChannel::new().name(&name);
-                    if let Err(e) = ChannelId::new(ch).edit(&ctx.http, edit).await {
-                        warn!(error = %e, "Echec mise a jour compteur membres");
-                    }
-                }
-            }
-        }
+        update_counter(
+            &ctx,
+            config.counter_enabled,
+            config.counter_channel_id.as_ref(),
+            &config.counter_format,
+            member_count,
+        )
+        .await;
 
         // ── Log ──
         base.send_log("info", &guild_id.to_string(), &format!(
@@ -212,6 +233,19 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             Err(_) => return,
         };
 
+        // Compteur : INDEPENDANT du message de depart. On le met a jour AVANT
+        // les early-returns ci-dessous (sinon un message de depart desactive
+        // empechait la mise a jour du compteur au depart d'un membre).
+        let member_count = human_member_count(&ctx, guild_id).await;
+        update_counter(
+            &ctx,
+            config.counter_enabled,
+            config.counter_channel_id.as_ref(),
+            &config.counter_format,
+            member_count,
+        )
+        .await;
+
         if !config.leave_enabled {
             return;
         }
@@ -231,21 +265,6 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             .await
             .map(|g| g.name.clone())
             .unwrap_or_else(|_| "Serveur".into());
-
-        // Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur
-        // le compte approximatif Discord (qui inclut les bots) si cache vide.
-        let human_count = ctx
-            .cache
-            .guild(guild_id)
-            .map(|g| g.members.values().filter(|m| !m.user.bot).count() as u64);
-        let member_count = match human_count {
-            Some(n) if n > 0 => n,
-            _ => guild_id
-                .to_partial_guild_with_counts(&ctx.http)
-                .await
-                .map(|g| g.approximate_member_count.unwrap_or(0))
-                .unwrap_or(0),
-        };
 
         let text = template::render(
             &config.leave_message,
@@ -278,18 +297,7 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
         if let Err(e) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
             warn!(error = %e, "Echec envoi message depart");
         }
-
-        // Mise a jour compteur
-        if config.counter_enabled {
-            if let Some(counter_ch) = &config.counter_channel_id {
-                if let Ok(c) = counter_ch.parse::<u64>() {
-                    let name = config.counter_format.replace("{count}", &member_count.to_string());
-                    if let Err(e) = ChannelId::new(c).edit(&ctx.http, EditChannel::new().name(&name)).await {
-                        warn!(error = %e, "Echec mise a jour compteur");
-                    }
-                }
-            }
-        }
+        // (Le compteur a deja ete mis a jour plus haut, avant le return.)
     }
 
 /// Appele pour les interactions de composants (bouton reglement).
