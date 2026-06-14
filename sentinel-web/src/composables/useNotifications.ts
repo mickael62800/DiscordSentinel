@@ -200,17 +200,6 @@ function eventToNotification(wsEvent: { event: string; data: unknown }): Notific
       };
     }
 
-    case "user_zero_points":
-      return {
-        id,
-        notification_type: "conduct",
-        title: "Points de conduite a zero",
-        message: `${data.username ?? "Utilisateur"} a atteint 0 points (action: ${data.action ?? "inconnue"})`,
-        severity: "high",
-        read: false,
-        created_at: now,
-      };
-
     case "strike_added": {
       const escalation = data.escalation_action;
       if (!escalation) return null;

@@ -13,8 +13,6 @@ fn sample_user(last: Option<chrono::DateTime<Utc>>) -> WatchedUser {
         total_warns: 1,
         total_mutes: 2,
         total_bans: 0,
-        conduct_points: Some(80),
-        max_conduct_points: Some(100),
         last_incident_at: last,
         security_events_count: 3,
         first_seen_at: Utc.with_ymd_and_hms(2024, 1, 1, 0, 0, 0).unwrap(),
@@ -29,7 +27,6 @@ fn from_watched_user_preserves_fields_and_formats_dates() {
     assert_eq!(dto.username, "alice");
     assert_eq!(dto.risk_level, "high");
     assert_eq!(dto.total_mutes, 2);
-    assert_eq!(dto.conduct_points, Some(80));
     assert_eq!(dto.security_events_count, 3);
     assert_eq!(dto.last_incident_at.as_deref(), Some("2024-06-15T12:30:00+00:00"));
     assert!(dto.first_seen_at.starts_with("2024-01-01T"));
@@ -48,7 +45,6 @@ fn from_user_dossier_maps_empty_collections() {
         infractions: vec![],
         moderation_actions: vec![],
         security_events: vec![],
-        conduct_log: vec![],
         notes: vec![],
     };
     let dto = UserDossierResponseDto::from(dossier);
@@ -56,6 +52,5 @@ fn from_user_dossier_maps_empty_collections() {
     assert!(dto.infractions.is_empty());
     assert!(dto.moderation_actions.is_empty());
     assert!(dto.security_events.is_empty());
-    assert!(dto.conduct_log.is_empty());
     assert!(dto.notes.is_empty());
 }

@@ -49,39 +49,15 @@ pub async fn purge_infractions(
     let count = state.infractions_uc.delete_older_than_days(&dto.guild_id, dto.days).await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge infractions");
 
-    // `days = 0` = purge totale → on restitue aussi tous les points de
-    // conduite a leur max. Pour une purge partielle (>0 jours), on ne
-    // touche pas aux points (on ne sait pas a qui restituer quoi).
-    let mut points_restored: u64 = 0;
-    if dto.days == 0 {
-        match state.conduct_uc.reset_all_points(&dto.guild_id).await {
-            Ok(n) => {
-                points_restored = n;
-                info!(
-                    guild_id = %dto.guild_id,
-                    users_restored = n,
-                    "Reset points de conduite suite a purge totale"
-                );
-            }
-            Err(e) => tracing::warn!(
-                error = %e,
-                guild_id = %dto.guild_id,
-                "Echec reset points conduite apres purge totale"
-            ),
-        }
-    }
-
     state.broadcaster.broadcast("purge_completed", serde_json::json!({
         "type": "infractions",
         "guild_id": &dto.guild_id,
         "days": dto.days,
         "deleted": count,
-        "points_restored": points_restored,
     }));
 
     Ok(Json(serde_json::json!({
         "deleted": count,
-        "points_restored": points_restored,
     })))
 }
 

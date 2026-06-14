@@ -38,16 +38,6 @@ pub const MEMBER_RESET_TABLES: &[MemberResetTable] = &[
         response_key: "moderation_actions",
     },
     MemberResetTable {
-        sql_table: "user_conduct_points",
-        user_column: "user_id",
-        response_key: "conduct_points",
-    },
-    MemberResetTable {
-        sql_table: "conduct_points_log",
-        user_column: "user_id",
-        response_key: "conduct_log",
-    },
-    MemberResetTable {
         sql_table: "user_strikes",
         user_column: "user_id",
         response_key: "strikes",

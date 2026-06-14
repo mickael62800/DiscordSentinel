@@ -322,38 +322,6 @@ export interface VoiceChannelDetail {
   bans: VoiceChannelBan[];
 }
 
-// ── Conduct (points de conduite) ──
-
-export interface ConductConfig {
-  guild_id: string;
-  max_points: number;
-  regen_amount: number;
-  regen_interval: string;
-  penalty_warn: number;
-  penalty_delete: number;
-  penalty_mute: number;
-  penalty_ban: number;
-}
-
-export interface UserConductPoints {
-  id: string;
-  guild_id: string;
-  user_id: string;
-  username: string;
-  points: number;
-  last_regen_at: string;
-  created_at: string;
-}
-
-export interface ConductPointsLog {
-  id: string;
-  delta: number;
-  reason: string;
-  points_before: number;
-  points_after: number;
-  created_at: string;
-}
-
 // ── Role Panels ──
 
 export interface RolePanel {
@@ -476,8 +444,6 @@ export interface WatchedUser {
   total_warns: number;
   total_mutes: number;
   total_bans: number;
-  conduct_points: number | null;
-  max_conduct_points: number | null;
   last_incident_at: string | null;
   security_events_count: number;
   first_seen_at: string;
@@ -494,7 +460,6 @@ export interface UserDossier {
   infractions: Infraction[];
   moderation_actions: ModerationActionResponse[];
   security_events: SecurityEvent[];
-  conduct_log: ConductPointsLog[];
   notes?: DossierNote[];
 }
 
@@ -580,12 +545,6 @@ export interface Member {
   left_at?: string | null;
 }
 
-export interface MemberConduct {
-  points: number;
-  max_points: number;
-  log: Record<string, unknown>[];
-}
-
 export interface MemberInfractions {
   total: number;
   recent: Record<string, unknown>[];
@@ -606,7 +565,6 @@ export interface MemberStats {
 
 export interface MemberSummary {
   member: Member;
-  conduct: MemberConduct;
   infractions: MemberInfractions;
   moderation: MemberModeration;
   stats: MemberStats;

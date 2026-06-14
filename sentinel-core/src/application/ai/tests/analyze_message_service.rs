@@ -59,31 +59,11 @@ impl CachePort for MockCache {
 }
 
 
-struct MockConduct;
-
-
-#[async_trait]
-impl ManageConductUseCase for MockConduct {
-    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::community::conduct::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn save_config(&self, _: crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand) -> Result<crate::domain::entities::community::conduct::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::community::conduct::UserConductPoints>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::community::conduct::ConductPointsLog>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> {
-        let now = chrono::Utc::now();
-        Ok(crate::domain::entities::community::conduct::UserConductPoints { id: uuid::Uuid::new_v4(), guild_id: String::new(), user_id: String::new(), username: String::new(), points: 100, last_regen_at: now, created_at: now, updated_at: now })
-    }
-    async fn add_points(&self, _: crate::ports::inbound::community::manage_conduct::AddPointsCommand) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn run_regen(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
-}
-
-
-    
     use chrono::Utc;
     use uuid::Uuid;
     use crate::domain::entities::system::rule::Rule;
     use crate::domain::services::moderation::channel_tension::TensionAction;
-    use crate::adapters::outbound::inference_service::InferenceClassification;
+    use crate::ports::outbound::ai::inference_service::InferenceClassification;
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
         let now = Utc::now();
@@ -156,21 +136,32 @@ impl ManageConductUseCase for MockConduct {
         assert_eq!(DEFAULT_TEXT_THRESHOLD, 0.5);
     }
 
+    struct MockInference;
+    impl crate::ports::outbound::ai::inference_service::InferenceService for MockInference {
+        fn vision_available(&self) -> bool { false }
+        fn text_available(&self) -> bool { false }
+        fn classify_image(&self, _: ndarray::Array4<f32>) -> Result<Vec<InferenceClassification>, String> { Ok(vec![]) }
+        fn classify_text(&self, _: ndarray::Array2<i64>, _: ndarray::Array2<i64>) -> Result<Vec<InferenceClassification>, String> { Ok(vec![]) }
+    }
+
+    struct MockTokenizer;
+    impl crate::ports::outbound::ai::text_tokenizer::TextTokenizer for MockTokenizer {
+        fn available(&self) -> bool { false }
+        fn tokenize(&self, _: &str) -> Result<(ndarray::Array2<i64>, ndarray::Array2<i64>), String> { Err("mock".to_string()) }
+    }
+
     #[test]
     fn test_with_text_inference_sets_fields() {
         use std::sync::Arc;
-        use crate::adapters::outbound::inference_service::InferenceService;
-        use crate::adapters::outbound::text_tokenizer::TextTokenizer;
         use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
-        let inference = Arc::new(InferenceService::new(None, None));
-        let tokenizer = Arc::new(TextTokenizer::new(None, 256));
+        let inference = Arc::new(MockInference);
+        let tokenizer = Arc::new(MockTokenizer);
 
         let _service = AnalyzeMessageService::new(
             Arc::new(MockRuleRepo),
             Arc::new(MockInfractionRepo),
             Arc::new(MockCache),
-            Arc::new(MockConduct),
             Arc::new(MockBotConfigRepo),
             Arc::new(InferenceRateLimiter::new(4, 0)),
         ).with_text_inference(inference, tokenizer);

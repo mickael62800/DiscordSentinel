@@ -68,7 +68,6 @@ impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
             infractions: vec![],
             moderation_actions: vec![],
             security_events: vec![],
-            conduct_log: vec![],
             notes: vec![],
         })
     }
@@ -122,8 +121,6 @@ fn sample_user(guild_id: &str, user_id: &str, risk: &str) -> WatchedUser {
         total_warns: 1,
         total_mutes: 1,
         total_bans: 0,
-        conduct_points: Some(50),
-        max_conduct_points: Some(100),
         last_incident_at: None,
         security_events_count: 2,
         first_seen_at: Utc::now(),

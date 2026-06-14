@@ -1,5 +1,5 @@
 //! Tests d'integration REELS pour le pipeline automod (avec PostgreSQL).
-//! Verifie le flow complet : config guild → rules → scoring → infractions → conduct.
+//! Verifie le flow complet : config guild → rules → scoring → infractions.
 
 use std::sync::Arc;
 use sqlx::PgPool;
@@ -172,15 +172,13 @@ async fn full_analyze_spam_creates_infraction() {
     let infraction_repo = Arc::new(PgInfractionRepository::new(pool.clone()));
     let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool.clone()));
 
-    // Mock conduct UC (minimal) et cache
-    let conduct_uc = Arc::new(StubConductUC);
     let cache = Arc::new(NoCache);
     let inference = Arc::new(InferenceService::new(None, None));
     let tokenizer = Arc::new(TextTokenizer::new(None, 512));
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
     let service = AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, conduct_uc, bot_config_repo, limiter,
+        rule_repo, infraction_repo, cache, bot_config_repo, limiter,
     ).with_text_inference(inference, tokenizer);
 
     // Analyze a spam message
@@ -337,47 +335,14 @@ fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
     let rule_repo = Arc::new(PgRuleRepository::new(pool.clone()));
     let infraction_repo = Arc::new(PgInfractionRepository::new(pool.clone()));
     let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool.clone()));
-    let conduct_uc = Arc::new(StubConductUC);
     let cache = Arc::new(NoCache);
     let inference = Arc::new(InferenceService::new(None, None));
     let tokenizer = Arc::new(TextTokenizer::new(None, 512));
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
     AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, conduct_uc, bot_config_repo, limiter,
+        rule_repo, infraction_repo, cache, bot_config_repo, limiter,
     ).with_text_inference(inference, tokenizer)
-}
-
-// Stub minimal pour ManageConductUseCase
-struct StubConductUC;
-
-#[async_trait::async_trait]
-impl sentinel_api::ports::inbound::community::manage_conduct::ManageConductUseCase for StubConductUC {
-    async fn get_config(&self, _: &str) -> Result<sentinel_core::domain::entities::community::conduct::ConductConfig, sentinel_core::domain::errors::DomainError> {
-        Ok(sentinel_core::domain::entities::community::conduct::ConductConfig::default_for_guild(""))
-    }
-    async fn save_config(&self, _: sentinel_api::ports::inbound::community::manage_conduct::SaveConductConfigCommand) -> Result<sentinel_core::domain::entities::community::conduct::ConductConfig, sentinel_core::domain::errors::DomainError> {
-        unimplemented!()
-    }
-    async fn get_points(&self, _: &str, _: &str) -> Result<sentinel_core::domain::entities::community::conduct::UserConductPoints, sentinel_core::domain::errors::DomainError> {
-        unimplemented!()
-    }
-    async fn add_points(&self, _: sentinel_api::ports::inbound::community::manage_conduct::AddPointsCommand) -> Result<sentinel_core::domain::entities::community::conduct::UserConductPoints, sentinel_core::domain::errors::DomainError> {
-        unimplemented!()
-    }
-    async fn deduct_points(&self, _: sentinel_api::ports::inbound::community::manage_conduct::DeductPointsCommand) -> Result<sentinel_core::domain::entities::community::conduct::UserConductPoints, sentinel_core::domain::errors::DomainError> {
-        // Retourner un stub minimal — le test n'utilise pas la valeur
-        Err(sentinel_core::domain::errors::DomainError::NotFound("stub".into()))
-    }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::community::conduct::UserConductPoints>, sentinel_core::domain::errors::DomainError> {
-        unimplemented!()
-    }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::community::conduct::ConductPointsLog>, sentinel_core::domain::errors::DomainError> {
-        unimplemented!()
-    }
-    async fn run_regen(&self) -> Result<u64, sentinel_core::domain::errors::DomainError> {
-        Ok(0)
-    }
 }
 
 // Stub cache qui ne cache rien (force la lecture DB a chaque fois)

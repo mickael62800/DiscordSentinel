@@ -19,8 +19,6 @@ use crate::domain::enums::moderation::action::Action;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
@@ -32,7 +30,6 @@ pub struct AnalyzeMessageService {
     rule_repo: Arc<dyn RuleRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
-    conduct_uc: Arc<dyn ManageConductUseCase>,
     /// Repo pour lire la config automod-bot : cles IA (text_enabled,
     /// text_threshold, context_dampening, context_format) + cles tension
     /// de salon (activation + seuils). Anciennement lu depuis la table
@@ -51,7 +48,6 @@ impl AnalyzeMessageService {
         rule_repo: Arc<dyn RuleRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
-        conduct_uc: Arc<dyn ManageConductUseCase>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
         inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
@@ -59,7 +55,6 @@ impl AnalyzeMessageService {
             rule_repo,
             infraction_repo,
             cache,
-            conduct_uc,
             bot_config_repo,
             inference_limiter,
             inference: None,
@@ -451,18 +446,6 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         };
 
         self.infraction_repo.save(&infraction).await?;
-
-        // 4b. Deduire les points de conduite
-        if result.action.as_str() != "none" {
-            if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
-                guild_id: infraction.guild_id.clone(),
-                user_id: infraction.user_id.clone(),
-                username: infraction.username.clone(),
-                action: result.action.as_str().to_string(),
-            }).await {
-                tracing::warn!(error = %e, guild_id = %infraction.guild_id, user_id = %infraction.user_id, "Echec deduction points conduite (analyse message)");
-            }
-        }
 
         // 5. Retourner l'analyse
         Ok(MessageAnalysis {

@@ -17,7 +17,6 @@ use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
@@ -51,7 +50,6 @@ pub struct AppState {
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
     pub stats_uc: Arc<dyn ManageStatsUseCase>,
     pub voice_channels_uc: Arc<dyn ManageVoiceChannelsUseCase>,
-    pub conduct_uc: Arc<dyn ManageConductUseCase>,
     pub watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>,
     pub audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>,
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,

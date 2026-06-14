@@ -26,7 +26,6 @@ use crate::adapters::outbound::postgres::audit::analytics_repository::PgAnalytic
 use crate::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
 use crate::adapters::outbound::postgres::casino::blackjack_table_repository::PgBlackjackTableRepository;
 use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
-use crate::adapters::outbound::postgres::community::conduct_repository::PgConductRepository;
 use crate::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
 use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
 use crate::adapters::outbound::postgres::coude::combat_repository::PgCombatRepository;
@@ -81,7 +80,6 @@ use crate::application::casino::blackjack_service::BlackjackService;
 use crate::application::coude::combat::expire_batch::ExpireCombatsBatchService;
 use crate::application::system::export_service::ExportService;
 use crate::application::audit::manage_audit_logs_service::ManageAuditLogsService;
-use crate::application::community::manage_conduct_service::ManageConductService;
 use crate::application::coude::bet::manage::ManageCoudeBetsService;
 use crate::application::coude::manage_cashbox_service::ManageCoudeCashboxService;
 use crate::application::coude::manage_catalog_service::ManageCoudeCatalogService;
@@ -249,7 +247,6 @@ pub async fn build_app_state(
     let stats_repo = Arc::new(PgStatsRepository::new(pg_pool.clone()));
     let voice_channel_repo = Arc::new(PgVoiceChannelRepository::new(pg_pool.clone()));
     let bot_config_repo = Arc::new(PgBotConfigRepository::new(pg_pool.clone()));
-    let conduct_repo = Arc::new(PgConductRepository::new(pg_pool.clone()));
     let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
     // Phase 5C — Batch writes : BatchedPgLogRepository bufferise les inserts et
     // flush via multi-row INSERT toutes les 500ms ou 100 entries.
@@ -272,18 +269,11 @@ pub async fn build_app_state(
     // ── Inference ONNX ──
     let (inference, tokenizer, inference_limiter) = build_inference();
 
-    // Discord API (un seul client partage, cree ici avant conduct pour l'injecter).
+    // Discord API (un seul client partage).
     let discord_api: Arc<dyn crate::adapters::outbound::discord_api::DiscordApi> =
         Arc::new(DiscordApiService::new(config.discord_bot_token.clone()));
 
     // ── Services applicatifs ──
-    let conduct_uc = Arc::new(ManageConductService::new(
-        conduct_repo.clone(),
-        infraction_repo.clone(),
-        broadcaster.clone(),
-        discord_api.clone(),
-    ));
-
     // Buffer in-memory partage (tension de salon). Pas de persistance :
     // reset au restart bot, c'est OK car seulement les N derniers messages.
     let channel_tension_buffer = Arc::new(sentinel_core::domain::services::moderation::channel_tension::ChannelTensionBuffer::new());
@@ -293,7 +283,6 @@ pub async fn build_app_state(
             rule_repo.clone(),
             infraction_repo.clone(),
             cache.clone(),
-            conduct_uc.clone(),
             bot_config_repo.clone(),
             inference_limiter.clone(),
         )
@@ -305,7 +294,6 @@ pub async fn build_app_state(
         rule_repo.clone(),
         infraction_repo.clone(),
         cache.clone(),
-        conduct_uc.clone(),
         bot_config_repo.clone(),
         inference_limiter.clone(),
     ));
@@ -386,7 +374,6 @@ pub async fn build_app_state(
             moderation_repo.clone(),
             strike_repo.clone(),
             cache.clone(),
-            conduct_uc.clone(),
         )
         .with_strikes_uc(strikes_uc.clone() as Arc<dyn crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase>)
         .with_audit_logs_uc(
@@ -717,7 +704,6 @@ pub async fn build_app_state(
         infractions_uc.clone(),
         moderation_uc.clone(),
         security_uc.clone(),
-        conduct_uc.clone(),
         notes_uc.clone(),
     ));
 
@@ -725,11 +711,10 @@ pub async fn build_app_state(
         member_repo,
         infractions_uc.clone(),
         moderation_uc.clone(),
-        conduct_uc.clone(),
         stats_uc.clone(),
     ));
 
-    // ── Discord API service : instance deja creee plus haut pour conduct.
+    // ── Discord API service : instance deja creee plus haut.
     // On re-declare ici pour garder la variable accessible dans la suite du
     // bootstrap (AppState.discord_api).
 
@@ -807,7 +792,6 @@ pub async fn build_app_state(
         moderation_uc,
         stats_uc,
         voice_channels_uc,
-        conduct_uc,
         watched_users_uc,
         audit_logs_uc,
         levels_uc,

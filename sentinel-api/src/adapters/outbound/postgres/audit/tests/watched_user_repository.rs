@@ -10,8 +10,6 @@ fn row(warns: i64, mutes: i64, bans: i64) -> WatchedUserRow {
         total_warns: warns,
         total_mutes: mutes,
         total_bans: bans,
-        conduct_points: None,
-        max_conduct_points: None,
         last_incident_at: None,
         security_events_count: 0,
         first_seen_at: Utc::now(),

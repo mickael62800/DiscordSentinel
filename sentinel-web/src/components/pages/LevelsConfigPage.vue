@@ -2,22 +2,17 @@
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import LevelsConfigCard from "../organisms/LevelsConfigCard.vue";
 import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
-import ConductConfigCard from "../organisms/ConductConfigCard.vue";
-import ConductActionsCard from "../organisms/ConductActionsCard.vue";
 </script>
 
 <template>
-  <AdminPageShell title="Levels & Conduite — Configuration" icon="⚙️">
+  <AdminPageShell title="Niveaux — Configuration" icon="⚙️">
     <template #lede>
-      Paramètres XP / niveau (texte + vocal) et système de conduite
-      (points, regen, escalade automatique vers ban à 0 point).
+      Paramètres XP / niveau (texte + vocal).
     </template>
 
     <div class="grid">
       <LevelsConfigCard />
       <LevelsManualXpCard />
-      <ConductConfigCard />
-      <ConductActionsCard />
     </div>
   </AdminPageShell>
 </template>

@@ -17,7 +17,6 @@ use uuid::Uuid;
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::entities::community::guild_member::MemberConduct;
 use sentinel_core::domain::entities::community::guild_member::MemberInfractions;
 use sentinel_core::domain::entities::community::guild_member::MemberModeration;
 use sentinel_core::domain::entities::community::guild_member::MemberStats;
@@ -79,7 +78,6 @@ impl ManageMembersUseCase for MockMembersUC {
             .ok_or_else(|| DomainError::NotFound("member".into()))?;
         Ok(MemberSummary {
             member: m,
-            conduct: MemberConduct { points: 100, max_points: 100, log: vec![] },
             infractions: MemberInfractions { total: 0, recent: vec![] },
             moderation: MemberModeration { total_warns: 0, total_mutes: 0, total_bans: 0, actions: vec![] },
             stats: MemberStats { message_count: 0, voice_seconds: 0, last_active: None },
@@ -214,7 +212,6 @@ async fn get_member_summary_aggregates() {
     let (status, json) = get(app, "/api/members/111111111111111111/u1/summary").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["member"]["user_id"], "u1");
-    assert_eq!(json["conduct"]["points"], 100);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -341,8 +338,8 @@ async fn reset_member_success_returns_totals() {
     );
     let (status, json) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);
-    // Les 8 tables listees dans MEMBER_RESET_TABLES doivent etre dans totals
-    for key in ["infractions", "moderation_actions", "conduct_points", "conduct_log",
+    // Les tables listees dans MEMBER_RESET_TABLES doivent etre dans totals
+    for key in ["infractions", "moderation_actions",
                 "strikes", "notes", "manual_watched", "sanction_reminders"] {
         assert!(json["totals"].get(key).is_some(), "missing key {key}");
     }

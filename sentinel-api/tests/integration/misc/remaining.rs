@@ -1,5 +1,5 @@
 //! Tests d'integration pour les tables restantes :
-//! guild_members, conduct_points_log, ticket_assignments, voice_channel_themes,
+//! guild_members, ticket_assignments, voice_channel_themes,
 //! voice_channel_whitelists, bot_definitions, user_activity_log, coude_daily_chaos.
 
 use sqlx::PgPool;
@@ -50,25 +50,6 @@ async fn guild_member_unique_per_guild() {
     let name = sqlx::query_as::<_, (String,)>("SELECT username FROM guild_members WHERE guild_id = $1 AND user_id = '444'")
         .bind(&gid).fetch_one(&p).await.unwrap().0;
     assert_eq!(name, "B");
-}
-
-// ── Conduct points log ──
-
-#[tokio::test]
-async fn conduct_points_log_trail() {
-    let p = pool().await;
-    let gid = ugid();
-
-    for (reason, delta) in &[("warn", -1i32), ("delete", -2), ("regen", 1)] {
-        sqlx::query(
-            "INSERT INTO conduct_points_log (id, guild_id, user_id, reason, delta, points_before, points_after) VALUES (gen_random_uuid(), $1, '444', $2, $3, 10, 10 + $3)",
-        ).bind(&gid).bind(reason).bind(delta).execute(&p).await.unwrap();
-    }
-
-    let total_deducted = sqlx::query_as::<_, (i64,)>(
-        "SELECT COALESCE(SUM(delta), 0)::bigint FROM conduct_points_log WHERE guild_id = $1 AND user_id = '444' AND delta < 0",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
-    assert_eq!(total_deducted, -3);
 }
 
 // ── Ticket assignments ──

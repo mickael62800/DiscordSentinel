@@ -11,7 +11,6 @@ use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseC
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct ManageWatchedUsersService {
@@ -19,7 +18,6 @@ pub struct ManageWatchedUsersService {
     infractions_uc: Arc<dyn ManageInfractionsUseCase>,
     moderation_uc: Arc<dyn ManageModerationUseCase>,
     security_uc: Arc<dyn ManageSecurityUseCase>,
-    conduct_uc: Arc<dyn ManageConductUseCase>,
     notes_uc: Arc<dyn ManageNotesUseCase>,
 }
 
@@ -29,7 +27,6 @@ impl ManageWatchedUsersService {
         infractions_uc: Arc<dyn ManageInfractionsUseCase>,
         moderation_uc: Arc<dyn ManageModerationUseCase>,
         security_uc: Arc<dyn ManageSecurityUseCase>,
-        conduct_uc: Arc<dyn ManageConductUseCase>,
         notes_uc: Arc<dyn ManageNotesUseCase>,
     ) -> Self {
         Self {
@@ -37,7 +34,6 @@ impl ManageWatchedUsersService {
             infractions_uc,
             moderation_uc,
             security_uc,
-            conduct_uc,
             notes_uc,
         }
     }
@@ -81,15 +77,6 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             .filter(|e| e.user_ids.contains(&user_id.to_string()))
             .collect();
 
-        let conduct_log = self
-            .conduct_uc
-            .get_points_log(guild_id, user_id, 100)
-            .await
-            .unwrap_or_else(|e| {
-                tracing::warn!(error = %e, guild_id, user_id, "Echec chargement log conduite pour dossier");
-                vec![]
-            });
-
         let notes = self.notes_uc.get_notes(guild_id, user_id).await.unwrap_or_else(|e| {
             tracing::warn!(error = %e, guild_id, user_id, "Echec chargement notes pour dossier");
             vec![]
@@ -100,7 +87,6 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             infractions,
             moderation_actions: history.actions,
             security_events,
-            conduct_log,
             notes,
         })
     }

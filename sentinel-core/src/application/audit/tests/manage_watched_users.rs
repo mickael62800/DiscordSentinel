@@ -6,31 +6,24 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use crate::application::audit::manage_watched_users_service::ManageWatchedUsersService;
-use crate::domain::entities::community::conduct::ConductConfig;
-use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::audit::dashboard_stats::DashboardStats;
 use crate::domain::entities::audit::user_stats::GuildStatsOverview;
 use crate::domain::entities::audit::user_stats::GuildVoiceStats;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::audit::security_event::SecurityEvent;
-use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
 use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
-use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::ports::inbound::audit::manage_security::SecurityDecision;
 use crate::ports::inbound::moderation::manage_notes::AddNoteCommand;
 use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
@@ -45,7 +38,6 @@ fn sample_watched(uid: &str) -> WatchedUser {
         guild_id: "g".into(), guild_name: "Guild".into(),
         risk_level: "low".into(),
         total_warns: 0, total_mutes: 0, total_bans: 0,
-        conduct_points: None, max_conduct_points: None,
         last_incident_at: None, security_events_count: 0,
         first_seen_at: chrono::Utc::now(),
     }
@@ -109,21 +101,6 @@ impl ManageSecurityUseCase for StubSec {
     async fn analyze_new_member(&self, _: AnalyzeNewMemberCommand) -> Result<SecurityDecision, DomainError> { unimplemented!() }
 }
 
-struct StubConduct;
-#[async_trait]
-impl ManageConductUseCase for StubConduct {
-    async fn get_config(&self, g: &str) -> Result<ConductConfig, DomainError> {
-        Ok(ConductConfig::default_for_guild(g))
-    }
-    async fn save_config(&self, _: SaveConductConfigCommand) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn add_points(&self, _: AddPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserConductPoints>, DomainError> { Ok(vec![]) }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<ConductPointsLog>, DomainError> { Ok(vec![]) }
-    async fn run_regen(&self) -> Result<u64, DomainError> { Ok(0) }
-}
-
 struct StubNotes;
 #[async_trait]
 impl ManageNotesUseCase for StubNotes {
@@ -140,7 +117,6 @@ fn make_service(repo: Arc<MockRepo>) -> ManageWatchedUsersService {
         Arc::new(StubInf),
         Arc::new(StubMod),
         Arc::new(StubSec),
-        Arc::new(StubConduct),
         Arc::new(StubNotes),
     )
 }
@@ -224,7 +200,7 @@ async fn get_user_dossier_filters_security_events_by_user_id() {
     r.users.lock().unwrap().push(sample_watched("u1"));
     let svc = ManageWatchedUsersService::new(
         r, Arc::new(StubInf), Arc::new(StubMod), Arc::new(RichSec),
-        Arc::new(StubConduct), Arc::new(StubNotes),
+        Arc::new(StubNotes),
     );
     let d = svc.get_user_dossier("g", "u1").await.unwrap();
     // Seul l'evenement qui contient "u1" dans user_ids doit etre retenu.
@@ -243,6 +219,5 @@ async fn get_user_dossier_found_returns_empty_dossier() {
     assert!(d.infractions.is_empty());
     assert!(d.moderation_actions.is_empty());
     assert!(d.security_events.is_empty());
-    assert!(d.conduct_log.is_empty());
     assert!(d.notes.is_empty());
 }

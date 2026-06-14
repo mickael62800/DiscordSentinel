@@ -22,7 +22,6 @@ const {
   selectedMember,
   isWatched,
   fetchMembers,
-  fetchConductConfig,
   selectMember,
   closeMember,
 } = useMembers();
@@ -42,8 +41,8 @@ const tabFilteredMembers = computed(() => {
 
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedMembers } = usePagination(tabFilteredMembers);
 
-onMounted(() => { fetchMembers(); fetchConductConfig(); });
-watch(selectedGuildId, () => { closeMember(); fetchMembers(); fetchConductConfig(); });
+onMounted(() => { fetchMembers(); });
+watch(selectedGuildId, () => { closeMember(); fetchMembers(); });
 
 async function onSelectMember(userId: string) {
   await selectMember(userId);

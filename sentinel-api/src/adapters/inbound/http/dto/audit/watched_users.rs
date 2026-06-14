@@ -3,7 +3,6 @@ use serde::Serialize;
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseDto;
-use crate::adapters::inbound::http::dto::community::conduct::ConductPointsLogDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
@@ -20,8 +19,6 @@ pub struct WatchedUserResponseDto {
     pub total_warns: i64,
     pub total_mutes: i64,
     pub total_bans: i64,
-    pub conduct_points: Option<i32>,
-    pub max_conduct_points: Option<i32>,
     pub last_incident_at: Option<String>,
     pub security_events_count: i64,
     pub first_seen_at: String,
@@ -38,8 +35,6 @@ impl From<WatchedUser> for WatchedUserResponseDto {
             total_warns: u.total_warns,
             total_mutes: u.total_mutes,
             total_bans: u.total_bans,
-            conduct_points: u.conduct_points,
-            max_conduct_points: u.max_conduct_points,
             last_incident_at: u.last_incident_at.map(|dt| dt.to_rfc3339()),
             security_events_count: u.security_events_count,
             first_seen_at: u.first_seen_at.to_rfc3339(),
@@ -53,7 +48,6 @@ pub struct UserDossierResponseDto {
     pub infractions: Vec<InfractionResponseDto>,
     pub moderation_actions: Vec<ModerationActionResponseDto>,
     pub security_events: Vec<SecurityEventResponseDto>,
-    pub conduct_log: Vec<ConductPointsLogDto>,
     pub notes: Vec<UserNoteDto>,
 }
 
@@ -64,7 +58,6 @@ impl From<UserDossier> for UserDossierResponseDto {
             infractions: d.infractions.into_iter().map(InfractionResponseDto::from).collect(),
             moderation_actions: d.moderation_actions.into_iter().map(ModerationActionResponseDto::from).collect(),
             security_events: d.security_events.into_iter().map(SecurityEventResponseDto::from).collect(),
-            conduct_log: d.conduct_log.into_iter().map(ConductPointsLogDto::from).collect(),
             notes: d.notes.into_iter().map(UserNoteDto::from).collect(),
         }
     }

@@ -25,8 +25,6 @@ struct WatchedUserRow {
     total_warns: i64,
     total_mutes: i64,
     total_bans: i64,
-    conduct_points: Option<i32>,
-    max_conduct_points: Option<i32>,
     last_incident_at: Option<chrono::DateTime<chrono::Utc>>,
     security_events_count: i64,
     first_seen_at: chrono::DateTime<chrono::Utc>,
@@ -47,8 +45,6 @@ impl From<WatchedUserRow> for WatchedUser {
             total_warns: row.total_warns,
             total_mutes: row.total_mutes,
             total_bans: row.total_bans,
-            conduct_points: row.conduct_points,
-            max_conduct_points: row.max_conduct_points,
             last_incident_at: row.last_incident_at,
             security_events_count: row.security_events_count,
             first_seen_at: row.first_seen_at,
@@ -89,8 +85,6 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                     SELECT COUNT(*)::bigint FROM infractions i
                     WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'ban'
                 ), 0) AS total_bans,
-                ucp.points AS conduct_points,
-                cc.max_points AS max_conduct_points,
                 (
                     SELECT MAX(i.created_at) FROM infractions i
                     WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id
@@ -104,9 +98,6 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                 mw.created_at AS first_seen_at
             FROM manual_watched_users mw
             LEFT JOIN guilds g ON g.guild_id = mw.guild_id
-            LEFT JOIN user_conduct_points ucp
-                ON ucp.guild_id = mw.guild_id AND ucp.user_id = mw.user_id
-            LEFT JOIN conduct_config cc ON cc.guild_id = mw.guild_id
             WHERE ($1::text IS NULL OR mw.guild_id = $1)
             ORDER BY mw.created_at DESC
             LIMIT $2 OFFSET $3

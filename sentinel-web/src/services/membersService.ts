@@ -17,7 +17,7 @@ export const membersService = {
   },
   /**
    * Reinitialise completement un membre : supprime infractions, actions de
-   * moderation, points de conduite, strikes, notes, surveillance et rappels.
+   * moderation, strikes, notes, surveillance et rappels.
    * Irreversible, necessite admin+.
    */
   resetMember(guildId: string, userId: string): Promise<ResetMemberResult> {

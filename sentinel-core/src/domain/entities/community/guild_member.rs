@@ -27,17 +27,9 @@ pub struct GuildMember {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberSummary {
     pub member: GuildMember,
-    pub conduct: MemberConduct,
     pub infractions: MemberInfractions,
     pub moderation: MemberModeration,
     pub stats: MemberStats,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MemberConduct {
-    pub points: i32,
-    pub max_points: i32,
-    pub log: Vec<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

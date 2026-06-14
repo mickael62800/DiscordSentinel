@@ -147,7 +147,6 @@ pub struct SyncMembersPayload {
 /// Supprime :
 /// - infractions (table `infractions`)
 /// - actions de moderation (table `moderation_actions`, colonne target_id)
-/// - points de conduite + historique (`user_conduct_points`, `conduct_points_log`)
 /// - strikes (`user_strikes`)
 /// - notes moderateurs (`user_notes`)
 /// - surveillance manuelle (`manual_watched_users`)
@@ -236,7 +235,7 @@ pub struct UpdateMemberPayload {
 /// - guild_members.left_at = NOW() (idempotent : ne reset pas si deja parti)
 /// - user_wallets.coins = 0 (empeche d'etre cible de vols / paris)
 ///
-/// Les autres donnees (infractions, audit_logs, stats, conduct, tickets)
+/// Les autres donnees (infractions, audit_logs, stats, tickets)
 /// sont conservees pour la chaine de moderation et l'historique.
 /// Au retour (rejoin), le user repart de zero cote jeu mais garde ses
 /// donnees non-jeu liees a son user_id Discord.

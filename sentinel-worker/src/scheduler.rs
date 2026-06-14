@@ -410,15 +410,6 @@ pub fn start(
     // Porte de l'ancien moderation-worker.
     // ─────────────────────────────────────────────────────────────
     spawn_periodic(
-        "conduct_regen",
-        config.conduct_regen_interval_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "moderation-bot",
-        |pool| Box::pin(async move { domains::moderation::conduct_regen::run(&pool).await }),
-    );
-    spawn_periodic(
         "cleanup_bans",
         config.ban_cleanup_interval_secs,
         pool.clone(),
@@ -426,17 +417,6 @@ pub fn start(
         api_url.clone(),
         "moderation-bot",
         |pool| Box::pin(async move { domains::moderation::cleanup_bans::run(&pool).await }),
-    );
-    spawn_periodic(
-        "sync_ban_proposals",
-        config.sync_ban_proposals_interval_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "moderation-bot",
-        |pool| {
-            Box::pin(async move { domains::moderation::sync_ban_proposals::run(&pool).await })
-        },
     );
     {
         let redis = redis_client.clone();

@@ -46,7 +46,7 @@ async fn worker_config_multiple_keys() {
     let gid = short_gid();
 
     for (key, val) in &[
-        ("conduct_regen_interval", "2"),
+        ("strike_decay_interval", "2"),
         ("ban_cleanup_interval", "5"),
         ("send_reminders_interval", "60"),
     ] {
@@ -109,7 +109,7 @@ async fn worker_config_all_workers_configurable() {
 
     let workers = vec![
         ("analytics-worker", "daily_snapshot_interval", "3"),
-        ("moderation-worker", "conduct_regen_interval", "2"),
+        ("moderation-worker", "strike_decay_interval", "2"),
         ("cache-worker", "dashboard_cache_refresh", "900"),
         ("cleanup-worker", "voice_sessions_retention_days", "60"),
         ("coude-worker", "combat_expiry_check_secs", "43200"),

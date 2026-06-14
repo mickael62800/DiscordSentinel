@@ -1,4 +1,4 @@
-//! Tests d'integration pour les configs per-guild : strike_config, conduct_config, level_config.
+//! Tests d'integration pour les configs per-guild : strike_config, level_config.
 
 use sqlx::PgPool;
 
@@ -38,36 +38,6 @@ async fn strike_config_custom_thresholds() {
         .bind(&gid).fetch_one(&p).await.unwrap();
     assert_eq!(row.0, 7200);
     assert_eq!(row.1.as_array().unwrap().len(), 2);
-}
-
-// ── Conduct config ──
-
-#[tokio::test]
-async fn conduct_config_defaults() {
-    let p = pool().await;
-    let gid = ugid();
-    sqlx::query("INSERT INTO conduct_config (guild_id) VALUES ($1) ON CONFLICT DO NOTHING")
-        .bind(&gid).execute(&p).await.unwrap();
-    let row = sqlx::query_as::<_, (i32, i32, i32, i32)>(
-        "SELECT max_points, penalty_warn, penalty_mute, penalty_ban FROM conduct_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
-    assert_eq!(row.0, 12); // max_points
-    assert_eq!(row.1, 1);  // penalty_warn
-    assert_eq!(row.2, 3);  // penalty_mute
-    assert_eq!(row.3, 6);  // penalty_ban
-}
-
-#[tokio::test]
-async fn conduct_config_update() {
-    let p = pool().await;
-    let gid = ugid();
-    sqlx::query("INSERT INTO conduct_config (guild_id) VALUES ($1)").bind(&gid).execute(&p).await.unwrap();
-    sqlx::query("UPDATE conduct_config SET max_points = 20, penalty_ban = 10 WHERE guild_id = $1")
-        .bind(&gid).execute(&p).await.unwrap();
-    let row = sqlx::query_as::<_, (i32, i32)>("SELECT max_points, penalty_ban FROM conduct_config WHERE guild_id = $1")
-        .bind(&gid).fetch_one(&p).await.unwrap();
-    assert_eq!(row.0, 20);
-    assert_eq!(row.1, 10);
 }
 
 // ── Level config ──

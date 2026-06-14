@@ -54,11 +54,6 @@ function totalInfractions(u: WatchedUser): number {
   return u.total_warns + u.total_mutes + u.total_bans;
 }
 
-function conductPercent(u: WatchedUser): number | null {
-  if (u.conduct_points === null || u.max_conduct_points === null) return null;
-  return Math.round((u.conduct_points / u.max_conduct_points) * 100);
-}
-
 const dossierInfractionColumns: TableColumn[] = [
   { key: "infraction_type", label: "Type" },
   { key: "reason", label: "Raison" },
@@ -70,13 +65,6 @@ const dossierActionColumns: TableColumn[] = [
   { key: "action_type", label: "Action" },
   { key: "reason", label: "Raison" },
   { key: "target_name", label: "Cible" },
-];
-
-const dossierConductColumns: TableColumn[] = [
-  { key: "delta", label: "Points" },
-  { key: "reason", label: "Raison" },
-  { key: "points_after", label: "Apres" },
-  { key: "created_at", label: "Date" },
 ];
 </script>
 
@@ -112,12 +100,6 @@ const dossierConductColumns: TableColumn[] = [
       <div class="summary-card">
         <span class="summary-value">{{ user.security_events_count }}</span>
         <span class="summary-label">Evt Securite</span>
-      </div>
-      <div v-if="conductPercent(user) !== null" class="summary-card">
-        <span :class="['summary-value', { 'conduct-low': (conductPercent(user) ?? 0) < 30 }]">
-          {{ user.conduct_points }} / {{ user.max_conduct_points }}
-        </span>
-        <span class="summary-label">Points de conduite</span>
       </div>
     </div>
 
@@ -166,25 +148,6 @@ const dossierConductColumns: TableColumn[] = [
             <span class="mono event-date">{{ fmt(evt.created_at) }}</span>
           </div>
         </div>
-      </section>
-
-      <!-- Historique conduite -->
-      <section v-if="dossier.conduct_log.length > 0" class="dossier-section">
-        <h3>Historique de conduite ({{ dossier.conduct_log.length }})</h3>
-        <DataTable
-          :columns="dossierConductColumns"
-          :rows="(dossier.conduct_log as unknown as Record<string, unknown>[])"
-          empty-message="Aucun historique"
-        >
-          <template #cell-delta="{ value }">
-            <span :class="['delta', Number(value) < 0 ? 'delta-neg' : 'delta-pos']">
-              {{ Number(value) > 0 ? '+' : '' }}{{ value }}
-            </span>
-          </template>
-          <template #cell-created_at="{ value }">
-            <span class="mono">{{ fmt(String(value)) }}</span>
-          </template>
-        </DataTable>
       </section>
 
       <!-- Timeline d'activite -->
@@ -303,10 +266,6 @@ const dossierConductColumns: TableColumn[] = [
   word-break: break-all;
 }
 
-.summary-value.conduct-low {
-  color: var(--danger);
-}
-
 .summary-label {
   font-size: 10px;
   color: var(--text-secondary);
@@ -356,14 +315,6 @@ const dossierConductColumns: TableColumn[] = [
   font-size: 11px;
   color: var(--text-secondary);
 }
-
-.delta {
-  font-weight: 700;
-  font-family: "JetBrains Mono", "Cascadia Code", monospace;
-}
-
-.delta-neg { color: var(--danger); }
-.delta-pos { color: var(--success); }
 
 .dossier-placeholder {
   flex: 1;

@@ -175,7 +175,7 @@ DiscordSentinel/
 | `/api/security/*` | security.rs | Events de détection |
 | `/api/notes/*`, `/api/reminders/*` | notes / reminders | Notes mod + rappels |
 | `/api/voice-channels/*` | voice_channels.rs | Salons vocaux dynamiques |
-| `/api/conduct/*`, `/api/levels/*` | conduct / levels | Conduite + XP/niveaux |
+| `/api/levels/*` | levels | XP/niveaux |
 | `/api/coude/*` | coude/* | Jeu Coup de Coude (hexagonal, 8 sous-handlers) |
 | `/api/blackjack/*`, `/api/games/*`, `/api/wallet/*` | blackjack/* / games / wallet | Jeux + porte-monnaie |
 | `/api/audit-logs/*`, `/api/watched-users/*`, `/api/user-activity/*` | audit_logs / watched_users / user_activity | Audit + dossiers surveillés |

@@ -1,6 +1,5 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::audit::security_event::SecurityEvent;
@@ -14,7 +13,6 @@ pub struct UserDossier {
     pub infractions: Vec<Infraction>,
     pub moderation_actions: Vec<ModerationAction>,
     pub security_events: Vec<SecurityEvent>,
-    pub conduct_log: Vec<ConductPointsLog>,
     pub notes: Vec<UserNote>,
 }
 

@@ -1,4 +1,4 @@
-//! Routes progression: conduct, levels, role panels, auto-roles.
+//! Routes progression: levels, role panels, auto-roles.
 
 use axum::routing::delete;
 use axum::routing::get;
@@ -8,21 +8,6 @@ use axum::Router;
 
 use super::super::handlers;
 use super::super::state::AppState;
-
-fn conduct_inner() -> Router<AppState> {
-    Router::new()
-        .route("/config/{guild_id}", get(handlers::community::conduct::get_config))
-        .route("/config", post(handlers::community::conduct::save_config))
-        .route("/{guild_id}/{user_id}", get(handlers::community::conduct::get_points))
-        .route("/{guild_id}/leaderboard", get(handlers::community::conduct::get_leaderboard))
-        .route("/{guild_id}/{user_id}/log", get(handlers::community::conduct::get_points_log))
-        .route("/{guild_id}/{user_id}/add", post(handlers::community::conduct::add_points))
-        // Endpoints appeles par moderation-worker : regen periodique +
-        // creation des propositions de ban pour les users a 0 points
-        // (cf. WORKERS_ARCHITECTURE_STATE.md P0 #1 + #2).
-        .route("/regen-tick", post(handlers::community::conduct::run_regen_tick))
-        .route("/sync-ban-proposals", post(handlers::community::conduct::sync_ban_proposals))
-}
 
 fn level_inner() -> Router<AppState> {
     Router::new()
@@ -134,7 +119,6 @@ fn confession_inner() -> Router<AppState> {
 
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .nest("/api/conduct", conduct_inner())
         .nest("/api/levels", level_inner())
         .nest("/api/announcements", announcement_inner())
         .nest("/api/confessions", confession_inner())

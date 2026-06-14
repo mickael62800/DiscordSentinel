@@ -15,8 +15,6 @@ use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
-use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
@@ -29,7 +27,6 @@ pub struct AnalyzeImageService {
     rule_repo: Arc<dyn RuleRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
-    conduct_uc: Arc<dyn ManageConductUseCase>,
     /// Lecture des cles `vision_enabled` / `vision_threshold` depuis la
     /// config `automod-bot` (fusionnee avec l'ancien `ia_config` par la
     /// migration 146).
@@ -43,7 +40,6 @@ impl AnalyzeImageService {
         rule_repo: Arc<dyn RuleRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
-        conduct_uc: Arc<dyn ManageConductUseCase>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
         inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
@@ -52,7 +48,6 @@ impl AnalyzeImageService {
             rule_repo,
             infraction_repo,
             cache,
-            conduct_uc,
             bot_config_repo,
             inference_limiter,
         }
@@ -334,18 +329,6 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         };
 
         self.infraction_repo.save(&infraction).await?;
-
-        // 6b. Deduire les points de conduite
-        if action.as_str() != "none" {
-            if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
-                guild_id: infraction.guild_id.clone(),
-                user_id: infraction.user_id.clone(),
-                username: infraction.username.clone(),
-                action: action.as_str().to_string(),
-            }).await {
-                tracing::warn!(error = %e, guild_id = %infraction.guild_id, user_id = %infraction.user_id, "Echec deduction points conduite (analyse image)");
-            }
-        }
 
         // 7. Retourner le resultat
         Ok(ImageAnalysis {

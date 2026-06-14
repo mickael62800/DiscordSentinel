@@ -21,7 +21,6 @@ use sentinel_core::domain::entities::casino::blackjack::*;
 use sentinel_core::domain::entities::casino::slot::*;
 use sentinel_core::domain::entities::casino::wallet::*;
 use sentinel_core::domain::entities::casino::wheel::*;
-use sentinel_core::domain::entities::community::conduct::*;
 use sentinel_core::domain::entities::community::daily_activity::*;
 use sentinel_core::domain::entities::community::guild_member::*;
 use sentinel_core::domain::entities::community::level::*;
@@ -66,7 +65,6 @@ use sentinel_api::ports::inbound::audit::manage_stats::*;
 use sentinel_api::ports::inbound::audit::manage_watched_users::*;
 use sentinel_api::ports::inbound::casino::*;
 use sentinel_api::ports::inbound::community::*;
-use sentinel_api::ports::inbound::community::manage_conduct::*;
 use sentinel_api::ports::inbound::community::manage_levels::*;
 use sentinel_api::ports::inbound::community::manage_members::*;
 use sentinel_api::ports::inbound::community::manage_role_panels::*;
@@ -190,18 +188,6 @@ impl ManageStatsUseCase for StubStats {
     async fn get_guild_voice_stats(&self, _: &str, _: u32, _: u32) -> Result<GuildVoiceStats, DomainError> { unimplemented!() }
 }
 
-pub struct StubConduct;
-#[async_trait]
-impl ManageConductUseCase for StubConduct {
-    async fn get_config(&self, _: &str) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn save_config(&self, _: SaveConductConfigCommand) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn add_points(&self, _: AddPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserConductPoints>, DomainError> { unimplemented!() }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<ConductPointsLog>, DomainError> { unimplemented!() }
-    async fn run_regen(&self) -> Result<u64, DomainError> { unimplemented!() }
-}
 
 pub struct StubWatchedUsers;
 #[async_trait]
@@ -896,7 +882,6 @@ fn base_state() -> AppState {
         moderation_uc: Arc::new(StubModeration),
         stats_uc: Arc::new(StubStats),
         voice_channels_uc: Arc::new(StubVoiceChannels),
-        conduct_uc: Arc::new(StubConduct),
         watched_users_uc: Arc::new(StubWatchedUsers),
         audit_logs_uc: Arc::new(StubAuditLogs),
         levels_uc: Arc::new(StubLevels),
@@ -1071,14 +1056,6 @@ pub fn build_test_state_analyze(analyze_uc: Arc<dyn AnalyzeMessageUseCase>) -> A
 pub fn build_test_state_security(security_uc: Arc<dyn ManageSecurityUseCase>) -> AppState {
     let mut state = base_state();
     state.security_uc = security_uc;
-    state
-}
-
-/// Construit un AppState avec un mock conduct use case injecte.
-#[allow(dead_code)]
-pub fn build_test_state_conduct(conduct_uc: Arc<dyn ManageConductUseCase>) -> AppState {
-    let mut state = base_state();
-    state.conduct_uc = conduct_uc;
     state
 }
 

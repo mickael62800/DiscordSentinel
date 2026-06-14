@@ -903,23 +903,6 @@ pub async fn delete_action(
 
     let deleted = state.moderation_uc.delete_action(uuid).await?;
     if deleted {
-        // Restitue les points de conduite associes a l'action annulee
-        // (warn=1, mute=2, ban=5 selon config guild). Best-effort : si
-        // la restitution echoue, on log mais on retourne quand meme 204
-        // (l'action est bien supprimee, c'est l'essentiel).
-        if let Err(e) = state
-            .conduct_uc
-            .restore_for_action(&guild_id, &target_id, &action_type)
-            .await
-        {
-            tracing::warn!(
-                error = %e,
-                guild_id = %guild_id,
-                target_id = %target_id,
-                action_type = %action_type,
-                "Echec restitution points de conduite apres annulation action"
-            );
-        }
         Ok(axum::http::StatusCode::NO_CONTENT)
     } else {
         Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into())))

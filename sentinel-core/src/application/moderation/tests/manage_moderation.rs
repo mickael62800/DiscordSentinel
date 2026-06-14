@@ -1,6 +1,6 @@
 //! Tests unitaires du ManageModerationService (use case).
 //! Teste la logique metier : log_action, get_history, list_bans, delete_bans_for_user.
-//! Utilise des mocks in-memory pour le repo, le cache et le conduct service.
+//! Utilise des mocks in-memory pour le repo et le cache.
 
 
 use std::sync::Arc;
@@ -11,12 +11,10 @@ use uuid::Uuid;
 
 use crate::application::moderation::manage_moderation_service::ManageModerationService;
 use crate::domain::entities::audit::audit_log::*;
-use crate::domain::entities::community::conduct::*;
 use crate::domain::entities::moderation::action::applied::*;
 use crate::domain::entities::moderation::action::strikes::*;
 use crate::domain::entities::system::rule::*;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::community::manage_conduct::*;
 use crate::ports::inbound::moderation::manage_moderation::*;
 use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
@@ -137,59 +135,19 @@ impl CachePort for NoOpCache {
 }
 
 // ══════════════════════════════════════════════════════════
-// Mock Conduct (enregistre les deductions)
-// ══════════════════════════════════════════════════════════
-
-struct MockConduct {
-    deductions: Mutex<Vec<String>>, // action types deducted
-}
-
-impl MockConduct {
-    fn new() -> Self {
-        Self { deductions: Mutex::new(vec![]) }
-    }
-}
-
-#[async_trait]
-impl ManageConductUseCase for MockConduct {
-    async fn get_config(&self, _: &str) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn save_config(&self, _: SaveConductConfigCommand) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn deduct_points(&self, cmd: DeductPointsCommand) -> Result<UserConductPoints, DomainError> {
-        self.deductions.lock().await.push(cmd.action.clone());
-        Ok(UserConductPoints {
-            id: Uuid::new_v4(),
-            guild_id: cmd.guild_id,
-            user_id: cmd.user_id,
-            username: cmd.username,
-            points: 80,
-            last_regen_at: chrono::Utc::now(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
-        })
-    }
-    async fn add_points(&self, _: AddPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserConductPoints>, DomainError> { unimplemented!() }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<ConductPointsLog>, DomainError> { unimplemented!() }
-    async fn run_regen(&self) -> Result<u64, DomainError> { unimplemented!() }
-}
-
-// ══════════════════════════════════════════════════════════
 // Helper : build service
 // ══════════════════════════════════════════════════════════
 
-fn build_service() -> (ManageModerationService, Arc<InMemoryModerationRepo>, Arc<MockConduct>) {
+fn build_service() -> (ManageModerationService, Arc<InMemoryModerationRepo>) {
     let repo = Arc::new(InMemoryModerationRepo::new());
     let cache = Arc::new(NoOpCache);
-    let conduct = Arc::new(MockConduct::new());
     let strike_repo = Arc::new(NoOpStrikeRepo);
     let svc = ManageModerationService::new(
         repo.clone() as Arc<dyn ModerationRepository>,
         strike_repo as Arc<dyn StrikeRepository>,
         cache as Arc<dyn CachePort>,
-        conduct.clone() as Arc<dyn ManageConductUseCase>,
     ).with_audit_logs_uc(Arc::new(NoOpAuditLogs) as Arc<dyn crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase>);
-    (svc, repo, conduct)
+    (svc, repo)
 }
 
 fn make_command(action_type: &str, gravity: Option<&str>, duration: Option<u64>) -> LogModerationCommand {
@@ -213,7 +171,7 @@ fn make_command(action_type: &str, gravity: Option<&str>, duration: Option<u64>)
 
 #[tokio::test]
 async fn log_action_saves_to_repo() {
-    let (svc, repo, _) = build_service();
+    let (svc, repo) = build_service();
     let result = svc.log_action(make_command("warn", Some("medium"), None)).await;
     assert!(result.is_ok());
     let actions = repo.actions.lock().await;
@@ -224,39 +182,14 @@ async fn log_action_saves_to_repo() {
 
 #[tokio::test]
 async fn log_action_returns_valid_uuid() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     let action = svc.log_action(make_command("warn", None, None)).await.unwrap();
     assert_ne!(action.id, Uuid::nil());
 }
 
 #[tokio::test]
-async fn log_action_deducts_conduct_points() {
-    let (svc, _, conduct) = build_service();
-    svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
-    let deductions = conduct.deductions.lock().await;
-    assert_eq!(deductions.len(), 1);
-    assert_eq!(deductions[0], "warn");
-}
-
-#[tokio::test]
-async fn log_action_deducts_for_mute() {
-    let (svc, _, conduct) = build_service();
-    svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
-    let deductions = conduct.deductions.lock().await;
-    assert_eq!(deductions[0], "mute_temp");
-}
-
-#[tokio::test]
-async fn log_action_deducts_for_ban() {
-    let (svc, _, conduct) = build_service();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
-    let deductions = conduct.deductions.lock().await;
-    assert_eq!(deductions[0], "ban_permanent");
-}
-
-#[tokio::test]
 async fn log_action_preserves_all_fields() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     let action = svc.log_action(LogModerationCommand {
         guild_id: "g1".into(),
         channel_id: "c1".into(),
@@ -285,7 +218,7 @@ async fn log_action_preserves_all_fields() {
 
 #[tokio::test]
 async fn get_history_empty_user() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     let history = svc.get_history("guild1", "user1").await.unwrap();
     assert_eq!(history.total_warns, 0);
     assert_eq!(history.total_mutes, 0);
@@ -295,7 +228,7 @@ async fn get_history_empty_user() {
 
 #[tokio::test]
 async fn get_history_counts_correctly() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
     svc.log_action(make_command("warn", Some("medium"), None)).await.unwrap();
     svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
@@ -310,7 +243,7 @@ async fn get_history_counts_correctly() {
 
 #[tokio::test]
 async fn get_history_counts_mute_types() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
     svc.log_action(make_command("mute_permanent", None, None)).await.unwrap();
 
@@ -320,7 +253,7 @@ async fn get_history_counts_mute_types() {
 
 #[tokio::test]
 async fn get_history_counts_ban_types() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("ban_temp", None, Some(3600))).await.unwrap();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
 
@@ -330,7 +263,7 @@ async fn get_history_counts_ban_types() {
 
 #[tokio::test]
 async fn get_history_isolates_guilds() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("warn", None, None)).await.unwrap();
 
     let history = svc.get_history("other_guild", "user1").await.unwrap();
@@ -339,7 +272,7 @@ async fn get_history_isolates_guilds() {
 
 #[tokio::test]
 async fn get_history_isolates_users() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("warn", None, None)).await.unwrap();
 
     let history = svc.get_history("guild1", "other_user").await.unwrap();
@@ -352,14 +285,14 @@ async fn get_history_isolates_users() {
 
 #[tokio::test]
 async fn list_bans_empty() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     let bans = svc.list_bans(None, 50, 0).await.unwrap();
     assert!(bans.is_empty());
 }
 
 #[tokio::test]
 async fn list_bans_excludes_non_bans() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
     svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
@@ -371,7 +304,7 @@ async fn list_bans_excludes_non_bans() {
 
 #[tokio::test]
 async fn list_bans_filters_by_guild() {
-    let (svc, _, _) = build_service();
+    let (svc, _) = build_service();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
     svc.log_action(LogModerationCommand {
         guild_id: "guild2".into(),
@@ -397,7 +330,7 @@ async fn list_bans_filters_by_guild() {
 
 #[tokio::test]
 async fn delete_bans_removes_ban_entries() {
-    let (svc, repo, _) = build_service();
+    let (svc, repo) = build_service();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
     svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
     assert_eq!(repo.actions.lock().await.len(), 2);
@@ -411,7 +344,7 @@ async fn delete_bans_removes_ban_entries() {
 
 #[tokio::test]
 async fn delete_bans_only_for_specific_user() {
-    let (svc, _repo, _) = build_service();
+    let (svc, _repo) = build_service();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
     svc.log_action(LogModerationCommand {
         guild_id: "guild1".into(),

@@ -63,24 +63,6 @@ pub async fn delete_infraction(
         return Err(sentinel_core::domain::errors::DomainError::NotFound("Infraction introuvable".into()).into());
     }
 
-    // Restitue les points de conduite associes a l'infraction annulee.
-    // Best-effort : on log si echec mais on continue le flow.
-    if let Some(ref inf) = infraction {
-        if let Err(e) = state
-            .conduct_uc
-            .restore_for_action(&inf.guild_id, &inf.user_id, inf.action.as_str())
-            .await
-        {
-            tracing::warn!(
-                error = %e,
-                guild_id = %inf.guild_id,
-                user_id = %inf.user_id,
-                action = %inf.action.as_str(),
-                "Echec restitution points de conduite apres annulation infraction"
-            );
-        }
-    }
-
     // Envoyer un DM a l'utilisateur pour l'informer de la grace
     if let Some(inf) = infraction {
         // Phase 1 sync : si c etait un proposal de ban, on previent le

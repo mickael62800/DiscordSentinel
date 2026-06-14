@@ -27,8 +27,6 @@ fn reset_tables_include_core_moderation() {
     let tables: Vec<&str> = MEMBER_RESET_TABLES.iter().map(|t| t.sql_table).collect();
     assert!(tables.contains(&"infractions"));
     assert!(tables.contains(&"moderation_actions"));
-    assert!(tables.contains(&"user_conduct_points"));
-    assert!(tables.contains(&"conduct_points_log"));
     assert!(tables.contains(&"user_strikes"));
     assert!(tables.contains(&"user_notes"));
     assert!(tables.contains(&"manual_watched_users"));

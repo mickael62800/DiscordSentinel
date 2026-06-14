@@ -53,7 +53,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/sponsorships", name: "sponsorships", component: () => import("../components/pages/SponsorshipsPage.vue") },
   { path: "/temp-roles", name: "temp-roles", component: () => import("../components/pages/TempRolesPage.vue") },
   { path: "/members", name: "members", component: () => import("../components/pages/MembersPage.vue") },
-  { path: "/conduct", redirect: "/members" },
   { path: "/watched-users", redirect: "/members" },
 
   // ── Jeux ──

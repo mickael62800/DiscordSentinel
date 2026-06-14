@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, computed, watch } from "vue";
 import { useMembers } from "../../composables/useMembers";
 import { useFormatDate } from "../../composables/useFormatDate";
@@ -9,7 +8,6 @@ import { safeImageUrl } from "../../utils/safeUrl";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppTabs from "../molecules/AppTabs.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
-import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 
 const { success, error: showError } = useToast();
 const { confirm: confirmDialog } = useConfirm();
@@ -18,16 +16,11 @@ const { formatShortDateTime: fmt } = useFormatDate();
 const {
   selectedMember,
   loadingSummary,
-  conductConfig,
-  conductLog,
-  conductLoading,
   dossier,
   dossierLoading,
   activityTimeline,
   isWatched,
   selectMember,
-  fetchConductDetail,
-  adjustPoints,
   fetchDossier,
   addToWatch,
   removeFromWatch,
@@ -35,11 +28,10 @@ const {
   closeMember,
 } = useMembers();
 
-const detailTab = ref<"profil" | "conduite" | "surveillance">("profil");
+const detailTab = ref<"profil" | "surveillance">("profil");
 
 const detailTabsItems = [
   { key: "profil", label: "Profil" },
-  { key: "conduite", label: "Conduite" },
   { key: "surveillance", label: "Surveillance" },
 ];
 
@@ -52,32 +44,11 @@ watch(
 watch(detailTab, async (tab) => {
   if (!selectedMember.value) return;
   const userId = selectedMember.value.member.user_id;
-  if (tab === "conduite") await fetchConductDetail(userId);
-  else if (tab === "surveillance") await fetchDossier(userId);
+  if (tab === "surveillance") await fetchDossier(userId);
 });
 
-const adjustAmount = ref(1);
-const adjustReason = ref("");
-const adjusting = ref(false);
 const watchAction = ref(false);
 const resetting = ref(false);
-
-async function doAdjust(positive: boolean) {
-  if (!selectedMember.value || !adjustReason.value) return;
-  adjusting.value = true;
-  try {
-    const amount = positive ? Math.abs(adjustAmount.value) : -Math.abs(adjustAmount.value);
-    await adjustPoints(selectedMember.value.member.user_id, amount, adjustReason.value);
-    adjustReason.value = "";
-    await selectMember(selectedMember.value.member.user_id);
-    success("Points de conduite ajustes avec succes");
-  } catch (e) {
-    console.error("Erreur ajustement:", e);
-    showError("Erreur lors de l'ajustement des points");
-  } finally {
-    adjusting.value = false;
-  }
-}
 
 async function toggleWatch() {
   if (!selectedMember.value) return;
@@ -125,7 +96,6 @@ async function handleReset() {
       "Cela efface :\n" +
       "• Infractions\n" +
       "• Actions de modération (warns/mutes/bans)\n" +
-      "• Points de conduite + historique\n" +
       "• Strikes\n" +
       "• Notes modérateurs\n" +
       "• Surveillance manuelle\n" +
@@ -153,8 +123,6 @@ async function handleReset() {
     await selectMember(member.user_id);
     if (detailTab.value === "surveillance") {
       await fetchDossier(member.user_id);
-    } else if (detailTab.value === "conduite") {
-      await fetchConductDetail(member.user_id);
     }
   } catch (e) {
     console.error("Erreur reset membre:", e);
@@ -165,13 +133,6 @@ async function handleReset() {
 }
 
 // Helpers
-function conductColor(points: number, max: number): string {
-  const ratio = points / max;
-  if (ratio >= 0.8) return "var(--success)";
-  if (ratio >= 0.5) return "var(--warning)";
-  return "var(--danger)";
-}
-
 function formatDate(date: string | null): string {
   if (!date) return "-";
   return new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
@@ -557,22 +518,6 @@ function discordProfileUrl(userId: string): string {
           </div>
         </div>
 
-        <div class="conduct-mini">
-          <div class="conduct-header">
-            <span class="section-label">Conduite</span>
-            <span class="conduct-value">{{ selectedMember.conduct.points }} / {{ selectedMember.conduct.max_points }}</span>
-          </div>
-          <div class="conduct-bar-track">
-            <div
-              class="conduct-bar-fill"
-              :style="{
-                width: (selectedMember.conduct.points / selectedMember.conduct.max_points * 100) + '%',
-                backgroundColor: conductColor(selectedMember.conduct.points, selectedMember.conduct.max_points),
-              }"
-            />
-          </div>
-        </div>
-
         <div class="stats-row">
           <div class="stat-box">
             <span class="stat-number">{{ selectedMember.stats.message_count }}</span>
@@ -610,63 +555,6 @@ function discordProfileUrl(userId: string): string {
             <div class="detail-row-body">{{ inf.reason }}</div>
           </div>
         </div>
-      </div>
-
-      <!-- ── TAB: Conduite ── -->
-      <div v-if="detailTab === 'conduite'" class="tab-content">
-        <div v-if="conductLoading" class="loading">Chargement...</div>
-        <template v-else>
-          <div class="conduct-display">
-            <div class="conduct-big">
-              <span
-                class="points-big"
-                :style="{ color: conductColor(selectedMember.conduct.points, selectedMember.conduct.max_points) }"
-              >{{ selectedMember.conduct.points }}</span>
-              <span class="points-max">/ {{ selectedMember.conduct.max_points }}</span>
-            </div>
-            <div class="conduct-bar-track conduct-bar-lg">
-              <div
-                class="conduct-bar-fill"
-                :style="{
-                  width: (selectedMember.conduct.points / selectedMember.conduct.max_points * 100) + '%',
-                  backgroundColor: conductColor(selectedMember.conduct.points, selectedMember.conduct.max_points),
-                }"
-              />
-            </div>
-          </div>
-
-          <div class="adjust-section">
-            <h3>Ajuster les points</h3>
-            <div class="adjust-form">
-              <NumberInputWithUnit v-model.number="adjustAmount" :min="1" :max="12" class="adjust-input" />
-              <AppInput v-model="adjustReason" type="text" class="adjust-reason" placeholder="Raison..." />
-              <button class="adjust-btn add" :disabled="adjusting || !adjustReason" @click="doAdjust(true)">+ Ajouter</button>
-              <button class="adjust-btn remove" :disabled="adjusting || !adjustReason" @click="doAdjust(false)">- Retirer</button>
-            </div>
-          </div>
-
-          <div v-if="conductConfig" class="config-bar">
-            <span>Max: {{ conductConfig.max_points }}</span>
-            <span>Regen: +{{ conductConfig.regen_amount }}/{{ conductConfig.regen_interval === 'weekly' ? 'sem' : 'mois' }}</span>
-            <span>Warn: -{{ conductConfig.penalty_warn }}</span>
-            <span>Delete: -{{ conductConfig.penalty_delete }}</span>
-            <span>Mute: -{{ conductConfig.penalty_mute }}</span>
-            <span>Ban: -{{ conductConfig.penalty_ban }}</span>
-          </div>
-
-          <h3>Historique</h3>
-          <div v-if="conductLog.length === 0" class="empty-small">Aucun mouvement</div>
-          <div v-for="entry in conductLog" :key="entry.id" class="detail-row">
-            <div class="detail-row-header">
-              <span class="detail-date">{{ fmt(entry.created_at) }}</span>
-              <span :class="['delta', entry.delta < 0 ? 'delta-neg' : 'delta-pos']">
-                {{ entry.delta > 0 ? '+' : '' }}{{ entry.delta }}
-              </span>
-            </div>
-            <div class="detail-row-body">{{ entry.reason }}</div>
-            <div class="detail-row-sub">{{ entry.points_before }} &rarr; {{ entry.points_after }}</div>
-          </div>
-        </template>
       </div>
 
       <!-- ── TAB: Surveillance ── -->
@@ -1117,27 +1005,6 @@ function discordProfileUrl(userId: string): string {
 .meta-label { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }
 .meta-value { font-size: 13px; font-weight: 600; color: var(--text-primary); }
 
-.conduct-mini { margin-bottom: 20px; }
-.conduct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
-.section-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
-  font-weight: 600;
-}
-.conduct-value { font-size: 13px; font-weight: 700; color: var(--text-primary); }
-
-.conduct-bar-track {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-secondary);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.conduct-bar-lg { height: 10px; border-radius: 5px; }
-.conduct-bar-fill { height: 100%; border-radius: inherit; transition: width 0.3s ease; }
-
 .stats-row { display: flex; gap: 10px; margin-bottom: 20px; }
 .stat-box {
   flex: 1;
@@ -1226,74 +1093,6 @@ function discordProfileUrl(userId: string): string {
 .diff-arrow { font-size: 20px; color: var(--text-secondary); }
 
 .channel-id { margin-left: 4px; font-size: 10px; opacity: 0.7; }
-
-/* Conduite tab */
-.conduct-display { margin-bottom: 20px; text-align: center; }
-.conduct-big { margin-bottom: 10px; }
-.points-big { font-size: 48px; font-weight: 800; }
-.points-max { font-size: 24px; color: var(--text-secondary); margin-left: 4px; }
-
-.adjust-section { margin-bottom: 20px; }
-.adjust-section h3 { font-size: 14px; margin-bottom: 10px; }
-.adjust-form { display: flex; gap: 8px; align-items: center; }
-
-.adjust-input {
-  width: 60px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 13px;
-  text-align: center;
-}
-.adjust-reason {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-size: 13px;
-}
-.adjust-reason::placeholder { color: var(--text-secondary); }
-.adjust-input:focus, .adjust-reason:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: var(--focus-ring);
-}
-
-.adjust-btn {
-  padding: 8px 14px;
-  border: none;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity var(--transition-fast);
-  white-space: nowrap;
-}
-.adjust-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.adjust-btn.add { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
-.adjust-btn.add:hover:not(:disabled) { background: var(--success); color: white; }
-.adjust-btn.remove { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
-.adjust-btn.remove:hover:not(:disabled) { background: var(--danger); color: white; }
-
-.config-bar {
-  display: flex;
-  gap: 12px;
-  padding: 10px 14px;
-  background: var(--bg-secondary);
-  border-radius: 8px;
-  margin-bottom: 16px;
-  font-size: 12px;
-  color: var(--text-secondary);
-  flex-wrap: wrap;
-}
-
-.delta { font-weight: 700; font-family: "JetBrains Mono", "Cascadia Code", monospace; }
-.delta-pos { color: var(--success); }
-.delta-neg { color: var(--danger); }
 
 /* Surveillance tab */
 .dossier-summary { display: flex; gap: 12px; margin-bottom: 20px; }

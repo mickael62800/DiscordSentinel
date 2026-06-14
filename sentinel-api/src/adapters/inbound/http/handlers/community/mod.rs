@@ -1,5 +1,4 @@
 pub mod announcements;
-pub mod conduct;
 pub mod confessions;
 pub mod discord_roles;
 pub mod guild_channels;

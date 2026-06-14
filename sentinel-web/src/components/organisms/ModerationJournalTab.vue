@@ -9,7 +9,6 @@ import { useModeration } from "../../composables/useModeration";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useGuildMembers } from "../../composables/useGuildMembers";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
-import { conductService } from "@/services/conductService";
 import type { TableColumn, Infraction, GuildMember } from "../../types";
 import { infractionTypeVariant } from "../../utils/variants";
 import { safeImageUrl } from "../../utils/safeUrl";
@@ -24,7 +23,6 @@ import AppModal from "../atoms/AppModal.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import FormField from "../atoms/FormField.vue";
-import CancelConductBanModal from "../molecules/CancelConductBanModal.vue";
 
 const emit = defineEmits<{
   /** Demande au parent de basculer vers Suivi → Notes & Preuves avec ce user. */
@@ -46,7 +44,7 @@ const {
   purging,
   purgeAll,
 } = useInfractions();
-useRealtimeRefresh(["infraction_new", "strike_added", "conduct_points_changed"], fetchInfractions);
+useRealtimeRefresh(["infraction_new", "strike_added"], fetchInfractions);
 
 const journalSearch = ref("");
 const journalType = ref<string>("all");
@@ -175,29 +173,12 @@ const infractionsColumns: TableColumn[] = [
   { key: "actions", label: "" },
 ];
 
-// Conduct ban modal
-const conductBanModalVisible = ref(false);
-const conductBanModalTarget = ref<Infraction | null>(null);
-
-function isConductProposal(row: Record<string, unknown>): boolean {
-  const source = row.source as string | undefined;
-  const actionType = String(row.infraction_type ?? "").toLowerCase();
-  const reason = String(row.reason ?? "");
-  return source === "detection" && actionType === "ban" && reason.startsWith("Points de conduite");
-}
-
 async function onDeleteInfraction(row: Record<string, unknown>) {
   const id = row.id as string;
   const source = (row.source as "detection" | "action" | undefined) ?? "detection";
   const actionType = String(row.infraction_type ?? "").toLowerCase();
   const isBan = source === "action" && actionType.startsWith("ban");
   const isMute = source === "action" && (actionType.startsWith("mute") || actionType === "timeout");
-
-  if (isConductProposal(row)) {
-    conductBanModalTarget.value = row as unknown as Infraction;
-    conductBanModalVisible.value = true;
-    return;
-  }
 
   let message: string;
   if (isBan) {
@@ -217,32 +198,6 @@ async function onDeleteInfraction(row: Record<string, unknown>) {
   } catch (e) {
     console.error("Erreur suppression infraction:", e);
     showError("Erreur lors de la suppression");
-  }
-}
-
-function closeConductBanModal() {
-  conductBanModalVisible.value = false;
-  conductBanModalTarget.value = null;
-}
-
-async function onConductBanModalConfirm(grant: number | null) {
-  const target = conductBanModalTarget.value;
-  if (!target) return;
-  try {
-    if (grant !== null && grant > 0) {
-      await conductService.adjustPoints(
-        target.server,
-        target.user_id,
-        grant,
-        "Annulation manuelle de la proposition de ban",
-      );
-    }
-    await deleteInfraction(target.id, "detection");
-    closeConductBanModal();
-  } catch (e) {
-    console.error("Erreur annulation proposition conduite:", e);
-    showError("Erreur lors de l'annulation");
-    closeConductBanModal();
   }
 }
 
@@ -633,13 +588,6 @@ async function handleActionSubmit() {
         </div>
       </template>
     </DataTable>
-
-    <CancelConductBanModal
-      :visible="conductBanModalVisible"
-      :target="conductBanModalTarget"
-      @close="closeConductBanModal"
-      @confirm="onConductBanModalConfirm"
-    />
 
     <AppModal
       :visible="actionModalVisible"

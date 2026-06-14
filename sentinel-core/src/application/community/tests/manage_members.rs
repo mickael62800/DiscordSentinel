@@ -53,25 +53,18 @@ impl MemberRepository for MockMemberRepo {
 
 // ── Stubs minimaux pour les use cases satellites (non utilises ici) ──
 
-use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
-use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use crate::domain::entities::community::conduct::ConductConfig;
-use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::audit::dashboard_stats::DashboardStats;
 use crate::domain::entities::audit::user_stats::GuildStatsOverview;
 use crate::domain::entities::audit::user_stats::GuildVoiceStats;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::moderation::action::applied::ModerationAction;
-use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::domain::entities::audit::user_stats::UserStats;
 struct StubInfUc;
@@ -101,29 +94,6 @@ impl ManageModerationUseCase for StubModUc {
     async fn delete_action(&self, _: uuid::Uuid) -> Result<bool, DomainError> { Ok(false) }
 }
 
-struct StubConductUc;
-#[async_trait]
-impl ManageConductUseCase for StubConductUc {
-    async fn get_config(&self, g: &str) -> Result<ConductConfig, DomainError> {
-        Ok(ConductConfig::default_for_guild(g))
-    }
-    async fn save_config(&self, _: SaveConductConfigCommand) -> Result<ConductConfig, DomainError> { unimplemented!() }
-    async fn get_points(&self, g: &str, u: &str) -> Result<UserConductPoints, DomainError> {
-        let now = chrono::Utc::now();
-        Ok(UserConductPoints {
-            id: uuid::Uuid::new_v4(),
-            guild_id: g.into(), user_id: u.into(), username: u.into(),
-            points: 100,
-            last_regen_at: now, created_at: now, updated_at: now,
-        })
-    }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn add_points(&self, _: AddPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserConductPoints>, DomainError> { Ok(vec![]) }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<ConductPointsLog>, DomainError> { Ok(vec![]) }
-    async fn run_regen(&self) -> Result<u64, DomainError> { Ok(0) }
-}
-
 struct StubStatsUc;
 #[async_trait]
 impl ManageStatsUseCase for StubStatsUc {
@@ -141,7 +111,6 @@ fn make_service(repo: Arc<MockMemberRepo>) -> ManageMembersService {
         repo,
         Arc::new(StubInfUc),
         Arc::new(StubModUc),
-        Arc::new(StubConductUc),
         Arc::new(StubStatsUc),
     )
 }
@@ -261,9 +230,6 @@ async fn get_member_summary_returns_default_shape_for_empty_stubs() {
     assert_eq!(s.moderation.total_warns, 0);
     assert_eq!(s.moderation.total_mutes, 0);
     assert_eq!(s.moderation.total_bans, 0);
-    // ConductConfig.default_for_guild fournit max_points ; StubConductUc.get_points renvoie 100.
-    assert_eq!(s.conduct.points, 100);
-    assert!(s.conduct.max_points > 0);
     // StatsUc renvoie None → 0/0/None.
     assert_eq!(s.stats.message_count, 0);
     assert_eq!(s.stats.voice_seconds, 0);
@@ -358,7 +324,7 @@ async fn get_member_summary_counts_moderation_actions_by_type() {
     r.members.lock().unwrap().push(sample_member("g", "u", "Alice"));
     let svc = ManageMembersService::new(
         r, Arc::new(RichInfUc), Arc::new(RichModUc),
-        Arc::new(StubConductUc), Arc::new(RichStatsUc),
+        Arc::new(RichStatsUc),
     );
     let s = svc.get_member_summary("g", "u").await.unwrap();
     assert_eq!(s.moderation.total_warns, 2);

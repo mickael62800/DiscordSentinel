@@ -210,11 +210,6 @@ path = "tests/integration/analyze/http.rs"
 name = "integration_security_http"
 path = "tests/integration/security/http.rs"
 
-# conduct
-[[test]]
-name = "integration_conduct_http"
-path = "tests/integration/conduct/http.rs"
-
 # levels
 [[test]]
 name = "integration_levels_http"
@@ -385,11 +380,6 @@ path = "tests/integration/postgres_members/repo.rs"
 name = "integration_postgres_moderation"
 path = "tests/integration/postgres_moderation/repo.rs"
 
-# postgres conduct repo
-[[test]]
-name = "integration_postgres_conduct"
-path = "tests/integration/postgres_conduct/repo.rs"
-
 # postgres levels repo
 [[test]]
 name = "integration_postgres_levels"
@@ -544,12 +534,6 @@ path = "tests/integration/stats_service/repo.rs"
 [[test]]
 name = "integration_security_service"
 path = "tests/integration/security_service/repo.rs"
-
-# conduct application service (config + points + regen + Discord mute path)
-[[test]]
-name = "integration_conduct_service"
-path = "tests/integration/conduct_service/repo.rs"
-
 
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]

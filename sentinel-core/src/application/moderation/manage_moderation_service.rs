@@ -8,11 +8,9 @@ use crate::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
 use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use tracing::warn;
@@ -27,7 +25,6 @@ pub struct ManageModerationService {
     repo: Arc<dyn ModerationRepository>,
     strike_repo: Arc<dyn StrikeRepository>,
     cache: Arc<dyn CachePort>,
-    conduct_uc: Arc<dyn ManageConductUseCase>,
     strikes_uc: Option<Arc<dyn ManageStrikesUseCase>>,
     audit_logs_uc: Option<Arc<dyn ManageAuditLogsUseCase>>,
 }
@@ -37,9 +34,8 @@ impl ManageModerationService {
         repo: Arc<dyn ModerationRepository>,
         strike_repo: Arc<dyn StrikeRepository>,
         cache: Arc<dyn CachePort>,
-        conduct_uc: Arc<dyn ManageConductUseCase>,
     ) -> Self {
-        Self { repo, strike_repo, cache, conduct_uc, strikes_uc: None, audit_logs_uc: None }
+        Self { repo, strike_repo, cache, strikes_uc: None, audit_logs_uc: None }
     }
 
     /// Injecte le use case strikes (optionnel — active `log_action_with_strike`).
@@ -116,16 +112,6 @@ impl ManageModerationUseCase for ManageModerationService {
         let cache_key = format!("modhistory:{}:{}", action.guild_id, action.target_id);
         if let Err(e) = self.cache.invalidate(&cache_key).await {
             warn!(error = %e, cache_key = %cache_key, "Echec invalidation cache mod history");
-        }
-
-        // Deduire les points de conduite
-        if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
-            guild_id: action.guild_id.clone(),
-            user_id: action.target_id.clone().into(),
-            username: action.target_name.clone(),
-            action: action.action_type.clone(),
-        }).await {
-            warn!(error = %e, guild_id = %action.guild_id, target_id = %action.target_id, "Echec deduction points conduite");
         }
 
         Ok(action)

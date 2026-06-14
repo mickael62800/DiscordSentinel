@@ -3,14 +3,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::domain::entities::community::guild_member::GuildMember;
-use crate::domain::entities::community::guild_member::MemberConduct;
 use crate::domain::entities::community::guild_member::MemberInfractions;
 use crate::domain::entities::community::guild_member::MemberModeration;
 use crate::domain::entities::community::guild_member::MemberStats;
 use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
@@ -24,7 +22,6 @@ pub struct ManageMembersService {
     member_repo: Arc<dyn MemberRepository>,
     infractions_uc: Arc<dyn ManageInfractionsUseCase>,
     moderation_uc: Arc<dyn ManageModerationUseCase>,
-    conduct_uc: Arc<dyn ManageConductUseCase>,
     stats_uc: Arc<dyn ManageStatsUseCase>,
 }
 
@@ -33,10 +30,9 @@ impl ManageMembersService {
         member_repo: Arc<dyn MemberRepository>,
         infractions_uc: Arc<dyn ManageInfractionsUseCase>,
         moderation_uc: Arc<dyn ManageModerationUseCase>,
-        conduct_uc: Arc<dyn ManageConductUseCase>,
         stats_uc: Arc<dyn ManageStatsUseCase>,
     ) -> Self {
-        Self { member_repo, infractions_uc, moderation_uc, conduct_uc, stats_uc }
+        Self { member_repo, infractions_uc, moderation_uc, stats_uc }
     }
 }
 
@@ -102,32 +98,6 @@ impl ManageMembersUseCase for ManageMembersService {
             (0, 0, 0, vec![])
         };
 
-        // Conduct
-        let conduct_points = match self.conduct_uc.get_points(guild_id, user_id).await {
-            Ok(p) => Some(p),
-            Err(e) => {
-                tracing::warn!(error = %e, guild_id, user_id, "Echec chargement points conduite pour summary");
-                None
-            }
-        };
-        let conduct_config = match self.conduct_uc.get_config(guild_id).await {
-            Ok(cfg) => cfg,
-            Err(_) => crate::domain::entities::community::conduct::ConductConfig::default_for_guild(guild_id),
-        };
-        let points = conduct_points.as_ref().map(|c| c.points).unwrap_or(conduct_config.max_points);
-        let max_points = conduct_config.max_points;
-        let conduct_log_entries = self.conduct_uc.get_points_log(guild_id, user_id, 20).await.unwrap_or_else(|e| {
-            tracing::warn!(error = %e, guild_id, user_id, "Echec chargement log conduite pour summary");
-            vec![]
-        });
-        let conduct_log: Vec<serde_json::Value> = conduct_log_entries.iter().take(20)
-            .map(|l| serde_json::json!({
-                "delta": l.delta,
-                "reason": l.reason,
-                "created_at": l.created_at.to_rfc3339(),
-            }))
-            .collect();
-
         // Stats
         let user_stats = self.stats_uc.get_user_stats(guild_id, user_id).await.ok().flatten();
         let (message_count, voice_seconds, last_active) = user_stats
@@ -136,7 +106,6 @@ impl ManageMembersUseCase for ManageMembersService {
 
         Ok(MemberSummary {
             member,
-            conduct: MemberConduct { points, max_points, log: conduct_log },
             infractions: MemberInfractions { total: infractions_total, recent: infractions_recent },
             moderation: MemberModeration { total_warns, total_mutes, total_bans, actions: mod_actions },
             stats: MemberStats { message_count, voice_seconds, last_active },

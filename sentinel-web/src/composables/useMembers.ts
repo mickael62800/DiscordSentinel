@@ -1,10 +1,9 @@
 import { ref, computed } from "vue";
-import type { Member, MemberSummary, UserConductPoints, ConductPointsLog, ConductConfig, UserDossier, WatchedUser } from "../types";
+import type { Member, MemberSummary, UserDossier, WatchedUser } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { membersService } from "@/services/membersService";
 import { watchedUsersService } from "@/services/watchedUsersService";
-import { conductService } from "@/services/conductService";
 import { userActivityService, type UserActivity } from "@/services/userActivityService";
 
 const members = ref<Member[]>([]);
@@ -17,11 +16,6 @@ const sortBy = ref<"username" | "joined_at">("username");
 const selectedMember = ref<MemberSummary | null>(null);
 const loadingSummary = ref(false);
 
-const conductConfig = ref<ConductConfig | null>(null);
-const conductPoints = ref<UserConductPoints | null>(null);
-const conductLog = ref<ConductPointsLog[]>([]);
-const conductLoading = ref(false);
-
 const dossier = ref<UserDossier | null>(null);
 const dossierLoading = ref(false);
 
@@ -29,7 +23,7 @@ const activityTimeline = ref<UserActivity[]>([]);
 
 export function useMembers() {
   const { selectedGuildId } = useGuildSelector();
-  const { success, error: showError } = useToast();
+  const { error: showError } = useToast();
 
   const watchedSet = computed(() => new Set(watchedUsers.value.map((u) => u.user_id)));
 
@@ -81,21 +75,10 @@ export function useMembers() {
     }
   }
 
-  async function fetchConductConfig() {
-    if (!selectedGuildId.value) return;
-    try {
-      conductConfig.value = await conductService.getConfig(selectedGuildId.value);
-    } catch {
-      // Config may not exist yet
-    }
-  }
-
   async function selectMember(userId: string) {
     if (!selectedGuildId.value) return;
     loadingSummary.value = true;
     dossier.value = null;
-    conductPoints.value = null;
-    conductLog.value = [];
     try {
       selectedMember.value = await membersService.getSummary(selectedGuildId.value, userId);
     } catch (e) {
@@ -103,32 +86,6 @@ export function useMembers() {
       showError("Erreur lors du chargement du resume du membre.");
     } finally {
       loadingSummary.value = false;
-    }
-  }
-
-  async function fetchConductDetail(userId: string) {
-    if (!selectedGuildId.value) return;
-    conductLoading.value = true;
-    try {
-      conductPoints.value = await conductService.getPoints(selectedGuildId.value, userId);
-      conductLog.value = await conductService.getLog(selectedGuildId.value, userId);
-    } catch {
-      conductPoints.value = null;
-      conductLog.value = [];
-    } finally {
-      conductLoading.value = false;
-    }
-  }
-
-  async function adjustPoints(userId: string, amount: number, reason: string) {
-    if (!selectedGuildId.value) return;
-    try {
-      await conductService.adjustPoints(selectedGuildId.value, userId, amount, reason);
-      await fetchConductDetail(userId);
-      success("Points de conduite ajustes avec succes.");
-    } catch (e) {
-      console.error("Erreur lors de l'ajustement des points de conduite :", e);
-      showError("Erreur lors de l'ajustement des points de conduite.");
     }
   }
 
@@ -181,19 +138,16 @@ export function useMembers() {
   function closeMember() {
     selectedMember.value = null;
     dossier.value = null;
-    conductPoints.value = null;
-    conductLog.value = [];
     activityTimeline.value = [];
   }
 
   return {
     members, filteredMembers, loading, error, search, sortBy,
     selectedMember, loadingSummary,
-    conductConfig, conductPoints, conductLog, conductLoading,
     dossier, dossierLoading,
     activityTimeline,
     isWatched,
-    fetchMembers, fetchConductConfig, selectMember, fetchConductDetail,
-    adjustPoints, fetchDossier, addToWatch, removeFromWatch, resetMember, closeMember,
+    fetchMembers, selectMember,
+    fetchDossier, addToWatch, removeFromWatch, resetMember, closeMember,
   };
 }
