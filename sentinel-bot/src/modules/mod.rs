@@ -11,6 +11,7 @@ pub mod confessions;
 pub mod coude;
 pub mod games;
 pub mod moderation;
+pub mod command_channel;
 pub mod progression;
 pub mod rotation;
 pub mod security;

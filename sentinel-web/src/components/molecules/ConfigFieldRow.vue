@@ -28,6 +28,7 @@ const CHANNEL_LIST_KEYS = new Set<string>([
   "excluded_channels",
   "whitelist_channels",
   "exempt_channels",
+  "command_channels",
 ]);
 const ROLE_LIST_KEYS = new Set<string>([
   "ignored_roles",

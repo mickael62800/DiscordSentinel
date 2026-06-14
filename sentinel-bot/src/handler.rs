@@ -165,6 +165,10 @@ impl EventHandler for Handler {
         if msg.author.bot {
             return;
         }
+        // Salons "commandes uniquement" : supprime le message classique en
+        // premier (avant l'XP / automod, qui n'ont pas a traiter un message
+        // qui va disparaitre).
+        modules::command_channel::on_message(&ctx, &msg).await;
         modules::automod::on_message(&ctx, &msg).await;
         modules::audit::on_message(&ctx, &msg).await;
         modules::progression::on_message(&ctx, &msg).await;
