@@ -11,9 +11,9 @@ pub const MODULE_BOT_NAME: &str = "rotation-bot";
 use std::sync::Arc;
 
 use serenity::all::{
-    ButtonStyle, ComponentInteraction, Context, CreateActionRow, CreateButton,
-    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage, GuildId, RoleId,
-    UserId,
+    ButtonStyle, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
+    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage, GuildId, Permissions, RoleId, UserId,
 };
 use tracing::{info, warn};
 
@@ -57,6 +57,128 @@ struct Cfg {
 
 pub fn handles_component(cid: &str) -> bool {
     cid.starts_with(PREFIX)
+}
+
+// ── Commandes slash ──
+
+pub fn register_commands() -> Vec<CreateCommand> {
+    vec![CreateCommand::new("rotation")
+        .description("Administrateur tournant")
+        .default_member_permissions(Permissions::MANAGE_GUILD)
+        .add_option(CreateCommandOption::new(CommandOptionType::SubCommand, "statut", "Affiche l'etat de la rotation"))
+        .add_option(CreateCommandOption::new(CommandOptionType::SubCommand, "lancer", "Force le demarrage d'une nouvelle rotation maintenant"))
+        .add_option(CreateCommandOption::new(CommandOptionType::SubCommand, "suivant", "Passe au moderateur suivant"))
+        .add_option(CreateCommandOption::new(CommandOptionType::SubCommand, "annuler", "Annule la rotation en cours (garde l'admin actuel)"))
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::SubCommand, "definir", "Definit directement l'administrateur (override)")
+                .add_sub_option(
+                    CreateCommandOption::new(CommandOptionType::User, "membre", "Le membre a nommer administrateur").required(true),
+                ),
+        )]
+}
+
+fn has_manage_guild(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(Permissions::MANAGE_GUILD) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false)
+}
+
+async fn reply_cmd(ctx: &Context, command: &CommandInteraction, text: &str) {
+    let _ = command
+        .create_response(
+            ctx,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().content(text).ephemeral(true),
+            ),
+        )
+        .await;
+}
+
+pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if command.data.name != "rotation" {
+        return;
+    }
+    if !has_manage_guild(command) {
+        return reply_cmd(ctx, command, "Permission MANAGE_GUILD requise.").await;
+    }
+    let guild_id = match command.guild_id {
+        Some(g) => g,
+        None => return reply_cmd(ctx, command, "Commande serveur uniquement.").await,
+    };
+    let gid = guild_id.to_string();
+    let api = match api(ctx).await { Some(a) => a, None => return };
+    let cfg = match load_cfg(&api, &gid).await {
+        Some(c) => c,
+        None => return reply_cmd(ctx, command, "Module inactif ou roles non configures (Composants -> Administrateur tournant).").await,
+    };
+    let mut st = get_state(&api, &gid).await.unwrap_or_else(|| RotationDto { guild_id: gid.clone(), state: "idle".into(), ..Default::default() });
+
+    let sub = command.data.options.first().map(|o| o.name.as_str()).unwrap_or("");
+    match sub {
+        "statut" => {
+            let admin = st.current_admin_id.as_deref().map(|id| format!("<@{id}>")).unwrap_or_else(|| "aucun".into());
+            let etat = match st.state.as_str() {
+                "offering_candidate" => format!("vote en cours (candidat : {})", st.candidate_id.as_deref().map(|id| format!("<@{id}>")).unwrap_or_default()),
+                "awaiting_owner" => "en attente de validation du fondateur".into(),
+                "offering_stay" => "en attente : l'admin actuel doit confirmer s'il reste".into(),
+                _ => "au repos".into(),
+            };
+            let next = st.next_rotation_at.as_deref()
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|d| format!("<t:{}:R>", d.timestamp()))
+                .unwrap_or_else(|| "non planifiee".into());
+            reply_cmd(ctx, command, &format!("👑 **Administrateur tournant**\nAdmin actuel : {admin}\nEtat : {etat}\nProchaine rotation : {next}")).await;
+        }
+        "lancer" => {
+            st.next_rotation_at = None; // force "due"
+            start_rotation(ctx, guild_id, &cfg, &api, &mut st).await;
+            reply_cmd(ctx, command, "Rotation lancee : le premier moderateur va recevoir un MP.").await;
+        }
+        "suivant" => {
+            if st.state == "offering_candidate" || st.state == "awaiting_owner" {
+                advance_or_finish(ctx, guild_id, &cfg, &api, &mut st).await;
+                reply_cmd(ctx, command, "Passage au moderateur suivant.").await;
+            } else {
+                reply_cmd(ctx, command, "Aucune sollicitation en cours.").await;
+            }
+        }
+        "annuler" => {
+            st.state = "idle".into();
+            st.candidate_id = None;
+            save_state(&api, &st).await;
+            reply_cmd(ctx, command, "Rotation en cours annulee (l'admin actuel est conserve).").await;
+        }
+        "definir" => {
+            // L'option `membre` est imbriquee dans la sous-commande `definir`.
+            let target = command.data.options.first().and_then(|o| match &o.value {
+                serenity::all::CommandDataOptionValue::SubCommand(opts) => opts
+                    .iter()
+                    .find(|so| so.name == "membre")
+                    .and_then(|so| match &so.value {
+                        serenity::all::CommandDataOptionValue::User(uid) => Some(*uid),
+                        _ => None,
+                    }),
+                _ => None,
+            });
+            let Some(target) = target else { return reply_cmd(ctx, command, "Membre invalide.").await };
+            // Retire le role admin a l'ancien.
+            if let Some(prev) = st.current_admin_id.clone().and_then(|s| s.parse::<u64>().ok()) {
+                swap_roles(ctx, guild_id, UserId::new(prev), Some(cfg.mod_role), Some(cfg.admin_role)).await;
+            }
+            swap_roles(ctx, guild_id, target, Some(cfg.admin_role), Some(cfg.mod_role)).await;
+            let _ = api.post_json::<_, serde_json::Value>(&format!("/api/rotation/{gid}/served"), &serde_json::json!({"user_id": target.get().to_string()})).await;
+            st.current_admin_id = Some(target.get().to_string());
+            st.current_admin_since = Some(now_rfc3339());
+            st.state = "idle".into();
+            st.candidate_id = None;
+            save_state(&api, &st).await;
+            reply_cmd(ctx, command, &format!("✅ <@{}> est desormais administrateur.", target.get())).await;
+        }
+        _ => reply_cmd(ctx, command, "Sous-commande inconnue.").await,
+    }
 }
 
 pub fn spawn_background_tasks(ctx: &Context) {

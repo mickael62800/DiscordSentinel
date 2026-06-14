@@ -32,6 +32,7 @@ fn command_module(name: &str) -> &'static str {
         "slot-setup" => "slot",
         "wheel-setup" => "wheel",
         "tama-setup" => "tamagotchi",
+        "rotation" => "rotation",
         "security" => "security",
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
@@ -455,6 +456,7 @@ impl EventHandler for Handler {
                         "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
                         "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
                         "tama-setup" => modules::tamagotchi::handle_command(&ctx, &command).await,
+                        "rotation" => modules::rotation::handle_command(&ctx, &command).await,
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
