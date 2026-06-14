@@ -130,6 +130,7 @@ impl EventHandler for Handler {
 
         // Automod: background tasks (slowmode deactivation + cache cleanup)
         modules::automod::spawn_background_tasks(&ctx);
+        modules::rotation::spawn_background_tasks(&ctx);
 
         // Moderation: Redis consumer pour events externes
         modules::moderation::spawn_background(ctx.clone());
@@ -535,6 +536,9 @@ impl EventHandler for Handler {
                     modules::automod::on_component(&ctx, &component).await;
                 } else if modules::moderation::handles_component(cid) {
                     modules::moderation::on_component(&ctx, &component).await;
+                } else if modules::rotation::handles_component(cid) {
+                    // Boutons cliques en MP (validation admin tournant).
+                    modules::rotation::on_component(&ctx, &component).await;
                 } else if modules::voice::handles_component(cid) {
                     modules::voice::on_component(&ctx, &component).await;
                 } else if modules::coude::handles_component(cid) {

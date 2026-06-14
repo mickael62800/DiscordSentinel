@@ -12,6 +12,7 @@ pub mod coude;
 pub mod games;
 pub mod moderation;
 pub mod progression;
+pub mod rotation;
 pub mod security;
 pub mod slot;
 pub mod tamagotchi;
