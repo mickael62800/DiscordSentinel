@@ -1,3 +1,4 @@
+pub mod admin_rotation;
 pub mod bot_config;
 pub mod bot_persistence;
 pub mod cache_stats;

@@ -462,6 +462,12 @@ pub async fn build_app_state(
             wallet_uc.clone(),
         ));
 
+    // Administrateur tournant : repo + use case.
+    let rotation_repo: Arc<dyn crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::admin_rotation_repository::PgAdminRotationRepository::new(pg_pool.clone()));
+    let rotation_uc: Arc<dyn crate::ports::inbound::system::manage_rotation::ManageRotationUseCase> =
+        Arc::new(sentinel_core::application::system::manage_rotation_service::ManageRotationService::new(rotation_repo.clone()));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -862,6 +868,7 @@ pub async fn build_app_state(
         welcome_config_uc,
         automod_reviews_uc,
         pets_uc,
+        rotation_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

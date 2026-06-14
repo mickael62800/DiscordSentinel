@@ -1,3 +1,4 @@
+pub mod admin_rotation;
 pub mod analytics;
 pub mod bot_config;
 pub mod config_parsers;

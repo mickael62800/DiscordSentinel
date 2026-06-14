@@ -1,3 +1,4 @@
+pub mod admin_rotation_repository;
 pub mod bot_config_repository;
 pub mod cache;
 pub mod cache_helpers;
