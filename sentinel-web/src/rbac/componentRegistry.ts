@@ -70,6 +70,9 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "community.sponsorships", label: "Bouton Parrainages", category: "Dashboard", minRole: "moderator" },
   { key: "community.temp-roles", label: "Bouton Rôles temporaires", category: "Dashboard", minRole: "moderator" },
 
+  // ── Dashboard : administration ──
+  { key: "rotation.dashboard", label: "Bouton Administrateur tournant", category: "Dashboard", minRole: "admin" },
+
   // ── Dashboard : logs / jeux ──
   { key: "logs.journal", label: "Bouton Journal logs Discord", category: "Dashboard", minRole: "admin" },
   { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },

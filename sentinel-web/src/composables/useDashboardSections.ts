@@ -43,6 +43,8 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "security.automod", path: "/automod", label: "Automod", icon: "shield", requiredBot: "automod-bot" },
   { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
+  { key: "rotation.dashboard", path: "/rotation-dashboard", label: "Admin tournant", icon: "users", requiredBot: "rotation-bot" },
+
   { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
