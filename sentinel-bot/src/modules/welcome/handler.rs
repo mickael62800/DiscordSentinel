@@ -60,6 +60,92 @@ async fn update_counter(
     }
 }
 
+/// Compte les HUMAINS (hors bots) actuellement connectes en vocal sur la
+/// guild, via le cache des `voice_states`. Les bots musique/soundboard ne
+/// sont pas comptes.
+fn voice_member_count(ctx: &Context, guild_id: GuildId) -> u64 {
+    let Some(g) = ctx.cache.guild(guild_id) else { return 0 };
+    g.voice_states
+        .values()
+        .filter(|vs| vs.channel_id.is_some())
+        .filter(|vs| {
+            // Exclut les bots : si le membre est en cache et marque bot, on
+            // l'ignore ; sinon on le compte (humain par defaut).
+            !g.members.get(&vs.user_id).map(|m| m.user.bot).unwrap_or(false)
+        })
+        .count() as u64
+}
+
+/// Renomme le salon compteur vocal avec le nombre de connectes en vocal.
+/// Independant du compteur de membres : ne depend que de
+/// `voice_counter_enabled`.
+async fn update_voice_counter(
+    ctx: &Context,
+    enabled: bool,
+    channel_id: Option<&String>,
+    format: &str,
+    voice_count: u64,
+) {
+    if !enabled {
+        return;
+    }
+    let Some(ch_id) = channel_id else { return };
+    let Ok(ch) = ch_id.parse::<u64>() else { return };
+    let name = format.replace("{count}", &voice_count.to_string());
+    if let Err(e) = ChannelId::new(ch).edit(&ctx.http, EditChannel::new().name(&name)).await {
+        warn!(error = %e, "Echec mise a jour compteur vocal");
+    }
+}
+
+/// Appele a chaque changement d'etat vocal (join/leave/move). Met a jour le
+/// salon compteur "En Vocal : N" si la fonctionnalite est activee.
+pub async fn on_voice_state_update(
+    ctx: &Context,
+    old: &Option<serenity::model::voice::VoiceState>,
+    new: &serenity::model::voice::VoiceState,
+) {
+    // guild_id provient de `new`, ou de `old` lors d'une deconnexion totale.
+    let guild_id = match new.guild_id.or_else(|| old.as_ref().and_then(|o| o.guild_id)) {
+        Some(g) => g,
+        None => return,
+    };
+
+    if !is_module_enabled(ctx, &guild_id.to_string(), crate::modules::welcome::MODULE_BOT_NAME).await {
+        return;
+    }
+
+    let data = ctx.data.read().await;
+    let base = match data.get::<ApiClientKey>() {
+        Some(b) => Arc::clone(b),
+        None => return,
+    };
+    let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+        Some(g) => Arc::clone(g),
+        None => return,
+    };
+    drop(data);
+
+    let api = WelcomeApiClient::new(base, grpc);
+    let config = match api.get_config(&guild_id.to_string()).await {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    if !config.voice_counter_enabled {
+        return;
+    }
+
+    let voice_count = voice_member_count(ctx, guild_id);
+    update_voice_counter(
+        ctx,
+        config.voice_counter_enabled,
+        config.voice_counter_channel_id.as_ref(),
+        &config.voice_counter_format,
+        voice_count,
+    )
+    .await;
+}
+
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
         let ctx = ctx.clone();
         let new_member = new_member.clone();

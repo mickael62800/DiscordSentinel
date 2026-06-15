@@ -1,6 +1,7 @@
 pub mod appeal;
 pub mod ban;
 pub mod call;
+pub mod card;
 pub mod compare;
 pub mod context;
 pub mod evidence;
@@ -120,6 +121,7 @@ pub fn all() -> Vec<CreateCommand> {
         history::register(),
         notes::register(),
         call::register(),
+        card::register(),
         context::register(),
         appeal::register(),
         export::register(),

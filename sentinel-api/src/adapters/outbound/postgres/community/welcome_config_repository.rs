@@ -61,6 +61,11 @@ impl From<Row> for WelcomeConfigData {
             counter_enabled: r.counter_enabled,
             counter_channel_id: r.counter_channel_id,
             counter_format: r.counter_format,
+            // Row legacy (table welcome_config) ne contient pas ces colonnes :
+            // defaults, la lecture reelle passe par overlay_with_bot_config.
+            voice_counter_enabled: false,
+            voice_counter_channel_id: None,
+            voice_counter_format: "En Vocal : {count}".into(),
             anniversary_enabled: r.anniversary_enabled,
             anniversary_channel_id: r.anniversary_channel_id,
             anniversary_message: r.anniversary_message,
@@ -103,6 +108,9 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         counter_enabled: false,
         counter_channel_id: None,
         counter_format: "Membres : {count}".into(),
+        voice_counter_enabled: false,
+        voice_counter_channel_id: None,
+        voice_counter_format: "En Vocal : {count}".into(),
         anniversary_enabled: false,
         anniversary_channel_id: None,
         anniversary_message: "Felicitations {user}, ca fait **{years} an(s)** que tu es sur **{server}** !".into(),
@@ -151,6 +159,9 @@ fn overlay_with_bot_config(
             "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
             "counter_channel_id" => d.counter_channel_id = if v.is_empty() { None } else { Some(v) },
             "counter_format" => { if !v.is_empty() { d.counter_format = v; } }
+            "voice_counter_enabled" => d.voice_counter_enabled = parse_bool(&v, d.voice_counter_enabled),
+            "voice_counter_channel_id" => d.voice_counter_channel_id = if v.is_empty() { None } else { Some(v) },
+            "voice_counter_format" => { if !v.is_empty() { d.voice_counter_format = v; } }
             "anniversary_enabled" => d.anniversary_enabled = parse_bool(&v, d.anniversary_enabled),
             "anniversary_channel_id" => d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) },
             "anniversary_message" => { if !v.is_empty() { d.anniversary_message = v; } }
@@ -249,6 +260,9 @@ pub(super) fn build_welcome_config_kvs(d: &WelcomeConfigData) -> Vec<(&'static s
         ("counter_enabled", b(d.counter_enabled)),
         ("counter_channel_id", opt(&d.counter_channel_id)),
         ("counter_format", d.counter_format.clone()),
+        ("voice_counter_enabled", b(d.voice_counter_enabled)),
+        ("voice_counter_channel_id", opt(&d.voice_counter_channel_id)),
+        ("voice_counter_format", d.voice_counter_format.clone()),
         ("anniversary_enabled", b(d.anniversary_enabled)),
         ("anniversary_channel_id", opt(&d.anniversary_channel_id)),
         ("anniversary_message", d.anniversary_message.clone()),

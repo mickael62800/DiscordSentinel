@@ -36,7 +36,7 @@ fn command_module(name: &str) -> &'static str {
         "security" => "security",
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-        | "note" | "call" | "context" | "appeal" | "expirations" | "compare"
+        | "note" | "call" | "card" | "context" | "appeal" | "expirations" | "compare"
         | "modstats" | "evidence" | "review" | "template" | "transcript"
         | "export" | "massmute" | "massban" => "moderation",
         "ticket" => "tickets",
@@ -295,6 +295,7 @@ impl EventHandler for Handler {
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
         modules::audit::on_voice_state_update(&ctx, old.clone(), &new).await;
         modules::voice::on_voice_state_update(&ctx, &old, &new).await;
+        modules::welcome::on_voice_state_update(&ctx, &old, &new).await;
         modules::progression::on_voice_state_update(&ctx, old, &new).await;
     }
 
@@ -464,7 +465,7 @@ impl EventHandler for Handler {
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-                        | "note" | "call" | "context" | "appeal" | "expirations" | "compare"
+                        | "note" | "call" | "card" | "context" | "appeal" | "expirations" | "compare"
                         | "modstats" | "evidence" | "review" | "template" | "transcript"
                         | "export" | "massmute" | "massban" => {
                             modules::moderation::handle_command(&ctx, &command).await

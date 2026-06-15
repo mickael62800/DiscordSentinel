@@ -188,6 +188,151 @@ pub(super) async fn post_vote_card(
     info!(review_id, "Carte de vote automod postee");
 }
 
+/// Variante manuelle : une carte de vote creee par un moderateur via la
+/// commande `/card` (et non par la detection automod). Difference cle : on
+/// affiche le contexte AVANT **et** APRES le message pour donner le contexte
+/// complet de l'echange. Reutilise le meme flux de review/vote/finalisation
+/// que la carte automatique (memes boutons `amv:`/`amf:`, meme review en base).
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn post_manual_vote_card(
+    ctx: &Context,
+    msg: &Message,
+    suggested_action: &Action,
+    reason: &str,
+    review_channel_id: u64,
+    deadline_hours: i64,
+    context_count: u8,
+    thread_enabled: bool,
+    moderator_name: &str,
+) {
+    if matches!(suggested_action, Action::None) {
+        return;
+    }
+    let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let channel_id = msg.channel_id.to_string();
+    let message_id = msg.id.to_string();
+    let user_id = msg.author.id.to_string();
+    let content_preview = super::review::sanitize_embed_content(&msg.content, 500);
+
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+
+    // 1. Creer la review en mode vote (memes champs que la carte automod ;
+    // score 0 et flags vides car signalement humain, pas IA).
+    let deadline = chrono::Utc::now() + chrono::Duration::hours(deadline_hours.clamp(1, 720));
+    let suggested_str = char_to_str(action_char(suggested_action));
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "channel_id": channel_id,
+        "message_id": message_id,
+        "user_id": user_id,
+        "user_name": msg.author.name,
+        "content_preview": content_preview,
+        "suggested_action": suggested_str,
+        "score": 0.0,
+        "reason": reason,
+        "flags": { "spam": false, "insult": false, "link": false, "phishing": false },
+        "voting_deadline": deadline.to_rfc3339(),
+    });
+
+    #[derive(serde::Deserialize)]
+    struct CreateResp { id: String }
+    let review_id = match api.post_json::<_, CreateResp>("/api/automod/reviews", &body).await {
+        Ok(r) => r.id,
+        Err(e) => {
+            warn!(error = %e, "Echec creation review (carte manuelle)");
+            return;
+        }
+    };
+
+    // 2. Contexte avant ET apres le message cible.
+    let before = fetch_context_before(ctx, msg, context_count).await;
+    let after = fetch_context_after(ctx, msg, context_count).await;
+
+    // 3. Construire la carte (embed dedie : pas de labels "IA").
+    let mut embed = serenity::builder::CreateEmbed::new()
+        .title("Signalement manuel -- VOTE des moderateurs")
+        .color(0x5865f2)
+        .field("Utilisateur", format!("<@{}> (`{}`)", user_id, msg.author.name), true)
+        .field("Salon", format!("<#{}>", channel_id), true)
+        .field("Signale par", format!("`{}`", moderator_name), true)
+        .field("Message signale", format!("```{}```", content_preview), false)
+        .field("Raison", reason, false)
+        .field("Action suggeree", action_label(suggested_str), true)
+        .field("Cloture", format!("<t:{}:R>", deadline.timestamp()), true);
+    if !before.is_empty() {
+        embed = embed.field("Contexte (avant)", before, false);
+    }
+    if !after.is_empty() {
+        embed = embed.field("Contexte (apres)", after, false);
+    }
+    embed = embed
+        .field(VOTES_FIELD, render_votes(&[]), false)
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Votez la sanction. A l'echeance, un admin finalise.",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    let msg_url = format!(
+        "https://discord.com/channels/{}/{}/{}",
+        guild_id, channel_id, message_id
+    );
+    let link_row = serenity::builder::CreateActionRow::Buttons(vec![
+        serenity::builder::CreateButton::new_link(msg_url).label("Aller au message"),
+    ]);
+
+    let builder = serenity::builder::CreateMessage::new()
+        .embed(embed)
+        .components(vec![vote_buttons(&review_id), link_row]);
+
+    let posted = match serenity::model::id::ChannelId::new(review_channel_id)
+        .send_message(&ctx.http, builder)
+        .await
+    {
+        Ok(p) => p,
+        Err(e) => {
+            error!(error = %e, review_channel = review_channel_id, "Echec envoi carte manuelle");
+            return;
+        }
+    };
+
+    // 4. Mapping pour le sync (web + event decided), identique a l'automod.
+    if let Ok(uuid) = uuid::Uuid::parse_str(&review_id) {
+        crate::sync::register_action_message(
+            &api,
+            uuid,
+            crate::sync::kinds::AUTOMOD_REVIEW,
+            &guild_id,
+            &posted.channel_id.to_string(),
+            &posted.id.to_string(),
+        )
+        .await;
+    }
+    if thread_enabled {
+        let thread_name = format!("Vote — {}", msg.author.name);
+        let thread_name: String = thread_name.chars().take(90).collect();
+        if let Err(e) = posted
+            .channel_id
+            .create_thread_from_message(
+                &ctx.http,
+                posted.id,
+                serenity::builder::CreateThread::new(thread_name)
+                    .auto_archive_duration(serenity::model::channel::AutoArchiveDuration::ThreeDays),
+            )
+            .await
+        {
+            warn!(error = %e, "Echec creation fil sur la carte manuelle");
+        }
+    }
+
+    info!(review_id, "Carte de vote manuelle postee");
+}
+
 /// Recupere jusqu'a `n` messages precedant le message signale et les rend
 /// en bloc chronologique (du plus ancien au plus recent). Tronque pour
 /// respecter la limite d'un field embed (1024 caracteres).
@@ -222,6 +367,49 @@ async fn fetch_context_before(ctx: &Context, msg: &Message, n: u8) -> String {
         };
         let line = format!("**{}** : {}", m.author.name, content);
         // Limite field embed = 1024 ; on garde une marge.
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
+/// Comme `fetch_context_before` mais pour les messages POSTERIEURS au message
+/// signale (utile pour la carte manuelle qui montre tout l'echange).
+async fn fetch_context_after(ctx: &Context, msg: &Message, n: u8) -> String {
+    if n == 0 {
+        return String::new();
+    }
+    let limit = n.min(25);
+    let after = match msg
+        .channel_id
+        .messages(
+            &ctx.http,
+            serenity::builder::GetMessages::new().after(msg.id).limit(limit),
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec recuperation contexte (messages apres)");
+            return String::new();
+        }
+    };
+    // L'API renvoie du plus recent au plus ancien -> on inverse pour l'ordre
+    // chronologique (du plus proche du message cible au plus recent).
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for m in after.iter().rev() {
+        let content = super::review::sanitize_embed_content(&m.content, 120);
+        let content = if content.trim().is_empty() {
+            "*(pièce jointe / embed)*".to_string()
+        } else {
+            content
+        };
+        let line = format!("**{}** : {}", m.author.name, content);
         if total + line.len() + 1 > 1000 {
             lines.push("…".to_string());
             break;

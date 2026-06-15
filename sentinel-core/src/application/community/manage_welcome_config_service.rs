@@ -62,6 +62,9 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         if let Some(v) = patch.counter_enabled { current.counter_enabled = v; }
         if let Some(v) = patch.counter_channel_id { current.counter_channel_id = Some(v); }
         if let Some(v) = patch.counter_format { current.counter_format = v; }
+        if let Some(v) = patch.voice_counter_enabled { current.voice_counter_enabled = v; }
+        if let Some(v) = patch.voice_counter_channel_id { current.voice_counter_channel_id = Some(v); }
+        if let Some(v) = patch.voice_counter_format { current.voice_counter_format = v; }
         if let Some(v) = patch.anniversary_enabled { current.anniversary_enabled = v; }
         if let Some(v) = patch.anniversary_channel_id { current.anniversary_channel_id = Some(v); }
         if let Some(v) = patch.anniversary_message { current.anniversary_message = v; }

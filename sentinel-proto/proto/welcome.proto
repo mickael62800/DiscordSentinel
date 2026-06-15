@@ -53,4 +53,8 @@ message WelcomeConfig {
   string anniversary_title = 29;
   string anniversary_image_url = 30;
   string anniversary_footer_text = 31;
+  // Compteur de membres en vocal (canal renomme avec le nb de connectes)
+  bool voice_counter_enabled = 35;
+  optional string voice_counter_channel_id = 36;
+  string voice_counter_format = 37;
 }

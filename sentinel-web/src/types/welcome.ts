@@ -39,6 +39,10 @@ export interface WelcomeConfig {
   counter_channel_id: string | null;
   counter_format: string;
 
+  voice_counter_enabled: boolean;
+  voice_counter_channel_id: string | null;
+  voice_counter_format: string;
+
   anniversary_enabled: boolean;
   anniversary_channel_id: string | null;
   anniversary_message: string;

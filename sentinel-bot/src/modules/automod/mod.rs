@@ -69,6 +69,67 @@ pub fn register_commands() -> Vec<CreateCommand> {
     vec![automod_cmd::register()]
 }
 
+/// Cree une carte de vote MANUELLE (commande `/card` du module moderation).
+/// Reutilise le flux de vote automod (review en base, boutons, finalisation
+/// admin), poste dans le salon de review automod (`log_channel_id`), et
+/// affiche le contexte avant ET apres le message cible.
+///
+/// `action_str` ∈ {warn, delete, mute, ban}. Retourne une erreur lisible
+/// (a renvoyer au moderateur) si la config est incomplete.
+pub async fn create_manual_vote_card(
+    ctx: &Context,
+    target: &Message,
+    action_str: &str,
+    reason: &str,
+    context_count: u8,
+    moderator_name: &str,
+) -> Result<(), String> {
+    use crate::shared::api_client::BaseApiClient;
+
+    let guild_id = target.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = {
+        let data = ctx.data.read().await;
+        data.get::<crate::shared::heartbeat::ApiClientKey>()
+            .cloned()
+            .ok_or_else(|| "API indisponible.".to_string())?
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+
+    let review_channel_id = BaseApiClient::config_u64(&cfg, "log_channel_id", 0);
+    if review_channel_id == 0 {
+        return Err(
+            "Aucun salon de review automod configure (parametre `log_channel_id`).".to_string(),
+        );
+    }
+    let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
+    let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
+
+    let action = match action_str {
+        "warn" => api_client::Action::Warn,
+        "delete" => api_client::Action::Delete,
+        "mute" => api_client::Action::Mute,
+        "ban" => api_client::Action::Ban,
+        _ => return Err("Action invalide.".to_string()),
+    };
+
+    vote::post_manual_vote_card(
+        ctx,
+        target,
+        &action,
+        reason,
+        review_channel_id,
+        deadline_hours,
+        context_count,
+        thread_enabled,
+        moderator_name,
+    )
+    .await;
+    Ok(())
+}
+
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;

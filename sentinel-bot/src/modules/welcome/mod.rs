@@ -21,6 +21,14 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     handler::on_component(ctx, component).await;
 }
 
+pub async fn on_voice_state_update(
+    ctx: &Context,
+    old: &Option<serenity::model::voice::VoiceState>,
+    new: &serenity::model::voice::VoiceState,
+) {
+    handler::on_voice_state_update(ctx, old, new).await;
+}
+
 pub fn handles_component(custom_id: &str) -> bool {
     custom_id == handler::RULES_ACCEPT_ID
 }

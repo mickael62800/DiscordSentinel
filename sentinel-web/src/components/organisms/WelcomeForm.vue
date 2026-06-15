@@ -39,6 +39,10 @@ const draft = reactive({
   counter_enabled: false,
   counter_channel_id: "",
   counter_format: "",
+  // Voice counter
+  voice_counter_enabled: false,
+  voice_counter_channel_id: "",
+  voice_counter_format: "",
   // Anniversary
   anniversary_enabled: false,
   anniversary_channel_id: "",
@@ -80,6 +84,9 @@ watch(
     draft.counter_enabled = c.counter_enabled;
     draft.counter_channel_id = c.counter_channel_id ?? "";
     draft.counter_format = c.counter_format;
+    draft.voice_counter_enabled = c.voice_counter_enabled;
+    draft.voice_counter_channel_id = c.voice_counter_channel_id ?? "";
+    draft.voice_counter_format = c.voice_counter_format;
     draft.anniversary_enabled = c.anniversary_enabled;
     draft.anniversary_channel_id = c.anniversary_channel_id ?? "";
     draft.anniversary_message = c.anniversary_message;
@@ -126,6 +133,9 @@ async function onSave() {
     counter_enabled: draft.counter_enabled,
     counter_channel_id: draft.counter_channel_id || null,
     counter_format: draft.counter_format,
+    voice_counter_enabled: draft.voice_counter_enabled,
+    voice_counter_channel_id: draft.voice_counter_channel_id || null,
+    voice_counter_format: draft.voice_counter_format,
     anniversary_enabled: draft.anniversary_enabled,
     anniversary_channel_id: draft.anniversary_channel_id || null,
     anniversary_message: draft.anniversary_message,
@@ -234,6 +244,28 @@ async function onSave() {
         </label>
         <label>Format
           <AppInput v-model="draft.counter_format" placeholder="👥 {count} membres" />
+        </label>
+      </div>
+    </fieldset>
+
+    <!-- Compteur vocal -->
+    <fieldset class="card">
+      <legend>
+        <label class="toggle-row">
+          <AppToggle v-model="draft.voice_counter_enabled" />
+          <span>🔊 Compteur de membres en vocal</span>
+        </label>
+      </legend>
+      <p class="hint">
+        Renomme un salon (idéalement verrouillé / lecture seule) avec le nombre
+        de membres actuellement connectés en vocal. Utilise {count}.
+      </p>
+      <div class="grid" :class="{ 'grid--disabled': !draft.voice_counter_enabled }">
+        <label>Salon
+          <ChannelSelect v-model="draft.voice_counter_channel_id" :guild-id="guildIdFilter ?? null" />
+        </label>
+        <label>Format
+          <AppInput v-model="draft.voice_counter_format" placeholder="En Vocal : {count}" />
         </label>
       </div>
     </fieldset>
