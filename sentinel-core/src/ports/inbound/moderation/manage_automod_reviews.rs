@@ -36,6 +36,14 @@ pub struct CastVoteCommand {
 #[async_trait]
 pub trait ManageAutomodReviewsUseCase: Send + Sync {
     async fn create(&self, review: NewAutomodReview) -> Result<AutomodReview, DomainError>;
+
+    /// Cree ou agrege une review (cf. `AutomodReviewRepository::create_or_merge`).
+    /// Retourne `(review, merged)`.
+    async fn create_or_merge(
+        &self,
+        review: NewAutomodReview,
+        aggregate: bool,
+    ) -> Result<(AutomodReview, bool), DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError>;
     async fn list_pending(
         &self,

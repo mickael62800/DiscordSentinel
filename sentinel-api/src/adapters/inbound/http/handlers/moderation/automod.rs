@@ -88,6 +88,11 @@ pub struct AutomodReviewDto {
     pub decided_action: Option<String>,
     pub quorum_met: bool,
     pub decided_at: Option<String>,
+    pub incident_count: i32,
+    pub cumulative_score: f64,
+    pub incidents: serde_json::Value,
+    /// True si ce POST a ete agrege dans une carte existante (pas une creation).
+    pub merged: bool,
 }
 
 impl From<AutomodReview> for AutomodReviewDto {
@@ -115,6 +120,10 @@ impl From<AutomodReview> for AutomodReviewDto {
             decided_action: r.decided_action,
             quorum_met: r.quorum_met,
             decided_at: r.decided_at.map(|d| d.to_rfc3339()),
+            incident_count: r.incident_count,
+            cumulative_score: r.cumulative_score,
+            incidents: r.incidents,
+            merged: false,
         }
     }
 }
@@ -170,6 +179,9 @@ pub struct CreateReviewBody {
     pub flags: Option<serde_json::Value>,
     /// Si fourni (RFC3339), ouvre la review en mode VOTE avec cette echeance.
     pub voting_deadline: Option<String>,
+    /// Si true, agrege l'incident dans la carte 'voting' ouverte du meme
+    /// utilisateur (anti-flood). Default false (comportement historique).
+    pub aggregate: Option<bool>,
 }
 
 /// POST /api/automod/reviews
@@ -188,38 +200,44 @@ pub async fn create_review(
         )))
     })?;
 
-    let review = state
+    let (review, merged) = state
         .automod_reviews_uc
-        .create(NewAutomodReview {
-            guild_id: body.guild_id.clone(),
-            channel_id: body.channel_id,
-            message_id: body.message_id,
-            user_id: body.user_id.clone(),
-            user_name: body.user_name,
-            content_preview: body.content_preview,
-            suggested_action: suggested,
-            score: body.score,
-            reason: body.reason,
-            flags: body.flags.unwrap_or(serde_json::json!({})),
-            voting_deadline: body
-                .voting_deadline
-                .as_deref()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|d| d.with_timezone(&chrono::Utc)),
-        })
+        .create_or_merge(
+            NewAutomodReview {
+                guild_id: body.guild_id.clone(),
+                channel_id: body.channel_id,
+                message_id: body.message_id,
+                user_id: body.user_id.clone(),
+                user_name: body.user_name,
+                content_preview: body.content_preview,
+                suggested_action: suggested,
+                score: body.score,
+                reason: body.reason,
+                flags: body.flags.unwrap_or(serde_json::json!({})),
+                voting_deadline: body
+                    .voting_deadline
+                    .as_deref()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    .map(|d| d.with_timezone(&chrono::Utc)),
+            },
+            body.aggregate.unwrap_or(false),
+        )
         .await?;
 
-    // Notification web : la liste des pending reviews vient d'augmenter.
+    // Notification web : creation OU mise a jour (agregation) d'une review.
     state.broadcaster.broadcast(
-        "automod_review_created",
+        if merged { "automod_review_updated" } else { "automod_review_created" },
         serde_json::json!({
             "review_id": review.id.to_string(),
             "guild_id": &review.guild_id,
             "user_id": &review.user_id,
+            "merged": merged,
         }),
     );
 
-    Ok(Json(review.into()))
+    let mut dto: AutomodReviewDto = review.into();
+    dto.merged = merged;
+    Ok(Json(dto))
 }
 
 #[derive(Debug, Deserialize)]

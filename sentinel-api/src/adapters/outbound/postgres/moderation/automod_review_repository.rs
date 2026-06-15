@@ -14,6 +14,19 @@ use crate::ports::outbound::moderation::automod_review_repository::AutomodReview
 const TBL: &str = "automod_reviews";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
+/// Construit l'entree JSON d'un incident (pour la liste agregee `incidents`).
+fn incident_json(r: &NewAutomodReview) -> serde_json::Value {
+    serde_json::json!({
+        "message_id": r.message_id.as_str(),
+        "channel_id": r.channel_id.as_str(),
+        "content_preview": r.content_preview,
+        "score": r.score,
+        "reason": r.reason,
+        "suggested_action": r.suggested_action.as_str(),
+        "at": chrono::Utc::now().to_rfc3339(),
+    })
+}
+
 #[derive(sqlx::FromRow)]
 struct Row {
     id: Uuid,
@@ -39,6 +52,12 @@ struct Row {
     #[sqlx(default)]
     quorum_met: bool,
     decided_at: Option<DateTime<Utc>>,
+    #[sqlx(default)]
+    incident_count: i32,
+    #[sqlx(default)]
+    cumulative_score: f64,
+    #[sqlx(default)]
+    incidents: serde_json::Value,
 }
 
 impl From<Row> for AutomodReview {
@@ -66,6 +85,9 @@ impl From<Row> for AutomodReview {
             decided_action: r.decided_action,
             quorum_met: r.quorum_met,
             decided_at: r.decided_at,
+            incident_count: r.incident_count,
+            cumulative_score: r.cumulative_score,
+            incidents: if r.incidents.is_null() { serde_json::json!([]) } else { r.incidents },
         }
     }
 }
@@ -108,11 +130,13 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
     async fn create(&self, r: NewAutomodReview) -> Result<AutomodReview, DomainError> {
         // Mode vote si une echeance est fournie : statut 'voting'.
         let status = if r.voting_deadline.is_some() { "voting" } else { "pending" };
+        let incidents = serde_json::json!([incident_json(&r)]);
         let row: Row = sqlx::query_as(
             "INSERT INTO automod_reviews \
                 (guild_id, channel_id, message_id, user_id, user_name, content_preview, \
-                 suggested_action, score, reason, flags, status, voting_deadline) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) \
+                 suggested_action, score, reason, flags, status, voting_deadline, \
+                 incident_count, cumulative_score, incidents) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$14) \
              RETURNING *",
         )
         .bind(r.guild_id.as_str())
@@ -127,10 +151,73 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .bind(&r.flags)
         .bind(status)
         .bind(r.voting_deadline)
+        .bind(r.score)
+        .bind(&incidents)
         .fetch_one(&self.pool)
         .await
         .map_err(pg_err)?;
         Ok(row.into())
+    }
+
+    async fn create_or_merge(
+        &self,
+        r: NewAutomodReview,
+        aggregate: bool,
+    ) -> Result<(AutomodReview, bool), DomainError> {
+        if aggregate {
+            // Carte ouverte existante pour ce (guild, user) ?
+            let existing: Option<Row> = sqlx::query_as(
+                "SELECT * FROM automod_reviews \
+                 WHERE guild_id = $1 AND user_id = $2 AND status = 'voting' \
+                 ORDER BY created_at DESC LIMIT 1",
+            )
+            .bind(r.guild_id.as_str())
+            .bind(r.user_id.as_str())
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
+
+            if let Some(prev) = existing {
+                // Agrege l'incident dans la carte existante.
+                let mut incidents = if prev.incidents.is_null() {
+                    serde_json::json!([])
+                } else {
+                    prev.incidents.clone()
+                };
+                if let Some(arr) = incidents.as_array_mut() {
+                    arr.push(incident_json(&r));
+                }
+                let new_count = prev.incident_count + 1;
+                let new_cumulative = prev.cumulative_score + r.score;
+                let new_max_score = prev.score.max(r.score);
+                let new_action = sentinel_core::domain::entities::moderation::review::automod::more_severe_suggested(
+                    &prev.suggested_action,
+                    r.suggested_action.as_str(),
+                );
+                let updated: Row = sqlx::query_as(
+                    "UPDATE automod_reviews SET \
+                        incidents = $1, incident_count = $2, cumulative_score = $3, \
+                        score = $4, suggested_action = $5, reason = $6, voting_deadline = $7 \
+                     WHERE id = $8 AND status = 'voting' \
+                     RETURNING *",
+                )
+                .bind(&incidents)
+                .bind(new_count)
+                .bind(new_cumulative)
+                .bind(new_max_score)
+                .bind(&new_action)
+                .bind(&r.reason)
+                .bind(r.voting_deadline)
+                .bind(prev.id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(pg_err)?;
+                return Ok((updated.into(), true));
+            }
+        }
+        // Pas d'agregation : creation normale.
+        let review = self.create(r).await?;
+        Ok((review, false))
     }
 
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError> {

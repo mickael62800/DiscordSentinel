@@ -40,6 +40,27 @@ impl SuggestedAction {
             _ => None,
         }
     }
+    /// Rang de severite (warn < delete < mute < ban).
+    pub fn severity(&self) -> u8 {
+        match self {
+            Self::Warn => 1,
+            Self::Delete => 2,
+            Self::Mute => 3,
+            Self::Ban => 4,
+        }
+    }
+}
+
+/// Retourne la plus severe des deux actions suggerees (strings). Sert a
+/// l'agregation : l'action d'une carte regroupee escalade vers le pire vu.
+/// En cas de valeur inconnue, on retombe sur l'autre (ou "warn").
+pub fn more_severe_suggested(a: &str, b: &str) -> String {
+    let rank = |s: &str| SuggestedAction::from_str(s).map(|x| x.severity()).unwrap_or(0);
+    if rank(a) >= rank(b) {
+        if rank(a) == 0 { "warn".to_string() } else { a.to_string() }
+    } else {
+        b.to_string()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,6 +123,14 @@ pub struct AutomodReview {
     pub quorum_met: bool,
     /// Horodatage du depouillement.
     pub decided_at: Option<DateTime<Utc>>,
+    // ── Agregation par utilisateur (cf. migration 264) ──
+    /// Nombre d'incidents agreges dans cette carte (1 si pas de regroupement).
+    pub incident_count: i32,
+    /// Somme des scores des incidents agreges (le champ `score` reste le max).
+    pub cumulative_score: f64,
+    /// Liste JSON des incidents agreges
+    /// (`[{message_id, channel_id, content_preview, score, reason, suggested_action, at}]`).
+    pub incidents: serde_json::Value,
 }
 
 // ── Vote des moderateurs ──────────────────────────────────────────────

@@ -765,6 +765,7 @@ pub struct StubWelcomeConfigRepo;
 pub struct StubAutomodReviewRepo;
 #[async_trait] impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository for StubAutomodReviewRepo {
     async fn create(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn create_or_merge(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview, _: bool) -> Result<(sentinel_core::domain::entities::moderation::review::automod::AutomodReview, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
     async fn get(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }
     async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
     async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }

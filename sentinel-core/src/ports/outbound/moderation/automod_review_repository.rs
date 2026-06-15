@@ -9,6 +9,17 @@ use crate::domain::errors::DomainError;
 #[async_trait]
 pub trait AutomodReviewRepository: Send + Sync {
     async fn create(&self, review: NewAutomodReview) -> Result<AutomodReview, DomainError>;
+
+    /// Cree une review, ou — si `aggregate` et qu'une carte 'voting' existe
+    /// deja pour le meme (guild, user) — y agrege l'incident (liste, compteur,
+    /// score cumule, score max, action la plus severe, deadline prolongee).
+    /// Retourne `(review, merged)` : `merged = true` si l'incident a ete
+    /// fusionne dans une carte existante.
+    async fn create_or_merge(
+        &self,
+        review: NewAutomodReview,
+        aggregate: bool,
+    ) -> Result<(AutomodReview, bool), DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError>;
     async fn list_pending(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
     async fn list_recent(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;

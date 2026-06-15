@@ -14,6 +14,8 @@
 //!      (source=discord) + execution de la sanction Discord. L'admin
 //!      confirme meme un refus (verdict 'ignore' = clore sans sanction).
 
+use std::sync::Arc;
+
 use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
@@ -71,6 +73,7 @@ pub(super) async fn post_vote_card(
     deadline_hours: i64,
     context_before: u8,
     thread_enabled: bool,
+    aggregate: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -90,6 +93,9 @@ pub(super) async fn post_vote_card(
     };
 
     // 1. Creer la review en mode vote (avec echeance) pour obtenir son id.
+    //    Si `aggregate`, l'API peut fusionner l'incident dans une carte
+    //    'voting' ouverte du meme utilisateur -> on edite alors la carte
+    //    existante au lieu d'en poster une nouvelle.
     let deadline = chrono::Utc::now() + chrono::Duration::hours(deadline_hours.clamp(1, 720));
     let suggested_str = char_to_str(action_char(suggested_action));
     let body = serde_json::json!({
@@ -107,26 +113,36 @@ pub(super) async fn post_vote_card(
             "link": flags.link, "phishing": flags.phishing,
         },
         "voting_deadline": deadline.to_rfc3339(),
+        "aggregate": aggregate,
     });
 
-    #[derive(serde::Deserialize)]
-    struct CreateResp { id: String }
-    let review_id = match api.post_json::<_, CreateResp>("/api/automod/reviews", &body).await {
-        Ok(r) => r.id,
+    let resp = match api.post_json::<_, ReviewResp>("/api/automod/reviews", &body).await {
+        Ok(r) => r,
         Err(e) => {
             warn!(error = %e, "Echec creation review vote (sync degrade)");
             return;
         }
     };
+    let review_id = resp.id.clone();
+
+    // Cas agregation : l'incident a ete fusionne -> on edite la carte existante.
+    if resp.merged {
+        edit_aggregated_card(ctx, &api, &resp).await;
+        return;
+    }
 
     // 2. Recuperer le contexte (N messages avant) pour aider les moderateurs.
     let context = fetch_context_before(ctx, msg, context_before).await;
 
-    // 3. Construire la carte.
-    let mut embed = vote_embed(
-        &user_id, &msg.author.name, &channel_id, score, &content_preview, reason, flags,
-        suggested_str, &deadline, &[],
-    );
+    // 3. Construire la carte. En mode agregation, layout enrichi (incidents).
+    let mut embed = if aggregate {
+        aggregated_vote_embed(&resp, &[])
+    } else {
+        vote_embed(
+            &user_id, &msg.author.name, &channel_id, score, &content_preview, reason, flags,
+            suggested_str, &deadline, &[],
+        )
+    };
     if !context.is_empty() {
         embed = embed.field("Contexte (messages precedents)", context, false);
     }
@@ -506,6 +522,131 @@ struct VoteDto {
     voter_id: String,
     voter_name: String,
     vote_action: String,
+}
+
+/// Reponse de POST /api/automod/reviews — champs utiles a la carte agregee.
+#[derive(serde::Deserialize, Default)]
+struct ReviewResp {
+    id: String,
+    #[serde(default)]
+    merged: bool,
+    #[serde(default)]
+    user_id: String,
+    #[serde(default)]
+    channel_id: String,
+    #[serde(default)]
+    content_preview: String,
+    #[serde(default)]
+    reason: String,
+    #[serde(default)]
+    suggested_action: String,
+    #[serde(default)]
+    score: f64,
+    #[serde(default)]
+    cumulative_score: f64,
+    #[serde(default)]
+    incident_count: i32,
+    #[serde(default)]
+    voting_deadline: Option<String>,
+    #[serde(default)]
+    incidents: serde_json::Value,
+}
+
+/// Rend la liste des incidents agreges (du plus ancien au plus recent),
+/// tronquee pour respecter la limite d'un field embed (1024 caracteres).
+fn render_incidents(incidents: &serde_json::Value) -> String {
+    let Some(arr) = incidents.as_array() else { return String::new() };
+    if arr.is_empty() {
+        return String::new();
+    }
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for inc in arr {
+        let action = inc.get("suggested_action").and_then(|v| v.as_str()).unwrap_or("warn");
+        let sc = inc.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let preview = inc.get("content_preview").and_then(|v| v.as_str()).unwrap_or("");
+        let preview: String = preview.chars().take(80).collect();
+        let preview = if preview.trim().is_empty() { "*(pièce jointe / embed)*".to_string() } else { preview };
+        let line = format!("• **{}** ({:.1}) — {}", action_label(action), sc, preview);
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
+/// Construit l'embed d'une carte de vote AGREGEE (plusieurs incidents pour un
+/// meme utilisateur). Affiche score max ET score cumule + nb d'incidents.
+fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::builder::CreateEmbed {
+    let deadline_ts = resp
+        .voting_deadline
+        .as_deref()
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|d| d.timestamp());
+
+    let mut embed = serenity::builder::CreateEmbed::new()
+        .title("AutoMod -- VOTE (alertes regroupees)")
+        .color(0x5865f2)
+        .field("Utilisateur", format!("<@{}>", resp.user_id), true)
+        .field("Salon", format!("<#{}>", resp.channel_id), true)
+        .field("Incidents", resp.incident_count.to_string(), true)
+        .field("Score max", format!("{:.2}", resp.score), true)
+        .field("Score cumule", format!("{:.2}", resp.cumulative_score), true)
+        .field("Action suggeree", action_label(&resp.suggested_action), true);
+    if let Some(ts) = deadline_ts {
+        embed = embed.field("Cloture", format!("<t:{}:R>", ts), true);
+    }
+    embed = embed
+        .field("Dernier message", format!("```{}```", resp.content_preview), false)
+        .field("Raison", if resp.reason.is_empty() { "—" } else { resp.reason.as_str() }, false);
+    let incidents = render_incidents(&resp.incidents);
+    if !incidents.is_empty() {
+        embed = embed.field("Detail des incidents", incidents, false);
+    }
+    embed = embed
+        .field(VOTES_FIELD, render_votes(votes), false)
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Alertes regroupees. Votez la sanction ; a l'echeance, un admin finalise.",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+    embed
+}
+
+/// Edite la carte existante d'une review agregee : recharge le mapping Discord
+/// + les votes, puis remplace l'embed (les boutons de vote sont conserves).
+async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &ReviewResp) {
+    use serenity::all::{ChannelId, MessageId};
+
+    #[derive(serde::Deserialize)]
+    struct Mapping { kind: String, channel_id: String, message_id: String }
+    let mappings: Vec<Mapping> = match api.get_json(&format!("/api/discord-messages/{}", resp.id)).await {
+        Ok(m) => m,
+        Err(e) => { warn!(error = %e, review_id = %resp.id, "Echec fetch mapping (agregation)"); return; }
+    };
+    let Some(mapping) = mappings.into_iter().find(|m| m.kind == "automod_review") else { return };
+    let (Ok(cid), Ok(mid)) = (mapping.channel_id.parse::<u64>(), mapping.message_id.parse::<u64>()) else { return };
+    let channel_id = ChannelId::new(cid);
+    let msg_id = MessageId::new(mid);
+
+    // Recharge les votes pour les conserver dans l'embed reconstruit.
+    let votes: Vec<VoteDto> = api
+        .get_json(&format!("/api/automod/reviews/{}/votes", resp.id))
+        .await
+        .unwrap_or_default();
+
+    let embed = aggregated_vote_embed(resp, &votes);
+    // On n'edite que l'embed : les composants (boutons de vote + lien) restent.
+    if let Err(e) = channel_id
+        .edit_message(&ctx.http, msg_id, serenity::builder::EditMessage::new().embed(embed))
+        .await
+    {
+        warn!(error = %e, review_id = %resp.id, "Echec edition carte agregee");
+    } else {
+        info!(review_id = %resp.id, incidents = resp.incident_count, "Carte agregee mise a jour");
+    }
 }
 
 /// Verifie qu'un membre a le droit de voter : role configure si defini,
