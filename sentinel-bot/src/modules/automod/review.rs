@@ -39,10 +39,11 @@ pub(super) async fn send_review_card(
                 let context_before = BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8;
                 let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
                 let aggregate = BaseApiClient::config_bool(&cfg, "vote_aggregate_enabled", false);
+                let discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
                 drop(data);
                 super::vote::post_vote_card(
                     ctx, msg, suggested_action, reason, score, flags, review_channel_id,
-                    deadline_hours, context_before, thread_enabled, aggregate,
+                    deadline_hours, context_before, thread_enabled, aggregate, discussion_enabled,
                 )
                 .await;
                 return;

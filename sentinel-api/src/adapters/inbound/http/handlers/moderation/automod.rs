@@ -389,3 +389,110 @@ pub async fn decide_review(
     );
     Ok(Json(review.into()))
 }
+
+/// DTO d'un salon de discussion lie a une review.
+#[derive(Debug, Serialize)]
+pub struct DiscussionChannelDto {
+    pub id: String,
+    pub review_id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub opened_by_id: String,
+    pub opened_by_name: String,
+    pub created_at: String,
+    /// True si ce POST vient de creer le salon (false = il existait deja).
+    pub created: bool,
+}
+
+impl DiscussionChannelDto {
+    fn build(
+        d: sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel,
+        created: bool,
+    ) -> Self {
+        Self {
+            id: d.id.to_string(),
+            review_id: d.review_id.to_string(),
+            guild_id: d.guild_id,
+            channel_id: d.channel_id,
+            opened_by_id: d.opened_by_id,
+            opened_by_name: d.opened_by_name,
+            created_at: d.created_at.to_rfc3339(),
+            created,
+        }
+    }
+}
+
+/// GET /api/automod/reviews/{review_id}/discussion
+/// Retourne le salon de discussion existant (ou `null`).
+pub async fn get_discussion(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+) -> Result<Json<Option<DiscussionChannelDto>>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let existing = state.automod_reviews_uc.get_discussion(id).await?;
+    Ok(Json(existing.map(|d| DiscussionChannelDto::build(d, false))))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct OpenDiscussionBody {
+    pub guild_id: String,
+    pub channel_id: String,
+    pub opened_by_id: String,
+    pub opened_by_name: String,
+    // Faits Discord du demandeur (la decision d'acces est prise par le domaine).
+    #[serde(default)]
+    pub is_admin: bool,
+    #[serde(default)]
+    pub has_moderate_members: bool,
+    #[serde(default)]
+    pub has_manage_messages: bool,
+    #[serde(default)]
+    pub has_mod_role: bool,
+}
+
+/// POST /api/automod/reviews/{review_id}/discussion
+/// Enregistre (idempotent) un salon de discussion apres application de la
+/// regle d'acces (`can_open_discussion`). `403` si non autorise.
+pub async fn open_discussion(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<OpenDiscussionBody>,
+) -> Result<Json<DiscussionChannelDto>, ApiError> {
+    use sentinel_core::domain::entities::moderation::review::automod::DiscussionRequester;
+    use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
+
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+
+    let (discussion, created) = state
+        .automod_reviews_uc
+        .open_discussion(OpenDiscussionCommand {
+            review_id: id,
+            guild_id: body.guild_id.clone(),
+            channel_id: body.channel_id,
+            opened_by_id: body.opened_by_id.clone(),
+            opened_by_name: body.opened_by_name,
+            requester: DiscussionRequester {
+                is_admin: body.is_admin,
+                has_moderate_members: body.has_moderate_members,
+                has_manage_messages: body.has_manage_messages,
+                has_mod_role: body.has_mod_role,
+            },
+        })
+        .await?;
+
+    if created {
+        state.broadcaster.broadcast(
+            "automod_discussion_opened",
+            serde_json::json!({
+                "review_id": review_id,
+                "guild_id": &body.guild_id,
+                "channel_id": &discussion.channel_id,
+                "opened_by_id": &body.opened_by_id,
+            }),
+        );
+    }
+
+    Ok(Json(DiscussionChannelDto::build(discussion, created)))
+}

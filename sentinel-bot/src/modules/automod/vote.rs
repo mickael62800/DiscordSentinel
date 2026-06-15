@@ -24,11 +24,12 @@ use crate::shared::api_client::BaseApiClient;
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::Action;
-use super::config::EmbedColors;
 use super::detectors;
 
 pub(super) const VOTE_PREFIX: &str = "amv:";
 pub(super) const FINALIZE_PREFIX: &str = "amf:";
+/// Bouton "Ouvrir une discussion" -> cree un salon textuel prive (membre + modos).
+pub(super) const DISCUSSION_PREFIX: &str = "amdisc:";
 
 fn action_char(action: &Action) -> char {
     match action {
@@ -74,6 +75,7 @@ pub(super) async fn post_vote_card(
     context_before: u8,
     thread_enabled: bool,
     aggregate: bool,
+    discussion_enabled: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -152,9 +154,7 @@ pub(super) async fn post_vote_card(
         "https://discord.com/channels/{}/{}/{}",
         guild_id, channel_id, message_id
     );
-    let link_row = serenity::builder::CreateActionRow::Buttons(vec![
-        serenity::builder::CreateButton::new_link(msg_url).label("Aller au message"),
-    ]);
+    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled);
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
@@ -220,6 +220,7 @@ pub(super) async fn post_manual_vote_card(
     context_count: u8,
     thread_enabled: bool,
     moderator_name: &str,
+    discussion_enabled: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -298,9 +299,7 @@ pub(super) async fn post_manual_vote_card(
         "https://discord.com/channels/{}/{}/{}",
         guild_id, channel_id, message_id
     );
-    let link_row = serenity::builder::CreateActionRow::Buttons(vec![
-        serenity::builder::CreateButton::new_link(msg_url).label("Aller au message"),
-    ]);
+    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled);
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
@@ -446,6 +445,22 @@ fn vote_buttons(review_id: &str) -> serenity::builder::CreateActionRow {
         CreateButton::new(format!("{VOTE_PREFIX}b:{review_id}")).label("Ban").style(ButtonStyle::Danger),
         CreateButton::new(format!("{VOTE_PREFIX}i:{review_id}")).label("Ignorer").style(ButtonStyle::Secondary),
     ])
+}
+
+/// Deuxieme rangee de boutons : lien vers le message + (option) "Ouvrir une
+/// discussion" si `discussion_enabled`.
+fn secondary_row(msg_url: &str, review_id: &str, discussion_enabled: bool) -> serenity::builder::CreateActionRow {
+    use serenity::all::ButtonStyle;
+    use serenity::builder::CreateButton;
+    let mut buttons = vec![CreateButton::new_link(msg_url).label("Aller au message")];
+    if discussion_enabled {
+        buttons.push(
+            CreateButton::new(format!("{DISCUSSION_PREFIX}{review_id}"))
+                .label("Ouvrir une discussion")
+                .style(ButtonStyle::Secondary),
+        );
+    }
+    serenity::builder::CreateActionRow::Buttons(buttons)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -681,6 +696,16 @@ fn can_finalize(component: &serenity::model::application::ComponentInteraction, 
         .and_then(|m| m.permissions)
         .map(|p| p.contains(serenity::all::Permissions::ADMINISTRATOR))
         .unwrap_or(false)
+}
+
+/// Edite une reponse deja deferee (ephemere). A utiliser apres un Defer.
+async fn edit_ephemeral(ctx: &Context, component: &serenity::model::application::ComponentInteraction, text: &str) {
+    let _ = component
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().content(text),
+        )
+        .await;
 }
 
 async fn reply_ephemeral(ctx: &Context, component: &serenity::model::application::ComponentInteraction, text: &str) {
@@ -924,6 +949,221 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         )
         .await;
     info!(review_id, action = %decided, admin = %component.user.name, "Vote automod finalise");
+}
+
+/// Handler du bouton "Ouvrir une discussion" (`amdisc:<review_id>`).
+/// Cree un salon textuel prive (membre concerne + role modo) sous la categorie
+/// configuree, avec un message de contexte epingle ("ancrage").
+pub(super) async fn handle_discussion_button(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+) {
+    use serenity::all::{ChannelId, Permissions, RoleId, UserId};
+    use serenity::model::channel::{PermissionOverwrite, PermissionOverwriteType};
+
+    let review_id = match component.data.custom_id.strip_prefix(DISCUSSION_PREFIX) {
+        Some(r) => r.to_string(),
+        None => return,
+    };
+    let guild_id = match component.guild_id {
+        Some(g) => g,
+        None => return,
+    };
+
+    // Defer ephemere : la creation de salon peut depasser les 3s d'ack.
+    if component
+        .create_response(
+            &ctx.http,
+            serenity::builder::CreateInteractionResponse::Defer(
+                serenity::builder::CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+        .is_err()
+    {
+        return;
+    }
+
+    let api = {
+        let d = ctx.data.read().await;
+        match d.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+    };
+    let config = api
+        .get_guild_config_for(&guild_id.to_string(), super::MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+
+    if !BaseApiClient::config_bool(&config, "discussion_channel_enabled", false) {
+        edit_ephemeral(ctx, component, "La creation de salon de discussion est desactivee.").await;
+        return;
+    }
+    let mod_role_id = config.get("vote_mod_role_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0);
+
+    // Reponse de l'API discussion (GET existant + POST open). La REGLE d'acces
+    // est appliquee cote core (full hexa) ; le bot ne fait que relayer.
+    #[derive(serde::Deserialize)]
+    struct DiscussionResp {
+        channel_id: String,
+        #[serde(default)]
+        created: bool,
+    }
+    // Idempotence : un salon existe deja ? on s'y refere sans rien creer.
+    if let Ok(Some(existing)) = api
+        .get_json::<Option<DiscussionResp>>(&format!("/api/automod/reviews/{review_id}/discussion"))
+        .await
+    {
+        edit_ephemeral(ctx, component, &format!("Un salon de discussion existe deja : <#{}>", existing.channel_id)).await;
+        return;
+    }
+
+    // Recupere la review (cible + contexte).
+    #[derive(serde::Deserialize)]
+    struct ReviewDto {
+        guild_id: String,
+        channel_id: String,
+        message_id: String,
+        user_id: String,
+        user_name: String,
+        suggested_action: Option<String>,
+        reason: String,
+        score: f64,
+    }
+    let review: ReviewDto = match api.get_json(&format!("/api/automod/reviews/{review_id}")).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, review_id, "Echec fetch review (discussion)");
+            edit_ephemeral(ctx, component, "Review introuvable.").await;
+            return;
+        }
+    };
+    let target_uid = match review.user_id.parse::<u64>() {
+        Ok(v) => UserId::new(v),
+        Err(_) => return,
+    };
+
+    // Overwrites : @everyone deny view ; cible + role modo + bot allow.
+    let participate =
+        Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY;
+    let mut overwrites = vec![
+        PermissionOverwrite {
+            allow: Permissions::empty(),
+            deny: Permissions::VIEW_CHANNEL,
+            kind: PermissionOverwriteType::Role(RoleId::new(guild_id.get())),
+        },
+        PermissionOverwrite {
+            allow: participate,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(target_uid),
+        },
+        PermissionOverwrite {
+            allow: participate,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(ctx.cache.current_user().id),
+        },
+    ];
+    if let Some(role) = mod_role_id {
+        overwrites.push(PermissionOverwrite {
+            allow: participate,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Role(RoleId::new(role)),
+        });
+    }
+
+    // Nom de salon : "discussion-pseudo" assaini.
+    let raw = format!("discussion-{}", review.user_name).to_lowercase();
+    let name: String = raw
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
+        .take(90)
+        .collect();
+
+    let mut builder = serenity::builder::CreateChannel::new(name)
+        .kind(serenity::model::channel::ChannelType::Text)
+        .permissions(overwrites);
+    if let Some(cat) = config.get("discussion_category_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0) {
+        builder = builder.category(ChannelId::new(cat));
+    }
+
+    let channel = match guild_id.create_channel(&ctx.http, builder).await {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(error = %e, "Echec creation salon discussion");
+            edit_ephemeral(ctx, component, "Echec creation du salon (permission Gerer les salons ?).").await;
+            return;
+        }
+    };
+
+    // Enregistre le salon cote API : le domaine applique la regle d'acces
+    // (can_open_discussion) sur les faits Discord du demandeur + idempotence.
+    let perms = component.member.as_ref().and_then(|m| m.permissions);
+    let has = |p: Permissions| perms.map(|x| x.contains(p)).unwrap_or(false);
+    let has_mod_role = match (mod_role_id, component.member.as_ref()) {
+        (Some(role), Some(m)) => m.roles.iter().any(|r| r.get() == role),
+        _ => false,
+    };
+    let open_body = serde_json::json!({
+        "guild_id": guild_id.to_string(),
+        "channel_id": channel.id.to_string(),
+        "opened_by_id": component.user.id.to_string(),
+        "opened_by_name": component.user.name,
+        "is_admin": has(Permissions::ADMINISTRATOR),
+        "has_moderate_members": has(Permissions::MODERATE_MEMBERS),
+        "has_manage_messages": has(Permissions::MANAGE_MESSAGES),
+        "has_mod_role": has_mod_role,
+    });
+    let opened: DiscussionResp = match api
+        .post_json(&format!("/api/automod/reviews/{review_id}/discussion"), &open_body)
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            // 403 (non autorise) ou autre erreur : on annule le salon cree.
+            warn!(error = %e, review_id, "Refus/echec enregistrement discussion -> suppression du salon");
+            let _ = channel.id.delete(&ctx.http).await;
+            edit_ephemeral(ctx, component, "Discussion non autorisee ou erreur : salon annule.").await;
+            return;
+        }
+    };
+    if !opened.created {
+        // Course : un salon a ete enregistre entre-temps -> on annule le notre.
+        let _ = channel.id.delete(&ctx.http).await;
+        edit_ephemeral(ctx, component, &format!("Un salon de discussion existe deja : <#{}>", opened.channel_id)).await;
+        return;
+    }
+
+    // Message d'ancrage epingle (contexte de la moderation).
+    let action = review.suggested_action.as_deref().unwrap_or("warn");
+    let origin_url = format!(
+        "https://discord.com/channels/{}/{}/{}",
+        review.guild_id, review.channel_id, review.message_id
+    );
+    let anchor = serenity::builder::CreateEmbed::new()
+        .title("Discussion de moderation")
+        .color(0x5865f2)
+        .field("Membre", format!("<@{}> (`{}`)", review.user_id, review.user_name), true)
+        .field("Action envisagee", action_label(action), true)
+        .field("Score", format!("{:.2}", review.score), true)
+        .field("Raison", if review.reason.is_empty() { "—" } else { review.reason.as_str() }, false)
+        .field("Message d'origine", format!("[Aller au message]({origin_url})"), false)
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Salon ouvert pour echanger avant decision.",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+    let ping = match mod_role_id {
+        Some(role) => format!("<@{}> <@&{}>", review.user_id, role),
+        None => format!("<@{}>", review.user_id),
+    };
+    if let Ok(posted) = channel
+        .id
+        .send_message(&ctx.http, serenity::builder::CreateMessage::new().content(ping).embed(anchor))
+        .await
+    {
+        // "Ancrage" = epinglage du message de contexte en haut du salon.
+        let _ = channel.id.pin(&ctx.http, posted.id).await;
+    }
+
+    edit_ephemeral(ctx, component, &format!("Salon de discussion cree : <#{}>", channel.id)).await;
+    info!(review_id, channel = %channel.id, "Salon de discussion cree");
 }
 
 /// Enregistre une infraction warn via le module moderation (gRPC log_action),

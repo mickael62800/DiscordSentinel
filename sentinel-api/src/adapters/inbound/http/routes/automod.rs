@@ -43,6 +43,11 @@ fn automod_inner() -> Router<AppState> {
             "/reviews/{review_id}/decide",
             post(handlers::moderation::automod::decide_review),
         )
+        .route(
+            "/reviews/{review_id}/discussion",
+            get(handlers::moderation::automod::get_discussion)
+                .post(handlers::moderation::automod::open_discussion),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

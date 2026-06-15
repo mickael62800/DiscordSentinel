@@ -151,4 +151,37 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError> {
         self.repo.list_expired_voting(limit.clamp(1, 500)).await
     }
+
+    async fn get_discussion(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Option<crate::domain::entities::moderation::review::automod::DiscussionChannel>, DomainError> {
+        self.repo.find_discussion(review_id).await
+    }
+
+    async fn open_discussion(
+        &self,
+        cmd: crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand,
+    ) -> Result<(crate::domain::entities::moderation::review::automod::DiscussionChannel, bool), DomainError> {
+        use crate::domain::entities::moderation::review::automod::{can_open_discussion, NewDiscussionChannel};
+
+        // Regle d'acces (domaine) : le demandeur doit etre moderateur.
+        if !can_open_discussion(&cmd.requester) {
+            return Err(DomainError::Forbidden(
+                "Tu n'es pas autorise a ouvrir une discussion.".into(),
+            ));
+        }
+        if cmd.channel_id.trim().is_empty() {
+            return Err(DomainError::ValidationError("channel_id requis".into()));
+        }
+        self.repo
+            .create_discussion(NewDiscussionChannel {
+                review_id: cmd.review_id,
+                guild_id: cmd.guild_id,
+                channel_id: cmd.channel_id,
+                opened_by_id: cmd.opened_by_id,
+                opened_by_name: cmd.opened_by_name,
+            })
+            .await
+    }
 }

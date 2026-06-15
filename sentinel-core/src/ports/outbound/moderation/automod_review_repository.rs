@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::moderation::review::automod::AutomodReview;
+use crate::domain::entities::moderation::review::automod::DiscussionChannel;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
+use crate::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
 use crate::domain::errors::DomainError;
 
@@ -59,4 +61,16 @@ pub trait AutomodReviewRepository: Send + Sync {
 
     /// Reviews en statut 'voting' dont l'echeance est depassee (job worker).
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
+
+    // ── Salon de discussion ──
+    /// Salon de discussion deja ouvert pour cette review, le cas echeant.
+    async fn find_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError>;
+
+    /// Enregistre un salon de discussion (idempotent : un seul par review).
+    /// Retourne `(salon, created)` — `created = false` si un salon existait
+    /// deja (on renvoie l'existant).
+    async fn create_discussion(
+        &self,
+        d: NewDiscussionChannel,
+    ) -> Result<(DiscussionChannel, bool), DomainError>;
 }

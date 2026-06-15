@@ -106,6 +106,7 @@ pub async fn create_manual_vote_card(
     }
     let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
     let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
+    let discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
 
     let action = match action_str {
         "warn" => api_client::Action::Warn,
@@ -125,6 +126,7 @@ pub async fn create_manual_vote_card(
         context_count,
         thread_enabled,
         moderator_name,
+        discussion_enabled,
     )
     .await;
     Ok(())
@@ -142,6 +144,7 @@ pub fn handles_component(custom_id: &str) -> bool {
     custom_id.starts_with(AM_PREFIX)
         || custom_id.starts_with(vote::VOTE_PREFIX)
         || custom_id.starts_with(vote::FINALIZE_PREFIX)
+        || custom_id.starts_with(vote::DISCUSSION_PREFIX)
 }
 
 /// Handle a component interaction (review/vote button click).
@@ -154,6 +157,8 @@ pub async fn on_component(ctx: &Context, component: &serenity::model::applicatio
         vote::handle_vote_button(ctx, component).await;
     } else if cid.starts_with(vote::FINALIZE_PREFIX) {
         vote::handle_finalize_button(ctx, component).await;
+    } else if cid.starts_with(vote::DISCUSSION_PREFIX) {
+        vote::handle_discussion_button(ctx, component).await;
     } else {
         review::handle_review_button(ctx, component).await;
     }

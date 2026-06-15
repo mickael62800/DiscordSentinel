@@ -6,7 +6,9 @@ use uuid::Uuid;
 
 use super::super::pg_err_ctx;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
+use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
+use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
@@ -101,6 +103,31 @@ struct VoteRow {
     vote_action: String,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct DiscussionRow {
+    id: Uuid,
+    review_id: Uuid,
+    guild_id: String,
+    channel_id: String,
+    opened_by_id: String,
+    opened_by_name: String,
+    created_at: DateTime<Utc>,
+}
+
+impl From<DiscussionRow> for DiscussionChannel {
+    fn from(r: DiscussionRow) -> Self {
+        Self {
+            id: r.id,
+            review_id: r.review_id,
+            guild_id: r.guild_id,
+            channel_id: r.channel_id,
+            opened_by_id: r.opened_by_id,
+            opened_by_name: r.opened_by_name,
+            created_at: r.created_at,
+        }
+    }
 }
 
 impl From<VoteRow> for ReviewVote {
@@ -410,5 +437,52 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .await
         .map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn find_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError> {
+        let row: Option<DiscussionRow> = sqlx::query_as(
+            "SELECT * FROM automod_discussion_channels WHERE review_id = $1",
+        )
+        .bind(review_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row.map(Into::into))
+    }
+
+    async fn create_discussion(
+        &self,
+        d: NewDiscussionChannel,
+    ) -> Result<(DiscussionChannel, bool), DomainError> {
+        // Idempotence : UNIQUE(review_id). On tente l'insert ; en cas de
+        // conflit on renvoie l'existant avec created=false.
+        let inserted: Option<DiscussionRow> = sqlx::query_as(
+            "INSERT INTO automod_discussion_channels \
+                (review_id, guild_id, channel_id, opened_by_id, opened_by_name) \
+             VALUES ($1,$2,$3,$4,$5) \
+             ON CONFLICT (review_id) DO NOTHING \
+             RETURNING *",
+        )
+        .bind(d.review_id)
+        .bind(&d.guild_id)
+        .bind(&d.channel_id)
+        .bind(&d.opened_by_id)
+        .bind(&d.opened_by_name)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        if let Some(row) = inserted {
+            return Ok((row.into(), true));
+        }
+        // Conflit : un salon existait deja -> on le renvoie.
+        let existing: DiscussionRow = sqlx::query_as(
+            "SELECT * FROM automod_discussion_channels WHERE review_id = $1",
+        )
+        .bind(d.review_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok((existing.into(), false))
     }
 }

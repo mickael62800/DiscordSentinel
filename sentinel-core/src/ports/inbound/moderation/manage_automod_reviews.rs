@@ -7,6 +7,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::moderation::review::automod::AutomodReview;
+use crate::domain::entities::moderation::review::automod::DiscussionChannel;
+use crate::domain::entities::moderation::review::automod::DiscussionRequester;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
 use crate::domain::entities::moderation::review::automod::TallyResult;
@@ -78,4 +80,28 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
 
     /// Reviews en vote dont l'echeance est depassee (job worker).
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
+
+    // ── Salon de discussion ──
+    /// Salon de discussion deja ouvert pour cette review, le cas echeant.
+    async fn get_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError>;
+
+    /// Ouvre (enregistre) un salon de discussion : applique la regle d'acces
+    /// (`can_open_discussion`) puis persiste de facon idempotente. Retourne
+    /// `(salon, created)`. `Forbidden` si le demandeur n'est pas autorise.
+    async fn open_discussion(
+        &self,
+        cmd: OpenDiscussionCommand,
+    ) -> Result<(DiscussionChannel, bool), DomainError>;
+}
+
+/// Commande d'ouverture d'un salon de discussion. Les `requester` sont les
+/// faits Discord fournis par l'adapter bot ; la DECISION est prise ici.
+#[derive(Debug, Clone)]
+pub struct OpenDiscussionCommand {
+    pub review_id: Uuid,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub opened_by_id: String,
+    pub opened_by_name: String,
+    pub requester: DiscussionRequester,
 }

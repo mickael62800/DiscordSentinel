@@ -234,6 +234,47 @@ pub fn tally_votes(votes: &[VoteAction], quorum: usize, tie: TieAction) -> Tally
     TallyResult { decided, quorum_met: true, total_votes: total }
 }
 
+// ── Salon de discussion lie a une review ─────────────────────────────
+
+/// Salon textuel ouvert pour discuter d'une review (membre + modos).
+/// Persiste pour l'audit et l'idempotence (un seul salon par review).
+#[derive(Debug, Clone)]
+pub struct DiscussionChannel {
+    pub id: Uuid,
+    pub review_id: Uuid,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub opened_by_id: String,
+    pub opened_by_name: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct NewDiscussionChannel {
+    pub review_id: Uuid,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub opened_by_id: String,
+    pub opened_by_name: String,
+}
+
+/// Faits Discord du demandeur, fournis par l'adapter bot. La DECISION
+/// d'autorisation (la regle) est prise par le domaine, pas par le bot.
+#[derive(Debug, Clone, Default)]
+pub struct DiscussionRequester {
+    pub is_admin: bool,
+    pub has_moderate_members: bool,
+    pub has_manage_messages: bool,
+    pub has_mod_role: bool,
+}
+
+/// Regle metier : qui peut ouvrir un salon de discussion sur une review.
+/// Un administrateur, un membre avec "Moderer les membres" ou "Gerer les
+/// messages", ou un porteur du role modo configure.
+pub fn can_open_discussion(r: &DiscussionRequester) -> bool {
+    r.is_admin || r.has_moderate_members || r.has_manage_messages || r.has_mod_role
+}
+
 #[derive(Debug, Clone)]
 pub struct NewAutomodReview {
     pub guild_id: GuildId,
