@@ -65,6 +65,8 @@ pub fn more_severe_suggested(a: &str, b: &str) -> String {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AppliedAction {
+    /// Cran le plus leger : prevention (tracee, hors escalade).
+    Prevention,
     Warn,
     Delete,
     Mute,
@@ -75,6 +77,7 @@ pub enum AppliedAction {
 impl AppliedAction {
     pub fn as_str(&self) -> &'static str {
         match self {
+            Self::Prevention => "prevention",
             Self::Warn => "warn",
             Self::Delete => "delete",
             Self::Mute => "mute",
@@ -84,6 +87,7 @@ impl AppliedAction {
     }
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
+            "prevention" => Some(Self::Prevention),
             "warn" => Some(Self::Warn),
             "delete" => Some(Self::Delete),
             "mute" => Some(Self::Mute),
@@ -141,14 +145,15 @@ pub type VoteAction = AppliedAction;
 
 impl AppliedAction {
     /// Rang de severite : sert au tie-break (plus clemente / plus severe).
-    /// ignore (0) < warn (1) < delete (2) < mute (3) < ban (4).
+    /// ignore (0) < prevention (1) < warn (2) < delete (3) < mute (4) < ban (5).
     pub fn severity(&self) -> u8 {
         match self {
             Self::Ignore => 0,
-            Self::Warn => 1,
-            Self::Delete => 2,
-            Self::Mute => 3,
-            Self::Ban => 4,
+            Self::Prevention => 1,
+            Self::Warn => 2,
+            Self::Delete => 3,
+            Self::Mute => 4,
+            Self::Ban => 5,
         }
     }
 }

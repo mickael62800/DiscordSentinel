@@ -84,7 +84,7 @@ pub(super) async fn send_review_card(
     if flags.phishing { flag_parts.push("Phishing"); }
     let flags_str = if flag_parts.is_empty() { "Aucun".to_string() } else { flag_parts.join(", ") };
 
-    let embed = serenity::builder::CreateEmbed::new()
+    let mut embed = serenity::builder::CreateEmbed::new()
         .title(format!("AutoMod -- Action suggeree : {}", action_label))
         .color(action_color)
         .field("Utilisateur", format!("<@{}> (`{}`)", user_id, msg.author.name), true)
@@ -98,6 +98,10 @@ pub(super) async fn send_review_card(
             "AutoMod Review | Cliquez pour valider ou ajuster",
         ))
         .timestamp(serenity::model::Timestamp::now());
+    // 2e section : antecedents de moderation du membre (avec dates).
+    if let Some(hist) = super::vote::render_member_history(ctx, &guild_id, &user_id).await {
+        embed = embed.field("📋 Antecedents du membre", hist, false);
+    }
 
     // Suffixe commun pour les custom_id
     let id_suffix = format!("{}:{}:{}:{}", guild_id, channel_id, message_id, user_id);
@@ -635,7 +639,7 @@ async fn apply_web_resolution(
     actor_id: &str,
     actor_name: &str,
 ) {
-    if !matches!(applied_action, "warn" | "delete" | "mute" | "ban") {
+    if !matches!(applied_action, "prevention" | "warn" | "delete" | "mute" | "ban") {
         return; // "ignore" ou inconnu : rien a appliquer.
     }
     let api = {
@@ -730,6 +734,7 @@ async fn edit_review_card_from_web(
     let msg_id = MessageId::new(msg_id_u64);
 
     let label = match applied_action {
+        "prevention" => "Prevention appliquee",
         "warn" => "Avertissement applique",
         "delete" => "Message supprime",
         "mute" => "Mute applique",

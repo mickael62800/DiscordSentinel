@@ -5,6 +5,7 @@ pub const MODULE_BOT_NAME: &str = "moderation-bot";
 
 pub mod api_client;
 pub mod commands;
+mod guild_reset;
 mod pending_actions;
 pub mod reason_templates;
 mod redis_events;
@@ -251,6 +252,7 @@ pub fn spawn_background(ctx: Context) {
                 let ctx = ctx.clone();
                 async move {
                     redis_events::handle_redis_moderation_event(&ctx, &payload).await;
+                    guild_reset::handle_guild_reset_event(&ctx, &payload).await;
                 }
             },
         )

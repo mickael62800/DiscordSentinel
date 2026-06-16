@@ -9,6 +9,7 @@ import RbacUsersTable from "../organisms/RbacUsersTable.vue";
 import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
 import ComponentMinRoleGrid from "../organisms/ComponentMinRoleGrid.vue";
 import InvitationsManager from "../organisms/InvitationsManager.vue";
+import GuildDangerZone from "../organisms/GuildDangerZone.vue";
 import type { RbacRole } from "@/types";
 
 const { myRole } = useRbac();
@@ -61,6 +62,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
       <InvitationsManager v-if="canEdit" />
       <ComponentMinRoleGrid v-if="canEdit" />
       <ComponentVisibilityGrid v-if="canEdit" />
+      <GuildDangerZone v-if="canEdit" />
     </template>
   </AdminPageShell>
 </template>

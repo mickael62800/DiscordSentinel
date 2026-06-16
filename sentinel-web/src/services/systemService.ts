@@ -1,4 +1,4 @@
-import { httpGet } from "@/api/http";
+import { httpGet, httpPost } from "@/api/http";
 
 export interface ServiceStatus {
   name: string;
@@ -53,8 +53,32 @@ export interface SystemInfo {
   db_size_mb: number;
 }
 
+export interface GuildResetResult {
+  tables_wiped: number;
+  total_rows: number;
+}
+
 export const systemService = {
   getInfo(): Promise<SystemInfo> {
     return httpGet("/api/system/info");
+  },
+
+  /**
+   * ⚠️ DANGER — Factory reset d'un serveur. IRREVERSIBLE.
+   * Efface toutes les donnees du serveur + demande au bot d'annuler l'etat
+   * Discord (deban / unmute / retrait des roles temp+quarantaine).
+   * Reserve a l'owner ; `confirmation` doit etre le nom EXACT du serveur.
+   */
+  resetGuild(
+    guildId: string,
+    confirmation: string,
+    options: { unban?: boolean; unmute?: boolean; remove_roles?: boolean } = {},
+  ): Promise<GuildResetResult> {
+    return httpPost(`/api/system/guild-reset/${guildId}`, {
+      confirmation,
+      unban: options.unban ?? true,
+      unmute: options.unmute ?? true,
+      remove_roles: options.remove_roles ?? true,
+    });
   },
 };

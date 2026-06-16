@@ -112,7 +112,7 @@ onUnmounted(() => {
         </div>
         <div class="review-actions">
           <button
-            v-for="choice in (['warn','delete','mute','ban','ignore'] as ResolveActionChoice[])"
+            v-for="choice in (['prevention','warn','delete','mute','ban','ignore'] as ResolveActionChoice[])"
             :key="choice"
             class="action-btn"
             :class="[`btn-${choice}`, { suggested: choice === r.suggested_action }]"
@@ -245,6 +245,7 @@ onUnmounted(() => {
   color: #2ECC71;
   font-weight: 600;
 }
+.action-btn.btn-prevention { border-color: #3498DB; color: #3498DB; }
 .action-btn.btn-ban { border-color: #E74C3C; color: #E74C3C; }
 .action-btn.btn-mute { border-color: #E67E22; color: #E67E22; }
 .action-btn.btn-warn { border-color: #F1C40F; color: #F1C40F; }

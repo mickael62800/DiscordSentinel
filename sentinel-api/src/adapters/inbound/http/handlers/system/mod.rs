@@ -5,6 +5,7 @@ pub mod cache_stats;
 pub mod component_min_role;
 pub mod component_visibility;
 pub mod docker;
+pub mod guild_reset;
 pub mod invitations;
 pub mod lockdown;
 pub mod quarantine;

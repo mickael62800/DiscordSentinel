@@ -328,6 +328,12 @@ pub async fn build_app_state(
             automod_review_repo.clone(),
         ));
 
+    // Reset complet d'un serveur (factory reset, owner-only).
+    let reset_guild_uc: Arc<dyn crate::ports::inbound::system::reset_guild::ResetGuildUseCase> =
+        Arc::new(crate::application::system::reset_guild_service::ResetGuildService::new(Arc::new(
+            crate::adapters::outbound::postgres::system::guild_reset_repository::PgGuildResetRepository::new(pg_pool.clone()),
+        )));
+
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
     let security_uc = Arc::new(
         ManageSecurityService::new(
@@ -851,6 +857,7 @@ pub async fn build_app_state(
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
         automod_reviews_uc,
+        reset_guild_uc,
         pets_uc,
         rotation_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(

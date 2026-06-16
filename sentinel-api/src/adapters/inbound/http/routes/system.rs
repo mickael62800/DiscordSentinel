@@ -21,6 +21,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/cache/stats", get(handlers::system::cache_stats::get_cache_stats))
         // Detail systeme (bots/workers list + CPU/RAM host + uptime + taille BDD)
         .route("/api/system/info", get(handlers::system::info::get_system_info))
+        // DANGER — factory reset d'un serveur (owner-only + confirmation forte)
+        .route("/api/system/guild-reset/{guild_id}", post(handlers::system::guild_reset::reset_guild))
         // Welcome config
         .route("/api/welcome/{guild_id}", get(handlers::community::welcome::get_config).put(handlers::community::welcome::save_config))
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)

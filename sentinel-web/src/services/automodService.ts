@@ -31,7 +31,7 @@ export interface AutomodReview {
   discussion_channel_id: string | null;
 }
 
-export type ResolveActionChoice = "warn" | "delete" | "mute" | "ban" | "ignore";
+export type ResolveActionChoice = "prevention" | "warn" | "delete" | "mute" | "ban" | "ignore";
 
 export const automodService = {
   /** GET /api/automod/{guild_id}/detections — timeline filtree action='detection'. */

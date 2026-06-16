@@ -43,6 +43,7 @@ fn action_char(action: &Action) -> char {
 
 fn char_to_str(c: char) -> &'static str {
     match c {
+        'p' => "prevention",
         'w' => "warn",
         'd' => "delete",
         'm' => "mute",
@@ -53,6 +54,7 @@ fn char_to_str(c: char) -> &'static str {
 
 fn action_label(s: &str) -> &'static str {
     match s {
+        "prevention" => "Prevention",
         "warn" => "Avertissement",
         "delete" => "Suppression",
         "mute" => "Mute",
@@ -148,6 +150,10 @@ pub(super) async fn post_vote_card(
     if !context.is_empty() {
         embed = embed.field("Contexte (messages precedents)", context, false);
     }
+    // 2e section : antecedents de moderation du membre (avec dates).
+    if let Some(hist) = render_member_history(ctx, &guild_id, &user_id).await {
+        embed = embed.field("📋 Antecedents du membre", hist, false);
+    }
 
     // Bouton lien : clic -> saute directement sur le message dans le salon.
     let msg_url = format!(
@@ -158,7 +164,11 @@ pub(super) async fn post_vote_card(
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
-        .components(vec![vote_buttons(&review_id), link_row]);
+        .components({
+            let mut rows = vote_buttons(&review_id);
+            rows.push(link_row);
+            rows
+        });
 
     let posted = match serenity::model::id::ChannelId::new(review_channel_id)
         .send_message(&ctx.http, builder)
@@ -295,6 +305,9 @@ pub(super) async fn post_manual_vote_card(
     if !after.is_empty() {
         embed = embed.field("Contexte (apres)", after, false);
     }
+    if let Some(hist) = render_member_history(ctx, &guild_id, &user_id).await {
+        embed = embed.field("📋 Antecedents du membre", hist, false);
+    }
     embed = embed
         .field(VOTES_FIELD, render_votes(&[]), false)
         .footer(serenity::builder::CreateEmbedFooter::new(
@@ -310,7 +323,11 @@ pub(super) async fn post_manual_vote_card(
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
-        .components(vec![vote_buttons(&review_id), link_row]);
+        .components({
+            let mut rows = vote_buttons(&review_id);
+            rows.push(link_row);
+            rows
+        });
 
     let posted = match serenity::model::id::ChannelId::new(review_channel_id)
         .send_message(&ctx.http, builder)
@@ -442,16 +459,83 @@ async fn fetch_context_after(ctx: &Context, msg: &Message, n: u8) -> String {
     lines.join("\n")
 }
 
-fn vote_buttons(review_id: &str) -> serenity::builder::CreateActionRow {
+/// Rangees de boutons de vote (6 actions -> 2 rangees car Discord limite a 5
+/// boutons par rangee). Ordre de severite : Prevention < Warn < Delete < Mute < Ban.
+fn vote_buttons(review_id: &str) -> Vec<serenity::builder::CreateActionRow> {
     use serenity::all::ButtonStyle;
-    use serenity::builder::CreateButton;
-    serenity::builder::CreateActionRow::Buttons(vec![
-        CreateButton::new(format!("{VOTE_PREFIX}w:{review_id}")).label("Warn").style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{VOTE_PREFIX}d:{review_id}")).label("Delete").style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{VOTE_PREFIX}m:{review_id}")).label("Mute").style(ButtonStyle::Primary),
-        CreateButton::new(format!("{VOTE_PREFIX}b:{review_id}")).label("Ban").style(ButtonStyle::Danger),
-        CreateButton::new(format!("{VOTE_PREFIX}i:{review_id}")).label("Ignorer").style(ButtonStyle::Secondary),
-    ])
+    use serenity::builder::{CreateActionRow, CreateButton};
+    vec![
+        CreateActionRow::Buttons(vec![
+            CreateButton::new(format!("{VOTE_PREFIX}p:{review_id}")).label("Prevention").style(ButtonStyle::Success),
+            CreateButton::new(format!("{VOTE_PREFIX}w:{review_id}")).label("Warn").style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{VOTE_PREFIX}d:{review_id}")).label("Delete").style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{VOTE_PREFIX}m:{review_id}")).label("Mute").style(ButtonStyle::Primary),
+            CreateButton::new(format!("{VOTE_PREFIX}b:{review_id}")).label("Ban").style(ButtonStyle::Danger),
+        ]),
+        CreateActionRow::Buttons(vec![
+            CreateButton::new(format!("{VOTE_PREFIX}i:{review_id}")).label("Ignorer").style(ButtonStyle::Secondary),
+        ]),
+    ]
+}
+
+/// Libelle court d'un type d'action moderation pour l'historique.
+fn history_action_label(action_type: &str) -> &str {
+    match action_type {
+        "prevention" => "Prevention",
+        "warn" => "Avertissement",
+        t if t.starts_with("mute") => "Mute",
+        t if t.starts_with("ban") => "Ban",
+        "unban" => "Unban",
+        "unmute" => "Unmute",
+        "call" => "Convocation",
+        other => other,
+    }
+}
+
+/// Recupere et formate l'historique de moderation du membre (2e section de la
+/// carte). Le nombre d'infractions listees vient de la config automod
+/// (`card_history_count`, 0 = totaux seuls). `None` si l'API moderation est
+/// indisponible. Autonome : pas besoin de threader la config dans les builders.
+pub(super) async fn render_member_history(
+    ctx: &Context,
+    guild_id: &str,
+    user_id: &str,
+) -> Option<String> {
+    use crate::modules::moderation::ModerationApiKey;
+    let (mod_api, base_api) = {
+        let d = ctx.data.read().await;
+        (d.get::<ModerationApiKey>()?.clone(), d.get::<ApiClientKey>()?.clone())
+    };
+    // Nb d'antecedents a lister, depuis la config automod (0 = totaux seuls).
+    let cfg = base_api.get_guild_config_for(guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
+    let count = BaseApiClient::config_u64(&cfg, "card_history_count", 5) as u8;
+
+    let hist = mod_api.get_history(guild_id, user_id).await.ok()?;
+    let totals = format!(
+        "**{}** warn(s) · **{}** mute(s) · **{}** ban(s)",
+        hist.total_warns, hist.total_mutes, hist.total_bans
+    );
+    if hist.actions.is_empty() {
+        return Some(format!("{}\n_Aucun antecedent._", totals));
+    }
+    if count == 0 {
+        return Some(totals);
+    }
+    let mut lines = vec![totals];
+    let mut total_len = 0usize;
+    // `actions` est ordonne chronologiquement -> on prend les plus recentes.
+    for a in hist.actions.iter().rev().take(count as usize) {
+        let date = a.created_at.split('T').next().unwrap_or(a.created_at.as_str());
+        let reason: String = a.reason.chars().take(60).collect();
+        let line = format!("• `{}` **{}** — {}", date, history_action_label(&a.action_type), reason);
+        if total_len + line.len() + 1 > 1000 {
+            lines.push("…".into());
+            break;
+        }
+        total_len += line.len() + 1;
+        lines.push(line);
+    }
+    Some(lines.join("\n"))
 }
 
 /// Deuxieme rangee de boutons : lien vers le message + (option) "Ouvrir une
@@ -552,6 +636,8 @@ struct ReviewResp {
     id: String,
     #[serde(default)]
     merged: bool,
+    #[serde(default)]
+    guild_id: String,
     #[serde(default)]
     user_id: String,
     #[serde(default)]
@@ -702,7 +788,10 @@ async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &Re
         .await
         .unwrap_or_default();
 
-    let embed = aggregated_vote_embed(resp, &votes);
+    let mut embed = aggregated_vote_embed(resp, &votes);
+    if let Some(hist) = render_member_history(ctx, &resp.guild_id, &resp.user_id).await {
+        embed = embed.field("📋 Antecedents du membre", hist, false);
+    }
     // On n'edite que l'embed : les composants (boutons de vote + lien) restent.
     if let Err(e) = channel_id
         .edit_message(&ctx.http, msg_id, serenity::builder::EditMessage::new().embed(embed))
@@ -1249,8 +1338,9 @@ pub(super) async fn log_sanction_to_moderation(
     use crate::modules::moderation::api_client::ModerationAction;
     use crate::modules::moderation::ModerationApiKey;
 
-    // Seules les sanctions de membre comptent dans l'historique.
-    if !matches!(action_type, "warn" | "mute" | "ban") {
+    // Sanctions de membre tracees dans l'historique (prevention incluse, mais
+    // elle ne compte pas dans l'escalade -- gere cote service log_action_with_strike).
+    if !matches!(action_type, "prevention" | "warn" | "mute" | "ban") {
         return;
     }
 
@@ -1327,6 +1417,20 @@ pub(super) async fn apply_member_sanction(
                     warn!(error = %e, user = user_id_str, "Echec ban (sanction validee) -- permission BAN_MEMBERS ?");
                 }
             }
+        }
+        "prevention" => {
+            // Cran le plus leger : aucun acte destructif, juste un message public
+            // de prevention (la trace est enregistree cote moderation).
+            let embed = serenity::builder::CreateEmbed::new()
+                .title("Prevention")
+                .description(format!(
+                    "<@{}> — message de prevention de la moderation. Merci d'ajuster ton comportement.",
+                    user_id_str
+                ))
+                .color(0x3498db);
+            let _ = channel_id
+                .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+                .await;
         }
         _ => {}
     }

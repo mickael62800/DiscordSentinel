@@ -762,6 +762,13 @@ pub struct StubWelcomeConfigRepo;
     async fn save_config(&self, _: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> { Ok(d.clone()) }
 }
 
+pub struct StubGuildResetRepo;
+#[async_trait] impl sentinel_api::ports::outbound::system::guild_reset_repository::GuildResetRepository for StubGuildResetRepo {
+    async fn guild_name(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
+    async fn collect_discord_context(&self, _: &str) -> Result<sentinel_api::ports::outbound::system::guild_reset_repository::ResetDiscordContext, DomainError> { Ok(Default::default()) }
+    async fn wipe_guild(&self, _: &str) -> Result<Vec<(String, u64)>, DomainError> { Ok(vec![]) }
+}
+
 pub struct StubAutomodReviewRepo;
 #[async_trait] impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository for StubAutomodReviewRepo {
     async fn create(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
@@ -947,6 +954,11 @@ fn base_state() -> AppState {
         automod_reviews_uc: Arc::new(
             sentinel_api::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
                 Arc::new(StubAutomodReviewRepo),
+            ),
+        ),
+        reset_guild_uc: Arc::new(
+            sentinel_api::application::system::reset_guild_service::ResetGuildService::new(
+                Arc::new(StubGuildResetRepo),
             ),
         ),
         discord_action_messages_uc: Arc::new(

@@ -122,8 +122,15 @@ impl ManageModerationUseCase for ManageModerationService {
         let guild_id = cmd.guild_id.clone();
         let target_id = cmd.target_id.clone();
         let reason = cmd.reason.clone();
+        let action_type = cmd.action_type.clone();
 
         let action = self.log_action(cmd).await?;
+
+        // La "prevention" est tracee dans l'historique mais NE compte PAS dans
+        // l'escalade : on n'ajoute pas de strike (cran sous le warn).
+        if action_type == "prevention" {
+            return Ok(LoggedModerationAction { action, strike: None });
+        }
 
         // Si le strikes_uc n'a pas ete injecte, on retourne sans strike
         // (compat descendante : certains tests n'en ont pas besoin).
