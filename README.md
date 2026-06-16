@@ -22,7 +22,7 @@ Discord Messages / Events / Images
 ┌─────────────────────────┐         ┌──────────────────────────┐
 │  API backend (Axum 0.8) │◄────────┤  Gateway WebSocket       │
 │  sentinel-api           │         │  sentinel-gateway        │
-│  - 225 migrations       │         │  (relay Redis → clients) │
+│  - 266 migrations       │         │  (relay Redis → clients) │
 │  - ONNX inference       │         └─────────┬────────────────┘
 │  - ~140 handlers HTTP   │                   │
 │  - Hexagonal            │                   │
@@ -36,7 +36,7 @@ Discord Messages / Events / Images
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
 │ Postgres  │  │  Redis    │        │ sentinel-web (Vue 3)       │
 │(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
-│ 150 migs  │  │  pub/sub) │        └────────────────────────┘
+│ 266 migs  │  │  pub/sub) │        └────────────────────────┘
 └─────┬─────┘  └─────┬─────┘
       │              │
       └──────┬───────┘
@@ -64,12 +64,12 @@ Discord Messages / Events / Images
 
 | Composant | Technologie | Détails |
 |---|---|---|
-| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~140 handlers, 225 migrations, ONNX inference, OAuth Discord |
+| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~140 handlers, 266 migrations, ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis pub/sub | Service dédié temps réel, auto-reconnect exponential backoff |
 | Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 17 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
 | 9 Workers | Rust / Tokio / sqlx / lib `worker-common` | 8 binaires spécialisés + 1 meta `sentinel-worker` (scheduler 17 domaines), heartbeat + métriques Prometheus |
 | gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (amorce scaling horizontal) |
-| PostgreSQL | Postgres 16 + **PgBouncer** | 225 migrations, partitionnement RANGE mensuel, vues matérialisées |
+| PostgreSQL | Postgres 16 + **PgBouncer** | 266 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache | Redis 7 | `maxmemory=2gb allkeys-lru`, pub/sub events, cache `user_guilds` multi-tenant |
 | Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
 | Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `sentinel-web` — servi par Nginx (Dockerfile + nginx.conf) |
@@ -101,7 +101,7 @@ DiscordSentinel/
 │   │   ├── application/             # use case services
 │   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
 │   │   └── ports/                   # traits inbound/outbound
-│   └── migrations/                  # 001 → 225
+│   └── migrations/                  # 001 → 266
 │
 ├── sentinel-gateway/            # WebSocket relay (Redis pub/sub → clients)
 ├── sentinel-proto/              # Définitions gRPC (`tonic` + `prost`)
@@ -115,9 +115,94 @@ DiscordSentinel/
 
 ---
 
+## Modules, fonctionnalités & commandes
+
+Le bot expose **17 modules** activables/configurables par serveur (table `bot_guild_config`, éditables depuis le dashboard web). Chaque commande slash est filtrée par module activé **et** par permission Discord. Référence détaillée : [`docs/COMMANDES_ADMIN.md`](docs/COMMANDES_ADMIN.md) (staff) et [`docs/COMMANDES_UTILISATEURS.md`](docs/COMMANDES_UTILISATEURS.md) (membres).
+
+### 🤖 automod — Modération automatique + vote des modérateurs
+
+Analyse chaque message (texte + images) : détecteurs locaux (spam, insulte, lien, phishing, caps, flood, emoji, mentions, unicode, fichiers suspects) **+** IA ONNX (texte multilingue, vision NSFW/illicite). Chaque flag a un **poids** ; la somme donne un **score** comparé aux **seuils** (warn / delete / mute / ban) configurés sur la page **Règles de modération** (`/api/rules`).
+
+**Selon le score et la config**, le message :
+- est traité **automatiquement** (warn / delete / mute appliqués ; le ban n'est jamais automatique → simple signalement), **ou**
+- déclenche une **carte de review/vote** dans le salon de review (`log_channel_id`).
+
+**Système de vote** (`vote_enabled`) : la carte affiche le contexte et des boutons **Warn / Delete / Mute / Ban / Ignorer**. Les modérateurs votent ; à l'échéance (`vote_deadline_hours`) le `sentinel-worker` dépouille (quorum + tie-break) ; un **administrateur finalise** via un bouton dédié (seule voie d'un ban réel).
+
+- **Regroupement par utilisateur** (`vote_aggregate_enabled`) : tant qu'une carte est ouverte pour un membre, les nouveaux signalements **s'agrègent** dans la même carte (liste d'incidents, score cumulé, deadline prolongée) au lieu de spammer des cartes.
+- **Salon de discussion** (`discussion_channel_enabled`) : un bouton « Ouvrir une discussion » crée un **salon textuel privé** (membre concerné + rôle modo) sous une catégorie configurable (`discussion_category_id`), avec un message de contexte épinglé, pour échanger avant décision.
+
+| Commande | Permission | Rôle |
+|---|---|---|
+| `/automod status` / `/automod test` | Gérer le serveur | État des caches/trackers ; tester l'analyse d'un message |
+
+### ⚖️ moderation — Modération manuelle (22 commandes)
+
+Sanctions (`/warn`, `/unwarn`, `/mute`, `/unmute`, `/ban`, `/unban`, `/massmute`, `/massban`), dossiers (`/history`, `/note`, `/context`, `/evidence`, `/expirations`, `/compare`, `/call`), outils (`/appeal`, `/review`, `/template`, `/transcript`, `/export`, `/modstats`).
+
+- **`/card`** *(nouveau)* — crée manuellement une carte de vote (identique à l'automod, contexte **avant + après** le message) quand une détection est passée au travers. Cible via **lien Discord** (cross-salon) ou ID. Postée dans le salon de review automod, flux de vote/finalisation complet.
+- **`/context`** — affiche les messages autour d'un message pour comprendre une situation.
+
+### 🔐 security — Anti-raid / alt accounts
+
+Détection de raids (pics de joins), comptes récents/alt, captcha, quarantaine, lockdown, slowmode adaptatif. `/security status`, `/security history`.
+
+### 🎉 welcome — Accueil & onboarding
+
+Messages de bienvenue / départ / retour (rich embeds), validation du règlement (bouton → rôle), anniversaires d'arrivée, et **deux compteurs de salon renommés** :
+- **Compteur de membres** (`counter_*`) → ex. `Membres : 1234`
+- **Compteur de présence vocale** (`voice_counter_*`) *(nouveau)* → ex. `En Vocal : 5`, mis à jour à chaque connexion/déconnexion vocale.
+
+*(Pas de commande : tout se configure via le dashboard web `/api/welcome`.)*
+
+### 🔊 voice — Salons vocaux temporaires
+
+Création à la volée (salon « créateur »), panneau de contrôle (rename, lock, limite, visibilité, whitelist, ban, co-admins, vote-kick), thèmes réutilisables, cleanup auto des salons vides.
+
+### 🎫 tickets — Support
+
+`/ticket close` (membre), `/ticket-admin panel|invite` (staff). SLA, fermeture sur inactivité, transcripts.
+
+### 🔎 audit — Journal d'audit Discord
+
+`/audit search`, `/audit stats`. Ingestion des audit-logs (domaine `discord_audit_sync` du worker), surveillance d'utilisateurs, rapports hebdomadaires.
+
+### 📈 progression — Niveaux & XP
+
+XP par activité (messages, vocal, ancienneté), rôles de niveau. `/level user|top`, `/stats`, `/progression-resync` (admin).
+
+### 🧹 cleanup — Nettoyage
+
+`/purge last|user|contains` (Gérer les messages), `/cleanup logs|infractions|audit` (admin).
+
+### 👥 community — Rôles & parrainage
+
+`/roles-panel` (panels de rôles auto-assignables, staff), `/parrain` (parrainage de nouveaux membres).
+
+### 🤫 confessions — Confessions anonymes
+
+`/confess` (membre, anonyme), `/confess-admin deploy-panel|delete|reveal` (admin).
+
+### 📣 announcements — Annonces planifiées
+
+Annonces programmées (publiées par le worker, consommées via Redis stream par le bot).
+
+### 🎮 Jeux & casino
+
+- **games** — `/game list|join|leave`, `/game-admin` (catalogue de jeux + panels d'inscription).
+- **blackjack** — `/blackjack` (solo) + tables multijoueur via `/blackjack-setup`.
+- **slot** — `/slot-setup` (machine à sous, jackpot progressif).
+- **wheel** — `/wheel-setup` (roue du destin).
+
+### 🥊 coude — Mini-jeu « Coup de Coude »
+
+Mini-RPG économie/combat (~36 commandes) : duels (`/coude`, `/coude-amical`, `/honneur`, `/vendetta`, `/coalition`), profil/progression (`/profil`, `/train`, `/classe`, `/prestige`, `/ultimate`…), économie/vol (`/voler`, `/donner`, `/braquage`, `/prime`, `/tout-ou-rien`…), social/paris (`/leaderboard`, `/pari`, `/maudire`, `/prank`…). Admin : `/taunts-channel`.
+
+---
+
 ## Base de données
 
-**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **225 migrations** versionnées (`sentinel-api/migrations/001 → 225`).
+**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **266 migrations** versionnées (`sentinel-api/migrations/001 → 266`).
 
 ### Optimisations structurelles
 
@@ -147,6 +232,8 @@ DiscordSentinel/
 | `temp_roles` | Rôles temporaires (scan par `temp-roles-worker`) |
 | `ai_jobs` | Queue IA async |
 | `welcome_config` | Config bienvenue + rich embeds (migrations 148–150) |
+| `automod_reviews` / `automod_review_votes` | Cartes de review + votes des modérateurs (incidents agrégés, score cumulé) |
+| `automod_discussion_channels` | Salons de discussion liés à une review (audit + idempotence, migration 266) |
 
 ### Flag types supportés (10)
 
@@ -212,7 +299,7 @@ Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatiqu
 
 ### Config IA per-guild
 
-Centralisée dans `bot_guild_config` (bot_name = `automod-bot`) : `text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold`, `context_dampening`, `context_format`, `context_max_messages`, `context_max_chars`. Configurable depuis le dashboard web. La table historique `ia_config` a été fusionnée (migration 146).
+Centralisée dans `bot_guild_config` (bot_name = `automod-bot`) : détection IA (`text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold`, `context_dampening`, `context_format`, `context_max_messages`, `context_max_chars`), tension de salon (`channel_tension_*`), et **système de vote** (`vote_enabled`, `vote_deadline_hours`, `vote_quorum`, `vote_mod_role_id`, `vote_admin_role_id`, `vote_tie_action`, `vote_context_before`, `vote_thread_enabled`, `vote_aggregate_enabled`, `discussion_channel_enabled`, `discussion_category_id`). Configurable depuis le dashboard web. La table historique `ia_config` a été fusionnée (migration 146).
 
 ### Mode async
 
