@@ -130,8 +130,9 @@ pub(super) async fn post_vote_card(
     let review_id = resp.id.clone();
 
     // Cas agregation : l'incident a ete fusionne -> on edite la carte existante.
-    if resp.merged {
-        edit_aggregated_card(ctx, &api, &resp).await;
+    // Si le message de cette carte a disparu (supprime), on ne `return` pas :
+    // on retombe sur le posting normal ci-dessous pour reposter une carte neuve.
+    if resp.merged && edit_aggregated_card(ctx, &api, &resp).await {
         return;
     }
 
@@ -279,8 +280,9 @@ pub(super) async fn post_manual_vote_card(
     let review_id = resp.id.clone();
 
     // Agregation : si l'incident a ete fusionne, on edite la carte existante.
-    if resp.merged {
-        edit_aggregated_card(ctx, &api, &resp).await;
+    // Si son message a disparu (supprime), on retombe sur le posting normal
+    // ci-dessous pour reposter une carte neuve (mapping upserte).
+    if resp.merged && edit_aggregated_card(ctx, &api, &resp).await {
         return;
     }
 
@@ -768,17 +770,24 @@ async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, rev
 
 /// Edite la carte existante d'une review agregee : recharge le mapping Discord
 /// + les votes, puis remplace l'embed (les boutons de vote sont conserves).
-async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &ReviewResp) {
+///
+/// Retourne `true` si la carte a ete editee (ou si l'echec est transitoire et
+/// ne justifie pas de recreer la carte), `false` si le message de la carte a
+/// disparu (supprime cote Discord) — dans ce cas l'appelant doit reposter une
+/// carte neuve (le mapping `discord_action_messages` etant upserte, le nouveau
+/// message_id remplace l'ancien).
+async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &ReviewResp) -> bool {
     use serenity::all::{ChannelId, MessageId};
 
     #[derive(serde::Deserialize)]
     struct Mapping { kind: String, channel_id: String, message_id: String }
     let mappings: Vec<Mapping> = match api.get_json(&format!("/api/discord-messages/{}", resp.id)).await {
         Ok(m) => m,
-        Err(e) => { warn!(error = %e, review_id = %resp.id, "Echec fetch mapping (agregation)"); return; }
+        Err(e) => { warn!(error = %e, review_id = %resp.id, "Echec fetch mapping (agregation)"); return true; }
     };
-    let Some(mapping) = mappings.into_iter().find(|m| m.kind == "automod_review") else { return };
-    let (Ok(cid), Ok(mid)) = (mapping.channel_id.parse::<u64>(), mapping.message_id.parse::<u64>()) else { return };
+    // Pas de mapping connu -> on ne peut pas editer : il faut (re)creer la carte.
+    let Some(mapping) = mappings.into_iter().find(|m| m.kind == "automod_review") else { return false };
+    let (Ok(cid), Ok(mid)) = (mapping.channel_id.parse::<u64>(), mapping.message_id.parse::<u64>()) else { return false };
     let channel_id = ChannelId::new(cid);
     let msg_id = MessageId::new(mid);
 
@@ -793,13 +802,27 @@ async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &Re
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
     // On n'edite que l'embed : les composants (boutons de vote + lien) restent.
-    if let Err(e) = channel_id
+    match channel_id
         .edit_message(&ctx.http, msg_id, serenity::builder::EditMessage::new().embed(embed))
         .await
     {
-        warn!(error = %e, review_id = %resp.id, "Echec edition carte agregee");
-    } else {
-        info!(review_id = %resp.id, incidents = resp.incident_count, "Carte agregee mise a jour");
+        Ok(_) => {
+            info!(review_id = %resp.id, incidents = resp.incident_count, "Carte agregee mise a jour");
+            true
+        }
+        Err(e) => {
+            // Message (ou salon) supprime cote Discord -> il faut recreer la carte.
+            // Pour les autres erreurs (rate limit, reseau...) on NE recree PAS,
+            // afin d'eviter les doublons : on retourne true (rien a recreer).
+            let s = e.to_string();
+            if s.contains("Unknown Message") || s.contains("Unknown Channel") || s.contains("10008") || s.contains("10003") {
+                warn!(review_id = %resp.id, "Carte agregee introuvable (message supprime) -> recreation");
+                false
+            } else {
+                warn!(error = %e, review_id = %resp.id, "Echec edition carte agregee (erreur transitoire, pas de recreation)");
+                true
+            }
+        }
     }
 }
 
