@@ -503,8 +503,13 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
         }
         Action::Ban => {
-            info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Ban signale via review");
-            let embed = critical_embed("Signalement pour bannissement (valide)")
+            // Decision humaine -> ban reel (coherent avec la finalisation de vote).
+            super::vote::apply_member_sanction(
+                ctx, component.guild_id, channel_id_str, message_id_str, user_id_str, "ban", mute_duration_secs,
+            )
+            .await;
+            info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Ban applique via review");
+            let embed = critical_embed("Banni par un moderateur")
                 .color(colors.ban)
                 .field("Valide par", moderator_name, true);
             if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
@@ -512,6 +517,25 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             }
         }
         Action::None => {}
+    }
+
+    // Trace la sanction de membre (warn/mute/ban) dans le module moderation
+    // (historique + escalade), au meme titre que le vote et les commandes.
+    let action_type = match action {
+        Action::Warn => "warn",
+        Action::Mute => "mute",
+        Action::Ban => "ban",
+        _ => "",
+    };
+    if !action_type.is_empty() {
+        super::vote::log_sanction_to_moderation(
+            ctx, &guild_id, &component.channel_id.to_string(),
+            &component.user.id.to_string(), &component.user.name,
+            user_id_str, user_id_str,
+            action_type, "Sanction validee par un moderateur (AutoMod review)",
+            if action == Action::Mute { Some(mute_duration_secs) } else { None },
+        )
+        .await;
     }
 
     // Mettre a jour la carte de review (retirer les boutons, afficher le resultat)
@@ -588,8 +612,75 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
         .and_then(|a| a.get("name"))
         .and_then(|n| n.as_str())
         .unwrap_or("Web admin");
+    let actor_id = data
+        .get("actor")
+        .and_then(|a| a.get("id"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("");
 
     edit_review_card_from_web(ctx, action_id, applied_action, actor_name).await;
+
+    // Applique REELLEMENT la sanction sur Discord + la trace (le handler web ne
+    // faisait qu'editer la carte ; sans ca, resoudre depuis le dashboard ne
+    // bannissait/mutait personne).
+    apply_web_resolution(ctx, action_id, applied_action, actor_id, actor_name).await;
+}
+
+/// Applique sur Discord la sanction resolue depuis le web + la trace dans le
+/// module moderation. Reutilise les helpers partages du mode vote.
+async fn apply_web_resolution(
+    ctx: &Context,
+    action_id: &str,
+    applied_action: &str,
+    actor_id: &str,
+    actor_name: &str,
+) {
+    if !matches!(applied_action, "warn" | "delete" | "mute" | "ban") {
+        return; // "ignore" ou inconnu : rien a appliquer.
+    }
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct ReviewDto {
+        guild_id: String,
+        channel_id: String,
+        message_id: String,
+        user_id: String,
+        user_name: String,
+    }
+    let review: ReviewDto = match api.get_json(&format!("/api/automod/reviews/{action_id}")).await {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, action_id, "Echec fetch review (resolution web) : sanction non appliquee");
+            return;
+        }
+    };
+
+    let config = api
+        .get_guild_config_for(&review.guild_id, crate::modules::automod::MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+
+    let gid = review.guild_id.parse::<u64>().ok().map(serenity::model::id::GuildId::new);
+
+    // Action Discord (delete/mute/ban ; warn = pas d'action destructive).
+    super::vote::apply_member_sanction(
+        ctx, gid, &review.channel_id, &review.message_id, &review.user_id, applied_action, mute_secs,
+    )
+    .await;
+
+    // Trace la sanction de membre (warn/mute/ban) avec l'acteur web comme moderateur.
+    super::vote::log_sanction_to_moderation(
+        ctx, &review.guild_id, &review.channel_id, actor_id, actor_name,
+        &review.user_id, &review.user_name, applied_action,
+        "Sanction appliquee depuis le dashboard web",
+        if applied_action == "mute" { Some(mute_secs) } else { None },
+    )
+    .await;
 }
 
 async fn edit_review_card_from_web(

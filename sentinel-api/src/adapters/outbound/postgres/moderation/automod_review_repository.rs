@@ -192,6 +192,16 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         aggregate: bool,
     ) -> Result<(AutomodReview, bool), DomainError> {
         if aggregate {
+            // Serialise les agregations concurrentes du meme (guild, user) :
+            // sans ca, deux messages quasi simultanes pourraient creer 2 cartes
+            // ou perdre un incident (read-modify-write sur le tableau JSON).
+            let mut tx = self.pool.begin().await.map_err(pg_err)?;
+            sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
+                .bind(format!("automod_review:{}:{}", r.guild_id.as_str(), r.user_id.as_str()))
+                .execute(&mut *tx)
+                .await
+                .map_err(pg_err)?;
+
             // Carte ouverte existante pour ce (guild, user) ?
             let existing: Option<Row> = sqlx::query_as(
                 "SELECT * FROM automod_reviews \
@@ -200,7 +210,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             )
             .bind(r.guild_id.as_str())
             .bind(r.user_id.as_str())
-            .fetch_optional(&self.pool)
+            .fetch_optional(&mut *tx)
             .await
             .map_err(pg_err)?;
 
@@ -241,11 +251,44 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .bind(&r.reason)
                 .bind(new_deadline)
                 .bind(prev.id)
-                .fetch_one(&self.pool)
+                .fetch_one(&mut *tx)
                 .await
                 .map_err(pg_err)?;
+                tx.commit().await.map_err(pg_err)?;
                 return Ok((updated.into(), true));
             }
+
+            // Aucune carte ouverte : on cree dans la meme transaction (sous le
+            // verrou) pour eviter une creation concurrente en double.
+            let status = if r.voting_deadline.is_some() { "voting" } else { "pending" };
+            let incidents = serde_json::json!([incident_json(&r)]);
+            let row: Row = sqlx::query_as(
+                "INSERT INTO automod_reviews \
+                    (guild_id, channel_id, message_id, user_id, user_name, content_preview, \
+                     suggested_action, score, reason, flags, status, voting_deadline, \
+                     incident_count, cumulative_score, incidents) \
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$14) \
+                 RETURNING *",
+            )
+            .bind(r.guild_id.as_str())
+            .bind(r.channel_id.as_str())
+            .bind(r.message_id.as_str())
+            .bind(r.user_id.as_str())
+            .bind(&r.user_name)
+            .bind(&r.content_preview)
+            .bind(r.suggested_action.as_str())
+            .bind(r.score)
+            .bind(&r.reason)
+            .bind(&r.flags)
+            .bind(status)
+            .bind(r.voting_deadline)
+            .bind(r.score)
+            .bind(&incidents)
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+            tx.commit().await.map_err(pg_err)?;
+            return Ok((row.into(), false));
         }
         // Pas d'agregation : creation normale.
         let review = self.create(r).await?;

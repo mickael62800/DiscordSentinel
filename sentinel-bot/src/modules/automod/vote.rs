@@ -963,16 +963,21 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         return;
     }
 
-    // Verdict warn : on cree une vraie infraction via le module moderation
-    // (gRPC log_action, comme /warn) pour qu'elle compte dans l'historique /
-    // l'escalade. Les autres sanctions Discord sont gerees par execute_sanction.
-    if decided == "warn" {
-        log_warn_to_moderation(ctx, component, &review.guild_id, &review.user_id, &review.user_name).await;
-    }
-
-    // Execute la sanction Discord (delete/mute/ban ; warn deja loggue ci-dessus).
+    // Trace TOUTE sanction de membre (warn/mute/ban) dans le module moderation
+    // pour qu'elle compte dans l'historique et l'escalade. delete = retrait de
+    // message (pas une sanction de membre) -> non trace.
     let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", super::DEFAULT_MUTE_DURATION_SECS);
-    execute_sanction(ctx, component, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;
+    log_sanction_to_moderation(
+        ctx, &review.guild_id, &component.channel_id.to_string(),
+        &component.user.id.to_string(), &component.user.name,
+        &review.user_id, &review.user_name,
+        &decided, "Sanction validee par vote des moderateurs (AutoMod)",
+        if decided == "mute" { Some(mute_secs) } else { None },
+    )
+    .await;
+
+    // Execute la sanction Discord (delete/mute/ban).
+    apply_member_sanction(ctx, component.guild_id, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;
 
     // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
     archive_discussion_channel(ctx, &api, &review_id, &review.user_id).await;
@@ -1108,6 +1113,13 @@ pub(super) async fn handle_discussion_button(
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(ctx.cache.current_user().id),
         },
+        // Le moderateur qui ouvre la discussion a toujours acces, meme si aucun
+        // role modo n'est configure (sinon le salon lui serait invisible).
+        PermissionOverwrite {
+            allow: participate,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(component.user.id),
+        },
     ];
     if let Some(role) = mod_role_id {
         overwrites.push(PermissionOverwrite {
@@ -1217,47 +1229,64 @@ pub(super) async fn handle_discussion_button(
 /// Enregistre une infraction warn via le module moderation (gRPC log_action),
 /// de sorte que le warn issu d'un vote compte dans l'historique et l'escalade
 /// au meme titre qu'un /warn manuel. L'admin qui finalise est le "moderateur".
-async fn log_warn_to_moderation(
+/// Trace une sanction de membre (warn/mute/ban) dans le module moderation via
+/// gRPC log_action, pour qu'elle compte dans l'historique et l'escalade au
+/// meme titre qu'une commande manuelle. `duration` = duree du mute en secondes.
+/// Partage par le vote (finalisation) et la review 1-clic.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn log_sanction_to_moderation(
     ctx: &Context,
-    component: &serenity::model::application::ComponentInteraction,
     guild_id: &str,
+    action_channel_id: &str,
+    moderator_id: &str,
+    moderator_name: &str,
     target_id: &str,
     target_name: &str,
+    action_type: &str,
+    reason: &str,
+    duration: Option<u64>,
 ) {
     use crate::modules::moderation::api_client::ModerationAction;
     use crate::modules::moderation::ModerationApiKey;
+
+    // Seules les sanctions de membre comptent dans l'historique.
+    if !matches!(action_type, "warn" | "mute" | "ban") {
+        return;
+    }
 
     let mod_api = {
         let data = ctx.data.read().await;
         match data.get::<ModerationApiKey>() {
             Some(a) => a.clone(),
             None => {
-                warn!("ModerationApiKey absent : warn vote non enregistre");
+                warn!("ModerationApiKey absent : sanction automod non enregistree");
                 return;
             }
         }
     };
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
-        channel_id: component.channel_id.to_string(),
-        moderator_id: component.user.id.to_string(),
-        moderator_name: component.user.name.clone(),
+        channel_id: action_channel_id.to_string(),
+        moderator_id: moderator_id.to_string(),
+        moderator_name: moderator_name.to_string(),
         target_id: target_id.to_string(),
         target_name: target_name.to_string(),
-        action_type: "warn".to_string(),
-        reason: "Sanction validee par vote des moderateurs (AutoMod)".to_string(),
-        gravity: Some("medium".to_string()),
-        duration: None,
+        action_type: action_type.to_string(),
+        reason: reason.to_string(),
+        gravity: if action_type == "warn" { Some("medium".to_string()) } else { None },
+        duration: if action_type == "mute" { duration } else { None },
     };
     if let Err(e) = mod_api.log_action(&action).await {
-        warn!(error = %e, target = target_id, "Echec enregistrement warn (vote) cote moderation");
+        warn!(error = %e, target = target_id, action = action_type, "Echec enregistrement sanction automod cote moderation");
     }
 }
 
-/// Execute la sanction Discord decidee (warn/delete/mute/ban/ignore).
-async fn execute_sanction(
+/// Execute la sanction Discord decidee (delete/mute/ban). Helper partage par le
+/// vote (finalisation) et la review 1-clic, pour une seule implementation.
+/// `warn`/`ignore` = pas d'action Discord destructive.
+pub(super) async fn apply_member_sanction(
     ctx: &Context,
-    component: &serenity::model::application::ComponentInteraction,
+    guild_id: Option<serenity::model::id::GuildId>,
     channel_id_str: &str,
     message_id_str: &str,
     user_id_str: &str,
@@ -1276,7 +1305,7 @@ async fn execute_sanction(
                     .await;
             }
             if action == "mute" {
-                if let (Some(gid), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
+                if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
                     if let Ok(mut member) = gid.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
                         let until = (std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
@@ -1293,14 +1322,12 @@ async fn execute_sanction(
             }
         }
         "ban" => {
-            if let (Some(gid), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
+            if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
                 if let Err(e) = gid.ban(&ctx.http, serenity::model::id::UserId::new(uid), 0).await {
-                    warn!(error = %e, user = user_id_str, "Echec ban via vote -- permission BAN_MEMBERS ?");
+                    warn!(error = %e, user = user_id_str, "Echec ban (sanction validee) -- permission BAN_MEMBERS ?");
                 }
             }
         }
-        // "warn" : trace uniquement (pas d'action Discord destructive).
-        // "ignore" : rien.
         _ => {}
     }
 }
