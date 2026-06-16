@@ -221,6 +221,11 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                     &prev.suggested_action,
                     r.suggested_action.as_str(),
                 );
+                // Plafond anti-troll : la deadline ne peut etre repoussee au-dela
+                // de created_at + 7 jours (un membre tres actif ne garde pas la
+                // carte ouverte indefiniment).
+                let cap = prev.created_at + chrono::Duration::days(7);
+                let new_deadline = r.voting_deadline.map(|d| d.min(cap));
                 let updated: Row = sqlx::query_as(
                     "UPDATE automod_reviews SET \
                         incidents = $1, incident_count = $2, cumulative_score = $3, \
@@ -234,7 +239,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .bind(new_max_score)
                 .bind(&new_action)
                 .bind(&r.reason)
-                .bind(r.voting_deadline)
+                .bind(new_deadline)
                 .bind(prev.id)
                 .fetch_one(&self.pool)
                 .await

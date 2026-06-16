@@ -14,13 +14,21 @@ export interface AutomodReview {
   score: number;
   reason: string;
   flags: Record<string, boolean>;
-  status: "pending" | "applied" | "ignored";
+  status: "pending" | "voting" | "decided" | "applied" | "ignored";
   applied_action: string | null;
   resolved_by_id: string | null;
   resolved_by_name: string | null;
   resolved_source: string | null;
   created_at: string;
   resolved_at: string | null;
+  // Agrégation par utilisateur (anti-flood) + vote
+  incident_count: number;
+  cumulative_score: number;
+  voting_deadline: string | null;
+  decided_action: string | null;
+  quorum_met: boolean;
+  // Salon de discussion lié (si ouvert depuis la carte)
+  discussion_channel_id: string | null;
 }
 
 export type ResolveActionChoice = "warn" | "delete" | "mute" | "ban" | "ignore";

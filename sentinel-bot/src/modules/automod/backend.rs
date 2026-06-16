@@ -42,6 +42,7 @@ pub(super) async fn send_to_backend(
     context_max_messages: u8,
     context_max_chars: usize,
     review_min_score: f64,
+    human_only: bool,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
     let context_messages = if context_max_messages == 0 {
@@ -144,7 +145,11 @@ pub(super) async fn send_to_backend(
             // on applique directement (filtre le bruit faible sur la pile).
             let score = response.score.unwrap_or(0.0);
             let above_threshold = score >= review_min_score;
-            if ai_review_mode && log_channel_id != 0 && above_threshold {
+            // Modération humaine : si `human_only`, TOUTE detection actionnable
+            // passe par une carte (jamais d'action auto). Sans salon de review,
+            // on ne sanctionne pas (plutot que de tomber en mode auto).
+            let card_path = log_channel_id != 0 && (human_only || (ai_review_mode && above_threshold));
+            if card_path {
                 send_review_card(
                     ctx, msg, &response.action,
                     &effective_reason,
@@ -152,6 +157,11 @@ pub(super) async fn send_to_backend(
                     &request.flags,
                     log_channel_id, colors,
                 ).await;
+            } else if human_only {
+                warn!(
+                    user = %msg.author.name,
+                    "human_only actif mais aucun salon de review configure : action auto bloquee, aucune sanction"
+                );
             } else {
                 // Mode auto ou pas de salon review -> action directe.
                 if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors).await {
@@ -161,6 +171,11 @@ pub(super) async fn send_to_backend(
         }
         Err(e) => {
             error!(error = %e, "Backend injoignable -- action locale par defaut");
+            // Modération humaine : pas d'action auto meme en fallback.
+            if human_only {
+                warn!(user = %msg.author.name, "Backend injoignable + human_only : aucune action auto (suppression bloquee)");
+                return;
+            }
             // En mode fallback, supprimer les messages flagges (phishing, insulte, spam, lien)
             let reason = if request.flags.phishing {
                 Some("Lien suspect detecte.")

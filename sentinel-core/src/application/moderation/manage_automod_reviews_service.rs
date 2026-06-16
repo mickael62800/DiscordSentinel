@@ -98,6 +98,15 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         if cmd.resolved_by_id.trim().is_empty() {
             return Err(DomainError::ValidationError("resolved_by_id requis".into()));
         }
+        // Regle d'acces (domaine) : finalisation Discord reservee aux admins.
+        // La source "web" est autorisee en amont par le middleware guild_auth.
+        if let Some(facts) = &cmd.requester {
+            if !crate::domain::entities::moderation::review::automod::can_finalize_review(facts) {
+                return Err(DomainError::Forbidden(
+                    "Seul un administrateur peut finaliser.".into(),
+                ));
+            }
+        }
         self.repo
             .resolve(
                 cmd.review_id,
@@ -110,6 +119,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     }
 
     async fn cast_vote(&self, cmd: CastVoteCommand) -> Result<Vec<ReviewVote>, DomainError> {
+        // Regle d'acces (domaine) : seul un moderateur peut voter.
+        if !crate::domain::entities::moderation::review::automod::is_moderator(&cmd.requester) {
+            return Err(DomainError::Forbidden("Tu n'es pas autorise a voter.".into()));
+        }
         if AppliedAction::from_str(&cmd.vote_action).is_none() {
             return Err(DomainError::ValidationError(format!(
                 "vote_action invalide : {}. Valeurs : warn|delete|mute|ban|ignore",
@@ -173,6 +186,19 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         }
         if cmd.channel_id.trim().is_empty() {
             return Err(DomainError::ValidationError("channel_id requis".into()));
+        }
+        // Pas de discussion sur une affaire deja close (sanction appliquee ou ignoree).
+        if let Some(review) = self.repo.get(cmd.review_id).await? {
+            if matches!(review.status.as_str(), "applied" | "ignored") {
+                return Err(DomainError::Conflict(
+                    "Cette review est close : impossible d'ouvrir une discussion.".into(),
+                ));
+            }
+        } else {
+            return Err(DomainError::NotFound(format!(
+                "review {} introuvable",
+                cmd.review_id
+            )));
         }
         self.repo
             .create_discussion(NewDiscussionChannel {

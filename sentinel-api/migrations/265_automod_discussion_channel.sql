@@ -6,11 +6,13 @@
 --   discussion_channel_enabled : affiche le bouton sur les cartes
 --   discussion_category_id     : categorie ou creer le salon (optionnel)
 
+-- Idempotent : on retire d'abord les cles si presentes, puis on les (re)ajoute.
 UPDATE bot_definitions
 SET config_schema = (
     SELECT jsonb_agg(elem)
     FROM (
-        SELECT jsonb_array_elements(config_schema) AS elem
+        SELECT elem FROM jsonb_array_elements(config_schema) AS elem
+            WHERE elem->>'key' NOT IN ('discussion_channel_enabled', 'discussion_category_id')
         UNION ALL SELECT '{
             "key": "discussion_channel_enabled",
             "label": "Bouton ''Ouvrir une discussion'' sur les cartes",

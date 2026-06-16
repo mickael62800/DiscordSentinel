@@ -221,6 +221,7 @@ pub(super) async fn post_manual_vote_card(
     thread_enabled: bool,
     moderator_name: &str,
     discussion_enabled: bool,
+    aggregate: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -255,17 +256,23 @@ pub(super) async fn post_manual_vote_card(
         "reason": reason,
         "flags": { "spam": false, "insult": false, "link": false, "phishing": false },
         "voting_deadline": deadline.to_rfc3339(),
+        "aggregate": aggregate,
     });
 
-    #[derive(serde::Deserialize)]
-    struct CreateResp { id: String }
-    let review_id = match api.post_json::<_, CreateResp>("/api/automod/reviews", &body).await {
-        Ok(r) => r.id,
+    let resp = match api.post_json::<_, ReviewResp>("/api/automod/reviews", &body).await {
+        Ok(r) => r,
         Err(e) => {
             warn!(error = %e, "Echec creation review (carte manuelle)");
             return;
         }
     };
+    let review_id = resp.id.clone();
+
+    // Agregation : si l'incident a ete fusionne, on edite la carte existante.
+    if resp.merged {
+        edit_aggregated_card(ctx, &api, &resp).await;
+        return;
+    }
 
     // 2. Contexte avant ET apres le message cible.
     let before = fetch_context_before(ctx, msg, context_count).await;
@@ -630,6 +637,49 @@ fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::buil
     embed
 }
 
+/// Archive le salon de discussion lie a une review finalisee : renomme en
+/// "clos-…" et retire le droit d'ecrire au membre concerne (les moderateurs
+/// gardent l'acces en lecture pour la trace). No-op si aucun salon.
+async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, review_id: &str, target_user_id: &str) {
+    use serenity::all::{ChannelId, Permissions, UserId};
+    use serenity::model::channel::{Channel, PermissionOverwrite, PermissionOverwriteType};
+
+    #[derive(serde::Deserialize)]
+    struct DiscussionResp { channel_id: String }
+    let Ok(Some(disc)) = api
+        .get_json::<Option<DiscussionResp>>(&format!("/api/automod/reviews/{review_id}/discussion"))
+        .await
+    else {
+        return;
+    };
+    let Ok(cid) = disc.channel_id.parse::<u64>() else { return };
+    let channel = ChannelId::new(cid);
+
+    // Renomme pour marquer l'affaire close.
+    if let Ok(Channel::Guild(gc)) = channel.to_channel(&ctx.http).await {
+        if !gc.name.starts_with("clos-") {
+            let new_name: String = format!("clos-{}", gc.name).chars().take(95).collect();
+            let _ = channel
+                .edit(&ctx.http, serenity::builder::EditChannel::new().name(new_name))
+                .await;
+        }
+    }
+    // Verrouille l'ecriture pour le membre concerne.
+    if let Ok(uid) = target_user_id.parse::<u64>() {
+        let _ = channel
+            .create_permission(
+                &ctx.http,
+                PermissionOverwrite {
+                    allow: Permissions::empty(),
+                    deny: Permissions::SEND_MESSAGES,
+                    kind: PermissionOverwriteType::Member(UserId::new(uid)),
+                },
+            )
+            .await;
+    }
+    info!(review_id, channel = %channel, "Salon de discussion archive (review finalisee)");
+}
+
 /// Edite la carte existante d'une review agregee : recharge le mapping Discord
 /// + les votes, puis remplace l'embed (les boutons de vote sont conserves).
 async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &ReviewResp) {
@@ -664,38 +714,29 @@ async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &Re
     }
 }
 
-/// Verifie qu'un membre a le droit de voter : role configure si defini,
-/// sinon permission Discord MODERATE_MEMBERS / MANAGE_MESSAGES / ADMIN.
-fn can_vote(component: &serenity::model::application::ComponentInteraction, mod_role_id: Option<u64>) -> bool {
-    if let (Some(role), Some(member)) = (mod_role_id, component.member.as_ref()) {
-        if member.roles.iter().any(|r| r.get() == role) {
-            return true;
-        }
-    }
-    component
-        .member
-        .as_ref()
-        .and_then(|m| m.permissions)
-        .map(|p| {
-            p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
-                || p.contains(serenity::all::Permissions::MANAGE_MESSAGES)
-                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
-        })
-        .unwrap_or(false)
-}
-
-fn can_finalize(component: &serenity::model::application::ComponentInteraction, admin_role_id: Option<u64>) -> bool {
-    if let (Some(role), Some(member)) = (admin_role_id, component.member.as_ref()) {
-        if member.roles.iter().any(|r| r.get() == role) {
-            return true;
-        }
-    }
-    component
-        .member
-        .as_ref()
-        .and_then(|m| m.permissions)
-        .map(|p| p.contains(serenity::all::Permissions::ADMINISTRATOR))
-        .unwrap_or(false)
+/// Collecte les FAITS Discord du demandeur (permissions + appartenance aux
+/// roles configures). La DECISION d'autorisation (is_moderator / can_finalize)
+/// est prise cote core (full hexa). Retourne
+/// `(is_admin, has_moderate_members, has_manage_messages, has_mod_role, has_admin_role)`.
+fn moderator_facts(
+    component: &serenity::model::application::ComponentInteraction,
+    mod_role_id: Option<u64>,
+    admin_role_id: Option<u64>,
+) -> (bool, bool, bool, bool, bool) {
+    use serenity::all::Permissions;
+    let perms = component.member.as_ref().and_then(|m| m.permissions);
+    let has = |p: Permissions| perms.map(|x| x.contains(p)).unwrap_or(false);
+    let has_role = |role: Option<u64>| match (role, component.member.as_ref()) {
+        (Some(r), Some(m)) => m.roles.iter().any(|x| x.get() == r),
+        _ => false,
+    };
+    (
+        has(Permissions::ADMINISTRATOR),
+        has(Permissions::MODERATE_MEMBERS),
+        has(Permissions::MANAGE_MESSAGES),
+        has_role(mod_role_id),
+        has_role(admin_role_id),
+    )
 }
 
 /// Edite une reponse deja deferee (ephemere). A utiliser apres un Defer.
@@ -741,15 +782,17 @@ pub(super) async fn handle_vote_button(ctx: &Context, component: &serenity::mode
     let config = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
     let mod_role_id = config.get("vote_mod_role_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0);
 
-    if !can_vote(component, mod_role_id) {
-        reply_ephemeral(ctx, component, "Tu n'es pas autorise a voter.").await;
-        return;
-    }
-
+    // Faits Discord du votant -> la regle d'acces (is_moderator) est appliquee
+    // cote API/domaine (full hexa). Un refus revient en erreur (403).
+    let facts = moderator_facts(component, mod_role_id, None);
     let body = serde_json::json!({
         "voter_id": component.user.id.to_string(),
         "voter_name": component.user.name,
         "vote_action": vote_action,
+        "is_admin": facts.0,
+        "has_moderate_members": facts.1,
+        "has_manage_messages": facts.2,
+        "has_mod_role": facts.3,
     });
     let votes: Vec<VoteDto> = match api
         .post_json(&format!("/api/automod/reviews/{review_id}/vote"), &body)
@@ -757,8 +800,8 @@ pub(super) async fn handle_vote_button(ctx: &Context, component: &serenity::mode
     {
         Ok(v) => v,
         Err(e) => {
-            warn!(error = %e, review_id, "Echec enregistrement vote");
-            reply_ephemeral(ctx, component, "Le vote n'a pas pu etre enregistre (vote clos ?).").await;
+            warn!(error = %e, review_id, "Vote refuse ou echec");
+            reply_ephemeral(ctx, component, "Vote impossible (non autorise ou vote clos).").await;
             return;
         }
     };
@@ -873,10 +916,9 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     let config = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
     let admin_role_id = config.get("vote_admin_role_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0);
 
-    if !can_finalize(component, admin_role_id) {
-        reply_ephemeral(ctx, component, "Seul un administrateur peut finaliser.").await;
-        return;
-    }
+    // Faits Discord -> la regle can_finalize_review est appliquee cote core
+    // (full hexa). Un non-admin recevra une erreur 403 a l'etape /resolve.
+    let facts = moderator_facts(component, None, admin_role_id);
 
     // Recupere la review (verdict + cible) depuis l'API.
     #[derive(serde::Deserialize)]
@@ -903,19 +945,21 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     }
     let decided = review.decided_action.clone().unwrap_or_else(|| "ignore".to_string());
 
-    // Persiste la resolution cote API (source discord).
+    // Persiste la resolution cote API (source discord) + faits du demandeur.
     let resolve_body = serde_json::json!({
         "applied_action": decided,
         "resolved_by_id": component.user.id.to_string(),
         "resolved_by_name": component.user.name,
         "source": "discord",
+        "is_admin": facts.0,
+        "has_admin_role": facts.4,
     });
     if let Err(e) = api
         .post_json::<_, serde_json::Value>(&format!("/api/automod/reviews/{review_id}/resolve"), &resolve_body)
         .await
     {
-        warn!(error = %e, review_id, "Echec resolve finalize");
-        reply_ephemeral(ctx, component, "Echec de l'enregistrement (deja finalise ?).").await;
+        warn!(error = %e, review_id, "Echec resolve finalize (non autorise ou deja finalise)");
+        reply_ephemeral(ctx, component, "Finalisation impossible (reserve aux admins, ou deja finalise).").await;
         return;
     }
 
@@ -929,6 +973,9 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // Execute la sanction Discord (delete/mute/ban ; warn deja loggue ci-dessus).
     let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", super::DEFAULT_MUTE_DURATION_SECS);
     execute_sanction(ctx, component, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;
+
+    // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
+    archive_discussion_channel(ctx, &api, &review_id, &review.user_id).await;
 
     // Edite la carte : finalise.
     let finalized = serenity::builder::CreateEmbed::new()
@@ -1056,7 +1103,8 @@ pub(super) async fn handle_discussion_button(
             kind: PermissionOverwriteType::Member(target_uid),
         },
         PermissionOverwrite {
-            allow: participate,
+            // Le bot a besoin de MANAGE_MESSAGES pour epingler le message d'ancrage.
+            allow: participate | Permissions::MANAGE_MESSAGES,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(ctx.cache.current_user().id),
         },

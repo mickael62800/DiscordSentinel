@@ -66,6 +66,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
     let colors = build_embed_colors(&config);
     let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
+    // Modération humaine : si actif, aucune sanction auto -> tout passe par une carte.
+    let human_only = BaseApiClient::config_bool(&config, "human_only_enabled", false);
 
     // Verifier les salons exclus
     let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
@@ -113,9 +115,12 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect detecte");
             let reason = format!("Piece jointe suspecte : {}", attachment.filename);
 
-            if files_review && log_channel_id != 0 {
+            if (files_review || human_only) && log_channel_id != 0 {
                 let flags = detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false };
                 send_review_card(ctx, msg, &Action::Delete, &reason, 1.0, &flags, log_channel_id, &colors).await;
+            } else if human_only {
+                // Modération humaine sans salon de review : on ne supprime pas.
+                warn!(user = %msg.author.name, "Fichier suspect + human_only sans salon review : suppression bloquee");
             } else {
                 let embed = moderate_embed("Fichier suspect supprime")
                     .color(colors.delete)
@@ -201,7 +206,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
                     let ai_review = true; // flood passe par le backend IA en review
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score).await;
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score, human_only).await;
                 });
             }
             return;
@@ -289,8 +294,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     tokio::spawn(async move {
         let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
 
-        // Analyse texte
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score).await;
+        // Analyse texte (`human_only` capture depuis le scope parent)
+        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score, human_only).await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {

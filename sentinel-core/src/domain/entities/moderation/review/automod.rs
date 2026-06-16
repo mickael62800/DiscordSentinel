@@ -259,20 +259,34 @@ pub struct NewDiscussionChannel {
 }
 
 /// Faits Discord du demandeur, fournis par l'adapter bot. La DECISION
-/// d'autorisation (la regle) est prise par le domaine, pas par le bot.
+/// d'autorisation (les regles ci-dessous) est prise par le domaine, pas par
+/// le bot — utilise pour le vote, la finalisation et l'ouverture de discussion.
 #[derive(Debug, Clone, Default)]
-pub struct DiscussionRequester {
+pub struct ModeratorFacts {
     pub is_admin: bool,
     pub has_moderate_members: bool,
     pub has_manage_messages: bool,
+    /// Porte le role moderateur configure (`vote_mod_role_id`).
     pub has_mod_role: bool,
+    /// Porte le role admin configure (`vote_admin_role_id`).
+    pub has_admin_role: bool,
 }
 
-/// Regle metier : qui peut ouvrir un salon de discussion sur une review.
-/// Un administrateur, un membre avec "Moderer les membres" ou "Gerer les
-/// messages", ou un porteur du role modo configure.
-pub fn can_open_discussion(r: &DiscussionRequester) -> bool {
-    r.is_admin || r.has_moderate_members || r.has_manage_messages || r.has_mod_role
+/// Regle metier : qui est "moderateur" (peut voter, ouvrir une discussion).
+/// Admin, "Moderer les membres", "Gerer les messages", ou role modo configure.
+pub fn is_moderator(f: &ModeratorFacts) -> bool {
+    f.is_admin || f.has_moderate_members || f.has_manage_messages || f.has_mod_role
+}
+
+/// Regle metier : qui peut FINALISER un vote (appliquer la sanction).
+/// Reserve aux administrateurs (permission ADMINISTRATOR ou role admin configure).
+pub fn can_finalize_review(f: &ModeratorFacts) -> bool {
+    f.is_admin || f.has_admin_role
+}
+
+/// Regle metier : qui peut ouvrir un salon de discussion (= moderateur).
+pub fn can_open_discussion(f: &ModeratorFacts) -> bool {
+    is_moderator(f)
 }
 
 #[derive(Debug, Clone)]

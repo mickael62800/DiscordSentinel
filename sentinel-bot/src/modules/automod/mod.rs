@@ -107,6 +107,7 @@ pub async fn create_manual_vote_card(
     let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
     let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
     let discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
+    let aggregate = BaseApiClient::config_bool(&cfg, "vote_aggregate_enabled", false);
 
     let action = match action_str {
         "warn" => api_client::Action::Warn,
@@ -127,6 +128,7 @@ pub async fn create_manual_vote_card(
         thread_enabled,
         moderator_name,
         discussion_enabled,
+        aggregate,
     )
     .await;
     Ok(())

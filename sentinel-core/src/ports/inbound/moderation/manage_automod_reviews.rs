@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
-use crate::domain::entities::moderation::review::automod::DiscussionRequester;
+use crate::domain::entities::moderation::review::automod::ModeratorFacts;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
 use crate::domain::entities::moderation::review::automod::TallyResult;
@@ -23,6 +23,10 @@ pub struct ResolveAutomodReviewCommand {
     pub resolved_by_name: String,
     /// "discord" ou "web".
     pub resolved_source: String,
+    /// Faits du demandeur pour appliquer la regle `can_finalize_review`
+    /// (source "discord"). `None` pour la source "web" (autorisee par le
+    /// middleware guild_auth en amont).
+    pub requester: Option<ModeratorFacts>,
 }
 
 /// Vote d'un moderateur sur une review en cours.
@@ -33,6 +37,8 @@ pub struct CastVoteCommand {
     pub voter_name: String,
     /// "warn" | "delete" | "mute" | "ban" | "ignore".
     pub vote_action: String,
+    /// Faits du demandeur pour appliquer la regle `is_moderator`.
+    pub requester: ModeratorFacts,
 }
 
 #[async_trait]
@@ -103,5 +109,5 @@ pub struct OpenDiscussionCommand {
     pub channel_id: String,
     pub opened_by_id: String,
     pub opened_by_name: String,
-    pub requester: DiscussionRequester,
+    pub requester: ModeratorFacts,
 }

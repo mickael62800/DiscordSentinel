@@ -42,17 +42,14 @@ Discord Messages / Events / Images
       └──────┬───────┘
              ▼
 ┌─────────────────────────────────────────┐
-│ 9 Workers (Tokio)                       │
-│ Spécialisés : ai · analytics · cache ·  │
-│ cleanup · coude · moderation ·          │
-│ monitoring · temp-roles                 │
-│ Meta : sentinel-worker (17 domaines :   │
+│ sentinel-worker (Tokio) — worker unifié │
+│ Meta-scheduler, 17 domaines périodiques: │
 │ ai · analytics · announcements ·        │
 │ appeal_sla · audit_cache · blackjack ·  │
 │ cache · cleanup · coude ·               │
 │ discord_audit_sync · export ·           │
 │ game_portal · moderation · monitoring · │
-│ security · temp_roles · tickets)        │
+│ security · temp_roles · tickets         │
 └─────────────────────────────────────────┘
 ```
 
@@ -67,7 +64,7 @@ Discord Messages / Events / Images
 | API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~140 handlers, 266 migrations, ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis pub/sub | Service dédié temps réel, auto-reconnect exponential backoff |
 | Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 17 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
-| 9 Workers | Rust / Tokio / sqlx / lib `worker-common` | 8 binaires spécialisés + 1 meta `sentinel-worker` (scheduler 17 domaines), heartbeat + métriques Prometheus |
+| Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 17 domaines périodiques), heartbeat + métriques Prometheus |
 | gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (amorce scaling horizontal) |
 | PostgreSQL | Postgres 16 + **PgBouncer** | 266 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache | Redis 7 | `maxmemory=2gb allkeys-lru`, pub/sub events, cache `user_guilds` multi-tenant |
@@ -367,7 +364,7 @@ Request
 ### Docker Compose
 
 ```bash
-# Stack complète (infra + API + bot unifié + 9 workers + gateway + web)
+# Stack complète (infra + API + bot unifié + worker unifié + gateway + web)
 docker compose -f sentinel-infrastructure/docker/docker-compose.yml up -d
 
 # Avec Prometheus + Grafana
@@ -414,7 +411,7 @@ bash sentinel-infrastructure/scripts/start-all.sh        # Démarre la stack com
 
 # Ou composant par composant :
 cd sentinel-api && cargo run
-cd services/workers/ai-worker && cargo run
+cd sentinel-worker && cargo run
 cd sentinel-bot && cargo run
 cd sentinel-web && npm run dev
 ```

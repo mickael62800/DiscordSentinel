@@ -58,9 +58,13 @@ watch(guildIdFilter, fetchReviews);
 
 const offCreated = onWsEvent("ws:automod_review_created", () => fetchReviews());
 const offResolved = onWsEvent("ws:automod_review_resolved", () => fetchReviews());
+const offUpdated = onWsEvent("ws:automod_review_updated", () => fetchReviews());
+const offDiscussion = onWsEvent("ws:automod_discussion_opened", () => fetchReviews());
 onUnmounted(() => {
   offCreated();
   offResolved();
+  offUpdated();
+  offDiscussion();
 });
 </script>
 
@@ -83,6 +87,9 @@ onUnmounted(() => {
             Suggéré : {{ r.suggested_action }}
           </span>
           <span class="muted">score {{ r.score.toFixed(2) }}</span>
+          <span v-if="r.incident_count > 1" class="badge agg">
+            {{ r.incident_count }} incidents · cumul {{ r.cumulative_score.toFixed(1) }}
+          </span>
           <span class="muted">·</span>
           <strong>{{ r.user_name }}</strong>
           <small class="muted">{{ r.user_id }}</small>
@@ -93,6 +100,14 @@ onUnmounted(() => {
           <div class="content-preview">
             <strong>Message :</strong>
             <pre>{{ r.content_preview }}</pre>
+          </div>
+          <div v-if="r.discussion_channel_id" class="discussion">
+            💬
+            <a
+              :href="`https://discord.com/channels/${r.guild_id}/${r.discussion_channel_id}`"
+              target="_blank"
+              rel="noopener"
+            >Salon de discussion ouvert</a>
           </div>
         </div>
         <div class="review-actions">
@@ -186,8 +201,19 @@ onUnmounted(() => {
 .sa-mute { background: #E67E22; }
 .sa-ban { background: #E74C3C; }
 
+.badge.agg {
+  background: #8E44AD;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.72rem;
+}
+
 .review-body { font-size: 0.88rem; margin-bottom: 8px; }
 .review-body .reason { margin-bottom: 6px; }
+.review-body .discussion { margin-top: 6px; font-size: 0.85rem; }
+.review-body .discussion a { color: var(--accent); text-decoration: none; }
+.review-body .discussion a:hover { text-decoration: underline; }
 .content-preview pre {
   background: #0d0d0d;
   padding: 8px 10px;

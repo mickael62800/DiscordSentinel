@@ -93,6 +93,8 @@ pub struct AutomodReviewDto {
     pub incidents: serde_json::Value,
     /// True si ce POST a ete agrege dans une carte existante (pas une creation).
     pub merged: bool,
+    /// Salon de discussion lie a cette review (si ouvert), pour la page web.
+    pub discussion_channel_id: Option<String>,
 }
 
 impl From<AutomodReview> for AutomodReviewDto {
@@ -124,6 +126,7 @@ impl From<AutomodReview> for AutomodReviewDto {
             cumulative_score: r.cumulative_score,
             incidents: r.incidents,
             merged: false,
+            discussion_channel_id: None,
         }
     }
 }
@@ -162,7 +165,17 @@ pub async fn list_reviews(
     } else {
         state.automod_reviews_uc.list_pending(&guild_id, limit).await?
     };
-    Ok(Json(reviews.into_iter().map(Into::into).collect()))
+    // Enrichit chaque carte avec son salon de discussion (si ouvert) pour le web.
+    let mut dtos: Vec<AutomodReviewDto> = Vec::with_capacity(reviews.len());
+    for r in reviews {
+        let rid = r.id;
+        let mut dto: AutomodReviewDto = r.into();
+        if let Ok(Some(d)) = state.automod_reviews_uc.get_discussion(rid).await {
+            dto.discussion_channel_id = Some(d.channel_id);
+        }
+        dtos.push(dto);
+    }
+    Ok(Json(dtos))
 }
 
 #[derive(Debug, Deserialize)]
@@ -248,6 +261,18 @@ pub struct ResolveReviewBody {
     pub resolved_by_name: String,
     /// "web" (defaut) ou "discord" (finalisation via bouton admin du bot).
     pub source: Option<String>,
+    // Faits Discord du demandeur (source "discord" uniquement). La regle
+    // can_finalize_review est appliquee cote domaine.
+    #[serde(default)]
+    pub is_admin: bool,
+    #[serde(default)]
+    pub has_moderate_members: bool,
+    #[serde(default)]
+    pub has_manage_messages: bool,
+    #[serde(default)]
+    pub has_mod_role: bool,
+    #[serde(default)]
+    pub has_admin_role: bool,
 }
 
 /// POST /api/automod/reviews/{review_id}/resolve
@@ -268,6 +293,19 @@ pub async fn resolve_review(
         Some("discord") => "discord",
         _ => "web",
     };
+    // Faits du demandeur seulement pour la finalisation Discord (la source
+    // "web" est autorisee par guild_auth en amont -> requester None).
+    let requester = if source == "discord" {
+        Some(sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+            is_admin: body.is_admin,
+            has_moderate_members: body.has_moderate_members,
+            has_manage_messages: body.has_manage_messages,
+            has_mod_role: body.has_mod_role,
+            has_admin_role: body.has_admin_role,
+        })
+    } else {
+        None
+    };
     let review = state
         .automod_reviews_uc
         .resolve(ResolveAutomodReviewCommand {
@@ -276,6 +314,7 @@ pub async fn resolve_review(
             resolved_by_id: body.resolved_by_id.clone(),
             resolved_by_name: body.resolved_by_name.clone(),
             resolved_source: source.into(),
+            requester,
         })
         .await?;
 
@@ -305,6 +344,15 @@ pub struct CastVoteBody {
     pub voter_name: String,
     /// "warn" | "delete" | "mute" | "ban" | "ignore".
     pub vote_action: String,
+    // Faits Discord du votant ; la regle is_moderator est appliquee cote domaine.
+    #[serde(default)]
+    pub is_admin: bool,
+    #[serde(default)]
+    pub has_moderate_members: bool,
+    #[serde(default)]
+    pub has_manage_messages: bool,
+    #[serde(default)]
+    pub has_mod_role: bool,
 }
 
 /// POST /api/automod/reviews/{review_id}/vote
@@ -322,6 +370,13 @@ pub async fn vote_review(
             voter_id: body.voter_id.clone(),
             voter_name: body.voter_name.clone(),
             vote_action: body.vote_action.clone(),
+            requester: sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+                is_admin: body.is_admin,
+                has_moderate_members: body.has_moderate_members,
+                has_manage_messages: body.has_manage_messages,
+                has_mod_role: body.has_mod_role,
+                has_admin_role: false,
+            },
         })
         .await?;
     state.broadcaster.broadcast(
@@ -339,7 +394,14 @@ pub async fn get_review(
     let id = Uuid::parse_str(&review_id)
         .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
     match state.automod_reviews_uc.get(id).await? {
-        Some(r) => Ok(Json(r.into())),
+        Some(r) => {
+            let rid = r.id;
+            let mut dto: AutomodReviewDto = r.into();
+            if let Ok(Some(d)) = state.automod_reviews_uc.get_discussion(rid).await {
+                dto.discussion_channel_id = Some(d.channel_id);
+            }
+            Ok(Json(dto))
+        }
         None => Err(ApiError::from(DomainError::NotFound(format!("review {review_id} introuvable")))),
     }
 }
@@ -459,7 +521,7 @@ pub async fn open_discussion(
     Path(review_id): Path<String>,
     Json(body): Json<OpenDiscussionBody>,
 ) -> Result<Json<DiscussionChannelDto>, ApiError> {
-    use sentinel_core::domain::entities::moderation::review::automod::DiscussionRequester;
+    use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
     use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
 
     let id = Uuid::parse_str(&review_id)
@@ -473,11 +535,12 @@ pub async fn open_discussion(
             channel_id: body.channel_id,
             opened_by_id: body.opened_by_id.clone(),
             opened_by_name: body.opened_by_name,
-            requester: DiscussionRequester {
+            requester: ModeratorFacts {
                 is_admin: body.is_admin,
                 has_moderate_members: body.has_moderate_members,
                 has_manage_messages: body.has_manage_messages,
                 has_mod_role: body.has_mod_role,
+                has_admin_role: false,
             },
         })
         .await?;

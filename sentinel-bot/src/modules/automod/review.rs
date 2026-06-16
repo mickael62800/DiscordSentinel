@@ -29,17 +29,22 @@ pub(super) async fn send_review_card(
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
     // Mode VOTE : si vote_enabled, on delegue a la carte de vote des
-    // moderateurs (au lieu de la validation 1-clic).
+    // moderateurs (au lieu de la validation 1-clic). On capture aussi
+    // `discussion_enabled` pour le bouton « Ouvrir une discussion » du 1-clic.
+    let mut discussion_enabled = false;
     {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
             let cfg = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
-            if BaseApiClient::config_bool(&cfg, "vote_enabled", false) {
+            discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
+            // Modération humaine : human_only force le mode vote (1 carte/personne
+            // agregee + decision humaine), au lieu des cartes 1-clic non agregees.
+            let force_vote = BaseApiClient::config_bool(&cfg, "human_only_enabled", false);
+            if force_vote || BaseApiClient::config_bool(&cfg, "vote_enabled", false) {
                 let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
                 let context_before = BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8;
                 let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
                 let aggregate = BaseApiClient::config_bool(&cfg, "vote_aggregate_enabled", false);
-                let discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
                 drop(data);
                 super::vote::post_vote_card(
                     ctx, msg, suggested_action, reason, score, flags, review_channel_id,
@@ -132,12 +137,31 @@ pub(super) async fn send_review_card(
         );
     }
 
+    // On cree la review en DB AVANT de poster la carte : on obtient son `id`,
+    // ce qui permet d'ajouter le bouton « Ouvrir une discussion » (amdisc:<id>)
+    // — meme bouton/handler que les cartes de vote (full hexa).
+    let review_id = create_review_in_api(
+        ctx, &guild_id, &channel_id, &message_id, &user_id, &msg.author.name,
+        &content_preview, suggested_action, score, reason, flags,
+    )
+    .await;
+
     let row1 = serenity::builder::CreateActionRow::Buttons(vec![btn_apply, btn_ignore]);
     let row2 = serenity::builder::CreateActionRow::Buttons(adjust_buttons);
+    let mut rows = vec![row1, row2];
+    if discussion_enabled {
+        if let Some(id) = &review_id {
+            rows.push(serenity::builder::CreateActionRow::Buttons(vec![
+                serenity::builder::CreateButton::new(format!("{}{}", super::vote::DISCUSSION_PREFIX, id))
+                    .label("Ouvrir une discussion")
+                    .style(serenity::all::ButtonStyle::Secondary),
+            ]));
+        }
+    }
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
-        .components(vec![row1, row2]);
+        .components(rows);
 
     match serenity::model::id::ChannelId::new(review_channel_id)
         .send_message(&ctx.http, builder)
@@ -151,21 +175,17 @@ pub(super) async fn send_review_card(
                 review_channel = review_channel_id,
                 "Carte de review envoyee"
             );
-            // Sync DB + mapping pour visibilite cote web et edit bilateral.
-            register_review_in_api(
-                ctx,
-                &guild_id,
-                &posted.channel_id.to_string(),
-                &posted.id.to_string(),
-                &user_id,
-                &msg.author.name,
-                &content_preview,
-                suggested_action,
-                score,
-                reason,
-                flags,
-            )
-            .await;
+            // Mapping carte <-> review pour la sync web (edit bilateral).
+            if let Some(id) = &review_id {
+                register_review_mapping(
+                    ctx,
+                    id,
+                    &guild_id,
+                    &posted.channel_id.to_string(),
+                    &posted.id.to_string(),
+                )
+                .await;
+            }
         }
         Err(e) => error!(
             error = %e,
@@ -175,11 +195,11 @@ pub(super) async fn send_review_card(
     }
 }
 
-/// Cree la review en DB via l API et enregistre le mapping
-/// `(action_id, kind=automod_review)` dans `discord_action_messages` pour
-/// que le web puisse retrouver la carte Discord lors d'une resolution.
-/// Fire-and-forget : si l API down, la carte Discord reste fonctionnelle.
-async fn register_review_in_api(
+/// Cree la review en DB via l'API et retourne son `id` (UUID) pour pouvoir
+/// construire les boutons qui en dependent (ex. discussion) puis enregistrer
+/// le mapping `(action_id, carte Discord)`. `None` si creation impossible
+/// (API down) — la carte Discord reste fonctionnelle (fire-and-forget).
+async fn create_review_in_api(
     ctx: &Context,
     guild_id: &str,
     channel_id: &str,
@@ -191,18 +211,18 @@ async fn register_review_in_api(
     score: f64,
     reason: &str,
     flags: &detectors::DetectionFlags,
-) {
+) -> Option<String> {
     let suggested_str = match suggested_action {
         Action::Warn => "warn",
         Action::Delete => "delete",
         Action::Mute => "mute",
         Action::Ban => "ban",
-        Action::None => return,
+        Action::None => return None,
     };
     let data = ctx.data.read().await;
     let api = match data.get::<ApiClientKey>() {
         Some(a) => a.clone(),
-        None => return,
+        None => return None,
     };
     drop(data);
 
@@ -243,24 +263,31 @@ async fn register_review_in_api(
     };
 
     let resp: Result<CreateResp, _> = api.post_json("/api/automod/reviews", &body).await;
-    let review_id_str = match resp {
-        Ok(r) => r.id,
+    match resp {
+        Ok(r) => Some(r.id),
         Err(e) => {
             warn!(error = %e, "Echec creation automod review en DB (sync degrade)");
-            return;
+            None
         }
-    };
-    let review_uuid = match uuid::Uuid::parse_str(&review_id_str) {
-        Ok(u) => u,
-        Err(_) => return,
+    }
+}
+
+/// Enregistre le mapping `(review_id, carte Discord)` dans
+/// `discord_action_messages` pour que le web retrouve la carte lors d'une
+/// resolution. Appele apres l'envoi de la carte (on a alors le message poste).
+async fn register_review_mapping(ctx: &Context, review_id: &str, guild_id: &str, card_channel_id: &str, card_message_id: &str) {
+    let Ok(uuid) = uuid::Uuid::parse_str(review_id) else { return };
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
     };
     crate::sync::register_action_message(
         &api,
-        review_uuid,
+        uuid,
         crate::sync::kinds::AUTOMOD_REVIEW,
         guild_id,
-        channel_id,
-        message_id,
+        card_channel_id,
+        card_message_id,
     )
     .await;
 }
