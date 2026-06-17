@@ -36,7 +36,7 @@ fn command_module(name: &str) -> &'static str {
         "security" => "security",
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-        | "note" | "call" | "card" | "context" | "appeal" | "expirations" | "compare"
+        | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
         | "modstats" | "evidence" | "review" | "template" | "transcript"
         | "export" | "massmute" | "massban" => "moderation",
         "ticket" => "tickets",
@@ -465,7 +465,7 @@ impl EventHandler for Handler {
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-                        | "note" | "call" | "card" | "context" | "appeal" | "expirations" | "compare"
+                        | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
                         | "modstats" | "evidence" | "review" | "template" | "transcript"
                         | "export" | "massmute" | "massban" => {
                             modules::moderation::handle_command(&ctx, &command).await

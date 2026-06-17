@@ -94,7 +94,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "history" => commands::history::handle(ctx, command).await,
         "note" => commands::notes::handle(ctx, command).await,
         "call" => commands::call::handle(ctx, command).await,
-        "card" => commands::card::handle(ctx, command).await,
+        "signalement" => commands::card::handle(ctx, command).await,
         "context" => commands::context::handle(ctx, command).await,
         "appeal" => commands::appeal::handle(ctx, command).await,
         "expirations" => commands::expirations::handle(ctx, command).await,

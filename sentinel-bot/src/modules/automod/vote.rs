@@ -1169,13 +1169,11 @@ pub(super) async fn handle_discussion_button(
             kind: PermissionOverwriteType::Role(RoleId::new(guild_id.get())),
         },
         PermissionOverwrite {
+            // On n'accorde QUE `participate` : accorder MANAGE_MESSAGES ici ferait
+            // echouer toute la creation si le bot n'a pas exactement cette perm au
+            // niveau serveur (Discord interdit d'accorder une perm qu'on n'a pas).
+            // Le pin du message d'ancrage utilise les perms serveur du bot.
             allow: participate,
-            deny: Permissions::empty(),
-            kind: PermissionOverwriteType::Member(target_uid),
-        },
-        PermissionOverwrite {
-            // Le bot a besoin de MANAGE_MESSAGES pour epingler le message d'ancrage.
-            allow: participate | Permissions::MANAGE_MESSAGES,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(ctx.cache.current_user().id),
         },
@@ -1195,29 +1193,79 @@ pub(super) async fn handle_discussion_button(
         });
     }
 
-    // Nom de salon : "discussion-pseudo" assaini.
-    let raw = format!("discussion-{}", review.user_name).to_lowercase();
-    let name: String = raw
+    // Nom de salon : "discussion-pseudo" assaini (alnum + tirets, sans doublons
+    // de tirets ni tirets en bord ; repli sur l'id si le pseudo donne un nom vide).
+    let mapped: String = format!("discussion-{}", review.user_name)
+        .to_lowercase()
         .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' { c } else { '-' })
-        .take(90)
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect();
-
-    let mut builder = serenity::builder::CreateChannel::new(name)
-        .kind(serenity::model::channel::ChannelType::Text)
-        .permissions(overwrites);
-    if let Some(cat) = config.get("discussion_category_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0) {
-        builder = builder.category(ChannelId::new(cat));
+    let mut collapsed = mapped;
+    while collapsed.contains("--") {
+        collapsed = collapsed.replace("--", "-");
     }
+    let trimmed = collapsed.trim_matches('-').to_string();
+    let name: String = if trimmed.is_empty() {
+        format!("discussion-{}", review.user_id)
+    } else {
+        trimmed.chars().take(95).collect()
+    };
 
-    let channel = match guild_id.create_channel(&ctx.http, builder).await {
+    let cat_id = config
+        .get("discussion_category_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|x| *x > 0);
+
+    let build = |with_cat: bool| {
+        let mut b = serenity::builder::CreateChannel::new(name.clone())
+            .kind(serenity::model::channel::ChannelType::Text)
+            .permissions(overwrites.clone());
+        if with_cat {
+            if let Some(c) = cat_id {
+                b = b.category(ChannelId::new(c));
+            }
+        }
+        b
+    };
+
+    // Cree le salon ; si echec AVEC categorie, on retente SANS (cause frequente :
+    // categorie invalide/pleine). L'erreur Discord reelle est remontee a l'admin.
+    let channel = match guild_id.create_channel(&ctx.http, build(true)).await {
         Ok(c) => c,
+        Err(e1) if cat_id.is_some() => {
+            warn!(error = %e1, "Echec creation salon discussion (avec categorie) -- retry sans categorie");
+            match guild_id.create_channel(&ctx.http, build(false)).await {
+                Ok(c) => c,
+                Err(e2) => {
+                    warn!(error = %e2, "Echec creation salon discussion (sans categorie)");
+                    edit_ephemeral(ctx, component, &format!("Echec creation du salon : {e2}")).await;
+                    return;
+                }
+            }
+        }
         Err(e) => {
             warn!(error = %e, "Echec creation salon discussion");
-            edit_ephemeral(ctx, component, "Echec creation du salon (permission Gerer les salons ?).").await;
+            edit_ephemeral(ctx, component, &format!("Echec creation du salon : {e}")).await;
             return;
         }
     };
+
+    // Donne l'acces au membre concerne APRES creation (best-effort) : s'il a
+    // quitte/est banni, l'overwrite peut echouer sans bloquer la creation.
+    if let Err(e) = channel
+        .id
+        .create_permission(
+            &ctx.http,
+            PermissionOverwrite {
+                allow: participate,
+                deny: Permissions::empty(),
+                kind: PermissionOverwriteType::Member(target_uid),
+            },
+        )
+        .await
+    {
+        warn!(error = %e, user = %target_uid, "guild discussion: acces membre cible non accorde (a-t-il quitte ?)");
+    }
 
     // Enregistre le salon cote API : le domaine applique la regle d'acces
     // (can_open_discussion) sur les faits Discord du demandeur + idempotence.

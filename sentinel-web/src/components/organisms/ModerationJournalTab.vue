@@ -100,7 +100,10 @@ const filteredInfractions = computed<Infraction[]>(() => {
   let rows = (infractions.value ?? []).slice();
 
   if (hideDetections.value) {
-    rows = rows.filter((i) => !isDetection(i.infraction_type));
+    // On se base sur la SOURCE (detection = proposition automod, action = validee),
+    // pas sur le type : une proposition peut avoir un type "warn"/"mute"/"ban".
+    // Par defaut on n'affiche QUE le valide (sanction appliquee via la carte/commande).
+    rows = rows.filter((i) => (i.source ?? "detection") === "action");
   }
 
   // Masque les bans appliques (visibles dans l'onglet "Bannis actifs"), mais

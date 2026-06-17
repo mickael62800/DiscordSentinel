@@ -12,8 +12,8 @@ use serenity::all::{
 use tracing::warn;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("card")
-        .description("Creer une carte de vote moderateurs sur un message (avec contexte avant/apres)")
+    CreateCommand::new("signalement")
+        .description("Signaler un message : cree une carte de vote moderateurs (avec contexte avant/apres)")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(
@@ -56,7 +56,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        warn!(error = %e, cmd = "card", "Echec defer interaction Discord");
+        warn!(error = %e, cmd = "signalement", "Echec defer interaction Discord");
         return;
     }
 
@@ -151,7 +151,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .edit_response(&ctx.http, EditInteractionResponse::new().content(reply))
         .await
     {
-        warn!(error = %e, cmd = "card", "Echec reponse /card");
+        warn!(error = %e, cmd = "signalement", "Echec reponse /card");
     }
 }
 
