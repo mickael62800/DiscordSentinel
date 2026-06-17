@@ -78,6 +78,50 @@ pub fn neutral_embed(title: impl Into<String>) -> CreateEmbed {
     sentinel_embed(title, COLOR_NEUTRAL)
 }
 
+// ── Gabarit de message de sanction (destiné au membre) ──
+
+/// Gabarit UNIFORME d'un message de sanction adressé au membre.
+///
+/// Ton cohérent quel que soit le chemin (automod auto, review 1-clic, vote) et
+/// **mention systématique du droit d'appel** (`/appeal`) quand `appeal` est vrai
+/// — conformité DSA. `action` ∈ prevention|warn|delete|mute|ban.
+pub fn sanction_notice(
+    action: &str,
+    reason: &str,
+    mute_minutes: Option<u64>,
+    validated_by: Option<&str>,
+    appeal: bool,
+) -> CreateEmbed {
+    let title = match action {
+        "prevention" => "Mesure de prévention",
+        "warn" => "Avertissement",
+        "delete" => "Message supprimé",
+        "mute" => "Exclusion temporaire (mute)",
+        "ban" => "Bannissement",
+        _ => "Décision de modération",
+    };
+    let mut e = sentinel_embed(format!("{} {}", action_emoji(action), title), action_color(action))
+        .field(
+            "Raison",
+            if reason.trim().is_empty() { "Non précisée" } else { reason },
+            false,
+        );
+    if let Some(m) = mute_minutes {
+        e = e.field("Durée", format!("{m} minute(s)"), true);
+    }
+    if let Some(by) = validated_by {
+        e = e.field("Validé par", by, true);
+    }
+    if appeal {
+        e = e.field(
+            "Contestation",
+            "Tu estimes cette décision injustifiée ? Tu peux la contester via la commande `/appeal`.",
+            false,
+        );
+    }
+    e
+}
+
 // ── Helpers pour les fields ──
 
 /// Couleur selon la gravite d'un avertissement.

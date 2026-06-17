@@ -78,6 +78,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     .max(flood_max_messages as u64) as usize;
     // Notification DSA au membre (DM motif + droit d'appel) lors d'une action auto.
     let auto_notify_member = BaseApiClient::config_bool(&config, "auto_protect_notify_member", true);
+    // Mention systematique du droit d'appel sur les messages de sanction (membre).
+    let sanction_appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
 
     // Verifier les salons exclus
     let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
@@ -235,7 +237,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
                     // Routage decide cote serveur.
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars, human_only, auto_notify_member).await;
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars, human_only, auto_notify_member, sanction_appeal).await;
                 });
             }
             return;
@@ -320,7 +322,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         // Analyse texte : le ROUTAGE (carte/auto/rien + severe + suppression
         // de lien) est decide cote serveur. Le bot execute la decision.
         // `human_only` n'est conserve que pour le fallback "backend injoignable".
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars, human_only, auto_notify_member).await;
+        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars, human_only, auto_notify_member, sanction_appeal).await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {

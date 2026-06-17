@@ -5,7 +5,7 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
-use crate::shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
+use crate::shared::embeds::danger_embed;
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::Action;
@@ -428,6 +428,7 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
 
     let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
     let colors = build_embed_colors(&config);
+    let appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
 
     if action == Action::None {
         // Ignorer -- mettre a jour la carte
@@ -472,10 +473,9 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
     match action {
         Action::Warn => {
             info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Warn valide via review");
-            let embed = warn_embed("Avertissement AutoMod")
-                .color(colors.warn)
-                .field("Raison", "Contenu inapproprie detecte par l'IA", false)
-                .field("Valide par", moderator_name, true);
+            let embed = crate::shared::embeds::sanction_notice(
+                "warn", "Contenu inapproprie detecte par l'IA", None, Some(moderator_name), appeal,
+            );
             if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
                 error!(error = %e, "Echec envoi embed warn dans le salon");
             }
@@ -490,9 +490,9 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
                     Err(e) => warn!(error = %e, message_id = %msg_id, "Echec suppression message (peut-etre deja supprime)"),
                 }
             }
-            let embed = moderate_embed("Message supprime par un moderateur")
-                .color(colors.delete)
-                .field("Valide par", moderator_name, true);
+            let embed = crate::shared::embeds::sanction_notice(
+                "delete", "Contenu inapproprie", None, Some(moderator_name), appeal,
+            );
             if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
                 error!(error = %e, "Echec envoi embed delete dans le salon");
             }
@@ -536,11 +536,17 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
                 }
             }
             let mute_min = mute_duration_secs / 60;
-            let status_text = if mute_applied { "applique" } else { "ECHOUE (voir logs)" };
-            let embed = danger_embed(format!("Mute {} par un moderateur", status_text))
-                .color(colors.mute)
-                .field("Duree", format!("{} minutes", mute_min), true)
-                .field("Valide par", moderator_name, true);
+            let embed = if mute_applied {
+                crate::shared::embeds::sanction_notice(
+                    "mute", "Contenu inapproprie", Some(mute_min), Some(moderator_name), appeal,
+                )
+            } else {
+                // Echec du mute : on reste factuel (pas un gabarit de sanction).
+                danger_embed("Mute ECHOUE (voir logs)")
+                    .color(colors.mute)
+                    .field("Duree", format!("{} minutes", mute_min), true)
+                    .field("Valide par", moderator_name.as_str(), true)
+            };
             let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
         }
         Action::Ban => {
@@ -550,9 +556,9 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             )
             .await;
             info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Ban applique via review");
-            let embed = critical_embed("Banni par un moderateur")
-                .color(colors.ban)
-                .field("Valide par", moderator_name, true);
+            let embed = crate::shared::embeds::sanction_notice(
+                "ban", "Contenu inapproprie", None, Some(moderator_name), appeal,
+            );
             if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
                 error!(error = %e, "Echec envoi embed ban dans le salon");
             }

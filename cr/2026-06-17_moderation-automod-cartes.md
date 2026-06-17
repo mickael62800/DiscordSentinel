@@ -62,5 +62,8 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
 - [x] Split de carte agrégée + drapeau membre vulnérable/mineur — owner : Nora
   - Drapeau mineur/vulnérable : SANS OBJET — aucun mineur ni membre vulnérable sur le serveur (confirmé 2 fois par le propriétaire). Rien à implémenter.
   - Split de carte agrégée : laissé optionnel (non demandé), à rouvrir seulement si le flood agrégé devient illisible en pratique.
-- [ ] Valider les gabarits de message de sanction (ton + mention systématique du droit d'appel), y compris actions automatiques — owner : Léo
-  - Partiellement couvert : les actions automatiques notifient déjà le membre en DM avec le droit d'appel (/appeal). Reste à uniformiser le ton des messages de sanction des autres chemins.
+- [x] Valider les gabarits de message de sanction (ton + mention systématique du droit d'appel), y compris actions automatiques — owner : Léo
+  - Gabarit unique `shared::embeds::sanction_notice(action, raison, durée, validé_par, appel)` : ton cohérent (titre/emoji/couleur par action) + champ « Contestation » → `/appeal` systématique.
+  - Branché sur les messages membre : automod auto (`execute_action` : warn/delete/mute + ban), review 1-clic (`handle_review_button`), analyse d'image. Les actions auto-protect notifient déjà en DM avec l'appel.
+  - Toggle web `sanction_appeal_enabled` (défaut true, migration 273) pour désactiver si le module d'appel n'est pas utilisé.
+  - Reste optionnel : notice membre côté finalisation de vote (aujourd'hui silencieuse en salon ; le membre subit l'effet mais sans embed dédié).

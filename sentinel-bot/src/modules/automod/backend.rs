@@ -7,7 +7,7 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{debug, error, info, warn};
 
-use crate::shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
+use crate::shared::embeds::{moderate_embed, critical_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::{Action, AnalyzeRequest, ApiClient, MessageMetadata};
@@ -130,6 +130,8 @@ pub(super) async fn send_to_backend(
     // serveur indisponible). Le routage nominal est decide cote API.
     human_only: bool,
     notify_member: bool,
+    // Ajoute la mention du droit d'appel aux messages de sanction (membre).
+    appeal: bool,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
     let context_messages = if context_max_messages == 0 {
@@ -275,7 +277,7 @@ pub(super) async fn send_to_backend(
                     // Sinon : human_only sans salon, ou rien a faire.
                 }
                 Routing::Auto => {
-                    if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors).await {
+                    if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors, appeal).await {
                         error!(error = %e, "Erreur lors de l'execution de l'action");
                     }
                 }
@@ -318,7 +320,8 @@ pub(super) async fn send_to_backend(
     }
 }
 
-/// Execute l'action decidee par le backend.
+/// Execute l'action decidee par le backend. `appeal` ajoute la mention du
+/// droit d'appel au message destine au membre (gabarit uniforme).
 pub(super) async fn execute_action(
     ctx: &Context,
     msg: &Message,
@@ -326,15 +329,15 @@ pub(super) async fn execute_action(
     reason: Option<&str>,
     mute_duration_secs: u64,
     colors: &EmbedColors,
+    appeal: bool,
 ) -> Result<(), serenity::Error> {
+    use crate::shared::embeds::sanction_notice;
     let reason_text = reason.unwrap_or("Automod");
 
     match action {
         Action::None => {}
         Action::Warn => {
-            let embed = warn_embed("Avertissement AutoMod")
-                .color(colors.warn)
-                .field("Raison", reason_text, false)
+            let embed = sanction_notice("warn", reason_text, None, None, appeal)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
             msg.channel_id.send_message(&ctx.http, builder).await?;
@@ -342,9 +345,7 @@ pub(super) async fn execute_action(
         }
         Action::Delete => {
             let content_preview = sanitize_embed_content(&msg.content, 200);
-            let embed = moderate_embed("Message supprime")
-                .color(colors.delete)
-                .field("Raison", reason_text, false)
+            let embed = sanction_notice("delete", reason_text, None, None, appeal)
                 .field("Contenu original", format!("```{}```", content_preview), false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -356,10 +357,7 @@ pub(super) async fn execute_action(
         }
         Action::Mute => {
             let mute_minutes = mute_duration_secs / 60;
-            let embed = danger_embed("Mute automatique")
-                .color(colors.mute)
-                .field("Raison", reason_text, false)
-                .field("Duree", format!("{} minutes", mute_minutes), false)
+            let embed = sanction_notice("mute", reason_text, Some(mute_minutes), None, appeal)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
             if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
@@ -403,10 +401,17 @@ pub(super) async fn execute_action(
         }
         Action::Ban => {
             if let Some(_guild_id) = msg.guild_id {
-                let embed = critical_embed("Signalement pour bannissement")
+                let mut embed = critical_embed("Signalement pour bannissement")
                     .color(colors.ban)
                     .field("Raison", reason_text, false)
                     .thumbnail(msg.author.face());
+                if appeal {
+                    embed = embed.field(
+                        "Contestation",
+                        "Tu estimes cette décision injustifiée ? Tu peux la contester via la commande `/appeal`.",
+                        false,
+                    );
+                }
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
                 if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
                     warn!(error = %e, "Echec envoi notification ban");
@@ -613,7 +618,8 @@ pub(super) async fn analyze_message_images(
         }
 
         info!(user = %msg.author.name, action = ?action, reason, "Image moderation (via ai-worker)");
-        if let Err(e) = execute_action(ctx, msg, &action, Some(reason), mute_duration_secs, colors).await {
+        let appeal = crate::shared::api_client::BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
+        if let Err(e) = execute_action(ctx, msg, &action, Some(reason), mute_duration_secs, colors, appeal).await {
             warn!(error = %e, "Echec execution action image");
         }
         break;
