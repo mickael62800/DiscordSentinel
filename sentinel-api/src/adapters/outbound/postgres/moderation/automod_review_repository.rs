@@ -190,8 +190,12 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         &self,
         r: NewAutomodReview,
         aggregate: bool,
+        window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError> {
         if aggregate {
+            // Fenetre d'inactivite : on ne fusionne que dans une carte ayant eu
+            // une infraction recemment. 0/negatif => pas de limite (legacy).
+            let window = window_minutes.max(0);
             // Serialise les agregations concurrentes du meme (guild, user) :
             // sans ca, deux messages quasi simultanes pourraient creer 2 cartes
             // ou perdre un incident (read-modify-write sur le tableau JSON).
@@ -202,14 +206,17 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .await
                 .map_err(pg_err)?;
 
-            // Carte ouverte existante pour ce (guild, user) ?
+            // Carte ouverte existante pour ce (guild, user) ET active (dernier
+            // incident dans la fenetre). Si window = 0 -> pas de filtre temporel.
             let existing: Option<Row> = sqlx::query_as(
                 "SELECT * FROM automod_reviews \
                  WHERE guild_id = $1 AND user_id = $2 AND status = 'voting' \
-                 ORDER BY created_at DESC LIMIT 1",
+                   AND ($3 = 0 OR last_incident_at > NOW() - make_interval(mins => $3)) \
+                 ORDER BY last_incident_at DESC LIMIT 1",
             )
             .bind(r.guild_id.as_str())
             .bind(r.user_id.as_str())
+            .bind(window as i32)
             .fetch_optional(&mut *tx)
             .await
             .map_err(pg_err)?;
@@ -239,7 +246,8 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 let updated: Row = sqlx::query_as(
                     "UPDATE automod_reviews SET \
                         incidents = $1, incident_count = $2, cumulative_score = $3, \
-                        score = $4, suggested_action = $5, reason = $6, voting_deadline = $7 \
+                        score = $4, suggested_action = $5, reason = $6, voting_deadline = $7, \
+                        last_incident_at = NOW() \
                      WHERE id = $8 AND status = 'voting' \
                      RETURNING *",
                 )

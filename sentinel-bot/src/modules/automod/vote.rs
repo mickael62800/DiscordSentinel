@@ -81,6 +81,7 @@ pub(super) async fn post_vote_card(
     context_before: u8,
     thread_enabled: bool,
     aggregate: bool,
+    aggregate_window_minutes: i64,
     discussion_enabled: bool,
     detail_url: Option<String>,
     auto_note: Option<String>,
@@ -124,6 +125,7 @@ pub(super) async fn post_vote_card(
         },
         "voting_deadline": deadline.to_rfc3339(),
         "aggregate": aggregate,
+        "aggregate_window_minutes": aggregate_window_minutes,
     });
 
     let resp = match api.post_json::<_, ReviewResp>("/api/automod/reviews", &body).await {

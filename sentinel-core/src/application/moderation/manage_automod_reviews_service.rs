@@ -49,11 +49,12 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         &self,
         review: NewAutomodReview,
         aggregate: bool,
+        window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError> {
         if review.guild_id.trim().is_empty() {
             return Err(DomainError::ValidationError("guild_id requis".into()));
         }
-        self.repo.create_or_merge(review, aggregate).await
+        self.repo.create_or_merge(review, aggregate, window_minutes).await
     }
 
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError> {

@@ -79,6 +79,9 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         &self,
         review: NewAutomodReview,
         aggregate: bool,
+        // Fenetre d'inactivite (minutes) au-dela de laquelle on n'agrege plus
+        // dans une carte existante (0 = pas de limite).
+        window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError>;
     async fn list_pending(

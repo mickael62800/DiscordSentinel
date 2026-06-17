@@ -772,7 +772,7 @@ pub struct StubGuildResetRepo;
 pub struct StubAutomodReviewRepo;
 #[async_trait] impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository for StubAutomodReviewRepo {
     async fn create(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
-    async fn create_or_merge(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview, _: bool) -> Result<(sentinel_core::domain::entities::moderation::review::automod::AutomodReview, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn create_or_merge(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview, _: bool, _: i64) -> Result<(sentinel_core::domain::entities::moderation::review::automod::AutomodReview, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
     async fn find_discussion(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel>, DomainError> { Ok(None) }
     async fn create_discussion(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel) -> Result<(sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
     async fn get(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }

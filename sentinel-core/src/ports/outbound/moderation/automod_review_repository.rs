@@ -21,6 +21,8 @@ pub trait AutomodReviewRepository: Send + Sync {
         &self,
         review: NewAutomodReview,
         aggregate: bool,
+        // Fenetre d'inactivite (minutes) ; 0 = pas de limite.
+        window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError>;
     async fn list_pending(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;

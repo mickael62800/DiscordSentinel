@@ -195,6 +195,9 @@ pub struct CreateReviewBody {
     /// Si true, agrege l'incident dans la carte 'voting' ouverte du meme
     /// utilisateur (anti-flood). Default false (comportement historique).
     pub aggregate: Option<bool>,
+    /// Fenetre d'inactivite (minutes) au-dela de laquelle on n'agrege plus dans
+    /// une carte existante. Default 60 ; 0 = pas de limite.
+    pub aggregate_window_minutes: Option<i64>,
 }
 
 /// POST /api/automod/reviews
@@ -234,6 +237,7 @@ pub async fn create_review(
                     .map(|d| d.with_timezone(&chrono::Utc)),
             },
             body.aggregate.unwrap_or(false),
+            body.aggregate_window_minutes.unwrap_or(60),
         )
         .await?;
 
