@@ -58,7 +58,8 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
   - Le bot ne décide plus : `send_to_backend` exécute la décision serveur. Retrait du routage dupliqué + des helpers `is_severe_content`/`contains_non_image_url` côté bot, et de 5 paramètres de config devenus inutiles. `human_only` conservé uniquement pour le fallback "backend injoignable".
   - Agrégation (`aggregate_into`) : déjà côté API via `create_or_merge` (flag `merged` renvoyé) — inchangé.
   - Reste optionnel : vérifier les rate limits d'édition de la carte agrégée (non bloquant).
-- [ ] Rédiger un ADR court "décider = API / agir = bot" (frontière + périmètre proto) — owner : Léa
+- [x] Rédiger un ADR court "décider = API / agir = bot" (frontière + périmètre proto) — owner : Léa
+  - `docs/adr/0001-automod-decide-api-agir-bot.md` (statut Accepté) : contexte, décision, conséquences, limites (flood bot-side, agrégation API), alternatives écartées (tout-bot, endpoint HTTP dédié, single-tx ACID).
 - [x] Split de carte agrégée + drapeau membre vulnérable/mineur — owner : Nora
   - Drapeau mineur/vulnérable : SANS OBJET — aucun mineur ni membre vulnérable sur le serveur (confirmé 2 fois par le propriétaire). Rien à implémenter.
   - Split de carte agrégée : laissé optionnel (non demandé), à rouvrir seulement si le flood agrégé devient illisible en pratique.
