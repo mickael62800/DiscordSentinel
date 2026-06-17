@@ -101,6 +101,17 @@ onUnmounted(() => {
             <strong>Message :</strong>
             <pre>{{ r.content_preview }}</pre>
           </div>
+          <details v-if="r.incidents && r.incidents.length > 1" class="incidents">
+            <summary>📋 Détails des incidents ({{ r.incidents.length }})</summary>
+            <ul>
+              <li v-for="(inc, i) in r.incidents" :key="i">
+                <span class="muted">{{ inc.at ? new Date(inc.at).toLocaleString("fr-FR") : "" }}</span>
+                <strong>{{ inc.suggested_action }}</strong>
+                <span class="muted">({{ (inc.score ?? 0).toFixed(1) }})</span>
+                — {{ inc.content_preview }}
+              </li>
+            </ul>
+          </details>
           <div v-if="r.discussion_channel_id" class="discussion">
             💬
             <a
@@ -211,6 +222,10 @@ onUnmounted(() => {
 
 .review-body { font-size: 0.88rem; margin-bottom: 8px; }
 .review-body .reason { margin-bottom: 6px; }
+.review-body .incidents { margin-top: 6px; font-size: 0.82rem; }
+.review-body .incidents summary { cursor: pointer; color: var(--text-secondary); }
+.review-body .incidents ul { margin: 6px 0 0; padding-left: 18px; }
+.review-body .incidents li { margin-bottom: 3px; line-height: 1.4; }
 .review-body .discussion { margin-top: 6px; font-size: 0.85rem; }
 .review-body .discussion a { color: var(--accent); text-decoration: none; }
 .review-body .discussion a:hover { text-decoration: underline; }

@@ -32,11 +32,13 @@ pub(super) async fn send_review_card(
     // moderateurs (au lieu de la validation 1-clic). On capture aussi
     // `discussion_enabled` pour le bouton « Ouvrir une discussion » du 1-clic.
     let mut discussion_enabled = false;
+    let mut detail_url: Option<String> = None;
     {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
             let cfg = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
             discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
+            detail_url = super::vote::build_detail_url(&cfg, &guild_id);
             // Modération humaine : human_only force le mode vote (1 carte/personne
             // agregee + decision humaine), au lieu des cartes 1-clic non agregees.
             let force_vote = BaseApiClient::config_bool(&cfg, "human_only_enabled", false);
@@ -48,7 +50,7 @@ pub(super) async fn send_review_card(
                 drop(data);
                 super::vote::post_vote_card(
                     ctx, msg, suggested_action, reason, score, flags, review_channel_id,
-                    deadline_hours, context_before, thread_enabled, aggregate, discussion_enabled,
+                    deadline_hours, context_before, thread_enabled, aggregate, discussion_enabled, detail_url,
                 )
                 .await;
                 return;
@@ -99,7 +101,7 @@ pub(super) async fn send_review_card(
         ))
         .timestamp(serenity::model::Timestamp::now());
     // 2e section : antecedents de moderation du membre (avec dates).
-    if let Some(hist) = super::vote::render_member_history(ctx, &guild_id, &user_id).await {
+    if let Some(hist) = super::vote::render_history_totals(ctx, &guild_id, &user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
 
@@ -153,14 +155,22 @@ pub(super) async fn send_review_card(
     let row1 = serenity::builder::CreateActionRow::Buttons(vec![btn_apply, btn_ignore]);
     let row2 = serenity::builder::CreateActionRow::Buttons(adjust_buttons);
     let mut rows = vec![row1, row2];
+    // 3e rangee : lien "Voir le detail" (dashboard) + (option) "Ouvrir une discussion".
+    let mut extra: Vec<serenity::builder::CreateButton> = Vec::new();
+    if let Some(url) = &detail_url {
+        extra.push(serenity::builder::CreateButton::new_link(url).label("📋 Voir le détail"));
+    }
     if discussion_enabled {
         if let Some(id) = &review_id {
-            rows.push(serenity::builder::CreateActionRow::Buttons(vec![
+            extra.push(
                 serenity::builder::CreateButton::new(format!("{}{}", super::vote::DISCUSSION_PREFIX, id))
                     .label("Ouvrir une discussion")
                     .style(serenity::all::ButtonStyle::Secondary),
-            ]));
+            );
         }
+    }
+    if !extra.is_empty() {
+        rows.push(serenity::builder::CreateActionRow::Buttons(extra));
     }
 
     let builder = serenity::builder::CreateMessage::new()

@@ -2,6 +2,16 @@ import { httpGet, httpPost } from "@/api/http";
 import type { Infraction } from "@/types";
 import { q } from "./_query";
 
+export interface AutomodIncident {
+  message_id?: string;
+  channel_id?: string;
+  content_preview?: string;
+  score?: number;
+  reason?: string;
+  suggested_action?: string;
+  at?: string;
+}
+
 export interface AutomodReview {
   id: string;
   guild_id: string;
@@ -24,6 +34,8 @@ export interface AutomodReview {
   // Agrégation par utilisateur (anti-flood) + vote
   incident_count: number;
   cumulative_score: number;
+  /** Détail des incidents agrégés (affiché dans le dashboard, plus sur la carte Discord). */
+  incidents: AutomodIncident[];
   voting_deadline: string | null;
   decided_action: string | null;
   quorum_met: boolean;

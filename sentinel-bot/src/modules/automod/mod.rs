@@ -108,6 +108,7 @@ pub async fn create_manual_vote_card(
     let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
     let discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
     let aggregate = BaseApiClient::config_bool(&cfg, "vote_aggregate_enabled", false);
+    let detail_url = vote::build_detail_url(&cfg, &guild_id);
 
     let action = match action_str {
         "warn" => api_client::Action::Warn,
@@ -129,6 +130,7 @@ pub async fn create_manual_vote_card(
         moderator_name,
         discussion_enabled,
         aggregate,
+        detail_url,
     )
     .await;
     Ok(())

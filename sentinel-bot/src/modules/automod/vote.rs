@@ -78,6 +78,7 @@ pub(super) async fn post_vote_card(
     thread_enabled: bool,
     aggregate: bool,
     discussion_enabled: bool,
+    detail_url: Option<String>,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -152,7 +153,7 @@ pub(super) async fn post_vote_card(
         embed = embed.field("Contexte (messages precedents)", context, false);
     }
     // 2e section : antecedents de moderation du membre (avec dates).
-    if let Some(hist) = render_member_history(ctx, &guild_id, &user_id).await {
+    if let Some(hist) = render_history_totals(ctx, &guild_id, &user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
 
@@ -161,7 +162,7 @@ pub(super) async fn post_vote_card(
         "https://discord.com/channels/{}/{}/{}",
         guild_id, channel_id, message_id
     );
-    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled);
+    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled, detail_url.as_deref());
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
@@ -233,6 +234,7 @@ pub(super) async fn post_manual_vote_card(
     moderator_name: &str,
     discussion_enabled: bool,
     aggregate: bool,
+    detail_url: Option<String>,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -307,7 +309,7 @@ pub(super) async fn post_manual_vote_card(
     if !after.is_empty() {
         embed = embed.field("Contexte (apres)", after, false);
     }
-    if let Some(hist) = render_member_history(ctx, &guild_id, &user_id).await {
+    if let Some(hist) = render_history_totals(ctx, &guild_id, &user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
     embed = embed
@@ -321,7 +323,7 @@ pub(super) async fn post_manual_vote_card(
         "https://discord.com/channels/{}/{}/{}",
         guild_id, channel_id, message_id
     );
-    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled);
+    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled, detail_url.as_deref());
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
@@ -480,72 +482,53 @@ fn vote_buttons(review_id: &str) -> Vec<serenity::builder::CreateActionRow> {
     ]
 }
 
-/// Libelle court d'un type d'action moderation pour l'historique.
-fn history_action_label(action_type: &str) -> &str {
-    match action_type {
-        "prevention" => "Prevention",
-        "warn" => "Avertissement",
-        t if t.starts_with("mute") => "Mute",
-        t if t.starts_with("ban") => "Ban",
-        "unban" => "Unban",
-        "unmute" => "Unmute",
-        "call" => "Convocation",
-        other => other,
-    }
-}
-
-/// Recupere et formate l'historique de moderation du membre (2e section de la
-/// carte). Le nombre d'infractions listees vient de la config automod
-/// (`card_history_count`, 0 = totaux seuls). `None` si l'API moderation est
-/// indisponible. Autonome : pas besoin de threader la config dans les builders.
-pub(super) async fn render_member_history(
+/// Antecedents du membre en TOTAUX (carte resumee). Le detail date est dans le
+/// dashboard web. `None` si l'API moderation est indisponible.
+pub(super) async fn render_history_totals(
     ctx: &Context,
     guild_id: &str,
     user_id: &str,
 ) -> Option<String> {
     use crate::modules::moderation::ModerationApiKey;
-    let (mod_api, base_api) = {
+    let mod_api = {
         let d = ctx.data.read().await;
-        (d.get::<ModerationApiKey>()?.clone(), d.get::<ApiClientKey>()?.clone())
+        d.get::<ModerationApiKey>()?.clone()
     };
-    // Nb d'antecedents a lister, depuis la config automod (0 = totaux seuls).
-    let cfg = base_api.get_guild_config_for(guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
-    let count = BaseApiClient::config_u64(&cfg, "card_history_count", 5) as u8;
-
     let hist = mod_api.get_history(guild_id, user_id).await.ok()?;
-    let totals = format!(
-        "**{}** warn(s) · **{}** mute(s) · **{}** ban(s)",
+    Some(format!(
+        "**{}** warn · **{}** mute · **{}** ban",
         hist.total_warns, hist.total_mutes, hist.total_bans
-    );
-    if hist.actions.is_empty() {
-        return Some(format!("{}\n_Aucun antecedent._", totals));
-    }
-    if count == 0 {
-        return Some(totals);
-    }
-    let mut lines = vec![totals];
-    let mut total_len = 0usize;
-    // `actions` est ordonne chronologiquement -> on prend les plus recentes.
-    for a in hist.actions.iter().rev().take(count as usize) {
-        let date = a.created_at.split('T').next().unwrap_or(a.created_at.as_str());
-        let reason: String = a.reason.chars().take(60).collect();
-        let line = format!("• `{}` **{}** — {}", date, history_action_label(&a.action_type), reason);
-        if total_len + line.len() + 1 > 1000 {
-            lines.push("…".into());
-            break;
-        }
-        total_len += line.len() + 1;
-        lines.push(line);
-    }
-    Some(lines.join("\n"))
+    ))
 }
 
 /// Deuxieme rangee de boutons : lien vers le message + (option) "Ouvrir une
 /// discussion" si `discussion_enabled`.
-fn secondary_row(msg_url: &str, review_id: &str, discussion_enabled: bool) -> serenity::builder::CreateActionRow {
+/// Construit l'URL "Voir le detail" vers le dashboard a partir de la config
+/// (`dashboard_base_url`). `None` si non configuree.
+pub(super) fn build_detail_url(
+    cfg: &std::collections::HashMap<String, String>,
+    guild_id: &str,
+) -> Option<String> {
+    let base = BaseApiClient::config_or(cfg, "dashboard_base_url", "");
+    let base = base.trim().trim_end_matches('/');
+    if base.is_empty() {
+        return None;
+    }
+    Some(format!("{base}/automod?guild={guild_id}"))
+}
+
+fn secondary_row(
+    msg_url: &str,
+    review_id: &str,
+    discussion_enabled: bool,
+    detail_url: Option<&str>,
+) -> serenity::builder::CreateActionRow {
     use serenity::all::ButtonStyle;
     use serenity::builder::CreateButton;
     let mut buttons = vec![CreateButton::new_link(msg_url).label("Aller au message")];
+    if let Some(url) = detail_url {
+        buttons.push(CreateButton::new_link(url).label("📋 Voir le détail"));
+    }
     if discussion_enabled {
         buttons.push(
             CreateButton::new(format!("{DISCUSSION_PREFIX}{review_id}"))
@@ -662,32 +645,6 @@ struct ReviewResp {
     incidents: serde_json::Value,
 }
 
-/// Rend la liste des incidents agreges (du plus ancien au plus recent),
-/// tronquee pour respecter la limite d'un field embed (1024 caracteres).
-fn render_incidents(incidents: &serde_json::Value) -> String {
-    let Some(arr) = incidents.as_array() else { return String::new() };
-    if arr.is_empty() {
-        return String::new();
-    }
-    let mut lines: Vec<String> = Vec::new();
-    let mut total = 0usize;
-    for inc in arr {
-        let action = inc.get("suggested_action").and_then(|v| v.as_str()).unwrap_or("warn");
-        let sc = inc.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
-        let preview = inc.get("content_preview").and_then(|v| v.as_str()).unwrap_or("");
-        let preview: String = preview.chars().take(80).collect();
-        let preview = if preview.trim().is_empty() { "*(pièce jointe / embed)*".to_string() } else { preview };
-        let line = format!("• **{}** ({:.1}) — {}", action_label(action), sc, preview);
-        if total + line.len() + 1 > 1000 {
-            lines.push("…".to_string());
-            break;
-        }
-        total += line.len() + 1;
-        lines.push(line);
-    }
-    lines.join("\n")
-}
-
 /// Construit l'embed d'une carte de vote AGREGEE (plusieurs incidents pour un
 /// meme utilisateur). Affiche score max ET score cumule + nb d'incidents.
 fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::builder::CreateEmbed {
@@ -712,10 +669,7 @@ fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::buil
     embed = embed
         .field("Dernier message", format!("```{}```", resp.content_preview), false)
         .field("Raison", if resp.reason.is_empty() { "—" } else { resp.reason.as_str() }, false);
-    let incidents = render_incidents(&resp.incidents);
-    if !incidents.is_empty() {
-        embed = embed.field("Detail des incidents", incidents, false);
-    }
+    // Le detail complet des incidents est dans le dashboard web (bouton lien).
     embed = embed
         .field(VOTES_FIELD, render_votes(votes), false)
         .footer(serenity::builder::CreateEmbedFooter::new(
@@ -798,7 +752,7 @@ async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &Re
         .unwrap_or_default();
 
     let mut embed = aggregated_vote_embed(resp, &votes);
-    if let Some(hist) = render_member_history(ctx, &resp.guild_id, &resp.user_id).await {
+    if let Some(hist) = render_history_totals(ctx, &resp.guild_id, &resp.user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
     // On n'edite que l'embed : les composants (boutons de vote + lien) restent.
