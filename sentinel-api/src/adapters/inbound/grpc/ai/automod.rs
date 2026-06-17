@@ -67,6 +67,23 @@ impl AutomodService for AutomodGrpc {
             })
             .await
             .map_err(domain_to_status)?;
+
+        // Metrique : compte les decisions de routage automod (observabilite —
+        // taux carte/auto/rien, sevères, suppressions de lien). Scrapé via /metrics.
+        use sentinel_core::domain::services::moderation::automod_routing::Routing;
+        let route_label = match analysis.route {
+            Routing::None => "none",
+            Routing::Card => "card",
+            Routing::Auto => "auto",
+        };
+        metrics::counter!(
+            "automod_decisions_total",
+            "route" => route_label,
+            "severe" => if analysis.severe { "true" } else { "false" },
+            "link_delete" => if analysis.auto_delete_link { "true" } else { "false" },
+        )
+        .increment(1);
+
         Ok(Response::new(analysis_to_proto(analysis)))
     }
 }

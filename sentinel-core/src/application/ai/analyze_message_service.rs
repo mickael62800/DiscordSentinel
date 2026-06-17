@@ -449,7 +449,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 action: result.action.clone(),
                 human_only: cfg_bool("human_only_enabled", false),
                 auto_protect: cfg_bool("auto_protect_enabled", true),
-                auto_delete_links: cfg_bool("auto_delete_links_enabled", true),
+                auto_delete_links: cfg_bool("auto_delete_links_enabled", false),
                 ai_review_mode: cfg_bool("ai_review_mode", true),
                 review_min_score: cfg_f64("review_min_score", 0.0),
                 log_channel_set: cfg_u64("log_channel_id", 0) != 0,

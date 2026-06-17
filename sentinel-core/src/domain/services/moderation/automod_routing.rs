@@ -77,20 +77,30 @@ pub fn contains_non_image_url(content: &str) -> bool {
 }
 
 /// Calcule la decision de routage a partir des faits + config guild.
+///
+/// Politique liens (CR revue moderation) : phishing / invitation Discord =
+/// SEVERE (auto-protection). Un lien generique non autorise HORS image part
+/// par defaut en CARTE (decision humaine) ; il n'est supprime automatiquement
+/// que si `auto_delete_links` est explicitement active (mode agressif opt-in).
 pub fn decide(i: &RoutingInputs) -> RoutingDecision {
     let severe = i.auto_protect && is_severe_content(i.flags, i.content);
 
-    let auto_delete_link = !severe
-        && i.auto_delete_links
-        && i.flags.link
-        && !i.flags.phishing
-        && contains_non_image_url(i.content);
+    // Lien generique (hors phishing, hors image) detecte.
+    let generic_link =
+        !severe && i.flags.link && !i.flags.phishing && contains_non_image_url(i.content);
+    // Suppression seche : uniquement si l'admin l'a explicitement demandee.
+    let auto_delete_link = generic_link && i.auto_delete_links;
+    // Sinon, le lien generique merite une carte (oeil humain).
+    let link_needs_card = generic_link && !auto_delete_link;
 
     let above_threshold = i.score >= i.review_min_score;
-    let should_card =
-        i.log_channel_set && (i.human_only || severe || (i.ai_review_mode && above_threshold));
+    let should_card = i.log_channel_set
+        && (i.human_only || severe || link_needs_card || (i.ai_review_mode && above_threshold));
 
-    let route = if should_card {
+    let route = if auto_delete_link {
+        // Le bot supprime via `auto_delete_link` ; pas d'autre action.
+        Routing::None
+    } else if should_card {
         Routing::Card
     } else if i.human_only {
         // Pas de carte (pas de salon) + human_only : aucune action auto.

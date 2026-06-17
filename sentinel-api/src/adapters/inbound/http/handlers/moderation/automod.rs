@@ -322,10 +322,14 @@ async fn log_review_sanction(
     let logged = match state.moderation_uc.log_action_with_strike(cmd).await {
         Ok(l) => l,
         Err(e) => {
+            // Compteur "logs manquants" : si non nul en prod, on active l'outbox
+            // (cf. ADR / CR revue moderation). Mesure la fenetre resolve->log.
+            metrics::counter!("automod_sanction_log_total", "result" => "error").increment(1);
             tracing::error!(error = %e, review_id = %review.id, action = %applied_action, "Echec log sanction (resolve) cote serveur");
             return;
         }
     };
+    metrics::counter!("automod_sanction_log_total", "result" => "ok").increment(1);
 
     // Memes broadcasts que l'endpoint /api/moderation/actions, pour que le
     // journal web et les notifications de strike restent a jour.

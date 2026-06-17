@@ -1059,6 +1059,27 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // Execute la sanction Discord (delete/mute/ban).
     apply_member_sanction(ctx, component.guild_id, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;
 
+    // Notice membre (cohérence de ton avec les autres chemins) : on informe le
+    // membre en DM de la sanction validée + droit d'appel. Best-effort.
+    if matches!(decided.as_str(), "prevention" | "warn" | "mute" | "ban") {
+        let appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
+        let mins = if decided == "mute" { Some(mute_secs / 60) } else { None };
+        let embed = crate::shared::embeds::sanction_notice(
+            &decided,
+            "Décision validée par les modérateurs",
+            mins,
+            Some(&component.user.name),
+            appeal,
+        );
+        if let Ok(uid) = review.user_id.parse::<u64>() {
+            if let Ok(ch) = serenity::model::id::UserId::new(uid).create_dm_channel(&ctx.http).await {
+                let _ = ch
+                    .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+                    .await;
+            }
+        }
+    }
+
     // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
     archive_discussion_channel(ctx, &api, &review_id, &review.user_id).await;
 
