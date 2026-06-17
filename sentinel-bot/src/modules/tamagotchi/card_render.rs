@@ -34,6 +34,8 @@ pub struct CardData {
     pub status: String,
     /// Couleur d'accent de l'espece (hex sans #), pour le placeholder avatar.
     pub species_color: String,
+    /// Slug de l'espece (ex. "loup") pour choisir le sprite d'evolution.
+    pub species_slug: String,
 }
 
 static FONTDB: OnceCell<Arc<usvg::fontdb::Database>> = OnceCell::new();
@@ -55,6 +57,100 @@ fn esc(s: &str) -> String {
 /// Largeur remplie d'une barre (sur `max_w`) pour une jauge 0-100.
 fn bar_w(value: i32, max_w: f32) -> f32 {
     (value.clamp(0, 100) as f32 / 100.0) * max_w
+}
+
+/// Stade d'evolution derive du niveau (cf. docs/TAMAGOTCHI_EVOLUTIONS_PROMPTS.md).
+pub(super) fn stage_from_level(level: i32) -> &'static str {
+    match level {
+        ..=4 => "bebe",
+        5..=14 => "jeune",
+        15..=29 => "adulte",
+        _ => "vieux",
+    }
+}
+
+/// Libelle affichable d'un stade (pour le message d'evolution).
+pub(super) fn stage_label(level: i32) -> &'static str {
+    match stage_from_level(level) {
+        "bebe" => "bébé",
+        "jeune" => "jeune",
+        "adulte" => "adulte",
+        _ => "vieux",
+    }
+}
+
+/// Lettre d'espece (1er segment du nom de fichier). loup = l ; les autres
+/// seront ajoutees a mesure que les sprites arrivent (lapin != loup : 'p').
+fn species_letter(slug: &str) -> &'static str {
+    match slug {
+        "loup" => "l",
+        "sanglier" => "s",
+        "renard" => "r",
+        "tortue" => "t",
+        "ours" => "o",
+        "lapin" => "p", // 'l' est pris par loup -> a confirmer quand le lapin arrive
+        _ => "x",
+    }
+}
+
+/// Lettre de stade (2e segment) : b=bebe, j=jeune, a=adulte, v=vieux.
+fn stage_letter(level: i32) -> &'static str {
+    match stage_from_level(level) {
+        "bebe" => "b",
+        "jeune" => "j",
+        "adulte" => "a",
+        _ => "v",
+    }
+}
+
+/// Lettre d'etat (3e segment) : a=affame, c=content, m=malade, z=dodo (fatigue).
+/// Priorite : malade > dodo > affame > content.
+fn state_letter(status: &str, hunger: i32, happiness: i32, energy: i32) -> &'static str {
+    if status == "sick" {
+        return "m";
+    }
+    if energy <= 25 {
+        return "z";
+    }
+    if hunger <= 25 || happiness <= 25 {
+        return "a";
+    }
+    "c"
+}
+
+/// Nom de fichier du sprite (sans extension) : `{espece}_{stade}_{etat}`
+/// (ex. `l_a_c` = loup adulte content). Mort -> logo partage `mort`.
+fn sprite_filename(d: &CardData) -> String {
+    if d.status == "dead" {
+        return "mort".to_string();
+    }
+    format!(
+        "{}_{}_{}",
+        species_letter(&d.species_slug),
+        stage_letter(d.level),
+        state_letter(&d.status, d.hunger, d.happiness, d.energy),
+    )
+}
+
+/// Charge le sprite depuis `TAMAGOTCHI_SPRITES_DIR` (defaut: `images`) et le
+/// renvoie en base64 (embarquement SVG). `None` si le fichier est absent ->
+/// le rendu retombe sur le placeholder.
+fn load_sprite_b64(d: &CardData) -> Option<String> {
+    use base64::Engine;
+    let dir = std::env::var("TAMAGOTCHI_SPRITES_DIR").unwrap_or_else(|_| "images".to_string());
+    let path = std::path::Path::new(&dir).join(format!("{}.png", sprite_filename(d)));
+    let bytes = std::fs::read(&path).ok()?;
+    Some(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// Avatar "mort" : une pierre tombale RIP dessinee en SVG (aucun asset requis).
+fn dead_avatar_svg() -> String {
+    r##"<rect x="93" y="74" width="84" height="118" rx="42" fill="#6b7280"/>
+  <rect x="86" y="182" width="98" height="16" rx="5" fill="#4b5563"/>
+  <rect x="129" y="96" width="12" height="46" rx="3" fill="#e5e7eb"/>
+  <rect x="116" y="110" width="38" height="12" rx="3" fill="#e5e7eb"/>
+  <text x="135" y="172" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="26" fill="#e5e7eb">RIP</text>"##
+        .to_string()
 }
 
 /// Construit le SVG de la carte.
@@ -121,16 +217,34 @@ fn build_svg(d: &CardData) -> String {
         )
     };
 
+    // Avatar : pierre tombale si mort ; sinon sprite d'evolution si dispo ;
+    // sinon placeholder (cercle + initiale).
+    let avatar_block = if d.status == "dead" {
+        dead_avatar_svg()
+    } else {
+        match load_sprite_b64(d) {
+        Some(b64) => format!(
+            r##"<defs><clipPath id="avclip"><circle cx="135" cy="125" r="84"/></clipPath></defs>
+  <image x="51" y="41" width="168" height="168" href="data:image/png;base64,{b64}" clip-path="url(#avclip)" preserveAspectRatio="xMidYMid slice"/>"##
+        ),
+        None => format!(
+            r##"<circle cx="135" cy="125" r="84" fill="#{species_color}"/>
+  <text x="135" y="160" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="90" fill="#ffffff" opacity="0.9">{initial}</text>"##,
+            species_color = d.species_color,
+            initial = esc(&initial),
+        ),
+        }
+    };
+
     format!(
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">
   <rect x="0" y="0" width="{w}" height="{h}" rx="22" fill="#1a1d28"/>
   <rect x="8" y="8" width="{inw}" height="{inh}" rx="18" fill="{bg}"/>
   <rect x="14" y="22" width="7" height="206" rx="3.5" fill="{accent}"/>
 
-  <!-- Avatar (placeholder) -->
+  <!-- Avatar -->
   <circle cx="135" cy="125" r="92" fill="#2c3144" stroke="{accent}" stroke-width="3"/>
-  <circle cx="135" cy="125" r="84" fill="#{species_color}"/>
-  <text x="135" y="160" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="90" fill="#ffffff" opacity="0.9">{initial}</text>
+  {avatar_block}
 
   <!-- En-tete -->
   <text x="290" y="48" font-family="DejaVu Sans" font-weight="bold" font-size="30" fill="{white}">{name}</text>
@@ -161,8 +275,7 @@ fn build_svg(d: &CardData) -> String {
 </svg>"##,
         inw = w - 16.0,
         inh = h - 16.0,
-        species_color = d.species_color,
-        initial = esc(&initial),
+        avatar_block = avatar_block,
         name = esc(&d.name),
         level = d.level,
         subtitle = subtitle,

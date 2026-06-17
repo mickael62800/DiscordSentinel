@@ -251,6 +251,23 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
 
     match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
         Ok(updated) => {
+            // Evolution : si l'action a fait franchir un palier de stade, on
+            // l'annonce publiquement dans le salon.
+            if super::card_render::stage_from_level(pet.level)
+                != super::card_render::stage_from_level(updated.level)
+            {
+                let _ = component
+                    .channel_id
+                    .send_message(
+                        &ctx.http,
+                        CreateMessage::new().content(format!(
+                            "🎉 **{}** a évolué en **{}** !",
+                            updated.name,
+                            super::card_render::stage_label(updated.level),
+                        )),
+                    )
+                    .await;
+            }
             let resp = update_from_card(&api, &guild_id, &user_id, &updated).await;
             let _ = component
                 .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
@@ -449,6 +466,10 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
     let n = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
 
+    // Niveau de l'attaquant AVANT le combat (pour detecter une evolution apres).
+    let user_id = component.user.id.to_string();
+    let before_level = fetch_pet(&api, &guild_id, &user_id).await.map(|p| p.level);
+
     let body = serde_json::json!({
         "guild_id": guild_id,
         "attacker_id": component.user.id.to_string(),
@@ -487,6 +508,25 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
                 ),
             )
             .await;
+
+            // Le combat (gagne OU perdu) donne de l'XP -> possible evolution.
+            if let (Some(old), Some(p2)) = (before_level, fetch_pet(&api, &guild_id, &user_id).await) {
+                if super::card_render::stage_from_level(old)
+                    != super::card_render::stage_from_level(p2.level)
+                {
+                    let _ = component
+                        .channel_id
+                        .send_message(
+                            &ctx.http,
+                            CreateMessage::new().content(format!(
+                                "🎉 **{}** a évolué en **{}** !",
+                                p2.name,
+                                super::card_render::stage_label(p2.level),
+                            )),
+                        )
+                        .await;
+                }
+            }
         }
         Err(e) => {
             warn!(error = %e, "Echec combat");
@@ -631,6 +671,7 @@ async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &Pe
         coins: fetch_coins(api, guild_id, owner_id).await,
         status: p.status.clone(),
         species_color: species_color(&p.species).to_string(),
+        species_slug: p.species.clone(),
     };
     render_card_png(&data)
 }
