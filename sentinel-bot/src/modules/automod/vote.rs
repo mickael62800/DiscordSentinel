@@ -79,6 +79,7 @@ pub(super) async fn post_vote_card(
     aggregate: bool,
     discussion_enabled: bool,
     detail_url: Option<String>,
+    auto_note: Option<String>,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -151,6 +152,10 @@ pub(super) async fn post_vote_card(
     };
     if !context.is_empty() {
         embed = embed.field("Contexte (messages precedents)", context, false);
+    }
+    // Action automatique deja appliquee (raid / phishing / pub / gros flood).
+    if let Some(note) = &auto_note {
+        embed = embed.field("🚨 Action automatique appliquee", note, false);
     }
     // 2e section : antecedents de moderation du membre (avec dates).
     if let Some(hist) = render_history_totals(ctx, &guild_id, &user_id).await {

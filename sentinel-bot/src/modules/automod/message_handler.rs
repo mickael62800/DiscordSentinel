@@ -68,6 +68,14 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
     // Modération humaine : si actif, aucune sanction auto -> tout passe par une carte.
     let human_only = BaseApiClient::config_bool(&config, "human_only_enabled", false);
+    // Auto-protection des cas severes (raid / phishing / pub Discord / gros flood) :
+    // applique une mesure reversible (mute + suppression) MEME en human_only, puis
+    // poste toujours la carte. `severe_flood_max_messages` = seuil "gros flood".
+    let auto_protect = BaseApiClient::config_bool(&config, "auto_protect_enabled", true);
+    let severe_flood_max = BaseApiClient::config_u64(
+        &config, "severe_flood_max_messages", (flood_max_messages as u64) * 2,
+    )
+    .max(flood_max_messages as u64) as usize;
 
     // Verifier les salons exclus
     let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
@@ -117,7 +125,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
             if (files_review || human_only) && log_channel_id != 0 {
                 let flags = detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false };
-                send_review_card(ctx, msg, &Action::Delete, &reason, 1.0, &flags, log_channel_id, &colors).await;
+                send_review_card(ctx, msg, &Action::Delete, &reason, 1.0, &flags, log_channel_id, &colors, None).await;
             } else if human_only {
                 // Modération humaine sans salon de review : on ne supprime pas.
                 warn!(user = %msg.author.name, "Fichier suspect + human_only sans salon review : suppression bloquee");
@@ -153,14 +161,15 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         };
         // Le lock ctx.data est libere ici
 
-        let is_flood = if let Some(tracker) = &flood_tracker {
+        let (is_flood, flood_count) = if let Some(tracker) = &flood_tracker {
             let key = (msg.channel_id, msg.author.id);
             let now = Instant::now();
             let mut entry = tracker.entry(key).or_default();
             let timestamps = entry.value_mut();
             timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
             timestamps.push(now);
-            let flood = timestamps.len() >= flood_max_messages;
+            let count = timestamps.len();
+            let flood = count >= flood_max_messages;
             // Drop le entry pour eviter le deadlock avec retain
             drop(entry);
             if tracker.len() > 5000 {
@@ -170,21 +179,40 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                         .unwrap_or(false)
                 });
             }
-            flood
+            (flood, count)
         } else {
-            false
+            (false, 0)
         };
 
         if is_flood {
-            info!(user = %msg.author.name, "Flood detecte");
+            // Gros flood : auto-protection immediate (mute + suppression), meme
+            // en human_only, puis carte toujours postee avec la note.
+            let severe = auto_protect && flood_count >= severe_flood_max;
+            info!(user = %msg.author.name, count = flood_count, severe, "Flood detecte");
             if let Some(tracker) = &flood_tracker {
                 tracker.remove(&(msg.channel_id, msg.author.id));
             }
 
+            let auto_note = if severe {
+                super::backend::apply_auto_protect(ctx, msg, mute_duration_secs).await
+            } else {
+                None
+            };
+
             let flood_review = BaseApiClient::config_bool(&config, "flood_review_mode", true);
-            if flood_review && log_channel_id != 0 {
+            if (flood_review || severe) && log_channel_id != 0 {
                 let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-                send_review_card(ctx, msg, &Action::Warn, "Flood detecte -- messages envoyes trop rapidement.", 0.9, &flags, log_channel_id, &colors).await;
+                // Cas severe : on suggere Mute (deja applique), sinon Warn.
+                let suggested = if severe { Action::Mute } else { Action::Warn };
+                let reason = if severe {
+                    "Gros flood detecte -- protection automatique appliquee (raid probable)."
+                } else {
+                    "Flood detecte -- messages envoyes trop rapidement."
+                };
+                send_review_card(ctx, msg, &suggested, reason, if severe { 0.99 } else { 0.9 }, &flags, log_channel_id, &colors, auto_note).await;
+            } else if severe {
+                // Severe sans salon de review : protection auto deja appliquee.
+                info!(user = %msg.author.name, "Gros flood protege automatiquement (pas de salon de review)");
             } else {
                 let embed = warn_embed("Avertissement AutoMod")
                     .color(colors.warn)
@@ -206,7 +234,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
                     let ai_review = true; // flood passe par le backend IA en review
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score, human_only).await;
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score, human_only, auto_protect, false).await;
                 });
             }
             return;
@@ -221,7 +249,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         let caps_review = BaseApiClient::config_bool(&config, "caps_review_mode", true);
         if caps_review && log_channel_id != 0 {
             let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-            send_review_card(ctx, msg, &Action::Warn, "Abus de majuscules detecte.", 0.8, &flags, log_channel_id, &colors).await;
+            send_review_card(ctx, msg, &Action::Warn, "Abus de majuscules detecte.", 0.8, &flags, log_channel_id, &colors, None).await;
         } else {
             let embed = warn_embed("Avertissement AutoMod")
                 .color(colors.warn)
@@ -294,8 +322,9 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     tokio::spawn(async move {
         let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
 
-        // Analyse texte (`human_only` capture depuis le scope parent)
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score, human_only).await;
+        // Analyse texte (`human_only` capture depuis le scope parent). La
+        // severite (phishing / pub Discord) est decidee dans send_to_backend.
+        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score, human_only, auto_protect, false).await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {

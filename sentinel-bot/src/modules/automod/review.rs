@@ -16,6 +16,7 @@ use super::{AM_PREFIX, DEFAULT_MUTE_DURATION_SECS};
 /// Envoie une carte de review dans le salon de logs au lieu d'appliquer
 /// l'action directement. Les moderateurs cliquent sur un bouton pour
 /// valider ou ajuster la severite.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn send_review_card(
     ctx: &Context,
     msg: &Message,
@@ -25,6 +26,9 @@ pub(super) async fn send_review_card(
     flags: &detectors::DetectionFlags,
     review_channel_id: u64,
     colors: &EmbedColors,
+    // Note d'action automatique deja appliquee (mute/suppression) a afficher
+    // sur la carte. `None` = aucune action auto.
+    auto_note: Option<String>,
 ) {
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
@@ -51,6 +55,7 @@ pub(super) async fn send_review_card(
                 super::vote::post_vote_card(
                     ctx, msg, suggested_action, reason, score, flags, review_channel_id,
                     deadline_hours, context_before, thread_enabled, aggregate, discussion_enabled, detail_url,
+                    auto_note,
                 )
                 .await;
                 return;
@@ -100,6 +105,10 @@ pub(super) async fn send_review_card(
             "AutoMod Review | Cliquez pour valider ou ajuster",
         ))
         .timestamp(serenity::model::Timestamp::now());
+    // Action automatique deja appliquee (raid / phishing / pub / gros flood).
+    if let Some(note) = &auto_note {
+        embed = embed.field("🚨 Action automatique appliquee", note, false);
+    }
     // 2e section : antecedents de moderation du membre (avec dates).
     if let Some(hist) = super::vote::render_history_totals(ctx, &guild_id, &user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);

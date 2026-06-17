@@ -30,7 +30,67 @@ fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
     }
 }
 
+/// Detecte un cas "severe" qui justifie une protection automatique immediate
+/// MEME en mode `human_only` : phishing/scam, invitation Discord (pub),
+/// (le gros flood est decide en amont et passe via `severe_external`).
+pub(super) fn is_severe_content(flags: &detectors::DetectionFlags, content: &str) -> bool {
+    flags.phishing || contains_discord_invite(content)
+}
+
+/// Detecte une invitation Discord dans le texte (pub vers un autre serveur).
+fn contains_discord_invite(content: &str) -> bool {
+    let l = content.to_lowercase();
+    l.contains("discord.gg/")
+        || l.contains("discord.com/invite/")
+        || l.contains("discordapp.com/invite/")
+}
+
+/// Applique une protection automatique reversible : mute (timeout) + suppression
+/// du message. Silencieux (pas d'embed dans le salon : c'est la carte de review
+/// qui porte l'info). Retourne une note a afficher sur la carte, ou `None` si la
+/// guild est absente. Utilise pour raid / phishing / pub Discord / gros flood,
+/// y compris quand `human_only` est actif (la decision finale reste humaine).
+pub(super) async fn apply_auto_protect(
+    ctx: &Context,
+    msg: &Message,
+    mute_duration_secs: u64,
+) -> Option<String> {
+    let guild_id = msg.guild_id?;
+    const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
+    let safe = mute_duration_secs.min(MAX_MUTE_SECS).max(60);
+
+    let now_secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs() as i64;
+    let mut mute_ok = false;
+    if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(now_secs + safe as i64) {
+        let timeout = serenity::model::Timestamp::from(dt);
+        match guild_id.member(&ctx.http, msg.author.id).await {
+            Ok(mut member) => match member.disable_communication_until_datetime(&ctx.http, timeout).await {
+                Ok(_) => {
+                    mute_ok = true;
+                    info!(user = %msg.author.name, duration_secs = safe, "Auto-protection : mute applique");
+                }
+                Err(e) => warn!(error = %e, user = %msg.author.name, "Auto-protection : echec mute (permission MODERATE_MEMBERS ?)"),
+            },
+            Err(e) => warn!(error = %e, user = %msg.author.name, "Auto-protection : membre introuvable pour mute"),
+        }
+    }
+
+    // Suppression du message declencheur (best-effort).
+    let _ = msg.delete(&ctx.http).await;
+
+    let mins = safe / 60;
+    Some(if mute_ok {
+        format!("Mute {mins} min + suppression appliques automatiquement (mesure de protection reversible). A valider/ajuster ci-dessous.")
+    } else {
+        "Message supprime automatiquement (mute echoue : verifier MODERATE_MEMBERS). A valider/ajuster ci-dessous.".to_string()
+    })
+}
+
 /// Envoie le message au backend pour analyse et execute l'action.
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn send_to_backend(
     ctx: &Context,
     msg: &Message,
@@ -43,6 +103,8 @@ pub(super) async fn send_to_backend(
     context_max_chars: usize,
     review_min_score: f64,
     human_only: bool,
+    auto_protect: bool,
+    severe_external: bool,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
     let context_messages = if context_max_messages == 0 {
@@ -145,10 +207,24 @@ pub(super) async fn send_to_backend(
             // on applique directement (filtre le bruit faible sur la pile).
             let score = response.score.unwrap_or(0.0);
             let above_threshold = score >= review_min_score;
+
+            // Cas SEVERE (raid / phishing / pub Discord / gros flood) : on
+            // applique une protection auto reversible (mute + suppression) MEME
+            // en `human_only`, puis on poste TOUJOURS la carte pour decision
+            // humaine. La carte affiche la note d'action auto.
+            let severe = auto_protect
+                && (severe_external || is_severe_content(&request.flags, &msg.content));
+            let auto_note = if severe {
+                apply_auto_protect(ctx, msg, mute_duration_secs).await
+            } else {
+                None
+            };
+
             // Modération humaine : si `human_only`, TOUTE detection actionnable
-            // passe par une carte (jamais d'action auto). Sans salon de review,
-            // on ne sanctionne pas (plutot que de tomber en mode auto).
-            let card_path = log_channel_id != 0 && (human_only || (ai_review_mode && above_threshold));
+            // passe par une carte (jamais d'action auto). Un cas severe force
+            // aussi la carte (en plus de l'action auto deja appliquee).
+            let card_path =
+                log_channel_id != 0 && (human_only || severe || (ai_review_mode && above_threshold));
             if card_path {
                 send_review_card(
                     ctx, msg, &response.action,
@@ -156,7 +232,12 @@ pub(super) async fn send_to_backend(
                     score,
                     &request.flags,
                     log_channel_id, colors,
+                    auto_note,
                 ).await;
+            } else if severe {
+                // Aucun salon de review : la protection auto a deja ete appliquee
+                // (mute + suppression), rien de plus a faire.
+                info!(user = %msg.author.name, "Cas severe protege automatiquement (pas de salon de review pour carte)");
             } else if human_only {
                 warn!(
                     user = %msg.author.name,
