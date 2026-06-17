@@ -368,6 +368,24 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         return;
     }
 
+    // Idempotence : la carte 1-clic applique la sanction SANS gate DB (le
+    // bouton ne porte pas le review_id). On verrouille donc au niveau carte :
+    // une seule action par carte, anti double-clic / double-modo simultane.
+    let guard_key = format!("card:{}", component.message.id);
+    if !super::claim_once(ctx, &guard_key).await {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                serenity::builder::CreateInteractionResponse::Message(
+                    serenity::builder::CreateInteractionResponseMessage::new()
+                        .content("Cette carte a deja ete traitee.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
     let custom_id = &component.data.custom_id;
     // Format : am_{action}:{guild_id}:{channel_id}:{message_id}:{user_id}
     let parts: Vec<&str> = custom_id.split(':').collect();
@@ -660,6 +678,12 @@ async fn apply_web_resolution(
 ) {
     if !matches!(applied_action, "prevention" | "warn" | "delete" | "mute" | "ban") {
         return; // "ignore" ou inconnu : rien a appliquer.
+    }
+    // Idempotence : le consumer Redis (stream group + ack) peut redelivrer
+    // l'event. On ne (re)applique la sanction qu'une fois par review.
+    if !super::claim_once(ctx, &format!("webres:{action_id}")).await {
+        info!(action_id, "Event web-resolve deja applique (redelivrance ignoree)");
+        return;
     }
     let api = {
         let data = ctx.data.read().await;

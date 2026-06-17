@@ -42,7 +42,11 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
 
 ## Actions
 - [ ] Définir les catégories "auto" (phishing/raid) + seuils, avec réversibilité, log et appel — owner : Ava
-- [ ] Auditer l'idempotence des 3 chemins de finalisation et le log-dans-la-transaction — owner : Marc
+- [x] Auditer l'idempotence des 3 chemins de finalisation et le log-dans-la-transaction — owner : Marc
+  - Vote → Finaliser : OK (gate DB `/resolve` sur status pending|decided, 2e clic = Conflict avant apply/log).
+  - Web-resolve : gate DB OK, mais redelivrance Redis possible → AJOUT d'un verrou anti-redelivrance (claim par review).
+  - 1-clic : trou reel (applique la sanction sans gate DB, bouton sans review_id) → AJOUT d'un verrou d'idempotence en memoire au niveau carte (une action par carte).
+  - Reste recommande : (1) log de sanction dans la MEME transaction API que la resolution (aujourd'hui 2 appels separes cote bot) ; (2) le verrou memoire ne couvre pas un deploiement multi-process/sharding — un verrou DB serait necessaire a cette echelle.
 - [ ] Spécifier le contrat API should_card / aggregate_into et retirer le routage redondant du bot ; vérifier les rate limits d'édition — owner : Kenji
 - [ ] Rédiger un ADR court "décider = API / agir = bot" (frontière + périmètre proto) — owner : Léa
 - [ ] Trancher la règle de split de carte agrégée et le drapeau membre vulnérable — owner : Nora

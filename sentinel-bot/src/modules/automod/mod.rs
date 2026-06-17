@@ -53,6 +53,36 @@ impl TypeMapKey for SlowmodeTrackerKey {
     type Value = SlowmodeTracker;
 }
 
+/// Verrou d'idempotence des interactions/events qui appliquent une sanction
+/// SANS gate DB (carte 1-clic, redelivrance d'event Redis web-resolve). Cle
+/// libre -> Instant du 1er traitement. Evite la double sanction sur double-clic
+/// ou redelivrance. Purge avec les autres caches.
+pub struct InteractionGuardKey;
+impl TypeMapKey for InteractionGuardKey {
+    type Value = Arc<DashMap<String, Instant>>;
+}
+
+/// Reserve atomiquement `key` : retourne `true` si c'est le 1er traitement
+/// (on peut continuer), `false` si deja traite recemment (on doit ignorer).
+pub(super) async fn claim_once(ctx: &Context, key: &str) -> bool {
+    let guard = {
+        let data = ctx.data.read().await;
+        match data.get::<InteractionGuardKey>() {
+            Some(g) => g.clone(),
+            None => return true, // pas de garde initialisee -> ne bloque pas
+        }
+    };
+    use dashmap::mapref::entry::Entry;
+    let claimed = match guard.entry(key.to_string()) {
+        Entry::Occupied(_) => false,
+        Entry::Vacant(v) => {
+            v.insert(Instant::now());
+            true
+        }
+    };
+    claimed
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // Module interface (register_commands, handle_command, handles_component)
 // ══════════════════════════════════════════════════════════════════════
@@ -62,6 +92,7 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     use dashmap::DashMap;
     data.insert::<ProcessedMessagesKey>(Arc::new(DashMap::new()));
     data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
+    data.insert::<InteractionGuardKey>(Arc::new(DashMap::new()));
     data.insert::<SlowmodeTrackerKey>(adaptive_slowmode::SlowmodeTracker::new(30));
 }
 
@@ -251,6 +282,10 @@ pub fn spawn_background_tasks(ctx: &Context) {
                 if removed > 0 {
                     info!(removed, remaining = tracker.len(), "Purge background flood tracker");
                 }
+            }
+
+            if let Some(guard) = data.get::<InteractionGuardKey>() {
+                guard.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
             }
         }
     });
