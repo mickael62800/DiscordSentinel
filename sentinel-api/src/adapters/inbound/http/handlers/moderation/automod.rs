@@ -275,6 +275,87 @@ pub struct ResolveReviewBody {
     pub has_admin_role: bool,
 }
 
+/// Enregistre la sanction de membre correspondant a une resolution de carte,
+/// cote serveur (historique de moderation + escalade), au lieu d'un 2e appel
+/// HTTP par le bot. Seules les vraies sanctions de membre sont tracees
+/// (prevention/warn/mute/ban) ; "delete"/"ignore" ne sont pas des sanctions.
+/// Best-effort : un echec est logge mais ne fait pas echouer la resolution.
+async fn log_review_sanction(
+    state: &AppState,
+    review: &AutomodReview,
+    applied_action: &str,
+    moderator_id: &str,
+    moderator_name: &str,
+) {
+    use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+
+    if !matches!(applied_action, "prevention" | "warn" | "mute" | "ban") {
+        return;
+    }
+
+    // Duree du mute depuis la config guild (pour le rappel d'expiration + l'historique).
+    let duration = if applied_action == "mute" {
+        state
+            .bot_config_repo
+            .get_config(review.guild_id.as_str(), "automod-bot")
+            .await
+            .unwrap_or_default()
+            .iter()
+            .find(|e| e.config_key == "mute_duration_secs")
+            .and_then(|e| e.config_value.parse::<u64>().ok())
+    } else {
+        None
+    };
+
+    let cmd = LogModerationCommand {
+        guild_id: review.guild_id.clone(),
+        channel_id: review.channel_id.clone(),
+        moderator_id: moderator_id.to_string(),
+        moderator_name: moderator_name.to_string(),
+        target_id: review.user_id.as_str().to_string(),
+        target_name: review.user_name.clone(),
+        action_type: applied_action.to_string(),
+        reason: "Sanction validee via carte AutoMod".to_string(),
+        gravity: if applied_action == "warn" { Some("medium".to_string()) } else { None },
+        duration,
+    };
+    let logged = match state.moderation_uc.log_action_with_strike(cmd).await {
+        Ok(l) => l,
+        Err(e) => {
+            tracing::error!(error = %e, review_id = %review.id, action = %applied_action, "Echec log sanction (resolve) cote serveur");
+            return;
+        }
+    };
+
+    // Memes broadcasts que l'endpoint /api/moderation/actions, pour que le
+    // journal web et les notifications de strike restent a jour.
+    state.broadcaster.broadcast(
+        "moderation_action",
+        serde_json::json!({
+            "action_type": applied_action,
+            "target_id": review.user_id.as_str(),
+            "target_name": &review.user_name,
+            "moderator_name": moderator_name,
+            "reason": "Sanction validee via carte AutoMod",
+            "guild_id": review.guild_id.as_str(),
+        }),
+    );
+    if let Some(sr) = &logged.strike {
+        if sr.should_trigger_escalation_broadcast() {
+            state.broadcaster.broadcast(
+                "strike_added",
+                serde_json::json!({
+                    "guild_id": review.guild_id.as_str(),
+                    "user_id": review.user_id.as_str(),
+                    "active_count": sr.active_count,
+                    "escalation_action": sr.escalation_action,
+                    "escalation_duration": sr.escalation_duration,
+                }),
+            );
+        }
+    }
+}
+
 /// POST /api/automod/reviews/{review_id}/resolve
 ///
 /// Marque la review comme resolue cote DB et publie l'event
@@ -317,6 +398,14 @@ pub async fn resolve_review(
             requester,
         })
         .await?;
+
+    // Tracabilite : on enregistre la sanction de membre cote serveur, dans la
+    // meme requete que la resolution (le bot n'a plus a faire un 2e appel
+    // HTTP -> plus de fenetre "resolu mais non logge" cote bot).
+    log_review_sanction(
+        &state, &review, &body.applied_action, &body.resolved_by_id, &body.resolved_by_name,
+    )
+    .await;
 
     // Event WebSocket + Redis Stream pour le bot listener.
     state.broadcaster.broadcast(

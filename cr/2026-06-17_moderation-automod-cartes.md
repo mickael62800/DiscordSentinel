@@ -50,8 +50,12 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
   - Vote → Finaliser : OK (gate DB `/resolve` sur status pending|decided, 2e clic = Conflict avant apply/log).
   - Web-resolve : gate DB OK, mais redelivrance Redis possible → AJOUT d'un verrou anti-redelivrance (claim par review).
   - 1-clic : trou reel (applique la sanction sans gate DB, bouton sans review_id) → AJOUT d'un verrou d'idempotence en memoire au niveau carte (une action par carte).
-  - Reste recommande : (1) log de sanction dans la MEME transaction API que la resolution (aujourd'hui 2 appels separes cote bot) ; (2) le verrou memoire ne couvre pas un deploiement multi-process/sharding — un verrou DB serait necessaire a cette echelle.
+  - Log de sanction désormais écrit CÔTÉ SERVEUR dans la requête `/resolve` (helper `log_review_sanction`), avec les mêmes broadcasts (moderation_action / strike_added). Le bot ne fait plus de 2e appel HTTP (finalize + web-resolve) → fin de la fenêtre "résolu mais non loggé".
+  - Limites restantes (assumées) : (1) ce n'est pas une seule transaction ACID (2 commits DB dans une même requête API) — un vrai single-tx exigerait des variantes `_tx` sur les repos audit_logs/strike/automod, jugé disproportionné/risqué sans tests ; (2) le verrou d'idempotence est en mémoire → un déploiement multi-process/sharding nécessiterait un verrou DB ; (3) le 1-clic continue de logger côté bot (il ne passe pas par `/resolve`).
 - [ ] Spécifier le contrat API should_card / aggregate_into et retirer le routage redondant du bot ; vérifier les rate limits d'édition — owner : Kenji
 - [ ] Rédiger un ADR court "décider = API / agir = bot" (frontière + périmètre proto) — owner : Léa
-- [ ] Trancher la règle de split de carte agrégée et le drapeau membre vulnérable — owner : Nora
+- [~] Split de carte agrégée + drapeau membre vulnérable/mineur — owner : Nora
+  - Drapeau mineur : SANS OBJET — le serveur n'accueille aucun mineur (certitude confirmée par le propriétaire). Pas de graduation spécifique mineur à implémenter.
+  - Split de carte agrégée (isoler un cas grave du bruit) : reste ouvert, optionnel.
 - [ ] Valider les gabarits de message de sanction (ton + mention systématique du droit d'appel), y compris actions automatiques — owner : Léo
+  - Partiellement couvert : les actions automatiques notifient déjà le membre en DM avec le droit d'appel (/appeal). Reste à uniformiser le ton des messages de sanction des autres chemins.

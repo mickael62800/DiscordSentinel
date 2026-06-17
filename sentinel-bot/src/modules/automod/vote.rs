@@ -1013,11 +1013,9 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // Recupere la review (verdict + cible) depuis l'API.
     #[derive(serde::Deserialize)]
     struct ReviewDto {
-        guild_id: String,
         channel_id: String,
         message_id: String,
         user_id: String,
-        user_name: String,
         decided_action: Option<String>,
         status: String,
     }
@@ -1053,18 +1051,10 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         return;
     }
 
-    // Trace TOUTE sanction de membre (warn/mute/ban) dans le module moderation
-    // pour qu'elle compte dans l'historique et l'escalade. delete = retrait de
-    // message (pas une sanction de membre) -> non trace.
+    // La sanction de membre est tracee cote API (dans la meme requete /resolve
+    // ci-dessus) -> plus de 2e appel HTTP ici (evite la fenetre "resolu mais
+    // non logge"). Le bot se contente d'executer l'action Discord.
     let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", super::DEFAULT_MUTE_DURATION_SECS);
-    log_sanction_to_moderation(
-        ctx, &review.guild_id, &component.channel_id.to_string(),
-        &component.user.id.to_string(), &component.user.name,
-        &review.user_id, &review.user_name,
-        &decided, "Sanction validee par vote des moderateurs (AutoMod)",
-        if decided == "mute" { Some(mute_secs) } else { None },
-    )
-    .await;
 
     // Execute la sanction Discord (delete/mute/ban).
     apply_member_sanction(ctx, component.guild_id, &review.channel_id, &review.message_id, &review.user_id, &decided, mute_secs).await;

@@ -653,28 +653,21 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
         .and_then(|a| a.get("name"))
         .and_then(|n| n.as_str())
         .unwrap_or("Web admin");
-    let actor_id = data
-        .get("actor")
-        .and_then(|a| a.get("id"))
-        .and_then(|n| n.as_str())
-        .unwrap_or("");
 
     edit_review_card_from_web(ctx, action_id, applied_action, actor_name).await;
 
-    // Applique REELLEMENT la sanction sur Discord + la trace (le handler web ne
-    // faisait qu'editer la carte ; sans ca, resoudre depuis le dashboard ne
-    // bannissait/mutait personne).
-    apply_web_resolution(ctx, action_id, applied_action, actor_id, actor_name).await;
+    // Applique l'action sur Discord (le handler web ne faisait qu'editer la
+    // carte). La sanction est tracee cote API dans la requete /resolve.
+    apply_web_resolution(ctx, action_id, applied_action).await;
 }
 
-/// Applique sur Discord la sanction resolue depuis le web + la trace dans le
-/// module moderation. Reutilise les helpers partages du mode vote.
+/// Applique sur Discord la sanction resolue depuis le web (delete/mute/ban).
+/// La tracabilite (historique moderation) est faite cote API. Reutilise les
+/// helpers partages du mode vote.
 async fn apply_web_resolution(
     ctx: &Context,
     action_id: &str,
     applied_action: &str,
-    actor_id: &str,
-    actor_name: &str,
 ) {
     if !matches!(applied_action, "prevention" | "warn" | "delete" | "mute" | "ban") {
         return; // "ignore" ou inconnu : rien a appliquer.
@@ -696,7 +689,6 @@ async fn apply_web_resolution(
         channel_id: String,
         message_id: String,
         user_id: String,
-        user_name: String,
     }
     let review: ReviewDto = match api.get_json(&format!("/api/automod/reviews/{action_id}")).await {
         Ok(r) => r,
@@ -715,17 +707,10 @@ async fn apply_web_resolution(
     let gid = review.guild_id.parse::<u64>().ok().map(serenity::model::id::GuildId::new);
 
     // Action Discord (delete/mute/ban ; warn = pas d'action destructive).
+    // La sanction est tracee cote API dans la requete /resolve (source web) ;
+    // le bot n'applique ici que l'action Discord (pas de log redondant).
     super::vote::apply_member_sanction(
         ctx, gid, &review.channel_id, &review.message_id, &review.user_id, applied_action, mute_secs,
-    )
-    .await;
-
-    // Trace la sanction de membre (warn/mute/ban) avec l'acteur web comme moderateur.
-    super::vote::log_sanction_to_moderation(
-        ctx, &review.guild_id, &review.channel_id, actor_id, actor_name,
-        &review.user_id, &review.user_name, applied_action,
-        "Sanction appliquee depuis le dashboard web",
-        if applied_action == "mute" { Some(mute_secs) } else { None },
     )
     .await;
 }
