@@ -1,6 +1,6 @@
 //! Routes du jeu Tamagotchi (montees sous `/api/tamagotchi`).
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
 use super::super::handlers;
@@ -14,6 +14,9 @@ fn inner() -> Router<AppState> {
         .route("/visit", post(handlers::tamagotchi::pets::visit))
         .route("/combat", post(handlers::tamagotchi::pets::combat))
         .route("/tick", post(handlers::tamagotchi::pets::tick_all))
+        // Admin web : liste des compagnons de la guild + suppression.
+        .route("/{guild_id}/pets", get(handlers::tamagotchi::pets::list_pets))
+        .route("/{guild_id}/pets/{pet_id}", delete(handlers::tamagotchi::pets::delete_pet))
         .route("/{guild_id}/{owner_id}", get(handlers::tamagotchi::pets::get_pet))
 }
 

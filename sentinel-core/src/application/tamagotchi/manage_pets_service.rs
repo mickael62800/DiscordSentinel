@@ -77,6 +77,17 @@ impl ManagePetsUseCase for ManagePetsService {
         self.repo.get_by_owner(guild_id, owner_id).await
     }
 
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError> {
+        if guild_id.trim().is_empty() {
+            return Err(DomainError::ValidationError("guild_id requis".into()));
+        }
+        self.repo.list_by_guild(guild_id).await
+    }
+
+    async fn delete(&self, pet_id: Uuid) -> Result<(), DomainError> {
+        self.repo.delete(pet_id).await
+    }
+
     async fn recent_events(&self, pet_id: Uuid, limit: i64) -> Result<Vec<PetEvent>, DomainError> {
         self.repo.recent_events(pet_id, limit.clamp(1, 50)).await
     }

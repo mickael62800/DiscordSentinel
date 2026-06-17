@@ -1,12 +1,15 @@
 //! Handlers HTTP du jeu Tamagotchi.
 
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{require_role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use axum::http::StatusCode;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
 use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::tamagotchi::manage_pets::{CareCommand, CreatePetCommand};
@@ -111,6 +114,41 @@ pub async fn get_pet(
         .ok_or_else(|| ApiError::from(DomainError::NotFound("aucun compagnon".into())))?;
     let events = load_events(&state, pet.id).await;
     Ok(Json(PetDto::from(pet, events)))
+}
+
+fn forbid(s: StatusCode, msg: &str) -> ApiError {
+    ApiError(if s == StatusCode::FORBIDDEN {
+        DomainError::Forbidden(msg.into())
+    } else {
+        DomainError::Internal(msg.into())
+    })
+}
+
+/// GET /api/tamagotchi/{guild_id}/pets — liste tous les compagnons de la guild
+/// (vue d'administration : dresseurs + evolution). Lecture : admin+.
+pub async fn list_pets(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<RoleContext>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<PetDto>>, ApiError> {
+    require_role(&ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))?;
+    let pets = state.pets_uc.list_by_guild(&guild_id).await?;
+    let dtos = pets.into_iter().map(|p| PetDto::from(p, vec![])).collect();
+    Ok(Json(dtos))
+}
+
+/// DELETE /api/tamagotchi/{guild_id}/pets/{pet_id} — supprime un compagnon.
+/// Action destructive : owner+. Le `guild_id` du path sert au contexte RBAC.
+pub async fn delete_pet(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<RoleContext>,
+    Path((_guild_id, pet_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    require_role(&ctx, Role::Owner).map_err(|s| forbid(s, "owner+ requis"))?;
+    let id = Uuid::parse_str(&pet_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("pet_id invalide".into())))?;
+    state.pets_uc.delete(id).await?;
+    Ok(StatusCode::NO_CONTENT)
 }
 
 #[derive(Debug, Deserialize)]

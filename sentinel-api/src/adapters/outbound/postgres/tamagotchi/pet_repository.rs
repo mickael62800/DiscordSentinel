@@ -120,6 +120,26 @@ impl PetRepository for PgPetRepository {
         Ok(row.map(Into::into))
     }
 
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError> {
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT * FROM pets WHERE guild_id = $1 ORDER BY level DESC, xp DESC",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn delete(&self, id: Uuid) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM pets WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn save(&self, p: &Pet) -> Result<Pet, DomainError> {
         let row: Row = sqlx::query_as(
             "UPDATE pets SET \

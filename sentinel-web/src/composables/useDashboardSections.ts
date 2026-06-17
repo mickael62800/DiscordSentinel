@@ -52,6 +52,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers", requiredBot: "blackjack-bot" },
   { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign", requiredBot: "slot-bot" },
   { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw", requiredBot: "wheel-bot" },
+  { key: "games.tamagotchi", path: "/tamagotchi", label: "Tamagotchi", icon: "heart", requiredBot: "tamagotchi-bot" },
   // Wallet : visible tant qu'au moins un jeu utilisant le wallet est actif.
   // Cache uniquement si coude + blackjack + slot + wheel sont TOUS off.
   {

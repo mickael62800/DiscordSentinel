@@ -106,6 +106,11 @@ pub struct TrainCommand {
 pub trait ManagePetsUseCase: Send + Sync {
     async fn create(&self, cmd: CreatePetCommand) -> Result<Pet, DomainError>;
     async fn get_by_owner(&self, guild_id: &str, owner_id: &str) -> Result<Option<Pet>, DomainError>;
+    /// Liste tous les compagnons d'une guild (vivants et morts), pour la page
+    /// d'administration web (vue des dresseurs + evolution).
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError>;
+    /// Supprime definitivement un compagnon (action admin web).
+    async fn delete(&self, pet_id: Uuid) -> Result<(), DomainError>;
     async fn recent_events(&self, pet_id: Uuid, limit: i64) -> Result<Vec<PetEvent>, DomainError>;
     /// Applique une action de soin (cooldown + debit coins + effet + XP).
     async fn care(&self, cmd: CareCommand) -> Result<Pet, DomainError>;

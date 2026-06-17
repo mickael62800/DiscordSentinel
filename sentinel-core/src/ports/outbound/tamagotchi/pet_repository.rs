@@ -9,6 +9,10 @@ pub trait PetRepository: Send + Sync {
     async fn create(&self, pet: NewPet) -> Result<Pet, DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<Pet>, DomainError>;
     async fn get_by_owner(&self, guild_id: &str, owner_id: &str) -> Result<Option<Pet>, DomainError>;
+    /// Liste tous les compagnons d'une guild (tous statuts), pour l'admin web.
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError>;
+    /// Supprime definitivement un compagnon (et ses events via cascade).
+    async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
     /// Persiste l'etat mutable du compagnon (jauges, stats, statut, xp/level,
     /// cooldowns, timers de sante, last_decay_at).
     async fn save(&self, pet: &Pet) -> Result<Pet, DomainError>;

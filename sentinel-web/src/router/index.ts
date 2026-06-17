@@ -65,6 +65,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/slot", name: "slot", component: () => import("../components/pages/SlotPage.vue") },
   { path: "/wheel", name: "wheel", component: () => import("../components/pages/WheelPage.vue") },
   { path: "/wallet", name: "wallet", component: () => import("../components/pages/WalletPage.vue") },
+  { path: "/tamagotchi", name: "tamagotchi", component: () => import("../components/pages/TamagotchiPage.vue") },
   { path: "/tournaments", name: "tournaments", component: () => import("../components/pages/TournamentPage.vue") },
   { path: "/game-portal", name: "game-portal", component: () => import("../components/pages/GamePortalPage.vue") },
 
