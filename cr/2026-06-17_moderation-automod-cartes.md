@@ -41,7 +41,11 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
 - Divergence de comportement bot/web tant que la décision n'est pas centralisée (règle dupliquée).
 
 ## Actions
-- [ ] Définir les catégories "auto" (phishing/raid) + seuils, avec réversibilité, log et appel — owner : Ava
+- [x] Définir les catégories "auto" (phishing/raid) + seuils, avec réversibilité, log et appel — owner : Ava
+  - Auto-protect (mute réversible + carte) pour phishing / invitation Discord / gros flood (migration 271).
+  - Sanction auto désormais TRACÉE dans l'historique de modération (acteur = AutoMod, compte dans l'escalade).
+  - Membre notifié en DM (motif + droit d'appel via /appeal) — conformité DSA (auto_protect_notify_member).
+  - Liens non autorisés HORS image supprimés automatiquement + traçabilité (auto_delete_links_enabled, migration 272).
 - [x] Auditer l'idempotence des 3 chemins de finalisation et le log-dans-la-transaction — owner : Marc
   - Vote → Finaliser : OK (gate DB `/resolve` sur status pending|decided, 2e clic = Conflict avant apply/log).
   - Web-resolve : gate DB OK, mais redelivrance Redis possible → AJOUT d'un verrou anti-redelivrance (claim par review).

@@ -45,6 +45,27 @@ fn contains_discord_invite(content: &str) -> bool {
         || l.contains("discordapp.com/invite/")
 }
 
+/// Extensions considerees comme "image" : on NE supprime pas un lien d'image
+/// (laisse au pipeline vision / au flux normal).
+const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "apng", "avif"];
+
+/// `true` si le message contient au moins une URL http(s) qui n'est PAS une
+/// image (lien "hors image" a supprimer). Sert a auto-supprimer les liens non
+/// autorises tout en epargnant les liens d'images.
+pub(super) fn contains_non_image_url(content: &str) -> bool {
+    content.split_whitespace().any(|tok| {
+        let t = tok.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '/' && c != ':' && c != '.' && c != '-' && c != '_');
+        let lower = t.to_lowercase();
+        if !(lower.starts_with("http://") || lower.starts_with("https://")) {
+            return false;
+        }
+        // Extension = dernier segment apres le dernier '.' (en ignorant la query).
+        let path = lower.split(['?', '#']).next().unwrap_or(&lower);
+        let ext = path.rsplit('.').next().unwrap_or("");
+        !IMAGE_EXTS.contains(&ext)
+    })
+}
+
 /// Applique une protection automatique reversible : mute (timeout) + suppression
 /// du message. Silencieux (pas d'embed dans le salon : c'est la carte de review
 /// qui porte l'info). Retourne une note a afficher sur la carte, ou `None` si la
@@ -54,6 +75,8 @@ pub(super) async fn apply_auto_protect(
     ctx: &Context,
     msg: &Message,
     mute_duration_secs: u64,
+    reason: &str,
+    notify_member: bool,
 ) -> Option<String> {
     let guild_id = msg.guild_id?;
     const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
@@ -81,9 +104,48 @@ pub(super) async fn apply_auto_protect(
     // Suppression du message declencheur (best-effort).
     let _ = msg.delete(&ctx.http).await;
 
+    // Tracabilite : on logge le mute auto comme une sanction de membre dans
+    // l'historique de moderation (acteur = le bot lui-meme / AutoMod), au meme
+    // titre qu'un mute valide par un humain (compte dans l'escalade).
+    if mute_ok {
+        let (bot_id, bot_name) = {
+            let cu = ctx.cache.current_user();
+            (cu.id.to_string(), cu.name.clone())
+        };
+        super::vote::log_sanction_to_moderation(
+            ctx,
+            &guild_id.to_string(),
+            &msg.channel_id.to_string(),
+            &bot_id,
+            &bot_name,
+            &msg.author.id.to_string(),
+            &msg.author.name,
+            "mute",
+            &format!("Protection automatique AutoMod : {reason}"),
+            Some(safe),
+        )
+        .await;
+    }
+
+    // Notification DSA au membre : motif + droit d'appel (best-effort, le DM
+    // peut echouer si le membre a ferme ses MP).
+    if notify_member && mute_ok {
+        let dm = format!(
+            "Une mesure de protection automatique (mute {} min) a ete appliquee a ton encontre.\n\
+             Motif : {reason}\n\
+             Si tu penses que c'est une erreur, tu peux contester via la commande **/appeal** sur le serveur.",
+            safe / 60
+        );
+        if let Ok(ch) = msg.author.create_dm_channel(&ctx.http).await {
+            let _ = ch
+                .send_message(&ctx.http, serenity::builder::CreateMessage::new().content(dm))
+                .await;
+        }
+    }
+
     let mins = safe / 60;
     Some(if mute_ok {
-        format!("Mute {mins} min + suppression appliques automatiquement (mesure de protection reversible). A valider/ajuster ci-dessous.")
+        format!("Mute {mins} min + suppression appliques automatiquement (mesure reversible, tracee). Le membre a ete informe de son droit d'appel (/appeal). A valider/ajuster ci-dessous.")
     } else {
         "Message supprime automatiquement (mute echoue : verifier MODERATE_MEMBERS). A valider/ajuster ci-dessous.".to_string()
     })
@@ -105,6 +167,8 @@ pub(super) async fn send_to_backend(
     human_only: bool,
     auto_protect: bool,
     severe_external: bool,
+    auto_delete_links: bool,
+    notify_member: bool,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
     let context_messages = if context_max_messages == 0 {
@@ -215,10 +279,31 @@ pub(super) async fn send_to_backend(
             let severe = auto_protect
                 && (severe_external || is_severe_content(&request.flags, &msg.content));
             let auto_note = if severe {
-                apply_auto_protect(ctx, msg, mute_duration_secs).await
+                apply_auto_protect(ctx, msg, mute_duration_secs, &effective_reason, notify_member).await
             } else {
                 None
             };
+
+            // Lien non autorise HORS image : suppression automatique + tracabilite
+            // (log + detection deja persistee a l'analyse), meme en human_only.
+            // On n'agit que si ce n'est pas deja un cas severe (deja gere).
+            if !severe
+                && auto_delete_links
+                && request.flags.link
+                && !request.flags.phishing
+                && contains_non_image_url(&msg.content)
+            {
+                if let Err(e) = msg.delete(&ctx.http).await {
+                    warn!(error = %e, message_id = %msg.id, "Echec suppression lien non autorise");
+                }
+                base.send_log(
+                    "warn",
+                    &request.guild_id,
+                    &format!("Lien non autorise supprime -- {} : {}", msg.author.name, effective_reason),
+                );
+                info!(user = %msg.author.name, "Lien non autorise (hors image) supprime automatiquement");
+                return;
+            }
 
             // Modération humaine : si `human_only`, TOUTE detection actionnable
             // passe par une carte (jamais d'action auto). Un cas severe force
