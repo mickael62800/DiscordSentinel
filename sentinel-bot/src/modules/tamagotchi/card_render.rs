@@ -132,15 +132,36 @@ fn sprite_filename(d: &CardData) -> String {
     )
 }
 
-/// Charge le sprite depuis `TAMAGOTCHI_SPRITES_DIR` (defaut: `images`) et le
+/// Charge le sprite depuis le dossier de sprites (cf. `sprites_dir`) et le
 /// renvoie en base64 (embarquement SVG). `None` si le fichier est absent ->
 /// le rendu retombe sur le placeholder.
 fn load_sprite_b64(d: &CardData) -> Option<String> {
     use base64::Engine;
-    let dir = std::env::var("TAMAGOTCHI_SPRITES_DIR").unwrap_or_else(|_| "images".to_string());
-    let path = std::path::Path::new(&dir).join(format!("{}.png", sprite_filename(d)));
-    let bytes = std::fs::read(&path).ok()?;
+    let file = format!("{}.png", sprite_filename(d));
+    let bytes = std::fs::read(sprites_dir().join(&file)).ok()?;
     Some(base64::engine::general_purpose::STANDARD.encode(bytes))
+}
+
+/// Racine des sprites. Override via `TAMAGOTCHI_SPRITES_DIR` ; sinon on essaie
+/// les emplacements usuels (meme logique que les cartes Blackjack) : cwd local
+/// (`cargo run` depuis la racine du workspace) ET conteneur Docker (`/app`).
+fn sprites_dir() -> std::path::PathBuf {
+    use std::path::PathBuf;
+    if let Ok(custom) = std::env::var("TAMAGOTCHI_SPRITES_DIR") {
+        return PathBuf::from(custom);
+    }
+    for candidate in [
+        "assets/tamagotchi",
+        "sentinel-bot/assets/tamagotchi",
+        "/app/assets/tamagotchi",
+        "images",
+    ] {
+        let p = PathBuf::from(candidate);
+        if p.is_dir() {
+            return p;
+        }
+    }
+    PathBuf::from("assets/tamagotchi")
 }
 
 /// Avatar "mort" : une pierre tombale RIP dessinee en SVG (aucun asset requis).
