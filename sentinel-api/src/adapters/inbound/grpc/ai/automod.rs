@@ -90,12 +90,24 @@ fn action_to_proto(a: Action) -> i32 {
     }
 }
 
+fn routing_to_proto(r: sentinel_core::domain::services::moderation::automod_routing::Routing) -> i32 {
+    use sentinel_core::domain::services::moderation::automod_routing::Routing;
+    match r {
+        Routing::None => proto::Routing::None as i32,
+        Routing::Card => proto::Routing::Card as i32,
+        Routing::Auto => proto::Routing::Auto as i32,
+    }
+}
+
 fn analysis_to_proto(a: MessageAnalysis) -> proto::AnalyzeMessageResponse {
     proto::AnalyzeMessageResponse {
         action: action_to_proto(a.action),
         reason: a.reason,
         score: a.score,
         duration: a.duration,
+        route: routing_to_proto(a.route),
+        severe: a.severe,
+        auto_delete_link: a.auto_delete_link,
     }
 }
 

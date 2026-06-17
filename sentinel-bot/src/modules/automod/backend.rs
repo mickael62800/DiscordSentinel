@@ -30,42 +30,6 @@ fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
     }
 }
 
-/// Detecte un cas "severe" qui justifie une protection automatique immediate
-/// MEME en mode `human_only` : phishing/scam, invitation Discord (pub),
-/// (le gros flood est decide en amont et passe via `severe_external`).
-pub(super) fn is_severe_content(flags: &detectors::DetectionFlags, content: &str) -> bool {
-    flags.phishing || contains_discord_invite(content)
-}
-
-/// Detecte une invitation Discord dans le texte (pub vers un autre serveur).
-fn contains_discord_invite(content: &str) -> bool {
-    let l = content.to_lowercase();
-    l.contains("discord.gg/")
-        || l.contains("discord.com/invite/")
-        || l.contains("discordapp.com/invite/")
-}
-
-/// Extensions considerees comme "image" : on NE supprime pas un lien d'image
-/// (laisse au pipeline vision / au flux normal).
-const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "apng", "avif"];
-
-/// `true` si le message contient au moins une URL http(s) qui n'est PAS une
-/// image (lien "hors image" a supprimer). Sert a auto-supprimer les liens non
-/// autorises tout en epargnant les liens d'images.
-pub(super) fn contains_non_image_url(content: &str) -> bool {
-    content.split_whitespace().any(|tok| {
-        let t = tok.trim_matches(|c: char| !c.is_ascii_alphanumeric() && c != '/' && c != ':' && c != '.' && c != '-' && c != '_');
-        let lower = t.to_lowercase();
-        if !(lower.starts_with("http://") || lower.starts_with("https://")) {
-            return false;
-        }
-        // Extension = dernier segment apres le dernier '.' (en ignorant la query).
-        let path = lower.split(['?', '#']).next().unwrap_or(&lower);
-        let ext = path.rsplit('.').next().unwrap_or("");
-        !IMAGE_EXTS.contains(&ext)
-    })
-}
-
 /// Applique une protection automatique reversible : mute (timeout) + suppression
 /// du message. Silencieux (pas d'embed dans le salon : c'est la carte de review
 /// qui porte l'info). Retourne une note a afficher sur la carte, ou `None` si la
@@ -159,15 +123,12 @@ pub(super) async fn send_to_backend(
     flags: detectors::DetectionFlags,
     mute_duration_secs: u64,
     log_channel_id: u64,
-    ai_review_mode: bool,
     colors: &EmbedColors,
     context_max_messages: u8,
     context_max_chars: usize,
-    review_min_score: f64,
+    // Conserve uniquement pour le fallback "backend injoignable" (decision
+    // serveur indisponible). Le routage nominal est decide cote API.
     human_only: bool,
-    auto_protect: bool,
-    severe_external: bool,
-    auto_delete_links: bool,
     notify_member: bool,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
@@ -267,32 +228,21 @@ pub(super) async fn send_to_backend(
                 );
             }
 
-            // Sync : si score < seuil configure, on saute la review et
-            // on applique directement (filtre le bruit faible sur la pile).
+            // DECIDE = API : la decision de routage (carte / auto / rien +
+            // severe + suppression de lien) est calculee cote serveur, qui
+            // connait la config guild. Le bot se contente d'EXECUTER.
             let score = response.score.unwrap_or(0.0);
-            let above_threshold = score >= review_min_score;
 
-            // Cas SEVERE (raid / phishing / pub Discord / gros flood) : on
-            // applique une protection auto reversible (mute + suppression) MEME
-            // en `human_only`, puis on poste TOUJOURS la carte pour decision
-            // humaine. La carte affiche la note d'action auto.
-            let severe = auto_protect
-                && (severe_external || is_severe_content(&request.flags, &msg.content));
-            let auto_note = if severe {
+            // Cas SEVERE (phishing / pub Discord) : protection auto reversible
+            // immediate (mute + suppression + trace + DM appel), meme en human_only.
+            let auto_note = if response.severe {
                 apply_auto_protect(ctx, msg, mute_duration_secs, &effective_reason, notify_member).await
             } else {
                 None
             };
 
-            // Lien non autorise HORS image : suppression automatique + tracabilite
-            // (log + detection deja persistee a l'analyse), meme en human_only.
-            // On n'agit que si ce n'est pas deja un cas severe (deja gere).
-            if !severe
-                && auto_delete_links
-                && request.flags.link
-                && !request.flags.phishing
-                && contains_non_image_url(&msg.content)
-            {
+            // Lien non autorise HORS image : suppression auto + tracabilite.
+            if response.auto_delete_link {
                 if let Err(e) = msg.delete(&ctx.http).await {
                     warn!(error = %e, message_id = %msg.id, "Echec suppression lien non autorise");
                 }
@@ -305,33 +255,29 @@ pub(super) async fn send_to_backend(
                 return;
             }
 
-            // Modération humaine : si `human_only`, TOUTE detection actionnable
-            // passe par une carte (jamais d'action auto). Un cas severe force
-            // aussi la carte (en plus de l'action auto deja appliquee).
-            let card_path =
-                log_channel_id != 0 && (human_only || severe || (ai_review_mode && above_threshold));
-            if card_path {
-                send_review_card(
-                    ctx, msg, &response.action,
-                    &effective_reason,
-                    score,
-                    &request.flags,
-                    log_channel_id, colors,
-                    auto_note,
-                ).await;
-            } else if severe {
-                // Aucun salon de review : la protection auto a deja ete appliquee
-                // (mute + suppression), rien de plus a faire.
-                info!(user = %msg.author.name, "Cas severe protege automatiquement (pas de salon de review pour carte)");
-            } else if human_only {
-                warn!(
-                    user = %msg.author.name,
-                    "human_only actif mais aucun salon de review configure : action auto bloquee, aucune sanction"
-                );
-            } else {
-                // Mode auto ou pas de salon review -> action directe.
-                if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors).await {
-                    error!(error = %e, "Erreur lors de l'execution de l'action");
+            use super::api_client::Routing;
+            match response.route {
+                Routing::Card => {
+                    send_review_card(
+                        ctx, msg, &response.action,
+                        &effective_reason,
+                        score,
+                        &request.flags,
+                        log_channel_id, colors,
+                        auto_note,
+                    ).await;
+                }
+                Routing::None => {
+                    if response.severe {
+                        // Protection auto deja appliquee, pas de salon de review.
+                        info!(user = %msg.author.name, "Cas severe protege automatiquement (pas de salon de review)");
+                    }
+                    // Sinon : human_only sans salon, ou rien a faire.
+                }
+                Routing::Auto => {
+                    if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors).await {
+                        error!(error = %e, "Erreur lors de l'execution de l'action");
+                    }
                 }
             }
         }

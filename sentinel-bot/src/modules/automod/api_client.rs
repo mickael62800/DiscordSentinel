@@ -48,6 +48,17 @@ pub struct MessageMetadata {
     pub timestamp: String,
 }
 
+/// Decision de routage calculee cote serveur (decide = API). Le bot execute.
+#[derive(Debug, Deserialize, PartialEq, Clone, Copy)]
+pub enum Routing {
+    /// Ne rien faire automatiquement.
+    None,
+    /// Poster une carte de review/vote.
+    Card,
+    /// Appliquer directement l'action (mode auto).
+    Auto,
+}
+
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AnalyzeResponse {
@@ -58,6 +69,12 @@ pub struct AnalyzeResponse {
     pub duration: Option<u64>,
     #[serde(default)]
     pub score: Option<f64>,
+    /// Decision de routage (cote serveur).
+    pub route: Routing,
+    /// Cas severe -> protection auto (mute + suppression) immediate.
+    pub severe: bool,
+    /// Lien non autorise hors image -> suppression auto immediate.
+    pub auto_delete_link: bool,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -123,6 +140,9 @@ impl ApiClient {
             },
             duration: resp.duration,
             score: Some(resp.score),
+            route: proto_routing_to_routing(resp.route),
+            severe: resp.severe,
+            auto_delete_link: resp.auto_delete_link,
         })
     }
 
@@ -136,6 +156,14 @@ fn proto_action_to_action(value: i32) -> Action {
         proto::Action::Delete => Action::Delete,
         proto::Action::Mute => Action::Mute,
         proto::Action::Ban => Action::Ban,
+    }
+}
+
+fn proto_routing_to_routing(value: i32) -> Routing {
+    match proto::Routing::try_from(value).unwrap_or(proto::Routing::None) {
+        proto::Routing::None => Routing::None,
+        proto::Routing::Card => Routing::Card,
+        proto::Routing::Auto => Routing::Auto,
     }
 }
 

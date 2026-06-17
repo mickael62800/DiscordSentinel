@@ -52,10 +52,15 @@ dans l'historique. Commande `/signalement` pour carte manuelle avec contexte ava
   - 1-clic : trou reel (applique la sanction sans gate DB, bouton sans review_id) → AJOUT d'un verrou d'idempotence en memoire au niveau carte (une action par carte).
   - Log de sanction désormais écrit CÔTÉ SERVEUR dans la requête `/resolve` (helper `log_review_sanction`), avec les mêmes broadcasts (moderation_action / strike_added). Le bot ne fait plus de 2e appel HTTP (finalize + web-resolve) → fin de la fenêtre "résolu mais non loggé".
   - Limites restantes (assumées) : (1) ce n'est pas une seule transaction ACID (2 commits DB dans une même requête API) — un vrai single-tx exigerait des variantes `_tx` sur les repos audit_logs/strike/automod, jugé disproportionné/risqué sans tests ; (2) le verrou d'idempotence est en mémoire → un déploiement multi-process/sharding nécessiterait un verrou DB ; (3) le 1-clic continue de logger côté bot (il ne passe pas par `/resolve`).
-- [ ] Spécifier le contrat API should_card / aggregate_into et retirer le routage redondant du bot ; vérifier les rate limits d'édition — owner : Kenji
+- [x] Spécifier le contrat API should_card / aggregate_into et retirer le routage redondant du bot — owner : Kenji
+  - La DÉCISION de routage est calculée côté serveur dans `analyze` (qui a déjà la config guild) : nouveau domaine pur `automod_routing::decide` → `RoutingDecision { route (None/Card/Auto), severe, auto_delete_link }`.
+  - Contrat exposé via le proto `AnalyzeMessageResponse` : enum `Routing` + champs `route`, `severe`, `auto_delete_link`.
+  - Le bot ne décide plus : `send_to_backend` exécute la décision serveur. Retrait du routage dupliqué + des helpers `is_severe_content`/`contains_non_image_url` côté bot, et de 5 paramètres de config devenus inutiles. `human_only` conservé uniquement pour le fallback "backend injoignable".
+  - Agrégation (`aggregate_into`) : déjà côté API via `create_or_merge` (flag `merged` renvoyé) — inchangé.
+  - Reste optionnel : vérifier les rate limits d'édition de la carte agrégée (non bloquant).
 - [ ] Rédiger un ADR court "décider = API / agir = bot" (frontière + périmètre proto) — owner : Léa
-- [~] Split de carte agrégée + drapeau membre vulnérable/mineur — owner : Nora
-  - Drapeau mineur : SANS OBJET — le serveur n'accueille aucun mineur (certitude confirmée par le propriétaire). Pas de graduation spécifique mineur à implémenter.
-  - Split de carte agrégée (isoler un cas grave du bruit) : reste ouvert, optionnel.
+- [x] Split de carte agrégée + drapeau membre vulnérable/mineur — owner : Nora
+  - Drapeau mineur/vulnérable : SANS OBJET — aucun mineur ni membre vulnérable sur le serveur (confirmé 2 fois par le propriétaire). Rien à implémenter.
+  - Split de carte agrégée : laissé optionnel (non demandé), à rouvrir seulement si le flood agrégé devient illisible en pratique.
 - [ ] Valider les gabarits de message de sanction (ton + mention systématique du droit d'appel), y compris actions automatiques — owner : Léo
   - Partiellement couvert : les actions automatiques notifient déjà le membre en DM avec le droit d'appel (/appeal). Reste à uniformiser le ton des messages de sanction des autres chemins.

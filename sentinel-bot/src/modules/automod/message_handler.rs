@@ -76,8 +76,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         &config, "severe_flood_max_messages", (flood_max_messages as u64) * 2,
     )
     .max(flood_max_messages as u64) as usize;
-    // Suppression auto des liens non autorises (hors image) + notification DSA.
-    let auto_delete_links = BaseApiClient::config_bool(&config, "auto_delete_links_enabled", true);
+    // Notification DSA au membre (DM motif + droit d'appel) lors d'une action auto.
     let auto_notify_member = BaseApiClient::config_bool(&config, "auto_protect_notify_member", true);
 
     // Verifier les salons exclus
@@ -232,15 +231,11 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
                 let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
                 let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
-                let flood_review_min_score: f64 = config
-                    .get("review_min_score")
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(0.0);
                 let ctx_clone = ctx.clone();
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
-                    let ai_review = true; // flood passe par le backend IA en review
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score, human_only, auto_protect, false, auto_delete_links, auto_notify_member).await;
+                    // Routage decide cote serveur.
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars, human_only, auto_notify_member).await;
                 });
             }
             return;
@@ -321,16 +316,11 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     let ctx_clone = ctx.clone();
     let msg_clone = msg.clone();
     let vision_enabled = BaseApiClient::config_bool(&config, "vision_enabled", true);
-    let review_min_score: f64 = config
-        .get("review_min_score")
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0.0);
     tokio::spawn(async move {
-        let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
-
-        // Analyse texte (`human_only` capture depuis le scope parent). La
-        // severite (phishing / pub Discord) est decidee dans send_to_backend.
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score, human_only, auto_protect, false, auto_delete_links, auto_notify_member).await;
+        // Analyse texte : le ROUTAGE (carte/auto/rien + severe + suppression
+        // de lien) est decide cote serveur. Le bot execute la decision.
+        // `human_only` n'est conserve que pour le fallback "backend injoignable".
+        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars, human_only, auto_notify_member).await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {

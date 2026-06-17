@@ -427,6 +427,35 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             }
         }
 
+        // 3bis. Decision de routage (DECIDE = API) : on connait ici la config
+        // guild + le score + les flags. Le bot n'aura qu'a EXECUTER.
+        let routing = {
+            use crate::domain::services::moderation::automod_routing::{decide, RoutingInputs};
+            let cfg_str = |k: &str| {
+                automod_entries
+                    .iter()
+                    .find(|e| e.config_key == k)
+                    .map(|e| e.config_value.as_str())
+            };
+            let cfg_bool = |k: &str, d: bool| {
+                cfg_str(k).map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")).unwrap_or(d)
+            };
+            let cfg_f64 = |k: &str, d: f64| cfg_str(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
+            let cfg_u64 = |k: &str, d: u64| cfg_str(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
+            decide(&RoutingInputs {
+                flags: &cmd.flags,
+                content: &cmd.content,
+                score: result.score,
+                action: result.action.clone(),
+                human_only: cfg_bool("human_only_enabled", false),
+                auto_protect: cfg_bool("auto_protect_enabled", true),
+                auto_delete_links: cfg_bool("auto_delete_links_enabled", true),
+                ai_review_mode: cfg_bool("ai_review_mode", true),
+                review_min_score: cfg_f64("review_min_score", 0.0),
+                log_channel_set: cfg_u64("log_channel_id", 0) != 0,
+            })
+        };
+
         // 4. Persister l'infraction
         let infraction = Infraction {
             id: Uuid::new_v4(),
@@ -447,12 +476,15 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
         self.infraction_repo.save(&infraction).await?;
 
-        // 5. Retourner l'analyse
+        // 5. Retourner l'analyse + la decision de routage
         Ok(MessageAnalysis {
             action: result.action,
             reason: result.reason,
             score: result.score,
             duration: result.duration,
+            route: routing.route,
+            severe: routing.severe,
+            auto_delete_link: routing.auto_delete_link,
         })
     }
 }
