@@ -28,6 +28,14 @@ fn automod_inner() -> Router<AppState> {
             post(handlers::moderation::automod::resolve_review),
         )
         .route(
+            "/reviews/{review_id}/ignore",
+            post(handlers::moderation::automod::ignore_review),
+        )
+        .route(
+            "/reviews/{review_id}/reopen",
+            post(handlers::moderation::automod::reopen_review),
+        )
+        .route(
             "/reviews/{review_id}",
             get(handlers::moderation::automod::get_review),
         )

@@ -36,6 +36,25 @@ pub trait AutomodReviewRepository: Send + Sync {
         resolved_source: &str,
     ) -> Result<AutomodReview, DomainError>;
 
+    /// Clore immediatement en "ignore" (statut pending|voting|decided ->
+    /// ignored). `Conflict` si la review est deja close (applied|ignored).
+    async fn close_ignored(
+        &self,
+        id: Uuid,
+        actor_id: &str,
+        actor_name: &str,
+        source: &str,
+    ) -> Result<AutomodReview, DomainError>;
+
+    /// Rouvrir un dossier (applied|ignored -> voting) : efface les votes,
+    /// remet les champs de resolution a NULL et fixe une nouvelle echeance
+    /// (NOW + `deadline_hours`). `Conflict` si la review n'est pas close.
+    async fn reopen(
+        &self,
+        id: Uuid,
+        deadline_hours: i64,
+    ) -> Result<AutomodReview, DomainError>;
+
     // ── Vote ──
     /// Enregistre/met a jour le vote d'un moderateur (un seul par review et
     /// par votant). `Conflict` si la review n'est plus en statut 'voting'.

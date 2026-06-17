@@ -29,6 +29,34 @@ pub struct ResolveAutomodReviewCommand {
     pub requester: Option<ModeratorFacts>,
 }
 
+/// Clore immediatement une review en "ignore" (sans attendre le vote/la
+/// finalisation). Ouvert a tout moderateur (regle `is_moderator`).
+#[derive(Debug, Clone)]
+pub struct CloseIgnoredCommand {
+    pub review_id: Uuid,
+    pub actor_id: String,
+    pub actor_name: String,
+    /// "discord" ou "web".
+    pub source: String,
+    /// Faits du demandeur (source "discord"). `None` pour "web".
+    pub requester: Option<ModeratorFacts>,
+}
+
+/// Rouvrir un dossier resolu/ignore : repasse en 'voting' avec une nouvelle
+/// echeance. Ouvert a tout moderateur (regle `is_moderator`).
+#[derive(Debug, Clone)]
+pub struct ReopenReviewCommand {
+    pub review_id: Uuid,
+    pub actor_id: String,
+    pub actor_name: String,
+    /// Duree (heures) de la nouvelle fenetre de vote.
+    pub deadline_hours: i64,
+    /// "discord" ou "web".
+    pub source: String,
+    /// Faits du demandeur (source "discord"). `None` pour "web".
+    pub requester: Option<ModeratorFacts>,
+}
+
 /// Vote d'un moderateur sur une review en cours.
 #[derive(Debug, Clone)]
 pub struct CastVoteCommand {
@@ -67,6 +95,17 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         &self,
         cmd: ResolveAutomodReviewCommand,
     ) -> Result<AutomodReview, DomainError>;
+
+    /// Clore immediatement en "ignore" (statut pending|voting|decided ->
+    /// ignored). Reserve aux moderateurs (`is_moderator`).
+    async fn close_ignored(
+        &self,
+        cmd: CloseIgnoredCommand,
+    ) -> Result<AutomodReview, DomainError>;
+
+    /// Rouvrir un dossier (applied|ignored -> voting), reinitialise les votes
+    /// et fixe une nouvelle echeance. Reserve aux moderateurs (`is_moderator`).
+    async fn reopen(&self, cmd: ReopenReviewCommand) -> Result<AutomodReview, DomainError>;
 
     // ── Vote ──
     /// Enregistre/met a jour un vote, retourne la liste des votes a jour.

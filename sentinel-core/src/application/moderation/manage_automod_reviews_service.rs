@@ -20,7 +20,9 @@ use crate::domain::entities::moderation::review::automod::TallyResult;
 use crate::domain::entities::moderation::review::automod::TieAction;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand;
+use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
 use crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase;
+use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
 use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
 use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
@@ -116,6 +118,47 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 &cmd.resolved_source,
             )
             .await
+    }
+
+    async fn close_ignored(
+        &self,
+        cmd: CloseIgnoredCommand,
+    ) -> Result<AutomodReview, DomainError> {
+        if !matches!(cmd.source.as_str(), "web" | "discord") {
+            return Err(DomainError::ValidationError(
+                "source doit etre 'web' ou 'discord'".into(),
+            ));
+        }
+        if cmd.actor_id.trim().is_empty() {
+            return Err(DomainError::ValidationError("actor_id requis".into()));
+        }
+        // Regle d'acces (domaine) : tout moderateur peut clore (source discord).
+        // La source "web" est autorisee en amont par le middleware guild_auth.
+        if let Some(facts) = &cmd.requester {
+            if !crate::domain::entities::moderation::review::automod::is_moderator(facts) {
+                return Err(DomainError::Forbidden(
+                    "Seul un moderateur peut clore ce dossier.".into(),
+                ));
+            }
+        }
+        self.repo
+            .close_ignored(cmd.review_id, &cmd.actor_id, &cmd.actor_name, &cmd.source)
+            .await
+    }
+
+    async fn reopen(&self, cmd: ReopenReviewCommand) -> Result<AutomodReview, DomainError> {
+        if cmd.actor_id.trim().is_empty() {
+            return Err(DomainError::ValidationError("actor_id requis".into()));
+        }
+        if let Some(facts) = &cmd.requester {
+            if !crate::domain::entities::moderation::review::automod::is_moderator(facts) {
+                return Err(DomainError::Forbidden(
+                    "Seul un moderateur peut rouvrir ce dossier.".into(),
+                ));
+            }
+        }
+        let hours = cmd.deadline_hours.clamp(1, 720);
+        self.repo.reopen(cmd.review_id, hours).await
     }
 
     async fn cast_vote(&self, cmd: CastVoteCommand) -> Result<Vec<ReviewVote>, DomainError> {

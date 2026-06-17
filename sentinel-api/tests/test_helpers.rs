@@ -779,6 +779,8 @@ pub struct StubAutomodReviewRepo;
     async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
     async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
     async fn resolve(&self, _: Uuid, _: &str, _: &str, _: &str, _: &str) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn close_ignored(&self, _: Uuid, _: &str, _: &str, _: &str) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn reopen(&self, _: Uuid, _: i64) -> Result<sentinel_core::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
 }
 
 pub struct StubDiscordActionMessageRepo;

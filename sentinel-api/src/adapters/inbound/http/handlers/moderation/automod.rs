@@ -339,6 +339,152 @@ pub async fn resolve_review(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CloseIgnoreBody {
+    pub actor_id: String,
+    pub actor_name: String,
+    /// "web" (defaut) ou "discord".
+    pub source: Option<String>,
+    // Faits Discord du demandeur (source "discord"). Regle is_moderator cote domaine.
+    #[serde(default)]
+    pub is_admin: bool,
+    #[serde(default)]
+    pub has_moderate_members: bool,
+    #[serde(default)]
+    pub has_manage_messages: bool,
+    #[serde(default)]
+    pub has_mod_role: bool,
+    #[serde(default)]
+    pub has_admin_role: bool,
+}
+
+fn discord_facts_or_none(
+    source: &str,
+    is_admin: bool,
+    has_moderate_members: bool,
+    has_manage_messages: bool,
+    has_mod_role: bool,
+    has_admin_role: bool,
+) -> Option<sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts> {
+    if source == "discord" {
+        Some(sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+            is_admin,
+            has_moderate_members,
+            has_manage_messages,
+            has_mod_role,
+            has_admin_role,
+        })
+    } else {
+        None
+    }
+}
+
+/// POST /api/automod/reviews/{review_id}/ignore
+/// Clore immediatement le dossier en "ignore" (tout moderateur).
+pub async fn ignore_review(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<CloseIgnoreBody>,
+) -> Result<Json<AutomodReviewDto>, ApiError> {
+    use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let source = match body.source.as_deref() {
+        Some("discord") => "discord",
+        _ => "web",
+    };
+    let requester = discord_facts_or_none(
+        source, body.is_admin, body.has_moderate_members, body.has_manage_messages,
+        body.has_mod_role, body.has_admin_role,
+    );
+    let review = state
+        .automod_reviews_uc
+        .close_ignored(CloseIgnoredCommand {
+            review_id: id,
+            actor_id: body.actor_id.clone(),
+            actor_name: body.actor_name.clone(),
+            source: source.into(),
+            requester,
+        })
+        .await?;
+
+    state.broadcaster.broadcast(
+        "automod_review_resolved",
+        serde_json::json!({
+            "review_id": review.id.to_string(),
+            "action_id": review.id.to_string(),
+            "guild_id": &review.guild_id,
+            "user_id": &review.user_id,
+            "applied_action": "ignore",
+            "actor": { "source": source, "id": &body.actor_id, "name": &body.actor_name },
+        }),
+    );
+    Ok(Json(review.into()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReopenBody {
+    pub actor_id: String,
+    pub actor_name: String,
+    /// Duree (heures) de la nouvelle fenetre de vote (defaut 72).
+    #[serde(default)]
+    pub deadline_hours: Option<i64>,
+    pub source: Option<String>,
+    #[serde(default)]
+    pub is_admin: bool,
+    #[serde(default)]
+    pub has_moderate_members: bool,
+    #[serde(default)]
+    pub has_manage_messages: bool,
+    #[serde(default)]
+    pub has_mod_role: bool,
+    #[serde(default)]
+    pub has_admin_role: bool,
+}
+
+/// POST /api/automod/reviews/{review_id}/reopen
+/// Rouvrir un dossier resolu/ignore -> repasse en vote (tout moderateur).
+pub async fn reopen_review(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<ReopenBody>,
+) -> Result<Json<AutomodReviewDto>, ApiError> {
+    use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let source = match body.source.as_deref() {
+        Some("discord") => "discord",
+        _ => "web",
+    };
+    let requester = discord_facts_or_none(
+        source, body.is_admin, body.has_moderate_members, body.has_manage_messages,
+        body.has_mod_role, body.has_admin_role,
+    );
+    let review = state
+        .automod_reviews_uc
+        .reopen(ReopenReviewCommand {
+            review_id: id,
+            actor_id: body.actor_id.clone(),
+            actor_name: body.actor_name.clone(),
+            deadline_hours: body.deadline_hours.unwrap_or(72),
+            source: source.into(),
+            requester,
+        })
+        .await?;
+
+    state.broadcaster.broadcast(
+        "automod_review_reopened",
+        serde_json::json!({
+            "review_id": review.id.to_string(),
+            "action_id": review.id.to_string(),
+            "guild_id": &review.guild_id,
+            "user_id": &review.user_id,
+            "actor": { "source": source, "id": &body.actor_id, "name": &body.actor_name },
+        }),
+    );
+    Ok(Json(review.into()))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CastVoteBody {
     pub voter_id: String,
     pub voter_name: String,

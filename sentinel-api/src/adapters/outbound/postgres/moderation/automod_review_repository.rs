@@ -386,6 +386,99 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         }
     }
 
+    async fn close_ignored(
+        &self,
+        id: Uuid,
+        actor_id: &str,
+        actor_name: &str,
+        source: &str,
+    ) -> Result<AutomodReview, DomainError> {
+        // Clore immediatement, meme pendant le vote (statut voting inclus).
+        let row: Option<Row> = sqlx::query_as(
+            "UPDATE automod_reviews SET \
+                status = 'ignored', applied_action = 'ignore', resolved_by_id = $2, \
+                resolved_by_name = $3, resolved_source = $4, resolved_at = NOW() \
+             WHERE id = $1 AND status IN ('pending','voting','decided') \
+             RETURNING *",
+        )
+        .bind(id)
+        .bind(actor_id)
+        .bind(actor_name)
+        .bind(source)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        match row {
+            Some(r) => Ok(r.into()),
+            None => {
+                let exists: Option<(String,)> =
+                    sqlx::query_as("SELECT status FROM automod_reviews WHERE id = $1")
+                        .bind(id)
+                        .fetch_optional(&self.pool)
+                        .await
+                        .map_err(pg_err)?;
+                match exists {
+                    None => Err(DomainError::NotFound(format!("review {id} introuvable"))),
+                    Some((s,)) => Err(DomainError::Conflict(format!(
+                        "review deja close (status={s})"
+                    ))),
+                }
+            }
+        }
+    }
+
+    async fn reopen(&self, id: Uuid, deadline_hours: i64) -> Result<AutomodReview, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        // Repasse en 'voting' : efface la resolution + le verdict + fixe une
+        // nouvelle echeance. Seules les reviews closes (applied|ignored) sont
+        // rouvrables.
+        let row: Option<Row> = sqlx::query_as(
+            "UPDATE automod_reviews SET \
+                status = 'voting', applied_action = NULL, decided_action = NULL, \
+                quorum_met = FALSE, decided_at = NULL, resolved_by_id = NULL, \
+                resolved_by_name = NULL, resolved_source = NULL, resolved_at = NULL, \
+                voting_deadline = NOW() + make_interval(hours => $2) \
+             WHERE id = $1 AND status IN ('applied','ignored') \
+             RETURNING *",
+        )
+        .bind(id)
+        .bind(deadline_hours as i32)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        let review = match row {
+            Some(r) => r,
+            None => {
+                let exists: Option<(String,)> =
+                    sqlx::query_as("SELECT status FROM automod_reviews WHERE id = $1")
+                        .bind(id)
+                        .fetch_optional(&mut *tx)
+                        .await
+                        .map_err(pg_err)?;
+                tx.rollback().await.map_err(pg_err)?;
+                return match exists {
+                    None => Err(DomainError::NotFound(format!("review {id} introuvable"))),
+                    Some((s,)) => Err(DomainError::Conflict(format!(
+                        "dossier non rouvrable (status={s})"
+                    ))),
+                };
+            }
+        };
+
+        // Repart sur un vote propre : on efface les votes du tour precedent.
+        sqlx::query("DELETE FROM automod_review_votes WHERE review_id = $1")
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
+        Ok(review.into())
+    }
+
     async fn upsert_vote(
         &self,
         review_id: Uuid,

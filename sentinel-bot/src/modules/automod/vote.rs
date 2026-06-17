@@ -30,6 +30,10 @@ pub(super) const VOTE_PREFIX: &str = "amv:";
 pub(super) const FINALIZE_PREFIX: &str = "amf:";
 /// Bouton "Ouvrir une discussion" -> cree un salon textuel prive (membre + modos).
 pub(super) const DISCUSSION_PREFIX: &str = "amdisc:";
+/// Bouton "Clore (ignorer)" -> clot immediatement le dossier (tout moderateur).
+pub(super) const CLOSE_PREFIX: &str = "amclose:";
+/// Bouton "Rouvrir le dossier" -> repasse en vote (tout moderateur).
+pub(super) const REOPEN_PREFIX: &str = "amreopen:";
 
 fn action_char(action: &Action) -> char {
     match action {
@@ -482,9 +486,21 @@ fn vote_buttons(review_id: &str) -> Vec<serenity::builder::CreateActionRow> {
             CreateButton::new(format!("{VOTE_PREFIX}b:{review_id}")).label("Ban").style(ButtonStyle::Danger),
         ]),
         CreateActionRow::Buttons(vec![
-            CreateButton::new(format!("{VOTE_PREFIX}i:{review_id}")).label("Ignorer").style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{VOTE_PREFIX}i:{review_id}")).label("Ignorer (vote)").style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{CLOSE_PREFIX}{review_id}")).label("🚫 Clore (ignorer)").style(ButtonStyle::Danger),
         ]),
     ]
+}
+
+/// Rangee avec uniquement le bouton "Rouvrir le dossier" (carte close).
+fn reopen_row(review_id: &str) -> serenity::builder::CreateActionRow {
+    use serenity::all::ButtonStyle;
+    use serenity::builder::{CreateActionRow, CreateButton};
+    CreateActionRow::Buttons(vec![
+        CreateButton::new(format!("{REOPEN_PREFIX}{review_id}"))
+            .label("♻️ Rouvrir le dossier")
+            .style(ButtonStyle::Secondary),
+    ])
 }
 
 /// Antecedents du membre en TOTAUX (carte resumee). Le detail date est dans le
@@ -951,7 +967,10 @@ pub(super) async fn handle_decided_event(ctx: &Context, payload: &str) {
     let finalize_btn = serenity::builder::CreateButton::new(format!("{FINALIZE_PREFIX}{action_id}"))
         .label(format!("Finaliser ({})", action_label(decided_action)))
         .style(serenity::all::ButtonStyle::Success);
-    let row = serenity::builder::CreateActionRow::Buttons(vec![finalize_btn]);
+    let close_btn = serenity::builder::CreateButton::new(format!("{CLOSE_PREFIX}{action_id}"))
+        .label("🚫 Clore (ignorer)")
+        .style(serenity::all::ButtonStyle::Danger);
+    let row = serenity::builder::CreateActionRow::Buttons(vec![finalize_btn, close_btn]);
 
     if let Ok(messages) = channel_id.messages(&ctx.http, GetMessages::new().limit(1).around(msg_id)).await {
         if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
@@ -1067,11 +1086,182 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
         .create_response(
             &ctx.http,
             serenity::builder::CreateInteractionResponse::UpdateMessage(
-                serenity::builder::CreateInteractionResponseMessage::new().embed(finalized).components(vec![]),
+                serenity::builder::CreateInteractionResponseMessage::new()
+                    .embed(finalized)
+                    .components(vec![reopen_row(&review_id)]),
             ),
         )
         .await;
     info!(review_id, action = %decided, admin = %component.user.name, "Vote automod finalise");
+}
+
+/// Handler du bouton "Clore (ignorer)" (`amclose:<review_id>`).
+/// Tout moderateur peut clore immediatement : statut -> ignored, aucune
+/// sanction, carte mise a jour + bouton "Rouvrir le dossier".
+pub(super) async fn handle_close_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let review_id = match component.data.custom_id.strip_prefix(CLOSE_PREFIX) {
+        Some(r) => r.to_string(),
+        None => return,
+    };
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+    };
+    let config = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
+    let mod_role_id = config.get("vote_mod_role_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0);
+    let facts = moderator_facts(component, mod_role_id, None);
+
+    let body = serde_json::json!({
+        "actor_id": component.user.id.to_string(),
+        "actor_name": component.user.name,
+        "source": "discord",
+        "is_admin": facts.0,
+        "has_moderate_members": facts.1,
+        "has_manage_messages": facts.2,
+        "has_mod_role": facts.3,
+    });
+    if let Err(e) = api
+        .post_json::<_, serde_json::Value>(&format!("/api/automod/reviews/{review_id}/ignore"), &body)
+        .await
+    {
+        warn!(error = %e, review_id, "Echec clore (ignorer) : non autorise ou deja clos");
+        reply_ephemeral(ctx, component, "Cloture impossible (reserve aux moderateurs, ou deja clos).").await;
+        return;
+    }
+
+    // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
+    // (user_id recupere best-effort via l'API pour verrouiller l'ecriture.)
+    #[derive(serde::Deserialize)]
+    struct U { user_id: String }
+    if let Ok(r) = api.get_json::<U>(&format!("/api/automod/reviews/{review_id}")).await {
+        archive_discussion_channel(ctx, &api, &review_id, &r.user_id).await;
+    }
+
+    let closed = serenity::builder::CreateEmbed::new()
+        .title("AutoMod -- Dossier clos (ignore)")
+        .description(format!(
+            "Clos par **{}**. Aucune sanction appliquee.\nUn moderateur peut rouvrir le dossier si besoin.",
+            component.user.name
+        ))
+        .color(0x95a5a6)
+        .footer(serenity::builder::CreateEmbedFooter::new("AutoMod | Dossier ignore"))
+        .timestamp(serenity::model::Timestamp::now());
+    let _ = component
+        .create_response(
+            &ctx.http,
+            serenity::builder::CreateInteractionResponse::UpdateMessage(
+                serenity::builder::CreateInteractionResponseMessage::new()
+                    .embed(closed)
+                    .components(vec![reopen_row(&review_id)]),
+            ),
+        )
+        .await;
+    info!(review_id, moderator = %component.user.name, "Dossier automod clos (ignore)");
+}
+
+/// Handler du bouton "Rouvrir le dossier" (`amreopen:<review_id>`).
+/// Repasse la review en vote (nouvelle echeance) et reconstruit la carte de
+/// vote complete. Tout moderateur peut rouvrir.
+pub(super) async fn handle_reopen_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let review_id = match component.data.custom_id.strip_prefix(REOPEN_PREFIX) {
+        Some(r) => r.to_string(),
+        None => return,
+    };
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+    };
+    let config = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
+    let mod_role_id = config.get("vote_mod_role_id").and_then(|v| v.parse::<u64>().ok()).filter(|x| *x > 0);
+    let deadline_hours = BaseApiClient::config_u64(&config, "vote_deadline_hours", 72) as i64;
+    let discussion_enabled = BaseApiClient::config_bool(&config, "discussion_channel_enabled", false);
+    let detail_url = build_detail_url(&config, &guild_id);
+    let facts = moderator_facts(component, mod_role_id, None);
+
+    #[derive(serde::Deserialize)]
+    struct ReopenedReview {
+        guild_id: String,
+        channel_id: String,
+        message_id: String,
+        user_id: String,
+        user_name: String,
+        content_preview: String,
+        suggested_action: String,
+        score: f64,
+        reason: String,
+        flags: serde_json::Value,
+        voting_deadline: Option<String>,
+    }
+
+    let body = serde_json::json!({
+        "actor_id": component.user.id.to_string(),
+        "actor_name": component.user.name,
+        "deadline_hours": deadline_hours,
+        "source": "discord",
+        "is_admin": facts.0,
+        "has_moderate_members": facts.1,
+        "has_manage_messages": facts.2,
+        "has_mod_role": facts.3,
+    });
+    let review: ReopenedReview = match api
+        .post_json(&format!("/api/automod/reviews/{review_id}/reopen"), &body)
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, review_id, "Echec rouvrir : non autorise ou deja ouvert");
+            reply_ephemeral(ctx, component, "Reouverture impossible (reserve aux moderateurs, ou deja ouvert).").await;
+            return;
+        }
+    };
+
+    let flags = detectors::DetectionFlags {
+        spam: review.flags.get("spam").and_then(|v| v.as_bool()).unwrap_or(false),
+        insult: review.flags.get("insult").and_then(|v| v.as_bool()).unwrap_or(false),
+        link: review.flags.get("link").and_then(|v| v.as_bool()).unwrap_or(false),
+        phishing: review.flags.get("phishing").and_then(|v| v.as_bool()).unwrap_or(false),
+    };
+    let deadline = review
+        .voting_deadline
+        .as_deref()
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|d| d.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|| chrono::Utc::now() + chrono::Duration::hours(deadline_hours));
+
+    let mut embed = vote_embed(
+        &review.user_id, &review.user_name, &review.channel_id, review.score,
+        &review.content_preview, &review.reason, &flags, &review.suggested_action, &deadline, &[],
+    );
+    if let Some(hist) = render_history_totals(ctx, &review.guild_id, &review.user_id).await {
+        embed = embed.field("📋 Antecedents du membre", hist, false);
+    }
+    embed = embed.field(
+        "♻️ Dossier rouvert",
+        format!("Rouvert par **{}** — nouveau vote en cours.", component.user.name),
+        false,
+    );
+
+    let msg_url = format!(
+        "https://discord.com/channels/{}/{}/{}",
+        review.guild_id, review.channel_id, review.message_id
+    );
+    let link_row = secondary_row(&msg_url, &review_id, discussion_enabled, detail_url.as_deref());
+    let mut rows = vote_buttons(&review_id);
+    rows.push(link_row);
+
+    let _ = component
+        .create_response(
+            &ctx.http,
+            serenity::builder::CreateInteractionResponse::UpdateMessage(
+                serenity::builder::CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .components(rows),
+            ),
+        )
+        .await;
+    info!(review_id, moderator = %component.user.name, "Dossier automod rouvert (vote relance)");
 }
 
 /// Handler du bouton "Ouvrir une discussion" (`amdisc:<review_id>`).
