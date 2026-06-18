@@ -3,12 +3,33 @@ use serenity::model::event::MessageUpdateEvent;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
 
-use crate::shared::embeds::critical_embed;
+use crate::shared::embeds::{critical_embed, moderate_embed, info_embed};
 
 use super::{audit_event, watched_users};
 use super::{AnomalyDetectorKey, MessageCacheKey, WeeklyTrackerKey};
 use super::{send_event, log, post_to_channel};
 use super::weekly_report::StatField;
+
+/// Formate un contenu de message pour un field embed : tronque a `max`,
+/// neutralise les mentions de masse et les blocs ``` pour eviter le bris de
+/// rendu. Retourne un placeholder si vide.
+fn fmt_block(content: &str, max: usize) -> String {
+    let trimmed: String = content.chars().take(max).collect();
+    let safe = trimmed
+        .replace("```", "` ` `")
+        .replace("@everyone", "@\u{200b}everyone")
+        .replace("@here", "@\u{200b}here");
+    let safe = if content.chars().count() > max { format!("{safe}…") } else { safe };
+    if safe.trim().is_empty() {
+        "*(vide / pièce jointe / embed)*".to_string()
+    } else {
+        format!("```{safe}```")
+    }
+}
+
+/// Salons de log message : cle dediee puis fallback log_channel_id (gere par
+/// post_to_channel).
+const MESSAGE_LOG_KEYS: &[&str] = &["message_log_channel_id"];
 
 /// Helper : construit et envoie un embed d'anomalie dans anomaly_channel_id.
 async fn post_anomaly_embed(
@@ -91,6 +112,22 @@ pub async fn handle_delete(
     }
 
     send_event(ctx, evt).await;
+
+    // Embed dans le salon de logs Discord (message_log_channel_id -> log_channel_id).
+    {
+        let mut embed = moderate_embed("🗑️ Message supprimé")
+            .field("Salon", format!("<#{}>", channel_id), true);
+        if let Some(c) = &cached {
+            embed = embed
+                .field("Auteur", format!("<@{}> (`{}`)", c.author_id, c.author_name), true)
+                .field("Contenu", fmt_block(&c.content, 1000), false);
+        } else {
+            embed = embed
+                .field("Message", format!("`{}` (contenu hors cache)", message_id), false);
+        }
+        embed = embed.timestamp(serenity::model::Timestamp::now());
+        post_to_channel(ctx, &gid_str, MESSAGE_LOG_KEYS, embed).await;
+    }
 
     // Surveillance : tracker la suppression si l'auteur est surveille
     if let Some(c) = &cached {
@@ -227,6 +264,29 @@ pub async fn handle_update(
     evt.actor_name = author_name;
 
     send_event(ctx, evt).await;
+
+    // Embed dans le salon de logs Discord, AVANT / APRES. On n'envoie l'embed
+    // que si le contenu a reellement change (Discord declenche aussi un update
+    // sur l'unfurl d'embed, l'epinglage, etc. -> sinon on spammerait le salon).
+    if !new_content.is_empty() && new_content != old_content {
+        let url = format!(
+            "https://discord.com/channels/{}/{}/{}",
+            gid, event.channel_id, event.id
+        );
+        let (a_id, a_name) = event
+            .author
+            .as_ref()
+            .map(|a| (a.id.to_string(), a.name.clone()))
+            .unwrap_or_else(|| ("?".to_string(), "?".to_string()));
+        let embed = info_embed("✏️ Message modifié")
+            .field("Auteur", format!("<@{}> (`{}`)", a_id, a_name), true)
+            .field("Salon", format!("<#{}>", event.channel_id), true)
+            .field("Avant", fmt_block(if old_content.is_empty() { "(inconnu)" } else { &old_content }, 1000), false)
+            .field("Après", fmt_block(&new_content, 1000), false)
+            .field("Lien", format!("[Aller au message]({url})"), false)
+            .timestamp(serenity::model::Timestamp::now());
+        post_to_channel(ctx, &gid, MESSAGE_LOG_KEYS, embed).await;
+    }
 
     // Surveillance : tracker l'edition si l'auteur est surveille
     if let Some(ref author) = event.author {
