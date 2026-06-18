@@ -2,7 +2,6 @@ use axum::extract::Path;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
-use serde::Deserialize;
 use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
@@ -10,7 +9,6 @@ use crate::adapters::inbound::http::middleware::rbac::check_role;
 use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::system::discord_role::parse_discord_permissions_bitfield;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Serialize)]
@@ -47,24 +45,6 @@ impl From<DiscordRole> for DiscordRoleDto {
             synced_at: r.synced_at.to_rfc3339(),
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SyncRoleDto {
-    pub id: String,
-    pub name: String,
-    pub color: i32,
-    pub position: i32,
-    pub permissions: String,
-    pub mentionable: bool,
-    pub managed: bool,
-    pub icon: Option<String>,
-    pub member_count: i32,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SyncRolesRequest {
-    pub roles: Vec<SyncRoleDto>,
 }
 
 /// GET /api/discord-roles/{guild_id} — Liste les roles Discord d'un serveur
@@ -125,37 +105,6 @@ pub struct EditRoleRequest {
     pub permissions: Option<String>,
     pub mentionable: Option<bool>,
     pub hoist: Option<bool>,
-}
-
-/// POST /api/discord-roles/{guild_id}/sync — Synchronise les roles (appele par le bot)
-pub async fn sync_roles(
-    State(state): State<AppState>,
-    Path(guild_id): Path<String>,
-    Json(body): Json<SyncRolesRequest>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let roles: Vec<DiscordRole> = body
-        .roles
-        .into_iter()
-        .map(|r| DiscordRole {
-            id: r.id,
-            guild_id: guild_id.clone().into(),
-            name: r.name,
-            color: r.color,
-            position: r.position,
-            // Regle metier : parse bitfield permissions -> `domain::entities::parse_discord_permissions_bitfield`
-            permissions: parse_discord_permissions_bitfield(&r.permissions),
-            mentionable: r.mentionable,
-            managed: r.managed,
-            icon: r.icon,
-            member_count: r.member_count,
-            synced_at: chrono::Utc::now(),
-        })
-        .collect();
-
-    let count = roles.len();
-    state.discord_role_repo.sync_roles(&guild_id, roles).await?;
-
-    Ok(Json(serde_json::json!({ "synced": count })))
 }
 
 #[cfg(test)]

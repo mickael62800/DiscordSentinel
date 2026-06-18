@@ -24,34 +24,4 @@ pub trait ManageDiscordActionMessagesUseCase: Send + Sync {
         &self,
         action_id: Uuid,
     ) -> Result<Vec<DiscordActionMessage>, DomainError>;
-
-    /// Recupere un mapping precis (action_id + kind).
-    async fn get(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<Option<DiscordActionMessage>, DomainError>;
-
-    /// Marque un mapping comme edite (pour audit / observability).
-    async fn touch_edited(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<(), DomainError>;
-
-    /// Supprime un mapping. Retourne `false` si rien n'a ete supprime.
-    async fn delete(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<bool, DomainError>;
-
-    /// Retrouve un mapping a partir d'un message Discord (utile au bot
-    /// quand il recoit un MESSAGE_DELETE Discord).
-    async fn find_by_message(
-        &self,
-        guild_id: &str,
-        channel_id: &str,
-        message_id: &str,
-    ) -> Result<Option<DiscordActionMessage>, DomainError>;
 }

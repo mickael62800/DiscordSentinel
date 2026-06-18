@@ -61,31 +61,6 @@ fn role_dto_none_icon_preserved() {
     assert!(dto.icon.is_none());
 }
 
-// ── SyncRoleDto deserialize ──
-
-#[test]
-fn sync_role_dto_deserializes() {
-    let raw = r#"{"id":"r","name":"Admin","color":16711680,"position":5,"permissions":"8","mentionable":true,"managed":false,"icon":null,"member_count":10}"#;
-    let dto: SyncRoleDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.id, "r");
-    assert_eq!(dto.permissions, "8");
-    assert_eq!(dto.member_count, 10);
-}
-
-#[test]
-fn sync_roles_request_deserializes_array() {
-    let raw = r#"{"roles":[{"id":"r1","name":"A","color":0,"position":1,"permissions":"0","mentionable":false,"managed":false,"icon":null,"member_count":0}]}"#;
-    let req: SyncRolesRequest = serde_json::from_str(raw).unwrap();
-    assert_eq!(req.roles.len(), 1);
-    assert_eq!(req.roles[0].name, "A");
-}
-
-#[test]
-fn sync_roles_request_empty_array() {
-    let req: SyncRolesRequest = serde_json::from_str(r#"{"roles":[]}"#).unwrap();
-    assert!(req.roles.is_empty());
-}
-
 // ── CreateRoleRequest + EditRoleRequest ──
 
 #[test]

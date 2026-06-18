@@ -52,39 +52,4 @@ impl ManageDiscordActionMessagesUseCase for ManageDiscordActionMessagesService {
     ) -> Result<Vec<DiscordActionMessage>, DomainError> {
         self.repo.list_for_action(action_id).await
     }
-
-    async fn get(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<Option<DiscordActionMessage>, DomainError> {
-        self.repo.get(action_id, kind).await
-    }
-
-    async fn touch_edited(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<(), DomainError> {
-        self.repo.touch_edited(action_id, kind).await
-    }
-
-    async fn delete(
-        &self,
-        action_id: Uuid,
-        kind: &str,
-    ) -> Result<bool, DomainError> {
-        self.repo.delete(action_id, kind).await
-    }
-
-    async fn find_by_message(
-        &self,
-        guild_id: &str,
-        channel_id: &str,
-        message_id: &str,
-    ) -> Result<Option<DiscordActionMessage>, DomainError> {
-        self.repo
-            .find_by_message(guild_id, channel_id, message_id)
-            .await
-    }
 }

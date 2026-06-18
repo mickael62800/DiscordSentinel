@@ -17,9 +17,8 @@ pub fn routes() -> Router<AppState> {
         // Watched users
         .route("/api/watched-users", get(handlers::audit::watched_users::list_watched_users).post(handlers::audit::watched_users::add_watched_user))
         .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::audit::watched_users::get_user_dossier).delete(handlers::audit::watched_users::remove_watched_user))
-        // Discord roles (CRUD + sync)
+        // Discord roles (CRUD)
         .route("/api/discord-roles/{guild_id}", get(handlers::community::discord_roles::list_roles))
-        .route("/api/discord-roles/{guild_id}/sync", post(handlers::community::discord_roles::sync_roles))
         .route("/api/discord-roles/{guild_id}/create", post(handlers::community::discord_roles::create_role))
         .route("/api/discord-roles/{guild_id}/{role_id}", patch(handlers::community::discord_roles::edit_role).delete(handlers::community::discord_roles::delete_role))
 }

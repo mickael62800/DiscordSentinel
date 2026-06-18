@@ -49,10 +49,6 @@ pub fn routes() -> Router<AppState> {
             "/api/discord-messages/{action_id}",
             get(handlers::audit::discord_action_messages::list_for_action),
         )
-        .route(
-            "/api/discord-messages/{action_id}/{kind}",
-            delete(handlers::audit::discord_action_messages::delete_mapping),
-        )
         // Phase Docker — administration via /var/run/docker.sock (gate superadmin sur les actions)
         .route("/api/docker/overview", get(handlers::system::docker::get_overview))
         .route("/api/docker/containers", get(handlers::system::docker::list_containers))

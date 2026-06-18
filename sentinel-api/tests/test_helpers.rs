@@ -787,10 +787,6 @@ pub struct StubDiscordActionMessageRepo;
 #[async_trait] impl sentinel_api::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository for StubDiscordActionMessageRepo {
     async fn register(&self, _: sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage) -> Result<(), DomainError> { Ok(()) }
     async fn list_for_action(&self, _: Uuid) -> Result<Vec<sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(vec![]) }
-    async fn get(&self, _: Uuid, _: &str) -> Result<Option<sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(None) }
-    async fn touch_edited(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn find_by_message(&self, _: &str, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(None) }
 }
 
 pub struct StubExportUC;

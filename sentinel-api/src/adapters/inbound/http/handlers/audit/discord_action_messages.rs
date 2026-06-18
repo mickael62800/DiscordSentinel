@@ -81,14 +81,3 @@ pub async fn list_for_action(
     Ok(Json(list.into_iter().map(DiscordActionMessageDto::from).collect()))
 }
 
-/// DELETE /api/discord-messages/{action_id}/{kind}
-pub async fn delete_mapping(
-    State(state): State<AppState>,
-    Path((action_id, kind)): Path<(Uuid, String)>,
-) -> Result<StatusCode, ApiError> {
-    let removed = state
-        .discord_action_messages_uc
-        .delete(action_id, &kind)
-        .await?;
-    Ok(if removed { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND })
-}
