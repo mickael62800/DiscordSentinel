@@ -63,6 +63,11 @@ fn build_cors(allowed_origins: &str) -> CorsLayer {
             header::HeaderName::from_static("x-discord-token"),
             header::HeaderName::from_static("x-api-key"),
         ])
+        // Cookies de session (refresh token) : requis pour fetch credentials.
+        // En prod le front est same-origin (reverse proxy) donc CORS ne joue
+        // pas ; en dev cross-origin, ALLOWED_ORIGINS doit lister l'origine exacte
+        // (pas `*`) pour que les cookies soient acceptes par le navigateur.
+        .allow_credentials(true)
         .max_age(std::time::Duration::from_secs(3600))
 }
 
@@ -116,7 +121,9 @@ pub fn build_for_test(state: AppState) -> Router {
     let public = Router::new()
         .route("/health", get(handlers::system::health::health))
         .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::system::oauth::callback));
+        .route("/auth/discord/callback", get(handlers::system::oauth::callback))
+        .route("/auth/refresh", post(handlers::system::oauth::refresh))
+        .route("/auth/logout", post(handlers::system::oauth::logout));
 
     Router::new()
         .merge(protected)
@@ -207,7 +214,11 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // OAuth Discord web : publiques car pas de token prealable.
         // Le state CSRF + l'echange code cote serveur protegent le flux.
         .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::system::oauth::callback));
+        .route("/auth/discord/callback", get(handlers::system::oauth::callback))
+        // Refresh/logout de session web (cookie httpOnly) : publiques car
+        // l'auth se fait via le cookie de session, pas le X-Discord-Token.
+        .route("/auth/refresh", post(handlers::system::oauth::refresh))
+        .route("/auth/logout", post(handlers::system::oauth::logout));
 
     // Helper : true pour les endpoints bruyants (heartbeat des bots toutes
     // les 1-3s, /health du frontend toutes les 90s). On veut les voir en

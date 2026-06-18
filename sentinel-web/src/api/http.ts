@@ -1,7 +1,12 @@
 // Wrapper fetch qui embarque bearer API key + header X-Discord-Token, comme le fait
 // ApiAdapter cote desktop. L'URL base est lue depuis la config stockee dans localStorage.
+//
+// Persistance "rester connecte" : un cookie httpOnly `ds_session` (pose au
+// callback OAuth) permet de re-emettre un token d'acces via POST /auth/refresh
+// sans re-validation Discord interactive. Sur 401, on tente un refresh
+// transparent puis on rejoue la requete une fois avant de rediriger sur /login.
 
-import { getApiConfig, getDiscordToken, clearDiscordToken } from "./config";
+import { getApiConfig, getDiscordToken, clearDiscordToken, setDiscordToken, setDiscordUser } from "./config";
 
 export function apiBase(): string {
   // Priorite : config localStorage utilisateur > VITE_API_URL au build > defaut.
@@ -23,6 +28,50 @@ function headers(extra?: Record<string, string>): Record<string, string> {
   return h;
 }
 
+// ── Refresh de session (cookie httpOnly) ──
+let refreshInFlight: Promise<boolean> | null = null;
+
+/**
+ * Tente de ré-émettre un token d'accès Discord via le cookie de session.
+ * Met à jour le token + l'identité en cache. Dédupe les appels concurrents.
+ * Retourne true si un nouveau token a été obtenu.
+ */
+export async function tryRefreshSession(): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    try {
+      const r = await fetch(`${apiBase()}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!r.ok) return false;
+      const data = await r.json().catch(() => null);
+      if (!data?.token) return false;
+      setDiscordToken(data.token);
+      setDiscordUser({
+        id: data.id,
+        username: data.username,
+        global_name: data.global_name ?? null,
+        avatar: data.avatar ?? null,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  const ok = await refreshInFlight;
+  refreshInFlight = null;
+  return ok;
+}
+
+/** Supprime la session serveur + le cookie (logout propre). */
+export async function logoutSession(): Promise<void> {
+  try {
+    await fetch(`${apiBase()}/auth/logout`, { method: "POST", credentials: "include" });
+  } catch { /* best-effort */ }
+}
+
 async function handle<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     if (resp.status === 401) {
@@ -36,17 +85,13 @@ async function handle<T>(resp: Response): Promise<T> {
       if (path.startsWith("/auth/")) {
         throw new Error("Unauthorized: session expired");
       }
-      // Token invalide/expire : on purge la session locale et on redirige
-      // vers /login pour forcer une re-authentification. Evite la boucle
-      // infinie ou le user reste "logge" cote front mais 401 cote API.
+      // Token invalide/expire ET refresh impossible : on purge la session
+      // locale et on redirige vers /login pour forcer une re-authentification.
       try {
         clearDiscordToken();
         localStorage.removeItem("ds.discord.user");
       } catch { /* storage quota / cookies disabled : ignore */ }
-      // Skip redirect si deja sur login (eviter boucle de redir).
       if (path !== "/login") {
-        // Soft redirect via window.location pour reset l'app entiere
-        // (Pinia stores, composables singletons, etc.).
         window.location.href = "/login?expired=1";
       }
       throw new Error("Unauthorized: session expired");
@@ -62,8 +107,6 @@ async function handle<T>(resp: Response): Promise<T> {
 /**
  * Retry exponentiel sur 503 (rate limit Discord, brefs incidents reseau).
  * Uniquement sur GET (idempotents). 3 tentatives max : 0ms / 500ms / 1500ms.
- * Evite les pages blanches quand le 503 dure < 2s (cas typique du middleware
- * guild_auth qui rebound apres un cache miss + Discord 429).
  */
 async function fetchWithRetry503(url: string, init?: RequestInit): Promise<Response> {
   const delays = [0, 500, 1500];
@@ -76,23 +119,48 @@ async function fetchWithRetry503(url: string, init?: RequestInit): Promise<Respo
   return last as Response;
 }
 
-export async function httpGet<T>(path: string): Promise<T> {
-  const r = await fetchWithRetry503(`${apiBase()}${path}`, { headers: headers() });
+/**
+ * Coeur des appels : pose toujours `credentials:'include'` (cookie de session)
+ * et, sur 401 hors flux /auth, tente un refresh transparent + rejoue 1 fois.
+ */
+async function request<T>(
+  path: string,
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
+  body?: unknown,
+): Promise<T> {
+  const url = `${apiBase()}${path}`;
+  const isGet = method === "GET";
+  const build = (): RequestInit => ({
+    method,
+    headers: headers(),
+    credentials: "include",
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+  let r = isGet ? await fetchWithRetry503(url, build()) : await fetch(url, build());
+
+  // 401 : tentative de refresh silencieux (cookie) puis rejoue une fois.
+  if (r.status === 401 && !path.startsWith("/auth/")) {
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      r = isGet ? await fetchWithRetry503(url, build()) : await fetch(url, build());
+    }
+  }
   return handle<T>(r);
+}
+
+export async function httpGet<T>(path: string): Promise<T> {
+  return request<T>(path, "GET");
 }
 export async function httpPost<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`${apiBase()}${path}`, { method: "POST", headers: headers(), body: body === undefined ? undefined : JSON.stringify(body) });
-  return handle<T>(r);
+  return request<T>(path, "POST", body);
 }
 export async function httpPut<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`${apiBase()}${path}`, { method: "PUT", headers: headers(), body: body === undefined ? undefined : JSON.stringify(body) });
-  return handle<T>(r);
+  return request<T>(path, "PUT", body);
 }
 export async function httpPatch<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`${apiBase()}${path}`, { method: "PATCH", headers: headers(), body: body === undefined ? undefined : JSON.stringify(body) });
-  return handle<T>(r);
+  return request<T>(path, "PATCH", body);
 }
 export async function httpDelete<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(`${apiBase()}${path}`, { method: "DELETE", headers: headers(), body: body === undefined ? undefined : JSON.stringify(body) });
-  return handle<T>(r);
+  return request<T>(path, "DELETE", body);
 }

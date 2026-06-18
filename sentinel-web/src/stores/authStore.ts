@@ -34,19 +34,26 @@ export const useAuthStore = defineStore("auth", () => {
       // Pas de session locale.
     }
 
-    // Si on a un user en cache MAIS plus de token Discord en sessionStorage
-    // (ex: tab ferme + rouvert, ou utilisateur revient de l'OAuth callback
-    // avant que AuthCallbackPage ait pu stocker le nouveau token), on purge
-    // le user obsolete sans pinguer l'API : la requete serait garantie 401
-    // et redirigerait sur /login?expired=1, cassant notamment le retour
-    // OAuth (/auth/callback) ou le token n'est pas encore en place.
-    if (user.value && !getDiscordToken()) {
-      user.value = null;
-      try {
-        const store = await getKv();
-        await store.delete(USER_KEY);
-      } catch { /* ignore */ }
-      return;
+    // Plus de token Discord en sessionStorage (ex: navigateur ferme + rouvert).
+    // On tente un refresh SILENCIEUX via le cookie de session httpOnly (POST
+    // /auth/refresh) -> "rester connecte" sans re-validation Discord. On evite
+    // ce refresh sur /auth/* (le callback gere son propre cycle de vie et pose
+    // le token lui-meme).
+    if (!getDiscordToken() && !window.location.pathname.startsWith("/auth/")) {
+      const { tryRefreshSession } = await import("@/api/http");
+      const ok = await tryRefreshSession();
+      if (ok) {
+        // tryRefreshSession a stocke le token + l'identite.
+        user.value = authService.getCurrentUser();
+      } else if (user.value) {
+        // Aucune session serveur recuperable -> purge le user obsolete.
+        user.value = null;
+        try {
+          const store = await getKv();
+          await store.delete(USER_KEY);
+        } catch { /* ignore */ }
+        return;
+      }
     }
 
     // Si on a un user en cache, valide que le token Discord est encore
@@ -92,6 +99,11 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   async function logout() {
+    // Supprime la session serveur + le cookie httpOnly (best-effort), puis purge local.
+    try {
+      const { logoutSession } = await import("@/api/http");
+      await logoutSession();
+    } catch { /* ignore */ }
     authService.logout();
     user.value = null;
     initialized.value = false;

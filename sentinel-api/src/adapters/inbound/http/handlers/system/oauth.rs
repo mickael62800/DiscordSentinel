@@ -60,6 +60,45 @@ fn redirect_to(location: &str) -> Response {
     }
 }
 
+/// Variante de `redirect_to` qui pose en plus un cookie (Set-Cookie).
+fn redirect_to_with_cookie(location: &str, cookie: &str) -> Response {
+    let mut headers = HeaderMap::new();
+    let loc = match header::HeaderValue::from_str(location) {
+        Ok(v) => v,
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Invalid redirect location").into_response(),
+    };
+    headers.insert(header::LOCATION, loc);
+    if let Ok(c) = header::HeaderValue::from_str(cookie) {
+        headers.insert(header::SET_COOKIE, c);
+    }
+    (StatusCode::FOUND, headers).into_response()
+}
+
+const SESSION_COOKIE: &str = "ds_session";
+const SESSION_MAX_AGE_SECS: i64 = 30 * 24 * 3600;
+
+/// Cookie de session opaque : httpOnly (invisible au JS), Secure, SameSite=Lax
+/// (first-party : front et API derriere le meme reverse proxy en prod).
+fn build_session_cookie(id: &str, max_age: i64) -> String {
+    format!(
+        "{SESSION_COOKIE}={id}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}"
+    )
+}
+
+fn clear_session_cookie() -> String {
+    format!("{SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0")
+}
+
+/// Extrait la valeur d'un cookie depuis l'en-tete `Cookie`.
+fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
+    let raw = headers.get(header::COOKIE)?.to_str().ok()?;
+    raw.split(';').find_map(|kv| {
+        let kv = kv.trim();
+        let (k, v) = kv.split_once('=')?;
+        if k.trim() == name { Some(v.trim().to_string()) } else { None }
+    })
+}
+
 fn front_error_redirect(front_url: &str, reason: &str) -> Response {
     let target = format!("{}/login?error={}", front_url.trim_end_matches('/'), percent_encode(reason));
     redirect_to(&target)
@@ -294,6 +333,39 @@ pub async fn callback(
         }
     });
 
+    // 3.7. Cree une session web persistante (refresh token cote serveur) pour
+    //      le "rester connecte". Best-effort : si pas de refresh_token ou echec
+    //      DB, on degrade vers le comportement actuel (re-login a l'expiration).
+    let session_cookie: Option<String> = if let Some(refresh) = token.refresh_token.as_deref() {
+        let session_id = uuid::Uuid::new_v4();
+        let expires_in = token.expires_in.unwrap_or(604800).max(0);
+        let access_exp = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
+        let res = sqlx::query(
+            "INSERT INTO web_oauth_sessions \
+                (id, discord_user_id, username, global_name, avatar, access_token, refresh_token, access_expires_at) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
+        )
+        .bind(session_id)
+        .bind(&me.id)
+        .bind(&me.username)
+        .bind(&me.global_name)
+        .bind(&me.avatar)
+        .bind(&token.access_token)
+        .bind(refresh)
+        .bind(access_exp)
+        .execute(&state.pg_pool)
+        .await;
+        match res {
+            Ok(_) => Some(build_session_cookie(&session_id.to_string(), SESSION_MAX_AGE_SECS)),
+            Err(e) => {
+                tracing::warn!(error = %e, "Echec creation session web (refresh) -- login sans persistance");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // 4. Rediriger le navigateur vers le front avec les infos dans le FRAGMENT
     //    (apres `#`) pour eviter que le token n'apparaisse dans les logs serveur,
     //    le referer ou l'historique intermediaire. Le front lit `location.hash`
@@ -312,7 +384,162 @@ pub async fn callback(
         fragment
     );
 
-    redirect_to(&target)
+    match session_cookie {
+        Some(c) => redirect_to_with_cookie(&target, &c),
+        None => redirect_to(&target),
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct SessionRow {
+    discord_user_id: String,
+    username: String,
+    global_name: Option<String>,
+    avatar: Option<String>,
+    access_token: String,
+    refresh_token: String,
+    access_expires_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(serde::Serialize)]
+struct RefreshResponse {
+    token: String,
+    id: String,
+    username: String,
+    global_name: Option<String>,
+    avatar: Option<String>,
+}
+
+fn unauthorized_clear_cookie() -> Response {
+    let mut headers = HeaderMap::new();
+    if let Ok(c) = header::HeaderValue::from_str(&clear_session_cookie()) {
+        headers.insert(header::SET_COOKIE, c);
+    }
+    (StatusCode::UNAUTHORIZED, headers, "no session").into_response()
+}
+
+/// `POST /auth/refresh` — ré-émet un token d'accès Discord à partir du cookie
+/// de session (refresh token côté serveur). Permet de rester connecté après
+/// fermeture du navigateur sans re-validation interactive.
+pub async fn refresh(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    let sid = match cookie_value(&headers, SESSION_COOKIE) {
+        Some(s) if !s.is_empty() => s,
+        _ => return unauthorized_clear_cookie(),
+    };
+    let session_id = match uuid::Uuid::parse_str(&sid) {
+        Ok(u) => u,
+        Err(_) => return unauthorized_clear_cookie(),
+    };
+
+    let row: Option<SessionRow> = sqlx::query_as(
+        "SELECT discord_user_id, username, global_name, avatar, access_token, refresh_token, access_expires_at \
+         FROM web_oauth_sessions WHERE id = $1",
+    )
+    .bind(session_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .unwrap_or(None);
+
+    let Some(s) = row else { return unauthorized_clear_cookie() };
+
+    // Token encore valide (marge 60s) -> on le renvoie tel quel.
+    let now = chrono::Utc::now();
+    if s.access_expires_at > now + chrono::Duration::seconds(60) {
+        let _ = sqlx::query("UPDATE web_oauth_sessions SET last_used_at = NOW() WHERE id = $1")
+            .bind(session_id)
+            .execute(&state.pg_pool)
+            .await;
+        return axum::Json(RefreshResponse {
+            token: s.access_token,
+            id: s.discord_user_id,
+            username: s.username,
+            global_name: s.global_name,
+            avatar: s.avatar,
+        })
+        .into_response();
+    }
+
+    // Sinon : on rafraichit aupres de Discord (grant_type=refresh_token).
+    let client = reqwest::Client::new();
+    let form = [
+        ("client_id", state.discord_oauth_client_id.as_str()),
+        ("client_secret", state.discord_oauth_client_secret.as_str()),
+        ("grant_type", "refresh_token"),
+        ("refresh_token", s.refresh_token.as_str()),
+    ];
+    let resp = match client
+        .post(DISCORD_TOKEN_URL)
+        .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+        .form(&form)
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r,
+        Ok(r) => {
+            tracing::warn!(status = %r.status(), "Refresh Discord refuse -> session invalidee");
+            let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")
+                .bind(session_id).execute(&state.pg_pool).await;
+            return unauthorized_clear_cookie();
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "Echec appel refresh Discord");
+            return (StatusCode::SERVICE_UNAVAILABLE, "discord unavailable").into_response();
+        }
+    };
+    let token: TokenResponse = match resp.json().await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::error!(error = %e, "Parse refresh TokenResponse impossible");
+            return (StatusCode::BAD_GATEWAY, "discord parse").into_response();
+        }
+    };
+
+    let expires_in = token.expires_in.unwrap_or(604800).max(0);
+    let new_exp = now + chrono::Duration::seconds(expires_in);
+    // Discord peut faire tourner le refresh_token : on garde le nouveau s'il existe.
+    let new_refresh = token.refresh_token.clone().unwrap_or(s.refresh_token);
+    let _ = sqlx::query(
+        "UPDATE web_oauth_sessions SET access_token = $2, refresh_token = $3, \
+            access_expires_at = $4, last_used_at = NOW() WHERE id = $1",
+    )
+    .bind(session_id)
+    .bind(&token.access_token)
+    .bind(&new_refresh)
+    .bind(new_exp)
+    .execute(&state.pg_pool)
+    .await;
+
+    axum::Json(RefreshResponse {
+        token: token.access_token,
+        id: s.discord_user_id,
+        username: s.username,
+        global_name: s.global_name,
+        avatar: s.avatar,
+    })
+    .into_response()
+}
+
+/// `POST /auth/logout` — supprime la session serveur + efface le cookie.
+pub async fn logout(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Response {
+    if let Some(sid) = cookie_value(&headers, SESSION_COOKIE) {
+        if let Ok(session_id) = uuid::Uuid::parse_str(&sid) {
+            let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")
+                .bind(session_id)
+                .execute(&state.pg_pool)
+                .await;
+        }
+    }
+    let mut resp_headers = HeaderMap::new();
+    if let Ok(c) = header::HeaderValue::from_str(&clear_session_cookie()) {
+        resp_headers.insert(header::SET_COOKIE, c);
+    }
+    (StatusCode::NO_CONTENT, resp_headers).into_response()
 }
 
 #[cfg(test)]
