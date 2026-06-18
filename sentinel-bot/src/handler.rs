@@ -101,6 +101,7 @@ impl EventHandler for Handler {
 
         // Background tasks blackjack (AFK cleanup consumer)
         modules::blackjack::spawn_background(ctx.clone());
+        modules::bump::spawn_background(ctx.clone());
 
         // Security: sync membres au demarrage + background tasks
         let ctx_sec = ctx.clone();
@@ -175,6 +176,7 @@ impl EventHandler for Handler {
         modules::voice::on_message(&ctx, &msg).await;
         modules::tickets::on_message(&ctx, &msg).await;
         modules::ai_dataset::on_message(&ctx, &msg).await;
+        modules::bump::on_message(&ctx, &msg).await;
     }
 
     async fn message_delete(

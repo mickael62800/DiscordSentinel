@@ -5,6 +5,7 @@ pub mod announcements;
 pub mod audit;
 pub mod automod;
 pub mod blackjack;
+pub mod bump;
 pub mod cleanup;
 pub mod community;
 pub mod confessions;
