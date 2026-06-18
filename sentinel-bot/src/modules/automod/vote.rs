@@ -477,6 +477,83 @@ async fn fetch_context_before_ids(
     lines.join("\n")
 }
 
+/// Variante de `fetch_context_after` par identifiants (salon + message), pour
+/// recuperer les N messages POSTERIEURS a l'infraction (salon de discussion).
+async fn fetch_context_after_ids(
+    ctx: &Context,
+    channel_id: serenity::model::id::ChannelId,
+    message_id: serenity::model::id::MessageId,
+    n: u8,
+) -> String {
+    if n == 0 {
+        return String::new();
+    }
+    let limit = n.min(25);
+    let after = match channel_id
+        .messages(
+            &ctx.http,
+            serenity::builder::GetMessages::new().after(message_id).limit(limit),
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec recuperation contexte apres (discussion)");
+            return String::new();
+        }
+    };
+    // L'API renvoie du plus recent au plus ancien -> inverse pour l'ordre chrono.
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for m in after.iter().rev() {
+        let content = super::review::sanitize_embed_content(&m.content, 120);
+        let content = if content.trim().is_empty() {
+            "*(pièce jointe / embed)*".to_string()
+        } else {
+            content
+        };
+        let line = format!("**{}** : {}", m.author.name, content);
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
+/// Rend la liste numerotee des infractions agregees (incidents) pour le message
+/// d'ancrage du salon de discussion : `1. [Action] contenu — raison`. Tronque
+/// pour rester sous la limite d'un field embed (1024).
+fn render_incident_list(incidents: &serde_json::Value, _count: i32) -> String {
+    let arr = match incidents.as_array() {
+        Some(a) if !a.is_empty() => a,
+        _ => return String::new(),
+    };
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for (i, inc) in arr.iter().enumerate() {
+        let content = inc.get("content_preview").and_then(|v| v.as_str()).unwrap_or("");
+        let reason = inc.get("reason").and_then(|v| v.as_str()).unwrap_or("");
+        let action = inc.get("suggested_action").and_then(|v| v.as_str()).unwrap_or("");
+        let c = super::review::sanitize_embed_content(content, 100);
+        let c = if c.trim().is_empty() { "*(pièce jointe / embed)*".to_string() } else { c };
+        let line = if reason.is_empty() {
+            format!("**{}.** [{}] {}", i + 1, action_label(action), c)
+        } else {
+            format!("**{}.** [{}] {} — _{}_", i + 1, action_label(action), c, reason)
+        };
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
 /// Comme `fetch_context_before` mais pour les messages POSTERIEURS au message
 /// signale (utile pour la carte manuelle qui montre tout l'echange).
 async fn fetch_context_after(ctx: &Context, msg: &Message, n: u8) -> String {
@@ -1402,7 +1479,7 @@ pub(super) async fn handle_discussion_button(
         return;
     }
 
-    // Recupere la review (cible + contexte).
+    // Recupere la review (cible + contexte + incidents agreges).
     #[derive(serde::Deserialize)]
     struct ReviewDto {
         guild_id: String,
@@ -1413,6 +1490,10 @@ pub(super) async fn handle_discussion_button(
         suggested_action: Option<String>,
         reason: String,
         score: f64,
+        #[serde(default)]
+        incident_count: i32,
+        #[serde(default)]
+        incidents: serde_json::Value,
     }
     let review: ReviewDto = match api.get_json(&format!("/api/automod/reviews/{review_id}")).await {
         Ok(r) => r,
@@ -1579,13 +1660,44 @@ pub(super) async fn handle_discussion_button(
         "https://discord.com/channels/{}/{}/{}",
         review.guild_id, review.channel_id, review.message_id
     );
-    let anchor = serenity::builder::CreateEmbed::new()
+    let mut anchor = serenity::builder::CreateEmbed::new()
         .title("Discussion de moderation")
         .color(0x5865f2)
         .field("Membre", format!("<@{}> (`{}`)", review.user_id, review.user_name), true)
         .field("Action envisagee", action_label(action), true)
         .field("Score", format!("{:.2}", review.score), true)
-        .field("Raison", if review.reason.is_empty() { "—" } else { review.reason.as_str() }, false)
+        .field("Raison", if review.reason.is_empty() { "—" } else { review.reason.as_str() }, false);
+
+    // Liste des infractions (incidents agreges). Affiche le contenu + la raison
+    // de chacune, numerotees, pour que le membre voie precisement ce qui pose
+    // probleme. Tronque pour rester sous la limite d'un field (1024).
+    let infractions = render_incident_list(&review.incidents, review.incident_count);
+    if !infractions.is_empty() {
+        anchor = anchor.field(
+            format!("Infractions ({})", review.incident_count.max(1)),
+            infractions,
+            false,
+        );
+    }
+
+    // Contexte conversationnel : X messages AVANT + Y messages APRES la
+    // derniere infraction, pour que le membre comprenne le fil.
+    let ctx_before = BaseApiClient::config_u64(&config, "vote_context_before", 10) as u8;
+    let ctx_after = BaseApiClient::config_u64(&config, "vote_context_after", 10) as u8;
+    if let (Ok(cid), Ok(mid)) = (review.channel_id.parse::<u64>(), review.message_id.parse::<u64>()) {
+        let chan = ChannelId::new(cid);
+        let msgid = serenity::model::id::MessageId::new(mid);
+        let before = fetch_context_before_ids(ctx, chan, msgid, ctx_before).await;
+        if !before.is_empty() {
+            anchor = anchor.field("Contexte (messages precedents)", before, false);
+        }
+        let after = fetch_context_after_ids(ctx, chan, msgid, ctx_after).await;
+        if !after.is_empty() {
+            anchor = anchor.field("Messages suivants", after, false);
+        }
+    }
+
+    anchor = anchor
         .field("Message d'origine", format!("[Aller au message]({origin_url})"), false)
         .footer(serenity::builder::CreateEmbedFooter::new(
             "Salon ouvert pour echanger avant decision.",
