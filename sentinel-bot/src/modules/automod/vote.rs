@@ -830,7 +830,7 @@ fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::buil
 /// Archive le salon de discussion lie a une review finalisee : renomme en
 /// "clos-…" et retire le droit d'ecrire au membre concerne (les moderateurs
 /// gardent l'acces en lecture pour la trace). No-op si aucun salon.
-async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, review_id: &str, target_user_id: &str) {
+pub(super) async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, review_id: &str, target_user_id: &str) {
     use serenity::all::{ChannelId, Permissions, UserId};
     use serenity::model::channel::{Channel, PermissionOverwrite, PermissionOverwriteType};
 

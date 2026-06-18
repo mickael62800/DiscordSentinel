@@ -666,6 +666,21 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
     // Applique l'action sur Discord (le handler web ne faisait qu'editer la
     // carte). La sanction est tracee cote API dans la requete /resolve.
     apply_web_resolution(ctx, action_id, applied_action).await;
+
+    // L'affaire est close : on archive le salon de discussion lie (snapshot du
+    // transcript en DB + verrouillage), comme la finalisation/cloture Discord.
+    // Vaut pour TOUTE resolution web, y compris "ignore".
+    {
+        let api = {
+            let data = ctx.data.read().await;
+            match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+        };
+        #[derive(serde::Deserialize)]
+        struct U { user_id: String }
+        if let Ok(r) = api.get_json::<U>(&format!("/api/automod/reviews/{action_id}")).await {
+            super::vote::archive_discussion_channel(ctx, &api, action_id, &r.user_id).await;
+        }
+    }
 }
 
 /// Applique sur Discord la sanction resolue depuis le web (delete/mute/ban).
