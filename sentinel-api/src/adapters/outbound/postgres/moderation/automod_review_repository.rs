@@ -247,6 +247,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                     "UPDATE automod_reviews SET \
                         incidents = $1, incident_count = $2, cumulative_score = $3, \
                         score = $4, suggested_action = $5, reason = $6, voting_deadline = $7, \
+                        content_preview = $9, channel_id = $10, message_id = $11, \
                         last_incident_at = NOW() \
                      WHERE id = $8 AND status = 'voting' \
                      RETURNING *",
@@ -259,6 +260,9 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .bind(&r.reason)
                 .bind(new_deadline)
                 .bind(prev.id)
+                .bind(&r.content_preview)
+                .bind(r.channel_id.as_str())
+                .bind(r.message_id.as_str())
                 .fetch_one(&mut *tx)
                 .await
                 .map_err(pg_err)?;

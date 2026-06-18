@@ -431,6 +431,52 @@ async fn fetch_context_before(ctx: &Context, msg: &Message, n: u8) -> String {
     lines.join("\n")
 }
 
+/// Variante de `fetch_context_before` par identifiants (salon + message), sans
+/// objet `Message` — utilisee pour re-construire le contexte d'une carte
+/// agregee autour du dernier incident.
+async fn fetch_context_before_ids(
+    ctx: &Context,
+    channel_id: serenity::model::id::ChannelId,
+    message_id: serenity::model::id::MessageId,
+    n: u8,
+) -> String {
+    if n == 0 {
+        return String::new();
+    }
+    let limit = n.min(25);
+    let before = match channel_id
+        .messages(
+            &ctx.http,
+            serenity::builder::GetMessages::new().before(message_id).limit(limit),
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec recuperation contexte agrege (messages avant)");
+            return String::new();
+        }
+    };
+    let mut lines: Vec<String> = Vec::new();
+    let mut total = 0usize;
+    for m in before.iter().rev() {
+        let content = super::review::sanitize_embed_content(&m.content, 120);
+        let content = if content.trim().is_empty() {
+            "*(pièce jointe / embed)*".to_string()
+        } else {
+            content
+        };
+        let line = format!("**{}** : {}", m.author.name, content);
+        if total + line.len() + 1 > 1000 {
+            lines.push("…".to_string());
+            break;
+        }
+        total += line.len() + 1;
+        lines.push(line);
+    }
+    lines.join("\n")
+}
+
 /// Comme `fetch_context_before` mais pour les messages POSTERIEURS au message
 /// signale (utile pour la carte manuelle qui montre tout l'echange).
 async fn fetch_context_after(ctx: &Context, msg: &Message, n: u8) -> String {
@@ -651,6 +697,8 @@ struct ReviewResp {
     #[serde(default)]
     channel_id: String,
     #[serde(default)]
+    message_id: String,
+    #[serde(default)]
     content_preview: String,
     #[serde(default)]
     reason: String,
@@ -775,6 +823,18 @@ async fn edit_aggregated_card(ctx: &Context, api: &Arc<BaseApiClient>, resp: &Re
         .unwrap_or_default();
 
     let mut embed = aggregated_vote_embed(resp, &votes);
+    // Re-injecte le CONTEXTE autour du DERNIER message agrege (sinon il
+    // disparaitrait a chaque fusion : aggregated_vote_embed ne le porte pas).
+    let context_before = {
+        let cfg = api.get_guild_config_for(&resp.guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
+        BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8
+    };
+    if let (Ok(lcid), Ok(lmid)) = (resp.channel_id.parse::<u64>(), resp.message_id.parse::<u64>()) {
+        let context = fetch_context_before_ids(ctx, ChannelId::new(lcid), MessageId::new(lmid), context_before).await;
+        if !context.is_empty() {
+            embed = embed.field("Contexte (messages precedents)", context, false);
+        }
+    }
     if let Some(hist) = render_history_totals(ctx, &resp.guild_id, &resp.user_id).await {
         embed = embed.field("📋 Antecedents du membre", hist, false);
     }
