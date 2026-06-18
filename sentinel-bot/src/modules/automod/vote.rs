@@ -830,9 +830,8 @@ fn aggregated_vote_embed(resp: &ReviewResp, votes: &[VoteDto]) -> serenity::buil
 /// Archive le salon de discussion lie a une review finalisee : renomme en
 /// "clos-…" et retire le droit d'ecrire au membre concerne (les moderateurs
 /// gardent l'acces en lecture pour la trace). No-op si aucun salon.
-pub(super) async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, review_id: &str, target_user_id: &str) {
-    use serenity::all::{ChannelId, Permissions, UserId};
-    use serenity::model::channel::{Channel, PermissionOverwrite, PermissionOverwriteType};
+pub(super) async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, review_id: &str, _target_user_id: &str) {
+    use serenity::all::ChannelId;
 
     #[derive(serde::Deserialize)]
     struct DiscussionResp { channel_id: String }
@@ -845,34 +844,16 @@ pub(super) async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiC
     let Ok(cid) = disc.channel_id.parse::<u64>() else { return };
     let channel = ChannelId::new(cid);
 
-    // Snapshot de la conversation -> DB (trace consultable sur le web), AVANT
-    // de renommer/verrouiller (le contenu n'est pas affecte, mais on capture
-    // tant que le salon existe).
+    // Snapshot de la conversation -> DB (trace consultable sur le web) AVANT de
+    // supprimer le salon. La trace reste consultable sur le web ensuite.
     snapshot_discussion_messages(ctx, api, review_id, channel).await;
 
-    // Renomme pour marquer l'affaire close.
-    if let Ok(Channel::Guild(gc)) = channel.to_channel(&ctx.http).await {
-        if !gc.name.starts_with("clos-") {
-            let new_name: String = format!("clos-{}", gc.name).chars().take(95).collect();
-            let _ = channel
-                .edit(&ctx.http, serenity::builder::EditChannel::new().name(new_name))
-                .await;
-        }
+    // Suppression du salon : l'affaire est close, la conversation est archivee.
+    if let Err(e) = channel.delete(&ctx.http).await {
+        warn!(error = %e, review_id, channel = %channel, "Echec suppression salon de discussion (archive)");
+    } else {
+        info!(review_id, channel = %channel, "Salon de discussion supprime (trace sauvee en DB)");
     }
-    // Verrouille l'ecriture pour le membre concerne.
-    if let Ok(uid) = target_user_id.parse::<u64>() {
-        let _ = channel
-            .create_permission(
-                &ctx.http,
-                PermissionOverwrite {
-                    allow: Permissions::empty(),
-                    deny: Permissions::SEND_MESSAGES,
-                    kind: PermissionOverwriteType::Member(UserId::new(uid)),
-                },
-            )
-            .await;
-    }
-    info!(review_id, channel = %channel, "Salon de discussion archive (review finalisee)");
 }
 
 /// Capture les messages du salon de discussion et les persiste cote API

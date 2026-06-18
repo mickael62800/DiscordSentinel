@@ -61,6 +61,17 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         self.repo.get(id).await
     }
 
+    async fn find_by_message_id(
+        &self,
+        guild_id: &str,
+        message_id: &str,
+    ) -> Result<Option<AutomodReview>, DomainError> {
+        if guild_id.trim().is_empty() || message_id.trim().is_empty() {
+            return Ok(None);
+        }
+        self.repo.find_by_message_id(guild_id, message_id).await
+    }
+
     async fn list_pending(
         &self,
         guild_id: &str,

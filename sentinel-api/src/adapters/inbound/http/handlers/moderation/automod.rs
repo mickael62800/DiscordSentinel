@@ -868,6 +868,20 @@ pub async fn append_discussion_messages(
     Ok(Json(serde_json::json!({ "inserted": inserted })))
 }
 
+/// GET /api/automod/{guild_id}/reviews/by-message/{message_id}
+/// Retrouve la review associee a un message Discord (pour retrouver le
+/// review_id depuis une carte 1-clic dont les boutons ne le portent pas).
+pub async fn find_review_by_message(
+    State(state): State<AppState>,
+    Path((guild_id, message_id)): Path<(String, String)>,
+) -> Result<Json<Option<AutomodReviewDto>>, ApiError> {
+    let review = state
+        .automod_reviews_uc
+        .find_by_message_id(&guild_id, &message_id)
+        .await?;
+    Ok(Json(review.map(Into::into)))
+}
+
 /// GET /api/automod/reviews/{review_id}/discussion/messages
 /// Liste le transcript (trace) pour affichage web.
 pub async fn list_discussion_messages(

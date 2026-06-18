@@ -586,6 +586,27 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         .await;
     }
 
+    // 1-clic : si un salon de discussion a ete ouvert pour cette infraction, on
+    // l'archive (snapshot transcript + suppression) maintenant que l'affaire est
+    // close. Les boutons 1-clic ne portent pas le review_id -> on le retrouve par
+    // le message d'infraction. No-op si aucune discussion.
+    {
+        let api = {
+            let data = ctx.data.read().await;
+            data.get::<ApiClientKey>().cloned()
+        };
+        if let Some(api) = api {
+            #[derive(serde::Deserialize)]
+            struct R { id: String, user_id: String }
+            if let Ok(Some(r)) = api
+                .get_json::<Option<R>>(&format!("/api/automod/{guild_id}/reviews/by-message/{message_id_str}"))
+                .await
+            {
+                super::vote::archive_discussion_channel(ctx, &api, &r.id, &r.user_id).await;
+            }
+        }
+    }
+
     // Mettre a jour la carte de review (retirer les boutons, afficher le resultat)
     let result_embed = serenity::builder::CreateEmbed::new()
         .title(format!("AutoMod -- {} applique", action_label))

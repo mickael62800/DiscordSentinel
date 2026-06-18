@@ -26,6 +26,14 @@ pub trait AutomodReviewRepository: Send + Sync {
         window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError>;
+    /// Retrouve la review la plus recente associee a un message Discord
+    /// (guild + message_id). Utile pour retrouver le review_id depuis une
+    /// carte 1-clic (dont les boutons ne portent pas l'id).
+    async fn find_by_message_id(
+        &self,
+        guild_id: &str,
+        message_id: &str,
+    ) -> Result<Option<AutomodReview>, DomainError>;
     async fn list_pending(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
     async fn list_recent(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
     /// Resolve une review (statut pending OU decided -> applied|ignored).

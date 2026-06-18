@@ -317,6 +317,24 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         Ok(row.map(Into::into))
     }
 
+    async fn find_by_message_id(
+        &self,
+        guild_id: &str,
+        message_id: &str,
+    ) -> Result<Option<AutomodReview>, DomainError> {
+        let row: Option<Row> = sqlx::query_as(
+            "SELECT * FROM automod_reviews \
+             WHERE guild_id = $1 AND message_id = $2 \
+             ORDER BY created_at DESC LIMIT 1",
+        )
+        .bind(guild_id)
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row.map(Into::into))
+    }
+
     async fn list_pending(
         &self,
         guild_id: &str,
