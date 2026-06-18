@@ -35,6 +35,9 @@ use super::*;
             reason: "spam".into(),
             score: 0.65,
             duration: Some(300),
+            route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+            severe: false,
+            auto_delete_link: false,
         };
         let p = analysis_to_proto(a);
         assert_eq!(p.action, proto::Action::Warn as i32);
@@ -50,6 +53,9 @@ use super::*;
             reason: String::new(),
             score: 0.0,
             duration: None,
+            route: sentinel_core::domain::services::moderation::automod_routing::Routing::None,
+            severe: false,
+            auto_delete_link: false,
         };
         let p = analysis_to_proto(a);
         assert_eq!(p.action, proto::Action::None as i32);
@@ -79,6 +85,9 @@ use super::*;
                 reason: "spam".into(),
                 score: 0.75,
                 duration: None,
+                route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+                severe: false,
+                auto_delete_link: false,
             })
         }
     }
