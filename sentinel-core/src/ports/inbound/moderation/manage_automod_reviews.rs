@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
+use crate::domain::entities::moderation::review::automod::DiscussionMessage;
 use crate::domain::entities::moderation::review::automod::ModeratorFacts;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
@@ -140,6 +141,18 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         &self,
         cmd: OpenDiscussionCommand,
     ) -> Result<(DiscussionChannel, bool), DomainError>;
+
+    /// Persiste le transcript d'un salon de discussion (batch idempotent).
+    async fn append_discussion_messages(
+        &self,
+        messages: Vec<DiscussionMessage>,
+    ) -> Result<u64, DomainError>;
+
+    /// Liste le transcript d'une review (ordre chronologique).
+    async fn list_discussion_messages(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Vec<DiscussionMessage>, DomainError>;
 }
 
 /// Commande d'ouverture d'un salon de discussion. Les `requester` sont les

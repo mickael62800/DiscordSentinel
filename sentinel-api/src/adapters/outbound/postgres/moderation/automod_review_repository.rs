@@ -7,6 +7,7 @@ use uuid::Uuid;
 use super::super::pg_err_ctx;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
+use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
@@ -637,5 +638,77 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .await
         .map_err(pg_err)?;
         Ok((existing.into(), false))
+    }
+
+    async fn append_discussion_messages(
+        &self,
+        messages: &[DiscussionMessage],
+    ) -> Result<u64, DomainError> {
+        if messages.is_empty() {
+            return Ok(0);
+        }
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let mut inserted = 0u64;
+        for m in messages {
+            let res = sqlx::query(
+                "INSERT INTO automod_discussion_messages \
+                    (review_id, discord_message_id, author_id, author_name, author_is_bot, content, sent_at) \
+                 VALUES ($1,$2,$3,$4,$5,$6,$7) \
+                 ON CONFLICT (review_id, discord_message_id) DO NOTHING",
+            )
+            .bind(m.review_id)
+            .bind(&m.discord_message_id)
+            .bind(&m.author_id)
+            .bind(&m.author_name)
+            .bind(m.author_is_bot)
+            .bind(&m.content)
+            .bind(m.sent_at)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+            inserted += res.rows_affected();
+        }
+        tx.commit().await.map_err(pg_err)?;
+        Ok(inserted)
+    }
+
+    async fn list_discussion_messages(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Vec<DiscussionMessage>, DomainError> {
+        let rows: Vec<DiscussionMsgRow> = sqlx::query_as(
+            "SELECT review_id, discord_message_id, author_id, author_name, author_is_bot, content, sent_at \
+             FROM automod_discussion_messages WHERE review_id = $1 ORDER BY sent_at ASC",
+        )
+        .bind(review_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct DiscussionMsgRow {
+    review_id: Uuid,
+    discord_message_id: String,
+    author_id: String,
+    author_name: String,
+    author_is_bot: bool,
+    content: String,
+    sent_at: DateTime<Utc>,
+}
+
+impl From<DiscussionMsgRow> for DiscussionMessage {
+    fn from(r: DiscussionMsgRow) -> Self {
+        DiscussionMessage {
+            review_id: r.review_id,
+            discord_message_id: r.discord_message_id,
+            author_id: r.author_id,
+            author_name: r.author_name,
+            author_is_bot: r.author_is_bot,
+            content: r.content,
+            sent_at: r.sent_at,
+        }
     }
 }

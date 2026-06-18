@@ -254,4 +254,21 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             })
             .await
     }
+
+    async fn append_discussion_messages(
+        &self,
+        messages: Vec<crate::domain::entities::moderation::review::automod::DiscussionMessage>,
+    ) -> Result<u64, DomainError> {
+        if messages.is_empty() {
+            return Ok(0);
+        }
+        self.repo.append_discussion_messages(&messages).await
+    }
+
+    async fn list_discussion_messages(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Vec<crate::domain::entities::moderation::review::automod::DiscussionMessage>, DomainError> {
+        self.repo.list_discussion_messages(review_id).await
+    }
 }

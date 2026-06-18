@@ -775,6 +775,8 @@ pub struct StubAutomodReviewRepo;
     async fn create_or_merge(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview, _: bool, _: i64) -> Result<(sentinel_core::domain::entities::moderation::review::automod::AutomodReview, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
     async fn find_discussion(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel>, DomainError> { Ok(None) }
     async fn create_discussion(&self, _: sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel) -> Result<(sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel, bool), DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn append_discussion_messages(&self, _: &[sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage]) -> Result<u64, DomainError> { Ok(0) }
+    async fn list_discussion_messages(&self, _: Uuid) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage>, DomainError> { Ok(vec![]) }
     async fn get(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }
     async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
     async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }

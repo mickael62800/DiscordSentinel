@@ -56,6 +56,11 @@ fn automod_inner() -> Router<AppState> {
             get(handlers::moderation::automod::get_discussion)
                 .post(handlers::moderation::automod::open_discussion),
         )
+        .route(
+            "/reviews/{review_id}/discussion/messages",
+            get(handlers::moderation::automod::list_discussion_messages)
+                .post(handlers::moderation::automod::append_discussion_messages),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

@@ -45,6 +45,16 @@ export interface AutomodReview {
 
 export type ResolveActionChoice = "prevention" | "warn" | "delete" | "mute" | "ban" | "ignore";
 
+/** Un message du transcript du salon de discussion (trace persistante). */
+export interface DiscussionMessage {
+  discord_message_id: string;
+  author_id: string;
+  author_name: string;
+  author_is_bot: boolean;
+  content: string;
+  sent_at: string;
+}
+
 export const automodService = {
   /** GET /api/automod/{guild_id}/detections — timeline filtree action='detection'. */
   listDetections(
@@ -70,6 +80,10 @@ export const automodService = {
         limit: params.limit ?? null,
       })}`,
     );
+  },
+  /** GET /api/automod/reviews/{review_id}/discussion/messages — transcript (trace). */
+  getDiscussionMessages(reviewId: string): Promise<DiscussionMessage[]> {
+    return httpGet(`/api/automod/reviews/${reviewId}/discussion/messages`);
   },
   /** POST /api/automod/reviews/{review_id}/resolve — applique une action. */
   resolveReview(

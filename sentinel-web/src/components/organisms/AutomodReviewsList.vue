@@ -4,7 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useAuth } from "@/composables/useAuth";
 import { useToast } from "@/composables/useToast";
 import { useAutomod } from "@/composables/useAutomod";
-import { automodService, type AutomodReview, type ResolveActionChoice } from "@/services/automodService";
+import { automodService, type AutomodReview, type ResolveActionChoice, type DiscussionMessage } from "@/services/automodService";
 import { on as onWsEvent } from "@/api/events";
 
 const { guildIdFilter } = useGuildSelector();
@@ -15,6 +15,26 @@ const { fetchDetections } = useAutomod();
 const reviews = ref<AutomodReview[]>([]);
 const reviewsLoading = ref(false);
 const resolving = ref<string | null>(null);
+
+// Transcript des salons de discussion (lazy-load au depliage).
+const transcripts = ref<Record<string, DiscussionMessage[]>>({});
+const transcriptLoading = ref<string | null>(null);
+
+async function loadTranscript(reviewId: string) {
+  if (transcripts.value[reviewId]) return; // deja charge
+  transcriptLoading.value = reviewId;
+  try {
+    transcripts.value = {
+      ...transcripts.value,
+      [reviewId]: await automodService.getDiscussionMessages(reviewId),
+    };
+  } catch (e) {
+    console.error(e);
+    showError("Echec chargement du transcript.");
+  } finally {
+    transcriptLoading.value = null;
+  }
+}
 
 async function fetchReviews() {
   if (!guildIdFilter.value) {
@@ -120,6 +140,20 @@ onUnmounted(() => {
               rel="noopener"
             >Salon de discussion ouvert</a>
           </div>
+          <details v-if="r.discussion_channel_id" class="transcript" @toggle="loadTranscript(r.id)">
+            <summary>🗂️ Conversation (trace)</summary>
+            <div v-if="transcriptLoading === r.id" class="muted">Chargement…</div>
+            <div v-else-if="(transcripts[r.id]?.length ?? 0) === 0" class="muted">
+              Aucun message enregistré (le transcript est capturé à la clôture du dossier).
+            </div>
+            <ul v-else class="transcript-list">
+              <li v-for="m in transcripts[r.id]" :key="m.discord_message_id" class="tmsg">
+                <span class="muted ttime">{{ new Date(m.sent_at).toLocaleString("fr-FR") }}</span>
+                <strong :class="{ bot: m.author_is_bot }">{{ m.author_name }}</strong>
+                <span class="tcontent">{{ m.content || "—" }}</span>
+              </li>
+            </ul>
+          </details>
         </div>
         <div class="review-actions">
           <button
@@ -229,6 +263,13 @@ onUnmounted(() => {
 .review-body .discussion { margin-top: 6px; font-size: 0.85rem; }
 .review-body .discussion a { color: var(--accent); text-decoration: none; }
 .review-body .discussion a:hover { text-decoration: underline; }
+.review-body .transcript { margin-top: 6px; font-size: 0.82rem; }
+.review-body .transcript summary { cursor: pointer; color: var(--text-secondary); }
+.transcript-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.tmsg { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; line-height: 1.4; flex-wrap: wrap; }
+.tmsg .ttime { font-size: 0.72rem; white-space: nowrap; }
+.tmsg strong.bot { color: var(--accent); }
+.tmsg .tcontent { word-break: break-word; }
 .content-preview pre {
   background: #0d0d0d;
   padding: 8px 10px;

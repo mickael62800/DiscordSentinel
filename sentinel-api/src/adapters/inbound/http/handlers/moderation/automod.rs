@@ -802,3 +802,91 @@ pub async fn open_discussion(
 
     Ok(Json(DiscussionChannelDto::build(discussion, created)))
 }
+
+// ── Transcript du salon de discussion (trace persistante) ──
+
+#[derive(Debug, Deserialize)]
+pub struct DiscussionMessageIn {
+    pub discord_message_id: String,
+    pub author_id: String,
+    #[serde(default)]
+    pub author_name: String,
+    #[serde(default)]
+    pub author_is_bot: bool,
+    #[serde(default)]
+    pub content: String,
+    /// RFC3339.
+    pub sent_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AppendDiscussionMessagesBody {
+    pub messages: Vec<DiscussionMessageIn>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DiscussionMessageDto {
+    pub discord_message_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub author_is_bot: bool,
+    pub content: String,
+    pub sent_at: String,
+}
+
+/// POST /api/automod/reviews/{review_id}/discussion/messages
+/// Persiste un lot de messages du salon (appele par le bot a l'archivage).
+pub async fn append_discussion_messages(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+    Json(body): Json<AppendDiscussionMessagesBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+
+    let messages: Vec<DiscussionMessage> = body
+        .messages
+        .into_iter()
+        .filter_map(|m| {
+            let sent_at = chrono::DateTime::parse_from_rfc3339(&m.sent_at)
+                .ok()?
+                .with_timezone(&chrono::Utc);
+            Some(DiscussionMessage {
+                review_id: id,
+                discord_message_id: m.discord_message_id,
+                author_id: m.author_id,
+                author_name: m.author_name,
+                author_is_bot: m.author_is_bot,
+                content: m.content,
+                sent_at,
+            })
+        })
+        .collect();
+
+    let inserted = state.automod_reviews_uc.append_discussion_messages(messages).await?;
+    Ok(Json(serde_json::json!({ "inserted": inserted })))
+}
+
+/// GET /api/automod/reviews/{review_id}/discussion/messages
+/// Liste le transcript (trace) pour affichage web.
+pub async fn list_discussion_messages(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+) -> Result<Json<Vec<DiscussionMessageDto>>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let msgs = state.automod_reviews_uc.list_discussion_messages(id).await?;
+    let dtos = msgs
+        .into_iter()
+        .map(|m| DiscussionMessageDto {
+            discord_message_id: m.discord_message_id,
+            author_id: m.author_id,
+            author_name: m.author_name,
+            author_is_bot: m.author_is_bot,
+            content: m.content,
+            sent_at: m.sent_at.to_rfc3339(),
+        })
+        .collect();
+    Ok(Json(dtos))
+}

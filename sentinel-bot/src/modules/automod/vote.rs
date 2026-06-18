@@ -845,6 +845,11 @@ async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, rev
     let Ok(cid) = disc.channel_id.parse::<u64>() else { return };
     let channel = ChannelId::new(cid);
 
+    // Snapshot de la conversation -> DB (trace consultable sur le web), AVANT
+    // de renommer/verrouiller (le contenu n'est pas affecte, mais on capture
+    // tant que le salon existe).
+    snapshot_discussion_messages(ctx, api, review_id, channel).await;
+
     // Renomme pour marquer l'affaire close.
     if let Ok(Channel::Guild(gc)) = channel.to_channel(&ctx.http).await {
         if !gc.name.starts_with("clos-") {
@@ -868,6 +873,55 @@ async fn archive_discussion_channel(ctx: &Context, api: &Arc<BaseApiClient>, rev
             .await;
     }
     info!(review_id, channel = %channel, "Salon de discussion archive (review finalisee)");
+}
+
+/// Capture les messages du salon de discussion et les persiste cote API
+/// (transcript). Best-effort : recupere jusqu'a 100 messages (ordre chrono),
+/// puis POST en batch (idempotent cote serveur sur (review, message_id)).
+async fn snapshot_discussion_messages(
+    ctx: &Context,
+    api: &Arc<BaseApiClient>,
+    review_id: &str,
+    channel: serenity::all::ChannelId,
+) {
+    let msgs = match channel
+        .messages(&ctx.http, serenity::builder::GetMessages::new().limit(100))
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, review_id, "Echec recuperation messages discussion (snapshot)");
+            return;
+        }
+    };
+    if msgs.is_empty() {
+        return;
+    }
+    // L'API renvoie du plus recent au plus ancien -> ordre chronologique.
+    let messages: Vec<serde_json::Value> = msgs
+        .iter()
+        .rev()
+        .map(|m| {
+            serde_json::json!({
+                "discord_message_id": m.id.to_string(),
+                "author_id": m.author.id.to_string(),
+                "author_name": m.author.name,
+                "author_is_bot": m.author.bot,
+                "content": m.content,
+                "sent_at": m.timestamp.to_string(),
+            })
+        })
+        .collect();
+    let body = serde_json::json!({ "messages": messages });
+    if let Err(e) = api
+        .post_json::<_, serde_json::Value>(
+            &format!("/api/automod/reviews/{review_id}/discussion/messages"),
+            &body,
+        )
+        .await
+    {
+        warn!(error = %e, review_id, "Echec persistance transcript discussion");
+    }
 }
 
 /// Edite la carte existante d'une review agregee : recharge le mapping Discord

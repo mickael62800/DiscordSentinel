@@ -3,6 +3,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
+use crate::domain::entities::moderation::review::automod::DiscussionMessage;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
@@ -94,4 +95,18 @@ pub trait AutomodReviewRepository: Send + Sync {
         &self,
         d: NewDiscussionChannel,
     ) -> Result<(DiscussionChannel, bool), DomainError>;
+
+    /// Persiste un lot de messages du salon de discussion (transcript).
+    /// Idempotent par (review_id, discord_message_id). Retourne le nombre
+    /// reellement insere (les doublons sont ignores).
+    async fn append_discussion_messages(
+        &self,
+        messages: &[DiscussionMessage],
+    ) -> Result<u64, DomainError>;
+
+    /// Liste le transcript d'une review (ordre chronologique).
+    async fn list_discussion_messages(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Vec<DiscussionMessage>, DomainError>;
 }

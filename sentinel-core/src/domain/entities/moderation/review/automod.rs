@@ -263,6 +263,18 @@ pub struct NewDiscussionChannel {
     pub opened_by_name: String,
 }
 
+/// Un message capture dans le salon de discussion (transcript persistant).
+#[derive(Debug, Clone)]
+pub struct DiscussionMessage {
+    pub review_id: Uuid,
+    pub discord_message_id: String,
+    pub author_id: String,
+    pub author_name: String,
+    pub author_is_bot: bool,
+    pub content: String,
+    pub sent_at: DateTime<Utc>,
+}
+
 /// Faits Discord du demandeur, fournis par l'adapter bot. La DECISION
 /// d'autorisation (les regles ci-dessous) est prise par le domaine, pas par
 /// le bot — utilise pour le vote, la finalisation et l'ouverture de discussion.
