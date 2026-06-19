@@ -139,22 +139,30 @@ async fn open_submit_modal(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
-async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
-    let channel = command.channel_id;
-    let embed = CreateEmbed::new()
+/// Embed du panneau "Poster une confession" (partage deploy + repost collant).
+fn panel_embed() -> CreateEmbed {
+    CreateEmbed::new()
         .title("📝 Confessions anonymes")
         .description(
             "Clique sur le bouton ci-dessous pour poster une confession **anonyme**.\n\
              Personne (sauf le bot) ne saura qui a écrit. Sois respectueux et lis les règles."
         )
-        .color(0x5865f2);
-    let row = CreateActionRow::Buttons(vec![
+        .color(0x5865f2)
+}
+
+/// Composants (bouton) du panneau.
+fn panel_components() -> Vec<CreateActionRow> {
+    vec![CreateActionRow::Buttons(vec![
         CreateButton::new(CID_SUBMIT_BUTTON)
             .label("Poster une confession")
             .style(ButtonStyle::Primary)
             .emoji('📝'),
-    ]);
-    let msg = CreateMessage::new().embed(embed).components(vec![row]);
+    ])]
+}
+
+async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
+    let channel = command.channel_id;
+    let msg = CreateMessage::new().embed(panel_embed()).components(panel_components());
     match channel.send_message(&ctx.http, msg).await {
         Ok(message) => {
             let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
@@ -415,11 +423,11 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     let id = created.get("id").and_then(|v| v.as_str()).unwrap_or("");
     let public_number = created.get("public_number").and_then(|v| v.as_i64()).unwrap_or(0);
 
-    // 2. Recupere la config pour le channel_id ou poster
+    // 2. Recupere la config (gardee entiere pour pouvoir republier le panneau).
     let cfg_path = format!("/api/confessions/config/{}", guild_id);
-    let cfg: Result<serde_json::Value, String> = api.get_json(&cfg_path).await;
-    let channel_id_str = cfg
-        .ok()
+    let cfg_val: Option<serde_json::Value> = api.get_json(&cfg_path).await.ok();
+    let channel_id_str = cfg_val
+        .as_ref()
         .and_then(|c| {
             c.get("channel_id")
                 .and_then(|v| v.as_str())
@@ -490,12 +498,59 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
         .post_json(&format!("/api/confessions/by-id/{}/message-refs", id), &refs_body)
         .await;
 
+    // 6. "Message collant" : on republie le panneau EN BAS du salon pour que le
+    // bouton "Poster une confession" reste accessible sans remonter le fil.
+    if let Some(cfg_val) = cfg_val {
+        repost_panel(ctx, &api, ch, cfg_val).await;
+    }
+
     modal_reply_ephemeral(
         ctx,
         modal,
         &format!("✅ Confession #{} postee anonymement", public_number),
     )
     .await;
+}
+
+/// Republie le panneau en bas du salon (sticky) : poste un nouveau panneau,
+/// met a jour `panel_message_id` en config (round-trip GET->modif->POST pour ne
+/// pas ecraser les autres reglages), puis supprime l'ancien panneau.
+async fn repost_panel(
+    ctx: &Context,
+    api: &Arc<BaseApiClient>,
+    channel: ChannelId,
+    mut cfg_val: serde_json::Value,
+) {
+    let old_panel_id = cfg_val
+        .get("panel_message_id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let posted = match channel
+        .send_message(&ctx.http, CreateMessage::new().embed(panel_embed()).components(panel_components()))
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec repost panneau confession");
+            return;
+        }
+    };
+
+    // Persiste le nouveau panel_message_id (les autres champs du DTO sont
+    // conserves tels quels).
+    cfg_val["panel_message_id"] = serde_json::Value::String(posted.id.to_string());
+    let _: Result<serde_json::Value, String> =
+        api.post_json("/api/confessions/config", &cfg_val).await;
+
+    // Supprime l'ancien panneau (best-effort ; ignore si deja absent).
+    if let Some(old) = old_panel_id {
+        if old != posted.id.to_string() {
+            if let Ok(mid) = old.parse::<u64>() {
+                let _ = channel.delete_message(&ctx.http, MessageId::new(mid)).await;
+            }
+        }
+    }
 }
 
 async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
