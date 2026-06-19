@@ -247,6 +247,7 @@ pub fn spawn_background_tasks(ctx: &Context) {
                 async move {
                     review::handle_redis_event(&ctx, &payload).await;
                     vote::handle_decided_event(&ctx, &payload).await;
+                    vote::handle_card_expired_event(&ctx, &payload).await;
                 }
             },
         )

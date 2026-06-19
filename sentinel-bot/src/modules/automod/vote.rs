@@ -1166,6 +1166,31 @@ pub(super) async fn handle_decided_event(ctx: &Context, payload: &str) {
     info!(action_id, decided_action, quorum_met, "Carte vote editee (decided)");
 }
 
+/// Event Redis `automod_card_expired` (worker 24h) : supprime le message
+/// Discord d'une carte close vieille de plus d'un mois. La review + le
+/// transcript restent en DB (trace web).
+pub(super) async fn handle_card_expired_event(ctx: &Context, payload: &str) {
+    use serenity::all::{ChannelId, MessageId};
+    let event: serde_json::Value = match serde_json::from_str(payload) { Ok(v) => v, Err(_) => return };
+    if event.get("event").and_then(|e| e.as_str()) != Some("automod_card_expired") {
+        return;
+    }
+    let data = match event.get("data") { Some(d) => d, None => return };
+    let cid = data.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
+    let mid = data.get("message_id").and_then(|v| v.as_str()).unwrap_or("");
+    let (Ok(c), Ok(m)) = (cid.parse::<u64>(), mid.parse::<u64>()) else { return };
+    match ChannelId::new(c).delete_message(&ctx.http, MessageId::new(m)).await {
+        Ok(_) => info!(channel = c, message = m, "Carte automod close supprimee (>1 mois)"),
+        Err(e) => {
+            // 404 = deja supprimee : on ignore.
+            let s = e.to_string();
+            if !s.contains("404") && !s.contains("Unknown Message") {
+                warn!(error = %e, "Echec suppression carte automod expiree");
+            }
+        }
+    }
+}
+
 /// Handler du bouton admin de finalisation (`amf:<review_id>`).
 pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
     let review_id = match component.data.custom_id.strip_prefix(FINALIZE_PREFIX) {
@@ -1184,12 +1209,20 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // (full hexa). Un non-admin recevra une erreur 403 a l'etape /resolve.
     let facts = moderator_facts(component, None, admin_role_id);
 
-    // Recupere la review (verdict + cible) depuis l'API.
+    // Recupere la review (verdict + cible + infraction) depuis l'API.
     #[derive(serde::Deserialize)]
     struct ReviewDto {
         channel_id: String,
         message_id: String,
         user_id: String,
+        #[serde(default)]
+        user_name: String,
+        #[serde(default)]
+        content_preview: String,
+        #[serde(default)]
+        reason: String,
+        #[serde(default)]
+        incident_count: i32,
         decided_action: Option<String>,
         status: String,
     }
@@ -1257,14 +1290,24 @@ pub(super) async fn handle_finalize_button(ctx: &Context, component: &serenity::
     // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
     archive_discussion_channel(ctx, &api, &review_id, &review.user_id).await;
 
-    // Edite la carte : finalise.
-    let finalized = serenity::builder::CreateEmbed::new()
+    // Edite la carte : finalise. On conserve les infos utiles (membre +
+    // infraction) pour garder une carte close lisible.
+    let mut finalized = serenity::builder::CreateEmbed::new()
         .title("AutoMod -- Vote finalise")
-        .description(format!(
-            "Sanction : **{}**\nFinalise par : **{}**\nCible : <@{}>",
-            action_label(&decided), component.user.name, review.user_id
-        ))
         .color(0x2ecc71)
+        .field("Membre", format!("<@{}> (`{}`)", review.user_id, review.user_name), true)
+        .field("Sanction", action_label(&decided), true)
+        .field("Finalise par", component.user.name.clone(), true)
+        .field("Raison", if review.reason.is_empty() { "—" } else { review.reason.as_str() }, false)
+        .field(
+            if review.incident_count > 1 { "Dernier message" } else { "Message" },
+            format!("```{}```", super::review::sanitize_embed_content(&review.content_preview, 500)),
+            false,
+        );
+    if review.incident_count > 1 {
+        finalized = finalized.field("Incidents", review.incident_count.to_string(), true);
+    }
+    finalized = finalized
         .footer(serenity::builder::CreateEmbedFooter::new("AutoMod Vote | Finalise par un admin"))
         .timestamp(serenity::model::Timestamp::now());
     let _ = component
@@ -1315,21 +1358,42 @@ pub(super) async fn handle_close_button(ctx: &Context, component: &serenity::mod
         return;
     }
 
-    // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
-    // (user_id recupere best-effort via l'API pour verrouiller l'ecriture.)
-    #[derive(serde::Deserialize)]
-    struct U { user_id: String }
-    if let Ok(r) = api.get_json::<U>(&format!("/api/automod/reviews/{review_id}")).await {
+    // Recupere la review (membre + infraction) pour garder une carte lisible,
+    // et archive le salon de discussion lie.
+    #[derive(serde::Deserialize, Default)]
+    struct ClosedReview {
+        #[serde(default)] user_id: String,
+        #[serde(default)] user_name: String,
+        #[serde(default)] content_preview: String,
+        #[serde(default)] reason: String,
+        #[serde(default)] incident_count: i32,
+    }
+    let r: ClosedReview = api
+        .get_json(&format!("/api/automod/reviews/{review_id}"))
+        .await
+        .unwrap_or_default();
+    if !r.user_id.is_empty() {
         archive_discussion_channel(ctx, &api, &review_id, &r.user_id).await;
     }
 
-    let closed = serenity::builder::CreateEmbed::new()
+    let mut closed = serenity::builder::CreateEmbed::new()
         .title("AutoMod -- Dossier clos (ignore)")
         .description(format!(
             "Clos par **{}**. Aucune sanction appliquee.\nUn moderateur peut rouvrir le dossier si besoin.",
             component.user.name
         ))
         .color(0x95a5a6)
+        .field("Membre", format!("<@{}> (`{}`)", r.user_id, r.user_name), true)
+        .field("Raison", if r.reason.is_empty() { "—" } else { r.reason.as_str() }, false)
+        .field(
+            if r.incident_count > 1 { "Dernier message" } else { "Message" },
+            format!("```{}```", super::review::sanitize_embed_content(&r.content_preview, 500)),
+            false,
+        );
+    if r.incident_count > 1 {
+        closed = closed.field("Incidents", r.incident_count.to_string(), true);
+    }
+    closed = closed
         .footer(serenity::builder::CreateEmbedFooter::new("AutoMod | Dossier ignore"))
         .timestamp(serenity::model::Timestamp::now());
     let _ = component

@@ -868,6 +868,65 @@ pub async fn append_discussion_messages(
     Ok(Json(serde_json::json!({ "inserted": inserted })))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CleanupCardsQuery {
+    /// Age minimum (jours) d'une carte close pour etre supprimee. Defaut 30.
+    pub days: Option<i64>,
+}
+
+/// POST /api/automod/cleanup-expired-cards — appele par le worker (24h).
+/// Pour chaque carte de review CLOSE (applied|ignored) resolue depuis plus de
+/// `days` jours et encore mappee a un message Discord : broadcast un event
+/// `automod_card_expired` (le bot supprime le message) et retire le mapping.
+/// La review + le transcript restent en DB (trace web conservee).
+pub async fn cleanup_expired_cards(
+    State(state): State<AppState>,
+    Query(q): Query<CleanupCardsQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let days = q.days.unwrap_or(30).clamp(1, 3650);
+
+    #[derive(sqlx::FromRow)]
+    struct ExpiredCard {
+        action_id: Uuid,
+        channel_id: String,
+        message_id: String,
+    }
+    let cards: Vec<ExpiredCard> = sqlx::query_as(
+        "SELECT m.action_id, m.channel_id, m.message_id \
+         FROM automod_reviews r \
+         JOIN discord_action_messages m ON m.action_id = r.id AND m.kind = 'automod_review' \
+         WHERE r.status IN ('applied','ignored') \
+           AND r.resolved_at IS NOT NULL \
+           AND r.resolved_at < NOW() - make_interval(days => $1) \
+         LIMIT 200",
+    )
+    .bind(days as i32)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(format!("cleanup query: {e}"))))?;
+
+    let mut count = 0u32;
+    for c in &cards {
+        state.broadcaster.broadcast(
+            "automod_card_expired",
+            serde_json::json!({
+                "action_id": c.action_id.to_string(),
+                "channel_id": c.channel_id,
+                "message_id": c.message_id,
+            }),
+        );
+        // Retire le mapping pour ne pas le re-traiter au prochain passage.
+        let _ = sqlx::query(
+            "DELETE FROM discord_action_messages WHERE action_id = $1 AND kind = 'automod_review'",
+        )
+        .bind(c.action_id)
+        .execute(&state.pg_pool)
+        .await;
+        count += 1;
+    }
+    Ok(Json(serde_json::json!({ "expired": count })))
+}
+
 /// GET /api/automod/{guild_id}/reviews/by-message/{message_id}
 /// Retrouve la review associee a un message Discord (pour retrouver le
 /// review_id depuis une carte 1-clic dont les boutons ne le portent pas).

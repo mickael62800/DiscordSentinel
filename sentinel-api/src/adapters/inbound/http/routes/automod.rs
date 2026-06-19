@@ -28,6 +28,10 @@ fn automod_inner() -> Router<AppState> {
             post(handlers::moderation::automod::create_review),
         )
         .route(
+            "/cleanup-expired-cards",
+            post(handlers::moderation::automod::cleanup_expired_cards),
+        )
+        .route(
             "/reviews/{review_id}/resolve",
             post(handlers::moderation::automod::resolve_review),
         )

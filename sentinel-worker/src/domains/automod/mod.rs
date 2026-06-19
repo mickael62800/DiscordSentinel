@@ -1,5 +1,6 @@
 //! Domaine automod : cloture des votes de moderation a echeance.
 
+pub mod cleanup_cards;
 pub mod close_votes;
 
 /// Quorum par defaut si non configure (doit matcher le defaut du

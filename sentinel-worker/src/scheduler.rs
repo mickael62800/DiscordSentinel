@@ -85,6 +85,21 @@ pub fn start(
         },
     );
 
+    // Domaine : automod — suppression des cartes closes vieilles de > 1 mois
+    // (24h). Le bot supprime le message Discord via event ; la review + le
+    // transcript restent en DB (trace web conservee).
+    spawn_periodic(
+        "automod_cleanup_cards",
+        86_400,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "automod-bot",
+        move |pool| {
+            Box::pin(async move { domains::automod::cleanup_cards::run(&pool).await })
+        },
+    );
+
     // ─────────────────────────────────────────────────────────────
     // Domaine : tamagotchi — tick de cycle de vie (decroissance/maladie/mort)
     // ─────────────────────────────────────────────────────────────
