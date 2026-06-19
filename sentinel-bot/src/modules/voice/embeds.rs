@@ -92,7 +92,7 @@ pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, u
             None => return,
         };
         entry.current_members += 1;
-        entry.add_event(format!("\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
+        entry.add_event(format!("\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
         entry.clone()
     };
     card_clone.update(ctx).await;
@@ -112,7 +112,7 @@ pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, use
             None => return,
         };
         entry.current_members = entry.current_members.saturating_sub(1);
-        entry.add_event(format!("\u{2b05}\u{fe0f} **{}** a quitte ({})", user_name, duration_text));
+        entry.add_event(format!("\u{1f534}\u{2b05}\u{fe0f} **{}** a quitte ({})", user_name, duration_text));
         entry.clone()
     };
     card_clone.update(ctx).await;

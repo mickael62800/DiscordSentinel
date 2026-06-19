@@ -1,10 +1,15 @@
+use serenity::builder::CreateEmbed;
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 
 use super::audit_event;
 use super::{WeeklyTrackerKey, watched_users};
-use super::{send_event, log};
+use super::{send_event, log, post_to_channel};
 use super::weekly_report::StatField;
+
+/// Salons de log vocal : cle dediee puis fallback log_channel_id (gere par
+/// post_to_channel).
+const VOICE_LOG_KEYS: &[&str] = &["voice_log_channel_id"];
 
 pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &VoiceState) {
     let gid = match new.guild_id {
@@ -36,6 +41,34 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         _ => String::new(),
     };
     log(ctx, "info", &gid, &voice_msg).await;
+
+    // Embed Discord (TOUS les salons vocaux, pas seulement les temporaires) :
+    // entree = vert + fleche droite, sortie = rouge + fleche gauche, deplacement
+    // = bleu. Poste dans voice_log_channel_id (fallback log_channel_id).
+    let (title, color, line): (&str, u32, String) = match (event_type, old_channel, new_channel) {
+        ("voice_join", _, Some(ch)) => (
+            "Connexion vocale",
+            0x57F287, // vert
+            format!("\u{1f7e2}\u{27a1}\u{fe0f} <@{}> a rejoint <#{}>", user_id, ch),
+        ),
+        ("voice_leave", Some(ch), _) => (
+            "Deconnexion vocale",
+            0xED4245, // rouge
+            format!("\u{1f534}\u{2b05}\u{fe0f} <@{}> a quitte <#{}>", user_id, ch),
+        ),
+        ("voice_move", Some(a), Some(b)) => (
+            "Changement de vocal",
+            0x5865F2, // bleu
+            format!("\u{1f504} <@{}> a change : <#{}> \u{2192} <#{}>", user_id, a, b),
+        ),
+        _ => ("Vocal", 0x95A5A6, voice_msg.clone()),
+    };
+    let embed = CreateEmbed::new()
+        .description(line)
+        .color(color)
+        .footer(serenity::builder::CreateEmbedFooter::new(format!("{title} · {user_name}")))
+        .timestamp(serenity::model::Timestamp::now());
+    post_to_channel(ctx, &gid, VOICE_LOG_KEYS, embed).await;
 
     let mut evt = audit_event::simple(gid.clone(), event_type)
         .with_actor(&user_id, &user_name)
