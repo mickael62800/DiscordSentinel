@@ -18,7 +18,7 @@ use tracing::{error, info, warn};
 
 use crate::shared::heartbeat::ApiClientKey;
 
-use crate::modules::voice::api_client::{ApiClient, CreateVoiceChannelRequest};
+use crate::modules::voice::api_client::{ApiClient, CreateVoiceChannelRequest, UpdateVoiceChannelRequest};
 use crate::modules::voice::embeds;
 use crate::modules::voice::{CooldownTrackerKey, VoiceOwnerMapKey};
 
@@ -48,15 +48,28 @@ pub(super) async fn create_temp_channel(
         Err(_) => return,
     };
     let display_name = member.display_name().to_string();
-    // Nom du vocal : prefix special pour les salons game
-    let voice_name = if kind == "game" {
-        format!("\u{1f3ae} {display_name}")
-    } else {
-        format!("Salon de {display_name}")
+
+    // Preset memorise par ce proprietaire (bouton "Sauvegarder params"). Sert
+    // a reappliquer nom / limite / visibilite / verrou + whitelist a chaque
+    // nouvelle creation. None si l'utilisateur n'a jamais sauvegarde.
+    let preset = {
+        let data = ctx.data.read().await;
+        if let Some(api) = ApiClient::from_data(&data) {
+            api.get_preset(&guild_id.to_string(), &user_id.get().to_string()).await
+        } else {
+            None
+        }
+    };
+
+    // Nom du vocal : preset si defini, sinon prefix special pour les game.
+    let voice_name = match preset.as_ref().and_then(|p| p.channel_name.clone()) {
+        Some(name) if !name.trim().is_empty() => name,
+        _ if kind == "game" => format!("\u{1f3ae} {display_name}"),
+        _ => format!("Salon de {display_name}"),
     };
     let everyone_role = guild_id.everyone_role();
-    // user_limit par defaut : lu depuis le theme API si present, sinon 0.
-    let default_user_limit: u32 = {
+    // user_limit : preset prioritaire, sinon theme API, sinon 0 (illimite).
+    let theme_user_limit: u32 = {
         let data = ctx.data.read().await;
         data.get::<crate::modules::voice::ThemeCacheKey>()
             .and_then(|themes| {
@@ -64,6 +77,11 @@ pub(super) async fn create_temp_channel(
             })
             .unwrap_or(0) as u32
     };
+    let default_user_limit: u32 = preset
+        .as_ref()
+        .and_then(|p| p.member_limit)
+        .map(|l| l.max(0) as u32)
+        .unwrap_or(theme_user_limit);
 
     // Lire la categorie ancre depuis la config guild (pour le positionnement).
     let anchor_category_id: Option<u64> = {
@@ -121,7 +139,54 @@ pub(super) async fn create_temp_channel(
         tracing::warn!(error = %e, "failed to set owner permission on voice channel");
     }
 
-    info!(channel = %voice_name, kind = %kind, "Salon vocal temporaire cree");
+    // ── Application du preset (visibilite/verrou) + whitelist ──
+    // Pour les salons `game`, la file d'attente gere deja les overwrites
+    // @everyone (verrou derriere la queue) : on ne superpose pas le preset.
+    let preset_hidden = preset.as_ref().map(|p| p.visibility == "hidden").unwrap_or(false);
+    let preset_locked = preset.as_ref().map(|p| p.locked).unwrap_or(false);
+
+    if kind != "game" && (preset_hidden || preset_locked) {
+        let mut deny = Permissions::empty();
+        if preset_hidden {
+            deny |= Permissions::VIEW_CHANNEL | Permissions::CONNECT;
+        }
+        if preset_locked {
+            deny |= Permissions::CONNECT;
+        }
+        let everyone_overwrite = PermissionOverwrite {
+            allow: Permissions::empty(),
+            deny,
+            kind: PermissionOverwriteType::Role(everyone_role),
+        };
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, everyone_overwrite).await {
+            warn!(error = %e, "failed to apply preset @everyone overwrite");
+        }
+    }
+
+    // Whitelist (liste d'amis persistante) : chaque membre whiteliste obtient
+    // l'acces, ce qui le rend visible meme si le salon est cache. Tolerant aux
+    // erreurs (rate-limit Discord) : on log et on continue.
+    let whitelist = {
+        let data = ctx.data.read().await;
+        if let Some(api) = ApiClient::from_data(&data) {
+            api.get_whitelist(&guild_id.to_string(), &user_id.get().to_string()).await
+        } else {
+            Vec::new()
+        }
+    };
+    for entry in &whitelist {
+        let Ok(target) = entry.target_id.parse::<u64>() else { continue };
+        let overwrite = PermissionOverwrite {
+            allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(UserId::new(target)),
+        };
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            warn!(error = %e, target = %target, "failed to apply whitelist overwrite");
+        }
+    }
+
+    info!(channel = %voice_name, kind = %kind, whitelist = whitelist.len(), "Salon vocal temporaire cree");
 
     // Stocker les mappings locaux AVANT le move.
     {
@@ -191,7 +256,7 @@ pub(super) async fn create_temp_channel(
     };
     let panel_msg_id = if panel_post_enabled && (kind == "private" || kind == "game") {
         let queue_enabled_init = queue_channel_id.is_some();
-        send_control_panel(ctx, voice_channel_id, false, queue_enabled_init, false, user_id.get()).await
+        send_control_panel(ctx, voice_channel_id, preset_hidden, queue_enabled_init, preset_locked, user_id.get()).await
     } else {
         None
     };
@@ -212,7 +277,7 @@ pub(super) async fn create_temp_channel(
                 category_id: None,
                 channel_name: voice_name.clone(),
                 kind: kind.to_string(),
-                visibility: "visible".to_string(),
+                visibility: if preset_hidden { "hidden".to_string() } else { "visible".to_string() },
                 queue_enabled: queue_channel_id.is_some(),
             };
 
@@ -227,6 +292,27 @@ pub(super) async fn create_temp_channel(
             None
         }
     };
+
+    // Le create RPC ne porte pas `locked` : on persiste le verrou du preset via
+    // un update de suivi pour que la DB et la web admin restent coherentes avec
+    // l'overwrite Discord deja applique. (Non applicable aux salons `game`.)
+    if preset_locked && kind != "game" {
+        let data = ctx.data.read().await;
+        if let Some(api) = ApiClient::from_data(&data) {
+            let upd = UpdateVoiceChannelRequest {
+                visibility: None,
+                locked: Some(true),
+                queue_enabled: None,
+                name: None,
+                status: None,
+                member_limit: None,
+                queue_channel_id: None,
+            };
+            if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &upd).await {
+                warn!(error = %e, "Erreur API update_channel (verrou preset)");
+            }
+        }
+    }
 
     // Sync bilateral : enregistre le panneau pour permettre au web de
     // declencher un re-render quand un admin change l etat du salon.
@@ -728,6 +814,9 @@ async fn send_control_panel(
         CreateButton::new("btn_transfer")
             .label("Transferer")
             .style(ButtonStyle::Secondary),
+        CreateButton::new("btn_save_prefs")
+            .label("Sauvegarder params")
+            .style(ButtonStyle::Primary),
     ];
 
     let user_select = CreateSelectMenu::new(

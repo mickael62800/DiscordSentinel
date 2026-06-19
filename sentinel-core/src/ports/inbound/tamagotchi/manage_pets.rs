@@ -125,9 +125,21 @@ pub trait ManagePetsUseCase: Send + Sync {
     /// Combat asynchrone contre le compagnon d'un autre joueur (ELO + XP).
     async fn combat(&self, cmd: CombatCommand) -> Result<CombatResult, DomainError>;
 
-    /// Compagnons vivants a faire decroitre (job worker, via l'API).
-    async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError>;
+    /// Compagnons vivants a faire decroitre (job worker, via l'API), pagine
+    /// par curseur `id` croissant (`after_id = None` pour la 1re page).
+    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError>;
     /// Applique un tick de cycle de vie (decroissance + maladie/mort) avec
     /// la config de la guild. Retourne l'evenement notable.
     async fn tick(&self, pet_id: Uuid, cfg: TickConfig) -> Result<TickOutcome, DomainError>;
+
+    /// Enregistre la localisation de la carte Discord du joueur.
+    async fn set_card_location(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        channel_id: &str,
+        message_id: &str,
+    ) -> Result<(), DomainError>;
+    /// Compagnons vivants ayant une carte a rafraichir (tache horaire du bot).
+    async fn list_cards(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError>;
 }

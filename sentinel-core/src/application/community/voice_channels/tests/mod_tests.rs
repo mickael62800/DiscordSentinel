@@ -5,7 +5,7 @@
     use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
     fn make_theme_cmd(name: &str) -> CreateThemeCommand {
         CreateThemeCommand {
-            guild_id: "guild1".to_string(),
+            guild_id: "guild1".into(),
             name: name.to_string(),
             emoji: None,
             channel_name_template: "{user}".to_string(),
@@ -346,6 +346,8 @@
             Ok(())
         }
         async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn find_preset(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { Ok(None) }
+        async fn upsert_preset(&self, _: &crate::domain::entities::community::voice_channel::VoiceChannelPreset) -> Result<(), DomainError> { Ok(()) }
         async fn find_bans(&self, _: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError> { Ok(vec![]) }
         async fn find_active_ban(&self, _: Uuid, _: &str) -> Result<Option<VoiceChannelBan>, DomainError> { Ok(None) }
         async fn save_ban(&self, _: &VoiceChannelBan) -> Result<(), DomainError> { Ok(()) }
@@ -823,7 +825,7 @@
         let svc = make_service(repo);
 
         let detail = svc.get_channel_detail("chan1").await.unwrap();
-        assert_eq!(detail.channel.channel_id, "chan1");
+        assert_eq!(detail.channel.channel_id.as_str(), "chan1");
         assert_eq!(detail.invite_links.len(), 1);
         assert_eq!(detail.invite_links[0].code, "DETAIL01");
         assert!(detail.co_admins.is_empty());

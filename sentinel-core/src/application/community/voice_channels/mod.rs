@@ -6,6 +6,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannel;
 use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
 use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
 use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelPreset;
 use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
@@ -16,6 +17,7 @@ use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelC
 use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
 use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
@@ -171,6 +173,14 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
 
     async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError> {
         self.remove_from_whitelist_impl(guild_id, owner_id, target_id).await
+    }
+
+    async fn get_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError> {
+        self.get_preset_impl(guild_id, owner_id).await
+    }
+
+    async fn save_preset(&self, cmd: SavePresetCommand) -> Result<(), DomainError> {
+        self.save_preset_impl(cmd).await
     }
 
     async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError> {

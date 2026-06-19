@@ -2,10 +2,12 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+use crate::domain::entities::community::voice_channel::VoiceChannelPreset;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use super::ManageVoiceChannelsService;
 
 impl ManageVoiceChannelsService {
@@ -28,6 +30,24 @@ impl ManageVoiceChannelsService {
 
     pub(super) async fn remove_from_whitelist_impl(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError> {
         self.repo.remove_from_whitelist(guild_id, owner_id, target_id).await
+    }
+
+    pub(super) async fn get_preset_impl(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError> {
+        self.repo.find_preset(guild_id, owner_id).await
+    }
+
+    pub(super) async fn save_preset_impl(&self, cmd: SavePresetCommand) -> Result<(), DomainError> {
+        let preset = VoiceChannelPreset {
+            guild_id: cmd.guild_id,
+            owner_id: cmd.owner_id,
+            channel_name: cmd.channel_name,
+            member_limit: cmd.member_limit,
+            visibility: cmd.visibility,
+            locked: cmd.locked,
+            queue_enabled: cmd.queue_enabled,
+            updated_at: Utc::now(),
+        };
+        self.repo.upsert_preset(&preset).await
     }
 
     pub(super) async fn ban_from_channel_impl(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError> {

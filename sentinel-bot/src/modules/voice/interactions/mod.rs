@@ -214,7 +214,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     info!(custom_id = %custom_id, user = %component.user.id, "Component interaction");
 
     match custom_id {
-        "btn_hide" | "btn_lock" | "btn_limit" | "btn_rename" | "btn_status" => {
+        "btn_hide" | "btn_lock" | "btn_limit" | "btn_rename" | "btn_status" | "btn_save_prefs" => {
             channel_management::handle(ctx, component).await;
         }
         "select_invite" | "btn_kick" | "select_kick" | "btn_ban" | "select_ban" => {

@@ -9,10 +9,19 @@
 pub const MODULE_BOT_NAME: &str = "tamagotchi-bot";
 
 mod card_render;
+mod lifecycle_events;
 mod panel;
+mod refresh;
 mod setup;
 
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};
+
+/// Spawn les taches de fond du module tamagotchi (appele au `ready`) :
+/// rafraichissement horaire des cartes + consumer des transitions de vie.
+pub fn spawn_background(ctx: Context) {
+    refresh::spawn(ctx.clone());
+    lifecycle_events::spawn(ctx);
+}
 
 use crate::shared::discord_helpers::{
     is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,

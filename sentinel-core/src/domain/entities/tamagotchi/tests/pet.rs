@@ -28,6 +28,8 @@ fn base_pet(now: chrono::DateTime<Utc>) -> Pet {
         losses: 0,
         cooldowns: serde_json::json!({}),
         last_decay_at: now,
+        card_channel_id: None,
+        card_message_id: None,
     }
 }
 

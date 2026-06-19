@@ -177,6 +177,8 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
     async fn get_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { Ok(vec![]) }
     async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> { Ok(()) }
     async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_preset(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { Ok(None) }
+    async fn save_preset(&self, _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand) -> Result<(), DomainError> { Ok(()) }
     async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> { Ok(()) }
     async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn is_banned(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }

@@ -65,6 +65,12 @@ pub struct Pet {
     pub cooldowns: serde_json::Value,
 
     pub last_decay_at: DateTime<Utc>,
+
+    /// Localisation de la carte postee dans Discord (salon prive du joueur),
+    /// pour permettre le rafraichissement automatique (re-edition) par le bot.
+    /// `None` tant que le joueur n'a pas ouvert son salon.
+    pub card_channel_id: Option<String>,
+    pub card_message_id: Option<String>,
 }
 
 impl Pet {

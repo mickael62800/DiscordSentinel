@@ -7,7 +7,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::api_client::{ApiClient, UpdateVoiceChannelRequest};
+use super::api_client::{ApiClient, SavePresetRequest, UpdateVoiceChannelRequest};
 
 /// Handle channel management interactions.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -19,6 +19,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         "btn_limit" => handle_limit_modal(ctx, component).await,
         "btn_rename" => handle_rename_modal(ctx, component).await,
         "btn_status" => handle_status_modal(ctx, component).await,
+        "btn_save_prefs" => handle_save_prefs(ctx, component).await,
         _ => {
             warn!(custom_id = %custom_id, "Channel management interaction inconnue");
         }
@@ -37,6 +38,45 @@ pub async fn handle_modal(ctx: &Context, modal: &ModalInteraction) {
             warn!(custom_id = %custom_id, "Channel management modal inconnue");
         }
     }
+}
+
+// ── Sauvegarde des parametres (preset par proprietaire) ──
+
+/// Memorise l'etat courant du salon (nom, limite, visibilite, verrou, file)
+/// comme preset du proprietaire. Reapplique automatiquement a la prochaine
+/// creation d'un salon temporaire par cet utilisateur.
+async fn handle_save_prefs(ctx: &Context, component: &ComponentInteraction) {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((_voice_channel_id, ch)) = super::require_admin_deferred(ctx, component).await else {
+        return;
+    };
+
+    let guild_id = component.guild_id.unwrap_or_default();
+
+    let request = SavePresetRequest {
+        owner_id: ch.owner_id.clone(),
+        channel_name: Some(ch.channel_name.clone()),
+        member_limit: ch.member_limit,
+        visibility: ch.visibility.clone(),
+        locked: ch.locked,
+        queue_enabled: ch.queue_enabled,
+    };
+
+    {
+        let data = ctx.data.read().await;
+        if let Some(api) = ApiClient::from_data(&data) {
+            api.save_preset(&guild_id.get().to_string(), &request).await;
+        }
+    }
+
+    super::respond_followup_ephemeral(
+        ctx,
+        component,
+        "Parametres sauvegardes. Ils seront reappliques a ton prochain salon (avec ta liste d'amis).",
+    )
+    .await;
+
+    info!(owner = %ch.owner_id, "Preset salon vocal sauvegarde");
 }
 
 // ── Hide / Show ──

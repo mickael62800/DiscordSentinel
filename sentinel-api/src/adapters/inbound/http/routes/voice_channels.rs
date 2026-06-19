@@ -34,6 +34,8 @@ fn voice_inner() -> Router<AppState> {
         .route("/whitelist/{guild_id}/{owner_id}", get(handlers::community::voice_channels::get_whitelist))
         .route("/whitelist", post(handlers::community::voice_channels::add_to_whitelist))
         .route("/whitelist/{guild_id}/{owner_id}/{target_id}", delete(handlers::community::voice_channels::remove_from_whitelist))
+        .route("/presets/{guild_id}", post(handlers::community::voice_channels::save_preset))
+        .route("/presets/{guild_id}/{owner_id}", get(handlers::community::voice_channels::get_preset))
         .route("/by-channel/{channel_id}/bans", post(handlers::community::voice_channels::ban_from_channel))
         .route(
             "/by-channel/{channel_id}/bans/{user_id}",

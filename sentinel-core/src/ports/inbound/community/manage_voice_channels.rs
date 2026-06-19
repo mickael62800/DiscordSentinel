@@ -4,6 +4,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannel;
 use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
 use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
 use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelPreset;
 use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
@@ -56,6 +57,16 @@ pub struct ManageWhitelistCommand {
     pub owner_id: String,
     pub target_id: String,
     pub target_name: String,
+}
+
+pub struct SavePresetCommand {
+    pub guild_id: GuildId,
+    pub owner_id: String,
+    pub channel_name: Option<String>,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
 }
 
 pub struct BanFromChannelCommand {
@@ -118,6 +129,10 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn get_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError>;
     async fn add_to_whitelist(&self, cmd: ManageWhitelistCommand) -> Result<(), DomainError>;
     async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError>;
+
+    // Presets par proprietaire
+    async fn get_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError>;
+    async fn save_preset(&self, cmd: SavePresetCommand) -> Result<(), DomainError>;
 
     // Bans
     async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError>;

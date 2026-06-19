@@ -105,7 +105,7 @@ pub fn start(
     // ─────────────────────────────────────────────────────────────
     spawn_periodic(
         "tamagotchi_tick",
-        300,
+        config.tamagotchi_tick_interval_secs,
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),

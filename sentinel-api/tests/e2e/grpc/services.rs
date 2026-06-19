@@ -789,6 +789,8 @@ impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
     async fn get_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { unimplemented!() }
     async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> { unimplemented!() }
     async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_preset(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { unimplemented!() }
+    async fn save_preset(&self, _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand) -> Result<(), DomainError> { unimplemented!() }
     async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> { unimplemented!() }
     async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn create_invite_link(&self, _: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> { unimplemented!() }

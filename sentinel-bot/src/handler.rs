@@ -160,6 +160,9 @@ impl EventHandler for Handler {
         // Confessions : consumer Redis stream pour synchroniser les
         // suppressions web -> Discord (delete confession ou reply).
         modules::confessions::spawn_consumer(ctx.clone());
+
+        // Tamagotchi : refresh horaire des cartes + consumer maladie/mort (DM).
+        modules::tamagotchi::spawn_background(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

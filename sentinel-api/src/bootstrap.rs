@@ -444,6 +444,7 @@ pub async fn build_app_state(
             wallet_repo.clone(),
             coude_taunts_uc.clone(),
             member_repo.clone(),
+            bot_config_repo.clone(),
         ));
 
     // Tamagotchi : repo + use case (debite les coins via le wallet partage).

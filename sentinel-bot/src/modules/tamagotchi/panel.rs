@@ -43,7 +43,7 @@ struct PetEventDto {
 }
 
 #[derive(serde::Deserialize)]
-struct PetDto {
+pub(super) struct PetDto {
     name: String,
     species: String,
     #[serde(default)]
@@ -154,13 +154,30 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
 
     // Pet existant ?
     let pet = fetch_pet(&api, &guild_id.to_string(), &user_id.to_string()).await;
+    let has_living_pet = matches!(&pet, Some(p) if p.status != "dead");
     let msg = match pet {
         Some(p) if p.status != "dead" => {
             card_message(&api, &guild_id.to_string(), &user_id.to_string(), &p).await
         }
         _ => species_choice_message(),
     };
-    let _ = channel.id.send_message(&ctx.http, msg).await;
+    let sent = channel.id.send_message(&ctx.http, msg).await;
+
+    // Memorise la position de la carte pour le rafraichissement automatique.
+    // (Pour un nouveau joueur, le pet n'existe pas encore -> persiste dans
+    // handle_pick apres la naissance.)
+    if has_living_pet {
+        if let Ok(message) = &sent {
+            persist_card_location(
+                &api,
+                &guild_id.to_string(),
+                &user_id.to_string(),
+                channel.id.get(),
+                message.id.get(),
+            )
+            .await;
+        }
+    }
 
     let _ = component
         .edit_response(&ctx.http, EditInteractionResponse::new().content(format!("Ton salon : <#{}>", channel.id)))
@@ -189,6 +206,16 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
             let _ = component
                 .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
                 .await;
+            // La carte = le message de choix d'espece qu'on vient d'editer
+            // (meme message_id). Memorise sa position pour le refresh auto.
+            persist_card_location(
+                &api,
+                &guild_id,
+                &component.user.id.to_string(),
+                component.channel_id.get(),
+                component.message.id.get(),
+            )
+            .await;
         }
         Err(e) => {
             warn!(error = %e, "Echec creation pet");
@@ -575,7 +602,7 @@ fn species_display(key: &str) -> &'static str {
     SPECIES.iter().find(|(k, _)| *k == key).map(|(_, d)| *d).unwrap_or("Compagnon")
 }
 
-fn card_embed(p: &PetDto) -> CreateEmbed {
+pub(super) fn card_embed(p: &PetDto) -> CreateEmbed {
     let status = match p.status.as_str() {
         "sick" => "🤒 Malade",
         "dead" => "🪦 Mort",
@@ -598,7 +625,7 @@ fn card_embed(p: &PetDto) -> CreateEmbed {
     e
 }
 
-fn care_buttons() -> Vec<CreateActionRow> {
+pub(super) fn care_buttons() -> Vec<CreateActionRow> {
     vec![
         CreateActionRow::Buttons(vec![
             CreateButton::new(format!("{ACT_PREFIX}feed")).label("Nourrir").emoji('🍗').style(ButtonStyle::Primary),
@@ -650,7 +677,7 @@ async fn fetch_coins(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> i64
 }
 
 /// Construit les donnees + rend le PNG de la carte (None si rendu echoue).
-async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> Option<Vec<u8>> {
+pub(super) async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> Option<Vec<u8>> {
     let data = CardData {
         name: p.name.clone(),
         species_label: species_display(&p.species).to_string(),
@@ -721,6 +748,26 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, text: 
             ),
         )
         .await;
+}
+
+/// Enregistre cote API la position (salon + message) de la carte du joueur,
+/// pour permettre au bot de la rafraichir automatiquement.
+async fn persist_card_location(
+    api: &BaseApiClient,
+    guild_id: &str,
+    owner_id: &str,
+    channel_id: u64,
+    message_id: u64,
+) {
+    let body = serde_json::json!({
+        "channel_id": channel_id.to_string(),
+        "message_id": message_id.to_string(),
+    });
+    api.post_fire_and_forget(
+        &format!("/api/tamagotchi/{guild_id}/{owner_id}/card"),
+        &body,
+    )
+    .await;
 }
 
 async fn fetch_pet(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> Option<PetDto> {

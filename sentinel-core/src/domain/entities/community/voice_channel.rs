@@ -99,6 +99,21 @@ pub struct VoiceChannelTheme {
     pub created_at: DateTime<Utc>,
 }
 
+/// Preset de parametres memorise par proprietaire. Reapplique a la creation
+/// d'un nouveau salon temporaire (le bouton "Sauvegarder mes parametres" du
+/// panneau de controle persiste l'etat courant du salon ici).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceChannelPreset {
+    pub guild_id: GuildId,
+    pub owner_id: String,
+    pub channel_name: Option<String>,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
+    pub updated_at: DateTime<Utc>,
+}
+
 /// Configuration voice-bot par guild. Valeurs lues depuis `bot_guild_config`
 /// (bot_name = "voice-bot"), avec fallback sur les defaults raisonnables.
 #[derive(Debug, Clone, Copy)]

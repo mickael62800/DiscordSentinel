@@ -71,6 +71,34 @@ pub struct AddWhitelistRequest {
 }
 
 #[derive(Debug, Serialize)]
+pub struct SavePresetRequest {
+    pub owner_id: String,
+    pub channel_name: Option<String>,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct VoicePresetResponse {
+    pub owner_id: String,
+    pub channel_name: Option<String>,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct WhitelistEntryResponse {
+    pub target_id: String,
+    pub target_name: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct BanFromChannelRequest {
     pub user_id: String,
     pub user_name: String,
@@ -321,6 +349,37 @@ impl ApiClient {
         g.guarded(|| async move { client.add_to_whitelist(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
+    }
+
+    // ── Presets + whitelist (HTTP via BaseApiClient) ──
+
+    /// Lit le preset memorise par ce proprietaire. `None` si aucun (404).
+    pub async fn get_preset(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Option<VoicePresetResponse> {
+        let path = format!("/api/voice-channels/presets/{guild_id}/{owner_id}");
+        self.base.get_json::<VoicePresetResponse>(&path).await.ok()
+    }
+
+    /// Cree ou met a jour le preset du proprietaire (fire-and-forget).
+    pub async fn save_preset(&self, guild_id: &str, request: &SavePresetRequest) {
+        let path = format!("/api/voice-channels/presets/{guild_id}");
+        self.base.post_fire_and_forget(&path, request).await;
+    }
+
+    /// Liste les membres whitelistes (amis) memorises pour ce proprietaire.
+    pub async fn get_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Vec<WhitelistEntryResponse> {
+        let path = format!("/api/voice-channels/whitelist/{guild_id}/{owner_id}");
+        self.base
+            .get_json::<Vec<WhitelistEntryResponse>>(&path)
+            .await
+            .unwrap_or_default()
     }
 
     // ── Bans ──

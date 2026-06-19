@@ -14,6 +14,8 @@ fn inner() -> Router<AppState> {
         .route("/visit", post(handlers::tamagotchi::pets::visit))
         .route("/combat", post(handlers::tamagotchi::pets::combat))
         .route("/tick", post(handlers::tamagotchi::pets::tick_all))
+        .route("/cards", get(handlers::tamagotchi::pets::list_cards))
+        .route("/{guild_id}/{owner_id}/card", post(handlers::tamagotchi::pets::set_card_location))
         // Admin web : liste des compagnons de la guild + suppression.
         .route("/{guild_id}/pets", get(handlers::tamagotchi::pets::list_pets))
         .route("/{guild_id}/pets/{pet_id}", delete(handlers::tamagotchi::pets::delete_pet))

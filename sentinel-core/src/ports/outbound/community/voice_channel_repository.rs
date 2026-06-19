@@ -5,6 +5,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannel;
 use crate::domain::entities::community::voice_channel::VoiceChannelBan;
 use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
 use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelPreset;
 use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
@@ -42,6 +43,10 @@ pub trait VoiceChannelRepository: Send + Sync {
     async fn find_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError>;
     async fn add_to_whitelist(&self, entry: &VoiceChannelWhitelistEntry) -> Result<(), DomainError>;
     async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError>;
+
+    // Presets par proprietaire
+    async fn find_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError>;
+    async fn upsert_preset(&self, preset: &VoiceChannelPreset) -> Result<(), DomainError>;
 
     // Bans
     async fn find_bans(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError>;

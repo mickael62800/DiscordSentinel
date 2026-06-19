@@ -44,11 +44,16 @@ use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::community::member_repository::MemberRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Nom de bot portant la config economie (solde de depart, etc.).
+const ECONOMY_BOT_NAME: &str = "coude-bot";
 
 pub struct ManageWalletService {
     repo: Arc<dyn WalletRepository>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     member_repo: Arc<dyn MemberRepository>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ManageWalletService {
@@ -56,8 +61,9 @@ impl ManageWalletService {
         repo: Arc<dyn WalletRepository>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
         member_repo: Arc<dyn MemberRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { repo, taunts_uc, member_repo }
+        Self { repo, taunts_uc, member_repo, bot_config_repo }
     }
 
     /// Renvoie une erreur si le user est marque comme parti (left_at IS NOT NULL).
@@ -282,8 +288,21 @@ impl ManageWalletUseCase for ManageWalletService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Wallet, DomainError> {
-        let env = std::env::var("WALLET_STARTING_COINS").ok();
-        let starting = resolve_starting_coins(env.as_deref());
+        // Solde de depart : config web par serveur (cle `starting_coins` du
+        // bot economie) > variable d'env WALLET_STARTING_COINS > defaut.
+        let cfg_override = self
+            .bot_config_repo
+            .get_config(guild_id, ECONOMY_BOT_NAME)
+            .await
+            .ok()
+            .and_then(|entries| {
+                entries
+                    .into_iter()
+                    .find(|e| e.config_key == "starting_coins")
+                    .map(|e| e.config_value)
+            })
+            .or_else(|| std::env::var("WALLET_STARTING_COINS").ok());
+        let starting = resolve_starting_coins(cfg_override.as_deref());
         self.repo
             .get_or_create(guild_id, user_id, user_id, starting)
             .await

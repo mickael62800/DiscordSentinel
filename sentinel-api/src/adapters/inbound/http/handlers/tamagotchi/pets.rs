@@ -77,12 +77,71 @@ impl PetDto {
     }
 }
 
+/// Carte a rafraichir : donnees de rendu + localisation du message Discord.
+#[derive(Debug, Serialize)]
+pub struct CardDto {
+    pub card_channel_id: String,
+    pub card_message_id: String,
+    #[serde(flatten)]
+    pub pet: PetDto,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreatePetBody {
     pub guild_id: String,
     pub owner_id: String,
     pub name: String,
     pub species: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetCardLocationBody {
+    pub channel_id: String,
+    pub message_id: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CardsQuery {
+    pub after: Option<String>,
+    pub limit: Option<i64>,
+}
+
+/// POST /api/tamagotchi/{guild_id}/{owner_id}/card — enregistre la position de
+/// la carte Discord (appele par le bot a l'ouverture du salon).
+pub async fn set_card_location(
+    State(state): State<AppState>,
+    Path((guild_id, owner_id)): Path<(String, String)>,
+    Json(body): Json<SetCardLocationBody>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .pets_uc
+        .set_card_location(&guild_id, &owner_id, &body.channel_id, &body.message_id)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// GET /api/tamagotchi/cards?after=<uuid>&limit=<n> — compagnons vivants ayant
+/// une carte postee (rafraichissement horaire par le bot). Pagine par curseur.
+pub async fn list_cards(
+    State(state): State<AppState>,
+    axum::extract::Query(q): axum::extract::Query<CardsQuery>,
+) -> Result<Json<Vec<CardDto>>, ApiError> {
+    let after = q.after.as_deref().and_then(|s| Uuid::parse_str(s).ok());
+    let limit = q.limit.unwrap_or(500).clamp(1, 1000);
+    let pets = state.pets_uc.list_cards(limit, after).await?;
+    let cards = pets
+        .into_iter()
+        .filter_map(|p| {
+            let ch = p.card_channel_id.clone()?;
+            let msg = p.card_message_id.clone()?;
+            Some(CardDto {
+                card_channel_id: ch,
+                card_message_id: msg,
+                pet: PetDto::from(p, vec![]),
+            })
+        })
+        .collect();
+    Ok(Json(cards))
 }
 
 /// POST /api/tamagotchi/pets
@@ -249,25 +308,66 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
     use sentinel_core::domain::entities::tamagotchi::pet::{TickConfig, TickOutcome};
     use std::collections::HashMap;
 
-    let pets = state.pets_uc.list_alive(500).await?;
+    const BATCH: i64 = 500;
+
     let mut cfg_cache: HashMap<String, TickConfig> = HashMap::new();
     let mut summary = TickSummary { processed: 0, sick: 0, died: 0, recovered: 0 };
+    // Pagination par curseur `id` : couvre TOUS les compagnons vivants, sans
+    // troncature silencieuse (l'ancienne version s'arretait a 500).
+    let mut after_id: Option<Uuid> = None;
 
-    for pet in pets {
-        let cfg = if let Some(c) = cfg_cache.get(&pet.guild_id) {
-            *c
-        } else {
-            let c = load_tick_config(&state, &pet.guild_id).await;
-            cfg_cache.insert(pet.guild_id.clone(), c);
-            c
-        };
-        match state.pets_uc.tick(pet.id, cfg).await {
-            Ok(TickOutcome::FellSick) => summary.sick += 1,
-            Ok(TickOutcome::Died) => summary.died += 1,
-            Ok(TickOutcome::Recovered) => summary.recovered += 1,
-            _ => {}
+    loop {
+        let batch = state.pets_uc.list_alive(BATCH, after_id).await?;
+        if batch.is_empty() {
+            break;
         }
-        summary.processed += 1;
+        after_id = batch.last().map(|p| p.id);
+        let batch_len = batch.len();
+
+        for pet in batch {
+            let cfg = if let Some(c) = cfg_cache.get(&pet.guild_id) {
+                *c
+            } else {
+                let c = load_tick_config(&state, &pet.guild_id).await;
+                cfg_cache.insert(pet.guild_id.clone(), c);
+                c
+            };
+            match state.pets_uc.tick(pet.id, cfg).await {
+                Ok(outcome @ (TickOutcome::FellSick | TickOutcome::Died | TickOutcome::Recovered)) => {
+                    match outcome {
+                        TickOutcome::FellSick => summary.sick += 1,
+                        TickOutcome::Died => summary.died += 1,
+                        TickOutcome::Recovered => summary.recovered += 1,
+                        _ => unreachable!(),
+                    }
+                    // Notifie le bot (DM au proprietaire) via la stream Redis.
+                    let status = match outcome {
+                        TickOutcome::FellSick => "sick",
+                        TickOutcome::Died => "death",
+                        _ => "recovered",
+                    };
+                    state.broadcaster.broadcast(
+                        "tamagotchi_pet_status",
+                        serde_json::json!({
+                            "guild_id": pet.guild_id,
+                            "owner_id": pet.owner_id,
+                            "pet_name": pet.name,
+                            "species": pet.species,
+                            "status": status,
+                            "card_channel_id": pet.card_channel_id,
+                            "card_message_id": pet.card_message_id,
+                        }),
+                    );
+                }
+                _ => {}
+            }
+            summary.processed += 1;
+        }
+
+        // Derniere page (batch incomplet) -> termine.
+        if batch_len < BATCH as usize {
+            break;
+        }
     }
     Ok(Json(summary))
 }

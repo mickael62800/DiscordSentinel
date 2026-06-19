@@ -207,6 +207,8 @@ use super::*;
             Ok(())
         }
         async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn get_preset(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { Ok(None) }
+        async fn save_preset(&self, _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand) -> Result<(), DomainError> { Ok(()) }
         async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError> {
             self.ban_calls.lock().unwrap().push(cmd);
             Ok(())

@@ -348,8 +348,24 @@ impl ManagePetsUseCase for ManagePetsService {
         })
     }
 
-    async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError> {
-        self.repo.list_alive(limit.clamp(1, 500)).await
+    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+        // Borne par batch (anti-OOM) ; la pagination par curseur permet de
+        // couvrir l'integralite des compagnons sur plusieurs appels.
+        self.repo.list_alive(limit.clamp(1, 1000), after_id).await
+    }
+
+    async fn set_card_location(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        channel_id: &str,
+        message_id: &str,
+    ) -> Result<(), DomainError> {
+        self.repo.set_card_location(guild_id, owner_id, channel_id, message_id).await
+    }
+
+    async fn list_cards(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+        self.repo.list_with_card(limit.clamp(1, 1000), after_id).await
     }
 
     async fn tick(&self, pet_id: Uuid, cfg: TickConfig) -> Result<TickOutcome, DomainError> {

@@ -38,6 +38,8 @@ struct Row {
     losses: i32,
     cooldowns: serde_json::Value,
     last_decay_at: DateTime<Utc>,
+    card_channel_id: Option<String>,
+    card_message_id: Option<String>,
 }
 
 impl From<Row> for Pet {
@@ -68,6 +70,8 @@ impl From<Row> for Pet {
             losses: r.losses,
             cooldowns: r.cooldowns,
             last_decay_at: r.last_decay_at,
+            card_channel_id: r.card_channel_id,
+            card_message_id: r.card_message_id,
         }
     }
 }
@@ -175,11 +179,54 @@ impl PetRepository for PgPetRepository {
         Ok(row.into())
     }
 
-    async fn list_alive(&self, limit: i64) -> Result<Vec<Pet>, DomainError> {
+    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+        // Tri par `id` (et non `last_decay_at`) : stable pour la pagination par
+        // curseur meme si le tick met a jour `last_decay_at` ou tue des pets.
         let rows: Vec<Row> = sqlx::query_as(
-            "SELECT * FROM pets WHERE status <> 'dead' ORDER BY last_decay_at ASC LIMIT $1",
+            "SELECT * FROM pets \
+             WHERE status <> 'dead' AND ($2::uuid IS NULL OR id > $2) \
+             ORDER BY id ASC LIMIT $1",
         )
         .bind(limit)
+        .bind(after_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn set_card_location(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        channel_id: &str,
+        message_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE pets SET card_channel_id = $3, card_message_id = $4 \
+             WHERE guild_id = $1 AND owner_id = $2",
+        )
+        .bind(guild_id)
+        .bind(owner_id)
+        .bind(channel_id)
+        .bind(message_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn list_with_card(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+        // Compagnons vivants ayant une carte postee (a rafraichir), pagine par
+        // curseur `id` croissant.
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT * FROM pets \
+             WHERE status <> 'dead' AND card_message_id IS NOT NULL \
+               AND ($2::uuid IS NULL OR id > $2) \
+             ORDER BY id ASC LIMIT $1",
+        )
+        .bind(limit)
+        .bind(after_id)
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;

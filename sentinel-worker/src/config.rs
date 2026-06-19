@@ -96,6 +96,9 @@ const DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS: u64 = 15;
 // Phase 5H — Slowmode security expire : tick 15s.
 const DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS: u64 = 15;
 
+// Tamagotchi : tick de cycle de vie (decroissance/maladie/mort). 300s par defaut.
+const DEFAULT_TAMAGOTCHI_TICK_INTERVAL_SECS: u64 = 300;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -172,6 +175,9 @@ pub struct WorkerConfig {
     pub quarantine_kick_check_secs: u64,
     pub lockdown_expire_check_secs: u64,
     pub slowmode_expire_check_secs: u64,
+
+    // ── Tamagotchi ──
+    pub tamagotchi_tick_interval_secs: u64,
 }
 
 impl WorkerConfig {
@@ -333,6 +339,12 @@ impl WorkerConfig {
             slowmode_expire_check_secs: load_env(
                 "SLOWMODE_EXPIRE_CHECK_SECS",
                 DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS,
+            ),
+
+            // tamagotchi
+            tamagotchi_tick_interval_secs: load_env(
+                "TAMAGOTCHI_TICK_INTERVAL_SECS",
+                DEFAULT_TAMAGOTCHI_TICK_INTERVAL_SECS,
             ),
         }
     }
