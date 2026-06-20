@@ -47,11 +47,15 @@ impl ManagePetsUseCase for ManagePetsService {
         }
         let species = Species::from_str(&cmd.species)
             .ok_or_else(|| DomainError::ValidationError(format!("espece inconnue : {}", cmd.species)))?;
-        // Un seul compagnon vivant par joueur.
+        // Un seul compagnon vivant par joueur. La contrainte UNIQUE
+        // (guild_id, owner_id) empeche de recreer tant que l'ancien existe :
+        // si le compagnon precedent est mort, on le supprime d'abord pour
+        // liberer la place (sinon l'INSERT echoue en doublon).
         if let Some(existing) = self.repo.get_by_owner(&cmd.guild_id, &cmd.owner_id).await? {
             if existing.status != Health::Dead {
                 return Err(DomainError::Conflict("tu as deja un compagnon".into()));
             }
+            self.repo.delete(existing.id).await?;
         }
         let base = species.base_stats();
         let pet = self
