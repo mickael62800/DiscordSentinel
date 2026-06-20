@@ -49,6 +49,8 @@ const VOICE_CHANNEL_KEYS = new Set<string>([
   // Compteur de membres : salon VOCAL (seul a accepter espaces/majuscules/":"
   // dans le nom, ex "Membres : 515").
   "counter_channel_id",
+  // Compteur de membres connectes EN VOCAL : renomme aussi un salon vocal.
+  "voice_counter_channel_id",
 ]);
 
 const props = defineProps<{
