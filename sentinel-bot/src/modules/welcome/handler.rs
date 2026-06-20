@@ -403,6 +403,63 @@ pub async fn on_component(ctx: &Context, component: &serenity::model::applicatio
 }
 
 /// Gere le clic sur le bouton "J'accepte les regles".
+/// Poste (ou republie) le panneau de reglement avec le bouton d'acceptation
+/// dans le salon configure. Declenche par l'event `welcome_rules_publish`
+/// (bouton "Publier le reglement" du dashboard).
+pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(), String> {
+    use serenity::all::ButtonStyle;
+    use serenity::builder::{CreateActionRow, CreateButton};
+
+    let (base, grpc) = {
+        let data = ctx.data.read().await;
+        let base = data
+            .get::<ApiClientKey>()
+            .map(Arc::clone)
+            .ok_or("client API absent")?;
+        let grpc = data
+            .get::<crate::shared::grpc_client::GrpcClientKey>()
+            .map(Arc::clone)
+            .ok_or("client gRPC absent")?;
+        (base, grpc)
+    };
+
+    let api = WelcomeApiClient::new(base, grpc);
+    let config = api
+        .get_config(&guild_id.to_string())
+        .await
+        .map_err(|e| format!("lecture config welcome: {e}"))?;
+
+    if !config.rules_enabled {
+        return Err("la validation du reglement est desactivee".into());
+    }
+    let channel_id = config
+        .rules_channel_id
+        .as_deref()
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(ChannelId::new)
+        .ok_or("aucun salon de reglement configure")?;
+
+    let label = {
+        let l = config.rules_button_label.trim();
+        if l.is_empty() { "J'accepte les règles".to_string() } else { l.to_string() }
+    };
+
+    let embed = CreateEmbed::new()
+        .title("📜 Règlement")
+        .description(&config.rules_message)
+        .color(0x5865f2);
+    let button = CreateButton::new(RULES_ACCEPT_ID).label(label).style(ButtonStyle::Success);
+    let row = CreateActionRow::Buttons(vec![button]);
+
+    channel_id
+        .send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row]))
+        .await
+        .map_err(|e| format!("envoi du message: {e}"))?;
+
+    info!(guild = %guild_id, channel = %channel_id, "Panneau de reglement publie");
+    Ok(())
+}
+
 async fn handle_rules_accept(
     ctx: &Context,
     component: &serenity::model::application::ComponentInteraction,

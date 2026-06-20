@@ -5,10 +5,10 @@ import { useWelcome } from "@/composables/useWelcome";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppToggle from "@/components/atoms/AppToggle.vue";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
-import RoleSelect from "@/components/atoms/RoleSelect.vue";
+import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
-const { config, saving, saveConfig } = useWelcome();
+const { config, saving, saveConfig, publishRules } = useWelcome();
 const { guildIdFilter } = useGuildSelector();
 
 const draft = reactive({
@@ -212,14 +212,16 @@ async function onSave() {
       </legend>
       <p class="hint">
         Affiche un bouton « J'ai lu les règles » dans le salon dédié.
-        Le rôle configuré est attribué après acceptation.
+        Le ou les rôles configurés sont attribués après acceptation.
+        Après avoir enregistré, clique sur « Publier le règlement » pour
+        (re)poster le message avec le bouton dans le salon.
       </p>
       <div class="grid" :class="{ 'grid--disabled': !draft.rules_enabled }">
         <label>Salon des règles
           <ChannelSelect v-model="draft.rules_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
-        <label>Rôle attribué
-          <RoleSelect v-model="draft.rules_role_id" :guild-id="guildIdFilter ?? null" />
+        <label>Rôles attribués (plusieurs possibles)
+          <IdsListPickerField v-model="draft.rules_role_id" :guild-id="guildIdFilter ?? null" kind="role" />
         </label>
         <label>Texte du bouton
           <AppInput v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
@@ -227,6 +229,12 @@ async function onSave() {
         <label class="full">Message
           <AppTextarea v-model="draft.rules_message" :rows="6" />
         </label>
+        <div class="full">
+          <button type="button" class="publish-btn" :disabled="!draft.rules_enabled || !draft.rules_channel_id" @click="publishRules">
+            📢 Publier le règlement
+          </button>
+          <small class="hint">Poste (ou remplace) le message avec le bouton dans le salon choisi. Enregistre d'abord tes changements.</small>
+        </div>
       </div>
     </fieldset>
 
@@ -402,6 +410,22 @@ async function onSave() {
   color: var(--text-secondary);
 }
 .grid label.full { grid-column: span 2; }
+.grid div.full { grid-column: span 2; display: flex; flex-direction: column; gap: 6px; }
+
+.publish-btn {
+  align-self: flex-start;
+  background: var(--accent, #5865f2);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  padding: 9px 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: opacity var(--transition-fast, 0.15s);
+}
+.publish-btn:hover:not(:disabled) { opacity: 0.9; }
+.publish-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .grid input,
 .grid textarea {

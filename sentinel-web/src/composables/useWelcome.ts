@@ -52,5 +52,17 @@ export function useWelcome() {
     }
   }
 
-  return { config, loading, saving, fetchConfig, saveConfig };
+  async function publishRules() {
+    if (!guildIdFilter.value) return;
+    try {
+      await welcomeService.publishRules(guildIdFilter.value);
+      success("Règlement publié dans le salon configuré.");
+    } catch (e) {
+      console.error("Erreur publication règlement :", e);
+      showError("Impossible de publier le règlement (vérifie le salon et l'activation).");
+      throw e;
+    }
+  }
+
+  return { config, loading, saving, fetchConfig, saveConfig, publishRules };
 }

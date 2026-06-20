@@ -163,6 +163,10 @@ impl EventHandler for Handler {
 
         // Tamagotchi : refresh horaire des cartes + consumer maladie/mort (DM).
         modules::tamagotchi::spawn_background(ctx.clone());
+
+        // Welcome : consumer Redis pour publier le panneau de reglement
+        // (bouton "Publier le reglement" du dashboard).
+        modules::welcome::spawn(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

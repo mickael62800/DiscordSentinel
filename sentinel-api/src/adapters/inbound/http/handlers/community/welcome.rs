@@ -129,6 +129,37 @@ pub async fn save_config(
     Ok(Json(saved.into()))
 }
 
+/// POST /api/welcome/{guild_id}/rules/publish
+/// Demande au bot de (re)poster le panneau de reglement (texte + bouton
+/// d'acceptation) dans le salon configure, via la stream d'events Redis.
+pub async fn publish_rules(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    crate::adapters::inbound::http::validation::validate_guild_id_path(&guild_id)?;
+    // Garde-fou : refuse si la validation du reglement n'est pas activee /
+    // configuree (sinon le bot echouerait silencieusement cote consumer).
+    let config = state.welcome_config_uc.get(&guild_id).await?;
+    if !config.rules_enabled {
+        return Err(ApiError::from(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "Active d'abord la validation du reglement.".into(),
+            ),
+        ));
+    }
+    if config.rules_channel_id.as_deref().unwrap_or("").is_empty() {
+        return Err(ApiError::from(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "Choisis d'abord le salon du reglement.".into(),
+            ),
+        ));
+    }
+    state
+        .broadcaster
+        .broadcast("welcome_rules_publish", serde_json::json!({ "guild_id": guild_id }));
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
 fn dto_to_patch(dto: SaveWelcomeConfigDto) -> WelcomeConfigPatch {
     WelcomeConfigPatch {
         welcome_enabled: dto.welcome_enabled,

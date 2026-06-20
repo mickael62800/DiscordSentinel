@@ -25,6 +25,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/system/guild-reset/{guild_id}", post(handlers::system::guild_reset::reset_guild))
         // Welcome config
         .route("/api/welcome/{guild_id}", get(handlers::community::welcome::get_config).put(handlers::community::welcome::save_config))
+        .route("/api/welcome/{guild_id}/rules/publish", post(handlers::community::welcome::publish_rules))
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
         .route("/api/ai/jobs", post(handlers::ai::ai_jobs::create_ai_job))
         .route("/api/ai/jobs/{id}", get(handlers::ai::ai_jobs::get_ai_job))
