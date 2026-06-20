@@ -174,6 +174,13 @@ impl EventHandler for Handler {
         // permet d'identifier une suppression de message de bot et de l'exclure
         // des logs. Le reste du pipeline ignore les bots.
         modules::audit::cache_message(&ctx, &msg).await;
+
+        // Bump : la confirmation de /bump est postee par Disboard (un BOT). On
+        // doit donc traiter ce module AVANT le filtre bot ci-dessous, sinon la
+        // detection ne se declenche jamais. (Le module filtre lui-meme sur l'id
+        // Disboard.)
+        modules::bump::on_message(&ctx, &msg).await;
+
         if msg.author.bot {
             return;
         }
@@ -187,7 +194,6 @@ impl EventHandler for Handler {
         modules::voice::on_message(&ctx, &msg).await;
         modules::tickets::on_message(&ctx, &msg).await;
         modules::ai_dataset::on_message(&ctx, &msg).await;
-        modules::bump::on_message(&ctx, &msg).await;
     }
 
     async fn message_delete(
