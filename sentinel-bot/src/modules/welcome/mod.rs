@@ -21,6 +21,16 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     handler::on_component(ctx, component).await;
 }
 
+/// Fin du filtrage d'adhesion natif Discord (membership screening) : on
+/// attribue le(s) role(s) du reglement, comme via le bouton du bot.
+pub async fn on_screening_complete(
+    ctx: &Context,
+    guild_id: GuildId,
+    user_id: serenity::model::id::UserId,
+) {
+    handler::on_screening_complete(ctx, guild_id, user_id).await;
+}
+
 pub async fn on_voice_state_update(
     ctx: &Context,
     old: &Option<serenity::model::voice::VoiceState>,

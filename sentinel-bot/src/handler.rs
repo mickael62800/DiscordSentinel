@@ -266,7 +266,16 @@ impl EventHandler for Handler {
         new_member: Option<Member>,
         event: serenity::model::event::GuildMemberUpdateEvent,
     ) {
+        // Fin du filtrage d'adhesion Discord (rules screening) : `pending`
+        // passe de true a false -> on attribue le(s) role(s) du reglement.
+        let screening_done = old.as_ref().map(|m| m.pending).unwrap_or(false) && !event.pending;
+        let (sg_guild, sg_user) = (event.guild_id, event.user.id);
+
         modules::audit::on_member_update(&ctx, old.clone(), new_member.clone(), event).await;
+
+        if screening_done {
+            modules::welcome::on_screening_complete(&ctx, sg_guild, sg_user).await;
+        }
         if let Some(member) = new_member {
             modules::security::on_member_update(&ctx, &member).await;
         }

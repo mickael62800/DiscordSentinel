@@ -460,6 +460,75 @@ pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(),
     Ok(())
 }
 
+/// Attribue le(s) role(s) configure(s) apres validation du reglement (CSV
+/// d'IDs). Retourne le nombre de roles reellement poses, ou `Err` si la
+/// fonctionnalite est desactivee / mal configuree (a logger par l'appelant).
+/// Partage par le bouton du bot ET le filtrage d'adhesion natif de Discord.
+async fn assign_rules_roles(
+    ctx: &Context,
+    guild_id: GuildId,
+    user_id: serenity::model::id::UserId,
+) -> Result<usize, String> {
+    let (base, grpc) = {
+        let data = ctx.data.read().await;
+        let base = data.get::<ApiClientKey>().map(Arc::clone).ok_or("api client absent")?;
+        let grpc = data
+            .get::<crate::shared::grpc_client::GrpcClientKey>()
+            .map(Arc::clone)
+            .ok_or("grpc client absent")?;
+        (base, grpc)
+    };
+
+    let api = WelcomeApiClient::new(base, grpc);
+    let config = api
+        .get_config(&guild_id.to_string())
+        .await
+        .map_err(|e| format!("lecture config welcome: {e}"))?;
+
+    if !config.rules_enabled {
+        return Err("validation du reglement desactivee".into());
+    }
+
+    // Liste de roles (CSV d'IDs) : un ancien reglage a role unique reste un
+    // CSV a 1 element -> retro-compatible.
+    let role_ids: Vec<RoleId> = config
+        .rules_role_id
+        .as_deref()
+        .unwrap_or("")
+        .split(',')
+        .filter_map(|s| s.trim().parse::<u64>().ok())
+        .map(RoleId::new)
+        .collect();
+    if role_ids.is_empty() {
+        return Err("aucun role configure".into());
+    }
+
+    let mut assigned = 0usize;
+    for role_id in &role_ids {
+        match ctx
+            .http
+            .add_member_role(guild_id, user_id, *role_id, Some("Reglement accepte"))
+            .await
+        {
+            Ok(_) => assigned += 1,
+            Err(e) => warn!(error = %e, role = %role_id, "Echec assignation role reglement"),
+        }
+    }
+    Ok(assigned)
+}
+
+/// Fin du filtrage d'adhesion Discord (membership screening) : `pending`
+/// passe de true a false. On attribue alors le(s) role(s) du reglement.
+pub async fn on_screening_complete(ctx: &Context, guild_id: GuildId, user_id: serenity::model::id::UserId) {
+    match assign_rules_roles(ctx, guild_id, user_id).await {
+        Ok(n) if n > 0 => info!(user = %user_id, guild = %guild_id, roles = n, "Roles reglement attribues (filtrage Discord)"),
+        Ok(_) => {}
+        // Desactive / non configure : silencieux (cas normal sur la plupart
+        // des serveurs). Les vraies erreurs d'assignation sont deja loggees.
+        Err(_) => {}
+    }
+}
+
 async fn handle_rules_accept(
     ctx: &Context,
     component: &serenity::model::application::ComponentInteraction,
@@ -469,55 +538,10 @@ async fn handle_rules_accept(
         None => return,
     };
 
-    let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => Arc::clone(b),
-        None => return,
-    };
-    let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
-        Some(g) => Arc::clone(g),
-        None => return,
-    };
-    drop(data);
-
-    let api = WelcomeApiClient::new(base, grpc);
-    let config = match api.get_config(&guild_id.to_string()).await {
-        Ok(c) => c,
+    let assigned = match assign_rules_roles(ctx, guild_id, component.user.id).await {
+        Ok(n) => n,
         Err(_) => return,
     };
-
-    if !config.rules_enabled {
-        return;
-    }
-
-    // Liste de roles (CSV d'IDs) : on peut en attribuer plusieurs. Un ancien
-    // reglage a role unique reste un CSV a 1 element -> retro-compatible.
-    let role_ids: Vec<RoleId> = match &config.rules_role_id {
-        Some(r) => r
-            .split(',')
-            .filter_map(|s| s.trim().parse::<u64>().ok())
-            .map(RoleId::new)
-            .collect(),
-        None => return,
-    };
-    if role_ids.is_empty() {
-        return;
-    }
-
-    // Assigner chaque role ; on compte les succes pour ne signaler une erreur
-    // que si AUCUN role n'a pu etre attribue.
-    let mut assigned = 0usize;
-    for role_id in &role_ids {
-        match ctx.http.add_member_role(
-            guild_id,
-            component.user.id,
-            *role_id,
-            Some("Reglement accepte"),
-        ).await {
-            Ok(_) => assigned += 1,
-            Err(e) => warn!(error = %e, role = %role_id, "Echec assignation role reglement"),
-        }
-    }
 
     if assigned == 0 {
         let resp = CreateInteractionResponse::Message(
