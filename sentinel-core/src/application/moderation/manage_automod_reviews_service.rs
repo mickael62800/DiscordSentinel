@@ -266,6 +266,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             .await
     }
 
+    async fn delete_discussion(&self, review_id: Uuid) -> Result<(), DomainError> {
+        self.repo.delete_discussion(review_id).await
+    }
+
     async fn append_discussion_messages(
         &self,
         messages: Vec<crate::domain::entities::moderation::review::automod::DiscussionMessage>,

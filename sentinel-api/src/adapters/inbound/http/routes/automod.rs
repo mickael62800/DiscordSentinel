@@ -62,7 +62,8 @@ fn automod_inner() -> Router<AppState> {
         .route(
             "/reviews/{review_id}/discussion",
             get(handlers::moderation::automod::get_discussion)
-                .post(handlers::moderation::automod::open_discussion),
+                .post(handlers::moderation::automod::open_discussion)
+                .delete(handlers::moderation::automod::delete_discussion),
         )
         .route(
             "/reviews/{review_id}/discussion/messages",

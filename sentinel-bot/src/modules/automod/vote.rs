@@ -1569,13 +1569,31 @@ pub(super) async fn handle_discussion_button(
         #[serde(default)]
         created: bool,
     }
-    // Idempotence : un salon existe deja ? on s'y refere sans rien creer.
+    // Idempotence : un salon existe deja ? On s'y refere sans rien creer.
+    // MAIS si le salon Discord a ete supprime a la main, l'enregistrement est
+    // orphelin -> on le purge cote API pour pouvoir en regenerer un neuf.
     if let Ok(Some(existing)) = api
         .get_json::<Option<DiscussionResp>>(&format!("/api/automod/reviews/{review_id}/discussion"))
         .await
     {
-        edit_ephemeral(ctx, component, &format!("Un salon de discussion existe deja : <#{}>", existing.channel_id)).await;
-        return;
+        let still_exists = match existing.channel_id.parse::<u64>() {
+            Ok(cid) => ChannelId::new(cid).to_channel(&ctx.http).await.is_ok(),
+            Err(_) => false,
+        };
+        if still_exists {
+            edit_ephemeral(ctx, component, &format!("Un salon de discussion existe deja : <#{}>", existing.channel_id)).await;
+            return;
+        }
+        // Salon disparu : on purge l'enregistrement orphelin puis on recree.
+        if let Err(e) = api
+            .delete_json::<serde_json::Value>(&format!("/api/automod/reviews/{review_id}/discussion"))
+            .await
+        {
+            warn!(error = %e, review_id, "Echec purge discussion orpheline -> recreation annulee");
+            edit_ephemeral(ctx, component, "Impossible de regenerer le salon (purge de l'ancien echouee).").await;
+            return;
+        }
+        info!(review_id, old_channel = %existing.channel_id, "Salon de discussion disparu : enregistrement purge, recreation");
     }
 
     // Recupere la review (cible + contexte + incidents agreges).

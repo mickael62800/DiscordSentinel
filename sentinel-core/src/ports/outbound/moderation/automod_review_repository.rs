@@ -104,6 +104,11 @@ pub trait AutomodReviewRepository: Send + Sync {
         d: NewDiscussionChannel,
     ) -> Result<(DiscussionChannel, bool), DomainError>;
 
+    /// Supprime l'enregistrement du salon de discussion d'une review (pas le
+    /// transcript). Utilise quand le salon Discord a disparu (supprime a la
+    /// main) pour permettre d'en rouvrir un neuf. No-op si rien a supprimer.
+    async fn delete_discussion(&self, review_id: Uuid) -> Result<(), DomainError>;
+
     /// Persiste un lot de messages du salon de discussion (transcript).
     /// Idempotent par (review_id, discord_message_id). Retourne le nombre
     /// reellement insere (les doublons sont ignores).

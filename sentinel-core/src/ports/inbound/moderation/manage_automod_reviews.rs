@@ -148,6 +148,10 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         cmd: OpenDiscussionCommand,
     ) -> Result<(DiscussionChannel, bool), DomainError>;
 
+    /// Supprime l'enregistrement du salon de discussion (le salon Discord a
+    /// ete supprime a la main) pour permettre d'en rouvrir un neuf.
+    async fn delete_discussion(&self, review_id: Uuid) -> Result<(), DomainError>;
+
     /// Persiste le transcript d'un salon de discussion (batch idempotent).
     async fn append_discussion_messages(
         &self,

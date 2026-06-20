@@ -658,6 +658,15 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         Ok((existing.into(), false))
     }
 
+    async fn delete_discussion(&self, review_id: Uuid) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM automod_discussion_channels WHERE review_id = $1")
+            .bind(review_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn append_discussion_messages(
         &self,
         messages: &[DiscussionMessage],

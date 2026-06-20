@@ -739,6 +739,19 @@ pub async fn get_discussion(
     Ok(Json(existing.map(|d| DiscussionChannelDto::build(d, false))))
 }
 
+/// DELETE /api/automod/reviews/{review_id}/discussion
+/// Purge l'enregistrement du salon (le salon Discord a ete supprime a la
+/// main) afin de pouvoir en rouvrir un neuf. Idempotent.
+pub async fn delete_discussion(
+    State(state): State<AppState>,
+    Path(review_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let id = Uuid::parse_str(&review_id)
+        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    state.automod_reviews_uc.delete_discussion(id).await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct OpenDiscussionBody {
     pub guild_id: String,
