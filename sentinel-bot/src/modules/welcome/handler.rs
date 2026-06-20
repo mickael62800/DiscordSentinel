@@ -433,25 +433,39 @@ async fn handle_rules_accept(
         return;
     }
 
-    let role_id = match &config.rules_role_id {
-        Some(r) => match r.parse::<u64>() {
-            Ok(id) => RoleId::new(id),
-            Err(_) => return,
-        },
+    // Liste de roles (CSV d'IDs) : on peut en attribuer plusieurs. Un ancien
+    // reglage a role unique reste un CSV a 1 element -> retro-compatible.
+    let role_ids: Vec<RoleId> = match &config.rules_role_id {
+        Some(r) => r
+            .split(',')
+            .filter_map(|s| s.trim().parse::<u64>().ok())
+            .map(RoleId::new)
+            .collect(),
         None => return,
     };
+    if role_ids.is_empty() {
+        return;
+    }
 
-    // Assigner le role
-    if let Err(e) = ctx.http.add_member_role(
-        guild_id,
-        component.user.id,
-        role_id,
-        Some("Reglement accepte"),
-    ).await {
-        warn!(error = %e, "Echec assignation role reglement");
+    // Assigner chaque role ; on compte les succes pour ne signaler une erreur
+    // que si AUCUN role n'a pu etre attribue.
+    let mut assigned = 0usize;
+    for role_id in &role_ids {
+        match ctx.http.add_member_role(
+            guild_id,
+            component.user.id,
+            *role_id,
+            Some("Reglement accepte"),
+        ).await {
+            Ok(_) => assigned += 1,
+            Err(e) => warn!(error = %e, role = %role_id, "Echec assignation role reglement"),
+        }
+    }
+
+    if assigned == 0 {
         let resp = CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
-                .content("Erreur lors de l'assignation du role.")
+                .content("Erreur lors de l'assignation des roles.")
                 .ephemeral(true),
         );
         let _ = component.create_response(&ctx.http, resp).await;

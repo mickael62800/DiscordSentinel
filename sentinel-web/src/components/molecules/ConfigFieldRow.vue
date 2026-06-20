@@ -36,6 +36,8 @@ const ROLE_LIST_KEYS = new Set<string>([
   "whitelist_roles",
   "exempt_roles",
   "double_xp_roles",
+  // Welcome : "roles apres validation du reglement" -> liste de roles.
+  "rules_role_id",
 ]);
 
 // Champs type="channel" qui doivent lister des salons VOCAUX (et non
