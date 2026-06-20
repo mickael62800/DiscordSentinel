@@ -9,6 +9,9 @@ pub struct CachedMessage {
     pub author_name: String,
     pub content: String,
     pub channel_id: String,
+    /// True si l'auteur est un bot : permet d'exclure ses editions/suppressions
+    /// des logs Discord.
+    pub is_bot: bool,
 }
 
 /// Cache LRU simplifie pour les messages par guild.
@@ -111,6 +114,7 @@ mod tests {
             author_name: "Alice".to_string(),
             content: content.to_string(),
             channel_id: "456".to_string(),
+            is_bot: false,
         }
     }
 

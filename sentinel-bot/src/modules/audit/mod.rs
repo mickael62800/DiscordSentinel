@@ -253,16 +253,17 @@ pub async fn on_ready(ctx: &Context) {
 }
 
 /// Intercepte tous les messages pour les cacher + tracker watched users.
-pub async fn on_message(ctx: &Context, msg: &Message) {
+/// Met en cache un message pour pouvoir retrouver son contenu/auteur a la
+/// suppression. Appele pour TOUS les messages (bots inclus) afin de pouvoir
+/// identifier — et exclure — les editions/suppressions de bots des logs.
+pub async fn cache_message(ctx: &Context, msg: &Message) {
     let guild_id = match msg.guild_id {
         Some(g) => g,
         None => return,
     };
-
     if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
-
     let data = ctx.data.read().await;
     if let Some(cache) = data.get::<MessageCacheKey>() {
         cache.store(
@@ -273,11 +274,24 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                 author_name: msg.author.name.clone(),
                 content: msg.content.clone(),
                 channel_id: msg.channel_id.to_string(),
+                is_bot: msg.author.bot,
             },
         );
     }
+}
+
+pub async fn on_message(ctx: &Context, msg: &Message) {
+    let guild_id = match msg.guild_id {
+        Some(g) => g,
+        None => return,
+    };
+
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
+        return;
+    }
 
     // Surveillance : tracker les messages des utilisateurs surveilles
+    let data = ctx.data.read().await;
     let user_id = msg.author.id.to_string();
     if watched_users::is_watched(&data, &user_id) {
         drop(data);

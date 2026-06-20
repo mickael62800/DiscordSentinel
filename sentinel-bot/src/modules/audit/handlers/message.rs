@@ -75,6 +75,12 @@ pub async fn handle_delete(
         .get::<MessageCacheKey>()
         .and_then(|cache| cache.remove(gid, message_id));
 
+    // Suppression d'un message de bot : on n'audite pas (pas de log Discord, pas
+    // de tracking). On libere le lock d'abord.
+    if cached.as_ref().map(|c| c.is_bot).unwrap_or(false) {
+        return;
+    }
+
     let (log_msg, details) = match &cached {
         Some(c) => {
             let preview = if c.content.chars().count() > 100 {

@@ -170,6 +170,10 @@ impl EventHandler for Handler {
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
+        // On met en cache TOUS les messages (bots inclus) pour l'audit : ca
+        // permet d'identifier une suppression de message de bot et de l'exclure
+        // des logs. Le reste du pipeline ignore les bots.
+        modules::audit::cache_message(&ctx, &msg).await;
         if msg.author.bot {
             return;
         }
