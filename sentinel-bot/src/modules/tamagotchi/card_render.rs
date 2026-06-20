@@ -176,8 +176,8 @@ fn dead_avatar_svg() -> String {
 
 /// Construit le SVG de la carte.
 fn build_svg(d: &CardData) -> String {
-    let w = 880.0;
-    let h = 250.0;
+    let w = 900.0;
+    let h = 640.0;
 
     // Couleurs.
     let bg = "#232838";
@@ -208,49 +208,50 @@ fn build_svg(d: &CardData) -> String {
     } else {
         0.0
     };
-    let xp_fill_w = 520.0 * xp_pct;
+    let xp_fill_w = 812.0 * xp_pct;
 
-    // Lignes de jauges (label, valeur, couleur).
+    // Lignes de jauges (label, valeur, couleur). Colonne gauche, sous l'image.
     let gauge_bar = |y: f32, label: &str, value: i32, color: &str| -> String {
         format!(
             r##"
-            <text x="290" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="15" fill="{white}">{label}</text>
-            <rect x="395" y="{by}" width="160" height="16" rx="8" fill="{track}"/>
-            <rect x="395" y="{by}" width="{fw}" height="16" rx="8" fill="{color}"/>
-            <text x="565" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="15" fill="{white}">{value}</text>
+            <text x="44" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="16" fill="{white}">{label}</text>
+            <rect x="160" y="{by}" width="240" height="18" rx="9" fill="{track}"/>
+            <rect x="160" y="{by}" width="{fw}" height="18" rx="9" fill="{color}"/>
+            <text x="412" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="16" fill="{white}">{value}</text>
             "##,
-            ty = y + 13.0,
+            ty = y + 14.0,
             by = y,
-            fw = bar_w(value, 160.0),
+            fw = bar_w(value, 240.0),
         )
     };
 
-    // Lignes combat (dot, label, valeur, couleur).
+    // Lignes combat (dot, label, valeur, couleur). Colonne droite, sous l'image.
     let combat_row = |y: f32, dot: &str, label: &str, value: i32| -> String {
         format!(
             r##"
-            <circle cx="605" cy="{cy}" r="5" fill="{dot}"/>
-            <text x="618" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="14" fill="{dot}">{label}</text>
-            <text x="845" y="{ty}" text-anchor="end" font-family="DejaVu Sans" font-weight="bold" font-size="16" fill="{white}">{value}</text>
+            <circle cx="500" cy="{cy}" r="5" fill="{dot}"/>
+            <text x="514" y="{ty}" font-family="DejaVu Sans" font-weight="bold" font-size="15" fill="{dot}">{label}</text>
+            <text x="852" y="{ty}" text-anchor="end" font-family="DejaVu Sans" font-weight="bold" font-size="17" fill="{white}">{value}</text>
             "##,
-            cy = y + 8.0,
-            ty = y + 13.0,
+            cy = y + 9.0,
+            ty = y + 14.0,
         )
     };
 
-    // Avatar : pierre tombale si mort ; sinon sprite d'evolution si dispo ;
+    // Image de l'animal : centree, ENTIERE (preserveAspectRatio meet, sans clip
+    // ni rognage). Pierre tombale si mort ; sinon sprite d'evolution si dispo ;
     // sinon placeholder (cercle + initiale).
     let avatar_block = if d.status == "dead" {
-        dead_avatar_svg()
+        // Tombstone d'origine recentree/agrandie dans le cadre (centre ~450,290).
+        format!(r##"<g transform="translate(247.5,86) scale(1.5)">{}</g>"##, dead_avatar_svg())
     } else {
         match load_sprite_b64(d) {
         Some(b64) => format!(
-            r##"<defs><clipPath id="avclip"><circle cx="135" cy="125" r="84"/></clipPath></defs>
-  <image x="51" y="41" width="168" height="168" href="data:image/png;base64,{b64}" clip-path="url(#avclip)" preserveAspectRatio="xMidYMid slice"/>"##
+            r##"<image x="318" y="158" width="264" height="264" href="data:image/png;base64,{b64}" preserveAspectRatio="xMidYMid meet"/>"##
         ),
         None => format!(
-            r##"<circle cx="135" cy="125" r="84" fill="#{species_color}"/>
-  <text x="135" y="160" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="90" fill="#ffffff" opacity="0.9">{initial}</text>"##,
+            r##"<circle cx="450" cy="290" r="120" fill="#{species_color}"/>
+  <text x="450" y="335" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="120" fill="#ffffff" opacity="0.9">{initial}</text>"##,
             species_color = d.species_color,
             initial = esc(&initial),
         ),
@@ -261,38 +262,38 @@ fn build_svg(d: &CardData) -> String {
         r##"<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">
   <rect x="0" y="0" width="{w}" height="{h}" rx="22" fill="#1a1d28"/>
   <rect x="8" y="8" width="{inw}" height="{inh}" rx="18" fill="{bg}"/>
-  <rect x="14" y="22" width="7" height="206" rx="3.5" fill="{accent}"/>
-
-  <!-- Avatar -->
-  <circle cx="135" cy="125" r="92" fill="#2c3144" stroke="{accent}" stroke-width="3"/>
-  {avatar_block}
+  <rect x="14" y="22" width="7" height="596" rx="3.5" fill="{accent}"/>
 
   <!-- En-tete -->
-  <text x="290" y="48" font-family="DejaVu Sans" font-weight="bold" font-size="30" fill="{white}">{name}</text>
-  <rect x="760" y="22" width="100" height="38" rx="10" fill="#a98467"/>
-  <text x="810" y="47" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="17" fill="#2a2118">Niv. {level}</text>
-  <text x="290" y="74" font-family="DejaVu Sans" font-size="14" fill="{grey}">{subtitle}</text>
+  <text x="44" y="58" font-family="DejaVu Sans" font-weight="bold" font-size="32" fill="{white}">{name}</text>
+  <rect x="762" y="30" width="108" height="42" rx="11" fill="#a98467"/>
+  <text x="816" y="58" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="18" fill="#2a2118">Niv. {level}</text>
+  <text x="44" y="86" font-family="DejaVu Sans" font-size="15" fill="{grey}">{subtitle}</text>
 
   <!-- Barre XP -->
-  <rect x="290" y="92" width="520" height="7" rx="3.5" fill="{track}"/>
-  <rect x="290" y="92" width="{xp_fill_w}" height="7" rx="3.5" fill="{accent}"/>
-  <text x="290" y="118" font-family="DejaVu Sans" font-size="12" fill="{grey}">XP {xp_in}/{xp_for}</text>
+  <rect x="44" y="100" width="812" height="8" rx="4" fill="{track}"/>
+  <rect x="44" y="100" width="{xp_fill_w}" height="8" rx="4" fill="{accent}"/>
+  <text x="44" y="128" font-family="DejaVu Sans" font-size="13" fill="{grey}">XP {xp_in}/{xp_for}</text>
 
-  <!-- Jauges -->
+  <!-- Image de l'animal (cadre centre) -->
+  <rect x="306" y="146" width="288" height="288" rx="26" fill="#2c3144" stroke="{accent}" stroke-width="3"/>
+  {avatar_block}
+
+  <!-- Jauges (colonne gauche, sous l'image) -->
   {g_faim}
   {g_bonheur}
   {g_energie}
 
-  <!-- Combat -->
-  <text x="595" y="118" font-family="DejaVu Sans" font-weight="bold" font-size="13" fill="{grey}" letter-spacing="1">COMBAT</text>
+  <!-- Combat (colonne droite, sous l'image) -->
+  <text x="500" y="476" font-family="DejaVu Sans" font-weight="bold" font-size="14" fill="{grey}" letter-spacing="1">COMBAT</text>
   {c_force}
   {c_vit}
   {c_agi}
-  <line x1="595" y1="205" x2="855" y2="205" stroke="{track}" stroke-width="1"/>
-  <text x="595" y="222" font-family="DejaVu Sans" font-size="13" fill="{grey}">📍 ELO {elo} ({wins}V/{losses}D)</text>
+  <line x1="500" y1="600" x2="856" y2="600" stroke="{track}" stroke-width="1"/>
+  <text x="500" y="624" font-family="DejaVu Sans" font-size="14" fill="{grey}">📍 ELO {elo} ({wins}V/{losses}D)</text>
 
   <!-- Coins -->
-  <text x="440" y="240" font-family="DejaVu Sans" font-weight="bold" font-size="15" fill="{gold}">🪙 {coins}</text>
+  <text x="44" y="624" font-family="DejaVu Sans" font-weight="bold" font-size="16" fill="{gold}">🪙 {coins}</text>
 </svg>"##,
         inw = w - 16.0,
         inh = h - 16.0,
@@ -303,12 +304,12 @@ fn build_svg(d: &CardData) -> String {
         xp_fill_w = xp_fill_w,
         xp_in = d.xp_in_level,
         xp_for = d.xp_for_level,
-        g_faim = gauge_bar(132.0, "FAIM", d.hunger, gold),
-        g_bonheur = gauge_bar(162.0, "BONHEUR", d.happiness, green),
-        g_energie = gauge_bar(192.0, "ÉNERGIE", d.energy, gold),
-        c_force = combat_row(132.0, "#e74c3c", "FORCE", d.str_),
-        c_vit = combat_row(162.0, "#5b8def", "VITALITÉ", d.vit),
-        c_agi = combat_row(192.0, "#4cd07d", "AGILITÉ", d.agi),
+        g_faim = gauge_bar(490.0, "FAIM", d.hunger, gold),
+        g_bonheur = gauge_bar(525.0, "BONHEUR", d.happiness, green),
+        g_energie = gauge_bar(560.0, "ÉNERGIE", d.energy, gold),
+        c_force = combat_row(490.0, "#e74c3c", "FORCE", d.str_),
+        c_vit = combat_row(525.0, "#5b8def", "VITALITÉ", d.vit),
+        c_agi = combat_row(560.0, "#4cd07d", "AGILITÉ", d.agi),
         elo = d.elo,
         wins = d.wins,
         losses = d.losses,
@@ -334,3 +335,4 @@ pub fn render_card_png(d: &CardData) -> Option<Vec<u8>> {
     resvg::render(&tree, resvg::tiny_skia::Transform::identity(), &mut pixmap.as_mut());
     pixmap.encode_png().ok()
 }
+
