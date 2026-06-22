@@ -94,6 +94,11 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
         warn!(error = %e, "Echec edit final wheel");
     }
 
+    // "Message collant" : le resultat du spin vient d'etre poste et a repousse
+    // le panneau vers le haut. On le republie en bas pour qu'il reste le
+    // dernier message du salon.
+    super::setup::repost_panel(ctx, component.channel_id).await;
+
     // Acquitte le clic ephemeral.
     let edit = serenity::builder::EditInteractionResponse::new()
         .content(format!("\u{1f300} Tu as tire la roue : {} ({})",
