@@ -47,6 +47,14 @@ pub struct BumpRewardDto {
     pub reward: i64,
     pub weekly_count: i64,
     pub new_balance: Option<i64>,
+    /// Role VIP a attribuer (le bot fait l'ajout Discord, idempotent). `None`
+    /// si la feature est desactivee ou le seuil de bumps pas encore atteint.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vip_role_id: Option<String>,
+    /// `true` uniquement au bump qui fait FRANCHIR le seuil (pour annoncer le
+    /// passage VIP une seule fois). `false` ensuite (role deja debloque).
+    #[serde(default)]
+    pub vip_just_unlocked: bool,
 }
 
 /// POST /api/bump/{guild_id}/{user_id} — enregistre un bump, calcule la
@@ -58,7 +66,7 @@ pub async fn record_bump(
 ) -> Result<Json<BumpRewardDto>, ApiError> {
     let cfg = state.bot_config_repo.get_config(&guild_id, "bump-bot").await.unwrap_or_default();
     if !cfg_bool(&cfg, "enabled", false) {
-        return Ok(Json(BumpRewardDto { rewarded: false, reward: 0, weekly_count: 0, new_balance: None }));
+        return Ok(Json(BumpRewardDto { rewarded: false, reward: 0, weekly_count: 0, new_balance: None, vip_role_id: None, vip_just_unlocked: false }));
     }
     let base = cfg_i64(&cfg, "bump_reward_base", 100).max(0);
     let step = cfg_i64(&cfg, "bump_reward_step", 50).max(0);
@@ -129,7 +137,40 @@ pub async fn record_bump(
     .execute(&state.pg_pool)
     .await;
 
-    Ok(Json(BumpRewardDto { rewarded: true, reward, weekly_count: n, new_balance }))
+    // Role VIP : attribue a partir d'un seuil de bumps CUMULES (all-time).
+    // Le bot fait l'ajout Discord (idempotent) ; on lui renvoie juste le role
+    // a poser + un flag "vient de debloquer" pour annoncer une seule fois.
+    let mut vip_role_id: Option<String> = None;
+    let mut vip_just_unlocked = false;
+    if cfg_bool(&cfg, "vip_enabled", false) {
+        let vip_role = cfg_str(&cfg, "vip_role_id").unwrap_or("").trim().to_string();
+        let vip_threshold = cfg_i64(&cfg, "vip_bump_threshold", 10).max(1);
+        if !vip_role.is_empty() {
+            let total_bumps: i64 = sqlx::query_scalar(
+                "SELECT COUNT(*) FROM bump_events WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&guild_id)
+            .bind(&user_id)
+            .fetch_one(&state.pg_pool)
+            .await
+            .unwrap_or(0);
+            if total_bumps >= vip_threshold {
+                vip_role_id = Some(vip_role);
+                // Le COUNT inclut le bump qu'on vient d'inserer : le passage
+                // se fait exactement quand le total atteint le seuil.
+                vip_just_unlocked = total_bumps == vip_threshold;
+            }
+        }
+    }
+
+    Ok(Json(BumpRewardDto {
+        rewarded: true,
+        reward,
+        weekly_count: n,
+        new_balance,
+        vip_role_id,
+        vip_just_unlocked,
+    }))
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]

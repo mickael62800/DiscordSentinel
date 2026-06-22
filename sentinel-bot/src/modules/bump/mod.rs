@@ -52,6 +52,12 @@ struct BumpRewardResp {
     reward: i64,
     #[serde(default)]
     weekly_count: i64,
+    /// Role VIP a poser (None si feature off ou seuil pas atteint).
+    #[serde(default)]
+    vip_role_id: Option<String>,
+    /// True uniquement au bump qui debloque le VIP (annonce one-shot).
+    #[serde(default)]
+    vip_just_unlocked: bool,
 }
 
 /// Appele pour chaque message : si c'est une confirmation de bump Disboard
@@ -121,6 +127,32 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             return;
         }
     };
+    // Role VIP : pose le role (idempotent) des que l'API le renvoie, et
+    // annonce le passage VIP une seule fois (vip_just_unlocked). Independant
+    // du montant de coins : un bump qui rapporte 0 compte quand meme.
+    if let Some(role_id_str) = resp.vip_role_id.as_deref() {
+        if let (Ok(gid), Ok(rid)) = (guild_id.parse::<u64>(), role_id_str.parse::<u64>()) {
+            let gid = serenity::model::id::GuildId::new(gid);
+            let rid = serenity::model::id::RoleId::new(rid);
+            if let Err(e) = ctx
+                .http
+                .add_member_role(gid, bumper.id, rid, Some("Bump VIP — seuil de bumps atteint"))
+                .await
+            {
+                warn!(error = %e, user = %bumper.id, role = %rid, "Echec attribution role VIP bump");
+            } else if resp.vip_just_unlocked {
+                let vip_msg = format!(
+                    "👑 <@{}> est maintenant **VIP** grâce à ses bumps ! Merci pour ton soutien au serveur 🙌",
+                    bumper.id
+                );
+                if let Err(e) = msg.channel_id.say(&ctx.http, vip_msg).await {
+                    warn!(error = %e, "Echec annonce passage VIP bump");
+                }
+                info!(guild_id, user = %bumper.id, "Membre passe VIP via bumps");
+            }
+        }
+    }
+
     if !resp.rewarded || resp.reward <= 0 {
         return;
     }
