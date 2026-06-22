@@ -302,7 +302,7 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
         }
         Err(e) => {
             warn!(error = %e, action, "Echec action soin");
-            reply_ephemeral(ctx, component, "Action impossible (cooldown, coins insuffisants, ou compagnon mort).").await;
+            reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await;
         }
     }
 }
@@ -329,7 +329,7 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
             let resp = update_from_card(&api, &guild_id, &user_id, &p).await;
             let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp)).await;
         }
-        Err(e) => { warn!(error = %e, "Echec entrainement"); reply_ephemeral(ctx, component, "Entrainement impossible (epuise, cooldown ou coins).").await; }
+        Err(e) => { warn!(error = %e, "Echec entrainement"); reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await; }
     }
 }
 
@@ -393,7 +393,7 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     });
     match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
         Ok(_) => reply_ephemeral(ctx, component, &format!("✅ {label} achete et utilise !")).await,
-        Err(e) => { warn!(error = %e, item, "Echec achat"); reply_ephemeral(ctx, component, "Achat impossible (coins insuffisants ?).").await; }
+        Err(e) => { warn!(error = %e, item, "Echec achat"); reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await; }
     }
 }
 
@@ -455,7 +455,7 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
         }
         Err(e) => {
             warn!(error = %e, "Echec visite");
-            reply_ephemeral(ctx, component, "Visite impossible (cooldown, limite/jour, ou ce joueur n'a pas de compagnon).").await;
+            reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await;
         }
     }
 }
@@ -557,7 +557,7 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
         }
         Err(e) => {
             warn!(error = %e, "Echec combat");
-            reply_ephemeral(ctx, component, "Combat impossible (épuisé, cooldown, ou ce joueur n'a pas de compagnon).").await;
+            reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await;
         }
     }
 }
