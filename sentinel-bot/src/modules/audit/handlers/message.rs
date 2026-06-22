@@ -202,10 +202,11 @@ pub async fn handle_update(
     _new: Option<Message>,
     event: MessageUpdateEvent,
 ) {
-    let gid = match event.guild_id {
-        Some(g) => g.to_string(),
+    let guild_gid = match event.guild_id {
+        Some(g) => g,
         None => return,
     };
+    let gid = guild_gid.to_string();
 
     // Ignorer les messages edites par des bots
     if event.author.as_ref().map(|a| a.bot).unwrap_or(false) {
@@ -217,7 +218,21 @@ pub async fn handle_update(
     let new_content = event.content.clone().unwrap_or_default();
     let mut old_content = old.as_ref().map(|m| m.content.clone()).unwrap_or_default();
 
-    // Fallback : si le cache RAM serenity n'avait pas l'ancien message,
+    // Fallback 1 : cache audit en RAM (contenu de TOUS les messages non-bot,
+    // alimente par `cache_message` a chaque message). C'est la source
+    // principale du "avant" — le cache serenity (`old`) est souvent vide.
+    if old_content.is_empty() {
+        let data = ctx.data.read().await;
+        if let Some(cache) = data.get::<MessageCacheKey>() {
+            if let Some(cached) = cache.get(guild_gid, event.id) {
+                if !cached.content.is_empty() {
+                    old_content = cached.content;
+                }
+            }
+        }
+    }
+
+    // Fallback 2 : si le cache RAM serenity n'avait pas l'ancien message,
     // on tente une lookup DB via /api/user-activity/{guild}/by-message/{msg_id}.
     // Permet de retrouver l'ancien contenu meme apres restart du bot ou
     // pour les messages anciens hors cache.
@@ -292,6 +307,27 @@ pub async fn handle_update(
             .field("Lien", format!("[Aller au message]({url})"), false)
             .timestamp(serenity::model::Timestamp::now());
         post_to_channel(ctx, &gid, MESSAGE_LOG_KEYS, embed).await;
+    }
+
+    // Met a jour le cache audit avec le nouveau contenu : une edition
+    // ULTERIEURE du meme message affichera correctement ce texte comme "avant".
+    if !new_content.is_empty() {
+        if let Some(author) = event.author.as_ref() {
+            let data = ctx.data.read().await;
+            if let Some(cache) = data.get::<MessageCacheKey>() {
+                cache.store(
+                    guild_gid,
+                    event.id,
+                    crate::modules::audit::message_cache::CachedMessage {
+                        author_id: author.id.to_string(),
+                        author_name: author.name.clone(),
+                        content: new_content.clone(),
+                        channel_id: event.channel_id.to_string(),
+                        is_bot: false,
+                    },
+                );
+            }
+        }
     }
 
     // Surveillance : tracker l'edition si l'auteur est surveille
