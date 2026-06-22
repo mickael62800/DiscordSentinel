@@ -167,6 +167,11 @@ impl EventHandler for Handler {
         // Welcome : consumer Redis pour publier le panneau de reglement
         // (bouton "Publier le reglement" du dashboard).
         modules::welcome::spawn(ctx.clone());
+
+        // Slot : fermeture auto des salons de machine a sous inactifs
+        // (timeout par guild, defaut 2 min). Suivi en memoire -> cleanup
+        // dans le bot, pas dans le worker.
+        modules::slot::spawn_background(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

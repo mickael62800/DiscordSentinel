@@ -78,8 +78,8 @@ impl SlotChannelManager {
         self.active.remove(&user_id).map(|(_, v)| v)
     }
 
-    /// V2 : retourne les salons inactifs depuis plus de `timeout_secs`.
-    /// Pas branche pour l instant, prevu pour un cleanup background task.
+    /// Retourne les salons inactifs depuis plus de `timeout_secs`.
+    /// Utilise par le cleanup background task (timeout global).
     #[allow(dead_code)]
     pub fn afk_channels(&self, timeout_secs: u64) -> Vec<(UserId, ActiveSlotChannel)> {
         let timeout = std::time::Duration::from_secs(timeout_secs);
@@ -89,6 +89,23 @@ impl SlotChannelManager {
             .filter(|entry| now.duration_since(entry.value().last_activity) >= timeout)
             .map(|entry| (*entry.key(), entry.value().clone()))
             .collect()
+    }
+
+    /// Snapshot de tous les salons actifs. Utilise par le cleanup background
+    /// task qui applique un timeout PAR GUILD (lu en config), et a donc besoin
+    /// de voir tous les salons + leur inactivite pour decider lesquels fermer.
+    pub fn snapshot(&self) -> Vec<(UserId, ActiveSlotChannel)> {
+        self.active
+            .iter()
+            .map(|entry| (*entry.key(), entry.value().clone()))
+            .collect()
+    }
+
+    /// Secondes d'inactivite d'un salon (depuis le dernier `touch`).
+    pub fn idle_secs(channel: &ActiveSlotChannel) -> u64 {
+        Instant::now()
+            .duration_since(channel.last_activity)
+            .as_secs()
     }
 
     /// Nombre de salons actifs. Utilise par tests + futur monitoring.
