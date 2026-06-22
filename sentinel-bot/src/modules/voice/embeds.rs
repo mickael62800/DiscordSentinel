@@ -79,6 +79,53 @@ pub async fn create_session_card(
     }
 }
 
+/// Log un join en garantissant qu'une carte de session existe.
+///
+/// Les vocaux TEMPORAIRES recoivent leur carte a la creation du salon
+/// (`create_session_card`). Les vocaux PERMANENTS observes n'en ont pas :
+/// on la cree paresseusement au premier join (en partant du nombre de membres
+/// deja presents), puis les join/leave suivants alimentent la meme carte.
+/// Cloturee par `session_closed` quand le salon se vide (cf. member_events).
+pub async fn ensure_card_and_member_joined(
+    ctx: &Context,
+    guild_id: GuildId,
+    voice_channel_id: ChannelId,
+    user_name: &str,
+    current_member_count: u32,
+) {
+    let exists = {
+        let data = ctx.data.read().await;
+        data.get::<SessionCardKey>()
+            .map(|c| c.contains_key(&voice_channel_id))
+            .unwrap_or(false)
+    };
+    if exists {
+        session_member_joined(ctx, voice_channel_id, user_name).await;
+        return;
+    }
+
+    let log_channel = match resolve_log_channel(ctx, guild_id).await {
+        Some(ch) => ch,
+        None => return,
+    };
+    let channel_name = get_channel_name(ctx, voice_channel_id).await;
+    let mut card = SessionCard::new(
+        log_channel,
+        channel_name,
+        "permanent".to_string(),
+        chrono::Utc::now().timestamp(),
+    );
+    card.current_members = current_member_count.max(1);
+    card.add_event("\u{1f3a4} **Session demarree** (salon permanent observe)".to_string());
+    card.add_event(format!("\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
+    card.send_initial(ctx).await;
+
+    let data = ctx.data.read().await;
+    if let Some(cards) = data.get::<SessionCardKey>() {
+        cards.insert(voice_channel_id, card);
+    }
+}
+
 /// Ajoute un evenement "membre rejoint" a la carte de session.
 pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, user_name: &str) {
     let mut card_clone = {

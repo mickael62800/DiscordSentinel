@@ -27,7 +27,7 @@ pub async fn handle_voice_state_update(
     };
     let user_id = new.user_id;
 
-    let (public_creator_id, private_creator_id, game_creator_id) = {
+    let (public_creator_id, private_creator_id, game_creator_id, observed_channels) = {
         let data = ctx.data.read().await;
         let env_config = match data.get::<ConfigKey>() {
             Some(config) => (
@@ -58,15 +58,18 @@ pub async fn handle_voice_state_update(
                         .and_then(|v| v.parse::<u64>().ok())
                         .filter(|id| *id > 0)
                         .map(ChannelId::new);
-                    (public_id, private_id, game_id)
+                    // Vocaux PERMANENTS a observer pour les logs (liste d'IDs
+                    // separes par des virgules, configuree depuis la web).
+                    let observed = parse_observed_channels(config.get("observed_voice_channels"));
+                    (public_id, private_id, game_id, observed)
                 }
                 Err(e) => {
                     warn!(error = %e, "Config API indisponible, fallback sur env vars");
-                    (env_config.0, env_config.1, None)
+                    (env_config.0, env_config.1, None, Vec::new())
                 }
             }
         } else {
-            (env_config.0, env_config.1, None)
+            (env_config.0, env_config.1, None, Vec::new())
         }
     };
 
@@ -85,11 +88,34 @@ pub async fn handle_voice_state_update(
         };
 
         if let Some(channel_id) = new_channel {
-            embeds::session_member_joined(ctx, channel_id, &user_label).await;
+            let is_creator = channel_id == public_creator_id
+                || channel_id == private_creator_id
+                || game_creator_id == Some(channel_id);
+            if !is_creator {
+                if is_temp_channel(ctx, channel_id).await {
+                    // Temporaire : carte deja creee a la creation du salon.
+                    embeds::session_member_joined(ctx, channel_id, &user_label).await;
+                } else if observed_channels.contains(&channel_id) {
+                    // Permanent observe : creation paresseuse de la carte.
+                    let count = count_members_in_channel(ctx, guild_id, channel_id);
+                    embeds::ensure_card_and_member_joined(ctx, guild_id, channel_id, &user_label, count).await;
+                }
+            }
         }
 
         if let Some(old_channel_id) = old_channel {
+            // No-op si aucune carte (vocaux non suivis) ; sinon log le leave.
             embeds::session_member_left(ctx, old_channel_id, &user_label, "?").await;
+
+            // Vocal PERMANENT observe vide -> on cloture sa carte (sans
+            // supprimer le salon). Les temporaires sont clotures par
+            // `check_and_delete_empty` qui appelle deja `session_closed`.
+            if !is_temp_channel(ctx, old_channel_id).await
+                && observed_channels.contains(&old_channel_id)
+                && count_members_in_channel(ctx, guild_id, old_channel_id) == 0
+            {
+                embeds::session_closed(ctx, old_channel_id, "session terminee").await;
+            }
         }
     }
 
@@ -130,6 +156,40 @@ pub async fn handle_voice_state_update(
             }
         }
     }
+}
+
+/// Parse la liste des vocaux permanents observes depuis la config
+/// (`observed_voice_channels` : IDs separes par virgule, espaces tolerees).
+fn parse_observed_channels(raw: Option<&String>) -> Vec<ChannelId> {
+    let Some(raw) = raw else { return Vec::new() };
+    raw.split(',')
+        .filter_map(|s| s.trim().parse::<u64>().ok())
+        .filter(|id| *id > 0)
+        .map(ChannelId::new)
+        .collect()
+}
+
+/// `true` si le salon est un vocal temporaire suivi (present dans la map
+/// d'ownership). Sert a distinguer temporaire vs permanent pour le logging.
+async fn is_temp_channel(ctx: &Context, channel_id: ChannelId) -> bool {
+    let data = ctx.data.read().await;
+    data.get::<crate::modules::voice::VoiceOwnerMapKey>()
+        .map(|map| map.contains_key(&channel_id))
+        .unwrap_or(false)
+}
+
+/// Nombre de membres actuellement dans un vocal (depuis le cache).
+fn count_members_in_channel(ctx: &Context, guild_id: GuildId, channel_id: ChannelId) -> u32 {
+    ctx.cache
+        .guild(guild_id)
+        .map(|guild| {
+            guild
+                .voice_states
+                .values()
+                .filter(|vs| vs.channel_id == Some(channel_id))
+                .count() as u32
+        })
+        .unwrap_or(0)
 }
 
 /// Si l'utilisateur qui vient de quitter etait l'owner d'un salon temporaire
