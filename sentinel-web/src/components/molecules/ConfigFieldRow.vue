@@ -29,7 +29,13 @@ const CHANNEL_LIST_KEYS = new Set<string>([
   "whitelist_channels",
   "exempt_channels",
   "command_channels",
+  // Liste de salons VOCAUX a observer pour les logs (voice-bot).
+  "observed_voice_channels",
 ]);
+
+// Sous-ensemble de CHANNEL_LIST_KEYS dont le picker doit lister des salons
+// VOCAUX (et non textuels).
+const VOICE_CHANNEL_LIST_KEYS = new Set<string>(["observed_voice_channels"]);
 const ROLE_LIST_KEYS = new Set<string>([
   "ignored_roles",
   "excluded_roles",
@@ -89,6 +95,9 @@ const isChannelList = computed(
 );
 const isRoleList = computed(
   () => props.field.type === "text" && ROLE_LIST_KEYS.has(props.field.key),
+);
+const isVoiceChannelList = computed(
+  () => props.field.type === "text" && VOICE_CHANNEL_LIST_KEYS.has(props.field.key),
 );
 const isVoiceChannel = computed(
   () => props.field.type === "channel" && VOICE_CHANNEL_KEYS.has(props.field.key),
@@ -188,7 +197,7 @@ const mapDefaults = computed(() => {
       v-else-if="isChannelList || isRoleList"
       :model-value="modelValue"
       :guild-id="guildId"
-      :kind="isRoleList ? 'role' : 'channel'"
+      :kind="isRoleList ? 'role' : (isVoiceChannelList ? 'channel-voice' : 'channel')"
       @update:model-value="update"
     />
 
