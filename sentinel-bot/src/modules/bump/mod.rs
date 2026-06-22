@@ -63,6 +63,27 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let Some(guild_id) = msg.guild_id else { return };
     let guild_id = guild_id.to_string();
 
+    // DIAGNOSTIC TEMPORAIRE : trace l'etat du message Disboard pour comprendre
+    // pourquoi la recompense ne se declenche pas (interaction_metadata absent ?
+    // embed non reconnu ?). A retirer une fois le bug bump identifie.
+    info!(
+        guild_id,
+        has_interaction_metadata = msg.interaction_metadata.is_some(),
+        is_command_interaction = matches!(
+            msg.interaction_metadata.as_deref(),
+            Some(MessageInteractionMetadata::Command(_))
+        ),
+        embed_count = msg.embeds.len(),
+        embed_desc = msg
+            .embeds
+            .first()
+            .and_then(|e| e.description.as_deref())
+            .unwrap_or("<aucune>"),
+        content = %msg.content,
+        detected_success = is_bump_success(msg),
+        "DIAG bump: message Disboard recu"
+    );
+
     // L'auteur du /bump : present dans interaction_metadata (reponse de commande).
     let bumper = match msg.interaction_metadata.as_deref() {
         Some(MessageInteractionMetadata::Command(meta)) => &meta.user,
