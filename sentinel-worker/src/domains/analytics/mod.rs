@@ -9,3 +9,4 @@ pub mod daily_snapshot;
 pub mod hourly_snapshot;
 pub mod retention_cleanup;
 pub mod publish_top_users;
+pub mod publish_monthly_ranking;

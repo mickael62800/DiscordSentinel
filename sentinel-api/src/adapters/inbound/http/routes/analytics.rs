@@ -21,6 +21,7 @@ pub fn inner() -> Router<AppState> {
         .route("/snapshot/hourly", post(handlers::audit::snapshots::snapshot_hourly_all))
         .route("/retention-cleanup", post(handlers::audit::snapshots::retention_cleanup_all))
         .route("/publish-top-users", post(handlers::audit::snapshots::publish_top_users_all))
+        .route("/publish-monthly-ranking", post(handlers::community::monthly_ranking::publish_monthly_ranking_all))
         // Export user-facing.
         .route("/export", get(handlers::audit::snapshots::export_analytics))
 }

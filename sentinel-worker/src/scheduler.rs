@@ -292,6 +292,18 @@ pub fn start(
         "analytics",
         |pool| Box::pin(async move { domains::analytics::publish_top_users::run(&pool).await }),
     );
+    // Classement mensuel (texte/vocal/global) : check horaire. L'API gate sur
+    // le passage de mois (baseline du mois courant deja posee -> no-op), donc
+    // un tick horaire publie au plus tot apres le 1er du mois sans spammer.
+    spawn_periodic(
+        "publish_monthly_ranking",
+        3_600,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "analytics",
+        |pool| Box::pin(async move { domains::analytics::publish_monthly_ranking::run(&pool).await }),
+    );
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : temp_roles (expiration des roles temporaires)
