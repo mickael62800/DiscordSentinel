@@ -789,8 +789,6 @@ struct ReviewResp {
     incident_count: i32,
     #[serde(default)]
     voting_deadline: Option<String>,
-    #[serde(default)]
-    incidents: serde_json::Value,
 }
 
 /// Construit l'embed d'une carte de vote AGREGEE (plusieurs incidents pour un

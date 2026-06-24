@@ -74,27 +74,3 @@ pub fn load_env_bool(key: &str, default: bool) -> bool {
     }
 }
 
-/// Config simple pour les bots sans champs supplementaires.
-/// Evite le boilerplate d'un struct + impl BotConfig dans chaque bot.
-///
-/// ```ignore
-/// let config = SimpleConfig::from_env("SENTINEL_DISCORD_TOKEN");
-/// ```
-#[derive(Clone)]
-pub struct SimpleConfig {
-    base: BaseConfig,
-}
-
-impl SimpleConfig {
-    pub fn from_env(token_var: &str) -> Self {
-        Self {
-            base: BaseConfig::from_env(token_var),
-        }
-    }
-}
-
-impl BotConfig for SimpleConfig {
-    fn base(&self) -> &BaseConfig {
-        &self.base
-    }
-}

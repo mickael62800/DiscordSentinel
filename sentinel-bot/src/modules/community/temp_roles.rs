@@ -2,14 +2,6 @@ use std::time::{Duration, Instant};
 
 use dashmap::DashMap;
 
-/// Role temporaire avec expiration.
-#[derive(Debug, Clone)]
-pub struct TempRole {
-    pub guild_id: u64,
-    pub user_id: u64,
-    pub role_id: u64,
-}
-
 /// Tracker de roles temporaires.
 pub struct TempRoleTracker {
     /// (guild_id, user_id, role_id) → expiry instant
@@ -39,19 +31,6 @@ impl TempRoleTracker {
                 self.roles.insert((guild_id, user_id, role_id), expiry);
             }
         }
-    }
-
-    /// Retourne les roles expires.
-    pub fn expired(&self) -> Vec<TempRole> {
-        let now = Instant::now();
-        self.roles
-            .iter()
-            .filter(|entry| now >= *entry.value())
-            .map(|entry| {
-                let (guild_id, user_id, role_id) = *entry.key();
-                TempRole { guild_id, user_id, role_id }
-            })
-            .collect()
     }
 
     /// Supprime un role du tracking.
@@ -92,23 +71,6 @@ mod tests {
     }
 
     #[test]
-    fn expired_returns_expired() {
-        let tracker = TempRoleTracker::new();
-        // Ajouter avec duree 0 (expire immediatement)
-        tracker.roles.insert((1, 100, 200), Instant::now() - Duration::from_secs(10));
-        let expired = tracker.expired();
-        assert_eq!(expired.len(), 1);
-        assert_eq!(expired[0].role_id, 200);
-    }
-
-    #[test]
-    fn expired_ignores_active() {
-        let tracker = TempRoleTracker::new();
-        tracker.add(1, 100, 200, 3600); // expire dans 1h
-        assert!(tracker.expired().is_empty());
-    }
-
-    #[test]
     fn remove_cleans_up() {
         let tracker = TempRoleTracker::new();
         tracker.add(1, 100, 200, 3600);
@@ -134,7 +96,6 @@ mod tests {
         let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
         tracker.add_with_expiry_timestamp(1, 100, 200, &future);
         assert!(tracker.is_temp(1, 100, 200));
-        assert!(tracker.expired().is_empty()); // pas encore expire
     }
 
     #[test]

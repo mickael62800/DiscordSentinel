@@ -11,4 +11,3 @@ pub mod heartbeat;
 pub mod parsers;
 pub mod season_theme;
 pub mod shard_launcher;
-pub mod tout_ou_rien;

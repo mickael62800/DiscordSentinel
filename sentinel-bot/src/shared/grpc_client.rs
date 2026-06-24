@@ -56,7 +56,6 @@ use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
 use sentinel_proto::tamagotchi::v1::tamagotchi_service_client::TamagotchiServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
-use sentinel_proto::images::v1::images_service_client::ImagesServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
 use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
@@ -321,15 +320,6 @@ impl SentinelGrpcClient {
             .accept_compressed(CompressionEncoding::Gzip)
     }
 
-    /// Retourne un client `ImagesService` pret a l'emploi.
-    pub fn images(
-        &self,
-    ) -> ImagesServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        ImagesServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
     /// Phase 7A.opt F.4 — Retourne un client `WelcomeService`.
     pub fn welcome(
         &self,
@@ -364,11 +354,6 @@ impl SentinelGrpcClient {
         AiDatasetServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Acces au circuit breaker pour les wrappers de plus haut niveau.
-    pub fn breaker(&self) -> &CircuitBreaker {
-        &self.breaker
     }
 
     /// Wrappe un appel gRPC dans le circuit breaker. A utiliser dans les

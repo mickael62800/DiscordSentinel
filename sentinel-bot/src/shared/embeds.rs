@@ -32,15 +32,6 @@ pub fn sentinel_embed(title: impl Into<String>, color: u32) -> CreateEmbed {
         .timestamp(Timestamp::now())
 }
 
-/// Embed avec le nom du bot dans le footer.
-pub fn bot_embed(title: impl Into<String>, color: u32, bot_name: &str) -> CreateEmbed {
-    CreateEmbed::new()
-        .title(title)
-        .color(color)
-        .footer(CreateEmbedFooter::new(format!("Sentinel {}", bot_name)))
-        .timestamp(Timestamp::now())
-}
-
 // ── Variantes pre-configurees ──
 
 /// Embed info (blurple) — stats, niveaux, roles

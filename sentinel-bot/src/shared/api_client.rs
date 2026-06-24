@@ -350,13 +350,6 @@ impl BaseApiClient {
 
     // ── Guild Config ──
 
-    pub async fn get_guild_config(
-        &self,
-        guild_id: &str,
-    ) -> Result<HashMap<String, String>, String> {
-        self.get_guild_config_for(guild_id, &self.bot_name).await
-    }
-
     /// Variante qui permet de specifier un `bot_name` arbitraire (utile pour
     /// le binaire unifie `sentinel-bot` qui doit lire la config des sous-modules
     /// `coude-bot`, `automod-bot`, etc., stockee sous leur nom d'origine en DB).

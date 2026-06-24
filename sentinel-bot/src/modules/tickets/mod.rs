@@ -16,7 +16,6 @@ pub mod sla;
 pub mod templates;
 pub mod transcript;
 
-use std::sync::Arc;
 
 use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand, ModalInteraction,
@@ -27,13 +26,10 @@ use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::discord_helpers::{
     is_module_enabled, is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
     is_module_enabled_or_reply_modal,
 };
-use crate::shared::embeds::neutral_embed;
-use crate::shared::grpc_client::SentinelGrpcClient;
 use crate::shared::heartbeat::ApiClientKey;
 
 use api_client::ApiClient;
@@ -327,198 +323,6 @@ async fn deploy_panel_if_needed(ctx: &Context) {
             Ok(_) => info!(channel_id = %ch_id, "Panel de tickets deploye"),
             Err(e) => error!(error = %e, channel_id = %ch_id, "Impossible de deployer le panel de tickets"),
         }
-    }
-}
-
-async fn close_inactive_tickets(ctx: &Context) {
-    let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => b.clone(),
-        None => return,
-    };
-    let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
-        Some(g) => g.clone(),
-        None => return,
-    };
-    drop(data);
-
-    let api = ApiClient::new(Arc::clone(&base), grpc);
-
-    let tickets = match api.list_tickets().await {
-        Ok(t) => t,
-        Err(_) => return,
-    };
-
-    let now = chrono::Utc::now();
-
-    let mut guild_timeouts: std::collections::HashMap<String, i64> =
-        std::collections::HashMap::new();
-
-    for ticket in &tickets {
-        if ticket.status == "closed" {
-            continue;
-        }
-
-        let timeout_days = if let Some(t) = guild_timeouts.get(&ticket.server) {
-            *t
-        } else {
-            let guild_config = match base.get_guild_config_for(&ticket.server, MODULE_BOT_NAME).await {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");
-                    std::collections::HashMap::new()
-                }
-            };
-            let configured = BaseApiClient::config_u64(
-                &guild_config,
-                "inactive_close_days",
-                7,
-            ) as i64;
-            guild_timeouts.insert(ticket.server.clone(), configured);
-            configured
-        };
-
-        if timeout_days <= 0 {
-            continue;
-        }
-
-        let updated_at = match chrono::DateTime::parse_from_rfc3339(&ticket.updated_at) {
-            Ok(dt) => dt.with_timezone(&chrono::Utc),
-            Err(_) => continue,
-        };
-
-        let inactive_days = (now - updated_at).num_days();
-        if inactive_days < timeout_days {
-            continue;
-        }
-
-        if let Err(e) = api.close_ticket(&ticket.id).await {
-            warn!(error = %e, ticket_id = %ticket.id, "Erreur fermeture ticket inactif");
-            continue;
-        }
-
-        if let Some(ref channel_id_str) = ticket.channel_id {
-            if let Ok(ch_id) = channel_id_str.parse::<u64>() {
-                let channel_id = ChannelId::new(ch_id);
-
-                let embed = neutral_embed("\u{1f550} Ticket ferme automatiquement")
-                    .description(format!(
-                        "Ce ticket a ete ferme apres {} jours d'inactivite.",
-                        timeout_days
-                    ));
-                if let Err(e) = channel_id.send_message(
-                    &ctx.http,
-                    serenity::builder::CreateMessage::new().embed(embed),
-                ).await {
-                    warn!(error = %e, "Failed to send auto-close notification");
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-                if let Err(e) = channel_id.delete(&ctx.http).await {
-                    warn!(error = %e, "Failed to delete inactive ticket channel");
-                }
-            }
-        }
-
-        info!(ticket_id = %ticket.id, inactive_days = %inactive_days, "Ticket inactif ferme automatiquement");
-    }
-}
-
-async fn check_escalations(ctx: &Context) {
-    let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => b.clone(),
-        None => return,
-    };
-    let grpc: Arc<SentinelGrpcClient> = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
-        Some(g) => g.clone(),
-        None => return,
-    };
-    // Extraire le tracker ici sous read lock — on en a besoin ensuite
-    let sla_tracker_present = data.get::<SlaTrackerKey>().is_some();
-    drop(data);
-
-    if !sla_tracker_present {
-        return;
-    }
-
-    // Cleanup stale
-    {
-        let data = ctx.data.read().await;
-        if let Some(sla_tracker) = data.get::<SlaTrackerKey>() {
-            sla_tracker.cleanup_stale();
-        }
-    }
-
-    let api = ApiClient::new(Arc::clone(&base), grpc);
-    let tickets = match api.list_tickets().await {
-        Ok(t) => t,
-        Err(_) => return,
-    };
-
-    for ticket in &tickets {
-        if ticket.status == "closed" {
-            continue;
-        }
-
-        let guild_config = match base.get_guild_config_for(&ticket.server, MODULE_BOT_NAME).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");
-                std::collections::HashMap::new()
-            }
-        };
-        let escalation_minutes = BaseApiClient::config_u64(&guild_config, "sla_escalation_minutes", 60);
-        if escalation_minutes == 0 {
-            continue;
-        }
-
-        let (breached, already_esc) = {
-            let data = ctx.data.read().await;
-            match data.get::<SlaTrackerKey>() {
-                Some(sla) => {
-                    let br = sla.breached_tickets(escalation_minutes);
-                    let esc = sla.is_escalated(&ticket.id);
-                    (br, esc)
-                }
-                None => return,
-            }
-        };
-
-        if !breached.contains(&ticket.id) {
-            continue;
-        }
-
-        if already_esc {
-            continue;
-        }
-
-        if let Err(e) = api.update_ticket_priority(&ticket.id, "high").await {
-            warn!(error = %e, ticket_id = %ticket.id, "Erreur escalade ticket");
-            continue;
-        }
-
-        {
-            let data = ctx.data.read().await;
-            if let Some(sla) = data.get::<SlaTrackerKey>() {
-                sla.mark_escalated(&ticket.id);
-            }
-        }
-
-        if let Some(ref channel_id_str) = ticket.channel_id {
-            if let Ok(ch_id) = channel_id_str.parse::<u64>() {
-                let channel = ChannelId::new(ch_id);
-                let msg = format!(
-                    "**\u{26a0}\u{fe0f} Escalade automatique** — Ce ticket n'a pas recu de reponse depuis {}min. La priorite a ete augmentee.",
-                    escalation_minutes
-                );
-                if let Err(e) = channel.say(&ctx.http, &msg).await {
-                    warn!(error = %e, "Failed to send escalation message in channel");
-                }
-            }
-        }
-
-        info!(ticket_id = %ticket.id, "Ticket escalade automatiquement (SLA breach)");
     }
 }
 

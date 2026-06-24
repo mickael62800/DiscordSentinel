@@ -89,18 +89,6 @@ impl QuarantineManager {
         self.quarantined.contains_key(&(guild_id, user_id))
     }
 
-    /// Retourne les utilisateurs dont le timeout de quarantaine a expire.
-    pub fn expired_users(&self, timeout_secs: u64) -> Vec<(GuildId, UserId)> {
-        let timeout = std::time::Duration::from_secs(timeout_secs);
-        let now = Instant::now();
-
-        self.quarantined
-            .iter()
-            .filter(|entry| now.duration_since(entry.value().0) >= timeout)
-            .map(|entry| *entry.key())
-            .collect()
-    }
-
     /// Retourne le nombre total d'utilisateurs en quarantaine.
     pub fn quarantined_count(&self) -> usize {
         self.quarantined.len()
@@ -129,25 +117,5 @@ mod tests {
 
         manager.remove_tracking(guild, user);
         assert!(!manager.is_quarantined(guild, user));
-    }
-
-    #[test]
-    fn test_expired_users() {
-        let manager = QuarantineManager::new();
-        let guild = GuildId::new(1);
-        let user = UserId::new(42);
-
-        // Inserer avec un timestamp dans le passe
-        manager
-            .quarantined
-            .insert((guild, user), (Instant::now() - std::time::Duration::from_secs(600), Vec::new()));
-
-        let expired = manager.expired_users(300); // timeout 5min
-        assert_eq!(expired.len(), 1);
-        assert_eq!(expired[0], (guild, user));
-
-        // Pas expire si timeout plus long
-        let expired = manager.expired_users(900);
-        assert!(expired.is_empty());
     }
 }

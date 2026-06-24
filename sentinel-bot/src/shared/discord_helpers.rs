@@ -123,70 +123,6 @@ pub async fn reply_ephemeral_embed(ctx: &Context, command: &CommandInteraction, 
     }
 }
 
-/// Reponse publique embed a une slash command.
-pub async fn reply_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, command = %command.data.name, "Echec reponse embed");
-    }
-}
-
-/// Defer un component interaction en mode ephemere.
-/// A appeler en tout debut de handler si le traitement peut depasser 3s.
-/// Apres ce defer, utiliser `component_followup_ephemeral` pour repondre.
-pub async fn component_defer_ephemeral(ctx: &Context, component: &ComponentInteraction) {
-    if let Err(e) = component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Defer(
-                CreateInteractionResponseMessage::new().ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Echec defer composant ephemere");
-    }
-}
-
-/// Defer un component interaction en mode UpdateMessage (acquitte
-/// l'interaction sans rien envoyer de visible). Apres ce defer, utiliser
-/// `component.edit_response(...)` ou `component.edit_message(...)` pour
-/// modifier le message d'origine.
-pub async fn component_defer_update(ctx: &Context, component: &ComponentInteraction) {
-    if let Err(e) = component
-        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
-        .await
-    {
-        warn!(error = %e, "Echec defer composant update");
-    }
-}
-
-/// Followup ephemere texte apres `component_defer_ephemeral`.
-pub async fn component_followup_ephemeral(
-    ctx: &Context,
-    component: &ComponentInteraction,
-    content: &str,
-) {
-    if let Err(e) = component
-        .create_followup(
-            &ctx.http,
-            CreateInteractionResponseFollowup::new()
-                .content(content)
-                .ephemeral(true),
-        )
-        .await
-    {
-        warn!(error = %e, "Echec followup composant ephemere texte");
-    }
-}
-
 /// Reponse ephemere texte a un component interaction (bouton/menu).
 pub async fn component_reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
     if let Err(e) = component
@@ -201,23 +137,6 @@ pub async fn component_reply_ephemeral(ctx: &Context, component: &ComponentInter
         .await
     {
         warn!(error = %e, "Echec reponse composant ephemere texte");
-    }
-}
-
-/// Reponse ephemere embed a un component interaction.
-pub async fn component_reply_embed(ctx: &Context, component: &ComponentInteraction, embed: CreateEmbed) {
-    if let Err(e) = component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Echec reponse composant ephemere embed");
     }
 }
 

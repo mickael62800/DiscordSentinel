@@ -239,18 +239,6 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    pub async fn update_ticket_priority(&self, id: &str, priority: &str) -> Result<(), String> {
-        let req = proto::UpdatePriorityRequest {
-            id: id.to_string(),
-            priority: priority.to_string(),
-        };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.update_priority(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
-    }
-
     pub async fn update_ticket_sla(
         &self,
         id: &str,
