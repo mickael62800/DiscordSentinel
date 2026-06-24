@@ -100,4 +100,10 @@ pub mod export {
     }
 }
 
+pub mod tamagotchi {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.tamagotchi.v1");
+    }
+}
+
 pub mod tls;

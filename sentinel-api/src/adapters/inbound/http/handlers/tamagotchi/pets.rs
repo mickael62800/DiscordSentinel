@@ -1,8 +1,13 @@
 //! Handlers HTTP du jeu Tamagotchi.
+//!
+//! Surface HTTP reduite : seuls l'admin web (liste + suppression) et le worker
+//! (tick de cycle de vie) restent en HTTP. Toutes les interactions du bot
+//! (creation, soins, entrainement, visite, combat, cartes) passent par le
+//! `TamagotchiService` gRPC.
 
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
@@ -12,7 +17,6 @@ use axum::http::StatusCode;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::inbound::tamagotchi::manage_pets::{CareCommand, CreatePetCommand};
 
 #[derive(Debug, Serialize)]
 pub struct PetEventDto {
@@ -77,104 +81,6 @@ impl PetDto {
     }
 }
 
-/// Carte a rafraichir : donnees de rendu + localisation du message Discord.
-#[derive(Debug, Serialize)]
-pub struct CardDto {
-    pub card_channel_id: String,
-    pub card_message_id: String,
-    #[serde(flatten)]
-    pub pet: PetDto,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CreatePetBody {
-    pub guild_id: String,
-    pub owner_id: String,
-    pub name: String,
-    pub species: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct SetCardLocationBody {
-    pub channel_id: String,
-    pub message_id: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CardsQuery {
-    pub after: Option<String>,
-    pub limit: Option<i64>,
-}
-
-/// POST /api/tamagotchi/{guild_id}/{owner_id}/card — enregistre la position de
-/// la carte Discord (appele par le bot a l'ouverture du salon).
-pub async fn set_card_location(
-    State(state): State<AppState>,
-    Path((guild_id, owner_id)): Path<(String, String)>,
-    Json(body): Json<SetCardLocationBody>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    state
-        .pets_uc
-        .set_card_location(&guild_id, &owner_id, &body.channel_id, &body.message_id)
-        .await?;
-    Ok(Json(serde_json::json!({ "ok": true })))
-}
-
-/// GET /api/tamagotchi/cards?after=<uuid>&limit=<n> — compagnons vivants ayant
-/// une carte postee (rafraichissement horaire par le bot). Pagine par curseur.
-pub async fn list_cards(
-    State(state): State<AppState>,
-    axum::extract::Query(q): axum::extract::Query<CardsQuery>,
-) -> Result<Json<Vec<CardDto>>, ApiError> {
-    let after = q.after.as_deref().and_then(|s| Uuid::parse_str(s).ok());
-    let limit = q.limit.unwrap_or(500).clamp(1, 1000);
-    let pets = state.pets_uc.list_cards(limit, after).await?;
-    let cards = pets
-        .into_iter()
-        .filter_map(|p| {
-            let ch = p.card_channel_id.clone()?;
-            let msg = p.card_message_id.clone()?;
-            Some(CardDto {
-                card_channel_id: ch,
-                card_message_id: msg,
-                pet: PetDto::from(p, vec![]),
-            })
-        })
-        .collect();
-    Ok(Json(cards))
-}
-
-/// POST /api/tamagotchi/pets
-pub async fn create_pet(
-    State(state): State<AppState>,
-    Json(body): Json<CreatePetBody>,
-) -> Result<Json<PetDto>, ApiError> {
-    let pet = state
-        .pets_uc
-        .create(CreatePetCommand {
-            guild_id: body.guild_id,
-            owner_id: body.owner_id,
-            name: body.name,
-            species: body.species,
-        })
-        .await?;
-    Ok(Json(PetDto::from(pet, vec![])))
-}
-
-/// GET /api/tamagotchi/{guild_id}/{owner_id}
-pub async fn get_pet(
-    State(state): State<AppState>,
-    Path((guild_id, owner_id)): Path<(String, String)>,
-) -> Result<Json<PetDto>, ApiError> {
-    let pet = state
-        .pets_uc
-        .get_by_owner(&guild_id, &owner_id)
-        .await?
-        .ok_or_else(|| ApiError::from(DomainError::NotFound("aucun compagnon".into())))?;
-    let events = load_events(&state, pet.id).await;
-    Ok(Json(PetDto::from(pet, events)))
-}
-
 fn forbid(s: StatusCode, msg: &str) -> ApiError {
     ApiError(if s == StatusCode::FORBIDDEN {
         DomainError::Forbidden(msg.into())
@@ -210,89 +116,6 @@ pub async fn delete_pet(
     Ok(StatusCode::NO_CONTENT)
 }
 
-#[derive(Debug, Deserialize)]
-pub struct CareBody {
-    /// "feed" | "play" | "sleep" | "cuddle".
-    pub action: String,
-    #[serde(default)]
-    pub coin_cost: i64,
-    #[serde(default)]
-    pub hunger_delta: i32,
-    #[serde(default)]
-    pub happiness_delta: i32,
-    #[serde(default)]
-    pub energy_delta: i32,
-    #[serde(default)]
-    pub xp_gain: i64,
-    #[serde(default)]
-    pub cooldown_secs: i64,
-    #[serde(default)]
-    pub cure: bool,
-}
-
-/// POST /api/tamagotchi/pets/{pet_id}/care
-pub async fn care_pet(
-    State(state): State<AppState>,
-    Path(pet_id): Path<String>,
-    Json(body): Json<CareBody>,
-) -> Result<Json<PetDto>, ApiError> {
-    let id = Uuid::parse_str(&pet_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("pet_id invalide".into())))?;
-    let pet = state
-        .pets_uc
-        .care(CareCommand {
-            pet_id: id,
-            action: body.action,
-            coin_cost: body.coin_cost,
-            hunger_delta: body.hunger_delta,
-            happiness_delta: body.happiness_delta,
-            energy_delta: body.energy_delta,
-            xp_gain: body.xp_gain,
-            cooldown_secs: body.cooldown_secs,
-            cure: body.cure,
-        })
-        .await?;
-    let events = load_events(&state, pet.id).await;
-    Ok(Json(PetDto::from(pet, events)))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct TrainBody {
-    /// "str" | "vit" | "agi".
-    pub stat: String,
-    #[serde(default)]
-    pub energy_cost: i32,
-    #[serde(default)]
-    pub coin_cost: i64,
-    #[serde(default)]
-    pub stat_gain: i32,
-    #[serde(default)]
-    pub cooldown_secs: i64,
-}
-
-/// POST /api/tamagotchi/pets/{pet_id}/train
-pub async fn train_pet(
-    State(state): State<AppState>,
-    Path(pet_id): Path<String>,
-    Json(body): Json<TrainBody>,
-) -> Result<Json<PetDto>, ApiError> {
-    let id = Uuid::parse_str(&pet_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("pet_id invalide".into())))?;
-    let pet = state
-        .pets_uc
-        .train(crate::ports::inbound::tamagotchi::manage_pets::TrainCommand {
-            pet_id: id,
-            stat: body.stat,
-            energy_cost: body.energy_cost,
-            coin_cost: body.coin_cost,
-            stat_gain: body.stat_gain,
-            cooldown_secs: body.cooldown_secs,
-        })
-        .await?;
-    let events = load_events(&state, pet.id).await;
-    Ok(Json(PetDto::from(pet, events)))
-}
-
 #[derive(Debug, Serialize)]
 pub struct TickSummary {
     pub processed: usize,
@@ -303,7 +126,7 @@ pub struct TickSummary {
 
 /// POST /api/tamagotchi/tick — appele par le worker. Applique la
 /// decroissance + maladie/mort a tous les compagnons vivants, avec la config
-/// de chaque guild.
+/// de chaque guild. Notifie le bot (DM + carte) via Redis sur transition.
 pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>, ApiError> {
     use sentinel_core::domain::entities::tamagotchi::pet::{TickConfig, TickOutcome};
     use std::collections::HashMap;
@@ -313,7 +136,7 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
     let mut cfg_cache: HashMap<String, TickConfig> = HashMap::new();
     let mut summary = TickSummary { processed: 0, sick: 0, died: 0, recovered: 0 };
     // Pagination par curseur `id` : couvre TOUS les compagnons vivants, sans
-    // troncature silencieuse (l'ancienne version s'arretait a 500).
+    // troncature silencieuse.
     let mut after_id: Option<Uuid> = None;
 
     loop {
@@ -340,7 +163,6 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
                         TickOutcome::Recovered => summary.recovered += 1,
                         _ => unreachable!(),
                     }
-                    // Notifie le bot (DM au proprietaire) via la stream Redis.
                     let status = match outcome {
                         TickOutcome::FellSick => "sick",
                         TickOutcome::Died => "death",
@@ -364,7 +186,6 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
             summary.processed += 1;
         }
 
-        // Derniere page (batch incomplet) -> termine.
         if batch_len < BATCH as usize {
             break;
         }
@@ -397,127 +218,4 @@ async fn load_tick_config(
         death_after_sick_secs: num("death_after_sick_hours", 24) * 3600,
         low_threshold: num("low_gauge_malus_threshold", 20) as i32,
     }
-}
-
-#[derive(Debug, Deserialize)]
-pub struct VisitBody {
-    pub guild_id: String,
-    pub visitor_id: String,
-    pub visitor_name: String,
-    pub target_id: String,
-    #[serde(default)]
-    pub xp_reward: i64,
-    #[serde(default)]
-    pub coins_reward: i64,
-    #[serde(default)]
-    pub cooldown_secs: i64,
-    #[serde(default)]
-    pub max_per_day: i64,
-}
-
-#[derive(Debug, Serialize)]
-pub struct VisitResultDto {
-    pub target_name: String,
-    pub xp_reward: i64,
-    pub coins_reward: i64,
-}
-
-/// POST /api/tamagotchi/visit
-pub async fn visit(
-    State(state): State<AppState>,
-    Json(body): Json<VisitBody>,
-) -> Result<Json<VisitResultDto>, ApiError> {
-    let r = state
-        .pets_uc
-        .visit(crate::ports::inbound::tamagotchi::manage_pets::VisitCommand {
-            guild_id: body.guild_id,
-            visitor_id: body.visitor_id,
-            visitor_name: body.visitor_name,
-            target_id: body.target_id,
-            xp_reward: body.xp_reward,
-            coins_reward: body.coins_reward,
-            cooldown_secs: body.cooldown_secs,
-            max_per_day: body.max_per_day,
-        })
-        .await?;
-    Ok(Json(VisitResultDto {
-        target_name: r.target_name,
-        xp_reward: r.xp_reward,
-        coins_reward: r.coins_reward,
-    }))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CombatBody {
-    pub guild_id: String,
-    pub attacker_id: String,
-    pub attacker_name: String,
-    pub target_id: String,
-    #[serde(default)] pub energy_cost: i32,
-    #[serde(default)] pub cooldown_secs: i64,
-    #[serde(default)] pub elo_k: i32,
-    #[serde(default)] pub xp_win: i64,
-    #[serde(default)] pub xp_loss: i64,
-    #[serde(default)] pub w_str: i32,
-    #[serde(default)] pub w_vit: i32,
-    #[serde(default)] pub w_agi: i32,
-    #[serde(default)] pub random_max: i32,
-}
-
-#[derive(Debug, Serialize)]
-pub struct CombatResultDto {
-    pub attacker_won: bool,
-    pub attacker_power: i64,
-    pub defender_power: i64,
-    pub defender_name: String,
-    pub attacker_new_elo: i32,
-    pub attacker_elo_delta: i32,
-}
-
-/// POST /api/tamagotchi/combat
-pub async fn combat(
-    State(state): State<AppState>,
-    Json(body): Json<CombatBody>,
-) -> Result<Json<CombatResultDto>, ApiError> {
-    let r = state
-        .pets_uc
-        .combat(crate::ports::inbound::tamagotchi::manage_pets::CombatCommand {
-            guild_id: body.guild_id,
-            attacker_id: body.attacker_id,
-            attacker_name: body.attacker_name,
-            target_id: body.target_id,
-            energy_cost: body.energy_cost,
-            cooldown_secs: body.cooldown_secs,
-            elo_k: body.elo_k,
-            xp_win: body.xp_win,
-            xp_loss: body.xp_loss,
-            w_str: body.w_str,
-            w_vit: body.w_vit,
-            w_agi: body.w_agi,
-            random_max: body.random_max,
-        })
-        .await?;
-    Ok(Json(CombatResultDto {
-        attacker_won: r.attacker_won,
-        attacker_power: r.attacker_power,
-        defender_power: r.defender_power,
-        defender_name: r.defender_name,
-        attacker_new_elo: r.attacker_new_elo,
-        attacker_elo_delta: r.attacker_elo_delta,
-    }))
-}
-
-async fn load_events(state: &AppState, pet_id: Uuid) -> Vec<PetEventDto> {
-    state
-        .pets_uc
-        .recent_events(pet_id, 5)
-        .await
-        .unwrap_or_default()
-        .into_iter()
-        .map(|e| PetEventDto {
-            kind: e.kind,
-            detail: e.detail,
-            created_at: e.created_at.to_rfc3339(),
-        })
-        .collect()
 }

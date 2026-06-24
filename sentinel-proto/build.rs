@@ -35,6 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/roles.proto",
                 "proto/security.proto",
                 "proto/stats.proto",
+                "proto/tamagotchi.proto",
                 "proto/tickets.proto",
                 "proto/voice.proto",
                 "proto/welcome.proto",

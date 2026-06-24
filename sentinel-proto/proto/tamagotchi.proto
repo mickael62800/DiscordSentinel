@@ -1,0 +1,151 @@
+syntax = "proto3";
+
+package sentinel.tamagotchi.v1;
+
+// Service Tamagotchi : compagnons virtuels. Wrappe `ManagePetsUseCase` cote
+// API. Appele par tamagotchi-bot (panel, refresh des cartes, consumer cycle
+// de vie). Le tick worker et l'admin web restent en HTTP.
+service TamagotchiService {
+  rpc CreatePet(CreatePetRequest) returns (Pet);
+  rpc GetPet(GetPetRequest) returns (GetPetResponse);
+  rpc CarePet(CareRequest) returns (Pet);
+  rpc TrainPet(TrainRequest) returns (Pet);
+  rpc Visit(VisitRequest) returns (VisitResult);
+  rpc Combat(CombatRequest) returns (CombatResult);
+  rpc SetCardLocation(SetCardLocationRequest) returns (Empty);
+  rpc ListCards(ListCardsRequest) returns (CardList);
+}
+
+message Empty {}
+
+message PetEvent {
+  string kind = 1;
+  string detail = 2;
+  string created_at = 3;
+}
+
+message Pet {
+  string id = 1;
+  string guild_id = 2;
+  string owner_id = 3;
+  string name = 4;
+  string species = 5;
+  int32 level = 6;
+  int64 xp = 7;
+  int64 xp_in_level = 8;
+  int64 xp_for_level = 9;
+  string born_at = 10;
+  int32 hunger = 11;
+  int32 happiness = 12;
+  int32 energy = 13;
+  string status = 14;
+  int32 str = 15;
+  int32 vit = 16;
+  int32 agi = 17;
+  int32 elo = 18;
+  int32 wins = 19;
+  int32 losses = 20;
+  repeated PetEvent events = 21;
+}
+
+message CreatePetRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+  string name = 3;
+  string species = 4;
+}
+
+message GetPetRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+}
+
+// `pet` absent si le joueur n'a pas de compagnon (parite avec HTTP 404).
+message GetPetResponse {
+  optional Pet pet = 1;
+}
+
+message CareRequest {
+  string pet_id = 1;
+  string action = 2;
+  int64 coin_cost = 3;
+  int32 hunger_delta = 4;
+  int32 happiness_delta = 5;
+  int32 energy_delta = 6;
+  int64 xp_gain = 7;
+  int64 cooldown_secs = 8;
+  bool cure = 9;
+}
+
+message TrainRequest {
+  string pet_id = 1;
+  string stat = 2;
+  int32 energy_cost = 3;
+  int64 coin_cost = 4;
+  int32 stat_gain = 5;
+  int64 cooldown_secs = 6;
+}
+
+message VisitRequest {
+  string guild_id = 1;
+  string visitor_id = 2;
+  string visitor_name = 3;
+  string target_id = 4;
+  int64 xp_reward = 5;
+  int64 coins_reward = 6;
+  int64 cooldown_secs = 7;
+  int64 max_per_day = 8;
+}
+
+message VisitResult {
+  string target_name = 1;
+  int64 xp_reward = 2;
+  int64 coins_reward = 3;
+}
+
+message CombatRequest {
+  string guild_id = 1;
+  string attacker_id = 2;
+  string attacker_name = 3;
+  string target_id = 4;
+  int32 energy_cost = 5;
+  int64 cooldown_secs = 6;
+  int32 elo_k = 7;
+  int64 xp_win = 8;
+  int64 xp_loss = 9;
+  int32 w_str = 10;
+  int32 w_vit = 11;
+  int32 w_agi = 12;
+  int32 random_max = 13;
+}
+
+message CombatResult {
+  bool attacker_won = 1;
+  int64 attacker_power = 2;
+  int64 defender_power = 3;
+  string defender_name = 4;
+  int32 attacker_new_elo = 5;
+  int32 attacker_elo_delta = 6;
+}
+
+message SetCardLocationRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+  string channel_id = 3;
+  string message_id = 4;
+}
+
+message ListCardsRequest {
+  int64 limit = 1;
+  optional string after_id = 2;
+}
+
+message Card {
+  string card_channel_id = 1;
+  string card_message_id = 2;
+  Pet pet = 3;
+}
+
+message CardList {
+  repeated Card cards = 1;
+}

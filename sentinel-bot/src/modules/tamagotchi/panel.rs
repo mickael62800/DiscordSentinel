@@ -14,6 +14,7 @@ use tracing::{error, warn};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::heartbeat::ApiClientKey;
 
+use super::api_client::{CareArgs, CombatArgs, PetData as PetDto, TamaApi, TrainArgs, VisitArgs};
 use super::MODULE_BOT_NAME;
 
 pub const PICK_PREFIX: &str = "tama_pick:";
@@ -37,37 +38,16 @@ const SPECIES: [(&str, &str); 6] = [
     ("ours", "🐻 Ours"),
 ];
 
-#[derive(serde::Deserialize)]
-struct PetEventDto {
-    detail: String,
-}
-
-#[derive(serde::Deserialize)]
-pub(super) struct PetDto {
-    name: String,
-    species: String,
-    #[serde(default)]
-    born_at: String,
-    level: i32,
-    xp_in_level: i64,
-    xp_for_level: i64,
-    hunger: i32,
-    happiness: i32,
-    energy: i32,
-    status: String,
-    str: i32,
-    vit: i32,
-    agi: i32,
-    elo: i32,
-    wins: i32,
-    losses: i32,
-    #[serde(default)]
-    events: Vec<PetEventDto>,
-}
-
 async fn get_api(ctx: &Context) -> Option<std::sync::Arc<BaseApiClient>> {
     let data = ctx.data.read().await;
     data.get::<ApiClientKey>().map(std::sync::Arc::clone)
+}
+
+/// Client gRPC tamagotchi (compagnons). La config guild + le wallet restent
+/// sur `BaseApiClient` (HTTP), domaines distincts.
+async fn get_tama(ctx: &Context) -> Option<TamaApi> {
+    let data = ctx.data.read().await;
+    TamaApi::from_data(&data)
 }
 
 /// Lit l'ID du proprietaire depuis le topic du salon (`[tama:<id>]`).
@@ -121,6 +101,10 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Some(a) => a,
         None => return,
     };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
 
     // Categorie configurable.
     let cfg = api.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default();
@@ -153,7 +137,7 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     };
 
     // Pet existant ?
-    let pet = fetch_pet(&api, &guild_id.to_string(), &user_id.to_string()).await;
+    let pet = fetch_pet(&tama, &guild_id.to_string(), &user_id.to_string()).await;
     let has_living_pet = matches!(&pet, Some(p) if p.status != "dead");
     let msg = match pet {
         Some(p) if p.status != "dead" => {
@@ -169,7 +153,7 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     if has_living_pet {
         if let Ok(message) = &sent {
             persist_card_location(
-                &api,
+                &tama,
                 &guild_id.to_string(),
                 &user_id.to_string(),
                 channel.id.get(),
@@ -193,14 +177,12 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
     let species = component.data.custom_id.strip_prefix(PICK_PREFIX).unwrap_or("").to_string();
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
 
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "owner_id": component.user.id.to_string(),
-        "name": component.user.name,
-        "species": species,
-    });
-    match api.post_json::<_, PetDto>("/api/tamagotchi/pets", &body).await {
+    match tama
+        .create_pet(&guild_id, &component.user.id.to_string(), &component.user.name, &species)
+        .await
+    {
         Ok(pet) => {
             let resp = update_from_card(&api, &guild_id, &component.user.id.to_string(), &pet).await;
             let _ = component
@@ -209,7 +191,7 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
             // La carte = le message de choix d'espece qu'on vient d'editer
             // (meme message_id). Memorise sa position pour le refresh auto.
             persist_card_location(
-                &api,
+                &tama,
                 &guild_id,
                 &component.user.id.to_string(),
                 component.channel_id.get(),
@@ -234,49 +216,61 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = component.user.id.to_string();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
 
-    let pet = match fetch_pet(&api, &guild_id, &user_id).await {
+    let pet = match fetch_pet(&tama, &guild_id, &user_id).await {
         Some(p) => p,
         None => { reply_ephemeral(ctx, component, "Tu n'as pas de compagnon ici.").await; return; }
     };
-    // On a besoin de l'id du pet -> on le relit (fetch_pet ne l'expose pas).
-    let pet_id = match fetch_pet_id(&api, &guild_id, &user_id).await {
-        Some(id) => id,
-        None => return,
-    };
+    let pet_id = pet.id.clone();
 
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
     let xp = BaseApiClient::config_u64(&cfg, "xp_per_action", 5) as i64;
-    let body = match action.as_str() {
-        "feed" => serde_json::json!({
-            "action": "feed",
-            "coin_cost": BaseApiClient::config_u64(&cfg, "feed_cost", 20) as i64,
-            "hunger_delta": BaseApiClient::config_u64(&cfg, "feed_hunger_gain", 40) as i32,
-            "xp_gain": xp,
-            "cooldown_secs": BaseApiClient::config_u64(&cfg, "feed_cooldown_secs", 1800) as i64,
-        }),
-        "play" => serde_json::json!({
-            "action": "play",
-            "happiness_delta": BaseApiClient::config_u64(&cfg, "play_happiness_gain", 30) as i32,
-            "energy_delta": -(BaseApiClient::config_u64(&cfg, "play_energy_cost", 10) as i32),
-            "xp_gain": xp,
-            "cooldown_secs": BaseApiClient::config_u64(&cfg, "play_cooldown_secs", 1800) as i64,
-        }),
-        "sleep" => serde_json::json!({
-            "action": "sleep",
-            "energy_delta": BaseApiClient::config_u64(&cfg, "sleep_energy_gain", 60) as i32,
-            "cooldown_secs": BaseApiClient::config_u64(&cfg, "sleep_cooldown_secs", 1020) as i64,
-        }),
-        "cuddle" => serde_json::json!({
-            "action": "cuddle",
-            "happiness_delta": BaseApiClient::config_u64(&cfg, "cuddle_happiness_gain", 15) as i32,
-            "xp_gain": xp,
-            "cooldown_secs": BaseApiClient::config_u64(&cfg, "cuddle_cooldown_secs", 3600) as i64,
-        }),
-        _ => { let _ = pet; return; }
+    let args = match action.as_str() {
+        "feed" => CareArgs {
+            action: "feed".into(),
+            coin_cost: BaseApiClient::config_u64(&cfg, "feed_cost", 20) as i64,
+            hunger_delta: BaseApiClient::config_u64(&cfg, "feed_hunger_gain", 40) as i32,
+            happiness_delta: 0,
+            energy_delta: 0,
+            xp_gain: xp,
+            cooldown_secs: BaseApiClient::config_u64(&cfg, "feed_cooldown_secs", 1800) as i64,
+            cure: false,
+        },
+        "play" => CareArgs {
+            action: "play".into(),
+            coin_cost: 0,
+            hunger_delta: 0,
+            happiness_delta: BaseApiClient::config_u64(&cfg, "play_happiness_gain", 30) as i32,
+            energy_delta: -(BaseApiClient::config_u64(&cfg, "play_energy_cost", 10) as i32),
+            xp_gain: xp,
+            cooldown_secs: BaseApiClient::config_u64(&cfg, "play_cooldown_secs", 1800) as i64,
+            cure: false,
+        },
+        "sleep" => CareArgs {
+            action: "sleep".into(),
+            coin_cost: 0,
+            hunger_delta: 0,
+            happiness_delta: 0,
+            energy_delta: BaseApiClient::config_u64(&cfg, "sleep_energy_gain", 60) as i32,
+            xp_gain: 0,
+            cooldown_secs: BaseApiClient::config_u64(&cfg, "sleep_cooldown_secs", 1020) as i64,
+            cure: false,
+        },
+        "cuddle" => CareArgs {
+            action: "cuddle".into(),
+            coin_cost: 0,
+            hunger_delta: 0,
+            happiness_delta: BaseApiClient::config_u64(&cfg, "cuddle_happiness_gain", 15) as i32,
+            energy_delta: 0,
+            xp_gain: xp,
+            cooldown_secs: BaseApiClient::config_u64(&cfg, "cuddle_cooldown_secs", 3600) as i64,
+            cure: false,
+        },
+        _ => return,
     };
 
-    match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
+    match tama.care(&pet_id, args).await {
         Ok(updated) => {
             // Evolution : si l'action a fait franchir un palier de stade, on
             // l'annonce publiquement dans le salon.
@@ -315,16 +309,17 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = component.user.id.to_string();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let pet_id = match fetch_pet_id(&api, &guild_id, &user_id).await { Some(id) => id, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await { Some(p) => p.id, None => return };
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
-    let body = serde_json::json!({
-        "stat": stat,
-        "energy_cost": BaseApiClient::config_u64(&cfg, "train_energy_cost", 25) as i32,
-        "coin_cost": BaseApiClient::config_u64(&cfg, "train_cost", 0) as i64,
-        "stat_gain": BaseApiClient::config_u64(&cfg, "train_stat_gain", 1) as i32,
-        "cooldown_secs": BaseApiClient::config_u64(&cfg, "train_cooldown_secs", 7200) as i64,
-    });
-    match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/train"), &body).await {
+    let args = TrainArgs {
+        stat,
+        energy_cost: BaseApiClient::config_u64(&cfg, "train_energy_cost", 25) as i32,
+        coin_cost: BaseApiClient::config_u64(&cfg, "train_cost", 0) as i64,
+        stat_gain: BaseApiClient::config_u64(&cfg, "train_stat_gain", 1) as i32,
+        cooldown_secs: BaseApiClient::config_u64(&cfg, "train_cooldown_secs", 7200) as i64,
+    };
+    match tama.train(&pet_id, args).await {
         Ok(p) => {
             let resp = update_from_card(&api, &guild_id, &user_id, &p).await;
             let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp)).await;
@@ -369,7 +364,8 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = component.user.id.to_string();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let pet_id = match fetch_pet_id(&api, &guild_id, &user_id).await { Some(id) => id, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await { Some(p) => p.id, None => return };
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
     let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
 
@@ -382,16 +378,17 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
         "potion" => (price("shop_potion_price", 100), 10, 10, 10, true, "Potion de soin"),
         _ => return,
     };
-    let body = serde_json::json!({
-        "action": format!("buy_{item}"),
-        "coin_cost": cost,
-        "hunger_delta": hunger,
-        "happiness_delta": happiness,
-        "energy_delta": energy,
-        "cure": cure,
-        "cooldown_secs": 0,
-    });
-    match api.post_json::<_, PetDto>(&format!("/api/tamagotchi/pets/{pet_id}/care"), &body).await {
+    let args = CareArgs {
+        action: format!("buy_{item}"),
+        coin_cost: cost,
+        hunger_delta: hunger,
+        happiness_delta: happiness,
+        energy_delta: energy,
+        xp_gain: 0,
+        cooldown_secs: 0,
+        cure,
+    };
+    match tama.care(&pet_id, args).await {
         Ok(_) => reply_ephemeral(ctx, component, &format!("✅ {label} achete et utilise !")).await,
         Err(e) => { warn!(error = %e, item, "Echec achat"); reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await; }
     }
@@ -429,22 +426,21 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
     let target = match target { Some(t) => t, None => return };
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
 
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "visitor_id": component.user.id.to_string(),
-        "visitor_name": component.user.name,
-        "target_id": target.to_string(),
-        "xp_reward": BaseApiClient::config_u64(&cfg, "visit_xp_reward", 5) as i64,
-        "coins_reward": BaseApiClient::config_u64(&cfg, "visit_coins_reward", 5) as i64,
-        "cooldown_secs": BaseApiClient::config_u64(&cfg, "visit_cooldown_secs", 6600) as i64,
-        "max_per_day": BaseApiClient::config_u64(&cfg, "visit_max_per_day", 10) as i64,
-    });
+    let args = VisitArgs {
+        guild_id: guild_id.clone(),
+        visitor_id: component.user.id.to_string(),
+        visitor_name: component.user.name.clone(),
+        target_id: target.to_string(),
+        xp_reward: BaseApiClient::config_u64(&cfg, "visit_xp_reward", 5) as i64,
+        coins_reward: BaseApiClient::config_u64(&cfg, "visit_coins_reward", 5) as i64,
+        cooldown_secs: BaseApiClient::config_u64(&cfg, "visit_cooldown_secs", 6600) as i64,
+        max_per_day: BaseApiClient::config_u64(&cfg, "visit_max_per_day", 10) as i64,
+    };
 
-    #[derive(serde::Deserialize)]
-    struct VisitResultDto { target_name: String, xp_reward: i64, coins_reward: i64 }
-    match api.post_json::<_, VisitResultDto>("/api/tamagotchi/visit", &body).await {
+    match tama.visit(args).await {
         Ok(r) => {
             reply_ephemeral(
                 ctx,
@@ -490,39 +486,31 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
     let target = match target { Some(t) => t, None => return };
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let api = match get_api(ctx).await { Some(a) => a, None => return };
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
     let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
     let n = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
 
     // Niveau de l'attaquant AVANT le combat (pour detecter une evolution apres).
     let user_id = component.user.id.to_string();
-    let before_level = fetch_pet(&api, &guild_id, &user_id).await.map(|p| p.level);
+    let before_level = fetch_pet(&tama, &guild_id, &user_id).await.map(|p| p.level);
 
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "attacker_id": component.user.id.to_string(),
-        "attacker_name": component.user.name,
-        "target_id": target.to_string(),
-        "energy_cost": n("combat_energy_cost", 20) as i32,
-        "cooldown_secs": n("combat_cooldown_secs", 3600),
-        "elo_k": n("combat_elo_k", 32) as i32,
-        "xp_win": n("combat_xp_win", 50),
-        "xp_loss": n("combat_xp_loss", 15),
-        "w_str": n("combat_w_str", 3) as i32,
-        "w_vit": n("combat_w_vit", 2) as i32,
-        "w_agi": n("combat_w_agi", 2) as i32,
-        "random_max": n("combat_random_max", 30) as i32,
-    });
+    let args = CombatArgs {
+        guild_id: guild_id.clone(),
+        attacker_id: component.user.id.to_string(),
+        attacker_name: component.user.name.clone(),
+        target_id: target.to_string(),
+        energy_cost: n("combat_energy_cost", 20) as i32,
+        cooldown_secs: n("combat_cooldown_secs", 3600),
+        elo_k: n("combat_elo_k", 32) as i32,
+        xp_win: n("combat_xp_win", 50),
+        xp_loss: n("combat_xp_loss", 15),
+        w_str: n("combat_w_str", 3) as i32,
+        w_vit: n("combat_w_vit", 2) as i32,
+        w_agi: n("combat_w_agi", 2) as i32,
+        random_max: n("combat_random_max", 30) as i32,
+    };
 
-    #[derive(serde::Deserialize)]
-    struct CombatResultDto {
-        attacker_won: bool,
-        attacker_power: i64,
-        defender_power: i64,
-        defender_name: String,
-        attacker_new_elo: i32,
-        attacker_elo_delta: i32,
-    }
-    match api.post_json::<_, CombatResultDto>("/api/tamagotchi/combat", &body).await {
+    match tama.combat(args).await {
         Ok(r) => {
             let issue = if r.attacker_won { "🏆 **Victoire !**" } else { "💀 **Défaite...**" };
             let sign = if r.attacker_elo_delta >= 0 { "+" } else { "" };
@@ -537,7 +525,7 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
             .await;
 
             // Le combat (gagne OU perdu) donne de l'XP -> possible evolution.
-            if let (Some(old), Some(p2)) = (before_level, fetch_pet(&api, &guild_id, &user_id).await) {
+            if let (Some(old), Some(p2)) = (before_level, fetch_pet(&tama, &guild_id, &user_id).await) {
                 if super::card_render::stage_from_level(old)
                     != super::card_render::stage_from_level(p2.level)
                 {
@@ -567,11 +555,11 @@ pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let pet = fetch_pet(&api, &guild_id, &component.user.id.to_string()).await;
+    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let pet = fetch_pet(&tama, &guild_id, &component.user.id.to_string()).await;
     let text = match pet {
         Some(p) if !p.events.is_empty() => {
-            p.events.iter().map(|e| format!("• {}", e.detail)).collect::<Vec<_>>().join("\n")
+            p.events.iter().map(|e| format!("• {e}")).collect::<Vec<_>>().join("\n")
         }
         _ => "Aucune action recente.".to_string(),
     };
@@ -616,11 +604,11 @@ pub(super) fn card_embed(p: &PetDto) -> CreateEmbed {
         .field("🍗 Faim", bar(p.hunger), true)
         .field("😊 Bonheur", bar(p.happiness), true)
         .field("⚡ Energie", bar(p.energy), true)
-        .field("Combat", format!("FORCE {} · VITALITE {} · AGILITE {}", p.str, p.vit, p.agi), false)
+        .field("Combat", format!("FORCE {} · VITALITE {} · AGILITE {}", p.str_, p.vit, p.agi), false)
         .field("ELO", format!("{} ({}V/{}D)", p.elo, p.wins, p.losses), true)
         .footer(CreateEmbedFooter::new("Tamagotchi"));
     if let Some(last) = p.events.first() {
-        e = e.field("Derniere action", &last.detail, false);
+        e = e.field("Derniere action", last, false);
     }
     e
 }
@@ -689,7 +677,7 @@ pub(super) async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &
         hunger: p.hunger,
         happiness: p.happiness,
         energy: p.energy,
-        str_: p.str,
+        str_: p.str_,
         vit: p.vit,
         agi: p.agi,
         elo: p.elo,
@@ -750,33 +738,18 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, text: 
         .await;
 }
 
-/// Enregistre cote API la position (salon + message) de la carte du joueur,
-/// pour permettre au bot de la rafraichir automatiquement.
+/// Enregistre cote API (gRPC) la position de la carte du joueur, pour le
+/// rafraichissement automatique.
 async fn persist_card_location(
-    api: &BaseApiClient,
+    tama: &TamaApi,
     guild_id: &str,
     owner_id: &str,
     channel_id: u64,
     message_id: u64,
 ) {
-    let body = serde_json::json!({
-        "channel_id": channel_id.to_string(),
-        "message_id": message_id.to_string(),
-    });
-    api.post_fire_and_forget(
-        &format!("/api/tamagotchi/{guild_id}/{owner_id}/card"),
-        &body,
-    )
-    .await;
+    tama.set_card_location(guild_id, owner_id, channel_id, message_id).await;
 }
 
-async fn fetch_pet(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> Option<PetDto> {
-    api.get_json::<PetDto>(&format!("/api/tamagotchi/{guild_id}/{owner_id}")).await.ok()
-}
-
-#[derive(serde::Deserialize)]
-struct PetIdDto { id: String }
-
-async fn fetch_pet_id(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> Option<String> {
-    api.get_json::<PetIdDto>(&format!("/api/tamagotchi/{guild_id}/{owner_id}")).await.ok().map(|p| p.id)
+async fn fetch_pet(tama: &TamaApi, guild_id: &str, owner_id: &str) -> Option<PetDto> {
+    tama.get_pet(guild_id, owner_id).await
 }

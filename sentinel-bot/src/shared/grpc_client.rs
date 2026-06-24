@@ -52,6 +52,7 @@ use sentinel_proto::progression::v1::progression_service_client::ProgressionServ
 use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClient;
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
+use sentinel_proto::tamagotchi::v1::tamagotchi_service_client::TamagotchiServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::images::v1::images_service_client::ImagesServiceClient;
@@ -342,6 +343,15 @@ impl SentinelGrpcClient {
         &self,
     ) -> CommunityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         CommunityServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `TamagotchiService` pret a l'emploi.
+    pub fn tamagotchi(
+        &self,
+    ) -> TamagotchiServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        TamagotchiServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }

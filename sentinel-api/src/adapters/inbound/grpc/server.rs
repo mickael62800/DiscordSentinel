@@ -40,6 +40,7 @@ use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServ
 use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
 use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
 use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
+use sentinel_proto::tamagotchi::v1::tamagotchi_service_server::TamagotchiServiceServer;
 use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 
@@ -63,6 +64,7 @@ use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use crate::adapters::inbound::grpc::system::export::ExportGrpc;
 use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
+use crate::adapters::inbound::grpc::system::tamagotchi::TamagotchiGrpc;
 use crate::adapters::inbound::http::state::AppState;
 
 /// Lance le serveur gRPC. A spawn dans une task tokio depuis `main.rs`.
@@ -147,6 +149,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let images = ImagesGrpc {
         uc: state.analyze_image_uc.clone(),
     };
+    let tamagotchi = TamagotchiGrpc {
+        uc: state.pets_uc.clone(),
+    };
 
     // Helper local : compression Gzip (send/accept) puis wrap dans l'auth
     // interceptor. Les methodes `send_compressed`/`accept_compressed` sont sur
@@ -182,6 +187,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let welcome_svc = svc!(WelcomeServiceServer, welcome);
     let export_svc = svc!(ExportServiceServer, export);
     let community_svc = svc!(CommunityServiceServer, community);
+    let tamagotchi_svc = svc!(TamagotchiServiceServer, tamagotchi);
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
     // comme SERVING. Permet `grpc_health_probe -addr=:50051` dans le healthcheck.
@@ -246,6 +252,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     health_reporter
         .set_serving::<CommunityServiceServer<CommunityGrpc>>()
         .await;
+    health_reporter
+        .set_serving::<TamagotchiServiceServer<TamagotchiGrpc>>()
+        .await;
 
     // mTLS optionnel : active si GRPC_TLS_DIR defini en env. Sinon plain HTTP/2
     // (mode dev / migration progressive). Le serveur exige un cert client signe
@@ -301,6 +310,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(coude_economy_svc)
         .add_service(coude_inventory_svc)
         .add_service(coude_social_svc)
+        .add_service(tamagotchi_svc)
         .serve(bind)
         .await
     {

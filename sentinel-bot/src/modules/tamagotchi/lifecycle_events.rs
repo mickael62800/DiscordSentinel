@@ -14,7 +14,8 @@ use tracing::{info, warn};
 
 use crate::shared::heartbeat::ApiClientKey;
 
-use super::panel::{card_embed, care_buttons, render_card, PetDto};
+use super::api_client::TamaApi;
+use super::panel::{card_embed, care_buttons, render_card};
 
 /// Spawn le consumer durable. Appele une fois au `ready`.
 pub fn spawn(ctx: Context) {
@@ -127,24 +128,26 @@ async fn edit_card(ctx: &Context, guild_id: &str, owner_id: &str, channel: &str,
         Err(_) => return,
     };
 
-    let api = {
+    let (base, tama) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
+        let base = match data.get::<ApiClientKey>() {
             Some(a) => a.clone(),
             None => return,
-        }
+        };
+        let tama = match TamaApi::from_data(&data) {
+            Some(t) => t,
+            None => return,
+        };
+        (base, tama)
     };
 
-    // Re-fetch l'etat courant pour rendre la carte a jour.
-    let pet: PetDto = match api
-        .get_json(&format!("/api/tamagotchi/{guild_id}/{owner_id}"))
-        .await
-    {
-        Ok(p) => p,
-        Err(_) => return,
+    // Re-fetch l'etat courant (gRPC) pour rendre la carte a jour.
+    let pet = match tama.get_pet(guild_id, owner_id).await {
+        Some(p) => p,
+        None => return,
     };
 
-    let edit = match render_card(&api, guild_id, owner_id, &pet).await {
+    let edit = match render_card(&base, guild_id, owner_id, &pet).await {
         Some(png) => EditMessage::new()
             .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
             .attachments(EditAttachments::new().add(CreateAttachment::bytes(png, "card.png")))

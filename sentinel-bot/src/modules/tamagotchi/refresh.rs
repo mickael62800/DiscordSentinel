@@ -2,8 +2,8 @@
 //!
 //! Le worker applique la decroissance en base toutes les ~5 min, mais le
 //! message Discord (la carte) restait fige tant que le joueur ne cliquait pas.
-//! Cette tache parcourt les cartes vivantes (via `GET /api/tamagotchi/cards`,
-//! pagine), re-rend le PNG et **edite** le message existant.
+//! Cette tache parcourt les cartes vivantes (via le `TamagotchiService` gRPC),
+//! re-rend le PNG et **edite** le message existant.
 //!
 //! La frequence est **configurable par serveur** depuis le panel web
 //! (cle `card_refresh_interval_minutes` de la config `tamagotchi-bot`). La
@@ -18,9 +18,11 @@ use serenity::all::{
 };
 use tracing::{info, warn};
 
+use crate::shared::api_client::BaseApiClient;
 use crate::shared::heartbeat::ApiClientKey;
 
-use super::panel::{card_embed, care_buttons, render_card, PetDto};
+use super::api_client::{CardData, TamaApi};
+use super::panel::{card_embed, care_buttons, render_card};
 use super::MODULE_BOT_NAME;
 
 /// Cadence de base : resolution a laquelle on verifie si un serveur est "du".
@@ -29,17 +31,6 @@ const BASE_POLL_SECS: u64 = 60;
 const DEFAULT_REFRESH_MINUTES: u64 = 60;
 /// Taille de page pour la pagination des cartes.
 const PAGE: i64 = 500;
-
-#[derive(serde::Deserialize)]
-struct CardItem {
-    id: String,
-    guild_id: String,
-    owner_id: String,
-    card_channel_id: String,
-    card_message_id: String,
-    #[serde(flatten)]
-    pet: PetDto,
-}
 
 /// Spawn la boucle de rafraichissement. Appelee une fois au `ready`.
 pub fn spawn(ctx: Context) {
@@ -55,23 +46,24 @@ pub fn spawn(ctx: Context) {
 }
 
 async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>) {
-    let api = {
+    let (base, tama) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
+        let base = match data.get::<ApiClientKey>() {
             Some(a) => a.clone(),
             None => return,
-        }
+        };
+        let tama = match TamaApi::from_data(&data) {
+            Some(t) => t,
+            None => return,
+        };
+        (base, tama)
     };
 
     // 1. Recupere toutes les cartes vivantes (paginees), groupees par serveur.
-    let mut by_guild: HashMap<String, Vec<CardItem>> = HashMap::new();
+    let mut by_guild: HashMap<String, Vec<CardData>> = HashMap::new();
     let mut after: Option<String> = None;
     loop {
-        let path = match &after {
-            Some(cursor) => format!("/api/tamagotchi/cards?limit={PAGE}&after={cursor}"),
-            None => format!("/api/tamagotchi/cards?limit={PAGE}"),
-        };
-        let batch: Vec<CardItem> = match api.get_json(&path).await {
+        let batch = match tama.list_cards(PAGE, after.clone()).await {
             Ok(b) => b,
             Err(e) => {
                 warn!(error = %e, "Echec fetch cartes tamagotchi a rafraichir");
@@ -95,7 +87,7 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
     let now = Instant::now();
     let mut refreshed = 0usize;
     for (guild_id, cards) in by_guild {
-        let interval = Duration::from_secs(guild_interval_minutes(&api, &guild_id).await * 60);
+        let interval = Duration::from_secs(guild_interval_minutes(&base, &guild_id).await * 60);
         let due = match last_refresh.get(&guild_id) {
             Some(prev) => now.duration_since(*prev) >= interval,
             None => true, // premiere fois : on rafraichit
@@ -105,7 +97,7 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
         }
         last_refresh.insert(guild_id.clone(), now);
         for item in &cards {
-            if edit_card(ctx, &api, item).await {
+            if edit_card(ctx, &base, item).await {
                 refreshed += 1;
             }
         }
@@ -117,8 +109,8 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
 }
 
 /// Lit `card_refresh_interval_minutes` depuis la config guild (defaut 60, min 1).
-async fn guild_interval_minutes(api: &crate::shared::api_client::BaseApiClient, guild_id: &str) -> u64 {
-    let cfg = api.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+async fn guild_interval_minutes(base: &BaseApiClient, guild_id: &str) -> u64 {
+    let cfg = base.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
     cfg.get("card_refresh_interval_minutes")
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(DEFAULT_REFRESH_MINUTES)
@@ -126,11 +118,7 @@ async fn guild_interval_minutes(api: &crate::shared::api_client::BaseApiClient, 
 }
 
 /// Re-rend et edite la carte d'un compagnon. Retourne true si l'edition a reussi.
-async fn edit_card(
-    ctx: &Context,
-    api: &crate::shared::api_client::BaseApiClient,
-    item: &CardItem,
-) -> bool {
+async fn edit_card(ctx: &Context, base: &BaseApiClient, item: &CardData) -> bool {
     let channel_id = match item.card_channel_id.parse::<u64>() {
         Ok(n) => ChannelId::new(n),
         Err(_) => return false,
@@ -140,7 +128,7 @@ async fn edit_card(
         Err(_) => return false,
     };
 
-    let edit = match render_card(api, &item.guild_id, &item.owner_id, &item.pet).await {
+    let edit = match render_card(base, &item.guild_id, &item.owner_id, &item.pet).await {
         Some(png) => EditMessage::new()
             .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
             .attachments(EditAttachments::new().add(CreateAttachment::bytes(png, "card.png")))
@@ -153,7 +141,6 @@ async fn edit_card(
     match channel_id.edit_message(&ctx.http, message_id, edit).await {
         Ok(_) => true,
         Err(e) => {
-            // Message probablement supprime (salon ferme) : log et on continue.
             warn!(error = %e, channel = %channel_id, "Echec edition carte tamagotchi");
             false
         }
