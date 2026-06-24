@@ -220,6 +220,42 @@ fn tension_is_stronger(current: &Action, tension: TensionAction) -> bool {
 
 #[async_trait]
 impl AnalyzeMessageUseCase for AnalyzeMessageService {
+    async fn evaluate_flood(
+        &self,
+        guild_id: &str,
+        flood_count: i32,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+        use crate::ports::inbound::ai::analyze_message::FloodDecision;
+        let entries = self
+            .bot_config_repo
+            .get_config(guild_id, "automod-bot")
+            .await
+            .unwrap_or_default();
+        let num = |key: &str, default: u64| -> u64 {
+            entries
+                .iter()
+                .find(|e| e.config_key == key)
+                .and_then(|e| e.config_value.parse::<u64>().ok())
+                .unwrap_or(default)
+        };
+        let auto_protect = entries
+            .iter()
+            .find(|e| e.config_key == "auto_protect_enabled")
+            .map(|e| {
+                let v = e.config_value.to_ascii_lowercase();
+                v == "true" || v == "1"
+            })
+            .unwrap_or(true);
+        let flood_max = num("flood_max_messages", 5);
+        let severe_max = num("severe_flood_max_messages", flood_max * 2);
+        let mute_dur = num("mute_duration_secs", 600);
+        let severe = auto_protect && (flood_count.max(0) as u64) >= severe_max;
+        Ok(FloodDecision {
+            severe,
+            mute_duration_secs: mute_dur as i64,
+        })
+    }
+
     async fn analyze(&self, cmd: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError> {
         // 1. Charger les règles (cache → DB)
         let rules = match self.cache.get_rules(&cmd.guild_id).await? {

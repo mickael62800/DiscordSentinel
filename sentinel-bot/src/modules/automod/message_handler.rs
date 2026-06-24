@@ -191,7 +191,42 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         if is_flood {
             // Gros flood : auto-protection immediate (mute + suppression), meme
             // en human_only, puis carte toujours postee avec la note.
-            let severe = auto_protect && flood_count >= severe_flood_max;
+            //
+            // Decision (severe ou non) prise COTE API : la regle (seuil severe,
+            // toggle auto_protect) vit dans la config serveur, plus dans le bot.
+            // Le tracker de rate reste local (legitime). Fallback sur le seuil
+            // local uniquement si l'API est indisponible (resilience).
+            let severe = {
+                let (base, grpc) = {
+                    let data = ctx.data.read().await;
+                    (
+                        data.get::<crate::shared::heartbeat::ApiClientKey>().cloned(),
+                        data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned(),
+                    )
+                };
+                match (base, grpc) {
+                    (Some(base), Some(grpc)) => {
+                        let api = crate::modules::automod::api_client::ApiClient::new(base, grpc);
+                        let gid = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+                        match api
+                            .evaluate_flood(
+                                &gid,
+                                &msg.author.id.to_string(),
+                                &msg.channel_id.to_string(),
+                                flood_count as i32,
+                            )
+                            .await
+                        {
+                            Ok((severe, _dur)) => severe,
+                            Err(e) => {
+                                warn!(error = %e, "evaluate_flood gRPC echoue, fallback seuil local");
+                                auto_protect && flood_count >= severe_flood_max
+                            }
+                        }
+                    }
+                    _ => auto_protect && flood_count >= severe_flood_max,
+                }
+            };
             info!(user = %msg.author.name, count = flood_count, severe, "Flood detecte");
             if let Some(tracker) = &flood_tracker {
                 tracker.remove(&(msg.channel_id, msg.author.id));

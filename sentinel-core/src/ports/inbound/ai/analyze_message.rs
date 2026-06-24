@@ -28,7 +28,27 @@ pub struct AnalyzeMessageCommand {
     pub context_messages: Vec<ContextMessageEntry>,
 }
 
+/// Decision d'auto-protection face a un flood, prise cote serveur a partir
+/// de la config guild (`auto_protect_enabled`, `severe_flood_max_messages`).
+/// Le bot detecte le flood (tracker rate en memoire, legitime) puis demande
+/// le verdict ici au lieu de comparer a un seuil local.
+pub struct FloodDecision {
+    /// True si une protection automatique (mute + suppression) doit s'appliquer.
+    pub severe: bool,
+    /// Duree du mute a appliquer si `severe` (secondes).
+    pub mute_duration_secs: i64,
+}
+
 #[async_trait]
 pub trait AnalyzeMessageUseCase: Send + Sync {
     async fn analyze(&self, command: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError>;
+
+    /// Evalue un signal de flood (nombre de messages dans la fenetre) et
+    /// renvoie la decision d'auto-protection. La regle (seuil severe, toggle)
+    /// vit cote serveur, pas dans le bot.
+    async fn evaluate_flood(
+        &self,
+        guild_id: &str,
+        flood_count: i32,
+    ) -> Result<FloodDecision, DomainError>;
 }

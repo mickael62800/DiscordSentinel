@@ -9,6 +9,22 @@ package sentinel.automod.v1;
 // au lieu de JSON, multiplexage HTTP/2, contrat type strict.
 service AutomodService {
   rpc AnalyzeMessage(AnalyzeMessageRequest) returns (AnalyzeMessageResponse);
+  // Verdict d'auto-protection face a un flood. Le bot detecte le flood
+  // (tracker rate en memoire) puis demande la decision ici : la regle
+  // (seuil severe, toggle) vit cote serveur.
+  rpc EvaluateFlood(EvaluateFloodRequest) returns (EvaluateFloodResponse);
+}
+
+message EvaluateFloodRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string channel_id = 3;
+  int32 flood_count = 4;
+}
+
+message EvaluateFloodResponse {
+  bool severe = 1;
+  int64 mute_duration_secs = 2;
 }
 
 message DetectionFlags {

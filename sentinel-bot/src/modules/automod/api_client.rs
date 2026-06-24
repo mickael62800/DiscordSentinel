@@ -146,6 +146,31 @@ impl ApiClient {
         })
     }
 
+    /// gRPC `AutomodService.EvaluateFlood` : verdict d'auto-protection face a
+    /// un flood. Retourne `(severe, mute_duration_secs)`. La regle (seuil
+    /// severe + toggle) vit cote serveur.
+    pub async fn evaluate_flood(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        channel_id: &str,
+        flood_count: i32,
+    ) -> Result<(bool, i64), String> {
+        let req = proto::EvaluateFloodRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            channel_id: channel_id.to_string(),
+            flood_count,
+        };
+        let mut client = self.grpc.automod();
+        let resp = self
+            .grpc
+            .guarded(|| async move { client.evaluate_flood(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok((resp.severe, resp.mute_duration_secs))
+    }
+
     // analyze_image supprime -- migre vers ai-worker (async queue + Redis).
 }
 

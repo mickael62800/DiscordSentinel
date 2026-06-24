@@ -107,6 +107,22 @@ impl AutomodService for AutomodGrpc {
 
         Ok(Response::new(analysis_to_proto(analysis)))
     }
+
+    async fn evaluate_flood(
+        &self,
+        request: Request<proto::EvaluateFloodRequest>,
+    ) -> Result<Response<proto::EvaluateFloodResponse>, Status> {
+        let req = request.into_inner();
+        let decision = self
+            .uc
+            .evaluate_flood(&req.guild_id, req.flood_count)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::EvaluateFloodResponse {
+            severe: decision.severe,
+            mute_duration_secs: decision.mute_duration_secs,
+        }))
+    }
 }
 
 fn proto_to_flags(p: proto::DetectionFlags) -> DetectionFlags {
