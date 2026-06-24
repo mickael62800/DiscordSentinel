@@ -17,6 +17,7 @@ pub async fn analyze(
     validation::validate_discord_id("channel_id", &dto.channel_id).map_err(ApiError)?;
 
     let username = dto.username.clone();
+    let guild_id = dto.guild_id.clone();
     let command = dto.into();
     let analysis = state.analyze_uc.analyze(command).await?;
 
@@ -27,6 +28,7 @@ pub async fn analyze(
         state.broadcaster.broadcast(
             "infraction_new",
             serde_json::json!({
+                "guild_id": guild_id,
                 "username": username,
                 "action": analysis.action.as_str(),
                 "reason": &analysis.reason,

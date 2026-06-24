@@ -6,6 +6,8 @@ import {
   type GameTemplate,
 } from "@/services/gamePortalService";
 import { useGuildSelector } from "@/composables/useGuildSelector";
+import { useRealtimeStore } from "@/stores/realtimeStore";
+import type { UnlistenFn } from "@/api/events-api";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
 import { useAuth } from "@/composables/useAuth";
@@ -16,6 +18,7 @@ import GamePortalCatalogPanel from "@/components/organisms/GamePortalCatalogPane
 import GamePortalConsolePanel, { type LogLine } from "@/components/organisms/GamePortalConsolePanel.vue";
 
 const { selectedGuildId } = useGuildSelector();
+const realtime = useRealtimeStore();
 const { success, error: toastError } = useToast();
 const { confirm } = useConfirm();
 const { user } = useAuth();
@@ -260,14 +263,37 @@ async function sendCommand() {
   }
 }
 
-// ── Polling ──
+// ── Temps reel + poll de secours ──
+// Les events `game_server_*` (publies par l'API) declenchent un refetch
+// immediat (reactivite cross-client). Le poll reste en secours car les
+// transitions de statut (start -> running) et les crashes sont asynchrones
+// (Docker/worker) et ne sont pas couverts par des events.
 let pollTick: number | undefined;
+const unlisteners: UnlistenFn[] = [];
+
+function onServerEvent(data: unknown) {
+  const p = data as { guild_id?: string };
+  if (!selectedGuildId.value || !p?.guild_id || p.guild_id === selectedGuildId.value) {
+    fetchAll();
+  }
+}
+
 onMounted(async () => {
   await fetchAll();
   pollTick = window.setInterval(fetchAll, 10_000);
+  for (const evt of [
+    "game_server_created",
+    "game_server_started",
+    "game_server_stopped",
+    "game_server_deleted",
+  ]) {
+    unlisteners.push(await realtime.onEvent(evt, onServerEvent));
+  }
 });
 onUnmounted(() => {
   if (pollTick) window.clearInterval(pollTick);
+  for (const u of unlisteners) u();
+  unlisteners.length = 0;
 });
 
 watch(selectedGuildId, fetchAll);

@@ -11,6 +11,7 @@ use sentinel_proto::automod::v1 as proto;
 use sentinel_proto::automod::v1::automod_service_server::AutomodService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
@@ -19,6 +20,7 @@ use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;
 pub struct AutomodGrpc {
     pub uc: Arc<dyn AnalyzeMessageUseCase>,
+    pub broadcaster: Arc<EventBroadcaster>,
 }
 
 #[tonic::async_trait]
@@ -39,6 +41,11 @@ impl AutomodService for AutomodGrpc {
         if req.content.is_empty() {
             return Err(Status::invalid_argument("content ne peut pas etre vide"));
         }
+
+        // Capture pour le broadcast WS (le live tail web de l'historique
+        // d'analyse) avant que `req` ne soit consomme dans la commande.
+        let guild_id_evt = req.guild_id.clone();
+        let username_evt = req.username.clone();
 
         let flags = req
             .flags
@@ -83,6 +90,20 @@ impl AutomodService for AutomodGrpc {
             "link_delete" => if analysis.auto_delete_link { "true" } else { "false" },
         )
         .increment(1);
+
+        // Push WS : previent le dashboard (historique d'analyse) en temps reel
+        // quand une action est prise, au lieu d'un polling cote web.
+        if analysis.action != Action::None {
+            self.broadcaster.broadcast(
+                "infraction_new",
+                serde_json::json!({
+                    "guild_id": guild_id_evt,
+                    "username": username_evt,
+                    "action": analysis.action.as_str(),
+                    "reason": &analysis.reason,
+                }),
+            );
+        }
 
         Ok(Response::new(analysis_to_proto(analysis)))
     }

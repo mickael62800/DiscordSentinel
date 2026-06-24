@@ -142,6 +142,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     };
     let automod = AutomodGrpc {
         uc: state.analyze_uc.clone(),
+        broadcaster: state.broadcaster.clone(),
     };
     let voice = VoiceChannelsGrpc {
         uc: state.voice_channels_uc.clone(),

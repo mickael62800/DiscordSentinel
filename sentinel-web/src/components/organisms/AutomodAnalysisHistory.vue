@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { infractionsService } from "@/services/infractionsService";
+import { useRealtimeStore } from "@/stores/realtimeStore";
+import type { UnlistenFn } from "@/api/events-api";
 import type { Infraction } from "@/types";
 
 // ⚠️ Vue de debug temporaire : permet d'analyser pourquoi un message est
@@ -16,7 +18,8 @@ const loading = ref(false);
 const errorMsg = ref<string>("");
 const autoRefresh = ref(true);
 const wiping = ref(false);
-let pollHandle: ReturnType<typeof setInterval> | null = null;
+const realtime = useRealtimeStore();
+let unlisten: UnlistenFn | null = null;
 
 const detections = computed(() =>
   items.value.filter((i) => i.source === "detection"),
@@ -55,25 +58,34 @@ async function wipe() {
   }
 }
 
-function startPolling() {
-  stopPolling();
-  pollHandle = setInterval(refresh, 5000);
+// Live via WebSocket : on s'abonne a l'event `infraction_new` (publie par
+// l'API a chaque action automod) et on rafraichit, au lieu d'un polling fixe.
+async function startLive() {
+  stopLive();
+  unlisten = await realtime.onEvent("infraction_new", (data) => {
+    const p = data as { guild_id?: string };
+    // Rafraichit si l'event concerne la guild affichee (ou s'il n'est pas
+    // estampille guild — fallback prudent).
+    if (!props.guildId || !p?.guild_id || p.guild_id === props.guildId) {
+      refresh();
+    }
+  });
 }
-function stopPolling() {
-  if (pollHandle) {
-    clearInterval(pollHandle);
-    pollHandle = null;
+function stopLive() {
+  if (unlisten) {
+    unlisten();
+    unlisten = null;
   }
 }
 
-watch(autoRefresh, (v) => (v ? startPolling() : stopPolling()));
+watch(autoRefresh, (v) => (v ? startLive() : stopLive()));
 watch(() => props.guildId, refresh);
 
 onMounted(() => {
   refresh();
-  if (autoRefresh.value) startPolling();
+  if (autoRefresh.value) startLive();
 });
-onUnmounted(stopPolling);
+onUnmounted(stopLive);
 
 function fmtScore(s: number | undefined): string {
   if (s === undefined || s === null) return "—";
@@ -132,7 +144,7 @@ function scoreClass(s: number | undefined): string {
         <span class="count">{{ detections.length }} message{{ detections.length > 1 ? "s" : "" }}</span>
         <label class="toggle-auto">
           <input type="checkbox" v-model="autoRefresh" />
-          Auto (5s)
+          Live
         </label>
         <button class="btn-refresh" :disabled="loading" @click="refresh">
           {{ loading ? "..." : "Rafraichir" }}
