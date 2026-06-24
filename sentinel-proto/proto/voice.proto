@@ -18,6 +18,10 @@ service VoiceChannelsService {
   rpc BanFromChannel(BanFromChannelRequest) returns (Empty);
   rpc GetVoiceConfig(GetVoiceConfigRequest) returns (VoiceConfig);
   rpc ListThemes(ListThemesRequest) returns (ThemeList);
+  // Presets par proprietaire (sauvegarde des parametres) + lecture whitelist.
+  rpc SavePreset(SavePresetRequest) returns (Empty);
+  rpc GetPreset(GetPresetRequest) returns (GetPresetResponse);
+  rpc GetWhitelist(GetWhitelistRequest) returns (WhitelistList);
 }
 
 message Empty {}
@@ -175,4 +179,49 @@ message VoiceChannelTheme {
 
 message ThemeList {
   repeated VoiceChannelTheme themes = 1;
+}
+
+// ── Presets par proprietaire + whitelist ──
+
+message SavePresetRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+  optional string channel_name = 3;
+  optional int32 member_limit = 4;
+  string visibility = 5;
+  bool locked = 6;
+  bool queue_enabled = 7;
+}
+
+message GetPresetRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+}
+
+message VoicePreset {
+  string owner_id = 1;
+  optional string channel_name = 2;
+  optional int32 member_limit = 3;
+  string visibility = 4;
+  bool locked = 5;
+  bool queue_enabled = 6;
+}
+
+// `preset` absent si aucun preset enregistre (parite avec HTTP 404).
+message GetPresetResponse {
+  optional VoicePreset preset = 1;
+}
+
+message GetWhitelistRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+}
+
+message WhitelistEntry {
+  string target_id = 1;
+  string target_name = 2;
+}
+
+message WhitelistList {
+  repeated WhitelistEntry entries = 1;
 }

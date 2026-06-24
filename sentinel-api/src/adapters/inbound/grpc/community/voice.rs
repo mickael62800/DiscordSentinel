@@ -17,6 +17,7 @@ use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelC
 use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
 use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 pub struct VoiceChannelsGrpc {
@@ -226,6 +227,66 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         Ok(Response::new(proto::ThemeList {
             themes: themes.into_iter().map(voice_theme_to_proto).collect(),
         }))
+    }
+
+    async fn save_preset(
+        &self,
+        request: Request<proto::SavePresetRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.uc
+            .save_preset(SavePresetCommand {
+                guild_id: req.guild_id.into(),
+                owner_id: req.owner_id,
+                channel_name: req.channel_name,
+                member_limit: req.member_limit,
+                visibility: req.visibility,
+                locked: req.locked,
+                queue_enabled: req.queue_enabled,
+            })
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn get_preset(
+        &self,
+        request: Request<proto::GetPresetRequest>,
+    ) -> Result<Response<proto::GetPresetResponse>, Status> {
+        let req = request.into_inner();
+        let preset = self
+            .uc
+            .get_preset(&req.guild_id, &req.owner_id)
+            .await
+            .map_err(domain_to_status)?
+            .map(|p| proto::VoicePreset {
+                owner_id: p.owner_id,
+                channel_name: p.channel_name,
+                member_limit: p.member_limit,
+                visibility: p.visibility,
+                locked: p.locked,
+                queue_enabled: p.queue_enabled,
+            });
+        Ok(Response::new(proto::GetPresetResponse { preset }))
+    }
+
+    async fn get_whitelist(
+        &self,
+        request: Request<proto::GetWhitelistRequest>,
+    ) -> Result<Response<proto::WhitelistList>, Status> {
+        let req = request.into_inner();
+        let entries = self
+            .uc
+            .get_whitelist(&req.guild_id, &req.owner_id)
+            .await
+            .map_err(domain_to_status)?
+            .into_iter()
+            .map(|e| proto::WhitelistEntry {
+                target_id: e.target_id,
+                target_name: e.target_name,
+            })
+            .collect();
+        Ok(Response::new(proto::WhitelistList { entries }))
     }
 }
 

@@ -353,33 +353,79 @@ impl ApiClient {
 
     // ── Presets + whitelist (HTTP via BaseApiClient) ──
 
-    /// Lit le preset memorise par ce proprietaire. `None` si aucun (404).
+    /// Lit le preset memorise par ce proprietaire (gRPC). `None` si aucun.
     pub async fn get_preset(
         &self,
         guild_id: &str,
         owner_id: &str,
     ) -> Option<VoicePresetResponse> {
-        let path = format!("/api/voice-channels/presets/{guild_id}/{owner_id}");
-        self.base.get_json::<VoicePresetResponse>(&path).await.ok()
+        let req = proto::GetPresetRequest {
+            guild_id: guild_id.to_string(),
+            owner_id: owner_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let resp = g
+            .guarded(|| async move { client.get_preset(req).await.map(|r| r.into_inner()) })
+            .await
+            .ok()?;
+        resp.preset.map(|p| VoicePresetResponse {
+            owner_id: p.owner_id,
+            channel_name: p.channel_name,
+            member_limit: p.member_limit,
+            visibility: p.visibility,
+            locked: p.locked,
+            queue_enabled: p.queue_enabled,
+        })
     }
 
-    /// Cree ou met a jour le preset du proprietaire (fire-and-forget).
+    /// Cree ou met a jour le preset du proprietaire (gRPC). Tolerant aux erreurs.
     pub async fn save_preset(&self, guild_id: &str, request: &SavePresetRequest) {
-        let path = format!("/api/voice-channels/presets/{guild_id}");
-        self.base.post_fire_and_forget(&path, request).await;
+        let req = proto::SavePresetRequest {
+            guild_id: guild_id.to_string(),
+            owner_id: request.owner_id.clone(),
+            channel_name: request.channel_name.clone(),
+            member_limit: request.member_limit,
+            visibility: request.visibility.clone(),
+            locked: request.locked,
+            queue_enabled: request.queue_enabled,
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        if let Err(e) = g
+            .guarded(|| async move { client.save_preset(req).await.map(|_| ()) })
+            .await
+        {
+            tracing::warn!(error = %grpc_err_to_string(e), "Echec save_preset gRPC");
+        }
     }
 
-    /// Liste les membres whitelistes (amis) memorises pour ce proprietaire.
+    /// Liste les membres whitelistes (amis) memorises pour ce proprietaire (gRPC).
     pub async fn get_whitelist(
         &self,
         guild_id: &str,
         owner_id: &str,
     ) -> Vec<WhitelistEntryResponse> {
-        let path = format!("/api/voice-channels/whitelist/{guild_id}/{owner_id}");
-        self.base
-            .get_json::<Vec<WhitelistEntryResponse>>(&path)
+        let req = proto::GetWhitelistRequest {
+            guild_id: guild_id.to_string(),
+            owner_id: owner_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        match g
+            .guarded(|| async move { client.get_whitelist(req).await.map(|r| r.into_inner()) })
             .await
-            .unwrap_or_default()
+        {
+            Ok(list) => list
+                .entries
+                .into_iter()
+                .map(|e| WhitelistEntryResponse {
+                    target_id: e.target_id,
+                    target_name: e.target_name,
+                })
+                .collect(),
+            Err(_) => Vec::new(),
+        }
     }
 
     // ── Bans ──

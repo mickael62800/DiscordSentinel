@@ -6,7 +6,6 @@ use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdm
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
@@ -170,42 +169,6 @@ pub struct WhitelistEntryResponseDto {
     pub created_at: String,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct SavePresetDto {
-    pub owner_id: String,
-    pub channel_name: Option<String>,
-    pub member_limit: Option<i32>,
-    pub visibility: String,
-    pub locked: bool,
-    pub queue_enabled: bool,
-}
-
-#[derive(Debug, Serialize)]
-pub struct PresetResponseDto {
-    pub guild_id: String,
-    pub owner_id: String,
-    pub channel_name: Option<String>,
-    pub member_limit: Option<i32>,
-    pub visibility: String,
-    pub locked: bool,
-    pub queue_enabled: bool,
-    pub updated_at: String,
-}
-
-impl From<VoiceChannelPreset> for PresetResponseDto {
-    fn from(p: VoiceChannelPreset) -> Self {
-        Self {
-            guild_id: p.guild_id.to_string(),
-            owner_id: p.owner_id,
-            channel_name: p.channel_name,
-            member_limit: p.member_limit,
-            visibility: p.visibility,
-            locked: p.locked,
-            queue_enabled: p.queue_enabled,
-            updated_at: p.updated_at.to_rfc3339(),
-        }
-    }
-}
 
 #[derive(Debug, Serialize)]
 pub struct BanResponseDto {

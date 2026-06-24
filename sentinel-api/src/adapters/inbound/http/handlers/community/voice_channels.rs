@@ -13,8 +13,6 @@ use crate::adapters::inbound::http::dto::community::voice_channels::CreateThemeD
 use crate::adapters::inbound::http::dto::community::voice_channels::CreateVoiceChannelDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::InviteLinkResponseDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::ThemeResponseDto;
-use crate::adapters::inbound::http::dto::community::voice_channels::PresetResponseDto;
-use crate::adapters::inbound::http::dto::community::voice_channels::SavePresetDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::TransferOwnershipDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::UpdateVoiceChannelDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::UseInviteLinkDto;
@@ -68,7 +66,6 @@ use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCom
 use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
-use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
@@ -563,46 +560,6 @@ pub async fn remove_from_whitelist(
     state
         .voice_channels_uc
         .remove_from_whitelist(&guild_id, &owner_id, &target_id)
-        .await?;
-
-    Ok(ok_response())
-}
-
-// ── Presets ──
-
-/// GET /api/voice-channels/presets/{guild_id}/{owner_id}
-/// Renvoie le preset memorise par ce proprietaire, ou 404 si aucun.
-pub async fn get_preset(
-    State(state): State<AppState>,
-    Path((guild_id, owner_id)): Path<(String, String)>,
-) -> Result<Json<PresetResponseDto>, ApiError> {
-    let preset = state
-        .voice_channels_uc
-        .get_preset(&guild_id, &owner_id)
-        .await?
-        .ok_or_else(|| ApiError(DomainError::NotFound("aucun preset enregistre".into())))?;
-    Ok(single_dto(preset))
-}
-
-/// POST /api/voice-channels/presets/{guild_id}
-/// Cree ou met a jour le preset du proprietaire (bouton "Sauvegarder mes
-/// parametres" du panneau de controle).
-pub async fn save_preset(
-    State(state): State<AppState>,
-    Path(guild_id): Path<String>,
-    Json(dto): Json<SavePresetDto>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    state
-        .voice_channels_uc
-        .save_preset(SavePresetCommand {
-            guild_id: guild_id.into(),
-            owner_id: dto.owner_id,
-            channel_name: dto.channel_name,
-            member_limit: dto.member_limit,
-            visibility: dto.visibility,
-            locked: dto.locked,
-            queue_enabled: dto.queue_enabled,
-        })
         .await?;
 
     Ok(ok_response())
