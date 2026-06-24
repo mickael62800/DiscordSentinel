@@ -36,6 +36,34 @@ impl CoudeEconomyService for EconomyGrpc {
         }))
     }
 
+    async fn gift_coins(
+        &self,
+        request: Request<proto::GiftCoinsRequest>,
+    ) -> Result<Response<proto::GiftCoinsResponse>, Status> {
+        let req = request.into_inner();
+        let outcome = self
+            .uc
+            .gift_coins(
+                &req.guild_id,
+                &req.donor_id,
+                &req.target_id,
+                req.amount,
+                req.tax_rate,
+                req.min_coins_after,
+            )
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::GiftCoinsResponse {
+            received: outcome.received,
+            tax: outcome.tax,
+            taunt_events: outcome
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_to_proto)
+                .collect(),
+        }))
+    }
+
     async fn steal(
         &self,
         request: Request<proto::StealRequest>,

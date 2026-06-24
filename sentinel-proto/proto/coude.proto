@@ -404,6 +404,7 @@ message RefundSummary {
 
 service CoudeEconomyService {
   rpc Transfer(TransferRequest) returns (TransferResponse);
+  rpc GiftCoins(GiftCoinsRequest) returns (GiftCoinsResponse);
   rpc Steal(StealRequest) returns (StealResponse);
   rpc StealFailPenalty(StealFailPenaltyRequest) returns (StealFailPenaltyResponse);
   rpc RecordCasinoWin(RecordCasinoWinRequest) returns (Empty);
@@ -434,6 +435,24 @@ message TransferRequest {
 // dispatche en un seul aller-retour.
 message TransferResponse {
   repeated TauntEvent taunt_events = 1;
+}
+
+// Don de coins taxe : la taxe (= amount - received) et la validation du
+// solde minimum sont calculees cote serveur. `tax_rate` et `min_coins_after`
+// viennent de la config guild (transmis par le bot).
+message GiftCoinsRequest {
+  string guild_id = 1;
+  string donor_id = 2;
+  string target_id = 3;
+  int64 amount = 4;
+  double tax_rate = 5;
+  int64 min_coins_after = 6;
+}
+
+message GiftCoinsResponse {
+  int64 received = 1;
+  int64 tax = 2;
+  repeated TauntEvent taunt_events = 3;
 }
 
 message StealRequest {

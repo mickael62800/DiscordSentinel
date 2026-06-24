@@ -18,6 +18,16 @@ pub struct StealOutcome {
     pub taunt_events: Vec<TauntEvent>,
 }
 
+/// Resultat d'un don de coins taxe (regle calculee cote serveur).
+/// `received` = montant arrive au destinataire, `tax` = part prelevee
+/// (a deposer en cashbox par l'appelant). `taunt_events` : taunts du transfert.
+#[derive(Debug, Clone)]
+pub struct GiftOutcome {
+    pub received: i64,
+    pub tax: i64,
+    pub taunt_events: Vec<TauntEvent>,
+}
+
 /// Use case "gérer l'économie Coup de Coude".
 ///
 /// Couvre les transferts inter-joueurs, le vol, le casino et les compteurs
@@ -38,6 +48,22 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
         to_id: &str,
         amount: i64,
     ) -> Result<Vec<TauntEvent>, DomainError>;
+
+    /// Don de coins avec taxe — la regle vit cote serveur (plus dans le bot).
+    /// Valide le solde minimum a conserver (`balance - amount >= min_coins_after`),
+    /// calcule `tax = ceil(amount * tax_rate)` et `received = amount - tax`,
+    /// transfere `received` au destinataire (atomique) puis debite la taxe a
+    /// l'emetteur. Retourne `GiftOutcome`. La taxe est a deposer en cashbox
+    /// par l'appelant (bookkeeping aval, best-effort).
+    async fn gift_coins(
+        &self,
+        guild_id: &str,
+        donor_id: &str,
+        target_id: &str,
+        amount: i64,
+        tax_rate: f64,
+        min_coins_after: i64,
+    ) -> Result<GiftOutcome, DomainError>;
 
     /// Vol reussi : debite la victime et credite le voleur de min(amount,
     /// solde victime). Depuis la migration wallet unifie, la mutation

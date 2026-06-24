@@ -173,18 +173,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
 
-        if donor.coins - amount < config.gift_min_coins_after() {
-            reply_ephemeral(
-                ctx,
-                command,
-                &format!(
-                    "Tu dois garder au moins {} coins apres le don. Tu as {} coins.",
-                    config.gift_min_coins_after(), donor.coins
-                ),
-            )
-            .await;
-            return;
-        }
+        // Note : la validation "garder au moins X coins apres le don" est
+        // desormais faite cote API (gift_coins), source de verite. On garde
+        // les pre-checks ci-dessus uniquement comme retour UI rapide.
 
         // Check cooldown (1 hour)
         match api
@@ -220,51 +211,40 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
         }
 
-        // Apply 10% tax (gold sink)
-        let tax = ((amount as f64) * config.gift_tax_rate()).ceil() as i64;
-        let received = amount - tax;
-
-        // Transfert atomique donor -> target de `received` coins (partie
-        // qui arrive effectivement au destinataire). C'est une seule
-        // transaction SQL cote API : impossible d'avoir un debit sans
-        // credit correspondant.
-        //
-        // Migration wallet unifie : l'API retourne desormais la liste
-        // des TauntEvents declenches (faillite, jackpot, don genereux).
-        // On les dispatche en une seule passe apres confirmation du
-        // transfert (cf. bas de ce bloc).
-        let transfer_taunts = match api
-            .transfer_coins(&guild_id, &donor_id, &target_id_str, received)
+        // Don taxe : taxe + validation du solde minimum + mutations wallet
+        // (transfert de la part recue + debit de la taxe) sont calcules et
+        // appliques **cote API** (gift_coins). Le bot ne calcule plus la regle.
+        // L'API retourne (received, tax, taunts).
+        let (received, tax, transfer_taunts) = match api
+            .gift_coins(
+                &guild_id,
+                &donor_id,
+                &target_id_str,
+                amount,
+                config.gift_tax_rate(),
+                config.gift_min_coins_after(),
+            )
             .await
         {
-            Ok(events) => events,
+            Ok(r) => r,
             Err(e) => {
                 reply_api_err(ctx, command, e).await;
                 return;
             }
         };
 
-        // Debit separe de la taxe, puis depot dans la caisse communautaire
-        // (Phase 9 : la taxe n'est plus un gold sink, elle alimente la caisse
-        // qui sera redistribuee aux joueurs actifs chaque semaine).
+        // Depot de la taxe dans la caisse communautaire (bookkeeping aval,
+        // best-effort : la taxe est deja prelevee cote API).
         if tax > 0 {
-            let taxed = api.update_player_coins(&guild_id, &donor_id, -tax).await;
-            match taxed {
-                Ok(_) => {
-                    if let Err(e) = api
-                        .deposit_cashbox(
-                            &guild_id,
-                            tax,
-                            crate::modules::coude::api_client::CashboxDepositSource::DonationTax,
-                        )
-                        .await
-                    {
-                        tracing::warn!(error = %e, guild_id, "Echec deposit cashbox donner");
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(error = %e, donor = %donor_id, tax, "Echec debit taxe donner (donor non taxe)");
-                }
+            if let Err(e) = api
+                .deposit_cashbox(
+                    &guild_id,
+                    tax,
+                    crate::modules::coude::api_client::CashboxDepositSource::DonationTax,
+                )
+                .await
+            {
+                tracing::warn!(error = %e, guild_id, "Echec deposit cashbox donner");
             }
         }
 

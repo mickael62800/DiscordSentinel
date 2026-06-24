@@ -8,6 +8,7 @@ use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::curse::LEAKY_WALLET_FEE_COINS;
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::coude::manage_economy::GiftOutcome;
 use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 use crate::ports::inbound::coude::manage_economy::StealOutcome;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
@@ -167,6 +168,55 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         }
 
         Ok(taunts)
+    }
+
+    async fn gift_coins(
+        &self,
+        guild_id: &str,
+        donor_id: &str,
+        target_id: &str,
+        amount: i64,
+        tax_rate: f64,
+        min_coins_after: i64,
+    ) -> Result<GiftOutcome, DomainError> {
+        require_positive(amount)?;
+        if donor_id == target_id {
+            return Err(DomainError::ValidationError(
+                "Impossible de se donner a soi-meme".into(),
+            ));
+        }
+
+        // Regle metier : conserver un solde minimum apres le don (validee
+        // cote serveur, plus dans le bot).
+        let balance = self.wallet_uc.get_balance(guild_id, donor_id).await?;
+        if balance - amount < min_coins_after {
+            return Err(DomainError::ValidationError(format!(
+                "Tu dois garder au moins {min_coins_after} coins apres le don."
+            )));
+        }
+
+        // Calcul de la taxe cote serveur (la regle ne vit plus dans le bot).
+        let tax = ((amount as f64) * tax_rate).ceil() as i64;
+        let received = amount - tax;
+
+        // Transfert atomique de la part recue (reutilise `transfer` : faillite/
+        // jackpot/don-genereux detectes comme avant, calcule sur `received` —
+        // comportement identique au legacy qui transferait deja `received`).
+        let taunts = self.transfer(guild_id, donor_id, target_id, received).await?;
+
+        // Debit de la taxe a l'emetteur (best-effort : le don est deja passe).
+        if tax > 0 {
+            if let Some(wallet_repo) = &self.wallet_repo {
+                if let Err(e) = wallet_repo
+                    .debit(guild_id, donor_id, tax, "coude_gift_tax", "Taxe sur don")
+                    .await
+                {
+                    tracing::warn!(error = %e, guild_id, donor_id, tax, "Echec debit taxe don (don deja passe)");
+                }
+            }
+        }
+
+        Ok(GiftOutcome { received, tax, taunt_events: taunts })
     }
 
     async fn steal(

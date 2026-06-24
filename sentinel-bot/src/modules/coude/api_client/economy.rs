@@ -162,6 +162,41 @@ impl ApiClient {
             .collect())
     }
 
+    /// Don de coins taxe : la taxe et le solde minimum sont calcules cote
+    /// API. Retourne `(received, tax, taunt_events)`.
+    pub async fn gift_coins(
+        &self,
+        guild_id: &str,
+        donor_id: &str,
+        target_id: &str,
+        amount: i64,
+        tax_rate: f64,
+        min_coins_after: i64,
+    ) -> Result<(i64, i64, Vec<super::TauntEvent>), String> {
+        let req = proto_coude::GiftCoinsRequest {
+            guild_id: guild_id.to_string(),
+            donor_id: donor_id.to_string(),
+            target_id: target_id.to_string(),
+            amount,
+            tax_rate,
+            min_coins_after,
+        };
+        let mut client = self.grpc.coude_economy();
+        let resp = self
+            .grpc
+            .guarded(|| async move { client.gift_coins(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok((
+            resp.received,
+            resp.tax,
+            resp.taunt_events
+                .into_iter()
+                .map(super::taunt_event_from_proto)
+                .collect(),
+        ))
+    }
+
     /// Vol reussi : debite la victime et credite le voleur (clamp au
     /// solde victime). Depuis la migration wallet unifie, retourne le
     /// montant reellement vole + la liste des TauntEvents (faillite
