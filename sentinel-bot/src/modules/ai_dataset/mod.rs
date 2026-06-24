@@ -4,8 +4,11 @@
 //!
 //! Toggle par guild : `is_module_enabled(ctx, gid, "ai-dataset-bot")`.
 //! Desactive par defaut. Quand actif, chaque message non-bot est
-//! envoye a `POST /api/ai-dataset/collect` qui l'insere dans la table
-//! `ai_dataset_messages`.
+//! envoye via gRPC `AiDatasetService.CollectMessage` qui l'insere dans la
+//! table `ai_dataset_messages`.
+//!
+//! Best-effort : l'appel reste fire-and-forget (resultat ignore) car c'est
+//! le chemin le plus chaud du bot et la perte d'un message est acceptable.
 //!
 //! La page web "Dataset IA" lit cette table pour permettre l'etiquetage
 //! manuel et l'export CSV.
@@ -14,7 +17,9 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 
 use crate::shared::discord_helpers::is_module_enabled;
-use crate::shared::heartbeat::ApiClientKey;
+use crate::shared::grpc_client::GrpcClientKey;
+
+use sentinel_proto::ai_dataset::v1 as proto;
 
 pub const MODULE_BOT_NAME: &str = "ai-dataset-bot";
 
@@ -47,19 +52,24 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         .map(|c| c.name.clone());
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
-        Some(api) => api.clone(),
+    let grpc = match data.get::<GrpcClientKey>() {
+        Some(grpc) => grpc.clone(),
         None => return,
     };
     drop(data);
 
-    let payload = serde_json::json!({
-        "guild_id": guild_id.to_string(),
-        "channel_id": msg.channel_id.to_string(),
-        "channel_name": channel_name,
-        "user_id": msg.author.id.to_string(),
-        "content": content,
-    });
+    let req = proto::CollectMessageRequest {
+        guild_id: guild_id.to_string(),
+        channel_id: msg.channel_id.to_string(),
+        channel_name,
+        user_id: msg.author.id.to_string(),
+        content: content.to_string(),
+    };
 
-    api.post_fire_and_forget("/api/ai-dataset/collect", &payload).await;
+    // Fire-and-forget : resultat ignore, ne bloque pas la chaine d'evenements.
+    // Le circuit breaker partage degrade gracieusement si l'API est down.
+    let mut client = grpc.ai_dataset();
+    let _ = grpc
+        .guarded(|| async move { client.collect_message(req).await.map(|r| r.into_inner()) })
+        .await;
 }

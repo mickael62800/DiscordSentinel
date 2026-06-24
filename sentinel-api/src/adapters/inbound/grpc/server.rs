@@ -22,6 +22,7 @@ use tonic::Request;
 use tonic::Status;
 use tracing::error;
 use tracing::info;
+use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
@@ -45,6 +46,7 @@ use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServi
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 
 use crate::adapters::inbound::grpc::ai::automod::AutomodGrpc;
+use crate::adapters::inbound::grpc::ai::dataset::AiDatasetGrpc;
 use crate::adapters::inbound::grpc::casino::blackjack::BlackjackGrpc;
 use crate::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
 use crate::adapters::inbound::grpc::coude::bets::BetsGrpc;
@@ -153,6 +155,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let tamagotchi = TamagotchiGrpc {
         uc: state.pets_uc.clone(),
     };
+    let ai_dataset = AiDatasetGrpc {
+        pg_pool: state.pg_pool.clone(),
+    };
 
     // Helper local : compression Gzip (send/accept) puis wrap dans l'auth
     // interceptor. Les methodes `send_compressed`/`accept_compressed` sont sur
@@ -189,6 +194,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let export_svc = svc!(ExportServiceServer, export);
     let community_svc = svc!(CommunityServiceServer, community);
     let tamagotchi_svc = svc!(TamagotchiServiceServer, tamagotchi);
+    let ai_dataset_svc = svc!(AiDatasetServiceServer, ai_dataset);
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
     // comme SERVING. Permet `grpc_health_probe -addr=:50051` dans le healthcheck.
@@ -256,6 +262,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     health_reporter
         .set_serving::<TamagotchiServiceServer<TamagotchiGrpc>>()
         .await;
+    health_reporter
+        .set_serving::<AiDatasetServiceServer<AiDatasetGrpc>>()
+        .await;
 
     // mTLS optionnel : active si GRPC_TLS_DIR defini en env. Sinon plain HTTP/2
     // (mode dev / migration progressive). Le serveur exige un cert client signe
@@ -312,6 +321,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(coude_inventory_svc)
         .add_service(coude_social_svc)
         .add_service(tamagotchi_svc)
+        .add_service(ai_dataset_svc)
         .serve(bind)
         .await
     {

@@ -10,6 +10,12 @@ pub mod common {
     }
 }
 
+pub mod ai_dataset {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.ai_dataset.v1");
+    }
+}
+
 pub mod progression {
     pub mod v1 {
         tonic::include_proto!("sentinel.progression.v1");

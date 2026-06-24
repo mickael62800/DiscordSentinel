@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_client(true)
         .compile_protos(
             &[
+                "proto/ai_dataset.proto",
                 "proto/automod.proto",
                 "proto/blackjack.proto",
                 "proto/common.proto",

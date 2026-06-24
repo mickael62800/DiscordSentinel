@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package sentinel.ai_dataset.v1;
+
+import "common.proto";
+
+// Collecte des messages texte pour l'entrainement de modeles IA.
+// Remplace `POST /api/ai-dataset/collect` (cf. ai-dataset-bot).
+//
+// Appele en fire-and-forget sur CHAQUE message non-bot des guilds ou le
+// module `ai-dataset-bot` est actif : c'est le chemin le plus chaud du bot.
+// gRPC (multiplexage HTTP/2 + payload binaire + gzip) y gagne le plus face
+// au cout d'une requete HTTP par message.
+//
+// Choix unaire : aligne sur le reste du projet (circuit breaker `guarded`
+// = unaire uniquement, aucun streaming existant). Si le volume devenait
+// problematique, un `rpc CollectStream(stream CollectMessageRequest)`
+// client-streaming permettrait d'amortir l'ouverture d'appel par message
+// sur une stream longue duree — a evaluer alors comme un nouveau pattern.
+service AiDatasetService {
+  // Insere un message dans la table `ai_dataset_messages`. Best-effort :
+  // le bot ignore le resultat (fire-and-forget), la reponse Empty sert
+  // juste d'acquittement gRPC.
+  rpc CollectMessage(CollectMessageRequest) returns (sentinel.common.v1.Empty);
+}
+
+message CollectMessageRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+  // Nom du salon resolu best-effort cote bot ; absent si non resolvable.
+  optional string channel_name = 3;
+  string user_id = 4;
+  string content = 5;
+}

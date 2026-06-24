@@ -40,9 +40,14 @@ Les endpoints ajoutés récemment passent par **HTTP** (`BaseApiClient`) alors q
 
 **Reco** : ajouter `SavePreset` / `GetPreset` / `GetWhitelist` au proto `voice.proto` existant (le service `VoiceChannelsService` a déjà `AddToWhitelist`) pour l'uniformité du domaine.
 
-### 3. Vérifier les domaines à gRPC partiel (basse)
+### 3. Vérifier les domaines à gRPC partiel (basse) — ✅ audité
 
-`welcome.proto` n'expose que `GetConfig` ; vérifier qu'aucun chemin bot↔API welcome ne reste en HTTP pour des écritures. Idem pour les modules récents (`bump`, `rotation`, `ai_dataset`) qui semblent 100% HTTP — à évaluer selon leur fréquence d'appel (faible fréquence → HTTP acceptable).
+Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
+
+- **welcome** : déjà migré. Le bot lit en gRPC (`WelcomeService.GetConfig` + `MembersService.GetMember` sur le hot path member-join) ; aucun chemin d'écriture welcome n'est appelé par le bot. Le seul HTTP restant est `send_log` (log générique fire-and-forget, non spécifique à welcome). **Rien à faire.**
+- **ai_dataset** : ✅ **migré en gRPC** (`AiDatasetService.CollectMessage`). C'était le seul candidat défendable du lot car l'appel est fire-and-forget **sur chaque message** (chemin le plus chaud du bot). L'endpoint HTTP `POST /api/ai-dataset/collect` a été supprimé.
+- **bump** : 100% HTTP. Fréquence faible (POST sur `/bump`, GET reminders toutes les 60 s, POST reminder-sent). **HTTP acceptable**, pas de migration justifiée.
+- **rotation** : 100% HTTP (state machine : GET config/state/history + POST save/served). Fréquence faible (tick 10 min + commandes). **HTTP acceptable.**
 
 ---
 
@@ -75,4 +80,4 @@ Les endpoints ajoutés récemment passent par **HTTP** (`BaseApiClient`) alors q
 1. **Tamagotchi → gRPC** (`TamagotchiService`, avec streaming pour `ListCards`). Incohérence la plus nette + bénéfice sur le refresh.
 2. **Presets vocaux → `voice.proto`** (résorber la dette HTTP introduite récemment).
 3. **AutomodAnalysisHistory + GamePortal → WS push** (vrais événements, gateway + `realtimeStore` déjà en place).
-4. (Veille) Vérifier les chemins welcome/bump/rotation/ai_dataset restés en HTTP ; migrer seulement si la fréquence le justifie.
+4. ✅ ~~(Veille) Vérifier les chemins welcome/bump/rotation/ai_dataset restés en HTTP~~ — audité : welcome déjà migré, **ai_dataset migré en gRPC**, bump/rotation restent en HTTP (fréquence faible, acceptable).

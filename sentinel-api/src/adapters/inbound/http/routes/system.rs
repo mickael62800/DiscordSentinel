@@ -74,10 +74,8 @@ pub fn routes() -> Router<AppState> {
             get(handlers::ai::dataset::list_messages)
                 .delete(handlers::ai::dataset::bulk_delete),
         )
-        .route(
-            "/api/ai-dataset/collect",
-            post(handlers::ai::dataset::collect_message),
-        )
+        // Note : la collecte des messages (ex POST /api/ai-dataset/collect) est
+        // passee en gRPC `AiDatasetService.CollectMessage` (cf. audit transport).
         // Invitations a usage unique (owner+ pour gerer, auth pour redeem)
         .route("/api/invitations", post(handlers::system::invitations::create_invitation))
         .route(

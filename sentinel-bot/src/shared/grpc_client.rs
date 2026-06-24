@@ -38,6 +38,7 @@ use tonic::transport::{Channel, Endpoint};
 use tonic::{Request, Status};
 use tracing::{error, info, warn};
 
+use sentinel_proto::ai_dataset::v1::ai_dataset_service_client::AiDatasetServiceClient;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::blackjack::v1::blackjack_service_client::BlackjackServiceClient;
 use sentinel_proto::coude::v1::coude_bets_service_client::CoudeBetsServiceClient;
@@ -352,6 +353,15 @@ impl SentinelGrpcClient {
         &self,
     ) -> TamagotchiServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         TamagotchiServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `AiDatasetService` pret a l'emploi.
+    pub fn ai_dataset(
+        &self,
+    ) -> AiDatasetServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        AiDatasetServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }
