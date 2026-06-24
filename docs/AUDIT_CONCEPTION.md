@@ -15,6 +15,24 @@
 
 ---
 
+## Suivi des corrections
+
+> Marqueur `[CORRIGÉ — <commit>]` sur les items traités. (À ne pas confondre avec le ✅ « relu/confirmé » de l'en-tête.)
+
+| Item | Gravité | Statut |
+|---|---|---|
+| Axe 1 A — `manage_wallet_service.rs` lit `std::env::var` | Haute | ✅ **CORRIGÉ** (`e9f87fdf`) — la config injectée via `bot_config_repo` est l'unique source ; plus d'`env` dans le cœur. |
+| Axe 2 #3 (haute) — `donner.rs` taxe + min-après dans le bot | Haute | ✅ **CORRIGÉ** (`5292ec13`) — nouveau `gift_coins` (use-case + RPC) : taxe et validation calculées/atomiques côté API. |
+| Axe 2 #2 (haute) — `automod/message_handler.rs` décision flood locale | Haute | ✅ **CORRIGÉ** (`aa99187a`) — nouveau `EvaluateFlood` (use-case + RPC) ; décision lue côté serveur, fallback local sur outage. Le **slowmode reste côté bot** (rate-tracking par message = légitime). |
+| Axe 1 B — adapters inbound en sqlx direct (bump/rbac/sponsorships…) | Haute | ⏳ **À FAIRE** (gros ×3 : entité+port+use-case+repo par domaine). |
+| Axe 2 #1 (haute) — `voler.rs` résolution de combat dans le bot | Haute | ⏳ **À FAIRE** (gros : use-case de résolution complète côté API, sensible à l'équilibrage). |
+| Axe 2 (moyenne/basse) — boutique tamagotchi, override vision, anomaly, cooldowns/soldes pré-validés | Moy./Basse | ⏳ À FAIRE |
+| Axe 3 — atomes web (fetch dans `*Select`/`ConnectionBanner`), molecules mal classées | Haute/Moy. | ⏳ À FAIRE (non type-checkable dans l'env actuel) |
+
+> Hors ce périmètre, l'audit **transport** (gRPC/WebSocket) a été traité séparément : presets vocaux + tamagotchi migrés en gRPC, push WS automod/game-portal (cf. `AUDIT_TRANSPORT_GRPC_WS.md`).
+
+---
+
 ## Axe 1 — Architecture hexagonale (sentinel-core / sentinel-api)
 
 Le **cœur** (`sentinel-core` : domain + application + ports) ne doit dépendre d'aucune infrastructure. Les **adapters inbound** (handlers HTTP/gRPC) ne doivent contenir aucune logique métier ni accès DB : ils délèguent à un use case (port inbound).
