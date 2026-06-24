@@ -289,7 +289,9 @@ impl ManageWalletUseCase for ManageWalletService {
         user_id: &str,
     ) -> Result<Wallet, DomainError> {
         // Solde de depart : config web par serveur (cle `starting_coins` du
-        // bot economie) > variable d'env WALLET_STARTING_COINS > defaut.
+        // bot economie), sinon defaut metier. Le coeur ne lit aucune variable
+        // d'env (respect hexagonal) — seule la config injectee via le port
+        // `bot_config_repo` est consultee.
         let cfg_override = self
             .bot_config_repo
             .get_config(guild_id, ECONOMY_BOT_NAME)
@@ -300,8 +302,7 @@ impl ManageWalletUseCase for ManageWalletService {
                     .into_iter()
                     .find(|e| e.config_key == "starting_coins")
                     .map(|e| e.config_value)
-            })
-            .or_else(|| std::env::var("WALLET_STARTING_COINS").ok());
+            });
         let starting = resolve_starting_coins(cfg_override.as_deref());
         self.repo
             .get_or_create(guild_id, user_id, user_id, starting)
