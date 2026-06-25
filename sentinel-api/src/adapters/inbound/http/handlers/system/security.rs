@@ -21,6 +21,7 @@ use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::host_probe::HostProbe;
+use sentinel_core::domain::entities::system::security_audit::{AuditLogFilter, CleanupOptions};
 use sentinel_core::domain::entities::system::security_log::LogWindow;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
@@ -205,73 +206,27 @@ pub async fn audit_logs(
     Query(q): Query<AuditQuery>,
 ) -> Result<Json<Vec<AuditEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
-
-    // Construction dynamique safe : seuls les noms de colonnes/tables sont
-    // hardcoded, valeurs bindees via $N.
-    let mut sql = String::from(
-        "SELECT id::text, guild_id, event_type, actor_id, actor_name, \
-                target_id, target_name, details, \
-                to_char(created_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') \
-         FROM audit_logs WHERE 1=1",
-    );
-    let mut idx = 1;
-    if q.guild_id.is_some() {
-        sql.push_str(&format!(" AND guild_id = ${idx}"));
-        idx += 1;
-    }
-    if q.event_type_prefix.is_some() {
-        sql.push_str(&format!(" AND event_type LIKE ${idx} || '%'"));
-        idx += 1;
-    }
-    sql.push_str(&format!(" ORDER BY created_at DESC LIMIT ${idx}"));
-
-    let mut q_builder = sqlx::query_as::<
-        _,
-        (
-            String,
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            serde_json::Value,
-            String,
-        ),
-    >(&sql);
-    if let Some(g) = &q.guild_id {
-        q_builder = q_builder.bind(g);
-    }
-    if let Some(p) = &q.event_type_prefix {
-        q_builder = q_builder.bind(p);
-    }
-    q_builder = q_builder.bind(limit);
-
-    let rows = q_builder
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query audit_logs: {e}"))))?;
-
-    let out = rows
-        .into_iter()
-        .map(
-            |(id, guild_id, event_type, actor_id, actor_name, target_id, target_name, details, created_at)| {
-                AuditEntry {
-                    id,
-                    guild_id,
-                    event_type,
-                    actor_id,
-                    actor_name,
-                    target_id,
-                    target_name,
-                    details,
-                    created_at,
-                }
-            },
-        )
-        .collect();
-    Ok(Json(out))
+    let filter = AuditLogFilter {
+        guild_id: q.guild_id,
+        event_type_prefix: q.event_type_prefix,
+        limit: q.limit.unwrap_or(100).clamp(1, 500),
+    };
+    let rows = state.security_audit_uc.audit_logs(filter).await.map_err(ApiError)?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|e| AuditEntry {
+                id: e.id,
+                guild_id: e.guild_id,
+                event_type: e.event_type,
+                actor_id: e.actor_id,
+                actor_name: e.actor_name,
+                target_id: e.target_id,
+                target_name: e.target_name,
+                details: e.details,
+                created_at: e.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            })
+            .collect(),
+    ))
 }
 
 // ── Ban IP : ajoute une IP a la blocklist host ──────────────────────────
@@ -763,30 +718,18 @@ pub async fn last_successful_logins(
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
     let limit = q.limit.unwrap_or(20).clamp(1, 200);
-
-    let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>)>(
-        "SELECT to_char(logged_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), \
-                discord_user_id, username, client_ip, user_agent \
-         FROM successful_logins \
-         ORDER BY logged_at DESC \
-         LIMIT $1",
-    )
-    .bind(limit)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("query: {e}"))))?;
-
-    let out = rows
-        .into_iter()
-        .map(|(ts, uid, name, ip, ua)| SuccessfulLoginEntry {
-            timestamp: ts,
-            discord_user_id: uid,
-            username: name,
-            client_ip: ip,
-            user_agent: ua,
-        })
-        .collect();
-    Ok(Json(out))
+    let rows = state.security_audit_uc.recent_logins(limit).await.map_err(ApiError)?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|l| SuccessfulLoginEntry {
+                timestamp: l.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                discord_user_id: l.discord_user_id,
+                username: l.username,
+                client_ip: l.client_ip,
+                user_agent: l.user_agent,
+            })
+            .collect(),
+    ))
 }
 
 // ── Trafic anormal : graphe req/s sur N heures ─────────────────────────
@@ -897,83 +840,17 @@ pub async fn cleanup_security_logs(
         return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
     };
     require_superadmin(&state, ctx).map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
-    let days = q.older_than_days.unwrap_or(0).max(0);
-    let include_audit = q.include_audit_logs.unwrap_or(false);
-    let include_events = q.include_server_events.unwrap_or(false);
-    let include_logins = q.include_successful_logins.unwrap_or(false);
-    let include_bans = q.include_manual_bans.unwrap_or(false);
 
-    let include_api = q.include_api_logs.unwrap_or(true);
-    let api_logs_deleted: u64 = if !include_api {
-        0
-    } else if days == 0 {
-        sqlx::query("DELETE FROM logs WHERE category = 'api'")
-            .execute(&state.pg_pool)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("delete logs: {e}"))))?
-            .rows_affected()
-    } else {
-        sqlx::query(&format!(
-            "DELETE FROM logs WHERE category = 'api' AND timestamp < NOW() - INTERVAL '{days} days'"
-        ))
-        .execute(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("delete logs: {e}"))))?
-        .rows_affected()
+    let options = CleanupOptions {
+        older_than_days: q.older_than_days.unwrap_or(0).max(0),
+        include_api_logs: q.include_api_logs.unwrap_or(true),
+        include_audit_logs: q.include_audit_logs.unwrap_or(false),
+        include_server_events: q.include_server_events.unwrap_or(false),
+        include_successful_logins: q.include_successful_logins.unwrap_or(false),
+        include_manual_bans: q.include_manual_bans.unwrap_or(false),
     };
 
-    let audit_deleted: u64 = if include_audit {
-        if days == 0 {
-            sqlx::query("DELETE FROM audit_logs")
-                .execute(&state.pg_pool)
-                .await
-                .map_err(|e| ApiError(DomainError::Internal(format!("delete audit: {e}"))))?
-                .rows_affected()
-        } else {
-            sqlx::query(&format!(
-                "DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '{days} days'"
-            ))
-            .execute(&state.pg_pool)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("delete audit: {e}"))))?
-            .rows_affected()
-        }
-    } else {
-        0
-    };
-
-    // Helper : DELETE avec ou sans filtre temporel sur la colonne donnee.
-    async fn purge_table(
-        pool: &sqlx::PgPool,
-        table: &str,
-        ts_col: &str,
-        days: i64,
-    ) -> u64 {
-        let sql = if days == 0 {
-            format!("DELETE FROM {table}")
-        } else {
-            format!("DELETE FROM {table} WHERE {ts_col} < NOW() - INTERVAL '{days} days'")
-        };
-        sqlx::query(&sql)
-            .execute(pool)
-            .await
-            .map(|r| r.rows_affected())
-            .unwrap_or_else(|e| {
-                tracing::warn!(error = %e, table = table, "purge table");
-                0
-            })
-    }
-
-    let server_events_deleted = if include_events {
-        purge_table(&state.pg_pool, "server_events", "timestamp", days).await
-    } else { 0 };
-    let logins_deleted = if include_logins {
-        purge_table(&state.pg_pool, "successful_logins", "logged_at", days).await
-    } else { 0 };
-    let bans_deleted = if include_bans {
-        // Pour manual_ip_bans, days=0 -> tout, sinon on filtre sur banned_at
-        purge_table(&state.pg_pool, "manual_ip_bans", "banned_at", days).await
-    } else { 0 };
+    let report = state.security_audit_uc.cleanup(options.clone()).await.map_err(ApiError)?;
 
     let actor = rbac
         .as_ref()
@@ -982,12 +859,12 @@ pub async fn cleanup_security_logs(
     tracing::info!(
         target: "audit::security",
         actor = actor,
-        api_logs = api_logs_deleted,
-        audit_logs = audit_deleted,
-        server_events = server_events_deleted,
-        successful_logins = logins_deleted,
-        manual_bans = bans_deleted,
-        days_kept = days,
+        api_logs = report.deleted_api_logs,
+        audit_logs = report.deleted_audit_logs,
+        server_events = report.deleted_server_events,
+        successful_logins = report.deleted_successful_logins,
+        manual_bans = report.deleted_manual_bans,
+        days_kept = options.older_than_days,
         "security cleanup executed"
     );
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
@@ -995,28 +872,32 @@ pub async fn cleanup_security_logs(
         actor,
         None,
         "security.cleanup",
-        Some(&format!("days={}", days)),
-        if include_audit { "warn" } else { "info" },
+        Some(&format!("days={}", options.older_than_days)),
+        if options.include_audit_logs { "warn" } else { "info" },
         serde_json::json!({
-            "deleted_api_logs": api_logs_deleted,
-            "deleted_audit_logs": audit_deleted,
-            "deleted_server_events": server_events_deleted,
-            "deleted_successful_logins": logins_deleted,
-            "deleted_manual_bans": bans_deleted,
-            "days_kept": days,
+            "deleted_api_logs": report.deleted_api_logs,
+            "deleted_audit_logs": report.deleted_audit_logs,
+            "deleted_server_events": report.deleted_server_events,
+            "deleted_successful_logins": report.deleted_successful_logins,
+            "deleted_manual_bans": report.deleted_manual_bans,
+            "days_kept": options.older_than_days,
         }),
     )
     .await;
 
     Ok(Json(CleanupResponse {
-        deleted_api_logs: api_logs_deleted as i64,
-        deleted_audit_logs: audit_deleted as i64,
-        deleted_server_events: server_events_deleted as i64,
-        deleted_successful_logins: logins_deleted as i64,
-        deleted_manual_bans: bans_deleted as i64,
+        deleted_api_logs: report.deleted_api_logs as i64,
+        deleted_audit_logs: report.deleted_audit_logs as i64,
+        deleted_server_events: report.deleted_server_events as i64,
+        deleted_successful_logins: report.deleted_successful_logins as i64,
+        deleted_manual_bans: report.deleted_manual_bans as i64,
         message: format!(
             "{} logs API, {} audit, {} events, {} logins, {} bans manuels supprimes",
-            api_logs_deleted, audit_deleted, server_events_deleted, logins_deleted, bans_deleted
+            report.deleted_api_logs,
+            report.deleted_audit_logs,
+            report.deleted_server_events,
+            report.deleted_successful_logins,
+            report.deleted_manual_bans
         ),
     }))
 }
