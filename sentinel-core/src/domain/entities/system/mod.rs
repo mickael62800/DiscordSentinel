@@ -5,6 +5,7 @@ pub mod config_parsers;
 pub mod discord_ids;
 pub mod discord_role;
 pub mod guild;
+pub mod host_probe;
 pub mod ip_ban;
 pub mod job_whitelists;
 pub mod log_entry;

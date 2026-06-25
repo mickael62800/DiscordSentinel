@@ -476,6 +476,12 @@ pub async fn build_app_state(
             fail2ban_reader,
         ));
 
+    // Sondes de securite host (JSON cron) : reader fichier + use case pass-through.
+    let host_probe_reader: Arc<dyn crate::ports::outbound::system::host_probe_reader::HostProbeReader> =
+        Arc::new(crate::adapters::outbound::host_security::probe_reader::FileHostProbeReader::new());
+    let host_probe_uc: Arc<dyn crate::ports::inbound::system::read_host_probe::ReadHostProbeUseCase> =
+        Arc::new(sentinel_core::application::system::read_host_probe_service::ReadHostProbeService::new(host_probe_reader));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -876,6 +882,7 @@ pub async fn build_app_state(
         pets_uc,
         rotation_uc,
         ip_bans_uc,
+        host_probe_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

@@ -20,6 +20,7 @@ use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::entities::system::host_probe::HostProbe;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -414,19 +415,15 @@ pub async fn unban_ip(
 
 // ── Lecture de fichiers JSON exposes par les cron host ──────────────────
 
-/// Helper generique : lit un fichier JSON expose par un cron host
-/// (pattern fichier-shim documente dans TODO_SECURITY_MONITORING.md).
-fn read_host_json<T: for<'de> serde::Deserialize<'de>>(
-    path: &str,
-    feature: &str,
+/// Helper : lit une sonde host via le use case et la deserialise dans le DTO
+/// de reponse. Toute l'infra (fichier, chemin) est dans l'adapter outbound.
+async fn read_probe<T: for<'de> serde::Deserialize<'de>>(
+    state: &AppState,
+    probe: HostProbe,
 ) -> Result<T, ApiError> {
-    let raw = std::fs::read_to_string(path).map_err(|e| {
-        ApiError(DomainError::NotFound(format!(
-            "{feature} non disponible. Setup : sudo bash sentinel-infrastructure/scripts/setup-host-security.sh {feature}. (lecture {path}: {e})"
-        )))
-    })?;
-    serde_json::from_str(&raw)
-        .map_err(|e| ApiError(DomainError::Internal(format!("parse {path}: {e}"))))
+    let value = state.host_probe_uc.read(probe).await.map_err(ApiError)?;
+    serde_json::from_value(value)
+        .map_err(|e| ApiError(DomainError::Internal(format!("parse {}: {e}", probe.feature()))))
 }
 
 // SSH failures
@@ -449,8 +446,7 @@ pub async fn ssh_failures(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<SshFailuresResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: SshFailuresResponse = read_host_json("/var/lib/sentinel/ssh-failures.json", "ssh-failures")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::SshFailures).await?))
 }
 
 // Disk trend
@@ -473,8 +469,7 @@ pub async fn disk_trend(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<DiskTrendResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: DiskTrendResponse = read_host_json("/var/lib/sentinel/disk-trend.json", "disk-trend")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::DiskTrend).await?))
 }
 
 // Active connections
@@ -497,8 +492,7 @@ pub async fn active_connections(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<ConnectionsResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: ConnectionsResponse = read_host_json("/var/lib/sentinel/connections.json", "connections")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::Connections).await?))
 }
 
 // Open ports check
@@ -521,8 +515,7 @@ pub async fn open_ports(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<OpenPortsResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: OpenPortsResponse = read_host_json("/var/lib/sentinel/open-ports.json", "open-ports")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::OpenPorts).await?))
 }
 
 // Trivy vulns
@@ -549,8 +542,7 @@ pub async fn trivy_vulns(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TrivyResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: TrivyResponse = read_host_json("/var/lib/sentinel/trivy.json", "trivy")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::Trivy).await?))
 }
 
 // GeoIP lookup via ip-api.com (batch, gratuit 45 req/min)
@@ -665,19 +657,19 @@ pub async fn nginx_suspicious(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<SuspiciousResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let mut data: SuspiciousResponse = read_host_json("/var/lib/sentinel/nginx-suspicious.json", "nginx-suspicious")?;
+    let mut data: SuspiciousResponse = read_probe(&state, HostProbe::NginxSuspicious).await?;
 
     // Filtre les entries dont l'IP est actuellement bannie manuellement.
     // Le fichier JSON est regenere par cron host depuis access.log et ne
     // tient pas compte des bans, donc on filtre ici. Les compteurs
     // (total_24h, by_category) sont rafraichis a partir des entries
     // restantes pour rester coherents avec ce que l'admin voit.
-    let banned: Vec<String> = sqlx::query_scalar(
-        "SELECT ip FROM manual_ip_bans WHERE unbanned_at IS NULL",
-    )
-    .fetch_all(&state.pg_pool)
-    .await
-    .unwrap_or_default();
+    let banned: Vec<String> = state
+        .ip_bans_uc
+        .list_manual_bans()
+        .await
+        .map(|bans| bans.into_iter().map(|b| b.ip).collect())
+        .unwrap_or_default();
 
     if !banned.is_empty() {
         let banset: std::collections::HashSet<&str> = banned.iter().map(|s| s.as_str()).collect();
@@ -740,8 +732,7 @@ pub async fn tls_errors(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TlsErrorsResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: TlsErrorsResponse = read_host_json("/var/lib/sentinel/tls-errors.json", "tls-errors")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::TlsErrors).await?))
 }
 
 // File integrity
@@ -765,8 +756,7 @@ pub async fn file_integrity(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<FileIntegrityResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: FileIntegrityResponse = read_host_json("/var/lib/sentinel/file-integrity.json", "file-integrity")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::FileIntegrity).await?))
 }
 
 // Outbound connections
@@ -789,8 +779,7 @@ pub async fn outbound_connections(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<OutboundResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let data: OutboundResponse = read_host_json("/var/lib/sentinel/outbound.json", "outbound")?;
-    Ok(Json(data))
+    Ok(Json(read_probe(&state, HostProbe::Outbound).await?))
 }
 
 // ── Last successful logins ──────────────────────────────────────────────

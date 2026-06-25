@@ -4,3 +4,4 @@
 
 pub mod ban_queue;
 pub mod fail2ban;
+pub mod probe_reader;
