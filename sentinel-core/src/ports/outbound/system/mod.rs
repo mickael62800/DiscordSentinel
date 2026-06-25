@@ -11,4 +11,5 @@ pub mod host_ban_queue;
 pub mod host_probe_reader;
 pub mod ip_ban_repository;
 pub mod log_repository;
+pub mod security_log_repository;
 pub mod ticket_repository;

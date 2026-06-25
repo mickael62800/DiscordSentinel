@@ -482,6 +482,12 @@ pub async fn build_app_state(
     let host_probe_uc: Arc<dyn crate::ports::inbound::system::read_host_probe::ReadHostProbeUseCase> =
         Arc::new(sentinel_core::application::system::read_host_probe_service::ReadHostProbeService::new(host_probe_reader));
 
+    // Analyse des logs securite (top IPs, echecs d'auth, trafic).
+    let security_log_repo: Arc<dyn crate::ports::outbound::system::security_log_repository::SecurityLogRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::security_log_repository::PgSecurityLogRepository::new(pg_pool.clone()));
+    let security_logs_uc: Arc<dyn crate::ports::inbound::system::read_security_logs::ReadSecurityLogsUseCase> =
+        Arc::new(sentinel_core::application::system::read_security_logs_service::ReadSecurityLogsService::new(security_log_repo));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -883,6 +889,7 @@ pub async fn build_app_state(
         rotation_uc,
         ip_bans_uc,
         host_probe_uc,
+        security_logs_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

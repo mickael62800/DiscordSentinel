@@ -21,6 +21,7 @@ use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::host_probe::HostProbe;
+use sentinel_core::domain::entities::system::security_log::LogWindow;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -60,14 +61,6 @@ pub struct WindowQuery {
     pub limit: Option<i64>,
 }
 
-fn window_to_interval(w: &str) -> &'static str {
-    match w {
-        "24h" => "24 hours",
-        "7d" => "7 days",
-        _ => "1 hour",
-    }
-}
-
 #[derive(Debug, Serialize)]
 pub struct TopIpEntry {
     pub client_ip: String,
@@ -82,35 +75,20 @@ pub async fn top_ips(
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let interval = window_to_interval(q.window.as_deref().unwrap_or("1h"));
+    let window = LogWindow::parse(q.window.as_deref().unwrap_or("1h"));
     let limit = q.limit.unwrap_or(20).clamp(1, 100);
 
-    let sql = format!(
-        "SELECT \
-            COALESCE(details->>'client_ip', '-') AS ip, \
-            COUNT(*)::bigint AS total, \
-            SUM(CASE WHEN level IN ('warn', 'error') THEN 1 ELSE 0 END)::bigint AS failed, \
-            to_char(MAX(timestamp), 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS last_seen \
-         FROM logs \
-         WHERE category = 'api' \
-           AND timestamp > NOW() - INTERVAL '{interval}' \
-           AND details->>'client_ip' IS NOT NULL \
-           AND details->>'client_ip' != '-' \
-         GROUP BY ip \
-         ORDER BY total DESC \
-         LIMIT {limit}"
-    );
-
-    let rows = sqlx::query_as::<_, (String, i64, i64, String)>(&sql)
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query top_ips: {e}"))))?;
-
-    let out = rows
-        .into_iter()
-        .map(|(ip, total, failed, last_seen)| TopIpEntry { client_ip: ip, total, failed, last_seen })
-        .collect();
-    Ok(Json(out))
+    let rows = state.security_logs_uc.top_ips(window, limit).await.map_err(ApiError)?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|r| TopIpEntry {
+                client_ip: r.client_ip,
+                total: r.total,
+                failed: r.failed,
+                last_seen: r.last_seen.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            })
+            .collect(),
+    ))
 }
 
 // ── 2. Echecs d'auth (401/403) recents ──────────────────────────────────
@@ -131,42 +109,22 @@ pub async fn auth_failures(
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let interval = window_to_interval(q.window.as_deref().unwrap_or("24h"));
+    let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
-    let sql = format!(
-        "SELECT \
-            to_char(timestamp, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS ts, \
-            COALESCE((details->>'status_code')::bigint, 0) AS status, \
-            COALESCE(details->>'method', '?') AS method, \
-            COALESCE(details->>'route', '?') AS route, \
-            COALESCE(details->>'client_ip', '-') AS ip, \
-            COALESCE(details->>'user_agent', '') AS ua \
-         FROM logs \
-         WHERE category = 'api' \
-           AND timestamp > NOW() - INTERVAL '{interval}' \
-           AND (details->>'status_code')::int IN (401, 403) \
-         ORDER BY timestamp DESC \
-         LIMIT {limit}"
-    );
-
-    let rows = sqlx::query_as::<_, (String, i64, String, String, String, String)>(&sql)
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query auth_failures: {e}"))))?;
-
-    let out = rows
-        .into_iter()
-        .map(|(ts, status, method, route, ip, ua)| AuthFailureEntry {
-            timestamp: ts,
-            status_code: status,
-            method,
-            route,
-            client_ip: ip,
-            user_agent: ua,
-        })
-        .collect();
-    Ok(Json(out))
+    let rows = state.security_logs_uc.auth_failures(window, limit).await.map_err(ApiError)?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|r| AuthFailureEntry {
+                timestamp: r.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                status_code: r.status_code,
+                method: r.method,
+                route: r.route,
+                client_ip: r.client_ip,
+                user_agent: r.user_agent,
+            })
+            .collect(),
+    ))
 }
 
 // ── 3. IPs bannies (lecture fichier export fail2ban) ───────────────────
@@ -864,64 +822,30 @@ pub async fn traffic_trend(
     Query(q): Query<TrafficTrendQuery>,
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let window = q.window.as_deref().unwrap_or("24h");
-    let interval = window_to_interval(window);
-    let bucket_min = q.bucket_minutes.unwrap_or(5).max(1).min(60) as i64;
+    let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
+    let bucket_min = (q.bucket_minutes.unwrap_or(5).clamp(1, 60)) as i64;
 
-    // Bucket par tranches de N minutes via date_trunc + arithmetique
-    let sql = format!(
-        "SELECT \
-            to_char(date_trunc('hour', timestamp) + \
-                INTERVAL '{bucket_min} min' * \
-                FLOOR(EXTRACT(MINUTE FROM timestamp) / {bucket_min}), \
-                'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS bucket, \
-            COUNT(*)::bigint AS total, \
-            SUM(CASE WHEN level IN ('warn', 'error') THEN 1 ELSE 0 END)::bigint AS errors \
-         FROM logs \
-         WHERE category = 'api' \
-           AND timestamp > NOW() - INTERVAL '{interval}' \
-         GROUP BY bucket \
-         ORDER BY bucket ASC"
-    );
-
-    let rows = sqlx::query_as::<_, (String, i64, i64)>(&sql)
-        .fetch_all(&state.pg_pool)
+    let trend = state
+        .security_logs_uc
+        .traffic_trend(window, bucket_min)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query traffic: {e}"))))?;
-
-    let datapoints: Vec<TrafficDatapoint> = rows
-        .into_iter()
-        .map(|(ts, total, errors)| TrafficDatapoint { timestamp: ts, total, errors })
-        .collect();
-
-    let totals: Vec<i64> = datapoints.iter().map(|d| d.total).collect();
-    let n = totals.len() as f64;
-    let sum: i64 = totals.iter().sum();
-    let baseline_avg = if n > 0.0 { sum as f64 / n } else { 0.0 };
-    let peak = totals.iter().copied().max().unwrap_or(0);
-    let peak_at = datapoints
-        .iter()
-        .max_by_key(|d| d.total)
-        .map(|d| d.timestamp.clone());
-
-    // Alerte si pic > 3x moyenne (et data > 10 buckets pour avoir du sens)
-    let alert = baseline_avg > 0.0 && datapoints.len() > 10 && (peak as f64) > baseline_avg * 3.0;
-    let alert_reason = if alert {
-        Some(format!(
-            "Pic à {} req sur 1 bucket (3× moyenne {:.1})",
-            peak, baseline_avg
-        ))
-    } else {
-        None
-    };
+        .map_err(ApiError)?;
 
     Ok(Json(TrafficTrendResponse {
-        datapoints,
-        baseline_avg,
-        peak,
-        peak_at,
-        alert,
-        alert_reason,
+        datapoints: trend
+            .datapoints
+            .into_iter()
+            .map(|d| TrafficDatapoint {
+                timestamp: d.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                total: d.total,
+                errors: d.errors,
+            })
+            .collect(),
+        baseline_avg: trend.baseline_avg,
+        peak: trend.peak,
+        peak_at: trend.peak_at.map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        alert: trend.alert,
+        alert_reason: trend.alert_reason,
     }))
 }
 
