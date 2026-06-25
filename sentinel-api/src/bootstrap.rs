@@ -462,6 +462,20 @@ pub async fn build_app_state(
     let rotation_uc: Arc<dyn crate::ports::inbound::system::manage_rotation::ManageRotationUseCase> =
         Arc::new(sentinel_core::application::system::manage_rotation_service::ManageRotationService::new(rotation_repo.clone()));
 
+    // Bans IP (panel securite) : repo DB + file-shim host + reader fail2ban.
+    let ip_ban_repo: Arc<dyn crate::ports::outbound::system::ip_ban_repository::IpBanRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::ip_ban_repository::PgIpBanRepository::new(pg_pool.clone()));
+    let host_ban_queue: Arc<dyn crate::ports::outbound::system::host_ban_queue::HostBanQueue> =
+        Arc::new(crate::adapters::outbound::host_security::ban_queue::FileBanQueue::new());
+    let fail2ban_reader: Arc<dyn crate::ports::outbound::system::host_ban_queue::Fail2banStatusReader> =
+        Arc::new(crate::adapters::outbound::host_security::fail2ban::Fail2banFileReader::new());
+    let ip_bans_uc: Arc<dyn crate::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase> =
+        Arc::new(sentinel_core::application::system::manage_ip_bans_service::ManageIpBansService::new(
+            ip_ban_repo,
+            host_ban_queue,
+            fail2ban_reader,
+        ));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -861,6 +875,7 @@ pub async fn build_app_state(
         reset_guild_uc,
         pets_uc,
         rotation_uc,
+        ip_bans_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

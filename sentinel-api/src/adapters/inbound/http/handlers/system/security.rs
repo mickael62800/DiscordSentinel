@@ -185,64 +185,34 @@ pub struct BannedIpsResponse {
     pub jails: Vec<Fail2banJail>,
 }
 
-const F2B_STATUS_PATH: &str = "/var/lib/sentinel/fail2ban-status.json";
-
 pub async fn banned_ips(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
 
-    // Lit le fichier expose par le cron host /usr/local/bin/fail2ban-export.sh
-    let raw = match std::fs::read_to_string(F2B_STATUS_PATH) {
-        Ok(s) => s,
-        Err(_) => {
-            return Ok(Json(BannedIpsResponse {
-                installed: false,
-                updated_at: None,
-                message: format!(
-                    "fail2ban status non disponible. Pour activer : 1) installer fail2ban sur l'host (apt install fail2ban) ; 2) creer le script /usr/local/bin/fail2ban-export.sh + cron pour exporter dans {F2B_STATUS_PATH} ; 3) monter /var/lib/sentinel:/var/lib/sentinel:ro dans le conteneur api du compose."
-                ),
-                jails: vec![],
-            }));
-        }
+    let Some(status) = state.ip_bans_uc.fail2ban_status().await.map_err(ApiError)? else {
+        return Ok(Json(BannedIpsResponse {
+            installed: false,
+            updated_at: None,
+            message: "fail2ban status non disponible. Pour activer : 1) installer fail2ban sur l'host (apt install fail2ban) ; 2) creer le script /usr/local/bin/fail2ban-export.sh + cron pour exporter dans /var/lib/sentinel/fail2ban-status.json ; 3) monter /var/lib/sentinel:/var/lib/sentinel:ro dans le conteneur api du compose.".to_string(),
+            jails: vec![],
+        }));
     };
 
-    #[derive(serde::Deserialize)]
-    struct RawJail {
-        name: String,
-        total_banned: i64,
-        banned_ips: String,
-    }
-    #[derive(serde::Deserialize)]
-    struct RawStatus {
-        updated_at: String,
-        jails: Vec<RawJail>,
-    }
-
-    let parsed: RawStatus = serde_json::from_str(&raw).map_err(|e| {
-        ApiError(DomainError::Internal(format!("parse fail2ban-status.json: {e}")))
-    })?;
-
-    let jails = parsed
+    let total = status.total_banned_ips();
+    let jails: Vec<Fail2banJail> = status
         .jails
         .into_iter()
         .map(|j| Fail2banJail {
             name: j.name,
             total_banned: j.total_banned,
-            banned_ips: j
-                .banned_ips
-                .split_whitespace()
-                .filter(|s| !s.is_empty())
-                .map(|s| s.to_string())
-                .collect(),
+            banned_ips: j.banned_ips,
         })
-        .collect::<Vec<_>>();
-
-    let total: usize = jails.iter().map(|j| j.banned_ips.len()).sum();
+        .collect();
     Ok(Json(BannedIpsResponse {
         installed: true,
-        updated_at: Some(parsed.updated_at),
+        updated_at: Some(status.updated_at),
         message: format!("{} IPs actuellement bannies sur {} jail(s)", total, jails.len()),
         jails,
     }))
@@ -361,12 +331,10 @@ pub struct BanIpResponse {
     pub message: String,
 }
 
-const BANS_PENDING_PATH: &str = "/var/lib/sentinel/bans-pending.txt";
-
 /// POST /api/security/ban-ip
-/// Pattern fichier-shim : l'API ecrit l'IP dans /var/lib/sentinel/bans-pending.txt,
-/// un cron host (apply-bans.sh) lit le fichier, applique `ufw deny from <IP>`,
-/// puis vide le fichier.
+/// Delegue au use case `ManageIpBansUseCase` (validation + file-shim host +
+/// persistance + purge logs). Le handler ne fait que le gate, l'audit et le
+/// mapping de la reponse.
 pub async fn ban_ip(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -374,87 +342,18 @@ pub async fn ban_ip(
 ) -> Result<Json<BanIpResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
 
-    let ip = dto.ip.trim();
-    // Validation basique : IPv4 ou IPv6
-    let parsed: Result<std::net::IpAddr, _> = ip.parse();
-    if parsed.is_err() {
-        return Err(ApiError(DomainError::ValidationError(format!(
-            "IP invalide : {ip}"
-        ))));
-    }
-    // Refus de banner les IPs LAN/loopback
-    let p = parsed.unwrap();
-    if p.is_loopback() {
-        return Err(ApiError(DomainError::ValidationError(
-            "Refus de bannir une IP loopback".into(),
-        )));
-    }
-    if let std::net::IpAddr::V4(v4) = p {
-        if v4.is_private() {
-            return Err(ApiError(DomainError::ValidationError(
-                "Refus de bannir une IP privee LAN".into(),
-            )));
-        }
-    }
-
-    // Append au fichier (cron host le lit + applique + vide)
-    use std::fs::OpenOptions;
-    use std::io::Write;
-    let parent = std::path::Path::new(BANS_PENDING_PATH).parent().unwrap();
-    if let Err(e) = std::fs::create_dir_all(parent) {
-        return Err(ApiError(DomainError::Internal(format!("mkdir: {e}"))));
-    }
-    let line = format!(
-        "{}\t{}\t{}\n",
-        ip,
-        chrono::Utc::now().to_rfc3339(),
-        dto.reason.as_deref().unwrap_or("")
-    );
-    let mut f = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(BANS_PENDING_PATH)
-        .map_err(|e| ApiError(DomainError::Internal(format!("open bans file: {e}"))))?;
-    f.write_all(line.as_bytes())
-        .map_err(|e| ApiError(DomainError::Internal(format!("write bans: {e}"))))?;
-
-    // Audit
     let actor = rbac
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
 
-    // Persist en table manual_ip_bans (source de verite UI). Reactive un
-    // ancien ban en remettant unbanned_at a NULL si l'IP existe deja.
-    if let Err(e) = sqlx::query(
-        "INSERT INTO manual_ip_bans (ip, banned_at, banned_by, reason, unbanned_at, unbanned_by) \
-         VALUES ($1, NOW(), $2, $3, NULL, NULL) \
-         ON CONFLICT (ip) DO UPDATE SET banned_at = NOW(), banned_by = EXCLUDED.banned_by, \
-            reason = EXCLUDED.reason, unbanned_at = NULL, unbanned_by = NULL",
-    )
-    .bind(ip)
-    .bind(&actor)
-    .bind(dto.reason.as_deref())
-    .execute(&state.pg_pool)
-    .await
-    {
-        tracing::warn!(error = %e, ip = ip, "INSERT manual_ip_bans");
-    }
+    let outcome = state
+        .ip_bans_uc
+        .ban(&dto.ip, dto.reason.clone(), &actor)
+        .await
+        .map_err(ApiError)?;
 
-    // Cleanup des logs API lies a cette IP (l'IP est bannie, les traces
-    // ne servent plus). Best-effort : on n'echoue pas si ca rate.
-    let deleted_logs: u64 = sqlx::query(
-        "DELETE FROM logs WHERE category = 'api' AND details->>'client_ip' = $1",
-    )
-    .bind(ip)
-    .execute(&state.pg_pool)
-    .await
-    .map(|r| r.rows_affected())
-    .unwrap_or_else(|e| {
-        tracing::warn!(error = %e, ip = ip, "DELETE logs apres ban");
-        0
-    });
-
+    let ip = dto.ip.trim();
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
         &state.pg_pool,
         &actor,
@@ -462,7 +361,7 @@ pub async fn ban_ip(
         "security.ban_ip",
         Some(ip),
         "warn",
-        serde_json::json!({ "reason": dto.reason, "ip": ip, "deleted_logs": deleted_logs }),
+        serde_json::json!({ "reason": dto.reason, "ip": ip, "deleted_logs": outcome.deleted_logs }),
     )
     .await;
 
@@ -470,14 +369,12 @@ pub async fn ban_ip(
         ok: true,
         message: format!(
             "IP {} bannie ({} logs purges, sera applique au prochain tick du cron host)",
-            ip, deleted_logs
+            ip, outcome.deleted_logs
         ),
     }))
 }
 
 // ── Unban IP : retire une IP de la blocklist ────────────────────────────
-
-const UNBANS_PENDING_PATH: &str = "/var/lib/sentinel/unbans-pending.txt";
 
 pub async fn unban_ip(
     State(state): State<AppState>,
@@ -486,52 +383,18 @@ pub async fn unban_ip(
 ) -> Result<Json<BanIpResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
 
-    let ip = dto.ip.trim();
-    let parsed: Result<std::net::IpAddr, _> = ip.parse();
-    if parsed.is_err() {
-        return Err(ApiError(DomainError::ValidationError(format!(
-            "IP invalide : {ip}"
-        ))));
-    }
-
-    use std::fs::OpenOptions;
-    use std::io::Write;
-    let parent = std::path::Path::new(UNBANS_PENDING_PATH).parent().unwrap();
-    if let Err(e) = std::fs::create_dir_all(parent) {
-        return Err(ApiError(DomainError::Internal(format!("mkdir: {e}"))));
-    }
-    let line = format!(
-        "{}\t{}\t{}\n",
-        ip,
-        chrono::Utc::now().to_rfc3339(),
-        dto.reason.as_deref().unwrap_or("")
-    );
-    let mut f = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(UNBANS_PENDING_PATH)
-        .map_err(|e| ApiError(DomainError::Internal(format!("open unbans file: {e}"))))?;
-    f.write_all(line.as_bytes())
-        .map_err(|e| ApiError(DomainError::Internal(format!("write unbans: {e}"))))?;
-
     let actor = rbac
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
 
-    // Marque le ban comme leve dans manual_ip_bans (best-effort : l'IP peut
-    // venir uniquement de fail2ban, auquel cas il n'y a pas de row a updater).
-    if let Err(e) = sqlx::query(
-        "UPDATE manual_ip_bans SET unbanned_at = NOW(), unbanned_by = $2 WHERE ip = $1 AND unbanned_at IS NULL",
-    )
-    .bind(ip)
-    .bind(&actor)
-    .execute(&state.pg_pool)
-    .await
-    {
-        tracing::warn!(error = %e, ip = ip, "UPDATE manual_ip_bans unban");
-    }
+    state
+        .ip_bans_uc
+        .unban(&dto.ip, dto.reason.clone(), &actor)
+        .await
+        .map_err(ApiError)?;
 
+    let ip = dto.ip.trim();
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
         &state.pg_pool,
         &actor,
@@ -845,17 +708,15 @@ pub async fn manual_bans(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let rows: Vec<(String, String, Option<String>, Option<String>)> = sqlx::query_as(
-        "SELECT ip, to_char(banned_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), banned_by, reason \
-         FROM manual_ip_bans WHERE unbanned_at IS NULL ORDER BY banned_at DESC",
-    )
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("query manual_bans: {e}"))))?;
-
+    let bans = state.ip_bans_uc.list_manual_bans().await.map_err(ApiError)?;
     Ok(Json(
-        rows.into_iter()
-            .map(|(ip, banned_at, banned_by, reason)| ManualBanEntry { ip, banned_at, banned_by, reason })
+        bans.into_iter()
+            .map(|b| ManualBanEntry {
+                ip: b.ip,
+                banned_at: b.banned_at.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+                banned_by: b.banned_by,
+                reason: b.reason,
+            })
             .collect(),
     ))
 }
