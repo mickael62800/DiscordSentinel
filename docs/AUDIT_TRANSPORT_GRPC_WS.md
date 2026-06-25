@@ -7,17 +7,21 @@
 
 ## État des lieux
 
-**gRPC déjà en place** (`sentinel-proto/proto/`) : `automod`, `blackjack`, `community`, `coude` (player/combats/bets/economy/inventory/social), `export`, `images`, `members`, `moderation`, `progression`, `roles`, `security`, `stats`, `tickets`, `voice`, `welcome`.
+**gRPC déjà en place** (`sentinel-proto/proto/`) : `ai_dataset`, `automod`, `blackjack`, `community`, `coude` (player/combats/bets/economy/inventory/social), `export`, `images`, `members`, `moderation`, `progression`, `roles`, `security`, `stats`, `tamagotchi`, `tickets`, `voice`, `welcome`.
 
 **WebSocket déjà en place** : `sentinel-gateway` relaie la stream Redis `sentinel:events` vers les clients ; côté web, `stores/realtimeStore.ts` consomme ces événements.
+
+> **Mise à jour** — Toutes les priorités de cet audit sont traitées. Détail par section ci-dessous, synthèse dans [Ce qu'il reste à faire](#ce-quil-reste-à-faire).
 
 ---
 
 ## 🔌 Candidats gRPC (bot ↔ API)
 
-### 1. Tamagotchi — incohérence majeure (haute)
+### 1. Tamagotchi — incohérence majeure (haute) — ✅ fait
 
-C'est le **seul** domaine de jeu **sans service gRPC**. Le bot parle à l'API entièrement en **HTTP** :
+> **Migré.** `tamagotchi.proto` (`TamagotchiService`) est en place ; le bot (`tamagotchi/api_client.rs`) ne fait **plus aucun appel HTTP** (CRUD pets, `Care`/`Train`/`Combat`, `Tick`, `ListCards` tous en gRPC). **Nuance** : `ListCards` a été implémenté en **unaire** (`rpc ListCards(ListCardsRequest) returns (CardList)`), pas en server-streaming comme suggéré ci-dessous — acceptable, à revoir seulement si le volume de cartes pose problème.
+
+C'était le **seul** domaine de jeu **sans service gRPC**. Le bot parlait à l'API entièrement en **HTTP** :
 
 | Fichier | Appels |
 |---|---|
@@ -29,9 +33,11 @@ Tous les modules comparables (voice, coude, blackjack, progression, stats…) so
 
 **Reco** : créer un `TamagotchiService` (proto) avec CRUD pets, `Care`/`Train`/`Combat`, `Tick`, `SetCardLocation`, `ListCards`. Le rafraîchissement horaire des cartes (aujourd'hui `GET /cards` paginé) gagnerait à utiliser un **server-streaming** gRPC (`rpc ListCards(...) returns (stream CardItem)`) plutôt qu'une pagination par curseur.
 
-### 2. Presets / whitelist vocaux — dette introduite (moyenne)
+### 2. Presets / whitelist vocaux — dette introduite (moyenne) — ✅ fait
 
-Les endpoints ajoutés récemment passent par **HTTP** (`BaseApiClient`) alors que tout le reste du domaine voice est sur `VoiceChannelsService` (gRPC) :
+> **Migré.** `GetPreset` / `SavePreset` / `GetWhitelist` ont été ajoutés au domaine voice gRPC ; `voice/api_client.rs` les appelle via `guarded(...)` et `channel_lifecycle.rs` / `channel_management.rs` n'utilisent plus HTTP pour ces chemins. La dette est résorbée.
+
+Les endpoints ajoutés récemment passaient par **HTTP** (`BaseApiClient`) alors que tout le reste du domaine voice est sur `VoiceChannelsService` (gRPC) :
 
 | Fichier | Appels HTTP |
 |---|---|
@@ -55,12 +61,13 @@ Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 7 fichiers web utilisent `setInterval`. Il faut distinguer **données événementielles** (→ push) et **jauges échantillonnées** (→ polling légitime).
 
-### Bons candidats au push (événements)
+### Bons candidats au push (événements) — ✅ fait
 
-| Fichier:ligne | Aujourd'hui | Reco |
+| Fichier:ligne | État | Détail |
 |---|---|---|
-| `components/organisms/AutomodAnalysisHistory.vue` | polling périodique de l'historique | Une nouvelle analyse est un **événement** → publier `automod_analysis_new` sur `sentinel:events`, consommer via `realtimeStore`. |
-| `components/pages/GamePortalPage.vue` + `components/molecules/GameServerStatsBar.vue` | `setInterval` sur `gamePortalService` | Démarrage / arrêt / join de serveur = événements → push de l'état (le worker `game_portal` peut émettre). |
+| `components/organisms/AutomodAnalysisHistory.vue` | ✅ poussé | Plus de `setInterval` ; consomme désormais le `realtimeStore` (événement de nouvelle analyse). |
+| `components/pages/GamePortalPage.vue` | ✅ poussé | S'abonne aux événements `game_server_created`/`started`/… via `realtimeStore`. Garde un `setInterval(fetchAll, 10s)` en **fallback** de resync — acceptable. |
+| `components/molecules/GameServerStatsBar.vue` | polling légitime | `setInterval(fetchStats, 5s)` : jauges de serveur (joueurs/CPU) **échantillonnées** → relève de la catégorie « mesure continue » ci-dessous, pas du push. |
 
 ### Polling légitime — NE PAS forcer en WS
 
@@ -75,9 +82,23 @@ Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 ---
 
-## Priorités
+## Priorités — toutes traitées
 
-1. **Tamagotchi → gRPC** (`TamagotchiService`, avec streaming pour `ListCards`). Incohérence la plus nette + bénéfice sur le refresh.
-2. **Presets vocaux → `voice.proto`** (résorber la dette HTTP introduite récemment).
-3. **AutomodAnalysisHistory + GamePortal → WS push** (vrais événements, gateway + `realtimeStore` déjà en place).
-4. ✅ ~~(Veille) Vérifier les chemins welcome/bump/rotation/ai_dataset restés en HTTP~~ — audité : welcome déjà migré, **ai_dataset migré en gRPC**, bump/rotation restent en HTTP (fréquence faible, acceptable).
+1. ✅ **Tamagotchi → gRPC** — `TamagotchiService` en place, bot 100% gRPC (`ListCards` en unaire, pas streaming).
+2. ✅ **Presets vocaux → `voice.proto`** — `GetPreset`/`SavePreset`/`GetWhitelist` ajoutés, dette HTTP résorbée.
+3. ✅ **AutomodAnalysisHistory + GamePortal → WS push** — les deux consomment `realtimeStore` (GamePortal garde un poll de resync en fallback).
+4. ✅ **Veille welcome/bump/rotation/ai_dataset** — welcome déjà migré, **ai_dataset migré en gRPC**, bump/rotation laissés en HTTP (fréquence faible, acceptable).
+
+---
+
+## Ce qu'il reste à faire
+
+**Aucune action obligatoire** : tous les candidats prioritaires de l'audit sont traités. Restent uniquement des points **optionnels / de veille**, à n'engager que si un besoin concret apparaît :
+
+| Point | Nature | Quand le faire |
+|---|---|---|
+| `TamagotchiService.ListCards` en **server-streaming** | Optimisation | Si le nombre de cartes par guild rend la réponse unaire `CardList` trop lourde (pagination/mémoire). Aujourd'hui non justifié. |
+| `ai_dataset` → **client-streaming** (`CollectStream`) | Optimisation | Si le volume per-message devient un coût mesurable. L'unaire fire-and-forget actuel suffit ; pattern streaming inexistant ailleurs dans le projet. |
+| **bump** / **rotation** → gRPC | Uniformité | Seulement par cohérence : fréquence faible (tick 10 min, poll 60 s), bénéfice marginal. Laisser en HTTP par défaut. |
+| `welcome` `send_log` → uniformiser | Cosmétique | Log générique fire-and-forget, non spécifique à welcome ; à traiter avec une éventuelle migration globale du logging, pas isolément. |
+| `GameServerStatsBar` / `ServerHealthPage` / `SystemOpsPage` / `DockerAdminSection` / `ConnectionBanner` | **NE PAS migrer** | Polling de **mesures continues échantillonnées** = bon choix (cf. règle ci-dessus). |
