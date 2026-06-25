@@ -29,8 +29,6 @@ use super::MODULE_BOT_NAME;
 const BASE_POLL_SECS: u64 = 60;
 /// Intervalle de refresh par defaut si non configure (minutes).
 const DEFAULT_REFRESH_MINUTES: u64 = 60;
-/// Taille de page pour la pagination des cartes.
-const PAGE: i64 = 500;
 
 /// Spawn la boucle de rafraichissement. Appelee une fois au `ready`.
 pub fn spawn(ctx: Context) {
@@ -59,28 +57,19 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
         (base, tama)
     };
 
-    // 1. Recupere toutes les cartes vivantes (paginees), groupees par serveur.
+    // 1. Recupere toutes les cartes vivantes (server-stream), groupees par
+    //    serveur. La pagination DB est geree cote API ; ici on consomme le
+    //    stream complet en une passe.
+    let cards = match tama.list_cards().await {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(error = %e, "Echec fetch cartes tamagotchi a rafraichir");
+            return;
+        }
+    };
     let mut by_guild: HashMap<String, Vec<CardData>> = HashMap::new();
-    let mut after: Option<String> = None;
-    loop {
-        let batch = match tama.list_cards(PAGE, after.clone()).await {
-            Ok(b) => b,
-            Err(e) => {
-                warn!(error = %e, "Echec fetch cartes tamagotchi a rafraichir");
-                return;
-            }
-        };
-        if batch.is_empty() {
-            break;
-        }
-        let batch_len = batch.len();
-        after = batch.last().map(|c| c.id.clone());
-        for item in batch {
-            by_guild.entry(item.guild_id.clone()).or_default().push(item);
-        }
-        if batch_len < PAGE as usize {
-            break;
-        }
+    for item in cards {
+        by_guild.entry(item.guild_id.clone()).or_default().push(item);
     }
 
     // 2. Pour chaque serveur, refresh seulement si son intervalle est ecoule.

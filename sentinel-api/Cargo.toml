@@ -77,6 +77,8 @@ dashmap = { workspace = true }
 subtle = "2"
 # Parse X.509 PEM pour endpoint /api/security/tls-cert (expiration Let's Encrypt)
 x509-parser = "0.16"
+# `ReceiverStream` pour exposer un mpsc en server-streaming gRPC (TamagotchiService.ListCards).
+tokio-stream = "0.1"
 
 [dev-dependencies]
 http-body-util = "0.1"

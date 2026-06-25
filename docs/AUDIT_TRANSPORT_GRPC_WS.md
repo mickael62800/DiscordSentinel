@@ -19,7 +19,7 @@
 
 ### 1. Tamagotchi — incohérence majeure (haute) — ✅ fait
 
-> **Migré.** `tamagotchi.proto` (`TamagotchiService`) est en place ; le bot (`tamagotchi/api_client.rs`) ne fait **plus aucun appel HTTP** (CRUD pets, `Care`/`Train`/`Combat`, `Tick`, `ListCards` tous en gRPC). **Nuance** : `ListCards` a été implémenté en **unaire** (`rpc ListCards(ListCardsRequest) returns (CardList)`), pas en server-streaming comme suggéré ci-dessous — acceptable, à revoir seulement si le volume de cartes pose problème.
+> **Migré.** `tamagotchi.proto` (`TamagotchiService`) est en place ; le bot (`tamagotchi/api_client.rs`) ne fait **plus aucun appel HTTP** (CRUD pets, `Care`/`Train`/`Combat`, `Tick`, `ListCards` tous en gRPC). `ListCards` est désormais en **server-streaming** (`rpc ListCards(ListCardsRequest) returns (stream Card)`) : l'API pagine la lecture DB en interne et streame les cartes une à une, le bot consomme le stream en une passe (plus de pagination par curseur côté client).
 
 C'était le **seul** domaine de jeu **sans service gRPC**. Le bot parlait à l'API entièrement en **HTTP** :
 
@@ -84,7 +84,7 @@ Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 ## Priorités — toutes traitées
 
-1. ✅ **Tamagotchi → gRPC** — `TamagotchiService` en place, bot 100% gRPC (`ListCards` en unaire, pas streaming).
+1. ✅ **Tamagotchi → gRPC** — `TamagotchiService` en place, bot 100% gRPC (`ListCards` en **server-streaming**).
 2. ✅ **Presets vocaux → `voice.proto`** — `GetPreset`/`SavePreset`/`GetWhitelist` ajoutés, dette HTTP résorbée.
 3. ✅ **AutomodAnalysisHistory + GamePortal → WS push** — les deux consomment `realtimeStore` (GamePortal garde un poll de resync en fallback).
 4. ✅ **Veille welcome/bump/rotation/ai_dataset** — welcome déjà migré, **ai_dataset migré en gRPC**, bump/rotation laissés en HTTP (fréquence faible, acceptable).
@@ -97,8 +97,7 @@ Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 | Point | Nature | Quand le faire |
 |---|---|---|
-| `TamagotchiService.ListCards` en **server-streaming** | Optimisation | Si le nombre de cartes par guild rend la réponse unaire `CardList` trop lourde (pagination/mémoire). Aujourd'hui non justifié. |
-| `ai_dataset` → **client-streaming** (`CollectStream`) | Optimisation | Si le volume per-message devient un coût mesurable. L'unaire fire-and-forget actuel suffit ; pattern streaming inexistant ailleurs dans le projet. |
+| `ai_dataset` → **client-streaming** (`CollectStream`) | Optimisation | Si le volume per-message devient un coût mesurable. L'unaire fire-and-forget actuel suffit. (Note : depuis le server-streaming de `ListCards`, le projet a désormais un précédent de streaming gRPC.) |
 | **bump** / **rotation** → gRPC | Uniformité | Seulement par cohérence : fréquence faible (tick 10 min, poll 60 s), bénéfice marginal. Laisser en HTTP par défaut. |
 | `welcome` `send_log` → uniformiser | Cosmétique | Log générique fire-and-forget, non spécifique à welcome ; à traiter avec une éventuelle migration globale du logging, pas isolément. |
 | `GameServerStatsBar` / `ServerHealthPage` / `SystemOpsPage` / `DockerAdminSection` / `ConnectionBanner` | **NE PAS migrer** | Polling de **mesures continues échantillonnées** = bon choix (cf. règle ci-dessus). |

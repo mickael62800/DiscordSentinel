@@ -13,7 +13,10 @@ service TamagotchiService {
   rpc Visit(VisitRequest) returns (VisitResult);
   rpc Combat(CombatRequest) returns (CombatResult);
   rpc SetCardLocation(SetCardLocationRequest) returns (Empty);
-  rpc ListCards(ListCardsRequest) returns (CardList);
+  // Server-streaming : l'API streame les cartes vivantes une a une au lieu
+  // d'une CardList unaire. Le serveur pagine la lecture DB en interne (cf.
+  // `limit` = taille de batch), le client n'a plus a gerer la pagination.
+  rpc ListCards(ListCardsRequest) returns (stream Card);
 }
 
 message Empty {}
@@ -136,7 +139,10 @@ message SetCardLocationRequest {
 }
 
 message ListCardsRequest {
+  // Taille de batch pour la lecture paginee cote serveur (defaut 500 si 0).
+  // Le client n'a plus a iterer : il consomme le stream jusqu'au bout.
   int64 limit = 1;
+  // Curseur de depart optionnel (rarement utile en mode stream complet).
   optional string after_id = 2;
 }
 
@@ -144,8 +150,4 @@ message Card {
   string card_channel_id = 1;
   string card_message_id = 2;
   Pet pet = 3;
-}
-
-message CardList {
-  repeated Card cards = 1;
 }

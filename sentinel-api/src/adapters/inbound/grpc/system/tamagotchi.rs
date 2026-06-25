@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
@@ -186,35 +187,70 @@ impl TamagotchiService for TamagotchiGrpc {
         Ok(Response::new(proto::Empty {}))
     }
 
+    type ListCardsStream = ListCardsStream;
+
     async fn list_cards(
         &self,
         request: Request<proto::ListCardsRequest>,
-    ) -> Result<Response<proto::CardList>, Status> {
+    ) -> Result<Response<Self::ListCardsStream>, Status> {
         let req = request.into_inner();
-        let after = match req.after_id.as_deref() {
+        // `limit` sert de taille de batch pour la lecture paginee interne.
+        let batch = if req.limit > 0 { req.limit } else { 500 };
+        let start_after = match req.after_id.as_deref() {
             Some(s) if !s.is_empty() => Some(parse_uuid(s)?),
             _ => None,
         };
-        let pets = self
-            .uc
-            .list_cards(req.limit, after)
-            .await
-            .map_err(domain_to_status)?;
-        let cards = pets
-            .into_iter()
-            .filter_map(|p| {
-                let ch = p.card_channel_id.clone()?;
-                let msg = p.card_message_id.clone()?;
-                Some(proto::Card {
-                    card_channel_id: ch,
-                    card_message_id: msg,
-                    pet: Some(pet_to_proto(p)),
-                })
-            })
-            .collect();
-        Ok(Response::new(proto::CardList { cards }))
+
+        let uc = self.uc.clone();
+        // Canal borne : applique un back-pressure naturel si le client consomme
+        // lentement (l'envoi bloque tant que le buffer est plein).
+        let (tx, rx) = tokio::sync::mpsc::channel(128);
+        tokio::spawn(async move {
+            let mut after = start_after;
+            loop {
+                let pets = match uc.list_cards(batch, after).await {
+                    Ok(p) => p,
+                    Err(e) => {
+                        let _ = tx.send(Err(domain_to_status(e))).await;
+                        return;
+                    }
+                };
+                if pets.is_empty() {
+                    break;
+                }
+                let len = pets.len();
+                // Curseur = id du dernier pet (Uuid Copy) avant consommation.
+                after = pets.last().map(|p| p.id);
+                for p in pets {
+                    // Ignore les pets sans carte Discord enregistree.
+                    let (Some(ch), Some(msg)) =
+                        (p.card_channel_id.clone(), p.card_message_id.clone())
+                    else {
+                        continue;
+                    };
+                    let card = proto::Card {
+                        card_channel_id: ch,
+                        card_message_id: msg,
+                        pet: Some(pet_to_proto(p)),
+                    };
+                    // Client deconnecte -> on arrete de paginer.
+                    if tx.send(Ok(card)).await.is_err() {
+                        return;
+                    }
+                }
+                // Derniere page atteinte.
+                if len < batch as usize {
+                    break;
+                }
+            }
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
     }
 }
+
+/// Type de stream renvoye par `ListCards` (server-streaming).
+type ListCardsStream = ReceiverStream<Result<proto::Card, Status>>;
 
 fn pet_to_proto(p: Pet) -> proto::Pet {
     let (xp_in_level, xp_for_level) = xp_progress(p.xp);

@@ -77,7 +77,6 @@ pub struct CombatData {
 
 /// Une carte a rafraichir (refresh horaire).
 pub struct CardData {
-    pub id: String,
     pub guild_id: String,
     pub owner_id: String,
     pub card_channel_id: String,
@@ -295,29 +294,35 @@ impl TamaApi {
         }
     }
 
-    /// Une page de cartes a rafraichir (pagination par curseur `id`).
-    pub async fn list_cards(&self, limit: i64, after_id: Option<String>) -> Result<Vec<CardData>, String> {
-        let req = proto::ListCardsRequest { limit, after_id };
+    /// Toutes les cartes vivantes a rafraichir, consommees depuis le
+    /// server-stream `ListCards` (le serveur pagine la lecture DB en interne).
+    /// Le circuit breaker garde l'ouverture de l'appel ; les erreurs survenant
+    /// pendant la consommation du stream sont remontees telles quelles.
+    pub async fn list_cards(&self) -> Result<Vec<CardData>, String> {
+        // limit = taille de batch cote serveur ; le client itere le stream.
+        let req = proto::ListCardsRequest { limit: 500, after_id: None };
         let g = &self.grpc;
         let mut c = g.tamagotchi();
-        let list = g
+        let mut stream = g
             .guarded(|| async move { c.list_cards(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(list
-            .cards
-            .into_iter()
-            .filter_map(|card| {
-                let pet = card.pet?;
-                Some(CardData {
-                    id: pet.id.clone(),
-                    guild_id: pet.guild_id.clone(),
-                    owner_id: pet.owner_id.clone(),
-                    card_channel_id: card.card_channel_id,
-                    card_message_id: card.card_message_id,
-                    pet: PetData::from(pet),
-                })
-            })
-            .collect())
+
+        let mut out = Vec::new();
+        while let Some(card) = stream
+            .message()
+            .await
+            .map_err(|e| format!("stream tamagotchi: {e}"))?
+        {
+            let Some(pet) = card.pet else { continue };
+            out.push(CardData {
+                guild_id: pet.guild_id.clone(),
+                owner_id: pet.owner_id.clone(),
+                card_channel_id: card.card_channel_id,
+                card_message_id: card.card_message_id,
+                pet: PetData::from(pet),
+            });
+        }
+        Ok(out)
     }
 }
