@@ -494,6 +494,16 @@ pub async fn build_app_state(
     let security_audit_uc: Arc<dyn crate::ports::inbound::system::manage_security_audit::ManageSecurityAuditUseCase> =
         Arc::new(sentinel_core::application::system::manage_security_audit_service::ManageSecurityAuditService::new(security_audit_repo));
 
+    // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
+    let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
+        Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
+    let tls_cert_uc: Arc<dyn crate::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase> =
+        Arc::new(sentinel_core::application::system::read_tls_cert_service::ReadTlsCertService::new(tls_cert_reader));
+    let geoip_lookup: Arc<dyn crate::ports::outbound::system::geoip_lookup::GeoIpLookup> =
+        Arc::new(crate::adapters::outbound::geoip::IpApiGeoIpLookup::new());
+    let geoip_uc: Arc<dyn crate::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase> =
+        Arc::new(sentinel_core::application::system::lookup_geoip_service::LookupGeoIpService::new(geoip_lookup));
+
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
     let coude_bet_repo = Arc::new(PgBetRepository::new(
@@ -897,6 +907,8 @@ pub async fn build_app_state(
         host_probe_uc,
         security_logs_uc,
         security_audit_uc,
+        tls_cert_uc,
+        geoip_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(pg_pool.clone()),
         ))),

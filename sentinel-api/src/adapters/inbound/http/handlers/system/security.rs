@@ -488,24 +488,30 @@ pub async fn geoip_lookup(
     Query(q): Query<GeoIpQuery>,
 ) -> Result<Json<Vec<GeoIpEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let ips: Vec<&str> = q.ips.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).take(100).collect();
-    if ips.is_empty() { return Ok(Json(vec![])); }
-
-    let body: Vec<serde_json::Value> = ips.iter()
-        .map(|ip| serde_json::json!({"query": ip, "fields": "status,country,countryCode,regionName,city,isp,as,query"}))
+    let ips: Vec<String> = q
+        .ips
+        .split(',')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .take(100)
+        .map(|s| s.to_string())
         .collect();
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .build()
-        .map_err(|e| ApiError(DomainError::Internal(format!("reqwest build: {e}"))))?;
-
-    let resp = client.post("http://ip-api.com/batch")
-        .json(&body).send().await
-        .map_err(|e| ApiError(DomainError::Internal(format!("geoip lookup: {e}"))))?;
-    let data: Vec<GeoIpEntry> = resp.json().await
-        .map_err(|e| ApiError(DomainError::Internal(format!("geoip parse: {e}"))))?;
-    Ok(Json(data))
+    let rows = state.geoip_uc.lookup(ips).await.map_err(ApiError)?;
+    Ok(Json(
+        rows.into_iter()
+            .map(|e| GeoIpEntry {
+                query: e.query,
+                status: e.status,
+                country: e.country,
+                country_code: e.country_code,
+                region_name: e.region_name,
+                city: e.city,
+                isp: e.isp,
+                asn: e.asn,
+            })
+            .collect(),
+    ))
 }
 
 // Container changes (snapshot diff via bollard)
@@ -921,118 +927,15 @@ pub async fn tls_cert(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TlsCertInfo>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let domain = std::env::var("WEB_DOMAIN").unwrap_or_default();
-    if domain.is_empty() {
-        return Err(ApiError(DomainError::Internal(
-            "WEB_DOMAIN non defini en env".into(),
-        )));
-    }
-
-    // 2 strategies pour recuperer le cert :
-    //
-    // 1. Lecture fichier /etc/letsencrypt/live/{domain}/cert.pem
-    //    -> echoue si volume monte mais perms certbot "live/" en 700 root
-    //
-    // 2. Fallback : openssl s_client connect web:443 -showcerts
-    //    -> recupere le cert directement via TLS handshake interne,
-    //       independant des perms fichier
-    //
-    // On essaye d'abord la lecture (rapide), fallback openssl si KO.
-    let path = format!("/etc/letsencrypt/live/{domain}/cert.pem");
-    let pem = match std::fs::read_to_string(&path) {
-        Ok(p) => p,
-        Err(_) => fetch_cert_via_openssl(&domain).map_err(|e| {
-            ApiError(DomainError::Internal(format!(
-                "lecture cert {path} echouee + fallback openssl echec : {e}"
-            )))
-        })?,
-    };
-
-    let info = parse_cert(&pem)
-        .map_err(|e| ApiError(DomainError::Internal(format!("parse cert: {e}"))))?;
-    Ok(Json(info))
-}
-
-/// Fallback : lance `openssl s_client -connect web:443 -servername {domain}`
-/// pour recuperer le cert via TLS handshake. Necessite openssl dans l'image
-/// (deja dispo dans les images Debian/Alpine standards).
-fn fetch_cert_via_openssl(domain: &str) -> Result<String, String> {
-    use std::io::Write;
-    use std::process::Command;
-    use std::process::Stdio;
-
-    // -connect web:443 = service nginx via DNS interne Docker
-    // -servername = SNI pour que nginx serve le bon vhost
-    // Stdin "" pour fermer la connexion immediatement apres le handshake
-    let mut child = Command::new("openssl")
-        .args(["s_client", "-connect", "web:443", "-servername", domain, "-showcerts"])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("spawn openssl: {e}"))?;
-
-    if let Some(mut stdin) = child.stdin.take() {
-        let _ = stdin.write_all(b"");
-    }
-
-    let output = child
-        .wait_with_output()
-        .map_err(|e| format!("wait openssl: {e}"))?;
-    let stdout = String::from_utf8_lossy(&output.stdout);
-
-    // Extraire le PREMIER bloc -----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----
-    let begin = stdout
-        .find("-----BEGIN CERTIFICATE-----")
-        .ok_or_else(|| "BEGIN CERTIFICATE marker absent".to_string())?;
-    let end_marker = "-----END CERTIFICATE-----";
-    let end = stdout[begin..]
-        .find(end_marker)
-        .ok_or_else(|| "END CERTIFICATE marker absent".to_string())?;
-    let pem = &stdout[begin..begin + end + end_marker.len()];
-    Ok(pem.to_string())
-}
-
-fn parse_cert(pem: &str) -> Result<TlsCertInfo, String> {
-    use x509_parser::pem::parse_x509_pem;
-    use x509_parser::prelude::*;
-
-    let (_, p) = parse_x509_pem(pem.as_bytes()).map_err(|e| format!("pem: {e}"))?;
-    let (_, cert) = X509Certificate::from_der(&p.contents).map_err(|e| format!("der: {e}"))?;
-
-    let issuer = cert.issuer().to_string();
-    let subject = cert.subject().to_string();
-    let nb = cert.validity().not_before;
-    let na = cert.validity().not_after;
-
-    // Conversion via ASN1Time -> chrono (pragmatique : format RFC).
-    let not_before = nb.to_rfc2822().unwrap_or_else(|_| nb.to_string());
-    let not_after = na.to_rfc2822().unwrap_or_else(|_| na.to_string());
-
-    let now = chrono::Utc::now();
-    let na_chrono = chrono::DateTime::<chrono::Utc>::from_timestamp(na.timestamp(), 0)
-        .ok_or_else(|| "timestamp invalide".to_string())?;
-    let days_until_expiry = (na_chrono - now).num_days();
-    let is_expired = days_until_expiry < 0;
-    let is_warning = !is_expired && days_until_expiry < 14;
-
-    // Domaine = CN du subject
-    let domain = cert
-        .subject()
-        .iter_common_name()
-        .next()
-        .and_then(|cn| cn.as_str().ok())
-        .unwrap_or("")
-        .to_string();
-
-    Ok(TlsCertInfo {
-        domain,
-        issuer,
-        subject,
-        not_before,
-        not_after,
-        days_until_expiry,
-        is_expired,
-        is_warning,
-    })
+    let info = state.tls_cert_uc.read().await.map_err(ApiError)?;
+    Ok(Json(TlsCertInfo {
+        domain: info.domain,
+        issuer: info.issuer,
+        subject: info.subject,
+        not_before: info.not_before,
+        not_after: info.not_after,
+        days_until_expiry: info.days_until_expiry,
+        is_expired: info.is_expired,
+        is_warning: info.is_warning,
+    }))
 }
