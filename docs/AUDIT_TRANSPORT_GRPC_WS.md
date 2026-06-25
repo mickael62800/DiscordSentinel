@@ -51,7 +51,7 @@ Les endpoints ajoutés récemment passaient par **HTTP** (`BaseApiClient`) alors
 Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 - **welcome** : déjà migré. Le bot lit en gRPC (`WelcomeService.GetConfig` + `MembersService.GetMember` sur le hot path member-join) ; aucun chemin d'écriture welcome n'est appelé par le bot. Le seul HTTP restant est `send_log` (log générique fire-and-forget, non spécifique à welcome). **Rien à faire.**
-- **ai_dataset** : ✅ **migré en gRPC** (`AiDatasetService.CollectMessage`). C'était le seul candidat défendable du lot car l'appel est fire-and-forget **sur chaque message** (chemin le plus chaud du bot). L'endpoint HTTP `POST /api/ai-dataset/collect` a été supprimé.
+- **ai_dataset** : ✅ **migré en gRPC client-streaming** (`AiDatasetService.CollectMessages`). C'était le candidat le plus défendable du lot (collecte **sur chaque message**, chemin le plus chaud du bot). Le bot pousse les messages dans un canal mpsc via `try_send` non bloquant ; une task de fond relaie ce canal vers une stream gRPC longue durée, réétablie automatiquement en cas de rupture. L'endpoint HTTP `POST /api/ai-dataset/collect` a été supprimé.
 - **bump** : 100% HTTP. Fréquence faible (POST sur `/bump`, GET reminders toutes les 60 s, POST reminder-sent). **HTTP acceptable**, pas de migration justifiée.
 - **rotation** : 100% HTTP (state machine : GET config/state/history + POST save/served). Fréquence faible (tick 10 min + commandes). **HTTP acceptable.**
 
@@ -97,7 +97,6 @@ Audit réalisé sur `welcome`, `bump`, `rotation`, `ai_dataset` :
 
 | Point | Nature | Quand le faire |
 |---|---|---|
-| `ai_dataset` → **client-streaming** (`CollectStream`) | Optimisation | Si le volume per-message devient un coût mesurable. L'unaire fire-and-forget actuel suffit. (Note : depuis le server-streaming de `ListCards`, le projet a désormais un précédent de streaming gRPC.) |
 | **bump** / **rotation** → gRPC | Uniformité | Seulement par cohérence : fréquence faible (tick 10 min, poll 60 s), bénéfice marginal. Laisser en HTTP par défaut. |
 | `welcome` `send_log` → uniformiser | Cosmétique | Log générique fire-and-forget, non spécifique à welcome ; à traiter avec une éventuelle migration globale du logging, pas isolément. |
 | `GameServerStatsBar` / `ServerHealthPage` / `SystemOpsPage` / `DockerAdminSection` / `ConnectionBanner` | **NE PAS migrer** | Polling de **mesures continues échantillonnées** = bon choix (cf. règle ci-dessus). |

@@ -172,6 +172,9 @@ impl EventHandler for Handler {
         // (timeout par guild, defaut 2 min). Suivi en memoire -> cleanup
         // dans le bot, pas dans le worker.
         modules::slot::spawn_background(ctx.clone());
+
+        // AI dataset : task de collecte (client-streaming gRPC longue duree).
+        modules::ai_dataset::spawn_collector(ctx.clone()).await;
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

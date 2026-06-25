@@ -23,6 +23,8 @@ uuid = { workspace = true }
 rand = { workspace = true }
 redis = { version = "0.27", features = ["tokio-comp"] }
 futures-util = { workspace = true }
+# `ReceiverStream` : expose un mpsc en client-streaming gRPC (ai-dataset).
+tokio-stream = "0.1"
 regex = "1"
 time = "0.3"
 base64 = "0.22"
