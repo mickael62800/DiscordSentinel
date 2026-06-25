@@ -476,13 +476,18 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
 
-    // 4. Cree le thread "Confession Replies (#N)"
+    // 4. Cree le thread "Confession Replies (#N)".
+    // auto_archive_duration : le thread s'archive (= se ferme/repli) apres ce
+    // delai d'inactivite. Discord n'autorise que 60min / 1j / 3j / 1 semaine.
+    // 1h par defaut pour garder le salon propre ; un thread archive se rouvre
+    // automatiquement des qu'une nouvelle reponse y est postee.
     let thread_name = format!("Confession Replies (#{})", public_number);
     let thread = ch
         .create_thread_from_message(
             &ctx.http,
             posted.id,
-            serenity::builder::CreateThread::new(thread_name),
+            serenity::builder::CreateThread::new(thread_name)
+                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneHour),
         )
         .await
         .ok();
