@@ -212,7 +212,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur log warn");
-            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, "⚠️ Impossible d'enregistrer l'avertissement pour le moment, reessaye dans un instant.").await;
         }
     }
 }

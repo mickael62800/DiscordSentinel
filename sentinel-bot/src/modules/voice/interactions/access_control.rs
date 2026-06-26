@@ -41,7 +41,7 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     let selected_users = match &component.data.kind {
         ComponentInteractionDataKind::UserSelect { values } => values.clone(),
         _ => {
-            super::respond_followup_ephemeral(ctx, component, "Erreur: type de composant inattendu.").await;
+            super::respond_followup_ephemeral(ctx, component, "❌ Interaction invalide, relance l'action depuis le panneau du salon.").await;
             return;
         }
     };
@@ -60,7 +60,7 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     };
     if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
         error!(error = %e, "Erreur permission invite");
-        super::respond_followup_ephemeral(ctx, component, "Erreur lors de l'invitation.").await;
+        super::respond_followup_ephemeral(ctx, component, "❌ Impossible d'inviter ce membre (le bot manque peut-etre la permission de gerer ce salon).").await;
         return;
     }
 
