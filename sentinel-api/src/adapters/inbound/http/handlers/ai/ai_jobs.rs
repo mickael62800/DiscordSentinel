@@ -19,6 +19,7 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
@@ -92,11 +93,7 @@ pub async fn get_ai_job(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<AiJobStatusDto>, ApiError> {
-    let uuid = Uuid::parse_str(&id).map_err(|_| {
-        ApiError::from(DomainError::ValidationError(format!(
-            "job_id invalide : {id}"
-        )))
-    })?;
+    let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;
 
     let job = sqlx::query_as::<_, AiJobStatusDto>(
         "SELECT id, guild_id, job_type, status, input_payload, result_payload, \

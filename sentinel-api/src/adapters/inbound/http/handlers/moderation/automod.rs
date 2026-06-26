@@ -11,7 +11,6 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
-use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
@@ -375,8 +374,7 @@ pub async fn resolve_review(
     Path(review_id): Path<String>,
     Json(body): Json<ResolveReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
 
     let source = match body.source.as_deref() {
         Some("discord") => "discord",
@@ -483,8 +481,7 @@ pub async fn ignore_review(
     Json(body): Json<CloseIgnoreBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let source = match body.source.as_deref() {
         Some("discord") => "discord",
         _ => "web",
@@ -546,8 +543,7 @@ pub async fn reopen_review(
     Json(body): Json<ReopenBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let source = match body.source.as_deref() {
         Some("discord") => "discord",
         _ => "web",
@@ -604,8 +600,7 @@ pub async fn vote_review(
     Path(review_id): Path<String>,
     Json(body): Json<CastVoteBody>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let votes = state
         .automod_reviews_uc
         .cast_vote(crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
@@ -634,8 +629,7 @@ pub async fn get_review(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     match state.automod_reviews_uc.get(id).await? {
         Some(r) => {
             let rid = r.id;
@@ -654,8 +648,7 @@ pub async fn list_review_votes(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let votes = state.automod_reviews_uc.list_votes(id).await?;
     Ok(Json(votes.into_iter().map(Into::into).collect()))
 }
@@ -677,8 +670,7 @@ pub async fn decide_review(
     Path(review_id): Path<String>,
     Json(body): Json<DecideReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let quorum = body.quorum.clamp(1, 100) as usize;
     let (review, tally) = state.automod_reviews_uc.decide(id, quorum, &body.tie_action).await?;
     state.broadcaster.broadcast(
@@ -733,8 +725,7 @@ pub async fn get_discussion(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Option<DiscussionChannelDto>>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let existing = state.automod_reviews_uc.get_discussion(id).await?;
     Ok(Json(existing.map(|d| DiscussionChannelDto::build(d, false))))
 }
@@ -746,8 +737,7 @@ pub async fn delete_discussion(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     state.automod_reviews_uc.delete_discussion(id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -780,8 +770,7 @@ pub async fn open_discussion(
     use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
     use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
 
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
 
     let (discussion, created) = state
         .automod_reviews_uc
@@ -855,8 +844,7 @@ pub async fn append_discussion_messages(
     Json(body): Json<AppendDiscussionMessagesBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
 
     let messages: Vec<DiscussionMessage> = body
         .messages
@@ -938,8 +926,7 @@ pub async fn list_discussion_messages(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<DiscussionMessageDto>>, ApiError> {
-    let id = Uuid::parse_str(&review_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("review_id invalide".into())))?;
+    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let msgs = state.automod_reviews_uc.list_discussion_messages(id).await?;
     let dtos = msgs
         .into_iter()

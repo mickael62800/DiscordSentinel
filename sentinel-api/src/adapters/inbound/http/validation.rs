@@ -3,6 +3,7 @@
 //! Toutes les fonctions retournent `Result<(), DomainError::ValidationError>`.
 
 use sentinel_core::domain::errors::DomainError;
+use uuid::Uuid;
 
 // ── Limites ──
 
@@ -98,6 +99,15 @@ pub fn validate_title(value: &str) -> Result<(), DomainError> {
 
 pub fn validate_search(value: &Option<String>) -> Result<(), DomainError> {
     validate_optional_string("search", value, MAX_SEARCH_LEN)
+}
+
+/// Parse un identifiant UUID passe en path/query/body. Retourne une
+/// `ValidationError` contextualisee si la chaine n'est pas un UUID valide.
+/// Remplace le pattern duplique
+/// `Uuid::parse_str(...).map_err(|_| ValidationError(...))`.
+pub fn parse_uuid(field: &str, value: &str) -> Result<Uuid, DomainError> {
+    Uuid::parse_str(value)
+        .map_err(|_| DomainError::ValidationError(format!("{field} invalide : {value}")))
 }
 
 // ── Validateurs numériques ──

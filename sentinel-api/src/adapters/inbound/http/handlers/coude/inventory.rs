@@ -4,7 +4,6 @@ use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use uuid::Uuid;
 
 use super::dto::AddItemDto;
 use super::dto::BuyInsuranceDto;
@@ -16,8 +15,8 @@ use super::dto::PrimeDto;
 use super::dto::UseItemDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::coude::inventory::NewCoudePrime;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 // ── Items ──
@@ -198,11 +197,7 @@ pub async fn expire_insurance(
     State(state): State<AppState>,
     Path(insurance_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let id = Uuid::parse_str(&insurance_id).map_err(|_| {
-        ApiError::from(DomainError::ValidationError(
-            "ID d'assurance invalide (UUID attendu)".into(),
-        ))
-    })?;
+    let id = validation::parse_uuid("insurance_id", &insurance_id).map_err(ApiError)?;
     state.coude_inventory_uc.expire_insurance(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

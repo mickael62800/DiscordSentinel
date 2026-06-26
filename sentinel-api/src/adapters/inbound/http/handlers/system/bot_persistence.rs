@@ -186,8 +186,7 @@ pub async fn update_ticket_sla(
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketSlaDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let uuid = uuid::Uuid::parse_str(&id)
-        .map_err(|_| ApiError(DomainError::ValidationError("ticket id invalide".into())))?;
+    let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
     state.tickets_uc
         .update_sla(uuid, dto.first_response_at.as_deref(), dto.resolved_at.as_deref(), dto.satisfaction_rating)
         .await
@@ -443,8 +442,7 @@ pub async fn resolve_pending_action(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // H10 — Revérif permission serveur : on lookup le guild_id de l'action
     // pending puis on gate sur Moderator+.
-    let uuid = uuid::Uuid::parse_str(&id)
-        .map_err(|_| ApiError(DomainError::ValidationError("id invalide".into())))?;
+    let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
     if rbac.is_some() {
         if let Some(guild_id) = state.pending_action_repo.get_guild_id(uuid).await? {

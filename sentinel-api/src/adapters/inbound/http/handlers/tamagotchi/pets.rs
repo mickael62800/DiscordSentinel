@@ -13,6 +13,7 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::{require_role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use axum::http::StatusCode;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
@@ -110,8 +111,7 @@ pub async fn delete_pet(
     Path((_guild_id, pet_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| forbid(s, "owner+ requis"))?;
-    let id = Uuid::parse_str(&pet_id)
-        .map_err(|_| ApiError::from(DomainError::ValidationError("pet_id invalide".into())))?;
+    let id = validation::parse_uuid("pet_id", &pet_id).map_err(ApiError)?;
     state.pets_uc.delete(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

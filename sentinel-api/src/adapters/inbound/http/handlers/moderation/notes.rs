@@ -14,7 +14,6 @@ use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
 
 /// POST /api/notes
 pub async fn add_note(
@@ -68,9 +67,7 @@ pub async fn delete_note(
     // pas le guild_id, donc on fetch d'abord en direct sqlx (pattern
     // "ressource-id-based" — plus simple qu'ajouter une methode au repo).
     if rbac.is_some() {
-        let note_uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
-            ApiError(DomainError::ValidationError("id note invalide".into()))
-        })?;
+        let note_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
         let row: Option<(String,)> = sqlx::query_as(
             "SELECT guild_id FROM user_notes WHERE id = $1",
         )

@@ -454,11 +454,7 @@ pub async fn add_evidence(
     // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
     sentinel_core::domain::entities::moderation::review::manual::validate_evidence_url(&dto.url)
         .map_err(|m| ApiError(sentinel_core::domain::errors::DomainError::ValidationError(m.into())))?;
-    let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
-        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "action_id invalide".into(),
-        ))
-    })?;
+    let action_uuid = validation::parse_uuid("action_id", &dto.action_id).map_err(ApiError)?;
     validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
     let description = dto.description.as_deref().map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
 
@@ -484,11 +480,7 @@ pub async fn list_evidence(
     State(state): State<AppState>,
     Path(action_id): Path<String>,
 ) -> Result<Json<Vec<EvidenceEntryDto>>, ApiError> {
-    let action_uuid = uuid::Uuid::parse_str(&action_id).map_err(|_| {
-        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "action_id invalide".into(),
-        ))
-    })?;
+    let action_uuid = validation::parse_uuid("action_id", &action_id).map_err(ApiError)?;
 
     let entries = state.evidence_repo.list(action_uuid).await?;
     let dtos = entries
@@ -563,11 +555,7 @@ pub async fn add_review(
     rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddReviewDto>,
 ) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
-    let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
-        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "action_id invalide".into(),
-        ))
-    })?;
+    let action_uuid = validation::parse_uuid("action_id", &dto.action_id).map_err(ApiError)?;
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("added_by", &dto.added_by).map_err(ApiError)?;
 
@@ -620,11 +608,7 @@ pub async fn resolve_review(
     Path(id): Path<String>,
     Json(dto): Json<ResolveReviewDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let review_uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
-        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "id invalide".into(),
-        ))
-    })?;
+    let review_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
     // RBAC via le repo.
     if rbac.is_some() {
@@ -748,8 +732,7 @@ pub async fn delete_action(
     rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
 ) -> Result<axum::http::StatusCode, ApiError> {
-    let uuid = uuid::Uuid::parse_str(&id)
-        .map_err(|_| ApiError(sentinel_core::domain::errors::DomainError::ValidationError("ID invalide".into())))?;
+    let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
     // Phase 4 : lookup dans `audit_logs` (event_type='mod_*') et plus
     // dans `moderation_actions` qui n'est plus alimentee. action_id est

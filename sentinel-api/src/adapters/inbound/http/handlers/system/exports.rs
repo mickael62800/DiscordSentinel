@@ -124,8 +124,7 @@ pub async fn get_export_job(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<ExportJobStatusDto>, ApiError> {
-    let uuid = Uuid::parse_str(&id)
-        .map_err(|_| ApiError(DomainError::ValidationError(format!("job_id invalide : {id}"))))?;
+    let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;
 
     let job = sqlx::query_as::<_, ExportJobStatusDto>(
         "SELECT id, guild_id, requested_by, job_type, format, status, result, result_rows, \
