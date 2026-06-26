@@ -105,6 +105,21 @@ pub struct SaveWelcomeConfigDto {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: Option<String>,
     pub rejoin_message: Option<String>,
+    // Titres / images / pieds d'embed : etaient absents du DTO -> ignores par
+    // serde et forces a None dans dto_to_patch, donc jamais persistes (l'URL
+    // d'image "disparaissait" apres sauvegarde).
+    pub welcome_title: Option<String>,
+    pub welcome_image_url: Option<String>,
+    pub welcome_footer_text: Option<String>,
+    pub leave_title: Option<String>,
+    pub leave_image_url: Option<String>,
+    pub leave_footer_text: Option<String>,
+    pub anniversary_title: Option<String>,
+    pub anniversary_image_url: Option<String>,
+    pub anniversary_footer_text: Option<String>,
+    pub rejoin_title: Option<String>,
+    pub rejoin_image_url: Option<String>,
+    pub rejoin_footer_text: Option<String>,
 }
 
 /// GET /api/welcome/{guild_id}
@@ -168,15 +183,15 @@ fn dto_to_patch(dto: SaveWelcomeConfigDto) -> WelcomeConfigPatch {
         welcome_embed_color: dto.welcome_embed_color,
         welcome_dm_enabled: dto.welcome_dm_enabled,
         welcome_dm_message: dto.welcome_dm_message,
-        welcome_title: None,
-        welcome_image_url: None,
-        welcome_footer_text: None,
+        welcome_title: dto.welcome_title,
+        welcome_image_url: dto.welcome_image_url,
+        welcome_footer_text: dto.welcome_footer_text,
         leave_enabled: dto.leave_enabled,
         leave_channel_id: dto.leave_channel_id,
         leave_message: dto.leave_message,
-        leave_title: None,
-        leave_image_url: None,
-        leave_footer_text: None,
+        leave_title: dto.leave_title,
+        leave_image_url: dto.leave_image_url,
+        leave_footer_text: dto.leave_footer_text,
         rules_enabled: dto.rules_enabled,
         rules_channel_id: dto.rules_channel_id,
         rules_message: dto.rules_message,
@@ -191,13 +206,13 @@ fn dto_to_patch(dto: SaveWelcomeConfigDto) -> WelcomeConfigPatch {
         anniversary_enabled: dto.anniversary_enabled,
         anniversary_channel_id: dto.anniversary_channel_id,
         anniversary_message: dto.anniversary_message,
-        anniversary_title: None,
-        anniversary_image_url: None,
-        anniversary_footer_text: None,
+        anniversary_title: dto.anniversary_title,
+        anniversary_image_url: dto.anniversary_image_url,
+        anniversary_footer_text: dto.anniversary_footer_text,
         rejoin_message: dto.rejoin_message,
-        rejoin_title: None,
-        rejoin_image_url: None,
-        rejoin_footer_text: None,
+        rejoin_title: dto.rejoin_title,
+        rejoin_image_url: dto.rejoin_image_url,
+        rejoin_footer_text: dto.rejoin_footer_text,
     }
 }
 
