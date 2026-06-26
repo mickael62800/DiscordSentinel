@@ -313,8 +313,16 @@
         }
     }
 
+    use crate::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoiceWhitelistStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoicePresetStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoiceBanStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoiceInviteStore;
+    use crate::ports::outbound::community::voice_channel_repository::VoiceThemeStore;
+
     #[async_trait]
-    impl VoiceChannelRepository for MockVoiceRepo {
+    impl VoiceChannelStore for MockVoiceRepo {
         async fn find_all(&self) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
         async fn find_all_by_guild(&self, _: &str) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
         async fn find_closed_by_guild(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
@@ -337,22 +345,42 @@
         async fn update_owner(&self, _: Uuid, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
         async fn update_queue_channel(&self, _: Uuid, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
         async fn update_stage(&self, _: Uuid, _: bool) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[async_trait]
+    impl VoiceCoAdminStore for MockVoiceRepo {
         async fn find_co_admins(&self, _: Uuid) -> Result<Vec<VoiceChannelCoAdmin>, DomainError> { Ok(vec![]) }
         async fn add_co_admin(&self, _: &VoiceChannelCoAdmin) -> Result<(), DomainError> { Ok(()) }
         async fn remove_co_admin(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[async_trait]
+    impl VoiceWhitelistStore for MockVoiceRepo {
         async fn find_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { Ok(vec![]) }
         async fn add_to_whitelist(&self, entry: &VoiceChannelWhitelistEntry) -> Result<(), DomainError> {
             self.whitelist_entries.lock().unwrap().push(entry.clone());
             Ok(())
         }
         async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[async_trait]
+    impl VoicePresetStore for MockVoiceRepo {
         async fn find_preset(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { Ok(None) }
         async fn upsert_preset(&self, _: &crate::domain::entities::community::voice_channel::VoiceChannelPreset) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[async_trait]
+    impl VoiceBanStore for MockVoiceRepo {
         async fn find_bans(&self, _: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError> { Ok(vec![]) }
         async fn find_active_ban(&self, _: Uuid, _: &str) -> Result<Option<VoiceChannelBan>, DomainError> { Ok(None) }
         async fn save_ban(&self, _: &VoiceChannelBan) -> Result<(), DomainError> { Ok(()) }
         async fn remove_ban(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
         async fn cleanup_expired_bans(&self) -> Result<u64, DomainError> { Ok(0) }
+    }
+
+    #[async_trait]
+    impl VoiceInviteStore for MockVoiceRepo {
         async fn find_invite_links(&self, _: Uuid) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
             Ok(self.invite_links.lock().unwrap().clone())
         }
@@ -367,6 +395,10 @@
             Ok(*self.increment_result.lock().unwrap())
         }
         async fn revoke_invite_link(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[async_trait]
+    impl VoiceThemeStore for MockVoiceRepo {
         async fn find_themes(&self, _: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
             Ok(self.themes.lock().unwrap().clone())
         }

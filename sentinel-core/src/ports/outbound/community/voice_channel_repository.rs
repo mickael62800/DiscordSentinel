@@ -10,9 +10,9 @@ use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
 
+/// Gestion du cycle de vie des salons vocaux (CRUD + mises a jour d'attributs).
 #[async_trait]
-pub trait VoiceChannelRepository: Send + Sync {
-    // Channels
+pub trait VoiceChannelStore: Send + Sync {
     async fn find_all(&self) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn find_all_by_guild(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError>;
     /// Historique : salons `channel_status = 'closed'` d'une guild, tries
@@ -33,36 +33,54 @@ pub trait VoiceChannelRepository: Send + Sync {
     async fn update_owner(&self, id: Uuid, owner_id: &str, owner_name: &str) -> Result<(), DomainError>;
     async fn update_queue_channel(&self, id: Uuid, queue_channel_id: Option<&str>) -> Result<(), DomainError>;
     async fn update_stage(&self, id: Uuid, stage_enabled: bool) -> Result<(), DomainError>;
+}
 
-    // Co-admins
+/// Gestion des co-administrateurs d'un salon vocal.
+#[async_trait]
+pub trait VoiceCoAdminStore: Send + Sync {
     async fn find_co_admins(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelCoAdmin>, DomainError>;
     async fn add_co_admin(&self, co_admin: &VoiceChannelCoAdmin) -> Result<(), DomainError>;
     async fn remove_co_admin(&self, voice_channel_id: Uuid, user_id: &str) -> Result<(), DomainError>;
+}
 
-    // Whitelists
+/// Gestion des listes blanches par proprietaire.
+#[async_trait]
+pub trait VoiceWhitelistStore: Send + Sync {
     async fn find_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError>;
     async fn add_to_whitelist(&self, entry: &VoiceChannelWhitelistEntry) -> Result<(), DomainError>;
     async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError>;
+}
 
-    // Presets par proprietaire
+/// Gestion des presets de configuration par proprietaire.
+#[async_trait]
+pub trait VoicePresetStore: Send + Sync {
     async fn find_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError>;
     async fn upsert_preset(&self, preset: &VoiceChannelPreset) -> Result<(), DomainError>;
+}
 
-    // Bans
+/// Gestion des bannissements de salon vocal.
+#[async_trait]
+pub trait VoiceBanStore: Send + Sync {
     async fn find_bans(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError>;
     async fn find_active_ban(&self, voice_channel_id: Uuid, user_id: &str) -> Result<Option<VoiceChannelBan>, DomainError>;
     async fn save_ban(&self, ban: &VoiceChannelBan) -> Result<(), DomainError>;
     async fn remove_ban(&self, voice_channel_id: Uuid, user_id: &str) -> Result<(), DomainError>;
     async fn cleanup_expired_bans(&self) -> Result<u64, DomainError>;
+}
 
-    // Invite Links
+/// Gestion des liens d'invitation vers les salons vocaux.
+#[async_trait]
+pub trait VoiceInviteStore: Send + Sync {
     async fn find_invite_links(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelInviteLink>, DomainError>;
     async fn find_invite_by_code(&self, code: &str) -> Result<Option<VoiceChannelInviteLink>, DomainError>;
     async fn save_invite_link(&self, link: &VoiceChannelInviteLink) -> Result<(), DomainError>;
     async fn increment_invite_uses(&self, id: Uuid) -> Result<bool, DomainError>;
     async fn revoke_invite_link(&self, id: Uuid) -> Result<(), DomainError>;
+}
 
-    // Themes
+/// Gestion des themes de salon vocal d'une guild.
+#[async_trait]
+pub trait VoiceThemeStore: Send + Sync {
     async fn find_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError>;
     async fn find_theme(&self, id: Uuid) -> Result<Option<VoiceChannelTheme>, DomainError>;
     async fn save_theme(&self, theme: &VoiceChannelTheme) -> Result<(), DomainError>;
@@ -70,3 +88,15 @@ pub trait VoiceChannelRepository: Send + Sync {
     async fn delete_theme(&self, id: Uuid) -> Result<(), DomainError>;
     async fn clear_default_themes(&self, guild_id: &str) -> Result<(), DomainError>;
 }
+
+/// Supertrait marqueur : regroupe l'ensemble des stores du domaine voix.
+/// Permet de continuer a manipuler un `dyn VoiceChannelRepository` unique.
+pub trait VoiceChannelRepository:
+    VoiceChannelStore + VoiceCoAdminStore + VoiceWhitelistStore + VoicePresetStore
+    + VoiceBanStore + VoiceInviteStore + VoiceThemeStore
+{}
+
+impl<T> VoiceChannelRepository for T where
+    T: VoiceChannelStore + VoiceCoAdminStore + VoiceWhitelistStore + VoicePresetStore
+        + VoiceBanStore + VoiceInviteStore + VoiceThemeStore
+{}
