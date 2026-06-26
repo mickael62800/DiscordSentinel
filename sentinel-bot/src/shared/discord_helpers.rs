@@ -89,6 +89,23 @@ pub async fn edit_response_text(ctx: &Context, command: &CommandInteraction, con
     }
 }
 
+/// Edit la reponse apres un defer avec un embed de feedback colore (cf.
+/// `embeds::feedback_embed`). A utiliser pour les retours d'erreur/succes apres
+/// `defer_with_confirmation`, quand on veut la coloration par severite plutot
+/// que `edit_response_text` (texte brut).
+pub async fn edit_response_feedback(ctx: &Context, command: &CommandInteraction, content: &str) {
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new()
+                .embed(crate::shared::embeds::feedback_embed(content)),
+        )
+        .await
+    {
+        warn!(error = %e, command = %command.data.name, "Echec edit response feedback");
+    }
+}
+
 /// Reponse ephemere texte a une slash command.
 pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
     if let Err(e) = command

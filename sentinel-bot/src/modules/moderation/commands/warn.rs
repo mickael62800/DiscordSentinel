@@ -10,6 +10,7 @@ use crate::shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, danger
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
+use crate::shared::discord_helpers::edit_response_feedback;
 use crate::shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
@@ -212,7 +213,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur log warn");
-            edit_response_text(ctx, command, "⚠️ Impossible d'enregistrer l'avertissement pour le moment, reessaye dans un instant.").await;
+            edit_response_feedback(ctx, command, "⚠️ Impossible d'enregistrer l'avertissement pour le moment, reessaye dans un instant.").await;
         }
     }
 }
