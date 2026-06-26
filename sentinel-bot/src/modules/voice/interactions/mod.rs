@@ -129,7 +129,7 @@ pub async fn respond_followup_ephemeral(
     use serenity::builder::CreateInteractionResponseFollowup;
 
     let msg = CreateInteractionResponseFollowup::new()
-        .content(content)
+        .embed(crate::shared::embeds::feedback_embed(content))
         .ephemeral(true);
 
     if let Err(e) = component.create_followup(&ctx.http, msg).await {

@@ -69,6 +69,32 @@ pub fn neutral_embed(title: impl Into<String>) -> CreateEmbed {
     sentinel_embed(title, COLOR_NEUTRAL)
 }
 
+/// Embed de feedback ephemere (retour d'une commande/interaction a son auteur).
+/// La couleur est deduite de l'emoji en tete de message, qui encode deja la
+/// nature du retour :
+///   ✅ succes -> vert | ⚠️/⏳ transitoire -> orange | ❌/⛔ erreur -> rouge |
+///   sinon -> gris neutre.
+/// Le message va dans la description (les mentions n'y declenchent pas de ping,
+/// ce qui convient a un retour ephemere).
+pub fn feedback_embed(message: impl Into<String>) -> CreateEmbed {
+    let message = message.into();
+    let head = message.trim_start();
+    let color = if head.starts_with('✅') {
+        COLOR_SUCCESS
+    } else if head.starts_with('⚠') || head.starts_with('⏳') {
+        COLOR_MODERATE
+    } else if head.starts_with('❌') || head.starts_with('⛔') {
+        COLOR_DANGER
+    } else {
+        COLOR_NEUTRAL
+    };
+    CreateEmbed::new()
+        .description(message)
+        .color(color)
+        .footer(CreateEmbedFooter::new("Sentinel"))
+        .timestamp(Timestamp::now())
+}
+
 // ── Gabarit de message de sanction (destiné au membre) ──
 
 /// Gabarit UNIFORME d'un message de sanction adressé au membre.

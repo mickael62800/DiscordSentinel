@@ -64,14 +64,16 @@ pub async fn defer_ephemeral(ctx: &Context, command: &CommandInteraction) -> boo
         })
 }
 
-/// Followup texte ephemeral — typiquement pour les messages d'erreur/info
-/// apres un defer. N'apparait que pour l'utilisateur qui a lance la commande.
+/// Followup ephemeral de feedback (erreur/info) apres un defer. N'apparait que
+/// pour l'utilisateur qui a lance la commande. Rendu en embed colore selon la
+/// nature du message (cf. `embeds::feedback_embed` : ✅ vert / ⚠️ orange /
+/// ❌ rouge / neutre), pour distinguer visuellement succes, attente et erreur.
 pub async fn followup_text(ctx: &Context, command: &CommandInteraction, content: &str) {
     if let Err(e) = command
         .create_followup(
             &ctx.http,
             CreateInteractionResponseFollowup::new()
-                .content(content)
+                .embed(crate::shared::embeds::feedback_embed(content))
                 .ephemeral(true),
         )
         .await

@@ -359,7 +359,7 @@ async fn followup_ephemeral(ctx: &Context, component: &ComponentInteraction, con
         .create_followup(
             &ctx.http,
             CreateInteractionResponseFollowup::new()
-                .content(content)
+                .embed(crate::shared::embeds::feedback_embed(content))
                 .ephemeral(true),
         )
         .await

@@ -194,7 +194,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
             .create_followup(
                 &ctx.http,
                 serenity::all::CreateInteractionResponseFollowup::new()
-                    .content(msg)
+                    .embed(crate::shared::embeds::feedback_embed(msg))
                     .ephemeral(true),
             )
             .await;

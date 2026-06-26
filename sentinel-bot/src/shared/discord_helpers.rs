@@ -96,7 +96,7 @@ pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, conten
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
-                    .content(content)
+                    .embed(crate::shared::embeds::feedback_embed(content))
                     .ephemeral(true),
             ),
         )
