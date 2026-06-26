@@ -16,9 +16,6 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 
 const DEFAULT_PRIZE_PCT: i64 = 10;
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
 
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let now = Utc::now();
@@ -295,16 +292,11 @@ async fn resolve_guild(
 
     match redis.get_multiplexed_async_connection().await {
         Ok(mut conn) => {
-            let res: redis::RedisResult<String> = redis::cmd("XADD")
-                .arg(STREAM_KEY)
-                .arg("MAXLEN")
-                .arg("~")
-                .arg(STREAM_MAXLEN)
-                .arg("*")
-                .arg(PAYLOAD_FIELD)
-                .arg(event_payload.to_string())
-                .query_async(&mut conn)
-                .await;
+            let res = crate::common::redis_helpers::xadd_event(
+                &mut conn,
+                &event_payload.to_string(),
+            )
+            .await;
             if let Err(e) = res {
                 warn!(error = %e, guild_id = %guild_id, "XADD tournament_resolved failed");
             } else {

@@ -49,10 +49,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let now = Utc::now();
     let mut escalated = 0u32;
@@ -114,16 +111,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         };
 
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg("sentinel:events")
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(10_000)
-            .arg("*")
-            .arg("payload")
-            .arg(&serialized)
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &serialized).await;
 
         match res {
             Ok(_) => {

@@ -19,10 +19,6 @@ use tracing::{info, warn};
 use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceClient;
 use sentinel_proto::coude::v1::TriggerDailyChaosRequest;
 
-const STREAM_KEY: &str = "sentinel:events";
-const PAYLOAD_FIELD: &str = "payload";
-const STREAM_MAXLEN: i64 = 10_000;
-
 /// Appele par le scheduler. Itere sur toutes les guilds avec joueurs
 /// coude actifs et tente un trigger chaos pour chacune.
 pub async fn run(_pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), String> {
@@ -133,16 +129,11 @@ async fn publish_taunts(
 
     match client.get_multiplexed_async_connection().await {
         Ok(mut conn) => {
-            let res: redis::RedisResult<String> = redis::cmd("XADD")
-                .arg(STREAM_KEY)
-                .arg("MAXLEN")
-                .arg("~")
-                .arg(STREAM_MAXLEN)
-                .arg("*")
-                .arg(PAYLOAD_FIELD)
-                .arg(event_payload.to_string())
-                .query_async(&mut conn)
-                .await;
+            let res = crate::common::redis_helpers::xadd_event(
+                &mut conn,
+                &event_payload.to_string(),
+            )
+            .await;
             if let Err(e) = res {
                 warn!(error = %e, guild_id, "XADD daily_chaos_taunts failed");
             } else {

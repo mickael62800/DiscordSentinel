@@ -25,10 +25,6 @@ use uuid::Uuid;
 
 use super::DEFAULT_AFK_TIMEOUT_SECS;
 
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
-
 #[derive(Debug, sqlx::FromRow)]
 struct AfkTable {
     id: Uuid,
@@ -74,10 +70,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     }
 
     // 2. Publie les events vers le bot
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let now = Utc::now();
     let mut published = 0u32;
@@ -103,16 +96,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         };
 
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY)
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(STREAM_MAXLEN)
-            .arg("*")
-            .arg(PAYLOAD_FIELD)
-            .arg(&serialized)
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &serialized).await;
 
         match res {
             Ok(_) => {

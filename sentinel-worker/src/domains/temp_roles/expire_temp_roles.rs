@@ -2,12 +2,6 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-/// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
-/// Doit rester synchronise avec `sentinel-bot/src/shared/event_bus.rs`.
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
-
 #[derive(sqlx::FromRow)]
 struct ExpiredRole {
     id: Uuid,
@@ -45,10 +39,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let mut published = 0u32;
     for role in &expired {
@@ -74,16 +65,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         };
 
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY)
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(STREAM_MAXLEN)
-            .arg("*")
-            .arg(PAYLOAD_FIELD)
-            .arg(&serialized)
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &serialized).await;
         match res {
             Ok(_) => published += 1,
             Err(e) => warn!(role_id = %role.id, error = %e, "XADD failed"),

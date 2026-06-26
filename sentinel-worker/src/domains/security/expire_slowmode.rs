@@ -4,10 +4,6 @@
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
-
 #[derive(sqlx::FromRow)]
 struct ExpiredSlowmode {
     guild_id: String,
@@ -30,10 +26,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let mut reverted = 0u32;
     for s in &candidates {
@@ -59,16 +52,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
                 "previous_states": s.previous_states,
             }
         });
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY)
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(STREAM_MAXLEN)
-            .arg("*")
-            .arg(PAYLOAD_FIELD)
-            .arg(payload.to_string())
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &payload.to_string()).await;
         if let Err(e) = res {
             warn!(error = %e, guild = %s.guild_id, "XADD slowmode_expired echoue");
         }

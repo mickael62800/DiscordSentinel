@@ -9,9 +9,6 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
 const DEFAULT_INACTIVE_DAYS: i64 = 7;
 
 #[derive(sqlx::FromRow)]
@@ -46,10 +43,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let mut closed = 0u32;
     for t in &candidates {
@@ -89,16 +83,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         });
 
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY)
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(STREAM_MAXLEN)
-            .arg("*")
-            .arg(PAYLOAD_FIELD)
-            .arg(payload.to_string())
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &payload.to_string()).await;
         if let Err(e) = res {
             warn!(error = %e, ticket_id = %t.id, "XADD ticket_auto_closed echoue");
         }

@@ -84,7 +84,10 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "type": if name.contains("worker") { "worker" } else { "bot" },
                         }
                     });
-                    if let Err(e) = xadd_event(&mut conn, &event.to_string()).await {
+                    if let Err(e) =
+                        crate::common::redis_helpers::xadd_event(&mut conn, &event.to_string())
+                            .await
+                    {
                         warn!(error = %e, "Erreur publication event offline sur Redis");
                     }
                 }
@@ -120,7 +123,10 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "type": if name.contains("worker") { "worker" } else { "bot" },
                         }
                     });
-                    if let Err(e) = xadd_event(&mut conn, &event.to_string()).await {
+                    if let Err(e) =
+                        crate::common::redis_helpers::xadd_event(&mut conn, &event.to_string())
+                            .await
+                    {
                         warn!(error = %e, "Erreur publication event online sur Redis");
                     }
                 }
@@ -134,29 +140,6 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
 /// Retourne le label d'un service (Bot ou Worker).
 fn service_label(name: &str) -> &'static str {
     if name.contains("worker") { "Worker" } else { "Bot" }
-}
-
-/// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
-/// Doit rester synchronise avec `sentinel-bot/src/shared/event_bus.rs`.
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
-
-async fn xadd_event(
-    conn: &mut redis::aio::MultiplexedConnection,
-    payload: &str,
-) -> redis::RedisResult<()> {
-    let _: String = redis::cmd("XADD")
-        .arg(STREAM_KEY)
-        .arg("MAXLEN")
-        .arg("~")
-        .arg(STREAM_MAXLEN)
-        .arg("*")
-        .arg(PAYLOAD_FIELD)
-        .arg(payload)
-        .query_async(conn)
-        .await?;
-    Ok(())
 }
 
 #[cfg(test)]

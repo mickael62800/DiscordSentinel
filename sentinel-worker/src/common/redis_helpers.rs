@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Helpers Redis pour les workers : init du client + XADD vers les streams.
 
 const STREAM_KEY: &str = "sentinel:events";

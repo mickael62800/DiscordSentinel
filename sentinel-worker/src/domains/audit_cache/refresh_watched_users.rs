@@ -21,9 +21,6 @@ use tracing::{debug, info, warn};
 
 const REDIS_KEY: &str = "audit:watched_users";
 const REDIS_TTL_SECS: u64 = 300;
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
 
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     // 1. Query Postgres : union des user_ids avec infractions + manual
@@ -48,10 +45,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         .map_err(|e| format!("serialize user_ids: {e}"))?;
 
     // 2. Push dans Redis (SET avec TTL)
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     use redis::AsyncCommands;
     conn.set_ex::<_, _, ()>(REDIS_KEY, &serialized, REDIS_TTL_SECS)
@@ -68,16 +62,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     });
 
     let event_str = event_payload.to_string();
-    let res: redis::RedisResult<String> = redis::cmd("XADD")
-        .arg(STREAM_KEY)
-        .arg("MAXLEN")
-        .arg("~")
-        .arg(STREAM_MAXLEN)
-        .arg("*")
-        .arg(PAYLOAD_FIELD)
-        .arg(&event_str)
-        .query_async(&mut conn)
-        .await;
+    let res = crate::common::redis_helpers::xadd_event(&mut conn, &event_str).await;
 
     if let Err(e) = res {
         warn!(error = %e, "XADD watched_users_refreshed failed");

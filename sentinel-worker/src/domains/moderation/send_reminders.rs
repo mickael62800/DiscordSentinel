@@ -5,12 +5,6 @@ use uuid::Uuid;
 
 use crate::common::is_worker_enabled;
 
-/// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
-/// Doit rester synchronise avec `sentinel-bot/src/shared/event_bus.rs`.
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
-
 #[derive(sqlx::FromRow)]
 struct PendingReminder {
     id: Uuid,
@@ -59,10 +53,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     for reminder in &reminders {
         if !is_worker_enabled(pool, &reminder.guild_id, "moderation-bot").await {
@@ -91,23 +82,8 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         });
 
-        match serde_json::to_string(&payload) {
-            Ok(serialized) => {
-                let res: redis::RedisResult<String> = redis::cmd("XADD")
-                    .arg(STREAM_KEY)
-                    .arg("MAXLEN")
-                    .arg("~")
-                    .arg(STREAM_MAXLEN)
-                    .arg("*")
-                    .arg(PAYLOAD_FIELD)
-                    .arg(&serialized)
-                    .query_async(&mut conn)
-                    .await;
-                if let Err(e) = res {
-                    warn!(reminder_id = %reminder.id, error = %e, "XADD reminder failed");
-                }
-            }
-            Err(e) => warn!(error = %e, "serialize reminder payload"),
+        if let Err(e) = crate::common::redis_helpers::xadd_event_json(&mut conn, &payload).await {
+            warn!(reminder_id = %reminder.id, error = %e, "XADD reminder failed");
         }
 
         info!(

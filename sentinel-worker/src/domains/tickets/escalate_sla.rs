@@ -16,9 +16,6 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-const STREAM_KEY: &str = "sentinel:events";
-const STREAM_MAXLEN: usize = 10_000;
-const PAYLOAD_FIELD: &str = "payload";
 const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
 const DEFAULT_SLA_WARN_MINUTES: i64 = 30;
 
@@ -62,10 +59,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         return Ok(());
     }
 
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
 
     let now = Utc::now();
     let mut escalated = 0u32;
@@ -109,16 +103,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
                 "escalation_minutes": escalation_minutes,
             }
         });
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY)
-            .arg("MAXLEN")
-            .arg("~")
-            .arg(STREAM_MAXLEN)
-            .arg("*")
-            .arg(PAYLOAD_FIELD)
-            .arg(payload.to_string())
-            .query_async(&mut conn)
-            .await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &payload.to_string()).await;
         if let Err(e) = res {
             warn!(error = %e, ticket_id = %t.id, "XADD ticket_sla_escalated echoue");
         }
@@ -177,10 +162,7 @@ async fn scan_and_warn(
     if candidates.is_empty() {
         return Ok(());
     }
-    let mut conn = redis
-        .get_multiplexed_async_connection()
-        .await
-        .map_err(|e| format!("redis connect: {e}"))?;
+    let mut conn = crate::common::redis_helpers::get_conn(redis).await?;
     let now = Utc::now();
     let mut warned = 0u32;
     for t in &candidates {
@@ -220,10 +202,7 @@ async fn scan_and_warn(
                 "warn_minutes": warn_minutes,
             }
         });
-        let res: redis::RedisResult<String> = redis::cmd("XADD")
-            .arg(STREAM_KEY).arg("MAXLEN").arg("~").arg(STREAM_MAXLEN)
-            .arg("*").arg(PAYLOAD_FIELD).arg(payload.to_string())
-            .query_async(&mut conn).await;
+        let res = crate::common::redis_helpers::xadd_event(&mut conn, &payload.to_string()).await;
         if let Err(e) = res {
             warn!(error = %e, ticket_id = %t.id, "XADD ticket_sla_warned echoue");
         }

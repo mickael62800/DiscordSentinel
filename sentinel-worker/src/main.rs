@@ -47,13 +47,7 @@ async fn main() {
     let pg_pool = common::create_pg_pool(&config.database_url).await;
     info!("PostgreSQL connecte");
 
-    let redis_client = match redis::Client::open(config.redis_url.as_str()) {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!(error = %e, url = %config.redis_url, "URL Redis invalide");
-            std::process::exit(1);
-        }
-    };
+    let redis_client = common::redis_helpers::open_or_exit(config.redis_url.as_str());
     match redis_client.get_multiplexed_async_connection().await {
         Ok(_) => info!("Redis connecte"),
         Err(e) => {
