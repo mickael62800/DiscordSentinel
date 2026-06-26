@@ -283,4 +283,43 @@ impl ModerationRepository for PgModerationRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(result.rows_affected() > 0)
     }
+
+    async fn action_guild_id(&self, action_id: Uuid) -> Result<Option<String>, DomainError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM moderation_actions WHERE id = $1",
+        )
+        .bind(action_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("fetch action guild_id: {e}")))?;
+        Ok(row.map(|(g,)| g))
+    }
+
+    async fn find_action_for_reversal(
+        &self, action_id: Uuid,
+    ) -> Result<Option<sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo>, DomainError> {
+        // Phase 4 : lookup dans `audit_logs` (event_type='mod_*') ; action_id est
+        // stocke dans `details->>'action_id'`. action_type derive de event_type
+        // en strippant le prefixe 'mod_'.
+        let row: Option<(String, Option<String>, Option<String>, String)> = sqlx::query_as(
+            "SELECT guild_id, target_id, target_name, event_type \
+             FROM audit_logs \
+             WHERE event_type LIKE 'mod_%' AND details->>'action_id' = $1 \
+             LIMIT 1",
+        )
+        .bind(action_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("fetch action: {e}")))?;
+
+        Ok(row.map(|(guild_id, target_id_opt, target_name_opt, event_type)| {
+            let action_type = event_type.strip_prefix("mod_").unwrap_or(&event_type).to_string();
+            sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo {
+                guild_id,
+                target_id: target_id_opt.unwrap_or_default(),
+                target_name: target_name_opt.unwrap_or_default(),
+                action_type,
+            }
+        }))
+    }
 }

@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::moderation::action::strikes::StrikeResult;
 use crate::domain::entities::moderation::action::applied::UserModerationHistory;
+use crate::domain::entities::moderation::action::reversal::ActionReversalInfo;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
@@ -49,4 +50,16 @@ pub trait ManageModerationUseCase: Send + Sync {
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError>;
     /// Supprime une action de moderation par son ID (unwarn, annulation).
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError>;
+
+    /// Recupere le guild_id de l'action de moderation (RBAC gate).
+    /// Default : None (pour les stubs de test).
+    async fn action_guild_id(&self, _action_id: uuid::Uuid) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+
+    /// Recupere les infos necessaires pour reverser une action (annulation +
+    /// reversal Discord). Default : None (pour les stubs de test).
+    async fn find_action_for_reversal(&self, _action_id: uuid::Uuid) -> Result<Option<ActionReversalInfo>, DomainError> {
+        Ok(None)
+    }
 }

@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::moderation::action::applied::ModerationAction;
+use crate::domain::entities::moderation::action::reversal::ActionReversalInfo;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -15,4 +16,16 @@ pub trait ModerationRepository: Send + Sync {
     async fn find_all_for_guild(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError>;
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError>;
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError>;
+
+    /// Recupere le guild_id d'une action (SELECT guild_id FROM moderation_actions).
+    /// Default : None (pour les mocks de test).
+    async fn action_guild_id(&self, _action_id: uuid::Uuid) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+
+    /// Recupere les infos de reversal depuis `audit_logs` (event_type `mod_*`)
+    /// en matchant `details->>'action_id'`. Default : None (mocks de test).
+    async fn find_action_for_reversal(&self, _action_id: uuid::Uuid) -> Result<Option<ActionReversalInfo>, DomainError> {
+        Ok(None)
+    }
 }

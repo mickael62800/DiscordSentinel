@@ -48,6 +48,7 @@ pub struct AppState {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
     pub security_uc: Arc<dyn ManageSecurityUseCase>,
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
+    pub modstats_uc: Arc<dyn crate::ports::inbound::moderation::read_modstats::ReadModstatsUseCase>,
     pub stats_uc: Arc<dyn ManageStatsUseCase>,
     pub voice_channels_uc: Arc<dyn ManageVoiceChannelsUseCase>,
     pub watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>,

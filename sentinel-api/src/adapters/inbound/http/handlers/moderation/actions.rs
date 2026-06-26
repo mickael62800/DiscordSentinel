@@ -21,7 +21,6 @@ use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
@@ -440,14 +439,7 @@ pub async fn add_evidence(
     // Pour gater RBAC on a besoin du guild_id : on le recupere via l'action liee.
     if rbac.is_some() {
         if let Ok(action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
-            let gid: Option<(String,)> = sqlx::query_as(
-                "SELECT guild_id FROM moderation_actions WHERE id = $1",
-            )
-            .bind(action_uuid)
-            .fetch_optional(&state.pg_pool)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("fetch action guild_id: {e}"))))?;
-            if let Some((guild_id,)) = gid {
+            if let Some(guild_id) = state.moderation_uc.action_guild_id(action_uuid).await? {
                 check_role_for_guild(
                     &state,
                     &rbac,
@@ -667,7 +659,7 @@ pub async fn resolve_review(
 /// Agrege les actions de moderation par moderateur sur les 30 derniers jours.
 /// Retourne le top 20 classe par nombre total d'actions decroissant.
 ///
-/// Approche pragmatique : sqlx direct (pas de use-case), read-only, aggregation simple.
+/// Lecture deleguee au use case `modstats_uc` (read-only, aggregation simple).
 pub async fn get_modstats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -676,45 +668,9 @@ pub async fn get_modstats(
 ) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
-    let days = params.days.unwrap_or(30).clamp(1, 90);
+    let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
 
-    #[derive(sqlx::FromRow)]
-    struct StatsRow {
-        moderator_id: String,
-        moderator_name: String,
-        total: i64,
-        warns: i64,
-        mutes: i64,
-        bans: i64,
-        kicks: i64,
-    }
-
-    // Phase 4 : on lit depuis `audit_logs` (event_type='mod_*') et plus
-    // depuis `moderation_actions` qui n'est plus alimentee.
-    let sql = format!(
-        "SELECT \
-            actor_id AS moderator_id, \
-            MAX(actor_name) AS moderator_name, \
-            COUNT(*) AS total, \
-            COUNT(*) FILTER (WHERE event_type = 'mod_warn') AS warns, \
-            COUNT(*) FILTER (WHERE event_type IN ('mod_mute_temp','mod_mute_permanent','mod_mute')) AS mutes, \
-            COUNT(*) FILTER (WHERE event_type IN ('mod_ban_temp','mod_ban_permanent','mod_ban')) AS bans, \
-            COUNT(*) FILTER (WHERE event_type = 'mod_kick') AS kicks \
-         FROM audit_logs \
-         WHERE guild_id = $1 \
-           AND event_type LIKE 'mod_%' \
-           AND event_type NOT IN ('mod_unban','mod_unmute') \
-           AND actor_id IS NOT NULL \
-           AND created_at >= NOW() - INTERVAL '{days} days' \
-         GROUP BY actor_id \
-         ORDER BY total DESC \
-         LIMIT 20"
-    );
-    let rows: Vec<StatsRow> = sqlx::query_as::<_, StatsRow>(&sql)
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(sentinel_core::domain::errors::DomainError::Internal(format!("modstats query: {e}"))))?;
+    let rows = state.modstats_uc.modstats(&guild_id, days).await?;
 
     let dtos = rows
         .into_iter()
@@ -748,46 +704,9 @@ pub async fn get_modstats_trend(
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
 
-    let days = params.days.unwrap_or(30).clamp(1, 90);
+    let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
 
-    #[derive(sqlx::FromRow)]
-    struct TrendRow {
-        day: chrono::NaiveDate,
-        warns: i64,
-        mutes: i64,
-        bans: i64,
-        kicks: i64,
-    }
-
-    // generate_series garantit que tous les jours apparaissent meme s'il
-    // n'y a eu aucune action ce jour-la (sinon la courbe a des trous).
-    let sql = format!(
-        "SELECT \
-            d::date AS day, \
-            COALESCE(SUM(CASE WHEN a.event_type = 'mod_warn' THEN 1 ELSE 0 END), 0) AS warns, \
-            COALESCE(SUM(CASE WHEN a.event_type IN ('mod_mute_temp','mod_mute_permanent','mod_mute') THEN 1 ELSE 0 END), 0) AS mutes, \
-            COALESCE(SUM(CASE WHEN a.event_type IN ('mod_ban_temp','mod_ban_permanent','mod_ban') THEN 1 ELSE 0 END), 0) AS bans, \
-            COALESCE(SUM(CASE WHEN a.event_type = 'mod_kick' THEN 1 ELSE 0 END), 0) AS kicks \
-         FROM generate_series( \
-                 (CURRENT_DATE - INTERVAL '{days} days')::date, \
-                 CURRENT_DATE, \
-                 INTERVAL '1 day' \
-              ) AS d \
-         LEFT JOIN audit_logs a \
-             ON a.guild_id = $1 \
-             AND a.event_type LIKE 'mod_%' \
-             AND a.event_type NOT IN ('mod_unban','mod_unmute') \
-             AND a.actor_id IS NOT NULL \
-             AND a.created_at::date = d::date \
-         GROUP BY d \
-         ORDER BY d ASC"
-    );
-
-    let rows: Vec<TrendRow> = sqlx::query_as::<_, TrendRow>(&sql)
-        .bind(&guild_id)
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(sentinel_core::domain::errors::DomainError::Internal(format!("modstats trend query: {e}"))))?;
+    let rows = state.modstats_uc.modstats_trend(&guild_id, days).await?;
 
     let dtos = rows
         .into_iter()
@@ -836,23 +755,13 @@ pub async fn delete_action(
     // dans `moderation_actions` qui n'est plus alimentee. action_id est
     // stocke dans `details->>'action_id'`. action_type derive de
     // event_type en strippant le prefixe 'mod_'.
-    let row: Option<(String, Option<String>, Option<String>, String)> = sqlx::query_as(
-        "SELECT guild_id, target_id, target_name, event_type \
-         FROM audit_logs \
-         WHERE event_type LIKE 'mod_%' AND details->>'action_id' = $1 \
-         LIMIT 1",
-    )
-    .bind(uuid.to_string())
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("fetch action: {e}"))))?;
-
-    let Some((guild_id, target_id_opt, target_name_opt, event_type)) = row else {
+    let Some(info) = state.moderation_uc.find_action_for_reversal(uuid).await? else {
         return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into())));
     };
-    let target_id = target_id_opt.unwrap_or_default();
-    let target_name = target_name_opt.unwrap_or_default();
-    let action_type = event_type.strip_prefix("mod_").unwrap_or(&event_type).to_string();
+    let guild_id = info.guild_id;
+    let target_id = info.target_id;
+    let target_name = info.target_name;
+    let action_type = info.action_type;
 
     // Gate RBAC : moderator+ sur la guild concernee.
     check_role_for_guild(

@@ -831,6 +831,12 @@ pub async fn build_app_state(
     );
 
     // ── State ──
+    let modstats_repo: Arc<dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository> =
+        Arc::new(PgModstatsRepository::new(pg_pool.clone()));
+    let modstats_uc: Arc<dyn crate::ports::inbound::moderation::read_modstats::ReadModstatsUseCase> = Arc::new(
+        crate::application::moderation::read_modstats_service::ReadModstatsService::new(modstats_repo.clone()),
+    );
+
     AppState {
         analyze_uc,
         analyze_image_uc,
@@ -839,6 +845,7 @@ pub async fn build_app_state(
         tickets_uc,
         security_uc,
         moderation_uc,
+        modstats_uc,
         stats_uc,
         voice_channels_uc,
         watched_users_uc,
@@ -914,7 +921,7 @@ pub async fn build_app_state(
         ))),
         evidence_repo: Arc::new(PgEvidenceRepository::new(pg_pool.clone())),
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),
-        modstats_repo: Arc::new(PgModstatsRepository::new(pg_pool.clone())),
+        modstats_repo,
         game_repo: Arc::new(PgGameRepository::new(pg_pool.clone())),
         sponsorship_repo: Arc::new(PgSponsorshipRepository::new(pg_pool.clone())),
         temp_role_repo: Arc::new(PgTempRoleRepository::new(pg_pool.clone())),

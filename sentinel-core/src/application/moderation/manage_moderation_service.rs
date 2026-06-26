@@ -239,6 +239,16 @@ impl ManageModerationUseCase for ManageModerationService {
 
         Ok(true)
     }
+
+    async fn action_guild_id(&self, action_id: uuid::Uuid) -> Result<Option<String>, DomainError> {
+        self.repo.action_guild_id(action_id).await
+    }
+
+    async fn find_action_for_reversal(
+        &self, action_id: uuid::Uuid,
+    ) -> Result<Option<crate::domain::entities::moderation::action::reversal::ActionReversalInfo>, DomainError> {
+        self.repo.find_action_for_reversal(action_id).await
+    }
 }
 
 #[cfg(test)]

@@ -893,6 +893,7 @@ fn base_state() -> AppState {
         tickets_uc: Arc::new(StubTickets),
         security_uc: Arc::new(StubSecurity),
         moderation_uc: Arc::new(StubModeration),
+        modstats_uc: Arc::new(sentinel_core::application::moderation::read_modstats_service::ReadModstatsService::new(Arc::new(StubModstatsRepo))),
         stats_uc: Arc::new(StubStats),
         voice_channels_uc: Arc::new(StubVoiceChannels),
         watched_users_uc: Arc::new(StubWatchedUsers),
