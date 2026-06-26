@@ -72,14 +72,64 @@ pub enum GrpcCallError {
     Transport(#[from] tonic::transport::Error),
 }
 
-/// Format de secours reutilisable pour convertir un `GrpcCallError` en String.
-/// La plupart des api_clients de modules s'en contentent ; blackjack a une
-/// version custom qui nettoie les messages pour l'affichage utilisateur.
+/// Convertit un `GrpcCallError` en message **destine a l'utilisateur Discord**,
+/// categorise par cause et prefixe d'un emoji distinctif :
+///   - ⚠️  probleme transitoire (service down, timeout) -> reessayer
+///   - ⏳  rate limit -> patienter
+///   - ❌  erreur definitive (saisie invalide, droits, introuvable, bug serveur)
+///
+/// Le but est qu'on distingue clairement sur Discord ce qui s'est passe et quoi
+/// faire, plutot qu'un opaque "gRPC InvalidArgument: ...". Pour les codes qui
+/// portent une regle metier (InvalidArgument, FailedPrecondition, AlreadyExists,
+/// NotFound), on affiche le message serveur tel quel (il est ecrit pour l'user) ;
+/// pour les erreurs techniques (Internal, Unknown...) on masque le detail.
+///
+/// La plupart des api_clients de modules s'en servent ; blackjack a une version
+/// custom.
 pub fn grpc_err_to_string(e: GrpcCallError) -> String {
+    use tonic::Code;
     match e {
-        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
-        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
-        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
+        GrpcCallError::Unavailable => {
+            "⚠️ Service momentanement indisponible, reessaye dans quelques instants.".to_string()
+        }
+        GrpcCallError::Transport(_) => {
+            "⚠️ Connexion au service impossible, reessaye dans quelques instants.".to_string()
+        }
+        GrpcCallError::Status(s) => {
+            let msg = s.message().trim();
+            match s.code() {
+                // Regles metier : le message serveur est ecrit pour l'utilisateur.
+                Code::InvalidArgument
+                | Code::FailedPrecondition
+                | Code::OutOfRange
+                | Code::AlreadyExists => {
+                    if msg.is_empty() {
+                        "❌ Action impossible.".to_string()
+                    } else {
+                        format!("❌ {msg}")
+                    }
+                }
+                Code::NotFound => {
+                    if msg.is_empty() {
+                        "❌ Introuvable.".to_string()
+                    } else {
+                        format!("❌ {msg}")
+                    }
+                }
+                Code::PermissionDenied | Code::Unauthenticated => {
+                    "❌ Action non autorisee.".to_string()
+                }
+                Code::ResourceExhausted => {
+                    "⏳ Trop de requetes, patiente un instant avant de reessayer.".to_string()
+                }
+                Code::DeadlineExceeded => {
+                    "⚠️ Le service a mis trop de temps a repondre, reessaye.".to_string()
+                }
+                Code::Cancelled => "⚠️ Operation interrompue, reessaye.".to_string(),
+                // Internal / Unknown / DataLoss / ... : pas de detail technique a l'user.
+                _ => "❌ Erreur interne du service, reessaye plus tard.".to_string(),
+            }
+        }
     }
 }
 

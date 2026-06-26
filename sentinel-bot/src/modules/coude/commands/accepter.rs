@@ -38,7 +38,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             return;
         }
         Err(e) => {
-            followup_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_ephemeral(ctx, component, &e).await;
             return;
         }
     };
@@ -101,7 +101,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             return;
         }
         Err(e) => {
-            followup_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_ephemeral(ctx, component, &e).await;
             return;
         }
         Ok(true) => {}

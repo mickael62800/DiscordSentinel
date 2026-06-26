@@ -146,7 +146,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -157,7 +157,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -289,7 +289,7 @@ async fn build_preconfirm_payload(
     let attacker = api
         .get_or_create_player(guild_id, &attacker_user.id.to_string(), &attacker_user.name)
         .await
-        .map_err(|e| format!("Erreur API : {e}"))?;
+        ?;
 
     if attacker.coins < mise {
         return Err(format!(
@@ -309,7 +309,7 @@ async fn build_preconfirm_payload(
         let has = api
             .has_item(guild_id, &attacker_user.id.to_string(), item_key)
             .await
-            .map_err(|e| format!("Erreur API : {e}"))?;
+            ?;
         if !has {
             return Err(format!("Tu n'as pas l'objet **{}** dans ton inventaire !", item_key));
         }
@@ -635,7 +635,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     {
         Ok(p) => p,
         Err(e) => {
-            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            edit_component_message(ctx, component, &e).await;
             return;
         }
     };
@@ -686,7 +686,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     {
         Ok(p) => p,
         Err(e) => {
-            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            edit_component_message(ctx, component, &e).await;
             return;
         }
     };
@@ -712,7 +712,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
             .use_item(&guild_id, &attacker_user.id.to_string(), &special)
             .await
         {
-            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            edit_component_message(ctx, component, &e).await;
             return;
         }
     }

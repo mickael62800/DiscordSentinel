@@ -171,7 +171,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             } else if e.to_lowercase().contains("solde") || e.to_lowercase().contains("insufficient") {
                 "Pas assez de coins (150c minimum).".to_string()
             } else {
-                format!("Erreur API : {e}")
+                e.clone()
             };
             reply_ephemeral(ctx, command, &msg).await;
         }

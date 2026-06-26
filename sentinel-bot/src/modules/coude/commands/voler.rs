@@ -148,7 +148,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Ok(None) => {}
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     }
@@ -160,7 +160,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -184,7 +184,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -208,7 +208,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .set_cooldown(&guild_id, &thief_id, "voler", config.steal_cooldown_secs())
         .await
     {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
         return;
     }
 
@@ -659,7 +659,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
                 .create_followup(
                     &ctx.http,
                     serenity::all::CreateInteractionResponseFollowup::new()
-                        .content(format!("Erreur API : {e}"))
+                        .content(e)
                         .ephemeral(true),
                 )
                 .await;
@@ -677,7 +677,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
                 .create_followup(
                     &ctx.http,
                     serenity::all::CreateInteractionResponseFollowup::new()
-                        .content(format!("Erreur API : {e}"))
+                        .content(e)
                         .ephemeral(true),
                 )
                 .await;

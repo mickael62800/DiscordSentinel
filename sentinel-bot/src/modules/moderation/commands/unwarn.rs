@@ -96,7 +96,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let history = match api.get_history(&guild_id, &target_id.to_string()).await {
         Ok(h) => h,
         Err(e) => {
-            edit_response(ctx, command, &format!("Erreur API : {e}")).await;
+            edit_response(ctx, command, &e).await;
             return;
         }
     };

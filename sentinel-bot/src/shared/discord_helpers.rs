@@ -33,14 +33,14 @@ pub async fn require_guild_id(
 
 /// Repond ephemerement avec le message d'erreur API standard.
 ///
-/// Remplace le pattern `reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await`
+/// Remplace le pattern `reply_ephemeral(ctx, command, &e.to_string()).await`
 /// duplique ~42 fois dans les commandes du bot.
 pub async fn reply_api_err<E: std::fmt::Display>(
     ctx: &Context,
     command: &CommandInteraction,
     e: E,
 ) {
-    reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+    reply_ephemeral(ctx, command, &e.to_string()).await;
 }
 
 /// Defer une slash command en mode ephemere.

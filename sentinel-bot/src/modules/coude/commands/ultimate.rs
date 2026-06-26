@@ -110,7 +110,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 } else if e.contains("reserve a la classe") {
                     "Cet ultimate ne correspond pas a ta classe.".to_string()
                 } else {
-                    format!("Erreur API : {e}")
+                    e.clone()
                 };
                 reply_ephemeral(ctx, command, &msg).await;
                 return;

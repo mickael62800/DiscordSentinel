@@ -119,7 +119,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             } else if e.contains("toi-meme") {
                 "Tu ne peux pas te vendetter toi-meme.".to_string()
             } else {
-                format!("Erreur API : {e}")
+                e.clone()
             };
             reply_ephemeral(ctx, command, &msg).await;
         }

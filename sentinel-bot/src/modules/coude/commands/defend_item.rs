@@ -60,7 +60,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            reply_ephemeral(ctx, component, &e).await;
             return;
         }
     };
@@ -199,7 +199,7 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
             return;
         }
         Err(e) => {
-            edit_response_text(ctx, component, &format!("Erreur API : {e}")).await;
+            edit_response_text(ctx, component, &e).await;
             return;
         }
     };

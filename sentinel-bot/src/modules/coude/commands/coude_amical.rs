@@ -93,7 +93,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             crate::modules::coude::interaction_helper::followup_text(
                 ctx,
                 command,
-                &format!("Erreur API : {e}"),
+                &e,
             )
             .await;
             return;

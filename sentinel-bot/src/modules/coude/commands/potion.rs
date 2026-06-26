@@ -100,7 +100,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            followup_info(ctx, command, &format!("Erreur API : {e}")).await;
+            followup_info(ctx, command, &e).await;
             return;
         }
     };
@@ -156,14 +156,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         Err(e) => {
-            followup_info(ctx, command, &format!("Erreur API : {e}")).await;
+            followup_info(ctx, command, &e).await;
             return;
         }
     }
 
     // Consommer l'item
     if let Err(e) = api.use_item(&guild_id, &user_id, &potion_key).await {
-        followup_info(ctx, command, &format!("Erreur API (use_item) : {e}")).await;
+        followup_info(ctx, command, &e).await;
         return;
     }
 
@@ -173,7 +173,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Mettre a jour les HP
     if let Err(e) = api.update_hp(&guild_id, &user_id, new_hp, hp_max).await {
-        followup_info(ctx, command, &format!("Erreur API (update_hp) : {e}")).await;
+        followup_info(ctx, command, &e).await;
         return;
     }
 

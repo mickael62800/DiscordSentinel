@@ -158,7 +158,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let cost = match api.price_steal_protection(&item_key, duration).await {
         Ok(c) => c,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -170,7 +170,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -192,7 +192,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // 3. Debit du wallet
     if let Err(e) = api.update_player_coins(&guild_id, &user_id, -cost).await {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
         return;
     }
 
@@ -206,7 +206,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             if let Err(e2) = api.update_player_coins(&guild_id, &user_id, cost).await {
                 tracing::warn!(error = %e2, "Echec remboursement protection apres echec souscription");
             }
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };

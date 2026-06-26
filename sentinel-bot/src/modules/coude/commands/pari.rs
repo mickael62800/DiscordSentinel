@@ -85,7 +85,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -119,7 +119,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };

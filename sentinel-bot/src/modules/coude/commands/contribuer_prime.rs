@@ -169,7 +169,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     target_id
                 )
             } else {
-                format!("Erreur API : {e}")
+                e.clone()
             };
             reply_ephemeral(ctx, command, &msg).await;
         }

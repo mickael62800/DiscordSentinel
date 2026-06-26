@@ -310,7 +310,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         for i in 0..qty {
             let has = match api.has_item(&guild_id, &donor_id, item_key).await {
                 Ok(h) => h,
-                Err(e) => { error_message = Some(format!("Erreur API : {e}")); break; }
+                Err(e) => { error_message = Some(e); break; }
             };
             if !has {
                 error_message = Some(if i == 0 {
@@ -323,7 +323,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
             // Remove from donor
             if let Err(e) = api.use_item(&guild_id, &donor_id, item_key).await {
-                error_message = Some(format!("Erreur API : {e}"));
+                error_message = Some(e);
                 break;
             }
 
@@ -335,7 +335,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 // `transferred` car ce i-eme item n'a jamais atteint la
                 // cible.
                 let _ = api.add_item(&guild_id, &donor_id, item_key).await;
-                error_message = Some(format!("Erreur API : {e}"));
+                error_message = Some(e);
                 break;
             }
 

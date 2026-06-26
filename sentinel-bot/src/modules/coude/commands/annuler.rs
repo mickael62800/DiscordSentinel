@@ -24,7 +24,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             return;
         }
         Err(e) => {
-            respond_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            respond_ephemeral(ctx, component, &e).await;
             return;
         }
     };
@@ -53,7 +53,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     let attacker = match api.get_or_create_player(&guild_id, &combat.attacker_id, &combat.attacker_name).await {
         Ok(p) => p,
         Err(e) => {
-            respond_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            respond_ephemeral(ctx, component, &e).await;
             return;
         }
     };

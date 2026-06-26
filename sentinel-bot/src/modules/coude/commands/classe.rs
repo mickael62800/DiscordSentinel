@@ -203,7 +203,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     let player = match api.get_or_create_player(&guild_id, &user_id, &component.user.name).await {
         Ok(p) => p,
         Err(e) => {
-            followup_err(ctx, component, format!("Erreur API : {e}")).await;
+            followup_err(ctx, component, e).await;
             return;
         }
     };
@@ -220,7 +220,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
             return;
         }
         if let Err(e) = api.update_player_coins(&guild_id, &user_id, -class_cost).await {
-            followup_err(ctx, component, format!("Erreur API : {e}")).await;
+            followup_err(ctx, component, e).await;
             return;
         }
         // Phase 9 : le cout de changement de classe alimente la caisse.
@@ -238,7 +238,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
 
     // Changer la classe
     if let Err(e) = api.update_player_class(&guild_id, &user_id, &class_name).await {
-        followup_err(ctx, component, format!("Erreur API : {e}")).await;
+        followup_err(ctx, component, e).await;
         return;
     }
 

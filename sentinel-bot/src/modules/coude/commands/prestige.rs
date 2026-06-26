@@ -86,7 +86,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             let msg = if e.contains("indisponible") {
                 "Prestige indisponible : verifie ton niveau (25+) et le cap (5 prestiges max).".to_string()
             } else {
-                format!("Erreur API : {e}")
+                e.clone()
             };
             reply_ephemeral(ctx, command, &msg).await;
         }

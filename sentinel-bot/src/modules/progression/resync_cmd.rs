@@ -185,7 +185,7 @@ async fn handle_all(
             Ok(list) => list,
             Err(e) => {
                 drop(data);
-                followup(ctx, command, &format!("Erreur API : {e}")).await;
+                followup(ctx, command, &e).await;
                 return;
             }
         }
@@ -248,7 +248,7 @@ async fn fetch_level(ctx: &Context, guild_id: &str, user_id: &str) -> Result<i32
     match api.get_user_level(guild_id, user_id).await {
         Ok(Some(u)) => Ok(u.level),
         Ok(None) => Err("Ce membre n'a pas encore d'XP.".to_string()),
-        Err(e) => Err(format!("Erreur API : {e}")),
+        Err(e) => Err(e),
     }
 }
 

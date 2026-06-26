@@ -84,7 +84,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };
@@ -112,7 +112,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .update_player_coins(&guild_id, &command.user.id.to_string(), -amount)
         .await
     {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
         return;
     }
 
@@ -128,7 +128,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
         return;
     }
 

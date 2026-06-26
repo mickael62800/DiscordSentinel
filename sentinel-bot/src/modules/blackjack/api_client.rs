@@ -498,7 +498,7 @@ fn grpc_err_to_string(e: GrpcCallError) -> String {
                 tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
                     "API temporairement indisponible, reessaie.".to_string()
                 }
-                _ => format!("Erreur API : {clean}"),
+                _ => clean.to_string(),
             }
         }
         GrpcCallError::Transport(_) => "Erreur de connexion à l'API, reessaie.".to_string(),
