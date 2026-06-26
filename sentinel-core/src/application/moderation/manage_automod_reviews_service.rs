@@ -14,6 +14,7 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::review::automod::tally_votes;
 use crate::domain::entities::moderation::review::automod::AppliedAction;
 use crate::domain::entities::moderation::review::automod::AutomodReview;
+use crate::domain::entities::moderation::review::automod::ExpiredReviewCard;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
 use crate::domain::entities::moderation::review::automod::TallyResult;
@@ -218,6 +219,16 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
 
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError> {
         self.repo.list_expired_voting(limit.clamp(1, 500)).await
+    }
+
+    async fn expired_review_cards(
+        &self,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
+        self.repo
+            .expire_review_cards(days.clamp(1, 3650), limit.clamp(1, 1000))
+            .await
     }
 
     async fn get_discussion(

@@ -896,29 +896,15 @@ pub async fn cleanup_expired_cards(
     State(state): State<AppState>,
     Query(q): Query<CleanupCardsQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let days = q.days.unwrap_or(30).clamp(1, 3650);
+    // Le use case trouve les cartes expirees et retire leur mapping ; le
+    // handler ne fait que diffuser l'event d'expiration (le bot supprime le
+    // message Discord correspondant).
+    let cards = state
+        .automod_reviews_uc
+        .expired_review_cards(q.days.unwrap_or(30), 200)
+        .await?;
 
-    #[derive(sqlx::FromRow)]
-    struct ExpiredCard {
-        action_id: Uuid,
-        channel_id: String,
-        message_id: String,
-    }
-    let cards: Vec<ExpiredCard> = sqlx::query_as(
-        "SELECT m.action_id, m.channel_id, m.message_id \
-         FROM automod_reviews r \
-         JOIN discord_action_messages m ON m.action_id = r.id AND m.kind = 'automod_review' \
-         WHERE r.status IN ('applied','ignored') \
-           AND r.resolved_at IS NOT NULL \
-           AND r.resolved_at < NOW() - make_interval(days => $1) \
-         LIMIT 200",
-    )
-    .bind(days as i32)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("cleanup query: {e}"))))?;
-
-    let mut count = 0u32;
+    let count = cards.len() as u32;
     for c in &cards {
         state.broadcaster.broadcast(
             "automod_card_expired",
@@ -928,14 +914,6 @@ pub async fn cleanup_expired_cards(
                 "message_id": c.message_id,
             }),
         );
-        // Retire le mapping pour ne pas le re-traiter au prochain passage.
-        let _ = sqlx::query(
-            "DELETE FROM discord_action_messages WHERE action_id = $1 AND kind = 'automod_review'",
-        )
-        .bind(c.action_id)
-        .execute(&state.pg_pool)
-        .await;
-        count += 1;
     }
     Ok(Json(serde_json::json!({ "expired": count })))
 }

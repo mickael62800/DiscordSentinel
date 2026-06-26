@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
 use crate::domain::entities::moderation::review::automod::DiscussionMessage;
+use crate::domain::entities::moderation::review::automod::ExpiredReviewCard;
 use crate::domain::entities::moderation::review::automod::ModeratorFacts;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
@@ -135,6 +136,15 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
 
     /// Reviews en vote dont l'echeance est depassee (job worker).
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
+
+    /// Cartes de review closes (applied|ignored) resolues depuis plus de
+    /// `days` jours et encore mappees a un message Discord. Retire le mapping
+    /// (pour ne pas re-traiter) et retourne la liste a faire expirer cote bot.
+    async fn expired_review_cards(
+        &self,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
 
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.

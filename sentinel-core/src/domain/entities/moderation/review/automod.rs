@@ -14,6 +14,16 @@ use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
 
+/// Carte de review close (applied|ignored) et expiree : encore mappee a un
+/// message Discord, a faire disparaitre par le bot. Le `action_id` est l'id
+/// de la review ; le mapping est retire cote repo.
+#[derive(Debug, Clone)]
+pub struct ExpiredReviewCard {
+    pub action_id: Uuid,
+    pub channel_id: String,
+    pub message_id: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SuggestedAction {
     Warn,

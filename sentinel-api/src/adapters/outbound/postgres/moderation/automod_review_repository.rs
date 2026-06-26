@@ -8,6 +8,7 @@ use super::super::pg_err_ctx;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
+use sentinel_core::domain::entities::moderation::review::automod::ExpiredReviewCard;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
@@ -712,6 +713,52 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .await
         .map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn expire_review_cards(
+        &self,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
+        #[derive(sqlx::FromRow)]
+        struct ExpiredRow {
+            action_id: Uuid,
+            channel_id: String,
+            message_id: String,
+        }
+        let rows: Vec<ExpiredRow> = sqlx::query_as(
+            "SELECT m.action_id, m.channel_id, m.message_id \
+             FROM automod_reviews r \
+             JOIN discord_action_messages m ON m.action_id = r.id AND m.kind = 'automod_review' \
+             WHERE r.status IN ('applied','ignored') \
+               AND r.resolved_at IS NOT NULL \
+               AND r.resolved_at < NOW() - make_interval(days => $1) \
+             LIMIT $2",
+        )
+        .bind(days as i32)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        // Retire le mapping pour ne pas re-traiter au prochain passage.
+        for row in &rows {
+            let _ = sqlx::query(
+                "DELETE FROM discord_action_messages WHERE action_id = $1 AND kind = 'automod_review'",
+            )
+            .bind(row.action_id)
+            .execute(&self.pool)
+            .await;
+        }
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ExpiredReviewCard {
+                action_id: r.action_id,
+                channel_id: r.channel_id,
+                message_id: r.message_id,
+            })
+            .collect())
     }
 }
 

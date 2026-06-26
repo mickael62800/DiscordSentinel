@@ -778,6 +778,7 @@ pub struct StubAutomodReviewRepo;
     async fn delete_discussion(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
     async fn append_discussion_messages(&self, _: &[sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage]) -> Result<u64, DomainError> { Ok(0) }
     async fn list_discussion_messages(&self, _: Uuid) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage>, DomainError> { Ok(vec![]) }
+    async fn expire_review_cards(&self, _: i64, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::ExpiredReviewCard>, DomainError> { Ok(vec![]) }
     async fn get(&self, _: Uuid) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }
     async fn find_by_message_id(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }
     async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_core::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
