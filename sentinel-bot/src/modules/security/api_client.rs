@@ -143,6 +143,10 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
+    /// Hard-delete d'un membre (gRPC). Plus appele sur depart de membre (on
+    /// fait un soft-delete via le lifecycle `/leave` pour garder la detection
+    /// de retour), conserve pour un eventuel usage admin/purge.
+    #[allow(dead_code)]
     pub async fn remove_member(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
         let req = proto_members::RemoveMemberRequest {
             guild_id: guild_id.to_string(),

@@ -275,15 +275,13 @@ pub async fn on_member_remove(
 
     let data = ctx.data.read().await;
 
-    // Supprimer le membre de la BDD
-    if let Some(sec_api) = data.get::<SecurityApiKey>() {
-        if let Err(e) = sec_api
-            .remove_member(&guild_id.to_string(), &user.id.to_string())
-            .await
-        {
-            warn!(error = %e, "Erreur remove_member");
-        }
-    }
+    // NE PAS hard-delete la ligne guild_members ici : le lifecycle
+    // `/api/members/{guild}/{user}/leave` (handler.rs::guild_member_removal)
+    // fait un soft-delete (left_at = NOW()) qui PRESERVE la ligne. C'est
+    // indispensable pour reconnaitre un membre qui revient (is_known_member ->
+    // message de RE-bienvenue au lieu de bienvenue). L'ancien remove_member
+    // (DELETE) ecrasait ce soft-delete et cassait la detection de retour.
+    // Les listes de jeu filtrent deja `left_at` cote requete.
 
     if let Some(base) = data.get::<ApiClientKey>() {
         base.send_log(
