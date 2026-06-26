@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -95,7 +96,7 @@ impl LevelRepository for PgLevelRepository {
         .bind(guild_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(LevelConfig::from))
     }
@@ -119,7 +120,7 @@ impl LevelRepository for PgLevelRepository {
         .bind(config.enabled)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -132,7 +133,7 @@ impl LevelRepository for PgLevelRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(UserLevel::from))
     }
@@ -158,7 +159,7 @@ impl LevelRepository for PgLevelRepository {
         .bind(user.last_xp_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -195,13 +196,13 @@ impl LevelRepository for PgLevelRepository {
             .bind(amount)
             .fetch_one(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(UserLevel::from(row))
     }
 
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
-        // Phase 2 A.2 — Lit depuis `mv_level_leaderboard` (5 min staleness max).
+        // Phase 2 A.2 â€” Lit depuis `mv_level_leaderboard` (5 min staleness max).
         let rows = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM mv_level_leaderboard WHERE guild_id = $1 ORDER BY rank LIMIT $2",
         )
@@ -209,7 +210,7 @@ impl LevelRepository for PgLevelRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(UserLevel::from).collect())
     }
@@ -228,7 +229,7 @@ impl LevelRepository for PgLevelRepository {
             .bind(limit)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(UserLevel::from).collect())
     }
@@ -237,7 +238,7 @@ impl LevelRepository for PgLevelRepository {
         sqlx::query("REFRESH MATERIALIZED VIEW CONCURRENTLY mv_level_leaderboard")
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 }

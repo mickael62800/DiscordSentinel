@@ -1,4 +1,4 @@
-//! GET/PUT /api/rbac/component-visibility/{guild_id} — gestion des overrides
+//! GET/PUT /api/rbac/component-visibility/{guild_id} â€” gestion des overrides
 //! de visibilite des composants UI par role.
 //!
 //! Lecture : ouverte a tout role authentifie (chaque utilisateur recupere
@@ -6,6 +6,7 @@
 //! Ecriture : Owner+ (modifie ce que les modos/admins voient).
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
@@ -41,7 +42,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     })
 }
 
-/// GET — liste tous les overrides de visibilite pour la guild.
+/// GET â€” liste tous les overrides de visibilite pour la guild.
 pub async fn list_visibility(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
@@ -56,7 +57,7 @@ pub async fn list_visibility(
     .bind(&guild_id)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("db: {}", e))))?;
+    .map_err(sqlx_internal("db"))?;
 
     let out: Vec<VisibilityEntryDto> = rows
         .into_iter()
@@ -69,7 +70,7 @@ pub async fn list_visibility(
     Ok(Json(out))
 }
 
-/// PUT — upsert batch de tous les overrides envoyes. Les entrees absentes
+/// PUT â€” upsert batch de tous les overrides envoyes. Les entrees absentes
 /// du payload sont conservees telles quelles (delete explicite via visibility
 /// par defaut : on garde simple, l'UI envoie tout l'etat affiche).
 pub async fn upsert_visibility(
@@ -101,7 +102,7 @@ pub async fn upsert_visibility(
         .pg_pool
         .begin()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("tx: {}", e))))?;
+        .map_err(sqlx_internal("tx"))?;
 
     for e in &body.entries {
         sqlx::query(
@@ -120,12 +121,12 @@ pub async fn upsert_visibility(
         .bind(&ctx.discord_user_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("upsert: {}", e))))?;
+        .map_err(sqlx_internal("upsert"))?;
     }
 
     tx.commit()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("commit: {}", e))))?;
+        .map_err(sqlx_internal("commit"))?;
 
     Ok(Json(serde_json::json!({ "ok": true, "count": body.entries.len() })))
 }

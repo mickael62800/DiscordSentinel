@@ -1,7 +1,8 @@
-//! Phase 5F — Endpoints minimalistes pour `security_quarantine_pending`.
-//! SQL direct (pas de port/adapter) — meme principe que steal_attempts.
+//! Phase 5F Ã¢â‚¬â€ Endpoints minimalistes pour `security_quarantine_pending`.
+//! SQL direct (pas de port/adapter) Ã¢â‚¬â€ meme principe que steal_attempts.
 
 use axum::extract::{Path, State};
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -9,7 +10,6 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Deserialize)]
 pub struct CreateQuarantineDto {
@@ -19,7 +19,7 @@ pub struct CreateQuarantineDto {
     pub timeout_secs: i64,
 }
 
-/// POST /api/security/quarantine — bot enregistre la mise en quarantaine
+/// POST /api/security/quarantine Ã¢â‚¬â€ bot enregistre la mise en quarantaine
 /// d'un user. UPSERT pour idempotence (re-quarantaine reset le timer).
 pub async fn create_quarantine(
     State(state): State<AppState>,
@@ -37,11 +37,11 @@ pub async fn create_quarantine(
     .bind(expires_at)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("upsert quarantine: {e}"))))?;
+    .map_err(sqlx_internal("upsert quarantine"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/security/quarantine/{guild_id}/{user_id} — bot retire un
+/// DELETE /api/security/quarantine/{guild_id}/{user_id} Ã¢â‚¬â€ bot retire un
 /// user de la quarantaine apres validation captcha (ou suppression par
 /// admin). Idempotent.
 pub async fn delete_quarantine(
@@ -55,6 +55,6 @@ pub async fn delete_quarantine(
     .bind(&user_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("delete quarantine: {e}"))))?;
+    .map_err(sqlx_internal("delete quarantine"))?;
     Ok(StatusCode::NO_CONTENT)
 }

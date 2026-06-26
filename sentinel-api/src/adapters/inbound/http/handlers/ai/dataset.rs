@@ -1,12 +1,13 @@
-//! GET /api/ai-dataset/messages — liste paginee des messages utilisateurs
+//! GET /api/ai-dataset/messages â€” liste paginee des messages utilisateurs
 //! pour construction d'un dataset d'entrainement IA.
-//! DELETE /api/ai-dataset/messages — suppression en masse des messages exportes.
+//! DELETE /api/ai-dataset/messages â€” suppression en masse des messages exportes.
 //!
 //! Gate :
 //!   - GET : admin+ (lecture du contenu de chat)
 //!   - DELETE : owner+ (action destructive)
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -133,7 +134,7 @@ pub async fn list_messages(
     let rows = q_items
         .fetch_all(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query: {}", e))))?;
+        .map_err(sqlx_internal("query"))?;
     let total = q_count
         .fetch_one(&state.pg_pool)
         .await
@@ -200,7 +201,7 @@ pub async fn bulk_delete(
     .bind(&uuids)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("delete: {}", e))))?;
+    .map_err(sqlx_internal("delete"))?;
 
     Ok(Json(BulkDeleteResponse {
         deleted: res.rows_affected() as i64,

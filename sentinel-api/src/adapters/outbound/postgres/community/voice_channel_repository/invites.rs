@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
@@ -49,7 +50,7 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
         .bind(voice_channel_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannelInviteLink::from).collect())
     }
@@ -61,7 +62,7 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
         .bind(code)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannelInviteLink::from))
     }
@@ -87,7 +88,7 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
         .bind(link.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -99,7 +100,7 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
         .bind(id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -109,7 +110,7 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }

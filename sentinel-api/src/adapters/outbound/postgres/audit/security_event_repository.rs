@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -71,7 +72,7 @@ impl SecurityEventRepository for PgSecurityEventRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(SecurityEvent::from).collect())
     }
@@ -84,7 +85,7 @@ impl SecurityEventRepository for PgSecurityEventRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(SecurityEvent::from).collect())
     }

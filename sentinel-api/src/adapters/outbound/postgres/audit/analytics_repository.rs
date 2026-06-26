@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 
 use sentinel_core::domain::entities::system::analytics::*;
@@ -44,7 +46,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .fetch_all(&self.pool)
             .await
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows
             .into_iter()
@@ -82,7 +84,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .fetch_all(&self.pool)
             .await
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         let total: i64 = rows.iter().map(|(_, c)| c.unwrap_or(0)).sum();
 
@@ -150,7 +152,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
                 .fetch_all(&self.pool)
                 .await
             }
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows
             .into_iter()
@@ -200,7 +202,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
                 .fetch_all(&self.pool)
                 .await
             }
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows
             .into_iter()
@@ -240,7 +242,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .fetch_all(&self.pool)
             .await
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows
             .into_iter()
@@ -272,33 +274,33 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         .bind(infractions)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
 
     async fn reset_activity(&self, guild_id: &str) -> Result<u64, DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("reset_activity begin: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset_activity begin", e))?;
         let h = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx).await
-            .map_err(|e| DomainError::Internal(format!("reset hourly_activity: {e}")))?
+            .map_err(|e| pg_err_ctx("reset hourly_activity", e))?
             .rows_affected();
         let d = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx).await
-            .map_err(|e| DomainError::Internal(format!("reset daily_activity: {e}")))?
+            .map_err(|e| pg_err_ctx("reset daily_activity", e))?
             .rows_affected();
-        // Vide aussi la baseline : sans ça, le prochain snapshot calculerait un
-        // delta basé sur l'ancienne baseline et reproduirait des chiffres faux.
+        // Vide aussi la baseline : sans Ã§a, le prochain snapshot calculerait un
+        // delta basÃ© sur l'ancienne baseline et reproduirait des chiffres faux.
         let b = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx).await
-            .map_err(|e| DomainError::Internal(format!("reset analytics_daily_baseline: {e}")))?
+            .map_err(|e| pg_err_ctx("reset analytics_daily_baseline", e))?
             .rows_affected();
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("reset_activity commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset_activity commit", e))?;
         Ok(h + d + b)
     }
 }

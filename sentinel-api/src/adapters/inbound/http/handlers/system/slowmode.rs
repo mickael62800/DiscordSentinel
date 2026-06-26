@@ -1,6 +1,7 @@
-//! Phase 5H — Endpoints pour `security_slowmode_active`.
+//! Phase 5H Ã¢â‚¬â€ Endpoints pour `security_slowmode_active`.
 
 use axum::extract::{Path, State};
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -8,7 +9,6 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Deserialize)]
 pub struct CreateSlowmodeDto {
@@ -36,7 +36,7 @@ pub async fn create_slowmode(
     .bind(expires_at)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("upsert slowmode: {e}"))))?;
+    .map_err(sqlx_internal("upsert slowmode"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -48,6 +48,6 @@ pub async fn delete_slowmode(
         .bind(&guild_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("delete slowmode: {e}"))))?;
+        .map_err(sqlx_internal("delete slowmode"))?;
     Ok(StatusCode::NO_CONTENT)
 }

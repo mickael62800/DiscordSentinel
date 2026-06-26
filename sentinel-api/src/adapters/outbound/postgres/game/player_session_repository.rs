@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -51,7 +52,7 @@ impl PlayerSessionRepository for PgPlayerSessionRepository {
         .bind(player_name)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("open session: {e}")))?;
+        .map_err(|e| pg_err_ctx("open session", e))?;
         Ok(id.0)
     }
 
@@ -69,7 +70,7 @@ impl PlayerSessionRepository for PgPlayerSessionRepository {
         .bind(player_name)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("close session: {e}")))?;
+        .map_err(|e| pg_err_ctx("close session", e))?;
         Ok(())
     }
 
@@ -82,7 +83,7 @@ impl PlayerSessionRepository for PgPlayerSessionRepository {
         .bind(server_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("list_active sessions: {e}")))?;
+        .map_err(|e| pg_err_ctx("list_active sessions", e))?;
         Ok(rows.into_iter().map(PlayerSession::from).collect())
     }
 
@@ -104,7 +105,7 @@ impl PlayerSessionRepository for PgPlayerSessionRepository {
         .bind(offset)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("list_history sessions: {e}")))?;
+        .map_err(|e| pg_err_ctx("list_history sessions", e))?;
         Ok(rows.into_iter().map(PlayerSession::from).collect())
     }
 
@@ -116,7 +117,7 @@ impl PlayerSessionRepository for PgPlayerSessionRepository {
         .bind(server_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("close_all_active: {e}")))?;
+        .map_err(|e| pg_err_ctx("close_all_active", e))?;
         Ok(())
     }
 }

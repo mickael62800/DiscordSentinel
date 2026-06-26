@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -133,7 +134,7 @@ impl TicketRepository for PgTicketRepository {
         let rows = qb.build_query_as::<TicketRow>()
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Ticket::from).collect())
     }
@@ -158,7 +159,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(Ticket::from))
     }
@@ -187,7 +188,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(ticket.updated_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -198,7 +199,7 @@ impl TicketRepository for PgTicketRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -209,7 +210,7 @@ impl TicketRepository for PgTicketRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -221,7 +222,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(ticket_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(TicketMessage::from).collect())
     }
@@ -241,7 +242,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(message.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -252,7 +253,7 @@ impl TicketRepository for PgTicketRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -263,7 +264,7 @@ impl TicketRepository for PgTicketRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -273,7 +274,7 @@ impl TicketRepository for PgTicketRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -287,17 +288,17 @@ impl TicketRepository for PgTicketRepository {
         if let Some(fr) = first_response_at {
             sqlx::query("UPDATE tickets SET first_response_at = $1::timestamptz, updated_at = NOW() WHERE id = $2")
                 .bind(fr).bind(id).execute(&self.pool).await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(pg_err)?;
         }
         if let Some(ra) = resolved_at {
             sqlx::query("UPDATE tickets SET resolved_at = $1::timestamptz, updated_at = NOW() WHERE id = $2")
                 .bind(ra).bind(id).execute(&self.pool).await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(pg_err)?;
         }
         if let Some(rating) = satisfaction_rating {
             sqlx::query("UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2")
                 .bind(rating).bind(id).execute(&self.pool).await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(pg_err)?;
         }
         Ok(())
     }

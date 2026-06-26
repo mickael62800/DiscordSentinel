@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -62,7 +64,7 @@ impl LogRepository for PgLogRepository {
         .bind(&entry.details)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -74,7 +76,7 @@ impl LogRepository for PgLogRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(LogEntry::from).collect())
     }
@@ -101,7 +103,7 @@ impl LogRepository for PgLogRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(LogEntry::from).collect())
     }
@@ -111,7 +113,7 @@ impl LogRepository for PgLogRepository {
             .bind(category)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(result.rows_affected())
     }
 
@@ -120,7 +122,7 @@ impl LogRepository for PgLogRepository {
             .bind(days)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_logs_older: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_logs_older", e))?;
         Ok(result.rows_affected())
     }
 }

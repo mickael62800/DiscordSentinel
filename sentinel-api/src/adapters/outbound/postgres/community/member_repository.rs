@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
@@ -60,7 +61,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("find_members: {e}")))?;
+        .map_err(|e| pg_err_ctx("find_members", e))?;
 
         Ok(rows.into_iter().map(GuildMember::from).collect())
     }
@@ -74,7 +75,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("find_member: {e}")))?;
+        .map_err(|e| pg_err_ctx("find_member", e))?;
 
         Ok(row.map(GuildMember::from))
     }
@@ -104,7 +105,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(member.is_bot)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("upsert_member: {e}")))?;
+        .map_err(|e| pg_err_ctx("upsert_member", e))?;
         Ok(())
     }
 
@@ -117,7 +118,7 @@ impl MemberRepository for PgMemberRepository {
         tracing::info!(count = total, "Debut sync batch membres");
 
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("begin tx upsert_many: {e}")))?;
+            .map_err(|e| pg_err_ctx("begin tx upsert_many", e))?;
 
         let mut count = 0u64;
         for member in members {
@@ -150,7 +151,7 @@ impl MemberRepository for PgMemberRepository {
         }
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("commit tx upsert_many: {e}")))?;
+            .map_err(|e| pg_err_ctx("commit tx upsert_many", e))?;
 
         tracing::info!(synced = count, "Sync batch membres terminee");
         Ok(count)
@@ -162,7 +163,7 @@ impl MemberRepository for PgMemberRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_member: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_member", e))?;
         Ok(())
     }
 
@@ -172,7 +173,7 @@ impl MemberRepository for PgMemberRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("update_last_seen: {e}")))?;
+            .map_err(|e| pg_err_ctx("update_last_seen", e))?;
         Ok(())
     }
 
@@ -186,7 +187,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("is_left: {e}")))?;
+        .map_err(|e| pg_err_ctx("is_left", e))?;
         Ok(row.map(|(b,)| b).unwrap_or(false))
     }
 }

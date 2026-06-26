@@ -1,10 +1,11 @@
-//! GET/PUT/DELETE /api/rbac/component-min-role/{guild_id} — gestion des
+//! GET/PUT/DELETE /api/rbac/component-min-role/{guild_id} â€” gestion des
 //! overrides du min_role par composant sensible (db.purge.*, db.reset.*).
 //!
 //! Lecture : ouverte aux Admin+ (visualiser la config).
 //! Ecriture : Owner+ (la config c'est de la securite).
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
@@ -46,7 +47,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     })
 }
 
-/// GET — liste les gates avec leur etat effectif pour cette guild.
+/// GET â€” liste les gates avec leur etat effectif pour cette guild.
 pub async fn list_min_roles(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
@@ -63,7 +64,7 @@ pub async fn list_min_roles(
     .bind(&guild_id)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("db: {}", e))))?;
+    .map_err(sqlx_internal("db"))?;
 
     let mut out = Vec::new();
     for (key, def) in component_gates::list_gates() {
@@ -88,7 +89,7 @@ pub async fn list_min_roles(
     Ok(Json(out))
 }
 
-/// PUT — upsert d'un override (component_key + min_role). Le min_role est
+/// PUT â€” upsert d'un override (component_key + min_role). Le min_role est
 /// clamp au floor du registry cote API au moment du gate.
 pub async fn upsert_min_role(
     State(state): State<AppState>,
@@ -129,14 +130,14 @@ pub async fn upsert_min_role(
     .bind(&ctx.discord_user_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("upsert: {}", e))))?;
+    .map_err(sqlx_internal("upsert"))?;
 
     component_gates::invalidate_cache(&state, &guild_id, &dto.component_key).await;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-/// DELETE — supprime l'override (retour au default).
+/// DELETE â€” supprime l'override (retour au default).
 pub async fn delete_min_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
@@ -154,7 +155,7 @@ pub async fn delete_min_role(
     .bind(&component_key)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("delete: {}", e))))?;
+    .map_err(sqlx_internal("delete"))?;
 
     component_gates::invalidate_cache(&state, &guild_id, &component_key).await;
 

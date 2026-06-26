@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -25,7 +26,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         .bind(server_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("get_all configs: {e}")))?;
+        .map_err(|e| pg_err_ctx("get_all configs", e))?;
         Ok(rows.into_iter().collect())
     }
 
@@ -50,7 +51,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         .bind(updated_by)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("upsert config: {e}")))?;
+        .map_err(|e| pg_err_ctx("upsert config", e))?;
         Ok(())
     }
 
@@ -62,7 +63,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         .bind(key)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("delete config: {e}")))?;
+        .map_err(|e| pg_err_ctx("delete config", e))?;
         Ok(())
     }
 
@@ -76,12 +77,12 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| DomainError::Internal(format!("tx begin: {e}")))?;
+            .map_err(|e| pg_err_ctx("tx begin", e))?;
         sqlx::query("DELETE FROM game_server_configs WHERE server_id = $1")
             .bind(server_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("replace_all delete: {e}")))?;
+            .map_err(|e| pg_err_ctx("replace_all delete", e))?;
         for (key, value) in &entries {
             sqlx::query(
                 "INSERT INTO game_server_configs (server_id, config_key, config_value, updated_by) \
@@ -93,11 +94,11 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
             .bind(updated_by)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("replace_all insert: {e}")))?;
+            .map_err(|e| pg_err_ctx("replace_all insert", e))?;
         }
         tx.commit()
             .await
-            .map_err(|e| DomainError::Internal(format!("tx commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("tx commit", e))?;
         Ok(())
     }
 }

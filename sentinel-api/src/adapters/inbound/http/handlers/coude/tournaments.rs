@@ -9,6 +9,7 @@
 //! (resolution, distribution du prix) vit dans le coude-worker, pas ici.
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::Json;
 use chrono::DateTime;
@@ -17,7 +18,6 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]
 pub struct StandingDto {
@@ -82,7 +82,7 @@ pub async fn get_current_tournament(
     .bind(week_end)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("tournaments query: {e}"))))?;
+    .map_err(sqlx_internal("tournaments query"))?;
 
     // Lookup usernames via user_wallets.
     let mut standings = Vec::with_capacity(rows.len());
@@ -94,7 +94,7 @@ pub async fn get_current_tournament(
         .bind(&user_id)
         .fetch_optional(&state.pg_pool)
         .await
-        .map_err(|e| ApiError::from(DomainError::Internal(format!("username lookup: {e}"))))?;
+        .map_err(sqlx_internal("username lookup"))?;
 
         standings.push(StandingDto {
             user_id: user_id.into(),
@@ -155,7 +155,7 @@ pub async fn get_tournament_history(
     .bind(&guild_id)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("history query: {e}"))))?;
+    .map_err(sqlx_internal("history query"))?;
 
     let out = rows
         .into_iter()

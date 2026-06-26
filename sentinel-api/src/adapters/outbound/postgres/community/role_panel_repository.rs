@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -83,7 +84,7 @@ impl RolePanelRepository for PgRolePanelRepository {
         .bind(panel.id).bind(panel.guild_id.as_str()).bind(panel.channel_id.as_str()).bind(panel.message_id.as_deref())
         .bind(&panel.title).bind(&panel.description).bind(&panel.mode).bind(panel.max_roles)
         .bind(panel.enabled).bind(panel.created_at).bind(panel.updated_at)
-        .execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(())
     }
 
@@ -94,7 +95,7 @@ impl RolePanelRepository for PgRolePanelRepository {
             )
             .bind(entry.id).bind(entry.panel_id).bind(entry.role_id.as_str()).bind(&entry.role_name)
             .bind(&entry.emoji).bind(&entry.label).bind(&entry.style).bind(entry.position)
-            .execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .execute(&self.pool).await.map_err(pg_err)?;
         }
         Ok(())
     }
@@ -102,11 +103,11 @@ impl RolePanelRepository for PgRolePanelRepository {
     async fn find_panel(&self, panel_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
         let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         let panel = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE id = $1")
-            .bind(id).fetch_optional(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(id).fetch_optional(&self.pool).await.map_err(pg_err)?;
         match panel {
             Some(p) => {
                 let entries = sqlx::query_as::<_, EntryRow>("SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC")
-                    .bind(id).fetch_all(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+                    .bind(id).fetch_all(&self.pool).await.map_err(pg_err)?;
                 Ok(Some(RolePanelDetail { panel: p.into(), entries: entries.into_iter().map(RolePanelEntry::from).collect() }))
             }
             None => Ok(None),
@@ -115,11 +116,11 @@ impl RolePanelRepository for PgRolePanelRepository {
 
     async fn find_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
         let panel = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE message_id = $1")
-            .bind(message_id).fetch_optional(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(message_id).fetch_optional(&self.pool).await.map_err(pg_err)?;
         match panel {
             Some(p) => {
                 let entries = sqlx::query_as::<_, EntryRow>("SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC")
-                    .bind(p.id).fetch_all(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+                    .bind(p.id).fetch_all(&self.pool).await.map_err(pg_err)?;
                 Ok(Some(RolePanelDetail { panel: p.into(), entries: entries.into_iter().map(RolePanelEntry::from).collect() }))
             }
             None => Ok(None),
@@ -128,27 +129,27 @@ impl RolePanelRepository for PgRolePanelRepository {
 
     async fn find_panels_by_guild(&self, guild_id: &str) -> Result<Vec<RolePanel>, DomainError> {
         let rows = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE guild_id = $1 ORDER BY created_at DESC")
-            .bind(guild_id).fetch_all(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
         Ok(rows.into_iter().map(RolePanel::from).collect())
     }
 
     async fn update_message_id(&self, panel_id: &str, message_id: &str) -> Result<(), DomainError> {
         let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         sqlx::query("UPDATE role_panels SET message_id = $1, updated_at = NOW() WHERE id = $2")
-            .bind(message_id).bind(id).execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(message_id).bind(id).execute(&self.pool).await.map_err(pg_err)?;
         Ok(())
     }
 
     async fn delete_panel(&self, panel_id: &str) -> Result<(), DomainError> {
         let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         sqlx::query("DELETE FROM role_panels WHERE id = $1")
-            .bind(id).execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(id).execute(&self.pool).await.map_err(pg_err)?;
         Ok(())
     }
 
     async fn find_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, DomainError> {
         let rows = sqlx::query_as::<_, AutoRoleRow>("SELECT * FROM auto_roles WHERE guild_id = $1")
-            .bind(guild_id).fetch_all(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
         Ok(rows.into_iter().map(AutoRole::from).collect())
     }
 
@@ -157,13 +158,13 @@ impl RolePanelRepository for PgRolePanelRepository {
             "INSERT INTO auto_roles (id, guild_id, role_id, role_name, delay_secs, enabled) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (guild_id, role_id) DO UPDATE SET role_name=$4, delay_secs=$5, enabled=$6"
         )
         .bind(ar.id).bind(ar.guild_id.as_str()).bind(ar.role_id.as_str()).bind(&ar.role_name).bind(ar.delay_secs).bind(ar.enabled)
-        .execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(())
     }
 
     async fn delete_auto_role(&self, guild_id: &str, role_id: &str) -> Result<(), DomainError> {
         sqlx::query("DELETE FROM auto_roles WHERE guild_id = $1 AND role_id = $2")
-            .bind(guild_id).bind(role_id).execute(&self.pool).await.map_err(|e| DomainError::Internal(e.to_string()))?;
+            .bind(guild_id).bind(role_id).execute(&self.pool).await.map_err(pg_err)?;
         Ok(())
     }
 }

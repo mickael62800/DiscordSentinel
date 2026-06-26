@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 
 use sentinel_core::domain::entities::system::guild::Guild;
@@ -58,7 +59,7 @@ impl GuildRepository for PgGuildRepository {
         .bind(guild.member_count)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -69,7 +70,7 @@ impl GuildRepository for PgGuildRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Guild::from).collect())
     }
@@ -81,7 +82,7 @@ impl GuildRepository for PgGuildRepository {
         .bind(guild_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(Guild::from))
     }
@@ -91,7 +92,7 @@ impl GuildRepository for PgGuildRepository {
             .bind(guild_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -108,7 +109,7 @@ impl GuildRepository for PgGuildRepository {
             .bind(keep_ids)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(result.rows_affected())
     }

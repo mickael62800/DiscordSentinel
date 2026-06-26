@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -89,7 +90,7 @@ impl DailyActivityRepository for PgDailyActivityRepository {
                 .await
         };
 
-        let rows = rows.map_err(|e| DomainError::Internal(e.to_string()))?;
+        let rows = rows.map_err(pg_err)?;
         Ok(rows.into_iter().map(DailyActivity::from).collect())
     }
 
@@ -118,7 +119,7 @@ impl DailyActivityRepository for PgDailyActivityRepository {
         .bind(guild_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }

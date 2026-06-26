@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -59,7 +60,7 @@ impl RuleRepository for PgRuleRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Rule::from).collect())
     }
@@ -70,7 +71,7 @@ impl RuleRepository for PgRuleRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Rule::from).collect())
     }
@@ -82,7 +83,7 @@ impl RuleRepository for PgRuleRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(Rule::from))
     }
@@ -95,7 +96,7 @@ impl RuleRepository for PgRuleRepository {
         .bind(id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("Regle {}", id)));
@@ -133,7 +134,7 @@ impl RuleRepository for PgRuleRepository {
         .bind(rule.updated_at)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(Rule::from(row))
     }
@@ -143,7 +144,7 @@ impl RuleRepository for PgRuleRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("Regle {}", id)));

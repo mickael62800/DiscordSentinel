@@ -1,4 +1,5 @@
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
@@ -25,7 +26,7 @@ use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
-/// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
+/// GET /api/guilds/{guild_id}/members â€” liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
@@ -55,7 +56,7 @@ pub async fn list_members(
     Ok(Json(members))
 }
 
-/// GET /api/members/{guild_id} — liste les membres depuis la BDD
+/// GET /api/members/{guild_id} â€” liste les membres depuis la BDD
 pub async fn list_members_db(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
@@ -64,7 +65,7 @@ pub async fn list_members_db(
     Ok(Json(members))
 }
 
-/// GET /api/members/{guild_id}/{user_id} — profil d'un membre
+/// GET /api/members/{guild_id}/{user_id} â€” profil d'un membre
 pub async fn get_member(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
@@ -73,7 +74,7 @@ pub async fn get_member(
     Ok(Json(member))
 }
 
-/// GET /api/members/{guild_id}/{user_id}/summary — profil complet agrege
+/// GET /api/members/{guild_id}/{user_id}/summary â€” profil complet agrege
 pub async fn get_member_summary(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
@@ -82,7 +83,7 @@ pub async fn get_member_summary(
     Ok(Json(summary))
 }
 
-/// POST /api/members/sync — sync bulk depuis un bot
+/// POST /api/members/sync â€” sync bulk depuis un bot
 pub async fn sync_members(
     State(state): State<AppState>,
     Json(payload): Json<SyncMembersPayload>,
@@ -94,7 +95,7 @@ pub async fn sync_members(
     Ok(Json(serde_json::json!({ "synced": count })))
 }
 
-/// POST /api/members/register — enregistre un nouveau membre
+/// POST /api/members/register â€” enregistre un nouveau membre
 pub async fn register_member(
     State(state): State<AppState>,
     Json(member): Json<GuildMember>,
@@ -103,13 +104,13 @@ pub async fn register_member(
     Ok(ok_response())
 }
 
-/// DELETE /api/members/{guild_id}/{user_id} — supprime un membre
+/// DELETE /api/members/{guild_id}/{user_id} â€” supprime un membre
 pub async fn remove_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ requis pour retirer un membre du cache local.
+    // Phase 7 B â€” Gate RBAC : moderator+ requis pour retirer un membre du cache local.
     if let Some(Extension(ctx)) = rbac {
         require_role(&ctx, Role::Moderator)
             .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour retirer un membre".into())))?;
@@ -118,7 +119,7 @@ pub async fn remove_member(
     Ok(ok_response())
 }
 
-/// PATCH /api/members/{guild_id}/{user_id} — met a jour un membre
+/// PATCH /api/members/{guild_id}/{user_id} â€” met a jour un membre
 pub async fn update_member(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
@@ -141,7 +142,7 @@ pub struct SyncMembersPayload {
     pub members: Vec<GuildMember>,
 }
 
-/// POST /api/members/{guild_id}/{user_id}/reset — nettoie TOUTES les donnees
+/// POST /api/members/{guild_id}/{user_id}/reset â€” nettoie TOUTES les donnees
 /// de moderation d'un membre sur une guild en une seule transaction.
 ///
 /// Supprime :
@@ -154,7 +155,7 @@ pub struct SyncMembersPayload {
 ///
 /// **Operation irreversible**, gatee derriere `Role::Admin` + bypass superadmin.
 /// Tout se fait dans une transaction atomique : en cas d'erreur sur un DELETE,
-/// on rollback et on retourne l'erreur — l'etat DB reste coherent.
+/// on rollback et on retourne l'erreur â€” l'etat DB reste coherent.
 pub async fn reset_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -173,7 +174,7 @@ pub async fn reset_member(
         .pg_pool
         .begin()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("begin tx reset: {e}"))))?;
+        .map_err(sqlx_internal("begin tx reset"))?;
 
     // Liste des tables a purger : regle metier dans
     // `domain/entities/guild_member_reset.rs::MEMBER_RESET_TABLES`.
@@ -196,7 +197,7 @@ pub async fn reset_member(
 
     tx.commit()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("commit tx reset: {e}"))))?;
+        .map_err(sqlx_internal("commit tx reset"))?;
 
     tracing::info!(
         guild_id = %guild_id,
@@ -246,7 +247,7 @@ pub async fn leave_member(
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let mut tx = state.pg_pool.begin().await
-        .map_err(|e| ApiError(DomainError::Internal(format!("leave_member begin: {e}"))))?;
+        .map_err(sqlx_internal("leave_member begin"))?;
 
     // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
     let res = sqlx::query(
@@ -256,7 +257,7 @@ pub async fn leave_member(
     .bind(&guild_id)
     .bind(&user_id)
     .execute(&mut *tx).await
-    .map_err(|e| ApiError(DomainError::Internal(format!("leave_member update: {e}"))))?;
+    .map_err(sqlx_internal("leave_member update"))?;
 
     // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
     let _ = sqlx::query(
@@ -266,10 +267,10 @@ pub async fn leave_member(
     .bind(&guild_id)
     .bind(&user_id)
     .execute(&mut *tx).await
-    .map_err(|e| ApiError(DomainError::Internal(format!("leave_member wallet reset: {e}"))))?;
+    .map_err(sqlx_internal("leave_member wallet reset"))?;
 
     tx.commit().await
-        .map_err(|e| ApiError(DomainError::Internal(format!("leave_member commit: {e}"))))?;
+        .map_err(sqlx_internal("leave_member commit"))?;
 
     Ok(Json(serde_json::json!({
         "ok": true,
@@ -299,7 +300,7 @@ pub async fn rejoin_member(
     .bind(&guild_id)
     .bind(&user_id)
     .execute(&state.pg_pool).await
-    .map_err(|e| ApiError(DomainError::Internal(format!("rejoin_member update: {e}"))))?;
+    .map_err(sqlx_internal("rejoin_member update"))?;
 
     Ok(Json(serde_json::json!({
         "ok": true,

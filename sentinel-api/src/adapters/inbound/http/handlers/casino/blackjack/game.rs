@@ -1,9 +1,10 @@
 //! Handlers du jeu solo : start, hit, stand, double, get_active.
 //!
-//! Tous délèguent à `state.blackjack_svc` et broadcastent un événement
+//! Tous dÃƒÂ©lÃƒÂ¨guent ÃƒÂ  `state.blackjack_svc` et broadcastent un ÃƒÂ©vÃƒÂ©nement
 //! `blackjack_result` via le broadcaster quand la partie se termine.
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
@@ -18,7 +19,7 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 
-/// Diffuse un événement `blackjack_result` pour la partie terminée.
+/// Diffuse un ÃƒÂ©vÃƒÂ©nement `blackjack_result` pour la partie terminÃƒÂ©e.
 fn broadcast_result(state: &AppState, game: &BlackjackGame, doubled: bool) {
     let mut payload = serde_json::json!({
         "guild_id": game.guild_id,
@@ -122,7 +123,7 @@ pub async fn stand(
         .await
         .ok();
 
-    // stand termine toujours la partie → on broadcast systématiquement.
+    // stand termine toujours la partie Ã¢â€ â€™ on broadcast systÃƒÂ©matiquement.
     broadcast_result(&state, &game, false);
 
     Ok(Json(to_dto(&game)))
@@ -182,7 +183,6 @@ pub async fn purge_all(
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    use sentinel_core::domain::errors::DomainError;
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.purge.blackjack",
         "role insuffisant pour purger blackjack",
@@ -193,14 +193,14 @@ pub async fn purge_all(
         .bind(&guild_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("purge blackjack_games: {e}"))))?;
+        .map_err(sqlx_internal("purge blackjack_games"))?;
 
     // blackjack_table_players est en CASCADE sur blackjack_tables.
     let tables = sqlx::query("DELETE FROM blackjack_tables WHERE guild_id = $1")
         .bind(&guild_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("purge blackjack_tables: {e}"))))?;
+        .map_err(sqlx_internal("purge blackjack_tables"))?;
 
     Ok(Json(serde_json::json!({
         "deleted_games": games.rows_affected(),

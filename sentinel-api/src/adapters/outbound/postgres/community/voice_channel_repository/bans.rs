@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
@@ -41,7 +42,7 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         .bind(voice_channel_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannelBan::from).collect())
     }
@@ -54,7 +55,7 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannelBan::from))
     }
@@ -81,7 +82,7 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         .bind(ban.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -92,7 +93,7 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -101,7 +102,7 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         let result = sqlx::query("DELETE FROM voice_channel_bans WHERE expires_at IS NOT NULL AND expires_at <= NOW()")
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(result.rows_affected())
     }

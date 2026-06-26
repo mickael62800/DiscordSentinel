@@ -1,12 +1,13 @@
 //! Codes d'invitation a usage unique pour onboarder de nouveaux users.
 //!
 //! Endpoints :
-//!   POST /api/invitations              (owner+, scope guild) — genere un code
-//!   GET  /api/invitations/{guild_id}   (owner+) — liste les codes
-//!   DELETE /api/invitations/{code}     (owner+) — revoque un code non utilise
-//!   POST /api/auth/redeem-invitation   (auth Discord token requis) — consomme code
+//!   POST /api/invitations              (owner+, scope guild) â€” genere un code
+//!   GET  /api/invitations/{guild_id}   (owner+) â€” liste les codes
+//!   DELETE /api/invitations/{code}     (owner+) â€” revoque un code non utilise
+//!   POST /api/auth/redeem-invitation   (auth Discord token requis) â€” consomme code
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
@@ -47,7 +48,7 @@ fn generate_code() -> String {
     parts.join("-")
 }
 
-// ── Generate ──
+// â”€â”€ Generate â”€â”€
 
 #[derive(Debug, Deserialize)]
 pub struct CreateInvitationDto {
@@ -96,7 +97,7 @@ pub async fn create_invitation(
         .bind(&dto.guild_id)
         .fetch_optional(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query role: {e}"))))?;
+        .map_err(sqlx_internal("query role"))?;
         let role_str = row.map(|r| r.0).unwrap_or_default();
         let role = Role::from_str(&role_str).unwrap_or(Role::Viewer);
         require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
@@ -145,7 +146,7 @@ pub async fn create_invitation(
     .bind(&dto.notes)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("insert: {e}"))))?;
+    .map_err(sqlx_internal("insert"))?;
 
     Ok(Json(InvitationDto {
         code: code.clone(),
@@ -161,7 +162,7 @@ pub async fn create_invitation(
     }))
 }
 
-// ── List ──
+// â”€â”€ List â”€â”€
 
 pub async fn list_invitations(
     State(state): State<AppState>,
@@ -183,7 +184,7 @@ pub async fn list_invitations(
         .bind(&guild_id)
         .fetch_optional(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query role: {e}"))))?;
+        .map_err(sqlx_internal("query role"))?;
         let role = Role::from_str(&row.map(|r| r.0).unwrap_or_default()).unwrap_or(Role::Viewer);
         require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
             .map_err(|s| forbid(s, "owner+ requis"))?;
@@ -211,7 +212,7 @@ pub async fn list_invitations(
     .bind(&guild_id)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("query list: {e}"))))?;
+    .map_err(sqlx_internal("query list"))?;
 
     let now = chrono::Utc::now();
     let out: Vec<InvitationDto> = rows
@@ -241,7 +242,7 @@ pub async fn list_invitations(
     Ok(Json(out))
 }
 
-// ── Revoke (delete unused) ──
+// â”€â”€ Revoke (delete unused) â”€â”€
 
 pub async fn revoke_invitation(
     State(state): State<AppState>,
@@ -254,7 +255,7 @@ pub async fn revoke_invitation(
             .bind(&code)
             .fetch_optional(&state.pg_pool)
             .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("query: {e}"))))?;
+            .map_err(sqlx_internal("query"))?;
     let Some((guild_id, used_at)) = row else {
         return Err(ApiError(DomainError::NotFound("code introuvable".into())));
     };
@@ -287,12 +288,12 @@ pub async fn revoke_invitation(
         .bind(&code)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("delete: {e}"))))?;
+        .map_err(sqlx_internal("delete"))?;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-// ── Check access (apres OAuth, avant dashboard) ──
+// â”€â”€ Check access (apres OAuth, avant dashboard) â”€â”€
 
 #[derive(Debug, Serialize)]
 pub struct CheckAccessResponse {
@@ -334,7 +335,7 @@ pub async fn check_access(
     .bind(&ctx.discord_user_id)
     .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("count guilds: {e}"))))?;
+    .map_err(sqlx_internal("count guilds"))?;
 
     let is_authorized = is_superadmin || guild_count > 0;
     let message = if is_authorized {
@@ -351,7 +352,7 @@ pub async fn check_access(
     }))
 }
 
-// ── Redeem (par l'utilisateur invite) ──
+// â”€â”€ Redeem (par l'utilisateur invite) â”€â”€
 
 #[derive(Debug, Deserialize)]
 pub struct RedeemDto {
@@ -386,7 +387,7 @@ pub async fn redeem_invitation(
         .bind(&code)
         .fetch_optional(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query: {e}"))))?;
+        .map_err(sqlx_internal("query"))?;
 
     let Some((guild_id, role, expires_at, used_at)) = row else {
         return Err(ApiError(DomainError::NotFound(
@@ -412,7 +413,7 @@ pub async fn redeem_invitation(
         .pg_pool
         .begin()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("tx: {e}"))))?;
+        .map_err(sqlx_internal("tx"))?;
 
     // Insert ou update api_user_guilds
     sqlx::query(
@@ -428,7 +429,7 @@ pub async fn redeem_invitation(
     .bind(&role)
     .execute(&mut *tx)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("grant role: {e}"))))?;
+    .map_err(sqlx_internal("grant role"))?;
 
     // Marquer le code consomme (atomic check-and-set)
     let updated = sqlx::query(
@@ -439,7 +440,7 @@ pub async fn redeem_invitation(
     .bind(&ctx.discord_user_id)
     .execute(&mut *tx)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("consume: {e}"))))?;
+    .map_err(sqlx_internal("consume"))?;
 
     if updated.rows_affected() == 0 {
         // Race condition : un autre user a consomme le code entre-temps.
@@ -450,7 +451,7 @@ pub async fn redeem_invitation(
 
     tx.commit()
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("commit: {e}"))))?;
+        .map_err(sqlx_internal("commit"))?;
 
     tracing::info!(
         target: "audit::invitation",
@@ -464,6 +465,6 @@ pub async fn redeem_invitation(
     Ok(Json(RedeemResponse {
         guild_id,
         role,
-        message: "Invitation acceptée".to_string(),
+        message: "Invitation acceptÃ©e".to_string(),
     }))
 }

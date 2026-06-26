@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -63,7 +64,7 @@ impl GameAuditRepository for PgGameAuditRepository {
         .bind(details)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("log audit: {e}")))?;
+        .map_err(|e| pg_err_ctx("log audit", e))?;
         Ok(())
     }
 
@@ -82,7 +83,7 @@ impl GameAuditRepository for PgGameAuditRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("list audit for server: {e}")))?;
+        .map_err(|e| pg_err_ctx("list audit for server", e))?;
         Ok(rows.into_iter().map(GameAuditEntry::from).collect())
     }
 
@@ -103,7 +104,7 @@ impl GameAuditRepository for PgGameAuditRepository {
         .bind(offset)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("list audit for guild: {e}")))?;
+        .map_err(|e| pg_err_ctx("list audit for guild", e))?;
         Ok(rows.into_iter().map(GameAuditEntry::from).collect())
     }
 }

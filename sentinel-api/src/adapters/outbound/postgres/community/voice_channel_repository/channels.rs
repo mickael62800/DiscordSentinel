@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
@@ -64,7 +65,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
@@ -76,7 +77,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
@@ -92,7 +93,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
@@ -107,7 +108,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(channel_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannel::from))
     }
@@ -119,7 +120,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannel::from))
     }
@@ -152,7 +153,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(channel.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -164,7 +165,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -176,7 +177,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         .bind(channel_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -192,7 +193,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -203,7 +204,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -214,7 +215,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -225,7 +226,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -236,7 +237,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -247,7 +248,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -259,7 +260,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -270,7 +271,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -281,7 +282,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }

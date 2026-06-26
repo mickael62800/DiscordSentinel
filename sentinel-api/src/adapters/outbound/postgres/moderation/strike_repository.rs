@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
@@ -95,7 +96,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(strike.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("save_strike: {e}")))?;
+        .map_err(|e| pg_err_ctx("save_strike", e))?;
         Ok(())
     }
 
@@ -114,7 +115,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(cutoff)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("find_active_strikes: {e}")))?;
+        .map_err(|e| pg_err_ctx("find_active_strikes", e))?;
 
         Ok(rows.into_iter().map(UserStrike::from).collect())
     }
@@ -125,7 +126,7 @@ impl StrikeRepository for PgStrikeRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_strikes: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_strikes", e))?;
         Ok(())
     }
 
@@ -134,7 +135,7 @@ impl StrikeRepository for PgStrikeRepository {
             .bind(infraction_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_strike_by_infraction_id: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_strike_by_infraction_id", e))?;
         Ok(result.rows_affected())
     }
 
@@ -146,7 +147,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(guild_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("get_strike_config: {e}")))?;
+        .map_err(|e| pg_err_ctx("get_strike_config", e))?;
 
         Ok(row.map(StrikeConfig::from))
     }
@@ -170,7 +171,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(config.enabled)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("save_strike_config: {e}")))?;
+        .map_err(|e| pg_err_ctx("save_strike_config", e))?;
 
         Ok(())
     }

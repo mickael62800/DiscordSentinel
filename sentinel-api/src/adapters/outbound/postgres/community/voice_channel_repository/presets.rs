@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset;
 use sentinel_core::domain::errors::DomainError;
@@ -41,7 +42,7 @@ impl VoicePresetStore for super::PgVoiceChannelRepository {
         .bind(owner_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannelPreset::from))
     }
@@ -70,7 +71,7 @@ impl VoicePresetStore for super::PgVoiceChannelRepository {
         .bind(preset.updated_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }

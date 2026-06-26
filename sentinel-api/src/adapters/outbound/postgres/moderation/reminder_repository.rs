@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
@@ -77,7 +78,7 @@ impl ReminderRepository for PgReminderRepository {
         .bind(r.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("save_reminder: {e}")))?;
+        .map_err(|e| pg_err_ctx("save_reminder", e))?;
         Ok(())
     }
 
@@ -91,7 +92,7 @@ impl ReminderRepository for PgReminderRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("find_pending_reminders: {e}")))?;
+        .map_err(|e| pg_err_ctx("find_pending_reminders", e))?;
 
         Ok(rows.into_iter().map(SanctionReminder::from).collect())
     }
@@ -101,7 +102,7 @@ impl ReminderRepository for PgReminderRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("mark_sent: {e}")))?;
+            .map_err(|e| pg_err_ctx("mark_sent", e))?;
         Ok(())
     }
 
@@ -110,7 +111,7 @@ impl ReminderRepository for PgReminderRepository {
             .bind(action_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("cancel_reminders: {e}")))?;
+            .map_err(|e| pg_err_ctx("cancel_reminders", e))?;
         Ok(())
     }
 
@@ -122,7 +123,7 @@ impl ReminderRepository for PgReminderRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("find_reminders_by_guild: {e}")))?;
+        .map_err(|e| pg_err_ctx("find_reminders_by_guild", e))?;
 
         Ok(rows.into_iter().map(SanctionReminder::from).collect())
     }

@@ -4,6 +4,7 @@
 //! Endpoint `GET /api/security/server-events` lit la table avec filtres.
 
 use axum::extract::Query;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
@@ -71,7 +72,7 @@ pub async fn record_server_event(
     }
 }
 
-// ── Endpoint : lire les events ──────────────────────────────────────────
+// â”€â”€ Endpoint : lire les events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 #[derive(Debug, Deserialize)]
 pub struct ServerEventsQuery {
@@ -141,7 +142,7 @@ pub async fn list_server_events(
     let rows = q_builder
         .fetch_all(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("query: {e}"))))?;
+        .map_err(sqlx_internal("query"))?;
 
     let out = rows
         .into_iter()

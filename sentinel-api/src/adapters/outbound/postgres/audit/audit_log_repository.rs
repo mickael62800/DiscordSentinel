@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -70,7 +72,7 @@ impl AuditLogRepository for PgAuditLogRepository {
         .bind(log.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -124,7 +126,7 @@ impl AuditLogRepository for PgAuditLogRepository {
         let rows = q
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(AuditLog::from).collect())
     }
@@ -135,7 +137,7 @@ impl AuditLogRepository for PgAuditLogRepository {
             .bind(days)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_audit_logs_older: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_audit_logs_older", e))?;
         Ok(result.rows_affected())
     }
 }

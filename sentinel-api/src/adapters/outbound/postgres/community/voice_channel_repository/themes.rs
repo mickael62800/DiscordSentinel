@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
@@ -55,7 +56,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannelTheme::from).collect())
     }
@@ -67,7 +68,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannelTheme::from))
     }
@@ -96,7 +97,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
         .bind(theme.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -126,7 +127,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
         .bind(theme.sort_order)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -136,7 +137,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }
@@ -146,7 +147,7 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
             .bind(guild_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }

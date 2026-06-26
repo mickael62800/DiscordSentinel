@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -46,7 +48,7 @@ impl From<AuditModRow> for ModerationAction {
             .get("gravity")
             .and_then(|v| v.as_str())
             .and_then(ModerationGravity::from_str_lossy);
-        // Negative duration → None (ne wrap pas sur u64::MAX).
+        // Negative duration â†’ None (ne wrap pas sur u64::MAX).
         let duration = row
             .details
             .get("duration_secs")
@@ -148,7 +150,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(ModerationAction::from))
     }
@@ -163,7 +165,7 @@ impl ModerationRepository for PgModerationRepository {
             .bind(target_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
@@ -173,7 +175,7 @@ impl ModerationRepository for PgModerationRepository {
         // Pour chaque (guild_id, target_id), on prend la derniere action ban*/unban
         // et on ne garde que celles dont l'event_type final commence par 'mod_ban'.
         // LEFT JOIN guild_members pour enrichir avec le pseudo serveur
-        // (target_display_name) — affiche dans la liste "Bannis actifs" cote web.
+        // (target_display_name) â€” affiche dans la liste "Bannis actifs" cote web.
         let rows = match guild_id {
             Some(gid) => {
                 sqlx::query_as::<_, AuditModRow>(
@@ -226,7 +228,7 @@ impl ModerationRepository for PgModerationRepository {
                 .await
             }
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
@@ -254,7 +256,7 @@ impl ModerationRepository for PgModerationRepository {
                     .await
             }
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
@@ -268,7 +270,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(target_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -280,7 +282,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(id.to_string())
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -291,7 +293,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(action_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("fetch action guild_id: {e}")))?;
+        .map_err(|e| pg_err_ctx("fetch action guild_id", e))?;
         Ok(row.map(|(g,)| g))
     }
 
@@ -310,7 +312,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(action_id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("fetch action: {e}")))?;
+        .map_err(|e| pg_err_ctx("fetch action", e))?;
 
         Ok(row.map(|(guild_id, target_id_opt, target_name_opt, event_type)| {
             let action_type = event_type.strip_prefix("mod_").unwrap_or(&event_type).to_string();

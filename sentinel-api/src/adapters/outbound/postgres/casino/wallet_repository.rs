@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
@@ -94,7 +95,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(starting_coins)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("get_or_create wallet: {e}")))?;
+        .map_err(|e| pg_err_ctx("get_or_create wallet", e))?;
 
         Ok(Wallet::from(row))
     }
@@ -108,14 +109,14 @@ impl WalletRepository for PgWalletRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("get wallet: {e}")))?;
+        .map_err(|e| pg_err_ctx("get wallet", e))?;
 
         Ok(row.map(Wallet::from))
     }
 
     async fn credit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("credit begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("credit begin tx", e))?;
 
         let row = sqlx::query_as::<_, WalletRow>(
             r#"UPDATE user_wallets
@@ -128,7 +129,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(user_id)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("credit update: {e}")))?
+        .map_err(|e| pg_err_ctx("credit update", e))?
         .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
 
         let wallet = Wallet::from(row);
@@ -146,10 +147,10 @@ impl WalletRepository for PgWalletRepository {
         .bind(description)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("credit insert tx: {e}")))?;
+        .map_err(|e| pg_err_ctx("credit insert tx", e))?;
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("credit commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("credit commit", e))?;
 
         info!(guild_id, user_id, amount, balance = wallet.coins, source, "Wallet credit");
         Ok(wallet)
@@ -157,7 +158,7 @@ impl WalletRepository for PgWalletRepository {
 
     async fn debit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("debit begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("debit begin tx", e))?;
 
         // Verifier le solde avant debit
         let current = sqlx::query_as::<_, WalletRow>(
@@ -168,7 +169,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(user_id)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("debit select: {e}")))?
+        .map_err(|e| pg_err_ctx("debit select", e))?
         .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
 
         if current.coins < amount {
@@ -191,7 +192,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(user_id)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("debit update: {e}")))?;
+        .map_err(|e| pg_err_ctx("debit update", e))?;
 
         let wallet = Wallet::from(row);
 
@@ -208,10 +209,10 @@ impl WalletRepository for PgWalletRepository {
         .bind(description)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("debit insert tx: {e}")))?;
+        .map_err(|e| pg_err_ctx("debit insert tx", e))?;
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("debit commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("debit commit", e))?;
 
         info!(guild_id, user_id, amount, balance = wallet.coins, source, "Wallet debit");
         Ok(wallet)
@@ -219,7 +220,7 @@ impl WalletRepository for PgWalletRepository {
 
     async fn transfer(&self, guild_id: &str, from_user: &str, to_user: &str, amount: i64, source: &str, description: &str) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("transfer begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("transfer begin tx", e))?;
 
         // Verifier le solde de l'expediteur
         let sender = sqlx::query_as::<_, WalletRow>(
@@ -230,7 +231,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(from_user)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("transfer select sender: {e}")))?
+        .map_err(|e| pg_err_ctx("transfer select sender", e))?
         .ok_or_else(|| DomainError::NotFound("Portefeuille expediteur introuvable".into()))?;
 
         if sender.coins < amount {
@@ -252,7 +253,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(from_user)
         .fetch_one(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("transfer debit: {e}")))?;
+        .map_err(|e| pg_err_ctx("transfer debit", e))?;
 
         // Crediter le destinataire
         let receiver_after = sqlx::query_scalar::<_, i64>(
@@ -264,7 +265,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(to_user)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("transfer credit: {e}")))?
+        .map_err(|e| pg_err_ctx("transfer credit", e))?
         .ok_or_else(|| DomainError::NotFound("Portefeuille destinataire introuvable".into()))?;
 
         // Transactions pour l'expediteur
@@ -281,7 +282,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(description)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("transfer insert tx sender: {e}")))?;
+        .map_err(|e| pg_err_ctx("transfer insert tx sender", e))?;
 
         // Transactions pour le destinataire
         sqlx::query(
@@ -297,10 +298,10 @@ impl WalletRepository for PgWalletRepository {
         .bind(description)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("transfer insert tx receiver: {e}")))?;
+        .map_err(|e| pg_err_ctx("transfer insert tx receiver", e))?;
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("transfer commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("transfer commit", e))?;
 
         info!(guild_id, from_user, to_user, amount, source, "Wallet transfer");
         Ok(())
@@ -317,7 +318,7 @@ impl WalletRepository for PgWalletRepository {
         description: &str,
     ) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("pay_combat begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("pay_combat begin tx", e))?;
 
         // Debit perdant (si loser_amount > 0). On ne fail pas si le wallet
         // n existe pas : le combat s est deja resolu en domain, on logge
@@ -332,7 +333,7 @@ impl WalletRepository for PgWalletRepository {
             .bind(loser_id)
             .fetch_optional(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("pay_combat debit loser: {e}")))?;
+            .map_err(|e| pg_err_ctx("pay_combat debit loser", e))?;
 
             if let Some(balance_after) = loser_after {
                 sqlx::query(
@@ -348,7 +349,7 @@ impl WalletRepository for PgWalletRepository {
                 .bind(description)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| DomainError::Internal(format!("pay_combat insert tx loser: {e}")))?;
+                .map_err(|e| pg_err_ctx("pay_combat insert tx loser", e))?;
             }
         }
 
@@ -363,7 +364,7 @@ impl WalletRepository for PgWalletRepository {
             .bind(winner_id)
             .fetch_optional(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("pay_combat credit winner: {e}")))?;
+            .map_err(|e| pg_err_ctx("pay_combat credit winner", e))?;
 
             if let Some(balance_after) = winner_after {
                 sqlx::query(
@@ -379,19 +380,19 @@ impl WalletRepository for PgWalletRepository {
                 .bind(description)
                 .execute(&mut *tx)
                 .await
-                .map_err(|e| DomainError::Internal(format!("pay_combat insert tx winner: {e}")))?;
+                .map_err(|e| pg_err_ctx("pay_combat insert tx winner", e))?;
             }
         }
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("pay_combat commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("pay_combat commit", e))?;
 
         info!(guild_id, winner_id, winner_amount, loser_id, loser_amount, source, "Combat payout atomic");
         Ok(())
     }
 
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
-        // Phase 2 A.2 — Lit depuis la vue materialisee `mv_wallet_leaderboard`
+        // Phase 2 A.2 â€” Lit depuis la vue materialisee `mv_wallet_leaderboard`
         // refreshee toutes les 5 min par le cache-worker. Le rang est precalcule
         // donc l'ORDER BY est un index scan O(N) sur (guild_id, rank). Gain
         // typique : 100-1000x sur les hits hot. La staleness max de 5 min est
@@ -412,7 +413,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("leaderboard: {e}")))?;
+        .map_err(|e| pg_err_ctx("leaderboard", e))?;
 
         Ok(rows.into_iter().map(Wallet::from).collect())
     }
@@ -429,7 +430,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("get_transactions: {e}")))?;
+        .map_err(|e| pg_err_ctx("get_transactions", e))?;
 
         Ok(rows.into_iter().map(WalletTransaction::from).collect())
     }
@@ -446,20 +447,20 @@ impl WalletRepository for PgWalletRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("list_by_guild: {e}")))?;
+        .map_err(|e| pg_err_ctx("list_by_guild", e))?;
 
         Ok(rows.into_iter().map(Wallet::from).collect())
     }
 
     async fn reset_wallet(&self, guild_id: &str, user_id: &str, new_balance: i64) -> Result<Wallet, DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("reset begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset begin tx", e))?;
 
         // Efface l'historique de transactions du joueur.
         sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1 AND user_id = $2")
             .bind(guild_id).bind(user_id)
             .execute(&mut *tx).await
-            .map_err(|e| DomainError::Internal(format!("reset wipe tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset wipe tx", e))?;
 
         // Reset le solde + total_earned/total_spent.
         let row = sqlx::query_as::<_, WalletRow>(
@@ -473,7 +474,7 @@ impl WalletRepository for PgWalletRepository {
         .bind(user_id)
         .fetch_optional(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("reset update: {e}")))?
+        .map_err(|e| pg_err_ctx("reset update", e))?
         .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
 
         // Log d'audit du reset en wallet_transactions.
@@ -488,10 +489,10 @@ impl WalletRepository for PgWalletRepository {
         .bind(new_balance)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("reset audit: {e}")))?;
+        .map_err(|e| pg_err_ctx("reset audit", e))?;
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("reset commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset commit", e))?;
 
         info!(guild_id, user_id, new_balance, "Wallet reset");
         Ok(Wallet::from(row))
@@ -499,13 +500,13 @@ impl WalletRepository for PgWalletRepository {
 
     async fn reset_all_wallets(&self, guild_id: &str, new_balance: i64) -> Result<u64, DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("reset_all begin tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset_all begin tx", e))?;
 
         // Efface toutes les transactions de la guild.
         sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx).await
-            .map_err(|e| DomainError::Internal(format!("reset_all wipe tx: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset_all wipe tx", e))?;
 
         // Reset tous les wallets.
         let affected = sqlx::query(
@@ -517,11 +518,11 @@ impl WalletRepository for PgWalletRepository {
         .bind(guild_id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| DomainError::Internal(format!("reset_all update: {e}")))?
+        .map_err(|e| pg_err_ctx("reset_all update", e))?
         .rows_affected();
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("reset_all commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("reset_all commit", e))?;
 
         info!(guild_id, affected, new_balance, "Wallets bulk reset");
         Ok(affected)
@@ -545,7 +546,7 @@ impl WalletRepository for PgWalletRepository {
         )
         .bind(guild_id).bind(user_id)
         .fetch_optional(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("credit_in_tx select: {e}")))?;
+        .map_err(|e| pg_err_ctx("credit_in_tx select", e))?;
         let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
         let after: i64 = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins + $1, total_earned = total_earned + $1, updated_at = NOW() \
@@ -553,14 +554,14 @@ impl WalletRepository for PgWalletRepository {
         )
         .bind(amount).bind(guild_id).bind(user_id)
         .fetch_one(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("credit_in_tx update: {e}")))?;
+        .map_err(|e| pg_err_ctx("credit_in_tx update", e))?;
         sqlx::query(
             "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
         )
         .bind(Uuid::new_v4()).bind(guild_id).bind(user_id).bind(amount).bind(after).bind(source).bind(description)
         .execute(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("insert wallet_transactions: {e}")))?;
+        .map_err(|e| pg_err_ctx("insert wallet_transactions", e))?;
         Ok((previous, after))
     }
 
@@ -582,7 +583,7 @@ impl WalletRepository for PgWalletRepository {
         )
         .bind(guild_id).bind(user_id)
         .fetch_optional(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("debit_in_tx select: {e}")))?;
+        .map_err(|e| pg_err_ctx("debit_in_tx select", e))?;
         let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
         if previous < amount {
             return Err(DomainError::ValidationError(format!(
@@ -596,14 +597,14 @@ impl WalletRepository for PgWalletRepository {
         )
         .bind(amount).bind(guild_id).bind(user_id)
         .fetch_one(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("debit_in_tx update: {e}")))?;
+        .map_err(|e| pg_err_ctx("debit_in_tx update", e))?;
         sqlx::query(
             "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
              VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
         )
         .bind(Uuid::new_v4()).bind(guild_id).bind(user_id).bind(-amount).bind(after).bind(source).bind(description)
         .execute(&mut **tx).await
-        .map_err(|e| DomainError::Internal(format!("insert wallet_transactions: {e}")))?;
+        .map_err(|e| pg_err_ctx("insert wallet_transactions", e))?;
         Ok((previous, after))
     }
 }

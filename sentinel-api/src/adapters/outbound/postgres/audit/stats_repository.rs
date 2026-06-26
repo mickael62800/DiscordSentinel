@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -65,7 +66,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(stats.updated_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -78,7 +79,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.map(UserStats::from))
     }
@@ -91,7 +92,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(limit as i32)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(UserStats::from).collect())
     }
@@ -114,7 +115,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(count as i64)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -137,7 +138,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(seconds as i64)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -148,7 +149,7 @@ impl StatsRepository for PgStatsRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
@@ -159,7 +160,7 @@ impl StatsRepository for PgStatsRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
@@ -192,7 +193,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(now)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -236,7 +237,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(limit as i64)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(|r| VoiceSessionStats {
             channel_id: r.channel_id.into(),
@@ -260,7 +261,7 @@ impl StatsRepository for PgStatsRepository {
         .bind(since)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.0)
     }

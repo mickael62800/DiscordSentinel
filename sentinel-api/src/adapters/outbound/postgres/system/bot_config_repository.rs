@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -67,7 +68,7 @@ impl BotConfigRepository for PgBotConfigRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(BotDefinition::from).collect())
     }
@@ -80,7 +81,7 @@ impl BotConfigRepository for PgBotConfigRepository {
         .bind(bot_name)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(BotGuildConfig::from).collect())
     }
@@ -92,7 +93,7 @@ impl BotConfigRepository for PgBotConfigRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(BotGuildConfig::from).collect())
     }
@@ -114,7 +115,7 @@ impl BotConfigRepository for PgBotConfigRepository {
         .bind(value)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -128,7 +129,7 @@ impl BotConfigRepository for PgBotConfigRepository {
         .bind(key)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }

@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
@@ -53,13 +54,13 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
     async fn sync_roles(&self, guild_id: &str, roles: Vec<DiscordRole>) -> Result<(), DomainError> {
         // Supprimer les anciens roles du guild puis inserer les nouveaux
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("Transaction error: {e}")))?;
+            .map_err(|e| pg_err_ctx("Transaction error", e))?;
 
         sqlx::query("DELETE FROM discord_roles WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("Delete roles error: {e}")))?;
+            .map_err(|e| pg_err_ctx("Delete roles error", e))?;
 
         for role in &roles {
             sqlx::query(
@@ -78,11 +79,11 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
             .bind(role.member_count)
             .execute(&mut *tx)
             .await
-            .map_err(|e| DomainError::Internal(format!("Insert role error: {e}")))?;
+            .map_err(|e| pg_err_ctx("Insert role error", e))?;
         }
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("Commit error: {e}")))?;
+            .map_err(|e| pg_err_ctx("Commit error", e))?;
 
         Ok(())
     }
@@ -95,7 +96,7 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("Query roles error: {e}")))?;
+        .map_err(|e| pg_err_ctx("Query roles error", e))?;
         Ok(rows.into_iter().map(DiscordRole::from).collect())
     }
 
@@ -108,7 +109,7 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
         .bind(role_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("Query role error: {e}")))?;
+        .map_err(|e| pg_err_ctx("Query role error", e))?;
         Ok(row.map(DiscordRole::from))
     }
 }

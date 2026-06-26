@@ -1,4 +1,4 @@
-//! Phase 5 — Endpoints pour la table `coude_steal_attempts`.
+//! Phase 5 Ã¢â‚¬â€ Endpoints pour la table `coude_steal_attempts`.
 //!
 //! Le bot Discord persiste chaque /voler ici (au lieu de lancer un
 //! `tokio::spawn(sleep 60s)` qui mourrait avec le process). Le worker
@@ -13,6 +13,7 @@
 //!     les heartbeats / lifecycle logs.
 
 use axum::extract::Path;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -22,7 +23,6 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Deserialize)]
 pub struct CreateStealAttemptDto {
@@ -41,7 +41,7 @@ pub struct StealAttemptDto {
     pub expires_at: DateTime<Utc>,
 }
 
-/// POST /api/coude/steals — bot cree une tentative quand /voler est lance.
+/// POST /api/coude/steals Ã¢â‚¬â€ bot cree une tentative quand /voler est lance.
 pub async fn create_steal_attempt(
     State(state): State<AppState>,
     Json(dto): Json<CreateStealAttemptDto>,
@@ -63,12 +63,12 @@ pub async fn create_steal_attempt(
     .bind(expires_at)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("create steal_attempt: {e}"))))?;
+    .map_err(sqlx_internal("create steal_attempt"))?;
 
     Ok(Json(StealAttemptDto { id, expires_at }))
 }
 
-/// PATCH /api/coude/steals/{id}/defend — la victime a clique le bouton.
+/// PATCH /api/coude/steals/{id}/defend Ã¢â‚¬â€ la victime a clique le bouton.
 /// Marque pending -> defended (atomique, idempotent).
 pub async fn mark_defended(
     State(state): State<AppState>,
@@ -81,17 +81,17 @@ pub async fn mark_defended(
     .bind(id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("mark defended: {e}"))))?;
+    .map_err(sqlx_internal("mark defended"))?;
 
     if res.rows_affected() == 0 {
         // Soit deja defended/expired, soit id inconnu. Retourne 200
-        // quand meme — l'idempotence cote bot evite de re-resoudre.
+        // quand meme Ã¢â‚¬â€ l'idempotence cote bot evite de re-resoudre.
         return Ok(StatusCode::NO_CONTENT);
     }
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PATCH /api/coude/steals/{id}/resolved — le bot a fini la resolution.
+/// PATCH /api/coude/steals/{id}/resolved Ã¢â‚¬â€ le bot a fini la resolution.
 /// Marque le row resolved (etat final).
 pub async fn mark_resolved(
     State(state): State<AppState>,
@@ -104,6 +104,6 @@ pub async fn mark_resolved(
     .bind(id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("mark resolved: {e}"))))?;
+    .map_err(sqlx_internal("mark resolved"))?;
     Ok(StatusCode::NO_CONTENT)
 }

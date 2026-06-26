@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use sqlx::PgPool;
 
 use sentinel_core::domain::entities::audit::watched_user::classify_risk_level;
@@ -33,7 +34,7 @@ struct WatchedUserRow {
 impl From<WatchedUserRow> for WatchedUser {
     fn from(row: WatchedUserRow) -> Self {
         // La regle de classification de risque est en `domain/entities/watched_user.rs`.
-        // Cet adapter se contente de mapper row → entity + appel de la fn pure.
+        // Cet adapter se contente de mapper row â†’ entity + appel de la fn pure.
         let risk_level = classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
 
         Self {
@@ -60,7 +61,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
-        // Phase X — surveillance purement MANUELLE : avant, la requete
+        // Phase X â€” surveillance purement MANUELLE : avant, la requete
         // faisait un UNION entre tous les users avec infractions (auto) et
         // les users dans manual_watched_users. Consequence : impossible de
         // retirer un user avec des infractions (il revenait via la branche
@@ -109,7 +110,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
             .bind(offset)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(WatchedUser::from).collect())
     }
@@ -138,7 +139,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         .bind(added_by)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -155,7 +156,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         .bind(user_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }

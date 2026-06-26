@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -184,7 +185,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(guild_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(row.0)
     }
 
@@ -206,7 +207,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(c.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -226,7 +227,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(thread_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -236,7 +237,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(content)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -255,7 +256,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(reason)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -265,7 +266,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(Confession::from))
     }
 
@@ -275,7 +276,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(message_id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(Confession::from))
     }
 
@@ -290,7 +291,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(public_number)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(Confession::from))
     }
 
@@ -313,7 +314,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(limit)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(rows.into_iter().map(Confession::from).collect())
     }
 
@@ -332,7 +333,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(since)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(count.0)
     }
 
@@ -343,7 +344,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(confession_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok((count.0 as i32) + 1)
     }
 
@@ -364,7 +365,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(r.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -374,7 +375,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(message_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -387,7 +388,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(deleted_by)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -397,7 +398,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(confession_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(rows.into_iter().map(ConfessionReply::from).collect())
     }
 
@@ -407,7 +408,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(ConfessionReply::from))
     }
 
@@ -427,7 +428,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(r.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -459,7 +460,7 @@ impl ConfessionRepository for PgConfessionRepository {
                 .fetch_all(&self.pool)
                 .await
         }
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(rows.into_iter().map(ConfessionReport::from).collect())
     }
 
@@ -477,7 +478,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(resolved_by)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -487,7 +488,7 @@ impl ConfessionRepository for PgConfessionRepository {
             .bind(guild_id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(ConfessionConfig::from))
     }
 
@@ -514,7 +515,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(serde_json::to_value(&c.banned_user_ids).unwrap_or_default())
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 }

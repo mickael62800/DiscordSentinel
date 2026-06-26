@@ -1,7 +1,8 @@
-//! Phase 5G — Endpoints pour `security_lockdown_active`.
+//! Phase 5G Ã¢â‚¬â€ Endpoints pour `security_lockdown_active`.
 //! SQL direct (meme principe que steal_attempts / quarantine).
 
 use axum::extract::{Path, State};
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -9,7 +10,6 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Deserialize)]
 pub struct CreateLockdownDto {
@@ -20,7 +20,7 @@ pub struct CreateLockdownDto {
     pub duration_secs: i64,
 }
 
-/// POST /api/security/lockdown — bot enregistre un lockdown actif.
+/// POST /api/security/lockdown Ã¢â‚¬â€ bot enregistre un lockdown actif.
 /// UPSERT pour idempotence (re-activation reset le timer + states).
 pub async fn create_lockdown(
     State(state): State<AppState>,
@@ -40,11 +40,11 @@ pub async fn create_lockdown(
     .bind(expires_at)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("upsert lockdown: {e}"))))?;
+    .map_err(sqlx_internal("upsert lockdown"))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/security/lockdown/{guild_id} — bot retire un lockdown
+/// DELETE /api/security/lockdown/{guild_id} Ã¢â‚¬â€ bot retire un lockdown
 /// (deactivation manuelle ou via worker).
 pub async fn delete_lockdown(
     State(state): State<AppState>,
@@ -54,6 +54,6 @@ pub async fn delete_lockdown(
         .bind(&guild_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("delete lockdown: {e}"))))?;
+        .map_err(sqlx_internal("delete lockdown"))?;
     Ok(StatusCode::NO_CONTENT)
 }

@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -59,7 +61,7 @@ impl From<InfractionRow> for Infraction {
             score: row.score,
             action: Action::from_str_lossy(&row.action),
             reason: row.reason,
-            // Negative duration (DB corruption / bogus migration) → None au lieu
+            // Negative duration (DB corruption / bogus migration) Ã¢â€ â€™ None au lieu
             // de wrap silencieusement sur u64::MAX via `as u64`.
             duration: row.duration.and_then(|d| u64::try_from(d).ok()),
             created_at: row.created_at,
@@ -103,7 +105,7 @@ impl InfractionRepository for PgInfractionRepository {
         .bind(infraction.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -141,7 +143,7 @@ impl InfractionRepository for PgInfractionRepository {
         let rows = q
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Infraction::from).collect())
     }
@@ -153,7 +155,7 @@ impl InfractionRepository for PgInfractionRepository {
         .bind(offset)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Infraction::from).collect())
     }
@@ -164,7 +166,7 @@ impl InfractionRepository for PgInfractionRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
@@ -178,7 +180,7 @@ impl InfractionRepository for PgInfractionRepository {
             .bind(uuid)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(row.map(Infraction::from))
     }
@@ -191,7 +193,7 @@ impl InfractionRepository for PgInfractionRepository {
             .bind(uuid)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(result.rows_affected() > 0)
     }
@@ -202,7 +204,7 @@ impl InfractionRepository for PgInfractionRepository {
             .bind(days)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(format!("delete_infractions_older: {e}")))?;
+            .map_err(|e| pg_err_ctx("delete_infractions_older", e))?;
         Ok(result.rows_affected())
     }
 }

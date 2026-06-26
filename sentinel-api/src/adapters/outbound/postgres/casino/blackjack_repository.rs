@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
@@ -63,11 +64,11 @@ impl From<BlackjackRow> for BlackjackGame {
 impl BlackjackRepository for PgBlackjackRepository {
     async fn create(&self, game: &BlackjackGame) -> Result<(), DomainError> {
         let player_hand = serde_json::to_value(&game.player_hand)
-            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation player_hand : {e}")))?;
         let dealer_hand = serde_json::to_value(&game.dealer_hand)
-            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation dealer_hand : {e}")))?;
         let deck = serde_json::to_value(&game.deck)
-            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation deck : {e}")))?;
 
         sqlx::query(
             "INSERT INTO blackjack_games (id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at)
@@ -90,7 +91,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(game.finished_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("blackjack create : {e}")))?;
+        .map_err(|e| pg_err_ctx("blackjack create ", e))?;
 
         Ok(())
     }
@@ -99,7 +100,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         // Une partie est reellement "active" uniquement si :
         //  - status = 'playing' ET finished_at IS NULL (pas un blackjack naturel)
         //  - created_at dans les 30 dernieres minutes (au-dela, on considere
-        //    la partie abandonnee suite a crash bot/timeout Discord — ne doit
+        //    la partie abandonnee suite a crash bot/timeout Discord Ã¢â‚¬â€ ne doit
         //    pas bloquer eternellement le user)
         let row = sqlx::query_as::<_, BlackjackRow>(
             "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
@@ -114,18 +115,18 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("blackjack get_active : {e}")))?;
+        .map_err(|e| pg_err_ctx("blackjack get_active ", e))?;
 
         Ok(row.map(BlackjackGame::from))
     }
 
     async fn update(&self, game: &BlackjackGame) -> Result<(), DomainError> {
         let player_hand = serde_json::to_value(&game.player_hand)
-            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation player_hand : {e}")))?;
         let dealer_hand = serde_json::to_value(&game.dealer_hand)
-            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation dealer_hand : {e}")))?;
         let deck = serde_json::to_value(&game.deck)
-            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation deck : {e}")))?;
 
         // Guard : ne mettre a jour que si la partie est encore en cours
         // Empeche les race conditions (deux hit simultanes, hit+stand, etc.)
@@ -149,7 +150,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(game.id)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("blackjack update : {e}")))?;
+        .map_err(|e| pg_err_ctx("blackjack update ", e))?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::Conflict("Partie deja terminee ou action concurrente".into()));
@@ -167,7 +168,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(format!("blackjack get_by_id : {e}")))?;
+        .map_err(|e| pg_err_ctx("blackjack get_by_id ", e))?;
 
         Ok(row.map(BlackjackGame::from))
     }
@@ -195,14 +196,14 @@ impl BlackjackRepository for PgBlackjackRepository {
             .bind(guild_id)
             .fetch_all(&self.pool).await
         }
-        .map_err(|e| DomainError::Internal(format!("blackjack list_by_guild : {e}")))?;
+        .map_err(|e| pg_err_ctx("blackjack list_by_guild ", e))?;
 
         Ok(rows.into_iter().map(BlackjackGame::from).collect())
     }
 
     async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("cancel_game begin : {e}")))?;
+            .map_err(|e| pg_err_ctx("cancel_game begin ", e))?;
 
         // Recupere la partie pour obtenir la mise et valider le status.
         let row = sqlx::query_as::<_, BlackjackRow>(
@@ -211,7 +212,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         )
         .bind(id)
         .fetch_optional(&mut *tx).await
-        .map_err(|e| DomainError::Internal(format!("cancel_game select : {e}")))?
+        .map_err(|e| pg_err_ctx("cancel_game select ", e))?
         .ok_or_else(|| DomainError::NotFound(format!("Partie blackjack {id} introuvable")))?;
 
         // Seules les parties en cours sont annulables.
@@ -231,7 +232,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         )
         .bind(id)
         .execute(&mut *tx).await
-        .map_err(|e| DomainError::Internal(format!("cancel_game update : {e}")))?;
+        .map_err(|e| pg_err_ctx("cancel_game update ", e))?;
 
         // Rembourse la mise sur le wallet du joueur.
         let refund = row.bet + if row.doubled { row.bet } else { 0 };
@@ -244,7 +245,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(row.guild_id.as_str())
         .bind(row.user_id.as_str())
         .execute(&mut *tx).await
-        .map_err(|e| DomainError::Internal(format!("cancel_game refund : {e}")))?;
+        .map_err(|e| pg_err_ctx("cancel_game refund ", e))?;
 
         sqlx::query(
             "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at)
@@ -257,10 +258,10 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(row.user_id.as_str())
         .bind(refund)
         .execute(&mut *tx).await
-        .map_err(|e| DomainError::Internal(format!("cancel_game audit : {e}")))?;
+        .map_err(|e| pg_err_ctx("cancel_game audit ", e))?;
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("cancel_game commit : {e}")))?;
+            .map_err(|e| pg_err_ctx("cancel_game commit ", e))?;
 
         tracing::info!(
             game_id = %id, guild_id = %row.guild_id, user_id = %row.user_id,

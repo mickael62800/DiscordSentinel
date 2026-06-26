@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
@@ -185,7 +186,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.next_run_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -229,7 +230,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.next_run_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -238,7 +239,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -248,7 +249,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             .bind(id)
             .fetch_optional(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(row.map(ScheduledAnnouncement::from))
     }
 
@@ -258,7 +259,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             .bind(guild_id)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(rows.into_iter().map(ScheduledAnnouncement::from).collect())
     }
 
@@ -268,7 +269,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             .bind(enabled)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(enabled)
     }
 
@@ -286,7 +287,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             .bind(limit)
             .fetch_all(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
         Ok(rows.into_iter().map(ScheduledAnnouncement::from).collect())
     }
 
@@ -306,7 +307,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 .bind(nr)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(pg_err)?;
             }
             None => {
                 // Annonce terminee : on disable + on garde un next_run_at
@@ -320,7 +321,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 .bind(far_future)
                 .execute(&self.pool)
                 .await
-                .map_err(|e| DomainError::Internal(e.to_string()))?;
+                .map_err(pg_err)?;
             }
         }
         Ok(())
@@ -341,7 +342,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(&run.error)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -361,7 +362,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(error)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -379,7 +380,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(rows.into_iter().map(AnnouncementRun::from).collect())
     }
 
@@ -402,7 +403,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(i.clicked_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(())
     }
 
@@ -431,7 +432,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(limit)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
         Ok(rows
             .into_iter()
             .map(|r| ButtonInteraction {

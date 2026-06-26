@@ -1,7 +1,8 @@
 //! Adapter Postgres du port `ExportRepository`. Execute les SELECT
-//! d'export et map vers les DTOs purs du port (sans sqlx::FromRow exposé).
+//! d'export et map vers les DTOs purs du port (sans sqlx::FromRow exposÃ©).
 
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -51,7 +52,7 @@ impl ExportRepository for PgExportRepository {
              FROM infractions WHERE guild_id = $1 ORDER BY created_at DESC LIMIT $2",
         ).bind(guild_id).bind(max_rows)
         .fetch_all(&self.pool).await
-        .map_err(|e| DomainError::Internal(format!("query infractions: {e}")))?;
+        .map_err(|e| pg_err_ctx("query infractions", e))?;
         Ok(rows.into_iter().map(|r| InfractionExport {
             id: r.id, guild_id: r.guild_id, channel_id: r.channel_id, user_id: r.user_id,
             username: r.username, message_id: r.message_id, content: r.content, score: r.score,
@@ -66,7 +67,7 @@ impl ExportRepository for PgExportRepository {
              FROM audit_logs WHERE guild_id = $1 ORDER BY created_at DESC LIMIT $2",
         ).bind(guild_id).bind(max_rows)
         .fetch_all(&self.pool).await
-        .map_err(|e| DomainError::Internal(format!("query audit_logs: {e}")))?;
+        .map_err(|e| pg_err_ctx("query audit_logs", e))?;
         Ok(rows.into_iter().map(|r| AuditLogExport {
             id: r.id, guild_id: r.guild_id, event_type: r.event_type,
             actor_id: r.actor_id, actor_name: r.actor_name,
@@ -83,7 +84,7 @@ impl ExportRepository for PgExportRepository {
              FROM moderation_actions WHERE guild_id = $1 ORDER BY created_at DESC LIMIT $2",
         ).bind(guild_id).bind(max_rows)
         .fetch_all(&self.pool).await
-        .map_err(|e| DomainError::Internal(format!("query moderation_actions: {e}")))?;
+        .map_err(|e| pg_err_ctx("query moderation_actions", e))?;
         Ok(rows.into_iter().map(|r| ModerationActionExport {
             id: r.id, guild_id: r.guild_id, moderator_id: r.moderator_id, moderator_name: r.moderator_name,
             target_id: r.target_id, target_name: r.target_name, action_type: r.action_type,

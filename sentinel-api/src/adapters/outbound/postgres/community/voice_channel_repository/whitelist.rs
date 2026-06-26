@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
@@ -38,7 +39,7 @@ impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
         .bind(owner_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannelWhitelistEntry::from).collect())
     }
@@ -59,7 +60,7 @@ impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
         .bind(entry.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -71,7 +72,7 @@ impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
             .bind(target_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }

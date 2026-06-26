@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::PgPool;
 
 use sentinel_core::domain::errors::DomainError;
@@ -196,7 +198,7 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(overlay_with_bot_config(default_config(guild_id), rows))
     }
@@ -211,7 +213,7 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
         let kvs = build_welcome_config_kvs(d);
 
         let mut tx = self.pool.begin().await
-            .map_err(|e| DomainError::Internal(format!("welcome save tx begin: {e}")))?;
+            .map_err(|e| pg_err_ctx("welcome save tx begin", e))?;
 
         for (k, v) in &kvs {
             sqlx::query(
@@ -229,7 +231,7 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
         }
 
         tx.commit().await
-            .map_err(|e| DomainError::Internal(format!("welcome save tx commit: {e}")))?;
+            .map_err(|e| pg_err_ctx("welcome save tx commit", e))?;
 
         // Relit la config apres upsert pour garantir que get_config renverra bien
         // ce qui vient d'etre ecrit.

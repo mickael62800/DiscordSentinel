@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use crate::adapters::outbound::postgres::pg_err;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
@@ -35,7 +36,7 @@ impl VoiceCoAdminStore for super::PgVoiceChannelRepository {
         .bind(voice_channel_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(VoiceChannelCoAdmin::from).collect())
     }
@@ -55,7 +56,7 @@ impl VoiceCoAdminStore for super::PgVoiceChannelRepository {
         .bind(co_admin.granted_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        .map_err(pg_err)?;
 
         Ok(())
     }
@@ -66,7 +67,7 @@ impl VoiceCoAdminStore for super::PgVoiceChannelRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| DomainError::Internal(e.to_string()))?;
+            .map_err(pg_err)?;
 
         Ok(())
     }

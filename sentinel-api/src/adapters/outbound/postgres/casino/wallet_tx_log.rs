@@ -1,4 +1,5 @@
 use sqlx::Postgres;
+use crate::adapters::outbound::postgres::pg_err_ctx;
 use sqlx::Transaction;
 use uuid::Uuid;
 
@@ -36,6 +37,6 @@ pub async fn log_wallet_tx(
     .bind(description)
     .execute(&mut **tx)
     .await
-    .map_err(|e| DomainError::Internal(format!("log_wallet_tx: {e}")))?;
+    .map_err(|e| pg_err_ctx("log_wallet_tx", e))?;
     Ok(())
 }

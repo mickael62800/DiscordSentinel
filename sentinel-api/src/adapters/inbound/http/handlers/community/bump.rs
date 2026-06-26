@@ -5,12 +5,12 @@
 //! et la recompense est un calcul pur ; pas de regle metier transverse a isoler.
 
 use axum::extract::{Path, State};
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 
 /// Recompense graduee : 1er bump = base ; chaque bump suppl. de la semaine
 /// ajoute `step` ; plafonnee a `max`. `n` = Nieme bump de la semaine (>=1).
@@ -57,7 +57,7 @@ pub struct BumpRewardDto {
     pub vip_just_unlocked: bool,
 }
 
-/// POST /api/bump/{guild_id}/{user_id} — enregistre un bump, calcule la
+/// POST /api/bump/{guild_id}/{user_id} Ã¢â‚¬â€ enregistre un bump, calcule la
 /// recompense graduee de la semaine et credite le wallet.
 pub async fn record_bump(
     State(state): State<AppState>,
@@ -87,7 +87,7 @@ pub async fn record_bump(
     .bind(&user_id)
     .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("bump count: {e}"))))?;
+    .map_err(sqlx_internal("bump count"))?;
     let n = week_count + 1;
     let reward = bump_reward(n, base, step, max);
 
@@ -102,7 +102,7 @@ pub async fn record_bump(
     .bind(n as i32)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("bump insert: {e}"))))?;
+    .map_err(sqlx_internal("bump insert"))?;
 
     // Credit du wallet partage.
     let new_balance = if reward > 0 {
@@ -179,7 +179,7 @@ pub struct DueReminderDto {
     pub channel_id: String,
 }
 
-/// GET /api/bump/due-reminders — guilds dont le cooldown est ecoule et dont le
+/// GET /api/bump/due-reminders Ã¢â‚¬â€ guilds dont le cooldown est ecoule et dont le
 /// rappel n'a pas encore ete envoye (poll par le bot).
 pub async fn due_reminders(
     State(state): State<AppState>,
@@ -191,11 +191,11 @@ pub async fn due_reminders(
     )
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(format!("due reminders: {e}"))))?;
+    .map_err(sqlx_internal("due reminders"))?;
     Ok(Json(rows))
 }
 
-/// POST /api/bump/{guild_id}/reminder-sent — marque le rappel comme envoye.
+/// POST /api/bump/{guild_id}/reminder-sent Ã¢â‚¬â€ marque le rappel comme envoye.
 pub async fn mark_reminder_sent(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
@@ -204,6 +204,6 @@ pub async fn mark_reminder_sent(
         .bind(&guild_id)
         .execute(&state.pg_pool)
         .await
-        .map_err(|e| ApiError::from(DomainError::Internal(format!("mark reminder: {e}"))))?;
+        .map_err(sqlx_internal("mark reminder"))?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
