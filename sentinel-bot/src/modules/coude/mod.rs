@@ -104,6 +104,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
     commands::all()
 }
 
+/// Jeu de commandes "Lite" (fun & simple) — voir `commands::lite`.
+pub fn register_commands_lite() -> Vec<CreateCommand> {
+    commands::lite()
+}
+
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;

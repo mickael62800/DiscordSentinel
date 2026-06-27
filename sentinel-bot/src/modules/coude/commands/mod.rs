@@ -83,3 +83,37 @@ pub fn all() -> Vec<CreateCommand> {
         travaux::register(),
     ]
 }
+
+/// Mode "Lite" (fun & simple) : ne garde que le coeur du jeu + les commandes
+/// rigolotes, en masquant tout le meta-jeu lourd (braquage/prison, ecosysteme
+/// anti-vol, guerre sociale, end-game prestige/ultimate, paris, saisons...).
+/// Active par guild via la config `coude-bot / lite_mode`.
+pub fn lite() -> Vec<CreateCommand> {
+    vec![
+        // Coeur du combat
+        coude::register(),
+        coude_amical::register(),
+        classe::register(),
+        train::register(),
+        profil::register(),
+        leaderboard::register(),
+        // PV
+        hp::register(),
+        repos::register(),
+        potion::register(),
+        // Boutique + un peu d'economie simple
+        shop_cmd::register(),
+        voler::register(),
+        donner::register(),
+        tout_ou_rien::register(),
+        memorial::register(),
+        // Fun / social light
+        prank::register(),
+        // Utilitaires
+        resume::register(),
+        reset_stats::register(),
+        no_taunts::register(),
+        taunts_channel::register(),
+        aide::register(),
+    ]
+}

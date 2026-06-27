@@ -79,11 +79,28 @@ async fn compute_guild_commands(api: &BaseApiClient, guild_id: &str) -> Vec<Crea
     for bot_name in BOT_NAMES_WITH_COMMANDS {
         // is_bot_enabled retourne true par defaut (pas de cle = active).
         let enabled = crate::shared::discord_helpers::is_bot_enabled(api, guild_id, bot_name).await;
-        if enabled {
+        if !enabled {
+            continue;
+        }
+        // Coup de Coude : mode "Lite" (fun & simple) optionnel par guild.
+        // Quand `coude-bot / lite_mode` est actif, on ne publie que le coeur
+        // du jeu + les commandes rigolotes, en masquant tout le meta-jeu lourd.
+        if *bot_name == "coude-bot" && coude_lite_mode(api, guild_id).await {
+            commands.extend(modules::coude::register_commands_lite());
+        } else {
             commands.extend(module_commands(bot_name));
         }
     }
     commands
+}
+
+/// Lit le flag `lite_mode` de la config `coude-bot` (defaut: false = jeu complet).
+async fn coude_lite_mode(api: &BaseApiClient, guild_id: &str) -> bool {
+    api.get_guild_config_for(guild_id, "coude-bot")
+        .await
+        .ok()
+        .and_then(|cfg| cfg.get("lite_mode").map(|v| v == "true" || v == "1"))
+        .unwrap_or(false)
 }
 
 /// Re-enregistre les commandes slash pour une guild precise. Discord
