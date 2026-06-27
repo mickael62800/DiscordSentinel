@@ -14,7 +14,6 @@ pub mod manage_steal_boosts;
 pub mod manage_steal_protections;
 pub mod manage_taunts;
 pub mod play_tout_ou_rien;
-pub mod play_travaux;
 pub mod resolve_betting_batch;
 pub mod resolve_combat_now;
 pub mod resolve_friendly_duel;

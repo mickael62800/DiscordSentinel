@@ -26,4 +26,3 @@ pub mod taunt;
 pub mod tournament;
 pub mod tout_ou_rien;
 pub mod tout_ou_rien_log;
-pub mod travaux;

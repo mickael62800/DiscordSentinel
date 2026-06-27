@@ -106,7 +106,6 @@ use crate::application::system::manage_tickets_service::ManageTicketsService;
 use crate::application::community::voice_channels::ManageVoiceChannelsService;
 use crate::application::audit::manage_watched_users_service::ManageWatchedUsersService;
 use crate::application::coude::play_tout_ou_rien_service::PlayToutOuRienService;
-use crate::application::coude::play_travaux_service::PlayTravauxService;
 use crate::application::coude::bet::resolve_batch::ResolveBettingBatchService;
 use crate::application::coude::combat::resolve_now::ResolveCombatNowService;
 use crate::application::coude::steal::roll::RollStealService;
@@ -642,15 +641,6 @@ pub async fn build_app_state(
         coude_tout_ou_rien_repo.clone(),
     ));
 
-    // Phase 2 #2 audit : RNG /travaux migre cote API.
-    let play_travaux_uc: Arc<dyn crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase> =
-        Arc::new(PlayTravauxService::new(
-            coude_heist_repo.clone(),
-            coude_player_repo.clone(),
-            wallet_uc.clone(),
-            coude_social_repo.clone(),
-        ));
-
     // Phase 2 #4 audit : RNG /voler (d20 + steal %) migre cote API.
     let roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase> =
         Arc::new(RollStealService::new());
@@ -859,7 +849,6 @@ pub async fn build_app_state(
         coude_safety_net_uc,
         coude_tout_ou_rien_repo,
         play_tout_ou_rien_uc,
-        play_travaux_uc,
         roll_steal_uc,
         coude_flavor_templates_repo,
         discord_action_messages_uc,

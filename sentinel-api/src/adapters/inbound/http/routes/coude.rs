@@ -167,11 +167,6 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/tout-ou-rien/play",
             post(handlers::coude::tout_ou_rien::play_tout_ou_rien),
         )
-        // Phase 2 #2 audit : RNG /travaux migre cote API.
-        .route(
-            "/{guild_id}/travaux/play",
-            post(handlers::coude::travaux::play_travaux),
-        )
         // Phase 2 #4 audit : RNG d20 + % de /voler migre cote API.
         .route(
             "/{guild_id}/steal/roll",

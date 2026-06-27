@@ -93,7 +93,6 @@ pub struct AppState {
     pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase>,
     pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository>,
     pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase>,
-    pub play_travaux_uc: Arc<dyn crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase>,
     pub roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase>,
     pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository>,
     pub discord_action_messages_uc:

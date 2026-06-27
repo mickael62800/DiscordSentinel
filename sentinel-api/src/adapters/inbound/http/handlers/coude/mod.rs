@@ -22,7 +22,6 @@ pub mod taunts;
 pub mod tournaments;
 pub mod curses;
 pub mod tout_ou_rien;
-pub mod travaux;
 pub mod steal_roll;
 pub mod steal_attempts;
 pub mod flavor;
