@@ -254,7 +254,13 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 send_review_card(ctx, msg, &suggested, reason, if severe { 0.99 } else { 0.9 }, &flags, log_channel_id, &colors, auto_note).await;
             } else if severe {
                 // Severe sans salon de review : protection auto deja appliquee.
+                // On poste une card pour que l'admin voie qui/pourquoi.
                 info!(user = %msg.author.name, "Gros flood protege automatiquement (pas de salon de review)");
+                if auto_note.is_some() {
+                    super::backend::post_auto_mute_notice(
+                        ctx, msg, "Gros flood / raid probable", mute_duration_secs, log_channel_id,
+                    ).await;
+                }
             } else {
                 let embed = warn_embed("Avertissement AutoMod")
                     .color(colors.warn)

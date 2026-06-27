@@ -30,6 +30,44 @@ fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
     }
 }
 
+/// Poste une card de notification d'auto-mute (qui / pourquoi / combien de
+/// temps) quand l'auto-protection severe a mute SANS qu'une carte de review
+/// soit affichee (route None). Sinon l'admin ne voit nulle part la raison.
+/// Cible : le salon de logs si configure, sinon le salon du message.
+pub(super) async fn post_auto_mute_notice(
+    ctx: &Context,
+    msg: &Message,
+    reason: &str,
+    mute_secs: u64,
+    log_channel_id: u64,
+) {
+    let target = if log_channel_id != 0 {
+        serenity::model::id::ChannelId::new(log_channel_id)
+    } else {
+        msg.channel_id
+    };
+    let mins = (mute_secs / 60).max(1);
+    let reason_txt = if reason.trim().is_empty() {
+        "Contenu interdit detecte (protection automatique)".to_string()
+    } else {
+        reason.to_string()
+    };
+    let embed = critical_embed("\u{1f507} AutoMod — Mute automatique")
+        .field("Membre", format!("<@{}> (`{}`)", msg.author.id, msg.author.id), true)
+        .field("Duree", format!("{} min", mins), true)
+        .field("Auteur", "AutoMod (protection auto)", true)
+        .field("Raison", reason_txt, false)
+        .field("Salon", format!("<#{}>", msg.channel_id), true)
+        .thumbnail(msg.author.face())
+        .timestamp(serenity::model::Timestamp::now());
+    if let Err(e) = target
+        .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+        .await
+    {
+        warn!(error = %e, "Echec envoi notice auto-mute");
+    }
+}
+
 /// Applique une protection automatique reversible : mute (timeout) + suppression
 /// du message. Silencieux (pas d'embed dans le salon : c'est la carte de review
 /// qui porte l'info). Retourne une note a afficher sur la carte, ou `None` si la
@@ -271,8 +309,13 @@ pub(super) async fn send_to_backend(
                 }
                 Routing::None => {
                     if response.severe {
-                        // Protection auto deja appliquee, pas de salon de review.
+                        // Protection auto deja appliquee, pas de salon de review :
+                        // on poste quand meme une card pour que l'admin voie
+                        // QUI a ete mute et POURQUOI (sinon trace invisible).
                         info!(user = %msg.author.name, "Cas severe protege automatiquement (pas de salon de review)");
+                        if auto_note.is_some() {
+                            post_auto_mute_notice(ctx, msg, &effective_reason, mute_duration_secs, log_channel_id).await;
+                        }
                     }
                     // Sinon : human_only sans salon, ou rien a faire.
                 }
