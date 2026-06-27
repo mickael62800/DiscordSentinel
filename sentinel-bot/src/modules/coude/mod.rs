@@ -209,6 +209,7 @@ pub fn handles_component(cid: &str) -> bool {
         || cid.starts_with(commands::annuler::CANCEL_PREFIX)
         || cid.starts_with(commands::classe::CLASS_SELECT_PREFIX)
         || cid.starts_with(commands::voler::STEAL_DEFEND_PREFIX)
+        || cid == commands::leaderboard::REFRESH_ID
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
@@ -239,6 +240,8 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::classe::handle_select(ctx, component).await;
     } else if custom_id.starts_with(commands::voler::STEAL_DEFEND_PREFIX) {
         commands::voler::handle_defend(ctx, component).await;
+    } else if custom_id == commands::leaderboard::REFRESH_ID {
+        commands::leaderboard::handle_refresh(ctx, component).await;
     }
 }
 
