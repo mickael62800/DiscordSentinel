@@ -9,7 +9,6 @@ pub mod achievements;
 pub mod api_client;
 pub mod catalog;
 pub mod milestones;
-pub mod ultimates;
 pub mod channel_check;
 pub mod commands;
 pub mod daily_chaos_events;
@@ -104,11 +103,6 @@ pub fn register_commands() -> Vec<CreateCommand> {
     commands::all()
 }
 
-/// Jeu de commandes "Lite" (fun & simple) — voir `commands::lite`.
-pub fn register_commands_lite() -> Vec<CreateCommand> {
-    commands::lite()
-}
-
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;
@@ -118,39 +112,22 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "coude-amical" => commands::coude_amical::handle(ctx, command).await,
         "profil" => commands::profil::handle(ctx, command).await,
         "shop" => commands::shop_cmd::handle(ctx, command).await,
-        "prime" => commands::prime::handle(ctx, command).await,
         "leaderboard" => commands::leaderboard::handle(ctx, command).await,
-        "pari" => commands::pari::handle(ctx, command).await,
         "voler" => commands::voler::handle(ctx, command).await,
-        "assurance" => commands::assurance::handle(ctx, command).await,
         "train" => commands::train::handle(ctx, command).await,
         "classe" => commands::classe::handle(ctx, command).await,
         "donner" => commands::donner::handle(ctx, command).await,
         "hp" => commands::hp::handle(ctx, command).await,
         "repos" => commands::repos::handle(ctx, command).await,
         "potion" => commands::potion::handle(ctx, command).await,
-        "saison" => commands::saison::handle(ctx, command).await,
         "reset-stats" => commands::reset_stats::handle(ctx, command).await,
         "resume" => commands::resume::handle(ctx, command).await,
-        "cagnotte" => commands::cagnotte::handle(ctx, command).await,
-        "protection" => commands::protection::handle(ctx, command).await,
-        "boost-voleur" => commands::boost_voleur::handle(ctx, command).await,
         "no-taunts" => commands::no_taunts::handle(ctx, command).await,
         "taunts-channel" => commands::taunts_channel::handle(ctx, command).await,
-        "braquage" => commands::braquage::handle(ctx, command).await,
-        "maudire" => commands::maudire::handle(ctx, command).await,
         "prank" => commands::prank::handle(ctx, command).await,
         "aide" => commands::aide::handle(ctx, command).await,
-        "saboter" => commands::saboter::handle(ctx, command).await,
         "tout-ou-rien" => commands::tout_ou_rien::handle(ctx, command).await,
-        "vendetta" => commands::vendetta::handle(ctx, command).await,
         "memorial" => commands::memorial::handle(ctx, command).await,
-        "contribuer-prime" => commands::contribuer_prime::handle(ctx, command).await,
-        "honneur" => commands::honneur::handle(ctx, command).await,
-        "coalition" => commands::coalition::handle(ctx, command).await,
-        "ultimate" => commands::ultimate::handle(ctx, command).await,
-        "prestige" => commands::prestige::handle(ctx, command).await,
-        "travaux" => commands::travaux::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -163,39 +140,22 @@ pub fn handles_command(name: &str) -> bool {
             | "coude-amical"
             | "profil"
             | "shop"
-            | "prime"
             | "leaderboard"
-            | "pari"
             | "voler"
-            | "assurance"
             | "train"
             | "classe"
             | "donner"
             | "hp"
             | "repos"
             | "potion"
-            | "saison"
             | "reset-stats"
             | "resume"
-            | "cagnotte"
-            | "protection"
-            | "boost-voleur"
             | "no-taunts"
             | "taunts-channel"
-            | "braquage"
-            | "maudire"
             | "prank"
             | "aide"
-            | "saboter"
             | "tout-ou-rien"
-            | "vendetta"
             | "memorial"
-            | "contribuer-prime"
-            | "honneur"
-            | "coalition"
-            | "ultimate"
-            | "prestige"
-            | "travaux"
     )
 }
 

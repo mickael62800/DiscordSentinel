@@ -86,6 +86,7 @@ pub async fn post_activity(
 
 /// Variante de `post_activity` pour les commandes qui ont deja defer
 /// l'interaction. Utilise `create_followup` au lieu de `create_response`.
+#[allow(dead_code)]
 pub async fn post_activity_followup(
     ctx: &Context,
     command: &CommandInteraction,

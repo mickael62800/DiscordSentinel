@@ -531,8 +531,6 @@ mod curses;
 mod vendetta;
 mod tout_ou_rien;
 pub use tout_ou_rien::PlayToutOuRienResp;
-mod travaux;
-pub use travaux::PlayTravauxResp;
 mod steal_roll;
 mod flavor;
 mod prank;

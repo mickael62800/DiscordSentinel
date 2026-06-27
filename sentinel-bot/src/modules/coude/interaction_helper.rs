@@ -93,6 +93,7 @@ pub async fn followup_embed(ctx: &Context, command: &CommandInteraction, embed: 
 }
 
 /// Followup embed ephemeral — pour des reponses detaillees mais cachees.
+#[allow(dead_code)]
 pub async fn followup_embed_ephemeral(
     ctx: &Context,
     command: &CommandInteraction,
