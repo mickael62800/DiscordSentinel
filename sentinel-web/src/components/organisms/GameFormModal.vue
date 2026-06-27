@@ -266,8 +266,9 @@ async function submit() {
         </label>
       </div>
       <p class="sub-hint">
-        Optionnel — le panel Discord utilise un dropdown, l'emoji sert
-        juste d'icone a cote du nom. Resize automatique a 128x128 PNG.
+        Recommande — sur le panel Discord, l'emoji devient l'icone du
+        bouton du jeu (les membres cliquent dessus pour s'abonner). Sans
+        emoji, le bouton affiche le nom du jeu. Resize automatique a 128x128 PNG.
       </p>
     </div>
 

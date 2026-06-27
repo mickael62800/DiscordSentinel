@@ -24,7 +24,7 @@ use crate::shared::discord_helpers::{
 };
 use crate::shared::heartbeat::ApiClientKey;
 
-use commands::PANEL_SELECT_PREFIX;
+use commands::{PANEL_BUTTON_PREFIX, PANEL_SELECT_PREFIX};
 
 pub fn register_commands() -> Vec<CreateCommand> {
     commands::all()
@@ -42,12 +42,14 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 // ── Component interactions (select menus des panels) ──
 
 pub fn handles_component(cid: &str) -> bool {
-    cid.starts_with(PANEL_SELECT_PREFIX)
+    cid.starts_with(PANEL_SELECT_PREFIX) || cid.starts_with(PANEL_BUTTON_PREFIX)
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     let cid = component.data.custom_id.as_str();
-    if !cid.starts_with(PANEL_SELECT_PREFIX) {
+    let is_select = cid.starts_with(PANEL_SELECT_PREFIX);
+    let is_button = cid.starts_with(PANEL_BUTTON_PREFIX);
+    if !is_select && !is_button {
         return;
     }
 
@@ -55,7 +57,121 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    handle_panel_select(ctx, component).await;
+    if is_button {
+        handle_panel_button(ctx, component).await;
+    } else {
+        handle_panel_select(ctx, component).await;
+    }
+}
+
+/// Clic sur un bouton-icone de jeu : toggle le role (abonnement) puis met a
+/// jour le panneau (compteurs). Confirmation ephemere a l'utilisateur.
+async fn handle_panel_button(ctx: &Context, component: &ComponentInteraction) {
+    let guild_id = match component.guild_id {
+        Some(g) => g,
+        None => return,
+    };
+    let guild_id_str = guild_id.to_string();
+
+    // custom_id : `game_panel_btn|{panel_id}|{game_id}`.
+    let rest = match component.data.custom_id.strip_prefix(PANEL_BUTTON_PREFIX) {
+        Some(s) => s,
+        None => return,
+    };
+    let (panel_id, game_id) = match rest.split_once('|') {
+        Some((p, g)) => (p.to_string(), g.to_string()),
+        None => return,
+    };
+
+    let base = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(b) => Arc::clone(b),
+            None => return,
+        }
+    };
+    let api = api_client::GameApiClient::new(base);
+
+    // Retrouve le panel (pour sa categorie) et les jeux de la categorie.
+    let panel = match api.list_panels(&guild_id_str).await {
+        Ok(panels) => panels.into_iter().find(|p| p.id == panel_id),
+        Err(e) => {
+            warn!(error = %e, "Erreur list_panels (bouton jeu)");
+            None
+        }
+    };
+    let Some(panel) = panel else {
+        reply_ephemeral(ctx, component, "Ce panneau n'existe plus. Demande a un admin de le redeployer.").await;
+        return;
+    };
+    let games = match api.list_games_by_category(&guild_id_str, panel.category.as_deref()).await {
+        Ok(g) => g,
+        Err(e) => {
+            warn!(error = %e, "Erreur list_games_by_category (bouton jeu)");
+            reply_ephemeral(ctx, component, "Erreur : impossible de lister les jeux.").await;
+            return;
+        }
+    };
+
+    let game = match games.iter().find(|g| g.id == game_id) {
+        Some(g) => g,
+        None => {
+            reply_ephemeral(ctx, component, "Ce jeu n'existe plus.").await;
+            return;
+        }
+    };
+    let role_id = match game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()) {
+        Some(id) => RoleId::new(id),
+        None => {
+            reply_ephemeral(ctx, component, "Ce jeu n'a pas de role associe. Demande a un admin de le recreer.").await;
+            return;
+        }
+    };
+
+    // Toggle du role sur le membre.
+    let member = match guild_id.member(&ctx.http, component.user.id).await {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Erreur fetch member (bouton jeu)");
+            reply_ephemeral(ctx, component, "Erreur : impossible de lire ton profil.").await;
+            return;
+        }
+    };
+    let has = member.roles.contains(&role_id);
+    let confirm = if has {
+        match member.remove_role(&ctx.http, role_id).await {
+            Ok(()) => format!("\u{274e} Tu ne suis plus **{}**.", game.game_name),
+            Err(e) => {
+                warn!(error = %e, "Erreur remove_role (bouton jeu)");
+                "Erreur lors du desabonnement (hierarchie des roles ?).".to_string()
+            }
+        }
+    } else {
+        match member.add_role(&ctx.http, role_id).await {
+            Ok(()) => format!("\u{2705} Tu suis maintenant **{}** ! Tu seras notifie.", game.game_name),
+            Err(e) => {
+                warn!(error = %e, "Erreur add_role (bouton jeu)");
+                "Erreur lors de l'abonnement (hierarchie des roles ?).".to_string()
+            }
+        }
+    };
+
+    reply_ephemeral(ctx, component, &confirm).await;
+
+    // Re-render du panneau (compteurs a jour). Edition directe du message.
+    let games_slice: Vec<&api_client::Game> = games.iter().take(commands::MAX_BUTTONS_PER_PANEL).collect();
+    let embed = commands::build_panel_embed(panel.category.as_deref(), &games_slice);
+    let components = commands::build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
+    let mut msg = component.message.clone();
+    if let Err(e) = msg
+        .edit(
+            &ctx.http,
+            serenity::all::EditMessage::new().embed(embed).components(components),
+        )
+        .await
+    {
+        warn!(error = %e, "Erreur re-render panneau jeux apres toggle");
+    }
 }
 
 async fn handle_panel_select(ctx: &Context, component: &ComponentInteraction) {

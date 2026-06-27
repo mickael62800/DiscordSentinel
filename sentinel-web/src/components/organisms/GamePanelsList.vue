@@ -20,8 +20,10 @@ function jumpUrl(panel: GamePanel): string {
     <h2>Panels Discord</h2>
     <p class="hint">
       Les panels sont deployes dans Discord via la commande
-      <code>/game-admin panel category:&lt;nom&gt;</code>. Ils affichent un dropdown
-      qui assigne/retire automatiquement le role Discord associe a chaque jeu.
+      <code>/game-admin panel category:&lt;nom&gt;</code>. Ils affichent un bouton-icone
+      par jeu (avec le nombre d'abonnes) : cliquer assigne/retire le role Discord
+      associe. Jusqu'a 25 jeux par panel. Rafraichir avec
+      <code>/game-admin refresh category:&lt;nom&gt;</code>.
     </p>
     <div v-if="panels.length === 0" class="muted">
       Aucun panel deploye. Utilisez la commande ci-dessus dans Discord.

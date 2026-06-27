@@ -1,8 +1,9 @@
+use std::collections::HashMap;
+
 use serenity::all::{
-    Colour, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateActionRow, CreateCommand, CreateCommandOption, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption, EditMessage, EditRole, RoleId,
+    ButtonStyle, Colour, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage, EditMessage, EditRole, GuildId, RoleId,
 };
 use serenity::builder::CreateEmbed;
 use tracing::{info, warn};
@@ -15,14 +16,18 @@ use super::api_client::{Game, GameApiClient};
 use super::emoji::parse_reaction_type;
 use super::MODULE_BOT_NAME;
 
-/// Prefix du custom_id des select menus de panel de jeux.
+/// Prefix du custom_id des select menus de panel de jeux (LEGACY : anciens
+/// panels deployes avant la bascule boutons ; le handler reste pour compat).
 /// Format : `game_panel_select_{panel_id}_{chunk_index}`.
 pub const PANEL_SELECT_PREFIX: &str = "game_panel_select_";
 
-/// Max options par select menu (limite Discord).
-const MAX_OPTIONS_PER_SELECT: usize = 25;
-/// Max select menus par message (limite Discord : 5 action rows).
-const MAX_SELECTS_PER_MESSAGE: usize = 5;
+/// Prefix du custom_id des boutons-icones de panel de jeux (nouveau systeme).
+/// Format : `game_panel_btn|{panel_id}|{game_id}`. Cliquer toggle le role du
+/// jeu (abonnement aux notifs) et met a jour le compteur d'abonnes du bouton.
+pub const PANEL_BUTTON_PREFIX: &str = "game_panel_btn|";
+
+/// Max jeux affiches dans un panel a boutons (5 boutons x 5 rangees).
+pub const MAX_BUTTONS_PER_PANEL: usize = 25;
 
 pub fn all() -> Vec<CreateCommand> {
     vec![register_public(), register_admin()]
@@ -357,10 +362,9 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         return;
     }
 
-    let max_games = MAX_OPTIONS_PER_SELECT * MAX_SELECTS_PER_MESSAGE;
-    let games_slice: Vec<&Game> = games.iter().take(max_games).collect();
-    if games.len() > max_games {
-        warn!(total = games.len(), shown = max_games, "Panel tronque : trop de jeux pour un seul message");
+    let games_slice: Vec<&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
+    if games.len() > MAX_BUTTONS_PER_PANEL {
+        warn!(total = games.len(), shown = MAX_BUTTONS_PER_PANEL, "Panel tronque : trop de jeux pour un seul message (max 25 boutons)");
     }
 
     let embed = build_panel_embed(category.as_deref(), &games_slice);
@@ -392,8 +396,9 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         }
     };
 
-    // 3) Edite le message pour attacher les components (select menus) en utilisant panel.id.
-    let components = build_panel_components(&panel.id, &games_slice);
+    // 3) Edite le message pour attacher les boutons-icones en utilisant panel.id.
+    let gid = cmd.guild_id.unwrap_or_default();
+    let components = build_panel_button_components(ctx, gid, &panel.id, &games_slice);
     let mut msg_mut = msg;
     if let Err(e) = msg_mut
         .edit(&ctx.http, EditMessage::new().components(components))
@@ -431,11 +436,11 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
         Ok(g) => g,
         Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
     };
-    let max_games = MAX_OPTIONS_PER_SELECT * MAX_SELECTS_PER_MESSAGE;
-    let games_slice: Vec<&Game> = games.iter().take(max_games).collect();
+    let games_slice: Vec<&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
 
     let embed = build_panel_embed(category.as_deref(), &games_slice);
-    let components = build_panel_components(&panel.id, &games_slice);
+    let gid = cmd.guild_id.unwrap_or_default();
+    let components = build_panel_button_components(ctx, gid, &panel.id, &games_slice);
 
     let channel_id: serenity::model::id::ChannelId = match panel.channel_id.parse::<u64>() {
         Ok(id) => serenity::model::id::ChannelId::new(id),
@@ -468,7 +473,7 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
     reply(ctx, cmd, &format!("Panneau rafraichi ({} jeux).", games_slice.len())).await;
 }
 
-fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
+pub(crate) fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
     let title = match category {
         Some(c) => format!("- [ {} ] -", c),
         None => "- [ Jeux ] -".to_string(),
@@ -487,77 +492,86 @@ fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
             lines.push(format!("{}. {}**{}**", idx + 1, prefix, g.game_name));
         }
         let mut s = lines.join("\n");
-        s.push_str("\n\n*Utilise le menu ci-dessous pour selectionner les jeux que tu veux suivre.*");
+        s.push_str("\n\n*Clique sur l'icone d'un jeu ci-dessous pour t'abonner / te desabonner a ses notifications. Le nombre = abonnes.*");
         s
     };
     info_embed(&title).description(desc)
 }
 
-/// Construit les action rows de select menus pour un panel donne.
-/// Si la liste depasse 25 jeux, on split en plusieurs select menus (max 5).
-fn build_panel_components(panel_id: &str, games: &[&Game]) -> Vec<CreateActionRow> {
+/// Construit les rangees de BOUTONS-ICONES d'un panel (nouveau systeme).
+/// Un bouton par jeu : emoji du jeu + compteur d'abonnes (membres ayant le
+/// role). Max 25 jeux (5x5). Cliquer toggle le role. Partage entre la pose du
+/// panel, le refresh et le handler de clic (pour re-render apres toggle).
+pub(crate) fn build_panel_button_components(
+    ctx: &Context,
+    guild_id: GuildId,
+    panel_id: &str,
+    games: &[&Game],
+) -> Vec<CreateActionRow> {
     if games.is_empty() {
         return Vec::new();
     }
 
-    let total_chunks = games.chunks(MAX_OPTIONS_PER_SELECT).count();
-    games
-        .chunks(MAX_OPTIONS_PER_SELECT)
-        .enumerate()
-        .take(MAX_SELECTS_PER_MESSAGE)
-        .map(|(chunk_idx, chunk)| {
-            let options: Vec<CreateSelectMenuOption> = chunk
+    // Compte les abonnes de chaque role en UN seul passage du cache membres.
+    let role_ids: Vec<RoleId> = games
+        .iter()
+        .filter_map(|g| g.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()).map(RoleId::new))
+        .collect();
+    let counts = role_member_counts(ctx, guild_id, &role_ids);
+
+    let shown: Vec<&&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
+    shown
+        .chunks(5)
+        .map(|chunk| {
+            let buttons: Vec<CreateButton> = chunk
                 .iter()
-                .map(|g| build_select_option(g))
+                .map(|g| {
+                    let role_id = g
+                        .role_id
+                        .as_deref()
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .map(RoleId::new);
+                    let count = role_id.and_then(|r| counts.get(&r)).copied().unwrap_or(0);
+                    let cid = format!("{}{}|{}", PANEL_BUTTON_PREFIX, panel_id, g.id);
+                    let mut btn = CreateButton::new(cid).style(ButtonStyle::Secondary);
+                    match g.emoji.as_deref().and_then(parse_reaction_type) {
+                        Some(rt) => btn = btn.emoji(rt).label(count.to_string()),
+                        None => {
+                            // Pas d'emoji : on retombe sur nom tronque + compteur.
+                            let mut name = g.game_name.clone();
+                            truncate_chars(&mut name, 70);
+                            btn = btn.label(format!("{} {}", name, count));
+                        }
+                    }
+                    btn
+                })
                 .collect();
-
-            let custom_id = format!("{}{}_{}", PANEL_SELECT_PREFIX, panel_id, chunk_idx);
-            let placeholder = if total_chunks > 1 {
-                format!(
-                    "Choisis les jeux que tu veux suivre ({}/{})",
-                    chunk_idx + 1,
-                    total_chunks.min(MAX_SELECTS_PER_MESSAGE),
-                )
-            } else {
-                "Choisis les jeux que tu veux suivre".to_string()
-            };
-
-            let max_values = options.len().min(MAX_OPTIONS_PER_SELECT) as u8;
-            let select = CreateSelectMenu::new(
-                custom_id,
-                CreateSelectMenuKind::String { options },
-            )
-            .placeholder(placeholder)
-            .min_values(0)
-            .max_values(max_values);
-
-            CreateActionRow::SelectMenu(select)
+            CreateActionRow::Buttons(buttons)
         })
         .collect()
 }
 
-fn build_select_option(g: &Game) -> CreateSelectMenuOption {
-    // label : max 100 chars
-    let mut label = g.game_name.clone();
-    truncate_chars(&mut label, 100);
-
-    let mut option = CreateSelectMenuOption::new(label, g.id.clone());
-
-    if let Some(cat) = &g.category {
-        if !cat.is_empty() {
-            let mut desc = format!("Categorie : {}", cat);
-            truncate_chars(&mut desc, 100);
-            option = option.description(desc);
+/// Compte, depuis le cache, le nombre de membres possedant chacun des roles.
+/// Un seul passage sur les membres du serveur (O(membres x roles/membre)).
+fn role_member_counts(
+    ctx: &Context,
+    guild_id: GuildId,
+    role_ids: &[RoleId],
+) -> HashMap<RoleId, usize> {
+    let mut counts: HashMap<RoleId, usize> = role_ids.iter().map(|r| (*r, 0usize)).collect();
+    if counts.is_empty() {
+        return counts;
+    }
+    if let Some(guild) = ctx.cache.guild(guild_id) {
+        for member in guild.members.values() {
+            for r in &member.roles {
+                if let Some(c) = counts.get_mut(r) {
+                    *c += 1;
+                }
+            }
         }
     }
-
-    if let Some(em) = &g.emoji {
-        if let Some(rt) = parse_reaction_type(em) {
-            option = option.emoji(rt);
-        }
-    }
-
-    option
+    counts
 }
 
 fn truncate_chars(s: &mut String, max: usize) {
