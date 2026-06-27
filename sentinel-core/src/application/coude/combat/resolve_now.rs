@@ -39,14 +39,9 @@ use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::bounty_repository::BountyRepository;
-use crate::ports::outbound::coude::coalition_repository::CoalitionRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
-use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
-use crate::ports::outbound::coude::ultimate_repository::UltimateRepository;
-use crate::ports::outbound::coude::vendetta_repository::VendettaRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 pub struct ResolveCombatNowService {
     combat_repo: Arc<dyn CombatRepository>,
@@ -60,11 +55,6 @@ pub struct ResolveCombatNowService {
     bot_config_repo: Arc<dyn BotConfigRepository>,
     curses_repo: Option<Arc<dyn CursesRepository>>,
     safety_net_repo: Option<Arc<dyn SafetyNetRepository>>,
-    vendetta_repo: Option<Arc<dyn VendettaRepository>>,
-    player_repo: Option<Arc<dyn PlayerRepository>>,
-    bounty_repo: Option<Arc<dyn BountyRepository>>,
-    coalition_repo: Option<Arc<dyn CoalitionRepository>>,
-    ultimate_repo: Option<Arc<dyn UltimateRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -91,39 +81,7 @@ impl ResolveCombatNowService {
             bot_config_repo,
             curses_repo: None,
             safety_net_repo: None,
-            vendetta_repo: None,
-            player_repo: None,
-            bounty_repo: None,
-            coalition_repo: None,
-            ultimate_repo: None,
         }
-    }
-
-    /// Branche le repo coalition (cf. COUPE_AMELIORATIONS 5.3).
-    pub fn with_coalition_repo(mut self, repo: Arc<dyn CoalitionRepository>) -> Self {
-        self.coalition_repo = Some(repo);
-        self
-    }
-
-    /// Branche le repo ultimate (cf. COUPE_AMELIORATIONS 3.1).
-    pub fn with_ultimate_repo(mut self, repo: Arc<dyn UltimateRepository>) -> Self {
-        self.ultimate_repo = Some(repo);
-        self
-    }
-
-    /// Branche le repo player (cf. COUPE_AMELIORATIONS 5.3) pour
-    /// detecter quand un winner casse une streak >= 5 du loser et
-    /// declencher la "Prime collective" (regicide bonus 1000c).
-    pub fn with_player_repo(mut self, repo: Arc<dyn PlayerRepository>) -> Self {
-        self.player_repo = Some(repo);
-        self
-    }
-
-    /// Branche le repo bounty (cf. COUPE_AMELIORATIONS 5.3) pour gerer
-    /// les primes collectives auto-ouvertes / claimees lors des combats.
-    pub fn with_bounty_repo(mut self, repo: Arc<dyn BountyRepository>) -> Self {
-        self.bounty_repo = Some(repo);
-        self
     }
 
     /// Branche le repo des maledictions pour activer Banana
@@ -138,15 +96,6 @@ impl ResolveCombatNowService {
     /// solde tombe sous le seuil.
     pub fn with_safety_net_repo(mut self, repo: Arc<dyn SafetyNetRepository>) -> Self {
         self.safety_net_repo = Some(repo);
-        self
-    }
-
-    /// Branche le repo des vendettas (cf. COUPE_AMELIORATIONS 5.3) pour
-    /// detecter les revanches en cours et appliquer le bonus +100% au
-    /// gain du challenger qui gagne sa revanche, ou marquer la vendetta
-    /// comme perdue dans le cas inverse.
-    pub fn with_vendetta_repo(mut self, repo: Arc<dyn VendettaRepository>) -> Self {
-        self.vendetta_repo = Some(repo);
         self
     }
 
@@ -376,165 +325,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // - Bourrin : swap HP avant l engine
         // - Tank : court-circuit, victoire forfait
         // - Agile : court-circuit, 50/50 pur
-        let mut ultimate_msg: Option<String> = None;
-        let mut shortcut_result: Option<engine::combat::CombatResult> = None;
-        let (atk_hp_for_engine, def_hp_for_engine) = {
-            let mut a = attacker.hp_current;
-            let mut d = defender.hp_current;
-            if let Some(ult_repo) = &self.ultimate_repo {
-                use crate::domain::entities::coude::ultimate::UltimateKind;
-                if let Ok(state) = ult_repo.get(&combat.guild_id, &combat.attacker_id).await {
-                    match state.pending_kind {
-                        Some(UltimateKind::Bourrin) => {
-                            std::mem::swap(&mut a, &mut d);
-                            ultimate_msg = Some(format!(
-                                "\u{1f504} **Echange de carcasses** : <@{}> swap son HP ({} -> {}) avec <@{}> ({} -> {}) !",
-                                combat.attacker_id, attacker.hp_current, d,
-                                combat.defender_id, defender.hp_current, a
-                            ));
-                            if let Err(e) = ult_repo
-                                .consume_pending(&combat.guild_id, &combat.attacker_id)
-                                .await
-                            {
-                                warn!(error = %e, "Echec consume ultimate Bourrin");
-                            }
-                        }
-                        Some(UltimateKind::Tank) => {
-                            shortcut_result = Some(engine::combat::CombatResult {
-                                winner_id: Some(combat.attacker_id.clone()),
-                                loser_id: Some(combat.defender_id.clone()),
-                                rounds: vec![],
-                                total_rounds: 10,
-                                attacker_hp_final: attacker.hp_current,
-                                defender_hp_final: defender.hp_current,
-                                attacker_hp_max: attacker.hp_max,
-                                defender_hp_max: defender.hp_max,
-                                chaos_events_count: 0,
-                                coins_won: combat.mise,
-                                coins_lost_by_loser: combat.mise,
-                                stolen_bonus: 0,
-                                vol_coins: 0,
-                                message: format!(
-                                    "\u{1f9f1} **STATUE** : <@{}> ne bouge pas. <@{}> attend... attend... finit par partir chercher un sandwich. Forfait au bout de 10 rounds.",
-                                    combat.attacker_id, combat.defender_id
-                                ),
-                                is_giant_killer: false,
-                                attacker_class_revealed: Some("tank".into()),
-                                defender_class_revealed: None,
-                            });
-                            if let Err(e) = ult_repo
-                                .consume_pending(&combat.guild_id, &combat.attacker_id)
-                                .await
-                            {
-                                warn!(error = %e, "Echec consume ultimate Tank");
-                            }
-                        }
-                        Some(UltimateKind::Agile) => {
-                            use rand::Rng;
-                            let heads = {
-                                let mut rng = rand::thread_rng();
-                                rng.gen_bool(0.5)
-                            };
-                            let (winner_id, loser_id) = if heads {
-                                (combat.attacker_id.clone(), combat.defender_id.clone())
-                            } else {
-                                (combat.defender_id.clone(), combat.attacker_id.clone())
-                            };
-                            shortcut_result = Some(engine::combat::CombatResult {
-                                winner_id: Some(winner_id.clone()),
-                                loser_id: Some(loser_id.clone()),
-                                rounds: vec![],
-                                total_rounds: 1,
-                                attacker_hp_final: if heads { attacker.hp_current } else { 0 },
-                                defender_hp_final: if heads { 0 } else { defender.hp_current },
-                                attacker_hp_max: attacker.hp_max,
-                                defender_hp_max: defender.hp_max,
-                                chaos_events_count: 0,
-                                coins_won: combat.mise,
-                                coins_lost_by_loser: combat.mise,
-                                stolen_bonus: 0,
-                                vol_coins: 0,
-                                message: format!(
-                                    "\u{1fa99} **PILE OU FACE** : la piece tombe. <@{}> gagne. <@{}> a juste regarde la piece tomber. Pas de combat, pas d explication.",
-                                    winner_id, loser_id
-                                ),
-                                is_giant_killer: false,
-                                attacker_class_revealed: Some("agile".into()),
-                                defender_class_revealed: None,
-                            });
-                            if let Err(e) = ult_repo
-                                .consume_pending(&combat.guild_id, &combat.attacker_id)
-                                .await
-                            {
-                                warn!(error = %e, "Echec consume ultimate Agile");
-                            }
-                        }
-                        Some(UltimateKind::Fourbe) => {
-                            // Le Fuyard : vol la mise du defenseur AVANT le
-                            // combat et te barre. Transfer atomique
-                            // defender -> attacker pour le montant de la
-                            // mise. Combat marque resolu sans HP perdu.
-                            let stolen = combat.mise;
-                            let transfer_ok = self
-                                .wallet_repo
-                                .transfer(
-                                    &combat.guild_id,
-                                    &combat.defender_id,
-                                    &combat.attacker_id,
-                                    stolen,
-                                    "ultimate_fourbe_fuyard",
-                                    "Ultimate Le Fuyard — vol pre-combat",
-                                )
-                                .await
-                                .is_ok();
-                            // Si le transfer echoue (solde insuffisant
-                            // defendeur), on annule l ultimate et on
-                            // laisse le combat se derouler normalement.
-                            if transfer_ok {
-                                shortcut_result = Some(engine::combat::CombatResult {
-                                    winner_id: Some(combat.attacker_id.clone()),
-                                    loser_id: Some(combat.defender_id.clone()),
-                                    rounds: vec![],
-                                    total_rounds: 0,
-                                    attacker_hp_final: attacker.hp_current,
-                                    defender_hp_final: defender.hp_current,
-                                    attacker_hp_max: attacker.hp_max,
-                                    defender_hp_max: defender.hp_max,
-                                    chaos_events_count: 0,
-                                    // Le transfer a deja eu lieu hors-engine.
-                                    // On force a 0 pour eviter un double payout
-                                    // dans le pipeline post-engine.
-                                    coins_won: 0,
-                                    coins_lost_by_loser: 0,
-                                    stolen_bonus: 0,
-                                    vol_coins: 0,
-                                    message: format!(
-                                        "\u{1f3c3} **LE FUYARD** : <@{}> rafle la mise ({}c) AVANT le combat et se barre. <@{}> recoit un message « ton adversaire a fui avec la caisse ».",
-                                        combat.attacker_id, stolen, combat.defender_id
-                                    ),
-                                    is_giant_killer: false,
-                                    attacker_class_revealed: Some("fourbe".into()),
-                                    defender_class_revealed: None,
-                                });
-                                if let Err(e) = ult_repo
-                                    .consume_pending(&combat.guild_id, &combat.attacker_id)
-                                    .await
-                                {
-                                    warn!(error = %e, "Echec consume ultimate Fourbe");
-                                }
-                            } else {
-                                // Transfer echoue : log et on n active PAS
-                                // l ultimate (le combat continue normalement,
-                                // pendant_kind reste posee pour reessai).
-                                warn!("Echec transfer Fourbe : solde defenseur insuffisant ?");
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            (a, d)
-        };
+        // Ultimates retires du jeu simplifie : plus de swap HP / court-circuit.
+        let ultimate_msg: Option<String> = None;
+        let shortcut_result: Option<engine::combat::CombatResult> = None;
+        let atk_hp_for_engine = attacker.hp_current;
+        let def_hp_for_engine = defender.hp_current;
 
         let mut result = if let Some(short) = shortcut_result {
             short
@@ -848,8 +643,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             title_color = 0x9B59B6;
         }
 
-        let mut vendetta_msg: Option<String> = None;
-        let mut vendetta_humiliation: Option<crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation> = None;
+        let vendetta_msg: Option<String> = None;
+        let vendetta_humiliation: Option<crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation> = None;
         // Bouclier malchance (4.1) : true si la 1ere defaite du jour a
         // ete adoucie. Visible aux deux match blocks (payout + streaks).
         let mut shield_active = false;
@@ -866,151 +661,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 let loser_balance = loser_wallet.map(|w| w.coins).unwrap_or(0);
                 let coins_transferred_nominal = result.coins_won.min(loser_balance);
 
-                // Vendetta (cf. COUPE_AMELIORATIONS 5.3) : si le winner a
-                // une vendetta active contre le loser, c est sa revanche
-                // — gain double. Inversement si le loser avait declare une
-                // vendetta contre le winner, on la resout comme perdue.
-                use crate::domain::entities::coude::vendetta::apply_revenge_bonus;
-                let coins_transferred = if let Some(repo) = &self.vendetta_repo {
-                    if let Ok(Some(v)) = repo.get_active(&combat.guild_id, winner_id, loser_id).await {
-                        let boosted = apply_revenge_bonus(coins_transferred_nominal, true);
-                        if let Err(e) = repo.resolve(v.id, true).await {
-                            warn!(error = %e, "Echec resolve vendetta won");
-                        }
-                        if boosted > coins_transferred_nominal {
-                            vendetta_msg = Some(format!(
-                                "\u{2694}\u{fe0f} **VENDETTA ACCOMPLIE !** Gain double : {} -> {} coins.",
-                                coins_transferred_nominal, boosted
-                            ));
-                        }
-                        boosted
-                    } else {
-                        // Verifie si le perdant avait une vendetta contre
-                        // le gagnant : il vient de la perdre.
-                        if let Ok(Some(v)) = repo
-                            .get_active(&combat.guild_id, loser_id, winner_id)
-                            .await
-                        {
-                            if let Err(e) = repo.resolve(v.id, false).await {
-                                warn!(error = %e, "Echec resolve vendetta lost");
-                            }
-                            vendetta_msg = Some(format!(
-                                "\u{1faa6} Vendetta de <@{}> ECHOUEE — il est de nouveau ecrase par <@{}>.",
-                                loser_id, winner_id
-                            ));
-                            // Le bot va renommer le winner "le Bourreau
-                            // de @loser" pendant 7 jours (cf. roadmap 5.3).
-                            vendetta_humiliation = Some(
-                                crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation {
-                                    target_user_id: winner_id.clone(),
-                                    challenger_user_id: loser_id.clone(),
-                                },
-                            );
-                        }
-                        coins_transferred_nominal
-                    }
-                } else {
-                    coins_transferred_nominal
-                };
-
-                // Coalition active contre le winner (cf. COUPE_AMELIORATIONS
-                // 5.3) : ses gains de combat sont reduits a 80% (perte
-                // de 20% absorbee par le neant). Si le loser est membre
-                // d une coalition contre le winner, on flag aussi pour
-                // potentiel auto-break ci-dessous.
-                let mut coalition_msg: Option<String> = None;
-                let mut break_coalition_id: Option<uuid::Uuid> = None;
-                let coins_transferred = if let Some(coalition_repo) = &self.coalition_repo {
-                    use crate::domain::entities::coude::coalition::apply_coalition_penalty;
-                    use crate::domain::entities::coude::coalition::COALITION_GAIN_MULTIPLIER;
-                    // Penalite si winner est cible d une coalition active.
-                    let winner_in_coalition = coalition_repo
-                        .get_active(&combat.guild_id, winner_id)
-                        .await
-                        .ok()
-                        .flatten()
-                        .filter(|c| c.is_active_at(chrono::Utc::now()));
-                    let after_coalition = if let Some(c) = &winner_in_coalition {
-                        // Le winner est cible. Loser membre ? -> auto-break.
-                        if c.members.iter().any(|m| m.member_id == *loser_id) {
-                            break_coalition_id = Some(c.id);
-                        }
-                        let reduced = apply_coalition_penalty(coins_transferred, true);
-                        if reduced < coins_transferred {
-                            coalition_msg = Some(format!(
-                                "\u{1f5e1}\u{fe0f} Coalition active : gain reduit a {}% ({} -> {} coins).",
-                                (COALITION_GAIN_MULTIPLIER * 100.0) as i32,
-                                coins_transferred,
-                                reduced
-                            ));
-                        }
-                        reduced
-                    } else {
-                        coins_transferred
-                    };
-                    after_coalition
-                } else {
-                    coins_transferred
-                };
-                if let Some(c_msg) = coalition_msg {
-                    insurance_msg = match insurance_msg {
-                        Some(prev) => Some(format!("{prev}\n{c_msg}")),
-                        None => Some(c_msg),
-                    };
-                }
-
-                // Bonus de prestige (cf. COUPE_AMELIORATIONS 3.3) :
-                // +5% par prestige du gagnant sur le payout combat.
-                // Lecture via player_repo si dispo.
-                let coins_transferred = if let Some(prepo) = &self.player_repo {
-                    use crate::domain::entities::coude::prestige::prestige_gain_multiplier_with_params;
-                    let prestige_count = prepo
-                        .get_prestige_count(&combat.guild_id, winner_id)
-                        .await
-                        .ok()
-                        .flatten()
-                        .unwrap_or(0);
-                    let bonus_pct = settings.get_percent_ratio("prestige_gain_bonus_percent", 5);
-                    let max_count = settings.get_i32("prestige_max_count", 5);
-                    let mult = prestige_gain_multiplier_with_params(
-                        prestige_count, bonus_pct, max_count,
-                    );
-                    if mult > 1.0 && coins_transferred > 0 {
-                        let boosted =
-                            ((coins_transferred as f64) * mult).round() as i64;
-                        let prestige_msg = format!(
-                            "\u{2728} Bonus prestige (x{:.2}) : {} -> {} coins.",
-                            mult, coins_transferred, boosted
-                        );
-                        insurance_msg = match insurance_msg {
-                            Some(prev) => Some(format!("{prev}\n{prestige_msg}")),
-                            None => Some(prestige_msg),
-                        };
-                        boosted
-                    } else {
-                        coins_transferred
-                    }
-                } else {
-                    coins_transferred
-                };
-                // Auto-break de la coalition : la cible vient de battre
-                // un de ses conspirateurs.
-                if let (Some(coalition_repo), Some(coalition_id)) =
-                    (&self.coalition_repo, break_coalition_id)
-                {
-                    if let Err(e) = coalition_repo.mark_broken(coalition_id, winner_id).await {
-                        warn!(error = %e, "Echec mark_broken coalition");
-                    } else {
-                        let break_msg = format!(
-                            "\u{1f4a5} **Coalition brisee !** <@{}> a battu <@{}> et leve la coalition contre lui. Les gains reprennent a 100%.",
-                            winner_id, loser_id
-                        );
-                        insurance_msg = match insurance_msg {
-                            Some(prev) => Some(format!("{prev}\n{break_msg}")),
-                            None => Some(break_msg),
-                        };
-                    }
-                }
+                // Gain = mise capee au solde du perdant (vendetta/coalition/
+                // prestige retires du jeu simplifie).
+                let coins_transferred = coins_transferred_nominal;
 
                 // Sabotage Empoisonner (cf. COUPE_AMELIORATIONS 5.2) :
                 // si le winner est sous l effet, 10% de son gain est
@@ -1523,71 +1176,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // credit le total au gagnant. Si pas de bounty mais
                 // streak >= 5 (cas legacy / pre-bounty), fallback bonus
                 // fixe pour preserver le comportement.
-                use crate::domain::entities::coude::bounty::BOUNTY_AUTO_OPEN_STREAK_THRESHOLD;
-                use crate::domain::entities::coude::bounty::BOUNTY_INITIAL_AMOUNT;
-                let mut loser_pre_streak: Option<i32> = None;
-                if let Some(repo) = &self.player_repo {
-                    if let Ok(Some((win_streak, _loss_streak))) = repo
-                        .get_combat_streaks(&combat.guild_id, loser_id)
-                        .await
-                    {
-                        loser_pre_streak = Some(win_streak);
-                        if win_streak >= BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
-                            // Cherche une bounty ouverte (theoriquement
-                            // auto-creee a streak=5 dans un combat
-                            // precedent). Sinon fallback BOUNTY_INITIAL.
-                            // Si claim() echoue, on retombe sur le fallback
-                            // BOUNTY_INITIAL_AMOUNT (montant fixe) plutot que
-                            // de crediter `total` : sinon la bounty reste
-                            // ouverte en DB et un autre joueur pourrait la
-                            // re-claim plus tard -> double-paiement.
-                            let bounty_amount: i64 = if let Some(brepo) = &self.bounty_repo {
-                                match brepo.get_open(&combat.guild_id, loser_id).await {
-                                    Ok(Some(b)) => {
-                                        match brepo.claim(b.id, winner_id).await {
-                                            Ok(_) => b.total_amount,
-                                            Err(e) => {
-                                                tracing::error!(
-                                                    error = %e,
-                                                    bounty_id = %b.id,
-                                                    "Echec claim bounty — fallback initial pour eviter double-paiement"
-                                                );
-                                                BOUNTY_INITIAL_AMOUNT
-                                            }
-                                        }
-                                    }
-                                    _ => BOUNTY_INITIAL_AMOUNT,
-                                }
-                            } else {
-                                BOUNTY_INITIAL_AMOUNT
-                            };
-                            if let Err(e) = self
-                                .wallet_repo
-                                .credit(
-                                    &combat.guild_id,
-                                    winner_id,
-                                    bounty_amount,
-                                    "regicide_bounty",
-                                    "Prime collective Regicide",
-                                )
-                                .await
-                            {
-                                warn!(error = %e, "Echec credit regicide");
-                            }
-                            fields.push(ResolvedCombatEmbedField {
-                                name: "\u{1f451} Regicide".into(),
-                                value: format!(
-                                    "\u{1f451} **REGICIDE !** <@{}> casse la serie de {} victoires de <@{}> et empoche **+{} coins** de prime collective.",
-                                    winner_id, win_streak, loser_id, bounty_amount
-                                ),
-                                inline: false,
-                            });
-                        }
-                    }
-                }
-                // (Etape 2 — post-touch — vit plus bas, voir
-                // bloc `if let Some(brepo)` apres on_player_won).
-                let _ = loser_pre_streak;
+                // Prime collective / Regicide retiree (jeu simplifie).
 
                 if let Ok(Some(ev)) = self
                     .taunts_uc
@@ -1610,48 +1199,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     }
                 }
 
-                // Etape 2 (post-touch) : si le gagnant vient d atteindre
-                // la 5e victoire consecutive, on auto-ouvre une prime
-                // de 1000c sur sa tete (cf. COUPE_AMELIORATIONS 5.3).
-                if let (Some(prepo), Some(brepo)) = (&self.player_repo, &self.bounty_repo) {
-                    if let Ok(Some((winner_streak, _))) = prepo
-                        .get_combat_streaks(&combat.guild_id, winner_id)
-                        .await
-                    {
-                        // >= et non == : sous shield ou autre edge case, la
-                        // streak peut sauter le seuil exact (ex. 4 -> 6) sans
-                        // qu on ait jamais ouvert la bounty. open() est
-                        // idempotente (Conflict ignore si deja ouverte).
-                        if winner_streak >= BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
-                            // open echoue avec Conflict si une bounty est
-                            // deja ouverte — c est OK, no-op silent.
-                            if let Err(e) = brepo
-                                .open(
-                                    &combat.guild_id,
-                                    winner_id,
-                                    BOUNTY_INITIAL_AMOUNT,
-                                )
-                                .await
-                            {
-                                if !matches!(e, DomainError::Conflict(_)) {
-                                    warn!(error = %e, "Echec auto-open bounty");
-                                }
-                            } else {
-                                taunt_events.push(crate::domain::entities::coude::taunt::TauntEvent {
-                                    channel_id: combat.guild_id.as_str().into(),
-                                    target_user_id: winner_id.clone(),
-                                    message: format!(
-                                        "\u{1f48e} Une **prime collective de {}c** vient de s ouvrir sur la tete de <@{}> ! Tout le monde peut contribuer via `/contribuer-prime` jusqu a ce qu il soit battu.",
-                                        BOUNTY_INITIAL_AMOUNT, winner_id
-                                    ),
-                                    nickname_suffix: String::new(),
-                                    streak_kind: "win",
-                                    streak_value: winner_streak,
-                                });
-                            }
-                        }
-                    }
-                }
+                // Auto-ouverture de prime collective retiree (jeu simplifie).
             }
             _ => {
                 // Draw : reset les deux streaks de combat.
