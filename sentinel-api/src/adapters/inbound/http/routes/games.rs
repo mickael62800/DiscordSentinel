@@ -19,6 +19,7 @@ fn game_inner() -> Router<AppState> {
         .route("/{guild_id}/by-name/{game_name}", get(handlers::casino::games::get_game_by_name))
         .route("/{guild_id}/by-category", get(handlers::casino::games::list_games_by_category))
         .route("/{guild_id}/panels", post(handlers::casino::games::save_panel).get(handlers::casino::games::list_panels))
+        .route("/{guild_id}/panel/deploy", post(handlers::casino::games::deploy_panel))
         .route("/{guild_id}/panels/by-message/{message_id}", get(handlers::casino::games::find_panel_by_message))
 }
 

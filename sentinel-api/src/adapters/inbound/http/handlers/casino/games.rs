@@ -317,6 +317,39 @@ pub async fn list_panels(
     Ok(Json(panels.into_iter().map(Into::into).collect()))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DeployPanelDto {
+    #[serde(default)]
+    pub category: Option<String>,
+    pub channel_id: String,
+}
+
+/// POST /api/games/{guild_id}/panel/deploy
+/// Demande au bot de poser (ou rafraichir) le panneau de jeux d'une categorie
+/// dans le salon indique, via la stream d'events Redis (bouton "Deployer" du
+/// dashboard). Le bot fait le travail Discord (consumer `games_panel_deploy`).
+pub async fn deploy_panel(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<DeployPanelDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if dto.channel_id.trim().is_empty() {
+        return Err(ApiError(DomainError::ValidationError(
+            "channel_id requis pour deployer le panneau".into(),
+        )));
+    }
+    let category = normalize_optional_tag(dto.category.as_deref());
+    state.broadcaster.broadcast(
+        "games_panel_deploy",
+        serde_json::json!({
+            "guild_id": guild_id,
+            "category": category,
+            "channel_id": dto.channel_id.trim(),
+        }),
+    );
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
 pub async fn list_games_by_category(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,

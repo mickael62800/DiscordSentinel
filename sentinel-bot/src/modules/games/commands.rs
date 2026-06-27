@@ -498,6 +498,81 @@ pub(crate) fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> Crea
     info_embed(&title).description(desc)
 }
 
+/// Deploie OU rafraichit le panneau d'une categorie sans CommandInteraction
+/// (declenche par le bouton "Deployer" du dashboard via event Redis).
+/// - Si un panneau existe deja pour la categorie : edite son message (refresh).
+/// - Sinon : poste un nouveau message dans `channel_id` et l'enregistre.
+/// Retourne un message de statut (Ok) ou une erreur lisible.
+pub(crate) async fn deploy_or_refresh_panel(
+    ctx: &Context,
+    guild_id: GuildId,
+    category: Option<&str>,
+    channel_id: serenity::all::ChannelId,
+) -> Result<String, String> {
+    let base = {
+        let data = ctx.data.read().await;
+        data.get::<ApiClientKey>().map(std::sync::Arc::clone)
+    }
+    .ok_or_else(|| "client API absent".to_string())?;
+    let api = GameApiClient::new(base);
+    let guild_id_str = guild_id.to_string();
+
+    let games = api
+        .list_games_by_category(&guild_id_str, category)
+        .await
+        .map_err(|e| format!("liste jeux : {e}"))?;
+    if games.is_empty() {
+        return Err("Aucun jeu dans cette categorie.".to_string());
+    }
+    let games_slice: Vec<&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
+
+    // Panneau existant pour cette categorie ?
+    let panels = api.list_panels(&guild_id_str).await.unwrap_or_default();
+    let cat_norm = category.map(str::to_lowercase);
+    let existing = panels
+        .into_iter()
+        .find(|p| p.category.as_deref().map(str::to_lowercase) == cat_norm);
+
+    if let Some(panel) = existing {
+        let ch = panel
+            .channel_id
+            .parse::<u64>()
+            .map(serenity::all::ChannelId::new)
+            .map_err(|_| "channel_id invalide en DB".to_string())?;
+        let mid = panel
+            .message_id
+            .parse::<u64>()
+            .map(serenity::all::MessageId::new)
+            .map_err(|_| "message_id invalide en DB".to_string())?;
+        if let Ok(mut msg) = ch.message(&ctx.http, mid).await {
+            let embed = build_panel_embed(category, &games_slice);
+            let components = build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
+            msg.edit(&ctx.http, EditMessage::new().embed(embed).components(components))
+                .await
+                .map_err(|e| format!("edition message : {e}"))?;
+            return Ok(format!("Panneau rafraichi ({} jeux).", games_slice.len()));
+        }
+        // Message disparu -> on repost en neuf ci-dessous.
+    }
+
+    // Nouveau panneau dans channel_id.
+    let embed = build_panel_embed(category, &games_slice);
+    let msg = channel_id
+        .send_message(&ctx.http, CreateMessage::new().embed(embed))
+        .await
+        .map_err(|e| format!("envoi message : {e}"))?;
+    let panel = api
+        .save_panel(&guild_id_str, &msg.channel_id.to_string(), &msg.id.to_string(), category)
+        .await
+        .map_err(|e| format!("sauvegarde panel : {e}"))?;
+    let components = build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
+    let mut msg_mut = msg;
+    if let Err(e) = msg_mut.edit(&ctx.http, EditMessage::new().components(components)).await {
+        warn!(error = %e, "Erreur attachement boutons au panel (deploy web)");
+    }
+    Ok(format!("Panneau deploye ({} jeux).", games_slice.len()))
+}
+
 /// Construit les rangees de BOUTONS-ICONES d'un panel (nouveau systeme).
 /// Un bouton par jeu : emoji du jeu + compteur d'abonnes (membres ayant le
 /// role). Max 25 jeux (5x5). Cliquer toggle le role. Partage entre la pose du

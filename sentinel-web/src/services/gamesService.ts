@@ -61,6 +61,17 @@ export const gamesService = {
   },
 
   /**
+   * Demande au bot de poser/rafraichir le panneau de jeux d'une categorie
+   * dans le salon indique (bouton "Deployer"). category null = sans categorie.
+   */
+  deployPanel(
+    guildId: string,
+    payload: { category: string | null; channel_id: string },
+  ): Promise<{ ok: boolean }> {
+    return httpPost(`/api/games/${guildId}/panel/deploy`, payload);
+  },
+
+  /**
    * Upload multipart d'un emoji (name + image). Passe par fetch direct pour
    * conserver les headers standards mais avec multipart.
    */

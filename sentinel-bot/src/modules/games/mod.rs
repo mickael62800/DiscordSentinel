@@ -30,6 +30,59 @@ pub fn register_commands() -> Vec<CreateCommand> {
     commands::all()
 }
 
+/// Spawn le consumer durable (Redis stream) : ecoute `games_panel_deploy`
+/// (bouton "Deployer" du dashboard) et pose/rafraichit le panneau de jeux.
+pub fn spawn(ctx: Context) {
+    tokio::spawn(async move {
+        let consumer = crate::shared::event_bus::default_consumer_name();
+        crate::shared::event_bus::listen_stream_group(
+            "sentinel-bot-games".to_string(),
+            consumer,
+            move |payload_json| {
+                let ctx = ctx.clone();
+                async move { handle_deploy_event(&ctx, &payload_json).await }
+            },
+        )
+        .await;
+    });
+}
+
+async fn handle_deploy_event(ctx: &Context, payload_json: &str) {
+    use serenity::all::{ChannelId, GuildId};
+
+    let envelope: serde_json::Value = match serde_json::from_str(payload_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if envelope.get("event").and_then(|v| v.as_str()) != Some("games_panel_deploy") {
+        return;
+    }
+    let data = match envelope.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    let guild_id = data
+        .get("guild_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok());
+    let channel_id = data
+        .get("channel_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok());
+    let (Some(g), Some(c)) = (guild_id, channel_id) else { return };
+    // category vide / absente => jeux sans categorie (None).
+    let category = data
+        .get("category")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    match commands::deploy_or_refresh_panel(ctx, GuildId::new(g), category.as_deref(), ChannelId::new(c)).await {
+        Ok(status) => tracing::info!(guild = g, %status, "Panneau jeux deploye (web)"),
+        Err(e) => tracing::warn!(guild = g, error = %e, "Echec deploiement panneau jeux (web)"),
+    }
+}
+
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;

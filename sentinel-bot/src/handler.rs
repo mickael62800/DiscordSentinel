@@ -173,6 +173,10 @@ impl EventHandler for Handler {
         // dans le bot, pas dans le worker.
         modules::slot::spawn_background(ctx.clone());
 
+        // Games : consumer Redis pour deployer/rafraichir le panneau de jeux
+        // (bouton "Deployer" du dashboard).
+        modules::games::spawn(ctx.clone());
+
         // AI dataset : task de collecte (client-streaming gRPC longue duree).
         modules::ai_dataset::spawn_collector(ctx.clone()).await;
     }
