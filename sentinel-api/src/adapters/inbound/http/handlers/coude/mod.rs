@@ -21,18 +21,13 @@ pub mod social;
 pub mod taunts;
 pub mod tournaments;
 pub mod curses;
-pub mod vendetta;
 pub mod tout_ou_rien;
 pub mod travaux;
 pub mod steal_roll;
 pub mod steal_attempts;
 pub mod flavor;
 pub mod prank;
-pub mod bounty;
 pub mod refusal;
-pub mod coalition;
-pub mod ultimate;
-pub mod prestige;
 pub mod friendly_duel;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.

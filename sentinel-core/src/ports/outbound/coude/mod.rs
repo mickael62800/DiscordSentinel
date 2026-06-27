@@ -1,7 +1,5 @@
 pub mod bet_repository;
-pub mod bounty_repository;
 pub mod cashbox_repository;
-pub mod coalition_repository;
 pub mod combat_query_repository;
 pub mod combat_repository;
 pub mod curses_repository;
@@ -18,5 +16,3 @@ pub mod steal_boost_repository;
 pub mod steal_protection_repository;
 pub mod taunts_repository;
 pub mod tout_ou_rien_repository;
-pub mod ultimate_repository;
-pub mod vendetta_repository;

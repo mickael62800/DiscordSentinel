@@ -29,8 +29,6 @@ use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotCon
 use crate::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
 use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
 use crate::adapters::outbound::postgres::coude::combat_repository::PgCombatRepository;
-use crate::adapters::outbound::postgres::coude::bounty_repository::PgBountyRepository;
-use crate::adapters::outbound::postgres::coude::coalition_repository::PgCoalitionRepository;
 use crate::adapters::outbound::postgres::coude::curses_repository::PgCursesRepository;
 use crate::adapters::outbound::postgres::coude::economy_repository::PgEconomyRepository;
 use crate::adapters::outbound::postgres::coude::flavor_templates_repository::PgFlavorTemplatesRepository;
@@ -39,8 +37,6 @@ use crate::adapters::outbound::postgres::coude::inventory_repository::PgInventor
 use crate::adapters::outbound::postgres::coude::refusal_count_repository::PgRefusalCountRepository;
 use crate::adapters::outbound::postgres::coude::safety_net_repository::PgSafetyNetRepository;
 use crate::adapters::outbound::postgres::coude::tout_ou_rien_repository::PgToutOuRienRepository;
-use crate::adapters::outbound::postgres::coude::ultimate_repository::PgUltimateRepository;
-use crate::adapters::outbound::postgres::coude::vendetta_repository::PgVendettaRepository;
 use crate::adapters::outbound::postgres::coude::player_repository::PgPlayerRepository;
 use crate::adapters::outbound::postgres::coude::social_repository::PgSocialRepository;
 use crate::adapters::outbound::postgres::coude::steal_boost_repository::PgStealBoostRepository;
@@ -89,7 +85,6 @@ use crate::application::coude::manage_economy_service::ManageCoudeEconomyService
 use crate::application::coude::manage_heist_service::ManageCoudeHeistService;
 use crate::application::coude::manage_inventory_service::ManageCoudeInventoryService;
 use crate::application::coude::manage_safety_net_service::ManageCoudeSafetyNetService;
-use crate::application::coude::manage_vendetta_service::ManageCoudeVendettaService;
 use crate::application::coude::manage_players_service::ManageCoudePlayersService;
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
 use crate::application::coude::steal::manage_boosts::ManageCoudeStealBoostsService;
@@ -419,13 +414,9 @@ pub async fn build_app_state(
     let coude_curses_repo: Arc<dyn crate::ports::outbound::coude::curses_repository::CursesRepository> =
         Arc::new(PgCursesRepository::new(pg_pool.clone()));
 
-    // Filet de securite et vendetta — repos crees tot pour pouvoir les
-    // brancher dans bets (boost x1.5 paris gagnants) et combat
-    // (bonus +100% revanche). Re-utilises plus bas pour creer les UC.
+    // Filet de securite — repo cree tot pour le brancher dans bets/combat.
     let coude_safety_net_repo: Arc<dyn crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository> =
         Arc::new(PgSafetyNetRepository::new(pg_pool.clone()));
-    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::coude::vendetta_repository::VendettaRepository> =
-        Arc::new(PgVendettaRepository::new(pg_pool.clone()));
 
     let coude_taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase> = Arc::new(
         ManageCoudeTauntsService::new(
@@ -637,10 +628,6 @@ pub async fn build_app_state(
                 .with_bot_config_repo(bot_config_repo.clone()),
         );
 
-    // Vendetta (cf. COUPE_AMELIORATIONS 5.3) — repo deja cree plus haut.
-    let coude_vendetta_uc: Arc<dyn crate::ports::inbound::coude::manage_vendetta::ManageCoudeVendettaUseCase> =
-        Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo.clone()));
-
     // Memorial des clodos / tout-ou-rien log (cf. COUPE_AMELIORATIONS 6.1).
     let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository> =
         Arc::new(PgToutOuRienRepository::new(pg_pool.clone()));
@@ -690,21 +677,9 @@ pub async fn build_app_state(
         discord_action_message_repo,
     ));
 
-    // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_bounty_repo: Arc<dyn crate::ports::outbound::coude::bounty_repository::BountyRepository> =
-        Arc::new(PgBountyRepository::new(pg_pool.clone()));
-
     // Compteurs de refus / dette d honneur (cf. COUPE_AMELIORATIONS 5.3).
     let coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository> =
         Arc::new(PgRefusalCountRepository::new(pg_pool.clone()));
-
-    // Coalitions (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_coalition_repo: Arc<dyn crate::ports::outbound::coude::coalition_repository::CoalitionRepository> =
-        Arc::new(PgCoalitionRepository::new(pg_pool.clone()));
-
-    // Ultimates par classe (cf. COUPE_AMELIORATIONS 3.1).
-    let coude_ultimate_repo: Arc<dyn crate::ports::outbound::coude::ultimate_repository::UltimateRepository> =
-        Arc::new(PgUltimateRepository::new(pg_pool.clone()));
 
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository,
@@ -882,17 +857,13 @@ pub async fn build_app_state(
         coude_heist_uc,
         coude_curses_uc,
         coude_safety_net_uc,
-        coude_vendetta_uc,
         coude_tout_ou_rien_repo,
         play_tout_ou_rien_uc,
         play_travaux_uc,
         roll_steal_uc,
         coude_flavor_templates_repo,
         discord_action_messages_uc,
-        coude_bounty_repo: coude_bounty_repo.clone(),
         coude_refusal_count_repo,
-        coude_coalition_repo: coude_coalition_repo.clone(),
-        coude_ultimate_repo: coude_ultimate_repo.clone(),
         broadcaster,
         job_client,
         discord_api,

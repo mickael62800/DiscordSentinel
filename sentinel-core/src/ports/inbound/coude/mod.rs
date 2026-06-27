@@ -13,7 +13,6 @@ pub mod manage_social;
 pub mod manage_steal_boosts;
 pub mod manage_steal_protections;
 pub mod manage_taunts;
-pub mod manage_vendetta;
 pub mod play_tout_ou_rien;
 pub mod play_travaux;
 pub mod resolve_betting_batch;

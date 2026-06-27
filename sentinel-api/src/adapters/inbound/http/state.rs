@@ -91,7 +91,6 @@ pub struct AppState {
     pub coude_heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
     pub coude_curses_uc: Arc<dyn crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase>,
     pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase>,
-    pub coude_vendetta_uc: Arc<dyn crate::ports::inbound::coude::manage_vendetta::ManageCoudeVendettaUseCase>,
     pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository>,
     pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase>,
     pub play_travaux_uc: Arc<dyn crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase>,
@@ -99,10 +98,7 @@ pub struct AppState {
     pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository>,
     pub discord_action_messages_uc:
         Arc<dyn crate::ports::inbound::audit::manage_discord_action_messages::ManageDiscordActionMessagesUseCase>,
-    pub coude_bounty_repo: Arc<dyn crate::ports::outbound::coude::bounty_repository::BountyRepository>,
     pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository>,
-    pub coude_coalition_repo: Arc<dyn crate::ports::outbound::coude::coalition_repository::CoalitionRepository>,
-    pub coude_ultimate_repo: Arc<dyn crate::ports::outbound::coude::ultimate_repository::UltimateRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

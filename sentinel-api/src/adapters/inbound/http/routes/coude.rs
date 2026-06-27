@@ -149,15 +149,6 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/curses/{target_id}/lift",
             post(handlers::coude::curses::lift_curse),
         )
-        // Migration 161 : vendettas (cf. COUPE_AMELIORATIONS 5.3)
-        .route(
-            "/{guild_id}/vendettas",
-            post(handlers::coude::vendetta::declare_vendetta),
-        )
-        .route(
-            "/{guild_id}/vendettas/by-challenger/{challenger_id}",
-            get(handlers::coude::vendetta::list_vendettas_by_challenger),
-        )
         // Migration 162 : Memorial des clodos (cf. COUPE_AMELIORATIONS 6.1)
         .route(
             "/{guild_id}/tout-ou-rien/record",
@@ -207,15 +198,6 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/prank/braquage/roll",
             post(handlers::coude::prank::roll_prank_braquage_amount),
         )
-        // Migration 164 : primes collectives (cf. COUPE_AMELIORATIONS 5.3)
-        .route(
-            "/{guild_id}/bounties/by-target/{target_id}",
-            get(handlers::coude::bounty::get_bounty_by_target),
-        )
-        .route(
-            "/{guild_id}/bounties/by-target/{target_id}/contribute",
-            post(handlers::coude::bounty::contribute_to_target),
-        )
         // Migration 165 : refusals / dette d honneur (cf. roadmap 5.3)
         .route(
             "/{guild_id}/refusals/{requester_id}/{refuser_id}/increment",
@@ -228,29 +210,6 @@ fn coude_inner() -> Router<AppState> {
         .route(
             "/{guild_id}/refusals/{requester_id}/{refuser_id}/reset",
             post(handlers::coude::refusal::reset_refusal),
-        )
-        // Migration 166 : coalitions (cf. roadmap 5.3)
-        .route(
-            "/{guild_id}/coalitions/join",
-            post(handlers::coude::coalition::join_coalition),
-        )
-        .route(
-            "/{guild_id}/coalitions/by-target/{target_id}",
-            get(handlers::coude::coalition::get_coalition_by_target),
-        )
-        // Migration 167 : ultimates par classe (cf. roadmap 3.1)
-        .route(
-            "/{guild_id}/ultimates/{user_id}/activate",
-            post(handlers::coude::ultimate::activate_ultimate),
-        )
-        .route(
-            "/{guild_id}/ultimates/{user_id}",
-            get(handlers::coude::ultimate::get_ultimate_state),
-        )
-        // Migration 168 : prestige (cf. roadmap 3.3)
-        .route(
-            "/{guild_id}/players/{user_id}/prestige",
-            post(handlers::coude::prestige::prestige_player),
         )
 }
 

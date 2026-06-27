@@ -1,9 +1,7 @@
 pub mod balance;
 pub mod bet;
-pub mod bounty;
 pub mod branding;
 pub mod cashbox;
-pub mod coalition;
 pub mod combat;
 pub mod cowardice_relief;
 pub mod curse;
@@ -29,5 +27,3 @@ pub mod tournament;
 pub mod tout_ou_rien;
 pub mod tout_ou_rien_log;
 pub mod travaux;
-pub mod ultimate;
-pub mod vendetta;
