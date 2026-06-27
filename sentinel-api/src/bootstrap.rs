@@ -735,12 +735,7 @@ pub async fn build_app_state(
                 bot_config_repo.clone(),
             )
             .with_curses_repo(coude_curses_repo.clone())
-            .with_safety_net_repo(coude_safety_net_repo.clone())
-            .with_vendetta_repo(coude_vendetta_repo.clone())
-            .with_player_repo(coude_player_repo.clone())
-            .with_bounty_repo(coude_bounty_repo.clone())
-            .with_coalition_repo(coude_coalition_repo.clone())
-            .with_ultimate_repo(coude_ultimate_repo.clone()),
+            .with_safety_net_repo(coude_safety_net_repo.clone()),
         );
     let resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase> =
         Arc::new(crate::application::coude::combat::resolve_friendly_duel::ResolveFriendlyDuelService::new(
