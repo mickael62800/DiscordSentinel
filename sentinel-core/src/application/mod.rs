@@ -1,3 +1,6 @@
+// Helpers transverses.
+pub mod validation;
+
 // Bounded contexts.
 pub mod ai;
 pub mod audit;

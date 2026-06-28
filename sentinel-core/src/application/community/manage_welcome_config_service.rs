@@ -22,9 +22,7 @@ impl ManageWelcomeConfigService {
 #[async_trait]
 impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
     async fn get(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.get_config(guild_id).await
     }
 
@@ -33,9 +31,7 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         guild_id: &str,
         patch: WelcomeConfigPatch,
     ) -> Result<WelcomeConfigData, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         // Merge : on lit la config actuelle puis on applique les champs
         // presents (le `None` conserve l existant).
         let mut current = self.repo.get_config(guild_id).await?;

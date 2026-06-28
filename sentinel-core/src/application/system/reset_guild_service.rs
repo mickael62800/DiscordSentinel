@@ -19,9 +19,7 @@ impl ResetGuildService {
 #[async_trait]
 impl ResetGuildUseCase for ResetGuildService {
     async fn reset(&self, guild_id: &str, confirmation: &str) -> Result<ResetGuildOutcome, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         // Confirmation forte : le nom saisi doit correspondre EXACTEMENT au nom
         // du serveur (anti-clic accidentel sur une action irreversible).
         let name = self

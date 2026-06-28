@@ -28,9 +28,7 @@ impl ManageRotationUseCase for ManageRotationService {
     }
 
     async fn save_state(&self, state: RotationState) -> Result<(), DomainError> {
-        if state.guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(&state.guild_id)?;
         self.repo.upsert(&state).await
     }
 

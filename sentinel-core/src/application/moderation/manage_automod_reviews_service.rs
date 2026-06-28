@@ -40,9 +40,7 @@ impl ManageAutomodReviewsService {
 #[async_trait]
 impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     async fn create(&self, review: NewAutomodReview) -> Result<AutomodReview, DomainError> {
-        if review.guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(&review.guild_id)?;
         self.repo.create(review).await
     }
 
@@ -52,9 +50,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         aggregate: bool,
         window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError> {
-        if review.guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(&review.guild_id)?;
         self.repo.create_or_merge(review, aggregate, window_minutes).await
     }
 
@@ -78,9 +74,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<AutomodReview>, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.list_pending(guild_id, limit.clamp(1, 500)).await
     }
 
@@ -89,9 +83,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<AutomodReview>, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.list_recent(guild_id, limit.clamp(1, 500)).await
     }
 

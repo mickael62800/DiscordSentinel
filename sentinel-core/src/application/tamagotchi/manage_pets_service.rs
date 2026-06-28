@@ -82,9 +82,7 @@ impl ManagePetsUseCase for ManagePetsService {
     }
 
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.list_by_guild(guild_id).await
     }
 
