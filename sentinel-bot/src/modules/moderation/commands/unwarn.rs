@@ -1,5 +1,5 @@
 use serenity::all::{
-    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType,
+    ButtonStyle, CommandInteraction, CommandOptionType,
     ComponentInteraction, Context, CreateActionRow, CreateButton, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
@@ -68,16 +68,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let unwarn_all = command
-        .data
-        .options
-        .iter()
-        .find(|o| o.name == "all")
-        .and_then(|o| match &o.value {
-            CommandDataOptionValue::Boolean(b) => Some(*b),
-            _ => None,
-        })
-        .unwrap_or(false);
+    let unwarn_all =
+        crate::shared::discord_helpers::option_bool(&command.data.options, "all").unwrap_or(false);
 
     let api = match ctx.data.read().await.get::<ModerationApiKey>().cloned() {
         Some(a) => a,

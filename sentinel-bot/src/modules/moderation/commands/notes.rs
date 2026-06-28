@@ -1,5 +1,5 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, info, warn};
@@ -46,12 +46,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
-    let content = options.iter().find(|o| o.name == "content")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let content = crate::shared::discord_helpers::option_str(options, "content")
         .unwrap_or("");
 
-    let category = options.iter().find(|o| o.name == "category")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let category = crate::shared::discord_helpers::option_str(options, "category")
         .unwrap_or("general");
 
     let guild_id = match command.guild_id {

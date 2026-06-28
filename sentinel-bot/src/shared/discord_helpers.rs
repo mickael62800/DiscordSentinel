@@ -310,6 +310,46 @@ pub async fn guild_config_or_default(
     api.get_guild_config_for(guild_id, module_bot_name).await.unwrap_or_default()
 }
 
+/// Lit une option String d'une slash command par son nom.
+/// Remplace le boilerplate `options.iter().find(|o| o.name == name)
+/// .and_then(|o| match &o.value { String(s) => Some(s.as_str()), _ => None })`.
+pub fn option_str<'a>(
+    options: &'a [serenity::all::CommandDataOption],
+    name: &str,
+) -> Option<&'a str> {
+    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
+        serenity::all::CommandDataOptionValue::String(s) => Some(s.as_str()),
+        _ => None,
+    })
+}
+
+/// Lit une option Integer d'une slash command par son nom.
+pub fn option_i64(options: &[serenity::all::CommandDataOption], name: &str) -> Option<i64> {
+    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
+        serenity::all::CommandDataOptionValue::Integer(n) => Some(*n),
+        _ => None,
+    })
+}
+
+/// Lit une option Boolean d'une slash command par son nom.
+pub fn option_bool(options: &[serenity::all::CommandDataOption], name: &str) -> Option<bool> {
+    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
+        serenity::all::CommandDataOptionValue::Boolean(b) => Some(*b),
+        _ => None,
+    })
+}
+
+/// Lit une option User d'une slash command par son nom.
+pub fn option_user(
+    options: &[serenity::all::CommandDataOption],
+    name: &str,
+) -> Option<serenity::all::UserId> {
+    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
+        serenity::all::CommandDataOptionValue::User(id) => Some(*id),
+        _ => None,
+    })
+}
+
 /// Lit le `log_channel_id` dans la config guild du module donne.
 pub async fn get_log_channel(ctx: &Context, guild_id: &str, module_bot_name: &str) -> Option<ChannelId> {
     let config = guild_config_or_default(ctx, guild_id, module_bot_name).await;

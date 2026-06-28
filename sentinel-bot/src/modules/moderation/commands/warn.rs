@@ -1,5 +1,5 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     CreateMessage,
 };
@@ -67,12 +67,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
-    let gravity = options.iter().find(|o| o.name == "gravity")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let gravity = crate::shared::discord_helpers::option_str(options, "gravity")
         .unwrap_or("medium");
 
-    let reason_raw = options.iter().find(|o| o.name == "reason")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
         .unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 

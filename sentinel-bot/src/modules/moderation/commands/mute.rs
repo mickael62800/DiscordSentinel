@@ -1,5 +1,5 @@
 use serenity::all::{
-    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    ButtonStyle, CommandInteraction, CommandOptionType, Context,
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
@@ -8,7 +8,6 @@ use tracing::{error, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::embeds::{critical_embed, moderate_embed, success_embed};
-use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
@@ -83,13 +82,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
 
-    let reason_raw = options.iter().find(|o| o.name == "reason")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
         .unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
-    let duration_minutes = options.iter().find(|o| o.name == "duration")
-        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
+    let duration_minutes = crate::shared::discord_helpers::option_i64(options, "duration");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
@@ -111,20 +108,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let guild_config = {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            match api.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await {
-                Ok(config) => config,
-                Err(e) => {
-                    warn!(error = %e, "Failed to fetch guild config for mute");
-                    std::collections::HashMap::new()
-                }
-            }
-        } else {
-            std::collections::HashMap::new()
-        }
-    };
+    let guild_config = crate::shared::discord_helpers::guild_config_or_default(
+        ctx,
+        &guild_id.to_string(),
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await;
     let default_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
     let max_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
 

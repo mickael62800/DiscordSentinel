@@ -54,16 +54,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let target_id = command
-        .data
-        .options
-        .iter()
-        .find(|o| o.name == "cible")
-        .and_then(|o| match &o.value {
-            CommandDataOptionValue::User(id) => Some(*id),
-            _ => None,
-        })
-        .unwrap();
+    let target_id =
+        crate::shared::discord_helpers::option_user(&command.data.options, "cible").unwrap();
 
     let don_type = command
         .data

@@ -1,5 +1,5 @@
 use serenity::all::{
-    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    ButtonStyle, CommandInteraction, CommandOptionType, Context,
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
@@ -8,7 +8,6 @@ use tracing::{error, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::embeds::{critical_embed, success_embed};
-use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
@@ -92,13 +91,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
-    let reason_raw = options.iter().find(|o| o.name == "reason")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
         .unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
-    let duration_hours = options.iter().find(|o| o.name == "duration")
-        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
+    let duration_hours = crate::shared::discord_helpers::option_i64(options, "duration");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
@@ -123,24 +120,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         format!("{}h", duration_hours.unwrap())
     };
 
-    let guild_config = {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            match api.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await {
-                Ok(config) => config,
-                Err(e) => {
-                    warn!(error = %e, "Failed to fetch guild config for ban");
-                    std::collections::HashMap::new()
-                }
-            }
-        } else {
-            std::collections::HashMap::new()
-        }
-    };
+    let guild_config = crate::shared::discord_helpers::guild_config_or_default(
+        ctx,
+        &guild_id.to_string(),
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await;
     // Purge des messages : l'option de commande (0/1/3/7 j, max Discord) prime
     // sur le reglage serveur `ban_delete_message_days` si le modo l'a choisie.
-    let purge_opt = options.iter().find(|o| o.name == "purge")
-        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
+    let purge_opt = crate::shared::discord_helpers::option_i64(options, "purge");
     let ban_delete_message_days = match purge_opt {
         Some(n) => n.clamp(0, 7) as u8,
         None => BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8,
@@ -371,8 +359,7 @@ pub async fn execute_ban(
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
-    let user_id_str = command.data.options.iter().find(|o| o.name == "user_id")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let user_id_str = crate::shared::discord_helpers::option_str(&command.data.options, "user_id")
         .unwrap_or("0");
 
     let user_id: u64 = match user_id_str.parse() {
