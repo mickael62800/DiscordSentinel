@@ -27,9 +27,15 @@ const {
 } = useMembers();
 
 const watchFilter = ref<"all" | "watched" | "unwatched">("all");
+// Filtre de presence : par defaut on n'affiche que les membres PRESENTS
+// (left_at null). Les membres partis (left_at renseigne) sont masques sauf
+// si on choisit "Partis" ou "Tous".
+const presenceFilter = ref<"present" | "left" | "all">("present");
 
 const tabFilteredMembers = computed(() => {
   let list = filteredMembers.value.filter((m) => !m.is_bot);
+  if (presenceFilter.value === "present") list = list.filter((m) => !m.left_at);
+  else if (presenceFilter.value === "left") list = list.filter((m) => !!m.left_at);
   if (watchFilter.value === "watched") list = list.filter((m) => isWatched(m.user_id));
   if (watchFilter.value === "unwatched") list = list.filter((m) => !isWatched(m.user_id));
   return list.sort((a, b) => {
@@ -67,6 +73,11 @@ function rolesCount(roles: unknown): number {
 
     <div class="filters">
       <AppInput v-model="search" type="text" class="search-input" placeholder="Rechercher par nom ou ID..." />
+      <AppSelect v-model="presenceFilter" class="sort-select">
+        <option value="present">Présents sur le serveur</option>
+        <option value="left">Partis</option>
+        <option value="all">Tous (présents + partis)</option>
+      </AppSelect>
       <AppSelect v-model="watchFilter" class="sort-select">
         <option value="all">Tous les membres</option>
         <option value="watched">Surveilles uniquement</option>
