@@ -1,5 +1,5 @@
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::moderation::reminders::CreateReminderDto;
@@ -30,7 +30,7 @@ pub async fn get_pending(
 /// GET /api/reminders/{guild_id}
 pub async fn list_by_guild(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<SanctionReminderDto>>, ApiError> {
     let reminders = state.reminders_uc.list_by_guild(&guild_id).await?;
     Ok(map_to_dtos(reminders))

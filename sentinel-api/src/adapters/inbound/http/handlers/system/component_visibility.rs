@@ -5,9 +5,9 @@
 //! la liste pour appliquer les overrides cote front).
 //! Ecriture : Owner+ (modifie ce que les modos/admins voient).
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -45,7 +45,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
 /// GET â€” liste tous les overrides de visibilite pour la guild.
 pub async fn list_visibility(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<VisibilityEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
@@ -76,7 +76,7 @@ pub async fn list_visibility(
 pub async fn upsert_visibility(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<VisibilityBatchDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner)

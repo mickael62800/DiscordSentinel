@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -106,7 +106,7 @@ pub struct LeaderboardQuery {
 
 pub async fn spin(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<WheelSpinDto>,
 ) -> Result<Json<WheelSpinResponseDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -136,7 +136,7 @@ pub async fn spin(
 
 pub async fn recent(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<WheelSpinLogDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -147,7 +147,7 @@ pub async fn recent(
 
 pub async fn leaderboard(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<WheelTopWinnerDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;

@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use redis::AsyncCommands;
@@ -29,7 +29,7 @@ use sentinel_core::domain::entities::system::discord_ids::GuildId;
 /// GET /api/guilds/{guild_id}/members â€” liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordMember>>, ApiError> {
     let cache_key = format!("guild:members:{guild_id}");
 
@@ -59,7 +59,7 @@ pub async fn list_members(
 /// GET /api/members/{guild_id} â€” liste les membres depuis la BDD
 pub async fn list_members_db(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GuildMember>>, ApiError> {
     let members = state.members_uc.list_members(&guild_id).await?;
     Ok(Json(members))
@@ -68,7 +68,7 @@ pub async fn list_members_db(
 /// GET /api/members/{guild_id}/{user_id} â€” profil d'un membre
 pub async fn get_member(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<GuildMember>, ApiError> {
     let member = state.members_uc.get_member(&guild_id, &user_id).await?;
     Ok(Json(member))
@@ -77,7 +77,7 @@ pub async fn get_member(
 /// GET /api/members/{guild_id}/{user_id}/summary â€” profil complet agrege
 pub async fn get_member_summary(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MemberSummary>, ApiError> {
     let summary = state.members_uc.get_member_summary(&guild_id, &user_id).await?;
     Ok(Json(summary))
@@ -108,7 +108,7 @@ pub async fn register_member(
 pub async fn remove_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B â€” Gate RBAC : moderator+ requis pour retirer un membre du cache local.
     if let Some(Extension(ctx)) = rbac {
@@ -122,7 +122,7 @@ pub async fn remove_member(
 /// PATCH /api/members/{guild_id}/{user_id} â€” met a jour un membre
 pub async fn update_member(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(payload): Json<UpdateMemberPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.members_uc.update_member(UpdateMemberCommand {
@@ -159,7 +159,7 @@ pub struct SyncMembersPayload {
 pub async fn reset_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_role_for_guild(
         &state,
@@ -244,7 +244,7 @@ pub struct UpdateMemberPayload {
 /// Endpoint appele par sentinel-bot sur GuildMemberRemove. Idempotent.
 pub async fn leave_member(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let mut tx = state.pg_pool.begin().await
         .map_err(sqlx_internal("leave_member begin"))?;
@@ -291,7 +291,7 @@ pub async fn leave_member(
 /// Endpoint appele par sentinel-bot sur GuildMemberAdd. Idempotent.
 pub async fn rejoin_member(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let res = sqlx::query(
         "UPDATE guild_members SET left_at = NULL, joined_at = NOW(), last_seen_at = NOW() \

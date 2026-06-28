@@ -8,9 +8,9 @@
 //! que de passer par un use case / repository dedie. La logique metier
 //! (resolution, distribution du prix) vit dans le coude-worker, pas ici.
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use chrono::DateTime;
 use chrono::Utc;
@@ -59,7 +59,7 @@ use sentinel_core::domain::entities::system::discord_ids::GuildId;
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<CurrentTournamentDto>, ApiError> {
     let (week_start, week_end) = current_week_bounds();
 
@@ -129,7 +129,7 @@ pub async fn get_current_tournament(
 /// GET /api/coude/{guild_id}/tournaments/history
 pub async fn get_tournament_history(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<PastTournamentDto>>, ApiError> {
     let rows = sqlx::query_as::<_, (
         sqlx::types::Uuid,

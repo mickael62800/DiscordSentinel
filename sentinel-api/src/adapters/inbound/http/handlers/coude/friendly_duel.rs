@@ -1,7 +1,7 @@
 //! Handler HTTP pour le duel amical (cf. COUPE_AMELIORATIONS 4.5).
 
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -34,7 +34,7 @@ pub struct FriendlyDuelResponse {
 /// POST /api/coude/{guild_id}/friendly-duels
 pub async fn resolve_friendly_duel(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(req): Json<FriendlyDuelRequest>,
 ) -> Result<Json<FriendlyDuelResponse>, ApiError> {
     let out = state

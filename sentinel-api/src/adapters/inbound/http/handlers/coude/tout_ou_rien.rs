@@ -3,9 +3,9 @@
 //! - POST /api/coude/{g}/tout-ou-rien/record : log une tentative
 //! - GET  /api/coude/{g}/tout-ou-rien/memorial : top N pertes
 
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::DateTime;
@@ -68,7 +68,7 @@ fn default_limit() -> i64 {
 /// POST /api/coude/{guild_id}/tout-ou-rien/record
 pub async fn record_tout_ou_rien(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<RecordToutOuRienDto>,
 ) -> Result<StatusCode, ApiError> {
     let outcome = ToutOuRienLogOutcome::from_db_str(&dto.outcome).ok_or_else(|| {
@@ -94,7 +94,7 @@ pub async fn record_tout_ou_rien(
 /// GET /api/coude/{guild_id}/tout-ou-rien/memorial?limit=N
 pub async fn get_memorial(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(q): Query<MemorialQuery>,
 ) -> Result<Json<Vec<MemorialEntryDto>>, ApiError> {
     let entries = state
@@ -164,7 +164,7 @@ impl From<ToutOuRienResolution> for ToutOuRienResolutionDto {
 /// (cooldown + get_player + RNG local + update_coins + set_cooldown + record).
 pub async fn play_tout_ou_rien(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<PlayToutOuRienDto>,
 ) -> Result<Json<ToutOuRienResolutionDto>, ApiError> {
     let res = state
@@ -181,7 +181,7 @@ pub async fn play_tout_ou_rien(
 /// GET /api/coude/{guild_id}/tout-ou-rien/by-user/{user_id}
 pub async fn get_user_stats(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<ToutOuRienUserStatsDto>, ApiError> {
     let stats = state
         .coude_tout_ou_rien_repo

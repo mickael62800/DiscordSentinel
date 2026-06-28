@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::community::role_panels::*;
@@ -39,7 +40,7 @@ pub async fn get_panel_by_message(
 
 pub async fn list_panels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<RolePanelDto>>, ApiError> {
     let panels = state.role_panels_uc.list_panels(&guild_id).await?;
     Ok(map_to_dtos(panels))
@@ -78,7 +79,7 @@ pub async fn delete_panel(
 
 pub async fn list_auto_roles(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AutoRoleDto>>, ApiError> {
     let roles = state.role_panels_uc.list_auto_roles(&guild_id).await?;
     Ok(map_to_dtos(roles))

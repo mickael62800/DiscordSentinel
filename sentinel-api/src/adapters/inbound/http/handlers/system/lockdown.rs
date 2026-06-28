@@ -1,7 +1,8 @@
 //! Phase 5G Ã¢â‚¬â€ Endpoints pour `security_lockdown_active`.
 //! SQL direct (meme principe que steal_attempts / quarantine).
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
@@ -48,7 +49,7 @@ pub async fn create_lockdown(
 /// (deactivation manuelle ou via worker).
 pub async fn delete_lockdown(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
     sqlx::query("DELETE FROM security_lockdown_active WHERE guild_id = $1")
         .bind(&guild_id)

@@ -9,8 +9,8 @@
 //! Logique metier zero : on ne fait que deleguer au use case.
 
 use axum::extract::Extension;
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
@@ -81,7 +81,7 @@ pub struct UpdateTauntsConfigDto {
 /// GET /api/coude/{guild_id}/config/taunts
 pub async fn get_taunts_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<TauntsConfigDto>, ApiError> {
     let config = state.coude_taunts_uc.get_config(&guild_id).await?;
     let opt_outs = state.coude_taunts_uc.list_opt_outs(&guild_id).await?;
@@ -99,7 +99,7 @@ pub async fn get_taunts_config(
 pub async fn update_taunts_config(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<UpdateTauntsConfigDto>,
 ) -> Result<StatusCode, ApiError> {
     if let Some(Extension(ctx)) = rbac {
@@ -137,7 +137,7 @@ pub async fn update_taunts_config(
 /// POST /api/coude/{guild_id}/taunts/bj/natural/{user_id}
 pub async fn track_bj_natural(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
         .coude_taunts_uc
@@ -151,7 +151,7 @@ pub async fn track_bj_natural(
 /// POST /api/coude/{guild_id}/taunts/bj/won/{user_id}
 pub async fn track_bj_won(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
         .coude_taunts_uc
@@ -165,7 +165,7 @@ pub async fn track_bj_won(
 /// POST /api/coude/{guild_id}/taunts/bj/bust/{user_id}
 pub async fn track_bj_bust(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
         .coude_taunts_uc
@@ -179,7 +179,7 @@ pub async fn track_bj_bust(
 /// POST /api/coude/{guild_id}/taunts/eco/bankruptcy/{user_id}
 pub async fn track_bankruptcy(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
         .coude_taunts_uc
@@ -193,7 +193,7 @@ pub async fn track_bankruptcy(
 /// POST /api/coude/{guild_id}/taunts/eco/jackpot/{user_id}
 pub async fn track_jackpot(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<EcoAmountDto>,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
@@ -208,7 +208,7 @@ pub async fn track_jackpot(
 /// POST /api/coude/{guild_id}/taunts/eco/donor/{user_id}
 pub async fn track_generous_donor(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<EcoAmountDto>,
 ) -> Result<Json<MaybeTauntEventDto>, ApiError> {
     let ev = state
@@ -225,7 +225,7 @@ pub async fn track_generous_donor(
 pub async fn remove_taunts_opt_out(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     if let Some(Extension(ctx)) = rbac {
         require_role(&ctx, Role::Admin).map_err(|_| {

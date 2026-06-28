@@ -1,3 +1,4 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::{Path, Query, State};
 use axum::Json;
 use uuid::Uuid;
@@ -125,7 +126,7 @@ pub async fn get_by_message_id(
 
 pub async fn list_confessions(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListConfessionsQuery>,
 ) -> Result<Json<Vec<ConfessionDto>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(500);
@@ -226,7 +227,7 @@ pub async fn create_report(
 
 pub async fn list_reports(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReportsQuery>,
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(500);
@@ -253,7 +254,7 @@ pub async fn resolve_report(
 
 pub async fn get_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<ConfigDto>, ApiError> {
     let cfg = state.confessions_uc.get_config(&guild_id).await?;
     Ok(single_dto(cfg))

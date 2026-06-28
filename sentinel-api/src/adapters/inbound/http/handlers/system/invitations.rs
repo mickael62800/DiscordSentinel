@@ -9,6 +9,7 @@
 use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -167,7 +168,7 @@ pub async fn create_invitation(
 pub async fn list_invitations(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<InvitationDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 

@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use serde::Serialize;
@@ -50,7 +51,7 @@ impl From<DiscordRole> for DiscordRoleDto {
 /// GET /api/discord-roles/{guild_id} — Liste les roles Discord d'un serveur
 pub async fn list_roles(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordRoleDto>>, ApiError> {
     let roles = state.discord_role_repo.find_by_guild(&guild_id).await?;
     Ok(map_to_dtos(roles))
@@ -59,7 +60,7 @@ pub async fn list_roles(
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let result = state.discord_api

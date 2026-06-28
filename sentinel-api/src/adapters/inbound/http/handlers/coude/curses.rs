@@ -8,6 +8,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::DateTime;
@@ -89,7 +90,7 @@ fn parse_kind(s: &str) -> Result<CurseKind, ApiError> {
 /// POST /api/coude/{guild_id}/curses
 pub async fn cast_curse(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CastCurseDto>,
 ) -> Result<Json<CastedCurseDto>, ApiError> {
     let kind = match dto.kind.as_deref() {

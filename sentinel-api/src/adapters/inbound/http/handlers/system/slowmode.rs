@@ -1,6 +1,7 @@
 //! Phase 5H Ã¢â‚¬â€ Endpoints pour `security_slowmode_active`.
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
@@ -42,7 +43,7 @@ pub async fn create_slowmode(
 
 pub async fn delete_slowmode(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
     sqlx::query("DELETE FROM security_slowmode_active WHERE guild_id = $1")
         .bind(&guild_id)

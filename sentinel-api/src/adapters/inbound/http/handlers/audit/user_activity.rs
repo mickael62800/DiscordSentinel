@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::Json;
 use serde::Deserialize;
 
@@ -73,7 +74,7 @@ pub async fn get_by_message_id(
 /// GET /api/user-activity/{guild_id}/{user_id} — timeline d'un utilisateur
 pub async fn get_activity(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<ActivityQuery>,
 ) -> Result<Json<Vec<UserActivity>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(200) as i64;

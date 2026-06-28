@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -48,9 +48,8 @@ pub struct LimitQuery {
 /// GET /api/wallet/{guild_id}/{user_id}
 pub async fn get_wallet(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Wallet>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     let wallet = state.wallet_uc.get_or_create(&guild_id, &user_id).await?;
     Ok(Json(wallet))
@@ -59,10 +58,9 @@ pub async fn get_wallet(
 /// POST /api/wallet/{guild_id}/{user_id}/credit
 pub async fn credit(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
@@ -89,10 +87,9 @@ pub async fn credit(
 /// POST /api/wallet/{guild_id}/{user_id}/debit
 pub async fn debit(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
@@ -166,10 +163,9 @@ pub async fn transfer(
 /// GET /api/wallet/{guild_id}/leaderboard?limit=20
 pub async fn leaderboard(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<Wallet>>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let limit = normalize_limit(params.limit, 20, 100);
     let wallets = state.wallet_uc.leaderboard(&guild_id, limit).await?;
@@ -179,10 +175,9 @@ pub async fn leaderboard(
 /// GET /api/wallet/{guild_id}/{user_id}/transactions?limit=20
 pub async fn transactions(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<WalletTransaction>>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     let limit = normalize_limit(params.limit, 20, 100);
     let txs = state.wallet_uc.get_transactions(&guild_id, &user_id, limit).await?;
@@ -193,9 +188,8 @@ pub async fn transactions(
 /// Utilise par la page Wallet du desktop.
 pub async fn list_wallets(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<Wallet>>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
     let wallets = state.wallet_uc.list_by_guild(&guild_id).await?;
     Ok(Json(wallets))
 }
@@ -209,10 +203,9 @@ pub struct ResetWalletDto {
 /// POST /api/wallet/{guild_id}/{user_id}/reset — reset individuel.
 pub async fn reset_wallet(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<Wallet>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     let (wallet, new_balance) = state
         .wallet_uc
@@ -235,10 +228,9 @@ pub async fn reset_wallet(
 pub async fn reset_all_wallets(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.reset.wallets",
         "role insuffisant pour reset bulk des wallets",

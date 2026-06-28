@@ -2,6 +2,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -24,7 +25,7 @@ use sentinel_core::domain::entities::system::discord_ids::UserId;
 /// GET /api/coude/{guild_id}/inventory/{user_id}
 pub async fn get_inventory(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<InventoryItemDto>>, ApiError> {
     let items = state
         .coude_inventory_uc
@@ -36,7 +37,7 @@ pub async fn get_inventory(
 /// POST /api/coude/{guild_id}/inventory/{user_id}/add
 pub async fn add_item(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AddItemDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -49,7 +50,7 @@ pub async fn add_item(
 /// POST /api/coude/{guild_id}/inventory/{user_id}/use
 pub async fn use_item(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UseItemDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let success = state
@@ -76,7 +77,7 @@ pub async fn has_item(
 /// POST /api/coude/{guild_id}/primes
 pub async fn create_prime(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreatePrimeDto>,
 ) -> Result<Json<PrimeDto>, ApiError> {
     let prime = state
@@ -108,7 +109,7 @@ pub async fn get_active_primes(
 /// POST /api/coude/{guild_id}/primes/claim
 pub async fn claim_primes(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<ClaimPrimesDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let total = state
@@ -123,7 +124,7 @@ pub async fn claim_primes(
 /// POST /api/coude/{guild_id}/insurance/buy
 pub async fn buy_insurance(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<BuyInsuranceDto>,
 ) -> Result<StatusCode, ApiError> {
     let inserted = state
@@ -159,7 +160,7 @@ pub struct BuyInsuranceResolvedDto {
 /// le verdict.
 pub async fn buy_insurance_with_roll(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<BuyInsuranceWithRollDto>,
 ) -> Result<Json<BuyInsuranceResolvedDto>, ApiError> {
     let (created, is_scam) = state
@@ -183,7 +184,7 @@ pub async fn buy_insurance_with_roll(
 /// GET /api/coude/{guild_id}/insurance/{user_id}
 pub async fn get_active_insurance(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<InsuranceDto>>, ApiError> {
     let insurance = state
         .coude_inventory_uc

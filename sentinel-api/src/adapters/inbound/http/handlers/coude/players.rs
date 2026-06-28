@@ -1,9 +1,9 @@
 //! Handlers joueurs : CRUD, progression (XP/level/stats), stats de combat,
 //! coins et HP. Tous délèguent à `state.coude_players_uc`.
 
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -47,7 +47,7 @@ async fn gate(
 /// GET /api/coude/{guild_id}/players — liste des joueurs
 pub async fn list_players(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<PlayerDto>>, ApiError> {
     let players = state.coude_players_uc.list(&guild_id).await?;
     Ok(Json(players.iter().map(PlayerDto::from).collect()))
@@ -64,7 +64,7 @@ pub async fn get_all_guild_ids(
 /// GET /api/coude/{guild_id}/players/random?count=2
 pub async fn get_random_players(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<RandomPlayersQuery>,
 ) -> Result<Json<Vec<FullPlayerDto>>, ApiError> {
     let count = params.count.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_OPPONENT_COUNT);
@@ -80,7 +80,7 @@ pub async fn get_random_players(
 /// POST /api/coude/{guild_id}/players/get-or-create
 pub async fn get_or_create_player(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<GetOrCreatePlayerDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     let player = state
@@ -93,7 +93,7 @@ pub async fn get_or_create_player(
 /// GET /api/coude/{guild_id}/players/{user_id}
 pub async fn get_player(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     let player = state.coude_players_uc.get(&guild_id, &user_id).await?;
     Ok(Json(player.into()))
@@ -103,7 +103,7 @@ pub async fn get_player(
 pub async fn update_player_class(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateClassDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour update_player_class").await?;
@@ -120,7 +120,7 @@ pub async fn update_player_class(
 pub async fn add_xp(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AddXpDto>,
 ) -> Result<Json<AddXpResponse>, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour add_xp").await?;
@@ -135,7 +135,7 @@ pub async fn add_xp(
 pub async fn spend_stat_point(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<SpendStatDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour spend_stat_point").await?;
@@ -158,7 +158,7 @@ pub async fn spend_stat_point(
 pub async fn reset_stats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<ResetStatsDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
@@ -178,7 +178,7 @@ pub async fn reset_stats(
 pub async fn record_win(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordWinDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour record_win").await?;
@@ -193,7 +193,7 @@ pub async fn record_win(
 pub async fn record_loss(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordLossDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour record_loss").await?;
@@ -208,7 +208,7 @@ pub async fn record_loss(
 pub async fn record_draw(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordDrawDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour record_draw").await?;
@@ -223,7 +223,7 @@ pub async fn record_draw(
 pub async fn increment_cowardice(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour increment_cowardice").await?;
     let count = state
@@ -237,7 +237,7 @@ pub async fn increment_cowardice(
 pub async fn increment_chaos(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour increment_chaos").await?;
     state
@@ -257,7 +257,7 @@ pub async fn increment_chaos(
 pub async fn adjust_coins(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AdjustCoinsDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour adjust_coins").await?;
@@ -289,7 +289,7 @@ pub async fn adjust_coins(
 pub async fn record_coins_earned(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour record_coins_earned").await?;
@@ -318,7 +318,7 @@ pub async fn record_coins_earned(
 pub async fn record_coins_lost(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour record_coins_lost").await?;
@@ -353,7 +353,7 @@ pub async fn record_coins_lost(
 pub async fn update_hp(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateHpDto>,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour update_hp").await?;
@@ -368,7 +368,7 @@ pub async fn update_hp(
 pub async fn repos(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour repos").await?;
     state.coude_players_uc.full_heal(&guild_id, &user_id).await?;

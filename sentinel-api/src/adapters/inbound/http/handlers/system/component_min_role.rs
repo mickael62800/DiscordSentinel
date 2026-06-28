@@ -7,6 +7,7 @@
 use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -51,7 +52,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
 pub async fn list_min_roles(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GateInfoDto>>, ApiError> {
     require_role(&ctx, Role::Admin)
         .map_err(|s| forbid(s, "admin+ requis pour lister les gates"))?;
@@ -94,7 +95,7 @@ pub async fn list_min_roles(
 pub async fn upsert_min_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SetMinRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner)

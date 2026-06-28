@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::community::levels::AddXpDto;
@@ -23,7 +23,7 @@ use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 
 pub async fn get_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<LevelConfigDto>, ApiError> {
     let config = state.levels_uc.get_config(&guild_id).await?;
     Ok(single_dto(config))
@@ -72,7 +72,7 @@ pub async fn add_xp(
 
 pub async fn get_user_level(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserLevelDto>, ApiError> {
     let level = state.levels_uc.get_user_level(&guild_id, &user_id).await?;
     Ok(single_dto(level))
@@ -80,7 +80,7 @@ pub async fn get_user_level(
 
 pub async fn get_leaderboard(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LevelLeaderboardParams>,
 ) -> Result<Json<Vec<UserLevelDto>>, ApiError> {
     let limit = normalize_limit(params.limit, 25, 100);

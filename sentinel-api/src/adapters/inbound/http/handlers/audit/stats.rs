@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -55,7 +55,7 @@ pub async fn record_voice(
 /// GET /api/stats/{guild_id}/user/{user_id} — stats d'un utilisateur
 pub async fn get_user_stats(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<UserStatsDto>>, ApiError> {
     let stats = state.stats_uc.get_user_stats(&guild_id, &user_id).await?;
     Ok(Json(stats.map(UserStatsDto::from)))
@@ -64,7 +64,7 @@ pub async fn get_user_stats(
 /// GET /api/stats/{guild_id}/overview — stats globales du serveur
 pub async fn get_guild_overview(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<GuildOverviewDto>, ApiError> {
     let overview = state.stats_uc.get_guild_overview(&guild_id).await?;
     Ok(Json(GuildOverviewDto::from(overview)))
@@ -73,7 +73,7 @@ pub async fn get_guild_overview(
 /// GET /api/stats/{guild_id}/leaderboard — classement
 pub async fn get_leaderboard(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<UserStatsDto>>, ApiError> {
     let limit = params.limit.unwrap_or(10).min(50);
@@ -84,7 +84,7 @@ pub async fn get_leaderboard(
 /// GET /api/stats/{guild_id}/voice-stats — stats vocales par salon
 pub async fn get_guild_voice_stats(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<VoiceStatsQuery>,
 ) -> Result<Json<GuildVoiceStatsDto>, ApiError> {
     let days = params.days.unwrap_or(30).min(90);

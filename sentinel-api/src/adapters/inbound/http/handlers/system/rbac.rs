@@ -9,8 +9,8 @@
 //! Pattern : direct sqlx (comme `bot_persistence.rs`, `rbac` simple, pas de
 //! logique metier complexe, pas besoin de use-case).
 
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -72,7 +72,7 @@ pub struct MyRoleDto {
 pub async fn grant_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<GrantRoleDto>,
 ) -> Result<Json<UserRoleDto>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour grant"))?;
@@ -137,7 +137,7 @@ pub async fn grant_role(
 pub async fn update_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour update"))?;
@@ -180,7 +180,7 @@ pub async fn update_role(
 pub async fn revoke_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour revoke"))?;
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -237,7 +237,7 @@ pub async fn revoke_role(
 pub async fn list_guild_users(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GuildUserEntryDto>>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| status_to_err(s, "admin+ requis pour lister"))?;
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -294,7 +294,7 @@ pub async fn list_guild_users(
 pub async fn get_my_role(
     State(state): State<AppState>,
     rbac: Option<axum::Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<MyRoleDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 

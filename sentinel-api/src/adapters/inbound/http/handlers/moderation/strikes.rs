@@ -1,5 +1,5 @@
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::strikes::AddStrikeDto;
@@ -21,7 +21,7 @@ use sentinel_core::domain::errors::DomainError;
 /// GET /api/strikes/config/{guild_id}
 pub async fn get_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
     let config = state.strikes_uc.get_config(&guild_id).await?;
     Ok(single_dto(config))
@@ -31,7 +31,7 @@ pub async fn get_config(
 pub async fn save_config(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveStrikeConfigDto>,
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
     // Config des seuils d'escalation = admin (pas moderator).
@@ -47,7 +47,7 @@ pub async fn save_config(
 /// GET /api/strikes/{guild_id}/{user_id}
 pub async fn get_active_strikes(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserStrikeDto>>, ApiError> {
     let strikes = state.strikes_uc.get_active_strikes(&guild_id, &user_id).await?;
     Ok(map_to_dtos(strikes))
@@ -68,10 +68,7 @@ pub async fn add_strike(
     )
     .await?;
 
-    let guild_id = dto.guild_id.clone();
-    let user_id = dto.user_id.clone();
-
-    let command = dto.into();
+    let (command, (guild_id, user_id)) = crate::capture_and_into!(dto, guild_id, user_id);
     let result = state.strikes_uc.add_strike(command).await?;
 
     let active_count = result.active_count;
@@ -96,7 +93,7 @@ pub async fn add_strike(
 pub async fn reset_strikes(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate RBAC : moderator+ requis pour reset les strikes d'un user.
     if let Some(Extension(ctx)) = rbac {

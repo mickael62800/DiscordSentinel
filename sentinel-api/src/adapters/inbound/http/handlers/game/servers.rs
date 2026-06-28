@@ -1,5 +1,6 @@
 //! Handlers HTTP Game Portal — gates RBAC via component_gates.
 
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::Extension;
@@ -39,7 +40,7 @@ async fn gate_server(
 pub async fn create_server(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateGameServerDto>,
 ) -> Result<(StatusCode, Json<GameServerDto>), ApiError> {
     check_component_role(
@@ -75,7 +76,7 @@ pub async fn create_server(
 /// GET /api/games/{guild_id}/servers
 pub async fn list_servers(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GameServerDto>>, ApiError> {
     let list = state.game_servers_uc.list_for_guild(&guild_id).await?;
     Ok(Json(list.into_iter().map(GameServerDto::from).collect()))

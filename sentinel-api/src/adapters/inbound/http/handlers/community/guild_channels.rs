@@ -4,8 +4,8 @@
 //! (config railleries, config salons d'activite, etc.). Cache Redis 10min
 //! pour eviter de taper Discord a chaque ouverture de page.
 
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use redis::AsyncCommands;
 use tracing::warn;
@@ -18,7 +18,7 @@ use sentinel_core::domain::entities::community::guild_member_reset::CHANNELS_CAC
 /// GET /api/guilds/{guild_id}/channels — liste les salons texte.
 pub async fn list_text_channels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordChannel>>, ApiError> {
     let cache_key = format!("guild:channels:{guild_id}");
 
@@ -49,7 +49,7 @@ pub async fn list_text_channels(
 /// deux types (xp_channel_multipliers, etc.).
 pub async fn list_all_channels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordChannel>>, ApiError> {
     let cache_key = format!("guild:channels:all:{guild_id}");
 

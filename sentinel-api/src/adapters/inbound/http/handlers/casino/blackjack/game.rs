@@ -6,6 +6,7 @@
 use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 
@@ -154,7 +155,7 @@ pub async fn double_down(
 /// GET /api/blackjack/{guild_id}/{user_id}/active
 pub async fn get_active(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<BlackjackGameDto>>, ApiError> {
     let game = state.blackjack_svc.get_active(&guild_id, &user_id).await?;
     Ok(Json(game.as_ref().map(to_dto)))
@@ -168,7 +169,7 @@ pub struct ListGamesQuery {
 /// GET /api/blackjack/admin/{guild_id}/games?status=playing
 pub async fn list_games(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     axum::extract::Query(q): axum::extract::Query<ListGamesQuery>,
 ) -> Result<Json<Vec<BlackjackGameDto>>, ApiError> {
     let games = state.blackjack_svc.list_games(&guild_id, q.status.as_deref()).await?;
@@ -181,7 +182,7 @@ pub async fn list_games(
 pub async fn purge_all(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.purge.blackjack",

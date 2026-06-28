@@ -1,8 +1,8 @@
 //! Handlers économie : transferts inter-joueurs, vol, casino et compteurs
 //! quotidiens. Délèguent à `state.coude_economy_uc`.
 
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -45,7 +45,7 @@ pub struct TransferCoinsResponse {
 pub async fn transfer_coins(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<TransferCoinsDto>,
 ) -> Result<Json<TransferCoinsResponse>, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour un transfert coude").await?;
@@ -72,7 +72,7 @@ pub struct StealResponse {
 pub async fn record_steal(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<StealDto>,
 ) -> Result<Json<StealResponse>, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour record_steal").await?;
@@ -104,7 +104,7 @@ pub struct StealFailPenaltyResponse {
 pub async fn steal_fail_penalty(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<StealFailPenaltyDto>,
 ) -> Result<Json<StealFailPenaltyResponse>, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour steal_fail_penalty").await?;
@@ -124,7 +124,7 @@ pub async fn steal_fail_penalty(
 pub async fn record_casino_win(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<GainDto>,
 ) -> Result<StatusCode, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-win").await?;
@@ -139,7 +139,7 @@ pub async fn record_casino_win(
 pub async fn record_casino_loss(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<LostDto>,
 ) -> Result<StatusCode, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-loss").await?;
@@ -154,7 +154,7 @@ pub async fn record_casino_loss(
 pub async fn record_casino_faillite(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-faillite").await?;
     let total_lost = state
@@ -167,7 +167,7 @@ pub async fn record_casino_faillite(
 /// GET /api/coude/{guild_id}/players/{user_id}/casino-today
 pub async fn count_casino_today(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let count = state
         .coude_economy_uc
@@ -179,7 +179,7 @@ pub async fn count_casino_today(
 /// GET /api/coude/{guild_id}/players/{user_id}/casino-gains-today
 pub async fn sum_casino_gains_today(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let total = state
         .coude_economy_uc
@@ -191,7 +191,7 @@ pub async fn sum_casino_gains_today(
 /// GET /api/coude/{guild_id}/players/{user_id}/steal-today
 pub async fn count_steal_today(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let count = state
         .coude_economy_uc

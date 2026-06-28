@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::audit::security::ReportEventDto;
@@ -23,12 +23,8 @@ pub async fn report_event(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_reason(&dto.description).map_err(ApiError)?;
 
-    let event_type = dto.event_type.clone();
-    let severity = dto.severity.clone();
-    let description = dto.description.clone();
-    let guild_id = dto.guild_id.clone();
-
-    let command = dto.into();
+    let (command, (event_type, severity, description, guild_id)) =
+        crate::capture_and_into!(dto, event_type, severity, description, guild_id);
     let event = state.security_uc.report_event(command).await?;
 
     // Broadcast WebSocket pour l'app desktop
@@ -51,7 +47,7 @@ pub async fn report_event(
 pub async fn purge_events(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.purge.security_events",

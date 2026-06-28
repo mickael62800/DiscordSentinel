@@ -1,5 +1,5 @@
-use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -125,7 +125,7 @@ pub struct SaveWelcomeConfigDto {
 /// GET /api/welcome/{guild_id}
 pub async fn get_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
     let config = state.welcome_config_uc.get(&guild_id).await?;
     Ok(Json(config.into()))
@@ -134,7 +134,7 @@ pub async fn get_config(
 /// PUT /api/welcome/{guild_id}
 pub async fn save_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveWelcomeConfigDto>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
     let saved = state
@@ -149,9 +149,8 @@ pub async fn save_config(
 /// d'acceptation) dans le salon configure, via la stream d'events Redis.
 pub async fn publish_rules(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    crate::adapters::inbound::http::validation::validate_guild_id_path(&guild_id)?;
     // Garde-fou : refuse si la validation du reglement n'est pas activee /
     // configuree (sinon le bot echouerait silencieusement cote consumer).
     let config = state.welcome_config_uc.get(&guild_id).await?;

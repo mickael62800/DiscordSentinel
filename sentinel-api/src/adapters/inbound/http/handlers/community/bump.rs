@@ -4,7 +4,8 @@
 //! Localise (raw sqlx + wallet_uc) : la table bump_events est un simple journal
 //! et la recompense est un calcul pur ; pas de regle metier transverse a isoler.
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
+use axum::extract::State;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::Json;
 use serde::{Deserialize, Serialize};
@@ -61,7 +62,7 @@ pub struct BumpRewardDto {
 /// recompense graduee de la semaine et credite le wallet.
 pub async fn record_bump(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(body): Json<RecordBumpBody>,
 ) -> Result<Json<BumpRewardDto>, ApiError> {
     let cfg = state.bot_config_repo.get_config(&guild_id, "bump-bot").await.unwrap_or_default();
@@ -198,7 +199,7 @@ pub async fn due_reminders(
 /// POST /api/bump/{guild_id}/reminder-sent Ã¢â‚¬â€ marque le rappel comme envoye.
 pub async fn mark_reminder_sent(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     sqlx::query("UPDATE bump_guild_state SET reminder_sent = TRUE, updated_at = NOW() WHERE guild_id = $1")
         .bind(&guild_id)

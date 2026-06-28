@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -120,7 +121,7 @@ pub async fn list_all_channels(
 
 pub async fn list_channels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
@@ -133,7 +134,7 @@ pub async fn list_channels(
 /// GET /api/voice-channels/{guild_id}/history — historique des salons fermes.
 pub async fn list_history_channels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 100, 500);
@@ -196,7 +197,7 @@ pub async fn purge_channel(
 pub async fn purge_history(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.purge.voice_history",
@@ -693,7 +694,7 @@ pub async fn revoke_invite_link(
 
 pub async fn list_themes(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ThemeResponseDto>>, ApiError> {
     let themes = state.voice_channels_uc.list_themes(&guild_id).await?;
     Ok(map_to_dtos(themes))
@@ -701,7 +702,7 @@ pub async fn list_themes(
 
 pub async fn create_theme(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
     let mut cmd: CreateThemeCommand = dto.into();

@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::audit::audit_logs::AuditLogQueryParams;
@@ -29,7 +29,7 @@ pub async fn create_audit_log(
 pub async fn purge_audit_logs(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state, &rbac, &guild_id, "db.purge.audit_logs",

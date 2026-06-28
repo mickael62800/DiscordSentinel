@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -40,7 +40,7 @@ pub async fn list_watched_users(
 
 pub async fn get_user_dossier(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserDossierResponseDto>, ApiError> {
     let dossier = state
         .watched_users_uc
@@ -84,7 +84,7 @@ pub async fn add_watched_user(
 pub async fn remove_watched_user(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Utilise check_role_for_guild (async, avec bypass superadmin) plutot
     // que check_role (sync, sans bypass).

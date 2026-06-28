@@ -1,6 +1,29 @@
 use axum::Json;
 use serde::Serialize;
 
+/// Capture (clone) des champs d'un DTO AVANT de le consommer par `.into()`,
+/// pour pouvoir les reutiliser ensuite (typiquement dans un broadcast).
+/// Retourne `(command, (champ1, champ2, ...))`.
+///
+/// Avant :
+/// ```ignore
+/// let guild_id = dto.guild_id.clone();
+/// let user_id = dto.user_id.clone();
+/// let command = dto.into();
+/// ```
+/// Apres :
+/// ```ignore
+/// let (command, (guild_id, user_id)) = capture_and_into!(dto, guild_id, user_id);
+/// ```
+#[macro_export]
+macro_rules! capture_and_into {
+    ($dto:expr, $($field:ident),+ $(,)?) => {{
+        let captured = ( $($dto.$field.clone(),)+ );
+        let command = $dto.into();
+        (command, captured)
+    }};
+}
+
 /// Convertit un Vec<T> en Json<Vec<D>> via From<T> pour D.
 /// Remplace le pattern repete : `items.into_iter().map(Dto::from).collect()`
 pub fn map_to_dtos<T, D: From<T>>(items: Vec<T>) -> Json<Vec<D>> {

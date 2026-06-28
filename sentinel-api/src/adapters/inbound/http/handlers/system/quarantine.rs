@@ -1,7 +1,8 @@
 //! Phase 5F Ã¢â‚¬â€ Endpoints minimalistes pour `security_quarantine_pending`.
 //! SQL direct (pas de port/adapter) Ã¢â‚¬â€ meme principe que steal_attempts.
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
+use axum::extract::State;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
@@ -46,7 +47,7 @@ pub async fn create_quarantine(
 /// admin). Idempotent.
 pub async fn delete_quarantine(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     sqlx::query(
         "DELETE FROM security_quarantine_pending WHERE guild_id = $1 AND user_id = $2",

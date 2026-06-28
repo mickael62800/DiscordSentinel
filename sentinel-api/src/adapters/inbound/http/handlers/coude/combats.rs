@@ -4,6 +4,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -28,7 +29,7 @@ use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
 /// GET /api/coude/{guild_id}/combats — liste des combats
 pub async fn list_combats(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<CombatQueryParams>,
 ) -> Result<Json<Vec<CombatDto>>, ApiError> {
     let limit = params.limit.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_COMBATS_LIMIT);
@@ -52,7 +53,7 @@ pub async fn get_combat(
 /// GET /api/coude/{guild_id}/combats/pending/attacker/{user_id}
 pub async fn get_pending_for_attacker(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<FullCombatDto>>, ApiError> {
     let combat = state
         .coude_combats_uc
@@ -64,7 +65,7 @@ pub async fn get_pending_for_attacker(
 /// GET /api/coude/{guild_id}/combats/pending/defender/{user_id}
 pub async fn get_pending_for_defender(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<FullCombatDto>>, ApiError> {
     let combat = state
         .coude_combats_uc
@@ -87,7 +88,7 @@ pub async fn get_expired_combats(
 pub async fn create_combat(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateCombatDto>,
 ) -> Result<Json<FullCombatDto>, ApiError> {
     check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour create_combat").await?;
@@ -214,7 +215,7 @@ pub async fn expire_combat(
 pub async fn purge_all(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state,

@@ -4,6 +4,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -73,7 +74,7 @@ pub async fn leaderboard(
 /// POST /api/coude/{guild_id}/daily-chaos
 pub async fn log_daily_chaos(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<DailyChaosDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -95,7 +96,7 @@ pub async fn log_daily_chaos(
 /// GET /api/coude/{guild_id}/events
 pub async fn get_active_events(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<EventDto>>, ApiError> {
     let events = state.coude_social_uc.list_active_events(&guild_id).await?;
     Ok(Json(events.into_iter().map(EventDto::from).collect()))
@@ -110,7 +111,7 @@ pub async fn get_active_events(
 /// Une saison dure 90 jours.
 pub async fn get_current_season(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<CurrentSeasonDto>, ApiError> {
     let season = state.coude_social_uc.current_season(&guild_id).await?;
     Ok(Json(season.into()))

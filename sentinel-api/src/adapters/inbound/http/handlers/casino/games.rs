@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -107,7 +108,7 @@ pub struct SavePanelDto {
 
 pub async fn list_games(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
     let games = state.game_repo.list(&guild_id).await?;
     Ok(Json(games.into_iter().map(Into::into).collect()))
@@ -290,7 +291,7 @@ pub async fn get_game_by_name(
 
 pub async fn save_panel(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SavePanelDto>,
 ) -> Result<Json<GamePanelDto>, ApiError> {
     let category_owned = normalize_optional_tag(dto.category.as_deref());
@@ -311,7 +312,7 @@ pub async fn find_panel_by_message(
 
 pub async fn list_panels(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GamePanelDto>>, ApiError> {
     let panels = state.game_repo.list_panels(&guild_id).await?;
     Ok(Json(panels.into_iter().map(Into::into).collect()))
@@ -330,7 +331,7 @@ pub struct DeployPanelDto {
 /// dashboard). Le bot fait le travail Discord (consumer `games_panel_deploy`).
 pub async fn deploy_panel(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<DeployPanelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     if dto.channel_id.trim().is_empty() {
@@ -352,7 +353,7 @@ pub async fn deploy_panel(
 
 pub async fn list_games_by_category(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     axum::extract::Query(q): axum::extract::Query<CategoryQuery>,
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
     let cat_owned = normalize_optional_tag(q.category.as_deref());
@@ -379,7 +380,7 @@ pub struct UploadEmojiResponse {
 pub async fn upload_emoji(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     mut multipart: axum::extract::Multipart,
 ) -> Result<Json<UploadEmojiResponse>, ApiError> {
     if let Some(Extension(ctx)) = rbac {

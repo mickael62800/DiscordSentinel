@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -52,10 +53,9 @@ pub async fn get_definitions(
 /// GET /api/bots/config/{guild_id} — config de tous les bots pour un serveur (cache 15min)
 pub async fn get_guild_config(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let cache_key = format!("bot:config:{guild_id}");
 
@@ -89,7 +89,6 @@ pub async fn get_bot_config(
     Path((guild_id, bot_name)): Path<(String, String)>,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
     validation::validate_short("bot_name", &bot_name).map_err(ApiError)?;
 
     let cache_key = format!("bot:config:{guild_id}:{bot_name}");

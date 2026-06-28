@@ -6,10 +6,10 @@
 //!   - GET : admin+ (lecture du contenu de chat)
 //!   - DELETE : owner+ (action destructive)
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -62,7 +62,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
 pub async fn list_messages(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(q): Query<ListMessagesQuery>,
 ) -> Result<Json<ListMessagesResponse>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))?;
@@ -169,7 +169,7 @@ pub struct BulkDeleteResponse {
 pub async fn bulk_delete(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<BulkDeleteDto>,
 ) -> Result<Json<BulkDeleteResponse>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| forbid(s, "owner+ requis"))?;

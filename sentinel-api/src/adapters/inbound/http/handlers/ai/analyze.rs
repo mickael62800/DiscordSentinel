@@ -16,9 +16,7 @@ pub async fn analyze(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_discord_id("channel_id", &dto.channel_id).map_err(ApiError)?;
 
-    let username = dto.username.clone();
-    let guild_id = dto.guild_id.clone();
-    let command = dto.into();
+    let (command, (username, guild_id)) = crate::capture_and_into!(dto, username, guild_id);
     let analysis = state.analyze_uc.analyze(command).await?;
 
     // Broadcast event if an action was taken.

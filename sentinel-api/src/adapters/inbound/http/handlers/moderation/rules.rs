@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use uuid::Uuid;
@@ -16,7 +17,7 @@ use crate::adapters::inbound::http::state::AppState;
 
 pub async fn get_rules(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<RuleResponseDto>>, ApiError> {
     let rules = state.rules_uc.get_rules(&guild_id).await?;
     Ok(map_to_dtos(rules))

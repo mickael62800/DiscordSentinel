@@ -3,6 +3,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 
@@ -29,7 +30,7 @@ use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
 pub async fn place_bet(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<PlaceBetDto>,
 ) -> Result<Json<PlaceBetResponse>, ApiError> {
     check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour place_bet").await?;
@@ -71,7 +72,7 @@ pub async fn get_combat_bets(
 /// vit dans le module bets puisqu'il sert le flow paris.
 pub async fn get_betting_combat(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<FullCombatDto>>, ApiError> {
     let combat = state
         .coude_combats_uc

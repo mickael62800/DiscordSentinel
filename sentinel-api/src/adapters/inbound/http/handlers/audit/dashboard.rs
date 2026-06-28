@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
@@ -346,7 +347,7 @@ pub async fn register_guild(
 /// cesse d'afficher un serveur fantome.
 pub async fn delete_guild(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
     state.guild_repo.delete(&guild_id).await?;
     invalidate_guilds_cache(&state).await;

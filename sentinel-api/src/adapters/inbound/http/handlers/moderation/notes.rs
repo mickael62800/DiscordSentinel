@@ -1,5 +1,6 @@
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
@@ -44,10 +45,9 @@ pub async fn add_note(
 pub async fn get_notes(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserNoteDto>>, ApiError> {
     // Validation
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     // Moderator+ requis : les notes sont sensibles (contexte interne de modo).
     use crate::adapters::inbound::http::middleware::rbac::check_role;

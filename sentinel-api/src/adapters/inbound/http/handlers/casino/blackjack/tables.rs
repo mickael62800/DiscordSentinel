@@ -2,6 +2,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -128,7 +129,7 @@ pub async fn close_table(
 /// GET /api/blackjack/admin/{guild_id}/tables
 pub async fn list_tables_by_guild(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<BlackjackTable>>, ApiError> {
     let tables = state.blackjack_table_repo.list_open_by_guild(&guild_id).await?;
     Ok(Json(tables))

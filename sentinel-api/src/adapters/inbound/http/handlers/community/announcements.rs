@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use chrono::Utc;
 use uuid::Uuid;
@@ -219,7 +220,7 @@ pub async fn get_announcement(
 
 pub async fn list_announcements(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AnnouncementDto>>, ApiError> {
     let list = state.announcements_uc.list_by_guild(&guild_id).await?;
     Ok(map_to_dtos(list))

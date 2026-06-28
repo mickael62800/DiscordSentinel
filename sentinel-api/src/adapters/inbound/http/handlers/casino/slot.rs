@@ -1,6 +1,6 @@
-use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -135,7 +135,7 @@ pub struct LeaderboardQuery {
 /// POST /api/slot/{guild_id}/spin
 pub async fn spin(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SpinDto>,
 ) -> Result<Json<SpinResponseDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -168,7 +168,7 @@ pub async fn spin(
 /// POST /api/slot/{guild_id}/daily
 pub async fn daily(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<DailyDto>,
 ) -> Result<Json<SpinResponseDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -199,7 +199,7 @@ pub async fn daily(
 /// GET /api/slot/{guild_id}/jackpot
 pub async fn get_jackpot(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<JackpotPoolDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let pool = state.slot_uc.get_jackpot_pool(&guild_id).await?;
@@ -209,7 +209,7 @@ pub async fn get_jackpot(
 /// GET /api/slot/{guild_id}/recent?limit=20
 pub async fn recent_spins(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<SlotSpinDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -221,7 +221,7 @@ pub async fn recent_spins(
 /// GET /api/slot/{guild_id}/leaderboard?days=7&limit=10
 pub async fn leaderboard(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<SlotTopWinnerDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;

@@ -5,14 +5,14 @@
 //! du guild en base, puis publie un event Redis `guild_reset` pour que le bot
 //! annule l'etat Discord (deban / unmute / retrait des roles temp+quarantaine).
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::{require_role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -43,10 +43,9 @@ pub struct ResetGuildResponse {
 pub async fn reset_guild(
     State(state): State<AppState>,
     ctx: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ResetGuildBody>,
 ) -> Result<Json<ResetGuildResponse>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     // ── Garde-fou 1 : OWNER uniquement ──
     let ctx = ctx

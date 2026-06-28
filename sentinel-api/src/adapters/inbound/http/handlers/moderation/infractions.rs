@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionQueryParams;
@@ -14,16 +15,14 @@ use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 pub async fn list_infractions(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<InfractionQueryParams>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let filters = InfractionFilters {
         user_id: params.user_id,

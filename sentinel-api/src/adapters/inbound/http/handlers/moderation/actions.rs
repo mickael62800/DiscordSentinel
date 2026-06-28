@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -394,10 +395,9 @@ pub async fn list_bans(
 /// GET /api/moderation/history/{guild_id}/{user_id}
 pub async fn get_history(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
     // Validation
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     let history = state
         .moderation_uc
@@ -583,7 +583,7 @@ pub async fn add_review(
 pub async fn list_pending_reviews(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour lister les reviews")?;
@@ -647,7 +647,7 @@ pub async fn resolve_review(
 pub async fn get_modstats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
@@ -682,7 +682,7 @@ pub async fn get_modstats(
 pub async fn get_modstats_trend(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;

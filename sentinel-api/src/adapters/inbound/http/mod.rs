@@ -1,6 +1,7 @@
 pub mod dto;
 pub mod errors;
 pub mod errors_helpers;
+pub mod extractors;
 pub mod handlers;
 pub mod helpers;
 pub mod metrics;

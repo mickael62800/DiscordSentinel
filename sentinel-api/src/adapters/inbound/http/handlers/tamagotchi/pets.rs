@@ -5,6 +5,7 @@
 //! (creation, soins, entrainement, visite, combat, cartes) passent par le
 //! `TamagotchiService` gRPC.
 
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
 use serde::Serialize;
@@ -95,7 +96,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
 pub async fn list_pets(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<PetDto>>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))?;
     let pets = state.pets_uc.list_by_guild(&guild_id).await?;

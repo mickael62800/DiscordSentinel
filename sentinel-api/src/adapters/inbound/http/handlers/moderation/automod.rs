@@ -8,6 +8,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -41,10 +42,9 @@ pub struct DetectionQuery {
 /// GET /api/automod/{guild_id}/detections
 pub async fn list_detections(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<DetectionQuery>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     // Filtre `action = "detection"` : seules les detections automod, pas
     // les actions de moderation (warn/mute/ban...).
@@ -154,10 +154,9 @@ pub struct ListReviewsQuery {
 /// GET /api/automod/{guild_id}/reviews
 pub async fn list_reviews(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReviewsQuery>,
 ) -> Result<Json<Vec<AutomodReviewDto>>, ApiError> {
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
     let limit = params.limit.unwrap_or(100).clamp(1, 500);
     let reviews = if params.include_resolved.unwrap_or(false) {
         state.automod_reviews_uc.list_recent(&guild_id, limit).await?

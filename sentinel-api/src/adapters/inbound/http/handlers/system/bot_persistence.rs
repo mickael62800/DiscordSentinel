@@ -7,6 +7,7 @@
 
 use axum::extract::Path;
 use axum::extract::State;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -55,9 +56,8 @@ pub struct NameHistoryEntryDto {
 /// Respect de l'archi hexagonale : passe par `audit_logs_uc.list()`.
 pub async fn list_name_history(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
     let logs = state
@@ -144,11 +144,10 @@ pub struct UpdateStreakDto {
 /// PATCH /api/levels/{guild_id}/{user_id}/streak
 pub async fn update_streak(
     State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
+    ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
-    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     sqlx::query(
         "UPDATE user_levels SET streak_current = $1, streak_best = $2, \
@@ -247,10 +246,9 @@ pub async fn create_sponsorship(
 /// GET /api/sponsorships/{guild_id}
 pub async fn list_sponsorships(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::coude::sponsorship_repository::Sponsorship>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let entries = state.sponsorship_repo.list(&guild_id).await.unwrap_or_else(|e| {
         warn!(error = %e, guild_id = %guild_id, "Echec list sponsorships");
@@ -312,10 +310,9 @@ pub async fn create_temp_role(
 /// GET /api/temp-roles/{guild_id}
 pub async fn list_temp_roles(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let entries = state.temp_role_repo.list_active(&guild_id).await.unwrap_or_else(|e| {
         warn!(error = %e, guild_id = %guild_id, "Echec list temp_roles");
@@ -414,10 +411,9 @@ pub async fn create_pending_action(
 /// GET /api/moderation/pending/{guild_id}
 pub async fn list_pending_actions(
     State(state): State<AppState>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>, ApiError> {
     // Validation
-    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let entries = state.pending_action_repo.list_pending(&guild_id).await.unwrap_or_else(|e| {
         warn!(error = %e, guild_id = %guild_id, "Echec list pending_mod_actions");

@@ -1,7 +1,8 @@
 //! Handlers HTTP de l'administrateur tournant (etat + historique).
 //! Persistance uniquement : l'orchestration Discord est cote bot.
 
-use axum::extract::{Path, State};
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
@@ -72,7 +73,7 @@ impl RotationStateDto {
 pub async fn get_state(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<RotationStateDto>, ApiError> {
     check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     let s = state.rotation_uc.get_state(&guild_id).await?;
@@ -83,7 +84,7 @@ pub async fn get_state(
 pub async fn save_state(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(mut body): Json<RotationStateDto>,
 ) -> Result<Json<RotationStateDto>, ApiError> {
     check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
@@ -102,7 +103,7 @@ pub struct ServedBody {
 pub async fn record_served(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ServedBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
@@ -120,7 +121,7 @@ pub struct ServedEntryDto {
 pub async fn history(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Path(guild_id): Path<String>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ServedEntryDto>>, ApiError> {
     check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
     let entries = state.rotation_uc.served_entries(&guild_id).await?;
