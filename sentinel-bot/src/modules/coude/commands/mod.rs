@@ -1,6 +1,7 @@
 pub mod accepter;
 pub mod aide;
 pub mod annuler;
+pub mod cagnotte;
 pub mod classe;
 pub mod coude;
 pub mod coude_amical;
@@ -48,6 +49,7 @@ pub fn all() -> Vec<CreateCommand> {
         donner::register(),
         tout_ou_rien::register(),
         memorial::register(),
+        cagnotte::register(),
         // Fun / social light
         prank::register(),
         // Utilitaires

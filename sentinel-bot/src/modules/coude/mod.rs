@@ -128,6 +128,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "aide" => commands::aide::handle(ctx, command).await,
         "tout-ou-rien" => commands::tout_ou_rien::handle(ctx, command).await,
         "memorial" => commands::memorial::handle(ctx, command).await,
+        "cagnotte" => commands::cagnotte::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -156,6 +157,7 @@ pub fn handles_command(name: &str) -> bool {
             | "aide"
             | "tout-ou-rien"
             | "memorial"
+            | "cagnotte"
     )
 }
 
@@ -175,6 +177,7 @@ pub fn handles_component(cid: &str) -> bool {
         || cid.starts_with(commands::classe::CLASS_SELECT_PREFIX)
         || cid.starts_with(commands::voler::STEAL_DEFEND_PREFIX)
         || cid == commands::leaderboard::REFRESH_ID
+        || cid == commands::cagnotte::REFRESH_ID
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
@@ -207,6 +210,8 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::voler::handle_defend(ctx, component).await;
     } else if custom_id == commands::leaderboard::REFRESH_ID {
         commands::leaderboard::handle_refresh(ctx, component).await;
+    } else if custom_id == commands::cagnotte::REFRESH_ID {
+        commands::cagnotte::handle_refresh(ctx, component).await;
     }
 }
 
