@@ -1,5 +1,5 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, warn};
@@ -15,12 +15,16 @@ pub fn register() -> CreateCommand {
         .description("Comparer l'historique de sanctions de deux utilisateurs")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user1", "Premier utilisateur")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user1", "Premier utilisateur (ou user1_id)"),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user2", "Second utilisateur")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user2", "Second utilisateur (ou user2_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user1_id", "ID du premier utilisateur (ex. parti / banni)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user2_id", "ID du second utilisateur (ex. parti / banni)"),
         )
 }
 
@@ -35,29 +39,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let user1_id = match command
-        .data
-        .options
-        .iter()
-        .find(|o| o.name == "user1")
-        .and_then(|o| match &o.value {
-            CommandDataOptionValue::User(id) => Some(*id),
-            _ => None,
-        }) {
+    let user1_id = match super::resolve_target_user_id_named(command, "user1", "user1_id") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Parametre 'user1' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Indique le 1er utilisateur (`user1`) ou son ID (`user1_id`).").await; return; }
     };
-    let user2_id = match command
-        .data
-        .options
-        .iter()
-        .find(|o| o.name == "user2")
-        .and_then(|o| match &o.value {
-            CommandDataOptionValue::User(id) => Some(*id),
-            _ => None,
-        }) {
+    let user2_id = match super::resolve_target_user_id_named(command, "user2", "user2_id") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Parametre 'user2' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Indique le 2e utilisateur (`user2`) ou son ID (`user2_id`).").await; return; }
     };
 
     if user1_id == user2_id {

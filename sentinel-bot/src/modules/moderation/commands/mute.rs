@@ -22,12 +22,14 @@ pub fn register() -> CreateCommand {
         .description("Mute un utilisateur (permanent ou temporaire)")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a mute")
+            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du mute")
                 .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du mute")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a mute (ou utilise user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (alternative au selecteur)"),
         )
         .add_option(
             CreateCommandOption::new(
@@ -43,8 +45,10 @@ pub fn register_unmute() -> CreateCommand {
         .description("Retirer le mute d'un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a unmute")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a unmute (ou utilise user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (alternative au selecteur)"),
         )
 }
 
@@ -74,9 +78,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let options = &command.data.options;
 
-    let target_id = match options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
@@ -379,9 +381,10 @@ pub async fn execute_mute(
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
-    let target_id = command.data.options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-        .unwrap();
+    let target_id = match super::resolve_target_user_id(command, "user") {
+        Some(id) => id,
+        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+    };
 
     let guild_id = match command.guild_id {
         Some(id) => id,

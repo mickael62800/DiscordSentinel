@@ -22,8 +22,10 @@ pub fn register() -> CreateCommand {
         .description("Convoquer un membre dans un salon prive")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Membre a convoquer")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user", "Membre a convoquer (ou utilise user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID du membre (alternative au selecteur)"),
         )
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "reason", "Raison de la convocation")
@@ -38,11 +40,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let target_id = match command.data.options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
     let reason = command.data.options.iter().find(|o| o.name == "reason")

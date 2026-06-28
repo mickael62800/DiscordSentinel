@@ -22,12 +22,14 @@ pub fn register() -> CreateCommand {
         .description("Bannir un utilisateur (permanent ou temporaire)")
         .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a bannir")
+            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du ban")
                 .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du ban")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a bannir (ou utilise user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. deja parti du serveur)"),
         )
         .add_option(
             CreateCommandOption::new(
@@ -85,11 +87,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let options = &command.data.options;
 
-    let target_id = match options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
     let reason_raw = options.iter().find(|o| o.name == "reason")

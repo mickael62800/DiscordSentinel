@@ -13,22 +13,22 @@ pub fn register() -> CreateCommand {
         .description("Exporter l'historique de moderation d'un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur dont exporter l'historique")
-                .required(true),
-        )
-        .add_option(
             CreateCommandOption::new(CommandOptionType::String, "format", "Format d'export")
                 .add_string_choice("JSON", "json")
                 .add_string_choice("CSV", "csv"),
         )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur dont exporter l'historique (ou user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let target_id = match command.data.options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
     let format = command.data.options.iter().find(|o| o.name == "format")

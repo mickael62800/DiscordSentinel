@@ -1,5 +1,5 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, warn};
@@ -14,17 +14,17 @@ pub fn register() -> CreateCommand {
         .description("Voir l'historique des sanctions d'un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a verifier")
-                .required(true),
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a verifier (ou utilise user_id)"),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let target_id = match command.data.options.iter().find(|o| o.name == "user")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
     };
 
     let guild_id = match command.guild_id {

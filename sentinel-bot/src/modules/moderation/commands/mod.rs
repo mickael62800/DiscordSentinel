@@ -111,6 +111,46 @@ pub fn has_mod_permission(command: &CommandInteraction, required: Permissions) -
         .unwrap_or(false)
 }
 
+/// Resout l'utilisateur cible d'une commande de modé depuis l'option User
+/// `picker_name` (selecteur de membre) OU une option String `user_id` (ID
+/// brut). Permet de cibler un membre **parti / banni** que le selecteur
+/// Discord ne propose pas. Retourne `None` si aucun des deux n'est fourni.
+pub fn resolve_target_user_id(
+    command: &CommandInteraction,
+    picker_name: &str,
+) -> Option<UserId> {
+    resolve_target_user_id_named(command, picker_name, "user_id")
+}
+
+/// Variante generique : nom du selecteur ET nom du champ ID (pour les
+/// commandes a plusieurs cibles, ex. /compare user1 / user1_id).
+pub fn resolve_target_user_id_named(
+    command: &CommandInteraction,
+    picker_name: &str,
+    id_name: &str,
+) -> Option<UserId> {
+    use serenity::all::CommandDataOptionValue;
+    let opts = &command.data.options;
+    let from_picker = opts
+        .iter()
+        .find(|o| o.name == picker_name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::User(id) => Some(*id),
+            _ => None,
+        });
+    let from_id = opts
+        .iter()
+        .find(|o| o.name == id_name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .map(|s| s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>'))
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(UserId::new);
+    from_picker.or(from_id)
+}
+
 pub fn all() -> Vec<CreateCommand> {
     vec![
         warn::register(),
