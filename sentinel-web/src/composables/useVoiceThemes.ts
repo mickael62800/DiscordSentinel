@@ -1,5 +1,5 @@
-import { ref, watch } from "vue";
 import { useGuildSelector } from "./useGuildSelector";
+import { useGuildFetch } from "./useGuildFetch";
 import { useToast } from "./useToast";
 import { voiceThemesService } from "@/services/voiceChannelsService";
 import type {
@@ -9,30 +9,14 @@ import type {
 } from "@/types/voice-extended";
 
 // Singleton module-scoped : un cache partage entre Table et FormModal.
+// useGuildFetch est concu pour etre hisse au scope module (cache partage).
 const { guildIdFilter } = useGuildSelector();
 
-const themes = ref<VoiceChannelTheme[]>([]);
-const loading = ref(true);
-
-async function fetchThemes() {
-  const { error: showError } = useToast();
-  if (!guildIdFilter.value) {
-    themes.value = [];
-    loading.value = false;
-    return;
-  }
-  loading.value = true;
-  try {
-    themes.value = await voiceThemesService.list(guildIdFilter.value);
-  } catch (e) {
-    console.error(e);
-    showError("Erreur chargement thèmes.");
-  } finally {
-    loading.value = false;
-  }
-}
-
-watch(guildIdFilter, fetchThemes, { immediate: true });
+const { data: themes, loading, refresh: fetchThemes } = useGuildFetch<VoiceChannelTheme[]>(
+  (guildId) => (guildId ? voiceThemesService.list(guildId) : Promise.resolve([])),
+  [],
+  { label: "themes vocaux" },
+);
 
 export function useVoiceThemes() {
   const { success, error: showError } = useToast();
