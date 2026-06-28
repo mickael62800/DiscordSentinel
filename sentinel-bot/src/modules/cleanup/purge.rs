@@ -42,21 +42,27 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
                 "user",
-                "Supprimer les messages d'un utilisateur",
+                "Supprimer les messages d'un utilisateur (par membre OU par ID)",
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::User,
                     "utilisateur",
-                    "Utilisateur cible",
-                )
-                .required(true),
+                    "Membre cible (laisse vide si tu utilises user_id)",
+                ),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "user_id",
+                    "ID de l'utilisateur (utile pour un membre parti / banni)",
+                ),
             )
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Integer,
                     "nombre",
-                    "Nombre de messages a analyser (1-100)",
+                    "Nombre de messages RECENTS a analyser dans le salon (1-100)",
                 )
                 .min_int_value(1)
                 .max_int_value(100)
@@ -266,17 +272,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let filtered: Vec<_> = match sub {
         "last" => messages,
         "user" => {
-            let target_id = sub_opts
+            // Cible : soit le selecteur de membre, soit un ID brut (user_id)
+            // — l'ID marche meme pour un membre parti ou banni.
+            let from_picker = sub_opts
                 .iter()
                 .find(|o| o.name == "utilisateur")
                 .and_then(|o| match &o.value {
                     CommandDataOptionValue::User(id) => Some(*id),
                     _ => None,
                 });
-            match target_id {
+            let from_id = sub_opts
+                .iter()
+                .find(|o| o.name == "user_id")
+                .and_then(|o| o.value.as_str())
+                .map(|s| s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>'))
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(serenity::all::UserId::new);
+            match from_picker.or(from_id) {
                 Some(uid) => messages.into_iter().filter(|m| m.author.id == uid).collect(),
                 None => {
-                    reply_error(ctx, command, "Utilisateur invalide.").await;
+                    reply_error(ctx, command, "Indique un membre (`utilisateur`) **ou** un identifiant (`user_id`).").await;
                     return;
                 }
             }
