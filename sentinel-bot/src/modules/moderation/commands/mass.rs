@@ -41,6 +41,17 @@ pub fn register_massban() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du ban")
                 .required(true),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "purge",
+                "Supprimer les messages recents des bannis (defaut 1 jour)",
+            )
+            .add_int_choice("Aucun message", 0)
+            .add_int_choice("1 jour", 1)
+            .add_int_choice("3 jours", 3)
+            .add_int_choice("7 jours", 7),
+        )
 }
 
 pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
@@ -211,6 +222,11 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Purge des messages (0/1/3/7 j) appliquee a tout le lot ; defaut 1 jour.
+    let delete_days: u8 = command.data.options.iter().find(|o| o.name == "purge")
+        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some((*n).clamp(0, 7) as u8), _ => None })
+        .unwrap_or(1);
+
     let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
         .content(format!("Ban en cours de {} utilisateurs...", user_ids.len()))).await;
 
@@ -234,7 +250,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
             .map(|u| u.name.clone())
             .unwrap_or_else(|_| uid.to_string());
 
-        if guild_id.ban_with_reason(&ctx.http, user_id, 1, reason).await.is_ok() {
+        if guild_id.ban_with_reason(&ctx.http, user_id, delete_days, reason).await.is_ok() {
             success += 1;
             if let Err(e) = api.log_action(&ModerationAction {
                 guild_id: guild_id.to_string(),
