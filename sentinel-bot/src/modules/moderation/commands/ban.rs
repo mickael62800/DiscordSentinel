@@ -36,6 +36,17 @@ pub fn register() -> CreateCommand {
                 "Duree en heures (vide = permanent)",
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "purge",
+                "Supprimer les messages recents du banni (vide = reglage du serveur)",
+            )
+            .add_int_choice("Aucun message", 0)
+            .add_int_choice("1 jour", 1)
+            .add_int_choice("3 jours", 3)
+            .add_int_choice("7 jours", 7),
+        )
 }
 
 pub fn register_unban() -> CreateCommand {
@@ -126,7 +137,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             std::collections::HashMap::new()
         }
     };
-    let ban_delete_message_days = BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
+    // Purge des messages : l'option de commande (0/1/3/7 j, max Discord) prime
+    // sur le reglage serveur `ban_delete_message_days` si le modo l'a choisie.
+    let purge_opt = options.iter().find(|o| o.name == "purge")
+        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
+    let ban_delete_message_days = match purge_opt {
+        Some(n) => n.clamp(0, 7) as u8,
+        None => BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8,
+    };
 
     if let Some(risk_reason) = risk_check::check_target_risk(ctx, guild_id, &target).await {
         defer_with_confirmation(

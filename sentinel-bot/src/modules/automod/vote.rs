@@ -1933,7 +1933,24 @@ pub(super) async fn apply_member_sanction(
         }
         "ban" => {
             if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
-                if let Err(e) = gid.ban(&ctx.http, serenity::model::id::UserId::new(uid), 0).await {
+                // Purge des messages selon le reglage serveur (defaut 1 jour),
+                // comme la commande /ban — au lieu de 0 (aucune suppression).
+                let delete_days: u8 = {
+                    let data = ctx.data.read().await;
+                    match data.get::<crate::shared::heartbeat::ApiClientKey>() {
+                        Some(api) => api
+                            .get_guild_config_for(&gid.to_string(), crate::modules::moderation::MODULE_BOT_NAME)
+                            .await
+                            .ok()
+                            .map(|cfg| crate::shared::api_client::BaseApiClient::config_u64(&cfg, "ban_delete_message_days", 1) as u8)
+                            .unwrap_or(1),
+                        None => 1,
+                    }
+                };
+                if let Err(e) = gid
+                    .ban_with_reason(&ctx.http, serenity::model::id::UserId::new(uid), delete_days, "Sanction AutoMod validee")
+                    .await
+                {
                     warn!(error = %e, user = user_id_str, "Echec ban (sanction validee) -- permission BAN_MEMBERS ?");
                 }
             }
