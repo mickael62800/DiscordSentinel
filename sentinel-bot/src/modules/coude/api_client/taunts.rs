@@ -51,12 +51,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             victim_id: victim_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.track_steal_victim(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, track_steal_victim, req)?;
         Ok(r.event.map(taunt_event_from_proto))
     }
 
@@ -66,11 +61,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.track_steal_defended(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, track_steal_defended, req)
     }
 
     pub async fn set_taunts_opt_out(
@@ -84,11 +75,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             opted_out,
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.set_taunts_opt_out(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, set_taunts_opt_out, req)
     }
 
     // ── Migration 139 : hooks blackjack + eco via HTTP ──
@@ -180,10 +167,6 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             channel_id: channel_id.map(|s| s.to_string()),
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.set_taunts_channel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, set_taunts_channel, req)
     }
 }

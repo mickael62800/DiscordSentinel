@@ -123,12 +123,7 @@ impl ApiClient {
                 })
                 .collect(),
         };
-        let mut client = self.grpc.automod();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.analyze_message(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, automod, analyze_message, req)?;
         Ok(AnalyzeResponse {
             action: proto_action_to_action(resp.action),
             reason: if resp.reason.is_empty() {
@@ -160,12 +155,7 @@ impl ApiClient {
             channel_id: channel_id.to_string(),
             flood_count,
         };
-        let mut client = self.grpc.automod();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.evaluate_flood(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, automod, evaluate_flood, req)?;
         Ok((resp.severe, resp.mute_duration_secs))
     }
 

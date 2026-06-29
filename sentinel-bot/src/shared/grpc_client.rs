@@ -86,6 +86,58 @@ pub enum GrpcCallError {
 ///
 /// La plupart des api_clients de modules s'en servent ; blackjack a une version
 /// custom.
+/// Factorise le boilerplate des appels gRPC via le circuit breaker.
+///
+/// Reproduit exactement le motif repete dans les `api_client` des modules :
+/// ```ignore
+/// let mut client = self.grpc.<service>();
+/// self.grpc
+///     .guarded(|| async move { client.<method>(req).await.map(|r| r.into_inner()) })
+///     .await
+///     .map_err(grpc_err_to_string)
+/// ```
+///
+/// Le premier argument est le handle gRPC (`self.grpc`, `&self.grpc`, `g`...),
+/// evalue deux fois (construction du client + `guarded`), comme dans le code
+/// d'origine. `grpc_err_to_string` est resolu **au site d'appel** (non
+/// qualifie) : les modules qui possedent leur propre version locale (blackjack)
+/// gardent donc leur comportement.
+///
+/// Variantes :
+/// - `grpc_call!(handle, service, method, req)` : reponse unaire ->
+///   `Result<Inner, String>`.
+/// - `grpc_call!(@unit handle, service, method, req)` : ignore le corps ->
+///   `Result<(), String>`.
+/// - `grpc_call!(@raw handle, service, method, req)` : resultat brut
+///   `Result<Inner, GrpcCallError>` (pour post-traitement custom : match
+///   NotFound, `.ok()?`, `.map(...).map_err(...)`...).
+/// - `grpc_call!(@raw_unit handle, service, method, req)` : idem mais corps
+///   ignore -> `Result<(), GrpcCallError>`.
+#[macro_export]
+macro_rules! grpc_call {
+    // Coeur interne : construit l'appel garde avec une transformation du Ok.
+    (@guarded $grpc:expr, $svc:ident, $method:ident, $req:expr, $map:expr) => {{
+        let mut client = $grpc.$svc();
+        $grpc
+            .guarded(|| async move { client.$method($req).await.map($map) })
+            .await
+    }};
+    ($grpc:expr, $svc:ident, $method:ident, $req:expr) => {
+        $crate::grpc_call!(@guarded $grpc, $svc, $method, $req, |r| r.into_inner())
+            .map_err(grpc_err_to_string)
+    };
+    (@unit $grpc:expr, $svc:ident, $method:ident, $req:expr) => {
+        $crate::grpc_call!(@guarded $grpc, $svc, $method, $req, |_| ())
+            .map_err(grpc_err_to_string)
+    };
+    (@raw $grpc:expr, $svc:ident, $method:ident, $req:expr) => {
+        $crate::grpc_call!(@guarded $grpc, $svc, $method, $req, |r| r.into_inner())
+    };
+    (@raw_unit $grpc:expr, $svc:ident, $method:ident, $req:expr) => {
+        $crate::grpc_call!(@guarded $grpc, $svc, $method, $req, |_| ())
+    };
+}
+
 pub fn grpc_err_to_string(e: GrpcCallError) -> String {
     use tonic::Code;
     match e {

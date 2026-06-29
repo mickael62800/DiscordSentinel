@@ -156,10 +156,7 @@ impl TamaApi {
             name: name.to_string(),
             species: species.to_string(),
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        g.guarded(|| async move { c.create_pet(req).await.map(|r| r.into_inner()) })
-            .await
+        crate::grpc_call!(@raw self.grpc, tamagotchi, create_pet, req)
             .map(PetData::from)
             .map_err(grpc_err_to_string)
     }
@@ -170,12 +167,7 @@ impl TamaApi {
             guild_id: guild_id.to_string(),
             owner_id: owner_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        let resp = g
-            .guarded(|| async move { c.get_pet(req).await.map(|r| r.into_inner()) })
-            .await
-            .ok()?;
+        let resp = crate::grpc_call!(@raw self.grpc, tamagotchi, get_pet, req).ok()?;
         resp.pet.map(PetData::from)
     }
 
@@ -191,10 +183,7 @@ impl TamaApi {
             cooldown_secs: args.cooldown_secs,
             cure: args.cure,
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        g.guarded(|| async move { c.care_pet(req).await.map(|r| r.into_inner()) })
-            .await
+        crate::grpc_call!(@raw self.grpc, tamagotchi, care_pet, req)
             .map(PetData::from)
             .map_err(grpc_err_to_string)
     }
@@ -208,10 +197,7 @@ impl TamaApi {
             stat_gain: args.stat_gain,
             cooldown_secs: args.cooldown_secs,
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        g.guarded(|| async move { c.train_pet(req).await.map(|r| r.into_inner()) })
-            .await
+        crate::grpc_call!(@raw self.grpc, tamagotchi, train_pet, req)
             .map(PetData::from)
             .map_err(grpc_err_to_string)
     }
@@ -227,10 +213,7 @@ impl TamaApi {
             cooldown_secs: args.cooldown_secs,
             max_per_day: args.max_per_day,
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        g.guarded(|| async move { c.visit(req).await.map(|r| r.into_inner()) })
-            .await
+        crate::grpc_call!(@raw self.grpc, tamagotchi, visit, req)
             .map(|r| VisitData {
                 target_name: r.target_name,
                 xp_reward: r.xp_reward,
@@ -255,10 +238,7 @@ impl TamaApi {
             w_agi: args.w_agi,
             random_max: args.random_max,
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        g.guarded(|| async move { c.combat(req).await.map(|r| r.into_inner()) })
-            .await
+        crate::grpc_call!(@raw self.grpc, tamagotchi, combat, req)
             .map(|r| CombatData {
                 attacker_won: r.attacker_won,
                 attacker_power: r.attacker_power,
@@ -284,12 +264,7 @@ impl TamaApi {
             channel_id: channel_id.to_string(),
             message_id: message_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        if let Err(e) = g
-            .guarded(|| async move { c.set_card_location(req).await.map(|_| ()) })
-            .await
-        {
+        if let Err(e) = crate::grpc_call!(@raw_unit self.grpc, tamagotchi, set_card_location, req) {
             warn!(error = %grpc_err_to_string(e), "Echec set_card_location gRPC");
         }
     }
@@ -304,12 +279,7 @@ impl TamaApi {
             limit: 500,
             after_id: None,
         };
-        let g = &self.grpc;
-        let mut c = g.tamagotchi();
-        let mut stream = g
-            .guarded(|| async move { c.list_cards(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let mut stream = crate::grpc_call!(self.grpc, tamagotchi, list_cards, req)?;
 
         let mut out = Vec::new();
         while let Some(card) = stream

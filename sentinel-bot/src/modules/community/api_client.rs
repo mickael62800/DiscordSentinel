@@ -102,12 +102,7 @@ impl ApiClient {
         let req = proto::ListAutoRolesRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.role_panels();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_auto_roles(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, role_panels, list_auto_roles, req)?;
         Ok(list.roles.into_iter().map(proto_auto_role_to_dto).collect())
     }
 
@@ -116,23 +111,14 @@ impl ApiClient {
             panel_id: panel_id.to_string(),
             message_id: message_id.to_string(),
         };
-        let mut client = self.grpc.role_panels();
-        self.grpc
-            .guarded(|| async move { client.set_message_id(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, role_panels, set_message_id, req)
     }
 
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, String> {
         let req = proto::ListPanelsRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.role_panels();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_panels(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, role_panels, list_panels, req)?;
         Ok(list.panels.into_iter().map(proto_panel_to_dto).collect())
     }
 
@@ -140,12 +126,7 @@ impl ApiClient {
         let req = proto::GetPanelRequest {
             panel_id: panel_id.to_string(),
         };
-        let mut client = self.grpc.role_panels();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.get_panel(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, role_panels, get_panel, req)?;
         Ok(resp.panel.map(proto_detail_to_dto))
     }
 
@@ -205,12 +186,7 @@ impl ApiClient {
         let req = proto_community::ListTempRolesRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.community();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_temp_roles(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, community, list_temp_roles, req)?;
         Ok(list
             .roles
             .into_iter()
@@ -247,11 +223,7 @@ impl ApiClient {
                 })
                 .collect(),
         };
-        let mut client = self.grpc.role_panels();
-        self.grpc
-            .guarded(|| async move { client.sync_discord_roles(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, role_panels, sync_discord_roles, req)
     }
 
     pub async fn delete_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str) {
@@ -260,12 +232,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             role_id: role_id.to_string(),
         };
-        let mut client = self.grpc.community();
-        if let Err(e) = self
-            .grpc
-            .guarded(|| async move { client.delete_temp_role(req).await.map(|_| ()) })
-            .await
-        {
+        if let Err(e) = crate::grpc_call!(@raw_unit self.grpc, community, delete_temp_role, req) {
             tracing::warn!(error = ?e, "Failed to delete temp role");
         }
     }

@@ -31,17 +31,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             username: username.to_string(),
         };
-        let mut client = self.grpc.coude_players();
-        let p = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_or_create_player(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let p = crate::grpc_call!(self.grpc, coude_players, get_or_create_player, req)?;
         Ok(proto_player_to_dto(p))
     }
 
@@ -54,11 +44,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_players();
-        let result = self
-            .grpc
-            .guarded(|| async move { client.get_player(req).await.map(|r| r.into_inner()) })
-            .await;
+        let result = crate::grpc_call!(@raw self.grpc, coude_players, get_player, req);
         match result {
             Ok(p) => Ok(Some(proto_player_to_dto(p))),
             Err(GrpcCallError::Status(s)) if s.code() == tonic::Code::NotFound => Ok(None),
@@ -77,11 +63,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             class: class.to_string(),
         };
-        let mut client = self.grpc.coude_players();
-        self.grpc
-            .guarded(|| async move { client.update_player_class(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_players, update_player_class, req)
     }
 
     pub async fn add_xp(
@@ -95,12 +77,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_players();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.add_xp(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_players, add_xp, req)?;
         Ok((r.new_xp, r.new_level, r.leveled_up, r.stat_points_gained))
     }
 
@@ -248,11 +225,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             delta,
         };
-        let mut client = self.grpc.coude_players();
-        self.grpc
-            .guarded(|| async move { client.adjust_coins(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        crate::grpc_call!(@unit self.grpc, coude_players, adjust_coins, req)?;
         // Refresh player state.
         self.get_or_create_player(guild_id, user_id, "").await
     }
@@ -271,11 +244,7 @@ impl ApiClient {
                 user_id: user_id.to_string(),
                 delta,
             };
-            let mut client = self.grpc.coude_players();
-            self.grpc
-                .guarded(|| async move { client.adjust_coins(req).await.map(|_| ()) })
-                .await
-                .map_err(grpc_err_to_string)?;
+            crate::grpc_call!(@unit self.grpc, coude_players, adjust_coins, req)?;
         }
         Ok(())
     }
@@ -293,11 +262,7 @@ impl ApiClient {
             hp_current,
             hp_max,
         };
-        let mut client = self.grpc.coude_players();
-        self.grpc
-            .guarded(|| async move { client.update_hp(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_players, update_hp, req)
     }
 
     /// HTTP : pas d'equivalent proto. On attend la reponse complete

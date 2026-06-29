@@ -110,12 +110,7 @@ impl ApiClient {
                 limit: PAGE_SIZE,
                 offset,
             };
-            let mut client = self.grpc.tickets();
-            let list = self
-                .grpc
-                .guarded(|| async move { client.list_tickets(req).await.map(|r| r.into_inner()) })
-                .await
-                .map_err(grpc_err_to_string)?;
+            let list = crate::grpc_call!(self.grpc, tickets, list_tickets, req)?;
             let returned = list.tickets.len();
             out.extend(list.tickets.into_iter().map(proto_ticket_to_dto));
             if returned < PAGE_SIZE as usize {
@@ -137,24 +132,14 @@ impl ApiClient {
             ticket_type: request.ticket_type.clone(),
             channel_id: request.channel_id.clone(),
         };
-        let mut client = self.grpc.tickets();
-        let t = self
-            .grpc
-            .guarded(|| async move { client.create_ticket(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let t = crate::grpc_call!(self.grpc, tickets, create_ticket, req)?;
         Ok(proto_ticket_to_dto(t))
     }
 
     #[allow(dead_code)]
     pub async fn get_ticket(&self, id: &str) -> Result<TicketDetail, String> {
         let req = proto::GetTicketDetailRequest { id: id.to_string() };
-        let mut client = self.grpc.tickets();
-        let detail = self
-            .grpc
-            .guarded(|| async move { client.get_ticket_detail(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let detail = crate::grpc_call!(self.grpc, tickets, get_ticket_detail, req)?;
         Ok(proto_ticket_detail_to_dto(detail))
     }
 
@@ -171,11 +156,7 @@ impl ApiClient {
             author_name: author_name.to_string(),
             author_role: author_role.to_string(),
         };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.reply_ticket(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, tickets, reply_ticket, req)
     }
 
     #[allow(dead_code)]
@@ -184,20 +165,12 @@ impl ApiClient {
             id: id.to_string(),
             status: status.to_string(),
         };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.update_status(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, tickets, update_status, req)
     }
 
     pub async fn close_ticket(&self, id: &str) -> Result<(), String> {
         let req = proto::CloseTicketRequest { id: id.to_string() };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.close_ticket(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, tickets, close_ticket, req)
     }
 
     #[allow(dead_code)]
@@ -206,11 +179,7 @@ impl ApiClient {
             ticket_id: id.to_string(),
             assignee: assignee.to_string(),
         };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.assign_ticket(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, tickets, assign_ticket, req)
     }
 
     pub async fn update_ticket_channel(
@@ -224,11 +193,7 @@ impl ApiClient {
             voice_channel_id,
             invited_user_id,
         };
-        let mut client = self.grpc.tickets();
-        self.grpc
-            .guarded(|| async move { client.update_ticket_channel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, tickets, update_ticket_channel, req)
     }
 
     pub async fn update_ticket_sla(
@@ -244,13 +209,8 @@ impl ApiClient {
             resolved_at: resolved_at.map(|s| s.to_string()),
             satisfaction_rating: satisfaction_rating.map(|r| r as i32),
         };
-        let mut client = self.grpc.tickets();
         let id_owned = id.to_string();
-        if let Err(e) = self
-            .grpc
-            .guarded(|| async move { client.update_sla(req).await.map(|_| ()) })
-            .await
-        {
+        if let Err(e) = crate::grpc_call!(@raw_unit self.grpc, tickets, update_sla, req) {
             tracing::warn!(ticket_id = %id_owned, error = %grpc_err_to_string(e), "UpdateSla a echoue");
         }
     }

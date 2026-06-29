@@ -73,12 +73,7 @@ impl ApiClient {
         let req = proto_security::ListEventsRequest {
             guild_id: Some(guild_id.to_string()),
         };
-        let mut client = self.grpc.security();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_events(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, security, list_events, req)?;
         // Le proto ne porte pas de champ `limit` : on tronque cote client.
         // Les evenements sont supposes etre retournes les plus recents d'abord.
         Ok(list
@@ -107,11 +102,7 @@ impl ApiClient {
             description: event.description.clone(),
             user_ids: event.user_ids.clone(),
         };
-        let mut client = self.grpc.security();
-        self.grpc
-            .guarded(|| async move { client.report_event(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, security, report_event, req)
     }
 
     // ── Members CRUD (gRPC) ──
@@ -125,22 +116,14 @@ impl ApiClient {
                 .map(member_payload_to_proto)
                 .collect::<Result<Vec<_>, String>>()?,
         };
-        let mut client = self.grpc.members();
-        self.grpc
-            .guarded(|| async move { client.sync_members(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, members, sync_members, req)
     }
 
     pub async fn register_member(&self, member: &MemberPayload) -> Result<(), String> {
         let req = proto_members::RegisterMemberRequest {
             member: Some(member_payload_to_proto(member)?),
         };
-        let mut client = self.grpc.members();
-        self.grpc
-            .guarded(|| async move { client.register_member(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, members, register_member, req)
     }
 
     /// Hard-delete d'un membre (gRPC). Plus appele sur depart de membre (on
@@ -152,11 +135,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.members();
-        self.grpc
-            .guarded(|| async move { client.remove_member(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, members, remove_member, req)
     }
 
     pub async fn update_member(
@@ -179,11 +158,7 @@ impl ApiClient {
             avatar: payload.avatar.clone(),
             roles_json,
         };
-        let mut client = self.grpc.members();
-        self.grpc
-            .guarded(|| async move { client.update_member(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, members, update_member, req)
     }
 
     // ── Analyse nouveau membre (gRPC) ──
@@ -214,12 +189,7 @@ impl ApiClient {
                 })
                 .collect(),
         };
-        let mut client = self.grpc.security();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.analyze_new_member(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, security, analyze_new_member, req)?;
         Ok(SecurityDecisionResponse {
             is_raid: resp.is_raid,
             raid_score: resp.raid_score,

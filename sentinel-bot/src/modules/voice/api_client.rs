@@ -185,12 +185,7 @@ impl ApiClient {
         let req = proto::ListChannelsRequest {
             guild_id: guild_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let list = g
-            .guarded(|| async move { client.list_channels(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, voice_channels, list_channels, req)?;
         Ok(list.channels.into_iter().map(proto_to_response).collect())
     }
 
@@ -212,12 +207,7 @@ impl ApiClient {
             visibility: request.visibility.clone(),
             queue_enabled: request.queue_enabled,
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let c = g
-            .guarded(|| async move { client.create_channel(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let c = crate::grpc_call!(self.grpc, voice_channels, create_channel, req)?;
         Ok(proto_to_response(c))
     }
 
@@ -225,11 +215,7 @@ impl ApiClient {
         let req = proto::DeleteChannelRequest {
             channel_id: channel_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.delete_channel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, delete_channel, req)
     }
 
     pub async fn update_channel(
@@ -252,11 +238,7 @@ impl ApiClient {
                 .clone()
                 .map(|opt| proto::QueueChannelUpdate { value: opt }),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.update_channel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, update_channel, req)
     }
 
     pub async fn get_channel(
@@ -266,12 +248,7 @@ impl ApiClient {
         let req = proto::GetChannelRequest {
             channel_id: channel_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let resp = g
-            .guarded(|| async move { client.get_channel(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, voice_channels, get_channel, req)?;
         Ok(resp.channel.map(proto_to_response))
     }
 
@@ -280,12 +257,7 @@ impl ApiClient {
         let req = proto::GetChannelRequest {
             channel_id: channel_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let resp = g
-            .guarded(|| async move { client.get_channel(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, voice_channels, get_channel, req)?;
         Ok(resp.co_admins.into_iter().map(|ca| ca.user_id).collect())
     }
 
@@ -301,11 +273,7 @@ impl ApiClient {
             new_owner_id: request.new_owner_id.clone(),
             new_owner_name: request.new_owner_name.clone(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.transfer_ownership(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, transfer_ownership, req)
     }
 
     // ── Co-admins ──
@@ -320,11 +288,7 @@ impl ApiClient {
             user_id: request.user_id.clone(),
             user_name: request.user_name.clone(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.add_co_admin(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, add_co_admin, req)
     }
 
     // ── Whitelist ──
@@ -336,11 +300,7 @@ impl ApiClient {
             target_id: request.target_id.clone(),
             target_name: request.target_name.clone(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.add_to_whitelist(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, add_to_whitelist, req)
     }
 
     // ── Presets + whitelist (HTTP via BaseApiClient) ──
@@ -351,12 +311,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             owner_id: owner_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let resp = g
-            .guarded(|| async move { client.get_preset(req).await.map(|r| r.into_inner()) })
-            .await
-            .ok()?;
+        let resp = crate::grpc_call!(@raw self.grpc, voice_channels, get_preset, req).ok()?;
         resp.preset.map(|p| VoicePresetResponse {
             owner_id: p.owner_id,
             channel_name: p.channel_name,
@@ -378,12 +333,7 @@ impl ApiClient {
             locked: request.locked,
             queue_enabled: request.queue_enabled,
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        if let Err(e) = g
-            .guarded(|| async move { client.save_preset(req).await.map(|_| ()) })
-            .await
-        {
+        if let Err(e) = crate::grpc_call!(@raw_unit self.grpc, voice_channels, save_preset, req) {
             tracing::warn!(error = %grpc_err_to_string(e), "Echec save_preset gRPC");
         }
     }
@@ -398,12 +348,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             owner_id: owner_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        match g
-            .guarded(|| async move { client.get_whitelist(req).await.map(|r| r.into_inner()) })
-            .await
-        {
+        match crate::grpc_call!(@raw self.grpc, voice_channels, get_whitelist, req) {
             Ok(list) => list
                 .entries
                 .into_iter()
@@ -431,11 +376,7 @@ impl ApiClient {
             reason: request.reason.clone(),
             duration_secs: request.duration_secs,
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        g.guarded(|| async move { client.ban_from_channel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, voice_channels, ban_from_channel, req)
     }
 
     // ── Moderation log (reuse ModerationService.LogAction) ──
@@ -456,11 +397,7 @@ impl ApiClient {
             gravity: None,
             duration: request.duration.map(|d| d as u64),
         };
-        let g = &self.grpc;
-        let mut client = g.moderation();
-        g.guarded(|| async move { client.log_action(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, moderation, log_action, req)
     }
 
     // ── Config voice-bot par guild (gRPC) ──
@@ -469,12 +406,7 @@ impl ApiClient {
         let req = proto::GetVoiceConfigRequest {
             guild_id: guild_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let cfg = g
-            .guarded(|| async move { client.get_voice_config(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let cfg = crate::grpc_call!(self.grpc, voice_channels, get_voice_config, req)?;
         Ok(VoiceConfigResponse {
             creation_cooldown_secs: cfg.creation_cooldown_secs,
             flood_max_messages: cfg.flood_max_messages,
@@ -490,12 +422,7 @@ impl ApiClient {
         let req = proto::ListThemesRequest {
             guild_id: guild_id.to_string(),
         };
-        let g = &self.grpc;
-        let mut client = g.voice_channels();
-        let list = g
-            .guarded(|| async move { client.list_themes(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, voice_channels, list_themes, req)?;
         Ok(list
             .themes
             .into_iter()

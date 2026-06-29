@@ -143,11 +143,7 @@ impl ApiClient {
             username: username.to_string(),
             count,
         };
-        let mut client = self.grpc.stats();
-        self.grpc
-            .guarded(|| async move { client.record_messages(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, stats, record_messages, req)
     }
 
     pub async fn record_voice(
@@ -167,11 +163,7 @@ impl ApiClient {
             channel_id: channel_id.to_string(),
             channel_name: channel_name.to_string(),
         };
-        let mut client = self.grpc.stats();
-        self.grpc
-            .guarded(|| async move { client.record_voice(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, stats, record_voice, req)
     }
 
     pub async fn get_user_stats(
@@ -183,12 +175,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.stats();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.get_user_stats(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, stats, get_user_stats, req)?;
         Ok(resp.stats.map(proto_user_stats_to_response))
     }
 
@@ -199,12 +186,7 @@ impl ApiClient {
         let req = proto_stats::GetGuildOverviewRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.stats();
-        let overview = self
-            .grpc
-            .guarded(|| async move { client.get_guild_overview(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let overview = crate::grpc_call!(self.grpc, stats, get_guild_overview, req)?;
         Ok(GuildOverviewResponse {
             guild_id: overview.guild_id,
             total_messages: overview.total_messages,
@@ -232,12 +214,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             limit,
         };
-        let mut client = self.grpc.stats();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.get_leaderboard(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, stats, get_leaderboard, req)?;
         Ok(list
             .users
             .into_iter()
@@ -262,12 +239,7 @@ impl ApiClient {
             amount,
             source: xp_source_str_to_proto(source),
         };
-        let mut client = self.grpc.progression();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.add_xp(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, progression, add_xp, req)?;
         Ok(proto_add_xp_to_response(resp))
     }
 
@@ -280,11 +252,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.progression();
-        let result = self
-            .grpc
-            .guarded(|| async move { client.get_user_level(req).await.map(|r| r.into_inner()) })
-            .await;
+        let result = crate::grpc_call!(@raw self.grpc, progression, get_user_level, req);
         match result {
             Ok(level) => Ok(Some(proto_user_level_to_response(level))),
             Err(GrpcCallError::Status(s)) if s.code() == tonic::Code::NotFound => Ok(None),
@@ -305,12 +273,7 @@ impl ApiClient {
                 .map(xp_source_str_to_proto)
                 .unwrap_or(proto_common::XpSource::Unspecified as i32),
         };
-        let mut client = self.grpc.progression();
-        let board = self
-            .grpc
-            .guarded(|| async move { client.get_leaderboard(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let board = crate::grpc_call!(self.grpc, progression, get_leaderboard, req)?;
         Ok(board
             .users
             .into_iter()

@@ -15,12 +15,7 @@ impl ApiClient {
         let req = proto_coude::GetCashboxRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.get_cashbox(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, get_cashbox, req)?;
         Ok(Cashbox {
             guild_id: r.guild_id,
             balance: r.balance,
@@ -47,10 +42,6 @@ impl ApiClient {
             amount,
             source: source.as_proto() as i32,
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.deposit_cashbox(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, deposit_cashbox, req)
     }
 }

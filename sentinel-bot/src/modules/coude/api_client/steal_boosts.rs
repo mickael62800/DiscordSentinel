@@ -18,12 +18,7 @@ impl ApiClient {
             item_key: item_key.to_string(),
             duration: duration.as_proto() as i32,
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.price_steal_boost(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, price_steal_boost, req)?;
         Ok(r.value)
     }
 
@@ -40,12 +35,7 @@ impl ApiClient {
             item_key: item_key.to_string(),
             duration: duration.as_proto() as i32,
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.buy_steal_boost(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, buy_steal_boost, req)?;
         Ok((r.cost, r.expires_at))
     }
 
@@ -61,17 +51,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_steal_boost_total(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, get_steal_boost_total, req)?;
         Ok(r.value as i32)
     }
 }

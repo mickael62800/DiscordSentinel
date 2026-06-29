@@ -138,11 +138,7 @@ impl WelcomeApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.members();
-        let result = self
-            .grpc
-            .guarded(|| async move { client.get_member(req).await.map(|r| r.into_inner()) })
-            .await;
+        let result = crate::grpc_call!(@raw self.grpc, members, get_member, req);
         match result {
             Ok(resp) => resp.member.is_some(),
             Err(_) => false,

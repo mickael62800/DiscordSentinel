@@ -24,11 +24,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             gain,
         };
-        let mut client = self.grpc.coude_economy();
-        self.grpc
-            .guarded(|| async move { client.record_casino_win(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_economy, record_casino_win, req)
     }
 
     pub async fn record_casino_loss(
@@ -42,11 +38,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             lost,
         };
-        let mut client = self.grpc.coude_economy();
-        self.grpc
-            .guarded(|| async move { client.record_casino_loss(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_economy, record_casino_loss, req)
     }
 
     pub async fn record_casino_faillite(
@@ -58,17 +50,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .record_casino_faillite(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, record_casino_faillite, req)?;
         Ok(r.cleared_coins)
     }
 
@@ -77,12 +59,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.count_casino_today(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, count_casino_today, req)?;
         Ok(r.value.max(0) as u64)
     }
 
@@ -95,17 +72,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .sum_casino_gains_today(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, sum_casino_gains_today, req)?;
         Ok(r.value)
     }
 
@@ -114,12 +81,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.count_steal_today(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, count_steal_today, req)?;
         Ok(r.value.max(0) as u64)
     }
 
@@ -143,12 +105,7 @@ impl ApiClient {
             to_id: to_id.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_economy();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.transfer(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_economy, transfer, req)?;
         Ok(resp
             .taunt_events
             .into_iter()
@@ -175,12 +132,7 @@ impl ApiClient {
             tax_rate,
             min_coins_after,
         };
-        let mut client = self.grpc.coude_economy();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.gift_coins(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_economy, gift_coins, req)?;
         Ok((
             resp.received,
             resp.tax,
@@ -211,12 +163,7 @@ impl ApiClient {
             victim_id: victim_id.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.steal(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, steal, req)?;
         let taunts = r
             .taunt_events
             .into_iter()
@@ -240,12 +187,7 @@ impl ApiClient {
             thief_id: thief_id.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_economy();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.steal_fail_penalty(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_economy, steal_fail_penalty, req)?;
         let taunts = r
             .taunt_events
             .into_iter()

@@ -147,12 +147,7 @@ impl ApiClient {
             gravity: action.gravity.clone(),
             duration: action.duration,
         };
-        let mut client = self.grpc.moderation();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.log_action(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, moderation, log_action, req)?;
         Ok(ModerationActionResponse {
             id: resp.id,
             action_type: resp.action_type,
@@ -173,12 +168,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.moderation();
-        let history = self
-            .grpc
-            .guarded(|| async move { client.get_history(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let history = crate::grpc_call!(self.grpc, moderation, get_history, req)?;
         Ok(UserHistory {
             target_id: history.target_id,
             target_name: history.target_name,

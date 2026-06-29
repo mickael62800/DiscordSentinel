@@ -15,12 +15,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.attempt_heist(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, attempt_heist, req)?;
         Ok(HeistResult {
             success: r.success,
             chance_percent: r.chance_percent,
@@ -40,12 +35,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.get_heist_cooldown(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, get_heist_cooldown, req)?;
         Ok(HeistCooldown {
             ready: r.ready,
             next_attempt_at: r.next_attempt_at,
@@ -62,12 +52,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.get_prison_status(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, get_prison_status, req)?;
         Ok(PrisonStatus {
             in_prison: r.in_prison,
             released_at: r.released_at,

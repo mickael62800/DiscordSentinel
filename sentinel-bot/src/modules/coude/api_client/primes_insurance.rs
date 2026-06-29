@@ -35,12 +35,7 @@ impl ApiClient {
             placed_by_name: placed_by_name.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_inventory();
-        let p = self
-            .grpc
-            .guarded(|| async move { client.create_prime(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let p = crate::grpc_call!(self.grpc, coude_inventory, create_prime, req)?;
         Ok(proto_prime_to_dto(p))
     }
 
@@ -53,12 +48,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             target_id: target_id.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_active_primes(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_inventory, list_active_primes, req)?;
         Ok(list.primes.into_iter().map(proto_prime_to_dto).collect())
     }
 
@@ -75,12 +65,7 @@ impl ApiClient {
             claimer_id: claimer_id.to_string(),
             claimer_name: claimer_name.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.claim_primes(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, claim_primes, req)?;
         Ok(r.value)
     }
 
@@ -99,11 +84,7 @@ impl ApiClient {
             duration_seconds,
             level,
         };
-        let mut client = self.grpc.coude_inventory();
-        self.grpc
-            .guarded(|| async move { client.buy_insurance(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_inventory, buy_insurance, req)
     }
 
     /// Phase 2 #3 audit : RNG scam decide cote API. Le bot envoie le taux
@@ -146,17 +127,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_active_insurance(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, get_active_insurance, req)?;
         Ok(r.insurance.map(|i| Insurance {
             id: i.id,
             is_scam: i.is_scam,
@@ -168,10 +139,6 @@ impl ApiClient {
         let req = proto_coude::ExpireInsuranceRequest {
             insurance_id: id.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        self.grpc
-            .guarded(|| async move { client.expire_insurance(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_inventory, expire_insurance, req)
     }
 }

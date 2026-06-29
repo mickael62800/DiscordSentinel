@@ -14,12 +14,7 @@ impl ApiClient {
         let req = proto_coude::CurrentSeasonRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let s = self
-            .grpc
-            .guarded(|| async move { client.current_season(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let s = crate::grpc_call!(self.grpc, coude_social, current_season, req)?;
         Ok(CurrentSeason {
             season_number: s.season_number,
             started_at: s.started_at,
@@ -44,23 +39,14 @@ impl ApiClient {
             winner_name: winner_name.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.log_daily_chaos(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, log_daily_chaos, req)
     }
 
     pub async fn get_active_events(&self, guild_id: &str) -> Result<Vec<ServerEvent>, String> {
         let req = proto_coude::ListActiveEventsRequest {
             guild_id: guild_id.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_active_events(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_social, list_active_events, req)?;
         Ok(list
             .events
             .into_iter()

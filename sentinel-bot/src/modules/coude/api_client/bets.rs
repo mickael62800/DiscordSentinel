@@ -33,12 +33,7 @@ impl ApiClient {
             backed_id: backed_id.to_string(),
             amount,
         };
-        let mut client = self.grpc.coude_bets();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.place(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_bets, place, req)?;
         Ok(resp
             .taunt_events
             .into_iter()
@@ -50,12 +45,7 @@ impl ApiClient {
         let req = proto_coude::ListForCombatRequest {
             combat_id: combat_id.to_string(),
         };
-        let mut client = self.grpc.coude_bets();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_for_combat(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_bets, list_for_combat, req)?;
         Ok(list
             .bets
             .into_iter()
@@ -79,17 +69,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_betting_for_participant(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_combats, get_betting_for_participant, req)?;
         Ok(r.combat.map(proto_combat_to_dto))
     }
 
@@ -104,12 +84,7 @@ impl ApiClient {
             combat_id: combat_id.to_string(),
             winner_id: winner_id.map(str::to_string),
         };
-        let mut client = self.grpc.coude_bets();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.resolve(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_bets, resolve, req)?;
         let plan = resp.plan.unwrap_or_default();
         let results = plan
             .payouts
@@ -142,12 +117,7 @@ impl ApiClient {
         let req = proto_coude::RefundBetsRequest {
             combat_id: combat_id.to_string(),
         };
-        let mut client = self.grpc.coude_bets();
-        let s = self
-            .grpc
-            .guarded(|| async move { client.refund(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let s = crate::grpc_call!(self.grpc, coude_bets, refund, req)?;
         Ok((s.refunded_count as usize, s.refunded_total))
     }
 }

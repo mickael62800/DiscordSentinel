@@ -21,11 +21,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             item_key: item_key.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        self.grpc
-            .guarded(|| async move { client.add_item(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_inventory, add_item, req)
     }
 
     pub async fn get_inventory(
@@ -37,12 +33,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_inventory(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_inventory, list_inventory, req)?;
         Ok(list
             .items
             .into_iter()
@@ -66,12 +57,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             item_key: item_key.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.use_item(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, use_item, req)?;
         Ok(r.consumed)
     }
 
@@ -86,12 +72,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             item_key: item_key.to_string(),
         };
-        let mut client = self.grpc.coude_inventory();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.has_item(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_inventory, has_item, req)?;
         Ok(r.value)
     }
 }

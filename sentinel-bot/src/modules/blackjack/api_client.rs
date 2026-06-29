@@ -149,12 +149,7 @@ impl ApiClient {
             username: username.to_string(),
             bet,
         };
-        let mut client = self.grpc.blackjack();
-        let result = self
-            .grpc
-            .guarded(|| async move { client.start_game(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let result = crate::grpc_call!(self.grpc, blackjack, start_game, req)?;
         Ok(proto_result_to_dto(result))
     }
 
@@ -212,12 +207,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.blackjack();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.get_active(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, blackjack, get_active, req)?;
         Ok(resp.game.map(proto_game_to_dto))
     }
 
@@ -228,12 +218,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
         };
-        let mut client = self.grpc.blackjack();
-        let w = self
-            .grpc
-            .guarded(|| async move { client.get_wallet(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let w = crate::grpc_call!(self.grpc, blackjack, get_wallet, req)?;
         Ok(WalletDto {
             id: w.id,
             guild_id: w.guild_id,

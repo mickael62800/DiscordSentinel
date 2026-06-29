@@ -20,12 +20,7 @@ impl ApiClient {
             category: category as i32,
             limit,
         };
-        let mut client = self.grpc.coude_social();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.leaderboard(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_social, leaderboard, req)?;
         Ok(list
             .entries
             .into_iter()

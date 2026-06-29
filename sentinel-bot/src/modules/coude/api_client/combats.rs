@@ -40,22 +40,13 @@ impl ApiClient {
             mise,
             special_attack: special_attack.map(str::to_string),
         };
-        let mut client = self.grpc.coude_combats();
-        let c = self
-            .grpc
-            .guarded(|| async move { client.create(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let c = crate::grpc_call!(self.grpc, coude_combats, create, req)?;
         Ok(proto_combat_to_dto(c))
     }
 
     pub async fn get_combat(&self, id: &str) -> Result<Option<Combat>, String> {
         let req = proto_coude::GetCombatRequest { id: id.to_string() };
-        let mut client = self.grpc.coude_combats();
-        let result = self
-            .grpc
-            .guarded(|| async move { client.get(req).await.map(|r| r.into_inner()) })
-            .await;
+        let result = crate::grpc_call!(@raw self.grpc, coude_combats, get, req);
         match result {
             Ok(c) => Ok(Some(proto_combat_to_dto(c))),
             Err(GrpcCallError::Status(s)) if s.code() == tonic::Code::NotFound => Ok(None),
@@ -72,17 +63,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             attacker_id: attacker_id.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_pending_for_attacker(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_combats, get_pending_for_attacker, req)?;
         Ok(r.combat.map(proto_combat_to_dto))
     }
 
@@ -95,17 +76,7 @@ impl ApiClient {
             guild_id: guild_id.to_string(),
             defender_id: defender_id.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        let r = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_pending_for_defender(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_combats, get_pending_for_defender, req)?;
         Ok(r.combat.map(proto_combat_to_dto))
     }
 
@@ -130,11 +101,7 @@ impl ApiClient {
             result_message: result_message.map(str::to_string),
             coins_transferred,
         };
-        let mut client = self.grpc.coude_combats();
-        self.grpc
-            .guarded(|| async move { client.resolve(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_combats, resolve, req)
     }
 
     /// Phase 8 : recupere le catalogue complet Coude (classes, shop,
@@ -145,12 +112,7 @@ impl ApiClient {
         &self,
     ) -> Result<crate::modules::coude::catalog::CatalogCache, String> {
         let req = proto_coude::Empty {};
-        let mut client = self.grpc.coude_social();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.get_catalog(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_social, get_catalog, req)?;
         Ok(crate::modules::coude::catalog::CatalogCache {
             classes: resp
                 .classes
@@ -223,12 +185,7 @@ impl ApiClient {
         let req = proto_coude::ResolveCombatNowRequest {
             combat_id: combat_id.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        let resp = self
-            .grpc
-            .guarded(|| async move { client.resolve_combat_now(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let resp = crate::grpc_call!(self.grpc, coude_combats, resolve_combat_now, req)?;
         Ok(ResolvedCombatEmbed {
             title: resp.title,
             description: resp.description,
@@ -261,22 +218,13 @@ impl ApiClient {
             id: id.to_string(),
             message_id: message_id.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.set_betting(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_combats, set_betting, req)?;
         Ok(r.transitioned)
     }
 
     pub async fn expire_combat(&self, id: &str) -> Result<(), String> {
         let req = proto_coude::ExpireCombatRequest { id: id.to_string() };
-        let mut client = self.grpc.coude_combats();
-        self.grpc
-            .guarded(|| async move { client.expire(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_combats, expire, req)
     }
 
     /// Annule un combat SEULEMENT s il est encore en `pending`.
@@ -285,11 +233,7 @@ impl ApiClient {
     /// `betting` (accepte concurremment par le defenseur).
     pub async fn cancel_combat(&self, id: &str) -> Result<(), String> {
         let req = proto_coude::CancelCombatRequest { id: id.to_string() };
-        let mut client = self.grpc.coude_combats();
-        self.grpc
-            .guarded(|| async move { client.cancel(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_combats, cancel, req)
     }
 
     pub async fn set_defender_special(&self, id: &str, item_key: &str) -> Result<(), String> {
@@ -297,26 +241,12 @@ impl ApiClient {
             id: id.to_string(),
             item_key: item_key.to_string(),
         };
-        let mut client = self.grpc.coude_combats();
-        self.grpc
-            .guarded(|| async move { client.set_defender_special(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_combats, set_defender_special, req)
     }
 
     pub async fn get_expired_combats(&self) -> Result<Vec<Combat>, String> {
         let req = proto_coude::Empty {};
-        let mut client = self.grpc.coude_combats();
-        let list = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .list_expired_pending(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let list = crate::grpc_call!(self.grpc, coude_combats, list_expired_pending, req)?;
         Ok(list.combats.into_iter().map(proto_combat_to_dto).collect())
     }
     pub async fn check_cooldown(
@@ -330,12 +260,7 @@ impl ApiClient {
             user_id: user_id.to_string(),
             action: action.to_string(),
         };
-        let mut client = self.grpc.coude_social();
-        let r = self
-            .grpc
-            .guarded(|| async move { client.check_cooldown(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
+        let r = crate::grpc_call!(self.grpc, coude_social, check_cooldown, req)?;
         Ok(r.available_at)
     }
 
@@ -352,10 +277,6 @@ impl ApiClient {
             action: action.to_string(),
             duration_secs,
         };
-        let mut client = self.grpc.coude_social();
-        self.grpc
-            .guarded(|| async move { client.set_cooldown(req).await.map(|_| ()) })
-            .await
-            .map_err(grpc_err_to_string)
+        crate::grpc_call!(@unit self.grpc, coude_social, set_cooldown, req)
     }
 }
