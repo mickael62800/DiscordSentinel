@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppSelect from "@/components/atoms/AppSelect.vue";
+import DockerLogsModal from "./docker-admin/DockerLogsModal.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { dockerService, type DockerContainer, type DockerImage, type DockerNetwork, type DockerOverview, type DockerVolume } from "@/services/dockerService";
 import { useToast } from "@/composables/useToast";
@@ -27,9 +28,6 @@ const filterContainerState = ref<"all" | "running" | "stopped">("all");
 // ── Logs modal ──
 const logsOpen = ref(false);
 const logsContainer = ref<DockerContainer | null>(null);
-const logsContent = ref("");
-const logsTail = ref(200);
-const logsLoading = ref(false);
 
 async function refreshTab() {
   loading.value = true;
@@ -170,26 +168,12 @@ async function removeCt(c: DockerContainer) {
   }
 }
 
-async function openLogs(c: DockerContainer) {
+function openLogs(c: DockerContainer) {
   logsContainer.value = c;
   logsOpen.value = true;
-  await fetchLogs();
-}
-async function fetchLogs() {
-  if (!logsContainer.value) return;
-  logsLoading.value = true;
-  try {
-    const r = await dockerService.containerLogs(logsContainer.value.id, logsTail.value, true);
-    logsContent.value = r.logs;
-  } catch (e: unknown) {
-    showError(`Erreur logs : ${errMsg(e)}`);
-  } finally {
-    logsLoading.value = false;
-  }
 }
 function closeLogs() {
   logsOpen.value = false;
-  logsContent.value = "";
   logsContainer.value = null;
 }
 
@@ -476,28 +460,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
     </div>
 
     <!-- ── Logs modal ── -->
-    <div v-if="logsOpen" class="logs-modal" @click.self="closeLogs">
-      <div class="logs-window">
-        <div class="logs-head">
-          <strong>📋 Logs : {{ logsContainer ? cleanName(logsContainer.names[0] ?? '') : '' }}</strong>
-          <div class="logs-controls">
-            <label>Lignes :
-              <AppSelect v-model.number="logsTail" @change="fetchLogs">
-                <option :value="50">50</option>
-                <option :value="200">200</option>
-                <option :value="500">500</option>
-                <option :value="2000">2000</option>
-                <option :value="5000">5000</option>
-              </AppSelect>
-            </label>
-            <button class="btn xs" :disabled="logsLoading" @click="fetchLogs">↻</button>
-            <button class="btn xs" @click="closeLogs">Fermer</button>
-          </div>
-        </div>
-        <pre v-if="!logsLoading" class="logs-body">{{ logsContent || '(vide)' }}</pre>
-        <div v-else class="muted center">Chargement…</div>
-      </div>
-    </div>
+    <DockerLogsModal v-if="logsOpen && logsContainer" :container="logsContainer" @close="closeLogs" />
   </section>
 </template>
 
@@ -680,52 +643,6 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .prune-card p { margin: 0; font-size: 12px; }
 .prune-card .reclaim { color: var(--warning, #e67e22); font-weight: 600; font-size: 12px; }
 
-/* Logs modal */
-.logs-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 30px;
-}
-.logs-window {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: min(1100px, 95vw);
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-.logs-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-secondary);
-}
-.logs-controls { display: flex; gap: 8px; align-items: center; font-size: 12px; }
-.logs-body {
-  margin: 0;
-  padding: 14px 16px;
-  overflow: auto;
-  flex: 1;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 11px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  word-break: break-all;
-  background: #0e1116;
-  color: #d4d4d8;
-}
-.center { padding: 30px; text-align: center; }
 .muted { color: var(--text-secondary); font-size: 12px; }
 .small { font-size: 11px; }
 
