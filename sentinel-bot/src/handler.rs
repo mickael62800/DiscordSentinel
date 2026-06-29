@@ -42,7 +42,7 @@ fn command_module(name: &str) -> &'static str {
         | "evidence" | "review" | "template" | "transcript" | "export" | "massmute" | "massban" => {
             "moderation"
         }
-        "ticket" => "tickets",
+        "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
         _ => "unknown",
@@ -517,7 +517,7 @@ impl EventHandler for Handler {
                         | "template" | "transcript" | "export" | "massmute" | "massban" => {
                             modules::moderation::handle_command(&ctx, &command).await
                         }
-                        "ticket" => modules::tickets::handle_command(&ctx, &command).await,
+                        "ticket" | "ticket-admin" => modules::tickets::handle_command(&ctx, &command).await,
                         "confess" | "confess-admin" => {
                             modules::confessions::handle_command(&ctx, &command).await
                         }
