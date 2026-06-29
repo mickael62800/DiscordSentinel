@@ -34,7 +34,7 @@ impl From<AuditRow> for GameAuditEntry {
         Self {
             id: r.id,
             server_id: r.server_id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             actor_user_id: r.actor_user_id,
             action: r.action,
             details: r.details,

@@ -53,14 +53,14 @@ fn tank_has_high_def_low_atk() {
 
 #[test]
 fn agile_has_dodge_chance() {
-    assert!(CLASS_AGILE.dodge_chance > 0.0);
-    assert!(CLASS_AGILE.dodge_chance <= 1.0);
+    const _: () = assert!(CLASS_AGILE.dodge_chance > 0.0);
+    const _: () = assert!(CLASS_AGILE.dodge_chance <= 1.0);
 }
 
 #[test]
 fn fourbe_has_steal_bonus() {
-    assert!(CLASS_FOURBE.steal_bonus > 0.0);
-    assert!(CLASS_FOURBE.steal_bonus <= 1.0);
+    const _: () = assert!(CLASS_FOURBE.steal_bonus > 0.0);
+    const _: () = assert!(CLASS_FOURBE.steal_bonus <= 1.0);
 }
 
 #[test]

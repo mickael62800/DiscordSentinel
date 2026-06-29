@@ -161,35 +161,33 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
                 cfg_cache.insert(pet.guild_id.clone(), c);
                 c
             };
-            match state.pets_uc.tick(pet.id, cfg).await {
-                Ok(
-                    outcome @ (TickOutcome::FellSick | TickOutcome::Died | TickOutcome::Recovered),
-                ) => {
-                    match outcome {
-                        TickOutcome::FellSick => summary.sick += 1,
-                        TickOutcome::Died => summary.died += 1,
-                        TickOutcome::Recovered => summary.recovered += 1,
-                        _ => unreachable!(),
-                    }
-                    let status = match outcome {
-                        TickOutcome::FellSick => "sick",
-                        TickOutcome::Died => "death",
-                        _ => "recovered",
-                    };
-                    state.broadcaster.broadcast(
-                        "tamagotchi_pet_status",
-                        serde_json::json!({
-                            "guild_id": pet.guild_id,
-                            "owner_id": pet.owner_id,
-                            "pet_name": pet.name,
-                            "species": pet.species,
-                            "status": status,
-                            "card_channel_id": pet.card_channel_id,
-                            "card_message_id": pet.card_message_id,
-                        }),
-                    );
+            if let Ok(
+                outcome @ (TickOutcome::FellSick | TickOutcome::Died | TickOutcome::Recovered),
+            ) = state.pets_uc.tick(pet.id, cfg).await
+            {
+                match outcome {
+                    TickOutcome::FellSick => summary.sick += 1,
+                    TickOutcome::Died => summary.died += 1,
+                    TickOutcome::Recovered => summary.recovered += 1,
+                    _ => unreachable!(),
                 }
-                _ => {}
+                let status = match outcome {
+                    TickOutcome::FellSick => "sick",
+                    TickOutcome::Died => "death",
+                    _ => "recovered",
+                };
+                state.broadcaster.broadcast(
+                    "tamagotchi_pet_status",
+                    serde_json::json!({
+                        "guild_id": pet.guild_id,
+                        "owner_id": pet.owner_id,
+                        "pet_name": pet.name,
+                        "species": pet.species,
+                        "status": status,
+                        "card_channel_id": pet.card_channel_id,
+                        "card_message_id": pet.card_message_id,
+                    }),
+                );
             }
             summary.processed += 1;
         }

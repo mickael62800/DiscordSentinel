@@ -16,7 +16,7 @@ fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
     let now = Utc::now();
     Rule {
         id: Uuid::new_v4(),
-        guild_id: "test".to_string(),
+        guild_id: "test".into(),
         flag_type,
         weight,
         threshold_warn: 2.0,

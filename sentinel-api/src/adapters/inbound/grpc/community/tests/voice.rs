@@ -277,19 +277,16 @@ impl ManageVoiceChannelsUseCase for MockVoiceUc {
         Ok(())
     }
     async fn get_voice_config(&self, _g: &str) -> Result<VoiceChannelConfig, DomainError> {
-        Ok(self
-            .config
-            .lock()
-            .unwrap()
-            .clone()
-            .unwrap_or(VoiceChannelConfig {
+        Ok(
+            (*self.config.lock().unwrap()).unwrap_or(VoiceChannelConfig {
                 creation_cooldown_secs: 60,
                 flood_max_messages: 5,
                 flood_time_window_secs: 10,
                 empty_cleanup_delay_secs: 300,
                 flood_mute_duration_secs: 300,
                 vote_kick_timeout_secs: 120,
-            }))
+            }),
+        )
     }
     async fn list_themes(&self, _: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
         Ok(self.themes.lock().unwrap().clone())

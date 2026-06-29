@@ -26,8 +26,6 @@ use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use sqlx::Postgres;
-use sqlx::Transaction;
 use std::sync::Arc;
 use std::sync::Mutex;
 // ── Mocks (minimal — seules les methodes utilisees sont implementees) ─

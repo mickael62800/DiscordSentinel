@@ -16,7 +16,7 @@ fn infraction_not_found_maps_to_not_found() {
 
 #[test]
 fn ticket_not_found_maps_to_not_found() {
-    let s = domain_to_status(DomainError::NotFound(format!("Ticket t1")));
+    let s = domain_to_status(DomainError::NotFound("Ticket t1".to_string()));
     assert_eq!(s.code(), Code::NotFound);
 }
 

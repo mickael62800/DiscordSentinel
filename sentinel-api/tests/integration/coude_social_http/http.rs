@@ -252,7 +252,7 @@ async fn log_daily_chaos_forwards_payload() {
     let (status, _) = req_json(app, "POST", "/api/coude/999/daily-chaos", Some(body)).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
     let logged = uc.chaos_logged.lock().unwrap();
-    assert_eq!(logged[0].guild_id, "999");
+    assert_eq!(logged[0].guild_id.as_str(), "999");
     assert_eq!(logged[0].loser_id, "111");
     assert_eq!(logged[0].amount, 500);
 }

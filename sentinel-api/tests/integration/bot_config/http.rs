@@ -59,7 +59,7 @@ impl BotConfigRepository for MockBotConfigRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|c| c.guild_id == guild_id && c.bot_name == bot_name)
+            .filter(|c| c.guild_id.as_str() == guild_id && c.bot_name == bot_name)
             .cloned()
             .collect())
     }
@@ -69,7 +69,7 @@ impl BotConfigRepository for MockBotConfigRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|c| c.guild_id == guild_id)
+            .filter(|c| c.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -82,7 +82,9 @@ impl BotConfigRepository for MockBotConfigRepo {
     ) -> Result<(), DomainError> {
         let mut cfg = self.configs.lock().unwrap();
         cfg.retain(|c| {
-            !(c.guild_id == guild_id && c.bot_name == bot_name && c.config_key == config_key)
+            !(c.guild_id.as_str() == guild_id
+                && c.bot_name == bot_name
+                && c.config_key == config_key)
         });
         cfg.push(BotGuildConfig {
             id: Uuid::new_v4(),
@@ -106,7 +108,9 @@ impl BotConfigRepository for MockBotConfigRepo {
             .push((guild_id.into(), bot_name.into(), config_key.into()));
         let mut cfg = self.configs.lock().unwrap();
         cfg.retain(|c| {
-            !(c.guild_id == guild_id && c.bot_name == bot_name && c.config_key == config_key)
+            !(c.guild_id.as_str() == guild_id
+                && c.bot_name == bot_name
+                && c.config_key == config_key)
         });
         Ok(())
     }

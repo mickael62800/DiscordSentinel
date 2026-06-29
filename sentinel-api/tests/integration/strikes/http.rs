@@ -102,7 +102,7 @@ impl ManageStrikesUseCase for MockStrikesUC {
         Ok(self
             .strikes
             .iter()
-            .filter(|s| s.guild_id == guild_id && s.user_id == user_id)
+            .filter(|s| s.guild_id.as_str() == guild_id && s.user_id.as_str() == user_id)
             .cloned()
             .collect())
     }

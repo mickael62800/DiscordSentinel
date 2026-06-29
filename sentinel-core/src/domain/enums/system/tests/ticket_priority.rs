@@ -54,7 +54,7 @@ fn as_str_covers_all_variants_directly() {
 fn copy_and_clone() {
     let p = TicketPriority::High;
     let copy = p;
-    let cloned = p.clone();
+    let cloned = p;
     assert_eq!(p, copy);
     assert_eq!(p, cloned);
 }

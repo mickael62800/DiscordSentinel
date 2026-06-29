@@ -52,7 +52,7 @@ impl ManageRulesUseCase for MockRulesUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|r| r.guild_id == guild_id)
+            .filter(|r| r.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -88,7 +88,7 @@ impl ManageRulesUseCase for MockRulesUC {
         self.rules
             .lock()
             .unwrap()
-            .retain(|r| !(r.guild_id == guild_id && r.id == rule_id));
+            .retain(|r| !(r.guild_id.as_str() == guild_id && r.id == rule_id));
         Ok(())
     }
 }

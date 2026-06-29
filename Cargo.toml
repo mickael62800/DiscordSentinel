@@ -76,6 +76,8 @@ result_large_err = "allow"
 doc_lazy_continuation = "allow"
 empty_line_after_doc_comments = "allow"
 type_complexity = "allow"
+should_implement_trait = "allow"
+const_is_empty = "allow"
 
 # ── Profil release partagé ──
 # lto = "thin" + codegen-units = 16 : compilation ~40-60% plus rapide

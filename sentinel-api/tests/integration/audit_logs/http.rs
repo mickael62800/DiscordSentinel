@@ -69,7 +69,7 @@ impl ManageAuditLogsUseCase for MockAuditLogsUC {
         let all = self.items.lock().unwrap();
         let matching: Vec<AuditLog> = all
             .iter()
-            .filter(|l| guild_id.is_none_or(|g| l.guild_id == g))
+            .filter(|l| guild_id.is_none_or(|g| l.guild_id.as_str() == g))
             .filter(|l| {
                 filters
                     .event_type
@@ -97,7 +97,7 @@ impl ManageAuditLogsUseCase for MockAuditLogsUC {
     async fn delete_older_than_days(&self, guild_id: &str, _: i32) -> Result<u64, DomainError> {
         let mut items = self.items.lock().unwrap();
         let before = items.len();
-        items.retain(|l| l.guild_id != guild_id);
+        items.retain(|l| l.guild_id.as_str() != guild_id);
         Ok((before - items.len()) as u64)
     }
 }

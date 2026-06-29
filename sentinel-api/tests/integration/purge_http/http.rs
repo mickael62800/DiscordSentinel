@@ -92,6 +92,14 @@ impl LogRepository for MockLogRepo {
     async fn find_all(&self, _: i64) -> Result<Vec<LogEntry>, DomainError> {
         Ok(vec![])
     }
+    async fn find_filtered(
+        &self,
+        _: Option<&str>,
+        _: Option<&str>,
+        _: i64,
+    ) -> Result<Vec<LogEntry>, DomainError> {
+        unimplemented!()
+    }
     async fn delete_by_category(&self, _: &str) -> Result<u64, DomainError> {
         Ok(0)
     }

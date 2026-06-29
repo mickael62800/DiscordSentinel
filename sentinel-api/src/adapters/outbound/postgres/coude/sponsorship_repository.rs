@@ -63,8 +63,8 @@ impl SponsorshipRepository for PgSponsorshipRepository {
             .map(|r| Sponsorship {
                 id: r.id,
                 guild_id: r.guild_id.into(),
-                sponsor_id: r.sponsor_id.into(),
-                sponsored_id: r.sponsored_id.into(),
+                sponsor_id: r.sponsor_id,
+                sponsored_id: r.sponsored_id,
                 created_at: r.created_at,
             })
             .collect())

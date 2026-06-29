@@ -4,7 +4,7 @@
 //!   - GET    /api/coude/{guild_id}/config/taunts        (tous les users)
 //!   - PUT    /api/coude/{guild_id}/config/taunts        (Admin+)
 //!   - DELETE /api/coude/{guild_id}/config/taunts/opt-outs/{user_id}
-//!                                                       (Admin+ : retrait force)
+//!     (Admin+ : retrait force)
 //!
 //! Logique metier zero : on ne fait que deleguer au use case.
 

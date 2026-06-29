@@ -141,7 +141,7 @@ impl ManageRolePanelsUseCase for MockRolePanelsUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|p| p.guild_id == guild_id)
+            .filter(|p| p.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -151,7 +151,7 @@ impl ManageRolePanelsUseCase for MockRolePanelsUC {
         let mut panels = self.panels.lock().unwrap();
         for p in panels.iter_mut() {
             if p.id == uuid {
-                p.message_id = Some(cmd.message_id.clone());
+                p.message_id = Some(cmd.message_id.to_string());
             }
         }
         Ok(())
@@ -168,7 +168,7 @@ impl ManageRolePanelsUseCase for MockRolePanelsUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|a| a.guild_id == guild_id)
+            .filter(|a| a.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -188,7 +188,7 @@ impl ManageRolePanelsUseCase for MockRolePanelsUC {
         self.auto_roles
             .lock()
             .unwrap()
-            .retain(|a| !(a.guild_id == guild_id && a.role_id == role_id));
+            .retain(|a| !(a.guild_id.as_str() == guild_id && a.role_id.as_str() == role_id));
         Ok(())
     }
 }

@@ -53,7 +53,7 @@ async fn create_and_get() {
         .create(sample_new_combat(&g, &att, &def))
         .await
         .unwrap();
-    assert_eq!(c.guild_id, g);
+    assert_eq!(c.guild_id.as_str(), g);
     assert_eq!(c.status, "pending");
     let got = repo.get(c.id).await.unwrap().unwrap();
     assert_eq!(got.mise, 100);

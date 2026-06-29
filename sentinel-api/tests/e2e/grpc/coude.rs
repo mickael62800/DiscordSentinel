@@ -687,6 +687,17 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
     async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
         unimplemented!()
     }
+    async fn gift_coins(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: f64,
+        _: i64,
+    ) -> Result<sentinel_api::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
+        unimplemented!()
+    }
 }
 
 #[tokio::test]
@@ -858,7 +869,7 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
     ) -> Result<Vec<LeaderboardEntry>, DomainError> {
         Ok((0..limit.min(3))
             .map(|i| LeaderboardEntry {
-                user_id: format!("u{i}"),
+                user_id: format!("u{i}").into(),
                 username: format!("Player{i}"),
                 value: 1000 - i * 100,
             })

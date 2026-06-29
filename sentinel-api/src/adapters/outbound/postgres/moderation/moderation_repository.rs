@@ -115,9 +115,9 @@ impl From<ActionRow> for ModerationAction {
             id: row.id,
             guild_id: row.guild_id.into(),
             channel_id: row.channel_id.into(),
-            moderator_id: row.moderator_id.into(),
+            moderator_id: row.moderator_id,
             moderator_name: row.moderator_name,
-            target_id: row.target_id.into(),
+            target_id: row.target_id,
             target_name: row.target_name,
             target_display_name: None,
             action_type: row.action_type,
@@ -161,7 +161,7 @@ impl ModerationRepository for PgModerationRepository {
         target_id: &str,
         limit: i64,
     ) -> Result<Vec<ModerationAction>, DomainError> {
-        let limit = limit.min(1000).max(1);
+        let limit = limit.clamp(1, 1000);
         let sql = format!(
             "{AUDIT_MOD_SELECT} WHERE guild_id = $1 AND target_id = $2 AND event_type LIKE 'mod_%' ORDER BY created_at DESC LIMIT {limit}"
         );

@@ -50,6 +50,14 @@ impl LogRepository for MockLogRepo {
     async fn find_all(&self, _limit: i64) -> Result<Vec<LogEntry>, DomainError> {
         Ok(self.entries.lock().unwrap().clone())
     }
+    async fn find_filtered(
+        &self,
+        _category: Option<&str>,
+        _level: Option<&str>,
+        _limit: i64,
+    ) -> Result<Vec<LogEntry>, DomainError> {
+        Ok(self.entries.lock().unwrap().clone())
+    }
     async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError> {
         self.deleted_by_category
             .lock()
@@ -97,11 +105,14 @@ impl GuildRepository for MockGuildRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|g| g.guild_id == id)
+            .find(|g| g.guild_id.as_str() == id)
             .cloned())
     }
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
-        self.guilds.lock().unwrap().retain(|g| g.guild_id != id);
+        self.guilds
+            .lock()
+            .unwrap()
+            .retain(|g| g.guild_id.as_str() != id);
         Ok(())
     }
     async fn delete_absent(&self, keep_ids: &[String]) -> Result<u64, DomainError> {

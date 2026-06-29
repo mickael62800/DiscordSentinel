@@ -42,7 +42,7 @@ pub struct BetPayout {
 /// Semantique metier d'un `BetPayout` derriere le tuple `(won, payout)` :
 /// - `Win` : le parieur a gagne → credit wallet + `total_earned` += payout.
 /// - `Refund` : egalite → credit wallet **sans** toucher `total_earned`
-///    (l'argent revient, ce n'est pas un gain).
+///   (l'argent revient, ce n'est pas un gain).
 /// - `Loss` : le parieur a perdu → aucune mutation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BetPayoutOutcome {

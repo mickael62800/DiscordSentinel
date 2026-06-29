@@ -43,7 +43,7 @@ impl NotesRepository for InMemoryNotesRepo {
         let notes = self.notes.lock().await;
         Ok(notes
             .iter()
-            .filter(|n| n.guild_id == guild_id && n.user_id == user_id)
+            .filter(|n| n.guild_id.as_str() == guild_id && n.user_id.as_str() == user_id)
             .cloned()
             .collect())
     }
@@ -85,8 +85,8 @@ fn make_cmd(category: &str) -> AddNoteCommand {
 async fn add_note_saves_to_repo() {
     let svc = build_service();
     let note = svc.add_note(make_cmd("general")).await.unwrap();
-    assert_eq!(note.guild_id, "g1");
-    assert_eq!(note.user_id, "u1");
+    assert_eq!(note.guild_id.as_str(), "g1");
+    assert_eq!(note.user_id.as_str(), "u1");
     assert_eq!(note.author_name, "Bob");
     assert_eq!(note.content, "Test note");
     assert_eq!(note.category, "general");

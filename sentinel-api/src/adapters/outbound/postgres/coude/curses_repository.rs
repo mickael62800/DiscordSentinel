@@ -50,7 +50,7 @@ impl TryFrom<CurseRow> for ActiveCurse {
         Ok(Self {
             id: r.id,
             guild_id: r.guild_id.into(),
-            target_id: r.target_id.into(),
+            target_id: r.target_id,
             source_id: r.source_id,
             kind,
             created_at: r.created_at,

@@ -14,9 +14,10 @@ fn default_config() -> SlotConfig {
 fn config_with_only_one_symbol_high_weight() -> SlotConfig {
     // Permet de forcer un resultat deterministique via les poids :
     // si seul un symbole a un poids non-nul, il sera toujours tire.
-    let mut c = SlotConfig::default();
-    c.weights = vec![0, 0, 0, 0, 0, 0, 1]; // seul le jackpot
-    c
+    SlotConfig {
+        weights: vec![0, 0, 0, 0, 0, 0, 1], // seul le jackpot
+        ..Default::default()
+    }
 }
 
 // ══════════════════════════════════════════════════════════

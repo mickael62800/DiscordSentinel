@@ -339,6 +339,28 @@ impl WalletRepository for MockWalletRepo {
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
     }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
 }
 
 // ── MockCashboxRepo ──
@@ -519,7 +541,7 @@ async fn expire_batch_happy_path_penalty_deposit_stats_refund() {
     let out = svc.expire_batch().await.unwrap();
 
     assert_eq!(out.len(), 1);
-    assert_eq!(out[0].guild_id, "g1");
+    assert_eq!(out[0].guild_id.as_str(), "g1");
     assert_eq!(out[0].defender_id, "lazy-def");
     // cowardice_penalty(1000) = 20% = 200
     assert_eq!(out[0].penalty, 200);
@@ -654,7 +676,7 @@ async fn expire_batch_output_preserves_channel_id() {
         Arc::new(MockBetsUc::default()),
     );
     let out = svc.expire_batch().await.unwrap();
-    assert_eq!(out[0].channel_id, "c1");
+    assert_eq!(out[0].channel_id.as_str(), "c1");
     assert_eq!(out[0].defender_name, "Def");
 }
 
@@ -672,5 +694,5 @@ async fn expire_batch_output_empty_channel_when_none() {
         Arc::new(MockBetsUc::default()),
     );
     let out = svc.expire_batch().await.unwrap();
-    assert_eq!(out[0].channel_id, "");
+    assert_eq!(out[0].channel_id.as_str(), "");
 }

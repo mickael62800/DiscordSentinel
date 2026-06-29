@@ -47,7 +47,7 @@ fn new_generates_unique_ids() {
 #[test]
 fn new_copies_guild_id() {
     let r = Rule::new("my_guild_123".into(), FlagType::Spam);
-    assert_eq!(r.guild_id, "my_guild_123");
+    assert_eq!(r.guild_id, GuildId::new("my_guild_123"));
 }
 
 #[test]

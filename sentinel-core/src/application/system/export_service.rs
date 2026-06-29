@@ -47,7 +47,7 @@ impl ExecuteExportUseCase for ExportService {
         format: &str,
         max_rows: i64,
     ) -> Result<ExportResult, DomainError> {
-        let max_rows = max_rows.min(50_000).max(1);
+        let max_rows = max_rows.clamp(1, 50_000);
         match job_type {
             "infractions" => {
                 let rows = self.repo.fetch_infractions(guild_id, max_rows).await?;

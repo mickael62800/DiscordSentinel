@@ -35,11 +35,11 @@ impl From<GameRow> for Game {
             id: r.id,
             guild_id: r.guild_id.into(),
             game_name: r.game_name,
-            created_by: r.created_by.into(),
+            created_by: r.created_by,
             created_at: r.created_at,
             emoji: r.emoji,
             category: r.category,
-            role_id: r.role_id.into(),
+            role_id: r.role_id,
         }
     }
 }

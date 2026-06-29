@@ -53,7 +53,7 @@ impl DailyActivityRepository for MockDailyActivityRepo {
         let items = self.items.lock().unwrap();
         let matching: Vec<DailyActivity> = items
             .iter()
-            .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
+            .filter(|a| guild_id.is_none_or(|g| a.guild_id.as_str() == g))
             .cloned()
             .collect();
         Ok(matching)

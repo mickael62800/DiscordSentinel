@@ -50,7 +50,7 @@ impl MockTauntsRepo {
         }
     }
     fn with_config(self, f: impl FnOnce(&mut TauntsConfig)) -> Self {
-        f(&mut *self.config.lock().unwrap());
+        f(&mut self.config.lock().unwrap());
         self
     }
 }
@@ -479,9 +479,9 @@ async fn config_setters_forward_to_repo() {
         t.set_channel_calls.lock().unwrap()[0].as_deref(),
         Some("c2")
     );
-    assert_eq!(t.set_enabled_calls.lock().unwrap()[0], false);
-    assert_eq!(t.set_rename_calls.lock().unwrap()[0], false);
-    assert_eq!(t.set_messages_calls.lock().unwrap()[0], false);
+    assert!(!t.set_enabled_calls.lock().unwrap()[0]);
+    assert!(!t.set_rename_calls.lock().unwrap()[0]);
+    assert!(!t.set_messages_calls.lock().unwrap()[0]);
     assert_eq!(t.opt_out_calls.lock().unwrap()[0], ("u1".into(), true));
 }
 
@@ -496,6 +496,6 @@ async fn get_config_and_opt_outs_forward() {
         Arc::new(MockBotConfigRepo::default()),
     );
     assert!(svc.get_config("g").await.is_ok());
-    assert_eq!(svc.is_opted_out("g", "u").await.unwrap(), true);
+    assert!(svc.is_opted_out("g", "u").await.unwrap());
     assert_eq!(svc.list_opt_outs("g").await.unwrap().len(), 2);
 }

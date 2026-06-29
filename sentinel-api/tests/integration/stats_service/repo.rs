@@ -18,6 +18,8 @@ use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_api::ports::outbound::system::cache::CachePort;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::system::service_registry::ServiceCounts;
+use sentinel_core::ports::outbound::system::service_registry::ServiceRegistry;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -64,11 +66,32 @@ impl CachePort for NoopCache {
     }
 }
 
+struct MockServiceRegistry;
+#[async_trait]
+impl ServiceRegistry for MockServiceRegistry {
+    async fn count_services(&self) -> ServiceCounts {
+        ServiceCounts {
+            bots_online: 0,
+            bots_total: 0,
+            workers_online: 0,
+            workers_total: 0,
+        }
+    }
+    async fn ping(&self) -> bool {
+        true
+    }
+}
+
 async fn build() -> ManageStatsService {
     let p = pool().await;
     let stats = Arc::new(PgStatsRepository::new(p.clone()));
     let inf = Arc::new(PgInfractionRepository::new(p));
-    ManageStatsService::new(stats, inf, Arc::new(NoopCache), redis_client())
+    ManageStatsService::new(
+        stats,
+        inf,
+        Arc::new(NoopCache),
+        Arc::new(MockServiceRegistry),
+    )
 }
 
 // ── record_messages / record_voice ──
@@ -147,7 +170,7 @@ async fn get_leaderboard_returns_users() {
     let g = fresh_id();
     svc.record_messages(RecordMessagesCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "A".into(),
         count: 10,
     })
@@ -155,7 +178,7 @@ async fn get_leaderboard_returns_users() {
     .unwrap();
     svc.record_messages(RecordMessagesCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "B".into(),
         count: 20,
     })
@@ -171,7 +194,7 @@ async fn get_guild_overview_aggregates_stats() {
     let g = fresh_id();
     svc.record_messages(RecordMessagesCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "A".into(),
         count: 10,
     })
@@ -179,7 +202,7 @@ async fn get_guild_overview_aggregates_stats() {
     .unwrap();
     svc.record_voice(RecordVoiceCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "B".into(),
         channel_id: "c1".into(),
         channel_name: "v".into(),
@@ -223,9 +246,9 @@ async fn get_guild_voice_stats_with_sessions() {
     for i in 0..3 {
         svc.record_voice(RecordVoiceCommand {
             guild_id: g.clone().into(),
-            user_id: fresh_id(),
+            user_id: fresh_id().into(),
             username: format!("u{i}"),
-            channel_id: format!("c{i}"),
+            channel_id: format!("c{i}").into(),
             channel_name: format!("ch{i}"),
             seconds: 100 * (i as u64 + 1),
         })

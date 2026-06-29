@@ -130,7 +130,7 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         Ok(self
             .channels
             .iter()
-            .filter(|c| c.guild_id == guild_id)
+            .filter(|c| c.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -142,12 +142,12 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         let ch = self
             .channels
             .iter()
-            .find(|c| c.channel_id == channel_id)
+            .find(|c| c.channel_id.as_str() == channel_id)
             .ok_or_else(|| DomainError::NotFound(format!("Channel {channel_id}")))?;
         let links = self
             .invite_links
             .iter()
-            .filter(|l| l.channel_id == channel_id)
+            .filter(|l| l.channel_id.as_str() == channel_id)
             .cloned()
             .collect();
         Ok(VoiceChannelDetail {
@@ -280,7 +280,7 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         Ok(self
             .invite_links
             .iter()
-            .filter(|l| l.channel_id == channel_id)
+            .filter(|l| l.channel_id.as_str() == channel_id)
             .cloned()
             .collect())
     }
@@ -304,7 +304,7 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         Ok(self
             .themes
             .iter()
-            .filter(|t| t.guild_id == guild_id)
+            .filter(|t| t.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }

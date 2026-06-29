@@ -1,4 +1,3 @@
-
 use super::*;
 use crate::domain::entities::community::voice_channel::VoiceChannelBan;
 use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;

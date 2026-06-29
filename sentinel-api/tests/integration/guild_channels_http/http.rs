@@ -66,6 +66,9 @@ impl DiscordApi for DiscordApiWithChannels {
     async fn list_text_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> {
         Ok(self.0.clone())
     }
+    async fn list_all_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> {
+        unimplemented!()
+    }
     async fn upload_emoji(
         &self,
         _: &str,
@@ -132,11 +135,13 @@ async fn list_text_channels_returns_non_empty_response() {
             id: "c1".into(),
             name: "general".into(),
             position: 0,
+            kind: "text".into(),
         },
         DiscordChannel {
             id: "c2".into(),
             name: "random".into(),
             position: 0,
+            kind: "text".into(),
         },
     ];
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
@@ -163,6 +168,7 @@ async fn list_text_channels_caches_and_second_call_returns_same() {
         id: "cached1".into(),
         name: "salon".into(),
         position: 0,
+        kind: "text".into(),
     }];
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
     state.discord_api = Arc::new(DiscordApiWithChannels(channels));

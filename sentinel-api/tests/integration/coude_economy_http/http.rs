@@ -106,6 +106,17 @@ impl ManageCoudeEconomyUseCase for MockEconomy {
     async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.counts_steal.lock().unwrap())
     }
+    async fn gift_coins(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: f64,
+        _: i64,
+    ) -> Result<sentinel_api::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn state_with(m: Arc<MockEconomy>) -> sentinel_api::adapters::inbound::http::state::AppState {

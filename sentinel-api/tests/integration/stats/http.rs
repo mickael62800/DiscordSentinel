@@ -79,14 +79,14 @@ impl ManageStatsUseCase for MockStatsUC {
             .lock()
             .unwrap()
             .iter()
-            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
+            .find(|u| u.guild_id.as_str() == guild_id && u.user_id.as_str() == user_id)
             .cloned())
     }
     async fn get_guild_overview(&self, guild_id: &str) -> Result<GuildStatsOverview, DomainError> {
         let users = self.users.lock().unwrap();
         let gu: Vec<UserStats> = users
             .iter()
-            .filter(|u| u.guild_id == guild_id)
+            .filter(|u| u.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
         Ok(GuildStatsOverview {
@@ -109,7 +109,7 @@ impl ManageStatsUseCase for MockStatsUC {
         let users = self.users.lock().unwrap();
         let mut matching: Vec<UserStats> = users
             .iter()
-            .filter(|u| u.guild_id == guild_id)
+            .filter(|u| u.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
         matching.sort_by(|a, b| b.message_count.cmp(&a.message_count));
@@ -194,7 +194,7 @@ async fn record_messages_returns_204_and_forwards_command() {
     let calls = uc.msg_calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].count, 3);
-    assert_eq!(calls[0].user_id, "u1");
+    assert_eq!(calls[0].user_id.as_str(), "u1");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

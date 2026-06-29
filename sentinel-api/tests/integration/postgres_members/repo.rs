@@ -31,6 +31,7 @@ fn member(guild: &str, user: &str, name: &str) -> GuildMember {
         account_created: None,
         is_bot: false,
         last_seen_at: None,
+        left_at: None,
     }
 }
 

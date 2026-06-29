@@ -58,8 +58,8 @@ fn find_heist_tool_works() {
 
 #[test]
 fn gain_range_is_sensible() {
-    assert!(HEIST_GAIN_MIN_PERCENT < HEIST_GAIN_MAX_PERCENT);
-    assert!(HEIST_GAIN_MAX_PERCENT <= 100);
+    const _: () = assert!(HEIST_GAIN_MIN_PERCENT < HEIST_GAIN_MAX_PERCENT);
+    const _: () = assert!(HEIST_GAIN_MAX_PERCENT <= 100);
 }
 
 // ══════════════════════════════════════════════════════════

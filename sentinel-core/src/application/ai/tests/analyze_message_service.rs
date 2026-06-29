@@ -205,7 +205,7 @@ fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
     let now = Utc::now();
     Rule {
         id: Uuid::new_v4(),
-        guild_id: "test".to_string(),
+        guild_id: "test".into(),
         flag_type,
         weight,
         threshold_warn: 2.0,
@@ -336,7 +336,7 @@ fn bot_entry(
 ) -> crate::domain::entities::system::bot_config::BotGuildConfig {
     crate::domain::entities::system::bot_config::BotGuildConfig {
         id: uuid::Uuid::new_v4(),
-        guild_id: "g".to_string(),
+        guild_id: "g".into(),
         bot_name: "automod-bot".to_string(),
         config_key: key.to_string(),
         config_value: value.to_string(),

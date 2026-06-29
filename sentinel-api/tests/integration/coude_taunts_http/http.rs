@@ -242,9 +242,9 @@ async fn update_taunts_config_without_rbac_passes_through() {
         m.channel_sets.lock().unwrap()[0].1.as_deref(),
         Some("chan-2")
     );
-    assert_eq!(m.enabled_sets.lock().unwrap()[0].1, false);
-    assert_eq!(m.rename_sets.lock().unwrap()[0].1, true);
-    assert_eq!(m.messages_sets.lock().unwrap()[0].1, false);
+    assert!(!m.enabled_sets.lock().unwrap()[0].1);
+    assert!(m.rename_sets.lock().unwrap()[0].1);
+    assert!(!m.messages_sets.lock().unwrap()[0].1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

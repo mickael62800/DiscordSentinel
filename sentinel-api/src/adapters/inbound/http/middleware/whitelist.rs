@@ -60,7 +60,7 @@ pub async fn whitelist_middleware(
 
     // 2. Endpoint exempt ? (le user doit pouvoir s'auto-autoriser).
     let path = request.uri().path();
-    if EXEMPT_PATHS.iter().any(|p| path == *p) {
+    if EXEMPT_PATHS.contains(&path) {
         return Ok(next.run(request).await);
     }
 

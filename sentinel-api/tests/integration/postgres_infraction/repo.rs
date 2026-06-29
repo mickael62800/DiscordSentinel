@@ -9,6 +9,8 @@ use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilt
 use sentinel_api::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::entities::system::discord_ids::MessageId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::enums::moderation::action::Action;
 
 async fn pool() -> PgPool {
@@ -32,7 +34,8 @@ fn sample_infraction(guild: &str, user: &str, action: Action, score: f64) -> Inf
         channel_id: "chan".into(),
         user_id: user.into(),
         username: format!("user_{user}"),
-        message_id: fresh_id(),
+        display_name: None,
+        message_id: MessageId::new(fresh_id()),
         content: "bad message".into(),
         flags: DetectionFlags {
             spam: true,
@@ -69,7 +72,7 @@ async fn save_and_find_by_guild() {
         .await
         .unwrap();
     assert_eq!(list.len(), 1);
-    assert_eq!(list[0].user_id, u);
+    assert_eq!(list[0].user_id, UserId::new(u));
     assert_eq!(list[0].action, Action::Warn);
 }
 
@@ -98,7 +101,7 @@ async fn find_by_guild_filter_by_user_id() {
         .await
         .unwrap();
     assert_eq!(list.len(), 1);
-    assert_eq!(list[0].user_id, u1);
+    assert_eq!(list[0].user_id, UserId::new(u1));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -195,7 +198,7 @@ async fn find_by_id_existing_returns_infraction() {
     repo.save(&inf).await.unwrap();
     let got = repo.find_by_id(&id.to_string()).await.unwrap().unwrap();
     assert_eq!(got.id, id);
-    assert_eq!(got.user_id, u);
+    assert_eq!(got.user_id, UserId::new(u));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -312,9 +315,9 @@ async fn save_preserves_detection_flags() {
     inf.duration = Some(600);
     repo.save(&inf).await.unwrap();
     let got = repo.find_by_id(&inf.id.to_string()).await.unwrap().unwrap();
-    assert_eq!(got.flags.spam, true);
-    assert_eq!(got.flags.insult, true);
-    assert_eq!(got.flags.link, false);
-    assert_eq!(got.flags.phishing, true);
+    assert!(got.flags.spam);
+    assert!(got.flags.insult);
+    assert!(!got.flags.link);
+    assert!(got.flags.phishing);
     assert_eq!(got.duration, Some(600));
 }

@@ -26,8 +26,6 @@ use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use sqlx::Postgres;
-use sqlx::Transaction;
 // ── Mocks ──
 
 #[derive(Default)]
@@ -189,21 +187,33 @@ impl ManageWalletUseCase for MockWalletUc {
     }
 }
 
-// Pool postgres factice : le service en a besoin pour begin(). Comme nos
-// tests court-circuitent avant begin(), un pool jamais utilise convient :
-// on cree avec PgPoolOptions::connect_lazy qui ne tente pas de se connecter.
-fn lazy_pool() -> sqlx::PgPool {
-    sqlx::postgres::PgPoolOptions::new()
-        .max_connections(1)
-        .connect_lazy("postgres://nobody@localhost:5432/none")
-        .expect("lazy pool")
+// UnitOfWork factice : le service en a besoin pour begin(). Comme nos tests
+// court-circuitent sur la validation AVANT begin(), un UoW dont begin() echoue
+// convient : les chemins valides s'arretent sur cette erreur Internal (non-validation).
+struct MockUow;
+#[async_trait]
+impl crate::ports::uow::UnitOfWork for MockUow {
+    async fn begin(&self) -> Result<Box<dyn crate::ports::uow::DbTx>, DomainError> {
+        Err(DomainError::Internal("no db in tests".into()))
+    }
+    async fn commit(&self, _tx: Box<dyn crate::ports::uow::DbTx>) -> Result<(), DomainError> {
+        Err(DomainError::Internal("no db in tests".into()))
+    }
+    async fn rollback(&self, _tx: Box<dyn crate::ports::uow::DbTx>) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn make_service(
     slot_repo: Arc<MockSlotRepo>,
     bot_config: Arc<MockBotConfigRepo>,
 ) -> ManageSlotService {
-    ManageSlotService::new(slot_repo, bot_config, Arc::new(MockWalletUc), lazy_pool())
+    ManageSlotService::new(
+        slot_repo,
+        bot_config,
+        Arc::new(MockWalletUc),
+        Arc::new(MockUow),
+    )
 }
 
 fn entry(key: &str, value: &str) -> BotGuildConfig {

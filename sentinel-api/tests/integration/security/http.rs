@@ -68,7 +68,7 @@ impl ManageSecurityUseCase for MockSecurityUC {
         let evs = self.events.lock().unwrap();
         let filtered: Vec<SecurityEvent> = evs
             .iter()
-            .filter(|e| guild_id.is_none_or(|g| e.guild_id == g))
+            .filter(|e| guild_id.is_none_or(|g| e.guild_id.as_str() == g))
             .cloned()
             .collect();
         Ok(filtered)

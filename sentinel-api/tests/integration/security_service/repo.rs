@@ -182,7 +182,7 @@ async fn analyze_new_member_alt_detection_flags_similar_username() {
 
     let cmd = AnalyzeNewMemberCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "alice_bad2".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
@@ -205,7 +205,7 @@ async fn analyze_new_member_alt_detection_no_match_when_names_differ() {
 
     let cmd = AnalyzeNewMemberCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "alice".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
@@ -229,7 +229,7 @@ async fn analyze_new_member_alt_detection_skipped_when_raid() {
     let now = chrono::Utc::now().timestamp();
     let cmd = AnalyzeNewMemberCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "alice".into(),
         has_avatar: false,
         account_created_timestamp: now - 3600,
@@ -267,7 +267,7 @@ async fn analyze_new_member_no_bans_still_runs_alt_path() {
     // Pas de bans → load_recent_ban_usernames retourne [] → pas de match possible
     let cmd = AnalyzeNewMemberCommand {
         guild_id: g.clone().into(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         username: "bob".into(),
         has_avatar: true,
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400,

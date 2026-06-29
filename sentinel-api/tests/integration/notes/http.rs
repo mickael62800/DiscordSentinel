@@ -79,7 +79,7 @@ impl ManageNotesUseCase for MockNotesUC {
         Ok(self
             .notes
             .iter()
-            .filter(|n| n.guild_id == guild_id && n.user_id == user_id)
+            .filter(|n| n.guild_id == guild_id.into() && n.user_id == user_id.into())
             .cloned()
             .collect())
     }

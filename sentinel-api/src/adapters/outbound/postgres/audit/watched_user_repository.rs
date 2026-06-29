@@ -69,28 +69,21 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         // auto), et impossible d'ajouter un user deja auto-tracke (il etait
         // deja "watched"). On ne retourne maintenant QUE les entrees
         // manual_watched_users, enrichies avec leurs stats d'infractions.
+        // Les compteurs d'infractions (warn/mute/ban + dernier incident) sont
+        // calcules en UN seul scan par user via un LEFT JOIN LATERAL + COUNT
+        // FILTER, au lieu de 4 sous-requetes correlees (1 scan de `infractions`
+        // au lieu de 4). L'agregat sans GROUP BY renvoie exactement une ligne
+        // par `mw`, donc pas de duplication.
         let query = r#"
             SELECT
                 mw.user_id,
                 mw.username,
                 mw.guild_id,
                 COALESCE(g.name, mw.guild_id) AS guild_name,
-                COALESCE((
-                    SELECT COUNT(*)::bigint FROM infractions i
-                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'warn'
-                ), 0) AS total_warns,
-                COALESCE((
-                    SELECT COUNT(*)::bigint FROM infractions i
-                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'mute'
-                ), 0) AS total_mutes,
-                COALESCE((
-                    SELECT COUNT(*)::bigint FROM infractions i
-                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'ban'
-                ), 0) AS total_bans,
-                (
-                    SELECT MAX(i.created_at) FROM infractions i
-                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id
-                ) AS last_incident_at,
+                COALESCE(inf.total_warns, 0) AS total_warns,
+                COALESCE(inf.total_mutes, 0) AS total_mutes,
+                COALESCE(inf.total_bans, 0) AS total_bans,
+                inf.last_incident_at AS last_incident_at,
                 COALESCE((
                     SELECT COUNT(*)::bigint
                     FROM security_events se,
@@ -100,6 +93,15 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                 mw.created_at AS first_seen_at
             FROM manual_watched_users mw
             LEFT JOIN guilds g ON g.guild_id = mw.guild_id
+            LEFT JOIN LATERAL (
+                SELECT
+                    COUNT(*) FILTER (WHERE i.action = 'warn')::bigint AS total_warns,
+                    COUNT(*) FILTER (WHERE i.action = 'mute')::bigint AS total_mutes,
+                    COUNT(*) FILTER (WHERE i.action = 'ban')::bigint  AS total_bans,
+                    MAX(i.created_at) AS last_incident_at
+                FROM infractions i
+                WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id
+            ) inf ON true
             WHERE ($1::text IS NULL OR mw.guild_id = $1)
             ORDER BY mw.created_at DESC
             LIMIT $2 OFFSET $3

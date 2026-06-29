@@ -130,7 +130,7 @@ impl ToutOuRienRepository for PgToutOuRienRepository {
                LIMIT $2"#,
         )
         .bind(guild_id)
-        .bind(limit.max(1).min(50))
+        .bind(limit.clamp(1, 50))
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;

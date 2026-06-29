@@ -188,6 +188,28 @@ impl WalletRepository for SpyWalletRepo {
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
     }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
 }
 
 fn make_svc(cb: Arc<MockCashboxRepo>, w: Arc<SpyWalletRepo>) -> ManageCoudeCashboxService {
@@ -203,7 +225,7 @@ async fn get_cashbox_delegates() {
         Arc::new(SpyWalletRepo::default()),
     );
     let cb = svc.get_cashbox("g").await.unwrap();
-    assert_eq!(cb.guild_id, "g");
+    assert_eq!(cb.guild_id.as_str(), "g");
 }
 
 #[tokio::test]

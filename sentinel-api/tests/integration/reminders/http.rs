@@ -104,7 +104,7 @@ impl ManageRemindersUseCase for MockRemindersUC {
         Ok(self
             .reminders
             .iter()
-            .filter(|r| r.guild_id == guild_id)
+            .filter(|r| r.guild_id == guild_id.into())
             .cloned()
             .collect())
     }

@@ -63,7 +63,7 @@ impl From<PanelRow> for RolePanel {
             id: r.id,
             guild_id: r.guild_id.into(),
             channel_id: r.channel_id.into(),
-            message_id: r.message_id.into(),
+            message_id: r.message_id,
             title: r.title,
             description: r.description,
             mode: r.mode,

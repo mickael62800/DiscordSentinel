@@ -41,12 +41,12 @@ impl From<ConfessionRow> for Confession {
     fn from(r: ConfessionRow) -> Self {
         Self {
             id: r.id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             public_number: r.public_number,
             author_user_id: r.author_user_id,
             content: r.content,
-            message_id: r.message_id.into(),
-            channel_id: r.channel_id.into(),
+            message_id: r.message_id,
+            channel_id: r.channel_id,
             thread_id: r.thread_id,
             deleted_at: r.deleted_at,
             deleted_by: r.deleted_by,
@@ -81,7 +81,7 @@ impl From<ReplyRow> for ConfessionReply {
             author_user_id: r.author_user_id,
             content: r.content,
             is_anonymous: r.is_anonymous,
-            message_id: r.message_id.into(),
+            message_id: r.message_id,
             deleted_at: r.deleted_at,
             deleted_by: r.deleted_by,
             edited_at: r.edited_at,
@@ -108,7 +108,7 @@ impl From<ReportRow> for ConfessionReport {
     fn from(r: ReportRow) -> Self {
         Self {
             id: r.id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             confession_id: r.confession_id,
             reply_id: r.reply_id,
             reporter_user_id: r.reporter_user_id,
@@ -140,9 +140,9 @@ impl From<ConfigRow> for ConfessionConfig {
     fn from(r: ConfigRow) -> Self {
         let banned: Vec<String> = serde_json::from_value(r.banned_user_ids).unwrap_or_default();
         Self {
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             enabled: r.enabled,
-            channel_id: r.channel_id.into(),
+            channel_id: r.channel_id,
             panel_message_id: r.panel_message_id,
             cooldown_secs: r.cooldown_secs,
             max_per_day: r.max_per_day,

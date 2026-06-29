@@ -2,7 +2,7 @@ use super::*;
 
 fn player(user_id: &str, class: &str, level: i32) -> Player {
     Player {
-        user_id: user_id.to_string(),
+        user_id: user_id.into(),
         class: Some(class.to_string()),
         level,
         atk: 10,
@@ -378,10 +378,14 @@ fn giant_killer_flag_set_when_underdog_wins() {
 fn custom_rage_bonus_increases_with_higher_value() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "tank", 5);
-    let mut low_params = BalanceParams::default();
-    low_params.rage_atk_bonus_pct = 10;
-    let mut high_params = BalanceParams::default();
-    high_params.rage_atk_bonus_pct = 100;
+    let low_params = BalanceParams {
+        rage_atk_bonus_pct: 10,
+        ..Default::default()
+    };
+    let high_params = BalanceParams {
+        rage_atk_bonus_pct: 100,
+        ..Default::default()
+    };
 
     let mut sum_low = 0i32;
     let mut sum_high = 0i32;
@@ -608,10 +612,8 @@ fn fourbe_defender_vampirisme_branch() {
             break;
         }
     }
-    assert!(
-        revealed || true,
-        "fourbe peut revealer sa classe via vampirisme"
-    );
+    // Le reveal est probabiliste : on exerce le chemin sans hard-fail sur l'issue.
+    let _ = revealed;
 }
 
 #[test]

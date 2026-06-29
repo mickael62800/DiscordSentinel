@@ -77,7 +77,7 @@ impl CommunityService for CommunityGrpc {
                 .into_iter()
                 .map(|r| proto::Sponsorship {
                     id: r.id.to_string(),
-                    guild_id: r.guild_id.into(),
+                    guild_id: r.guild_id,
                     sponsor_id: r.sponsor_id,
                     sponsored_id: r.sponsored_id,
                     created_at: r.created_at.to_rfc3339(),
@@ -130,9 +130,9 @@ impl CommunityService for CommunityGrpc {
                 .into_iter()
                 .map(|r| proto::TempRole {
                     id: r.id.to_string(),
-                    guild_id: r.guild_id.into(),
-                    user_id: r.user_id.into(),
-                    role_id: r.role_id.into(),
+                    guild_id: r.guild_id,
+                    user_id: r.user_id,
+                    role_id: r.role_id,
                     expires_at: r.expires_at.to_rfc3339(),
                     created_at: r.created_at.to_rfc3339(),
                 })

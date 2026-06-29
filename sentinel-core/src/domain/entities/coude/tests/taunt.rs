@@ -61,7 +61,7 @@ fn build_success_substitutes_user_mention() {
         .expect("should build event");
     assert!(ev.message.contains("<@u1>"));
     assert!(!ev.message.contains("{user}"));
-    assert_eq!(ev.channel_id, "123");
+    assert_eq!(ev.channel_id.as_str(), "123");
     assert_eq!(ev.target_user_id, "u1");
     assert_eq!(ev.streak_kind, "win");
     assert_eq!(ev.streak_value, 3);

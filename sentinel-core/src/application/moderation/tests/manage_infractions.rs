@@ -20,6 +20,7 @@ fn sample(id: &str) -> Infraction {
         channel_id: "c".into(),
         user_id: "u".into(),
         username: "u".into(),
+        display_name: None,
         message_id: "m".into(),
         content: "".into(),
         flags: DetectionFlags {
@@ -125,7 +126,7 @@ async fn delete_infraction_forwards_bool_result() {
     let r = Arc::new(MockRepo::default());
     *r.delete_returns.lock().unwrap() = true;
     let svc = ManageInfractionsService::new(r.clone());
-    assert_eq!(svc.delete_infraction("abc").await.unwrap(), true);
+    assert!(svc.delete_infraction("abc").await.unwrap());
     assert_eq!(r.deletes.lock().unwrap()[0], "abc");
 }
 

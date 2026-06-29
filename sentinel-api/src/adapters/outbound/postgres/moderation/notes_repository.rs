@@ -38,7 +38,7 @@ impl From<NoteRow> for UserNote {
             id: r.id,
             guild_id: r.guild_id.into(),
             user_id: r.user_id.into(),
-            author_id: r.author_id.into(),
+            author_id: r.author_id,
             author_name: r.author_name,
             content: r.content,
             category: r.category,

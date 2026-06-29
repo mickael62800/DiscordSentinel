@@ -34,6 +34,17 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
             .push((g.into(), f.into(), t.into(), a));
         Ok(vec![])
     }
+    async fn gift_coins(
+        &self,
+        _g: &str,
+        _d: &str,
+        _t: &str,
+        _a: i64,
+        _r: f64,
+        _m: i64,
+    ) -> Result<crate::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
+        unimplemented!()
+    }
     async fn steal(&self, g: &str, th: &str, v: &str, a: i64) -> Result<StealOutcome, DomainError> {
         self.steal_calls
             .lock()

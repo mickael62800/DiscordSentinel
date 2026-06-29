@@ -69,9 +69,9 @@ pub fn slugify_emoji_name(raw: &str) -> String {
     for ch in raw.chars() {
         if ch.is_ascii_alphanumeric() {
             out.push(ch.to_ascii_lowercase());
-        } else if ch == '_' {
-            out.push('_');
-        } else if (ch.is_whitespace() || ch == '-' || ch == '.') && !out.ends_with('_') {
+        } else if ch == '_'
+            || ((ch.is_whitespace() || ch == '-' || ch == '.') && !out.ends_with('_'))
+        {
             out.push('_');
         }
     }

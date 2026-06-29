@@ -29,7 +29,7 @@ impl From<InviteLinkRow> for VoiceChannelInviteLink {
             voice_channel_id: row.voice_channel_id,
             guild_id: row.guild_id.into(),
             channel_id: row.channel_id.into(),
-            created_by: row.created_by.into(),
+            created_by: row.created_by,
             created_by_name: row.created_by_name,
             code: row.code,
             max_uses: row.max_uses,

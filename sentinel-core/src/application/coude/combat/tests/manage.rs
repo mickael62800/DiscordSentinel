@@ -589,7 +589,12 @@ struct StubPlayersUc {
 }
 #[async_trait]
 impl ManageCoudePlayersUseCase for StubPlayersUc {
-    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> {
+    async fn get_or_create(
+        &self,
+        _: crate::domain::entities::system::discord_ids::GuildId,
+        _: crate::domain::entities::system::discord_ids::UserId,
+        _: String,
+    ) -> Result<Player, DomainError> {
         unimplemented!()
     }
     async fn get(&self, _: &str, _: &str) -> Result<Player, DomainError> {

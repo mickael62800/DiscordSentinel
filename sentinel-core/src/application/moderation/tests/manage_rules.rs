@@ -214,7 +214,7 @@ async fn get_rules_returns_guild_rules() {
     let svc = ManageRulesService::new(repo, Arc::new(SpyCache::default()));
     let rules = svc.get_rules("g1").await.unwrap();
     assert_eq!(rules.len(), 1);
-    assert_eq!(rules[0].guild_id, "g1");
+    assert_eq!(rules[0].guild_id.as_str(), "g1");
 }
 
 #[tokio::test]

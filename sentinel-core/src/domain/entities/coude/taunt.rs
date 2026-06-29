@@ -534,7 +534,7 @@ pub fn build_taunt_event_deterministic(
         return None;
     }
     Some(TauntEvent {
-        channel_id,
+        channel_id: channel_id.into(),
         target_user_id: target_user_id.to_string(),
         message,
         nickname_suffix,

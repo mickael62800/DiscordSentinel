@@ -381,5 +381,5 @@ async fn rule_find_all_returns_rows() {
     repo.save(&sample_rule(&g, FlagType::Spam)).await.unwrap();
     // find_all scope all — on verifie juste que notre insert est visible.
     let all = repo.find_all().await.unwrap();
-    assert!(all.iter().any(|r| r.guild_id == g));
+    assert!(all.iter().any(|r| r.guild_id.as_str() == g));
 }

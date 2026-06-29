@@ -7,7 +7,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
-use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceBanStore;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceInviteStore;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceThemeStore;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceWhitelistStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
@@ -64,7 +69,7 @@ async fn save_and_find_by_channel_id() {
     let vc = sample_channel(&g, &ch, &fresh_id());
     repo.save(&vc).await.unwrap();
     let got = repo.find_by_channel_id(&ch).await.unwrap().unwrap();
-    assert_eq!(got.channel_id, ch);
+    assert_eq!(got.channel_id.as_str(), ch);
     assert_eq!(got.channel_status, "open");
 }
 
@@ -245,7 +250,7 @@ async fn ban_save_find_and_remove() {
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(found.user_id, "trouble");
+    assert_eq!(found.user_id.as_str(), "trouble");
     let all = repo.find_bans(vc.id).await.unwrap();
     assert_eq!(all.len(), 1);
 

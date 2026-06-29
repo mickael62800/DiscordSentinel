@@ -20,6 +20,7 @@ use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::uow::DbTx;
 
 use test_helpers::build_test_state_wallet;
 
@@ -72,7 +73,7 @@ impl WalletRepository for MockWalletRepo {
         let mut wallets = self.wallets.lock().unwrap();
         if let Some(w) = wallets
             .iter()
-            .find(|w| w.guild_id == guild_id && w.user_id == user_id)
+            .find(|w| w.guild_id.as_str() == guild_id && w.user_id.as_str() == user_id)
         {
             return Ok(w.clone());
         }
@@ -86,7 +87,7 @@ impl WalletRepository for MockWalletRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|w| w.guild_id == guild_id && w.user_id == user_id)
+            .find(|w| w.guild_id.as_str() == guild_id && w.user_id.as_str() == user_id)
             .cloned())
     }
     async fn credit(
@@ -100,7 +101,7 @@ impl WalletRepository for MockWalletRepo {
         let mut wallets = self.wallets.lock().unwrap();
         let w = wallets
             .iter_mut()
-            .find(|w| w.guild_id == guild_id && w.user_id == user_id);
+            .find(|w| w.guild_id.as_str() == guild_id && w.user_id.as_str() == user_id);
         match w {
             Some(w) => {
                 w.coins += amount;
@@ -125,7 +126,7 @@ impl WalletRepository for MockWalletRepo {
         let mut wallets = self.wallets.lock().unwrap();
         let w = wallets
             .iter_mut()
-            .find(|w| w.guild_id == guild_id && w.user_id == user_id)
+            .find(|w| w.guild_id.as_str() == guild_id && w.user_id.as_str() == user_id)
             .ok_or_else(|| DomainError::NotFound("wallet".into()))?;
         if w.coins < amount {
             return Err(DomainError::ValidationError("solde insuffisant".into()));
@@ -165,7 +166,7 @@ impl WalletRepository for MockWalletRepo {
         let wallets = self.wallets.lock().unwrap();
         let mut matching: Vec<Wallet> = wallets
             .iter()
-            .filter(|w| w.guild_id == guild_id)
+            .filter(|w| w.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
         matching.sort_by(|a, b| b.coins.cmp(&a.coins));
@@ -186,7 +187,7 @@ impl WalletRepository for MockWalletRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|w| w.guild_id == guild_id)
+            .filter(|w| w.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -203,7 +204,7 @@ impl WalletRepository for MockWalletRepo {
         let mut wallets = self.wallets.lock().unwrap();
         let w = wallets
             .iter_mut()
-            .find(|w| w.guild_id == guild_id && w.user_id == user_id);
+            .find(|w| w.guild_id.as_str() == guild_id && w.user_id.as_str() == user_id);
         match w {
             Some(w) => {
                 w.coins = new_balance;
@@ -225,7 +226,10 @@ impl WalletRepository for MockWalletRepo {
     ) -> Result<u64, DomainError> {
         let mut wallets = self.wallets.lock().unwrap();
         let mut affected = 0u64;
-        for w in wallets.iter_mut().filter(|w| w.guild_id == guild_id) {
+        for w in wallets
+            .iter_mut()
+            .filter(|w| w.guild_id.as_str() == guild_id)
+        {
             w.coins = new_balance;
             affected += 1;
         }
@@ -234,6 +238,28 @@ impl WalletRepository for MockWalletRepo {
             .unwrap()
             .push((guild_id.into(), new_balance, affected));
         Ok(affected)
+    }
+    async fn credit_in_tx(
+        &self,
+        _tx: &mut dyn DbTx,
+        _guild_id: &str,
+        _user_id: &str,
+        _amount: i64,
+        _source: &str,
+        _description: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _tx: &mut dyn DbTx,
+        _guild_id: &str,
+        _user_id: &str,
+        _amount: i64,
+        _source: &str,
+        _description: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
     }
 }
 

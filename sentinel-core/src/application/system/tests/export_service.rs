@@ -103,15 +103,33 @@ fn serialize_rows_csv_format_produces_header_and_rows() {
 
 // ── execute() dispatch ──
 
+struct StubExportRepo;
+#[async_trait::async_trait]
+impl ExportRepository for StubExportRepo {
+    async fn fetch_infractions(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<InfractionExport>, DomainError> {
+        unimplemented!()
+    }
+    async fn fetch_audit_logs(&self, _: &str, _: i64) -> Result<Vec<AuditLogExport>, DomainError> {
+        unimplemented!()
+    }
+    async fn fetch_moderation_actions(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<ModerationActionExport>, DomainError> {
+        unimplemented!()
+    }
+}
+
 #[tokio::test]
 async fn execute_rejects_unknown_job_type() {
-    // Pool inutile pour cette branche : ValidationError se leve avant la requete.
-    // On construit un pool bidon avec lazy_connect qui ne touche pas la DB.
-    let options = sqlx::postgres::PgPoolOptions::new().max_connections(1);
-    let pool = options
-        .connect_lazy("postgres://none@localhost/none")
-        .unwrap();
-    let svc = ExportService::new(pool);
+    // Repo inutile pour cette branche : ValidationError se leve avant la requete
+    // (job_type inconnu court-circuite avant tout acces au repository).
+    let svc = ExportService::new(std::sync::Arc::new(StubExportRepo));
     let err = svc
         .execute("g", "unknown_type", "csv", 100)
         .await

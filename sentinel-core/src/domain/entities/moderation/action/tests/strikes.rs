@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn default_for_guild_sets_defaults() {
     let c = StrikeConfig::default_for_guild("g1");
-    assert_eq!(c.guild_id, "g1");
+    assert_eq!(c.guild_id.as_str(), "g1");
     assert_eq!(c.window_secs, 3600);
     assert!(c.thresholds.is_empty());
     assert!(c.enabled);
@@ -12,7 +12,7 @@ fn default_for_guild_sets_defaults() {
 #[test]
 fn default_for_guild_copies_guild_id() {
     let c = StrikeConfig::default_for_guild("my-server");
-    assert_eq!(c.guild_id, "my-server");
+    assert_eq!(c.guild_id.as_str(), "my-server");
 }
 
 #[test]

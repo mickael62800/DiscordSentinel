@@ -66,7 +66,7 @@ fn downcast_owned(tx: Box<dyn DbTx>) -> Result<Box<PgTx>, DomainError> {
 /// Helper pour les impls de repo Postgres : extrait la `&mut Transaction`
 /// concrète depuis un `&mut dyn DbTx`. Panique si l'impl injecte un autre
 /// backend — cohérent avec une architecture mono-Postgres.
-pub fn as_pg<'a>(tx: &'a mut dyn DbTx) -> &'a mut Transaction<'static, Postgres> {
+pub fn as_pg(tx: &mut dyn DbTx) -> &mut Transaction<'static, Postgres> {
     &mut tx
         .as_any_mut()
         .downcast_mut::<PgTx>()

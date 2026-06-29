@@ -81,7 +81,7 @@ async fn guild_find_all_includes_inserted() {
     let id = fresh_id();
     repo.upsert(&sample_guild(&id, "X")).await.unwrap();
     let all = repo.find_all().await.unwrap();
-    assert!(all.iter().any(|g| g.guild_id == id));
+    assert!(all.iter().any(|g| g.guild_id.as_str() == id));
 }
 
 // ══════════════════════════════════════════════════════════

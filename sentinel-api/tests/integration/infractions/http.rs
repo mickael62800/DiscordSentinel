@@ -53,8 +53,13 @@ impl ManageInfractionsUseCase for MockInfractionsUC {
         let all = self.items.lock().unwrap();
         let matching: Vec<Infraction> = all
             .iter()
-            .filter(|i| i.guild_id == guild_id)
-            .filter(|i| filters.user_id.as_deref().is_none_or(|u| i.user_id == u))
+            .filter(|i| i.guild_id.as_str() == guild_id)
+            .filter(|i| {
+                filters
+                    .user_id
+                    .as_deref()
+                    .is_none_or(|u| i.user_id.as_str() == u)
+            })
             .filter(|i| {
                 filters
                     .action
@@ -157,6 +162,7 @@ fn sample_infraction(guild_id: &str, user_id: &str, action: Action) -> Infractio
         reason: "reason".into(),
         duration: None,
         created_at: Utc::now(),
+        display_name: None,
     }
 }
 

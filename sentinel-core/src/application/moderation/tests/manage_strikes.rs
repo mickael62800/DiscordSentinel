@@ -35,7 +35,7 @@ impl InMemoryStrikeRepo {
 
     fn with_config(self, config: StrikeConfig) -> Self {
         let mut configs = HashMap::new();
-        configs.insert(config.guild_id.clone(), config);
+        configs.insert(config.guild_id.to_string(), config);
         Self {
             strikes: self.strikes,
             configs: Mutex::new(configs),
@@ -61,7 +61,7 @@ impl StrikeRepository for InMemoryStrikeRepo {
         let strikes = self.strikes.lock().await;
         Ok(strikes
             .iter()
-            .filter(|s| s.guild_id == guild_id && s.user_id == user_id)
+            .filter(|s| s.guild_id.as_str() == guild_id && s.user_id.as_str() == user_id)
             .filter(|s| s.expires_at.is_none_or(|e| e > now))
             .filter(|s| s.created_at > cutoff)
             .cloned()
@@ -70,7 +70,7 @@ impl StrikeRepository for InMemoryStrikeRepo {
 
     async fn delete_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         let mut strikes = self.strikes.lock().await;
-        strikes.retain(|s| !(s.guild_id == guild_id && s.user_id == user_id));
+        strikes.retain(|s| !(s.guild_id.as_str() == guild_id && s.user_id.as_str() == user_id));
         Ok(())
     }
 
@@ -91,7 +91,7 @@ impl StrikeRepository for InMemoryStrikeRepo {
 
     async fn save_config(&self, config: &StrikeConfig) -> Result<(), DomainError> {
         let mut configs = self.configs.lock().await;
-        configs.insert(config.guild_id.clone(), config.clone());
+        configs.insert(config.guild_id.to_string(), config.clone());
         Ok(())
     }
 }
@@ -147,8 +147,8 @@ fn make_cmd(guild_id: &str, user_id: &str) -> AddStrikeCommand {
 async fn add_strike_saves_to_repo() {
     let svc = build_service();
     let result = svc.add_strike(make_cmd("g1", "u1")).await.unwrap();
-    assert_eq!(result.strike.guild_id, "g1");
-    assert_eq!(result.strike.user_id, "u1");
+    assert_eq!(result.strike.guild_id.as_str(), "g1");
+    assert_eq!(result.strike.user_id.as_str(), "u1");
     assert_ne!(result.strike.id, Uuid::nil());
     assert_eq!(result.active_count, 1);
 }
@@ -237,7 +237,7 @@ async fn reset_strikes_clears_all() {
 async fn get_config_returns_defaults() {
     let svc = build_service();
     let config = svc.get_config("g1").await.unwrap();
-    assert_eq!(config.guild_id, "g1");
+    assert_eq!(config.guild_id.as_str(), "g1");
     assert_eq!(config.window_secs, 3600);
     assert!(config.thresholds.is_empty());
     assert!(config.enabled);

@@ -7,13 +7,19 @@ use uuid::Uuid;
 use crate::application::casino::manage_wallet_service::ManageWalletService;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::taunt::TauntsConfig;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::community::member_repository::MemberRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::uow::DbTx;
 
 struct MockWalletRepo {
     balance: Mutex<i64>,
@@ -145,6 +151,74 @@ impl WalletRepository for MockWalletRepo {
         *self.last_reset_all_balance.lock().unwrap() = Some(b);
         Ok(self.reset_all_affected)
     }
+    async fn credit_in_tx(
+        &self,
+        _tx: &mut dyn DbTx,
+        _g: &str,
+        _u: &str,
+        _a: i64,
+        _s: &str,
+        _d: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _tx: &mut dyn DbTx,
+        _g: &str,
+        _u: &str,
+        _a: i64,
+        _s: &str,
+        _d: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+}
+
+struct MockMemberRepo;
+#[async_trait]
+impl MemberRepository for MockMemberRepo {
+    async fn find_by_guild(&self, _g: &str) -> Result<Vec<GuildMember>, DomainError> {
+        Ok(vec![])
+    }
+    async fn find_one(&self, _g: &str, _u: &str) -> Result<Option<GuildMember>, DomainError> {
+        Ok(None)
+    }
+    async fn upsert(&self, _m: &GuildMember) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn upsert_many(&self, _m: &[GuildMember]) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn delete(&self, _g: &str, _u: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_last_seen(&self, _g: &str, _u: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn is_left(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+}
+
+struct MockBotConfigRepo;
+#[async_trait]
+impl BotConfigRepository for MockBotConfigRepo {
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(&self, _g: &str, _b: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(&self, _g: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 struct MockTaunts {
@@ -263,7 +337,12 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
 async fn credit_triggers_jackpot_when_amount_above_threshold() {
     let repo = Arc::new(MockWalletRepo::new(100));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts.clone());
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let m = svc.credit("g", "u", 15_000, "test", "d").await.unwrap();
     assert_eq!(m.new_balance, 15_100);
@@ -276,7 +355,12 @@ async fn credit_triggers_jackpot_when_amount_above_threshold() {
 async fn debit_full_balance_triggers_bankruptcy_taunt() {
     let repo = Arc::new(MockWalletRepo::new(500));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts.clone());
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let m = svc.debit("g", "u", 500, "test", "d").await.unwrap();
     assert_eq!(m.new_balance, 0);
@@ -289,7 +373,12 @@ async fn debit_full_balance_triggers_bankruptcy_taunt() {
 async fn debit_partial_does_not_trigger_bankruptcy() {
     let repo = Arc::new(MockWalletRepo::new(500));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts.clone());
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let m = svc.debit("g", "u", 100, "test", "d").await.unwrap();
     assert_eq!(m.triggered_taunts.len(), 0);
@@ -300,7 +389,12 @@ async fn debit_partial_does_not_trigger_bankruptcy() {
 async fn credit_rejects_non_positive_amount() {
     let repo = Arc::new(MockWalletRepo::new(100));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     assert!(svc.credit("g", "u", 0, "t", "d").await.is_err());
     assert!(svc.credit("g", "u", -1, "t", "d").await.is_err());
@@ -310,7 +404,12 @@ async fn credit_rejects_non_positive_amount() {
 async fn debit_rejects_non_positive_amount() {
     let repo = Arc::new(MockWalletRepo::new(100));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     assert!(svc.debit("g", "u", 0, "t", "d").await.is_err());
     assert!(svc.debit("g", "u", -5, "t", "d").await.is_err());
@@ -320,7 +419,12 @@ async fn debit_rejects_non_positive_amount() {
 async fn credit_below_jackpot_threshold_does_not_trigger() {
     let repo = Arc::new(MockWalletRepo::new(100));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts.clone());
+    let svc = ManageWalletService::new(
+        repo,
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let m = svc.credit("g", "u", 500, "t", "d").await.unwrap();
     assert!(m.triggered_taunts.is_empty());
@@ -334,7 +438,12 @@ async fn debit_from_zero_does_not_trigger_bankruptcy() {
     // previous == 0, so strict transition >0 → 0 not met.
     let repo = Arc::new(MockWalletRepo::new(100));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts.clone());
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     // Drain first (triggers one bankruptcy).
     let _ = svc.debit("g", "u", 100, "t", "d").await.unwrap();
@@ -349,7 +458,12 @@ async fn debit_from_zero_does_not_trigger_bankruptcy() {
 async fn transfer_rejects_non_positive() {
     let repo = Arc::new(MockWalletRepo::new(500));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
     assert!(svc.transfer("g", "a", "b", 0, "t", "d").await.is_err());
     assert!(svc.transfer("g", "a", "b", -5, "t", "d").await.is_err());
 }
@@ -358,7 +472,12 @@ async fn transfer_rejects_non_positive() {
 async fn transfer_rejects_self_transfer() {
     let repo = Arc::new(MockWalletRepo::new(500));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
     let err = svc
         .transfer("g", "alice", "alice", 100, "t", "d")
         .await
@@ -374,7 +493,12 @@ async fn transfer_full_balance_triggers_bankruptcy_and_jackpot() {
     // Sender drains to 0 (bankruptcy), receiver gets big amount (jackpot).
     let repo = Arc::new(MockWalletRepo::new(15_000));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts.clone());
+    let svc = ManageWalletService::new(
+        repo,
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
     let events = svc
         .transfer("g", "alice", "bob", 15_000, "t", "d")
         .await
@@ -389,7 +513,12 @@ async fn transfer_full_balance_triggers_bankruptcy_and_jackpot() {
 async fn transfer_insufficient_balance_propagates_error() {
     let repo = Arc::new(MockWalletRepo::new(50));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
     assert!(svc.transfer("g", "a", "b", 500, "t", "d").await.is_err());
 }
 
@@ -397,7 +526,12 @@ async fn transfer_insufficient_balance_propagates_error() {
 async fn get_balance_reads_from_repo() {
     let repo = Arc::new(MockWalletRepo::new(1234));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts);
+    let svc = ManageWalletService::new(
+        repo,
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
     assert_eq!(svc.get_balance("g", "u").await.unwrap(), 1234);
 }
 
@@ -406,7 +540,12 @@ async fn post_commit_taunts_emits_bankruptcy_and_jackpot() {
     use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts.clone());
+    let svc = ManageWalletService::new(
+        repo,
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let mutation = TxWalletMutation {
         new_balance: 0,
@@ -425,7 +564,12 @@ async fn post_commit_taunts_skips_when_flags_unset() {
     use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts.clone());
+    let svc = ManageWalletService::new(
+        repo,
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let mutation = TxWalletMutation {
         new_balance: 0,
@@ -446,7 +590,12 @@ async fn get_or_create_uses_default_starting_coins_when_env_absent() {
     std::env::remove_var("WALLET_STARTING_COINS");
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let _ = svc.get_or_create("g", "u").await.unwrap();
     assert_eq!(*repo.last_starting_coins.lock().unwrap(), Some(100));
@@ -458,7 +607,12 @@ async fn list_by_guild_delegates_to_repo() {
     let w = repo.wallet(42);
     *repo.list_return.lock().unwrap() = vec![w];
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let out = svc.list_by_guild("g").await.unwrap();
     assert_eq!(out.len(), 1);
@@ -470,7 +624,12 @@ async fn leaderboard_delegates_to_repo() {
     let repo = Arc::new(MockWalletRepo::new(0));
     *repo.leaderboard_return.lock().unwrap() = vec![repo.wallet(10), repo.wallet(5)];
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let out = svc.leaderboard("g", 20).await.unwrap();
     assert_eq!(out.len(), 2);
@@ -491,7 +650,12 @@ async fn get_transactions_delegates_to_repo() {
         created_at: Utc::now(),
     }];
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let out = svc.get_transactions("g", "u", 10).await.unwrap();
     assert_eq!(out.len(), 1);
@@ -502,7 +666,12 @@ async fn get_transactions_delegates_to_repo() {
 async fn reset_wallet_applies_resolve_reset_balance() {
     let repo = Arc::new(MockWalletRepo::new(999));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     // None → defaut 100
     let (_, nb) = svc.reset_wallet("g", "u", None).await.unwrap();
@@ -527,7 +696,12 @@ async fn reset_all_wallets_applies_resolve_reset_balance_and_returns_affected() 
     repo.reset_all_affected = 42;
     let repo = Arc::new(repo);
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo.clone(), taunts);
+    let svc = ManageWalletService::new(
+        repo.clone(),
+        taunts,
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let (affected, nb) = svc.reset_all_wallets("g", Some(-10)).await.unwrap();
     assert_eq!(affected, 42);
@@ -543,7 +717,12 @@ async fn post_commit_taunts_jackpot_below_threshold_emits_nothing() {
     use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
-    let svc = ManageWalletService::new(repo, taunts.clone());
+    let svc = ManageWalletService::new(
+        repo,
+        taunts.clone(),
+        Arc::new(MockMemberRepo),
+        Arc::new(MockBotConfigRepo),
+    );
 
     let mutation = TxWalletMutation {
         new_balance: 500,

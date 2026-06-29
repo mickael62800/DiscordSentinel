@@ -116,12 +116,13 @@ fn labels_empty_when_no_flag() {
 
 #[test]
 fn labels_order_is_stable() {
-    let mut f = CombatOutcomeFlags::default();
-    f.clutch = true;
-    f.comeback = true;
-    f.perfect = true;
-    f.ridicule = true;
-    f.zero_pointe = true;
+    let f = CombatOutcomeFlags {
+        clutch: true,
+        comeback: true,
+        perfect: true,
+        ridicule: true,
+        zero_pointe: true,
+    };
     let labels = f.labels();
     assert_eq!(labels.len(), 5);
     assert!(labels[0].contains("CLUTCH"));

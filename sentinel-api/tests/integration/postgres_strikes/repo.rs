@@ -11,6 +11,7 @@ use sentinel_api::ports::outbound::moderation::strike_repository::StrikeReposito
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -123,7 +124,7 @@ async fn find_active_strikes_scoped_to_user() {
         .await
         .unwrap();
     assert_eq!(found_a.len(), 1);
-    assert_eq!(found_a[0].user_id, user_a);
+    assert_eq!(found_a[0].user_id, UserId::new(user_a));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

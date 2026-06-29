@@ -98,7 +98,7 @@ impl ManageInfractionsUseCase for MockInfractionsUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|i| i.guild_id == guild_id)
+            .filter(|i| i.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -136,7 +136,7 @@ impl ManageModerationUseCase for MockModerationUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
+            .filter(|a| guild_id.is_none_or(|g| a.guild_id.as_str() == g))
             .cloned()
             .collect())
     }
@@ -176,7 +176,7 @@ impl ManageRulesUseCase for MockRulesUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|r| r.guild_id == guild_id)
+            .filter(|r| r.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -238,6 +238,7 @@ fn sample_infraction(guild_id: &str, action: Action) -> Infraction {
         username: "alice".into(),
         message_id: "m".into(),
         content: "x".into(),
+        display_name: None,
         flags: DetectionFlags {
             spam: false,
             insult: false,
@@ -261,6 +262,7 @@ fn sample_action(guild_id: &str, action_type: &str) -> ModerationAction {
         moderator_name: "Mod".into(),
         target_id: "u".into(),
         target_name: "alice".into(),
+        target_display_name: None,
         action_type: action_type.into(),
         reason: "r".into(),
         gravity: Some(ModerationGravity::Medium),
@@ -515,5 +517,5 @@ async fn toggle_rule_forwards_call_and_returns_new_state() {
     let toggled = rules.toggled.lock().unwrap();
     assert_eq!(toggled.len(), 1);
     assert_eq!(toggled[0].0, id);
-    assert_eq!(toggled[0].1, false);
+    assert!(!toggled[0].1);
 }

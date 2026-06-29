@@ -21,6 +21,7 @@ use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use sentinel_core::domain::entities::moderation::user_note::UserNote;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
@@ -140,7 +141,7 @@ async fn audit_log_delete_older_than_days() {
     sqlx::query(
         "INSERT INTO audit_logs (id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, channel_name, details, created_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"
-    ).bind(old_log.id).bind(&old_log.guild_id).bind(&old_log.event_type)
+    ).bind(old_log.id).bind(old_log.guild_id.as_str()).bind(&old_log.event_type)
      .bind(&old_log.actor_id).bind(&old_log.actor_name)
      .bind(&old_log.target_id).bind(&old_log.target_name)
      .bind(&old_log.channel_id).bind(&old_log.channel_name)
@@ -228,7 +229,7 @@ async fn security_find_all_returns_recent() {
     let g = fresh_id();
     seed_security_audit(&p, &g, "low", vec![]).await;
     let events = repo.find_all().await.unwrap();
-    assert!(events.iter().any(|e| e.guild_id == g));
+    assert!(events.iter().any(|e| e.guild_id == GuildId::new(g.clone())));
 }
 
 // ══════════════════════════════════════════════════════════

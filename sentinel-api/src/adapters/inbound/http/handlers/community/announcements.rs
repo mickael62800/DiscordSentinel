@@ -328,10 +328,7 @@ pub async fn retention_cleanup_all(
     for (guild_id,) in &guilds {
         // Module actif ?
         let enabled = read_cfg(&state, guild_id, "enabled").await;
-        let active = match enabled.as_deref() {
-            Some("false") | Some("0") => false,
-            _ => true,
-        };
+        let active = !matches!(enabled.as_deref(), Some("false") | Some("0"));
         if !active {
             skipped += 1;
             continue;

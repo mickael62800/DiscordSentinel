@@ -52,14 +52,19 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             ));
         }
 
-        let attacker = self
-            .player_repo
-            .get_or_create(&input.guild_id, &input.attacker_id, &input.attacker_name)
-            .await?;
-        let defender = self
-            .player_repo
-            .get_or_create(&input.guild_id, &input.defender_id, &input.defender_name)
-            .await?;
+        // Les deux joueurs sont distincts (verifie ci-dessus) → fetch en parallele.
+        let (attacker, defender) = tokio::try_join!(
+            self.player_repo.get_or_create(
+                &input.guild_id,
+                &input.attacker_id,
+                &input.attacker_name
+            ),
+            self.player_repo.get_or_create(
+                &input.guild_id,
+                &input.defender_id,
+                &input.defender_name
+            ),
+        )?;
 
         let attacker_lite = PlayerLite {
             user_id: attacker.user_id.clone(),

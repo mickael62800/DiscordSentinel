@@ -32,8 +32,6 @@ use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use sqlx::Postgres;
-use sqlx::Transaction;
 // ── Mock SocialRepository ──
 
 #[derive(Default)]
@@ -609,7 +607,7 @@ async fn trigger_daily_chaos_success_path_transfers_and_logs() {
     let outcome = got.expect("chaos should trigger");
     assert_eq!(outcome.loser_id, "victim");
     assert_eq!(outcome.winner_id, "winner");
-    assert_eq!(outcome.channel_id, "channel-1");
+    assert_eq!(outcome.channel_id.as_str(), "channel-1");
     assert!(outcome.amount > 0);
 
     // Verifier les appels side-effects

@@ -27,6 +27,7 @@ fn sample_member(g: &str, u: &str, name: &str) -> GuildMember {
         account_created: None,
         is_bot: false,
         last_seen_at: None,
+        left_at: None,
     }
 }
 
@@ -48,7 +49,7 @@ impl MemberRepository for MockMemberRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|m| m.guild_id == g && m.user_id == u)
+            .find(|m| m.guild_id.as_str() == g && m.user_id.as_str() == u)
             .cloned())
     }
     async fn upsert(&self, m: &GuildMember) -> Result<(), DomainError> {
@@ -65,6 +66,9 @@ impl MemberRepository for MockMemberRepo {
     }
     async fn update_last_seen(&self, _: &str, _: &str) -> Result<(), DomainError> {
         Ok(())
+    }
+    async fn is_left(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
     }
 }
 
@@ -366,6 +370,7 @@ impl ManageInfractionsUseCase for RichInfUc {
                 channel_id: "c".into(),
                 user_id: "u".into(),
                 username: "u".into(),
+                display_name: None,
                 message_id: "m".into(),
                 content: format!("msg{i}"),
                 flags: crate::domain::entities::moderation::detection_flags::DetectionFlags {
@@ -413,6 +418,7 @@ impl ManageModerationUseCase for RichModUc {
             channel_id: "c".into(),
             target_id: t.into(),
             target_name: "t".into(),
+            target_display_name: None,
             moderator_id: "m".into(),
             moderator_name: "M".into(),
             action_type: kind.into(),

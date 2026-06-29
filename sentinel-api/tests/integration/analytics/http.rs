@@ -72,6 +72,7 @@ impl AnalyticsRepository for MockAnalyticsRepo {
         _: Option<&str>,
         _: i32,
         _: i64,
+        _min_total: i64,
     ) -> Result<Vec<TopInfractor>, DomainError> {
         self.calls.lock().unwrap().push("infractors".into());
         Ok(vec![TopInfractor {
@@ -114,6 +115,9 @@ impl AnalyticsRepository for MockAnalyticsRepo {
     async fn record_hourly(&self, _: &str, _: i16, _: i64, _: i32) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn reset_activity(&self, _guild_id: &str) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
@@ -144,11 +148,11 @@ async fn full_analytics_aggregates_five_sources() {
     let app = build_app(Arc::new(MockAnalyticsRepo::new()));
     let (status, json) = get(app, "/api/analytics").await;
     assert_eq!(status, StatusCode::OK);
-    assert!(json["heatmap"].as_array().unwrap().len() >= 1);
-    assert!(json["action_distribution"].as_array().unwrap().len() >= 1);
-    assert!(json["top_infractors"].as_array().unwrap().len() >= 1);
-    assert!(json["moderation_trend"].as_array().unwrap().len() >= 1);
-    assert!(json["peak_hours"].as_array().unwrap().len() >= 1);
+    assert!(!json["heatmap"].as_array().unwrap().is_empty());
+    assert!(!json["action_distribution"].as_array().unwrap().is_empty());
+    assert!(!json["top_infractors"].as_array().unwrap().is_empty());
+    assert!(!json["moderation_trend"].as_array().unwrap().is_empty());
+    assert!(!json["peak_hours"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

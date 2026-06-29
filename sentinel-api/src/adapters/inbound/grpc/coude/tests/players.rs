@@ -16,8 +16,6 @@ use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::entities::system::discord_ids::{GuildId, UserId};
 use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
 use sentinel_core::domain::errors::DomainError;
-use sqlx::Postgres;
-use sqlx::Transaction;
 // ── Mocks ──
 
 #[derive(Default)]

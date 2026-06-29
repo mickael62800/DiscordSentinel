@@ -294,7 +294,7 @@ mod community_grpc {
         let sponsored = ugid();
 
         g.create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
-            guild_id: gid.clone().into(),
+            guild_id: gid.clone(),
             sponsor_id: sponsor.clone(),
             sponsored_id: sponsored.clone(),
         }))
@@ -303,7 +303,7 @@ mod community_grpc {
 
         let resp = g
             .list_sponsorships(Request::new(proto::ListSponsorshipsRequest {
-                guild_id: gid.clone().into(),
+                guild_id: gid.clone(),
             }))
             .await
             .unwrap();
@@ -324,7 +324,7 @@ mod community_grpc {
 
         // 1re insertion
         g.create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
-            guild_id: gid.clone().into(),
+            guild_id: gid.clone(),
             sponsor_id: ugid(),
             sponsored_id: sponsored.clone(),
         }))
@@ -334,7 +334,7 @@ mod community_grpc {
         // 2e insertion même (guild, sponsored) → ON CONFLICT DO NOTHING → pas d'erreur
         let result = g
             .create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
-                guild_id: gid.clone().into(),
+                guild_id: gid.clone(),
                 sponsor_id: ugid(),
                 sponsored_id: sponsored.clone(),
             }))
@@ -397,9 +397,9 @@ mod community_grpc {
         // Active : dans 1h
         let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
         g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
-            guild_id: gid.clone().into(),
-            user_id: uid.clone().into(),
-            role_id: role_future.clone().into(),
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role_future.clone(),
             expires_at: future,
         }))
         .await
@@ -408,9 +408,9 @@ mod community_grpc {
         // Expire : -1h (insert direct car le handler ne valide pas le passé)
         let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
         g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
-            guild_id: gid.clone().into(),
-            user_id: uid.clone().into(),
-            role_id: role_past.clone().into(),
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role_past.clone(),
             expires_at: past,
         }))
         .await
@@ -419,7 +419,7 @@ mod community_grpc {
         // list_temp_roles filtre `expires_at > NOW()` → doit ne renvoyer que le futur
         let list = g
             .list_temp_roles(Request::new(proto::ListTempRolesRequest {
-                guild_id: gid.clone().into(),
+                guild_id: gid.clone(),
             }))
             .await
             .unwrap()
@@ -440,17 +440,17 @@ mod community_grpc {
         let second = (chrono::Utc::now() + chrono::Duration::hours(5)).to_rfc3339();
 
         g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
-            guild_id: gid.clone().into(),
-            user_id: uid.clone().into(),
-            role_id: role.clone().into(),
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role.clone(),
             expires_at: first,
         }))
         .await
         .unwrap();
         g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
-            guild_id: gid.clone().into(),
-            user_id: uid.clone().into(),
-            role_id: role.clone().into(),
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role.clone(),
             expires_at: second.clone(),
         }))
         .await
@@ -478,8 +478,8 @@ mod community_grpc {
         let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
         for r in &[&role1, &role2] {
             g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
-                guild_id: gid.clone().into(),
-                user_id: uid.clone().into(),
+                guild_id: gid.clone(),
+                user_id: uid.clone(),
                 role_id: (*r).clone(),
                 expires_at: future.clone(),
             }))
@@ -487,9 +487,9 @@ mod community_grpc {
             .unwrap();
         }
         g.delete_temp_role(Request::new(proto::DeleteTempRoleRequest {
-            guild_id: gid.clone().into(),
-            user_id: uid.clone().into(),
-            role_id: role1.clone().into(),
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role1.clone(),
         }))
         .await
         .unwrap();

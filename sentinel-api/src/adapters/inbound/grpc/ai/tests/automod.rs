@@ -101,6 +101,13 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
             auto_delete_link: false,
         })
     }
+    async fn evaluate_flood(
+        &self,
+        _guild_id: &str,
+        _flood_count: i32,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn make_req(guild_id: &str, user_id: &str, content: &str) -> Request<proto::AnalyzeMessageRequest> {
@@ -121,6 +128,7 @@ fn make_req(guild_id: &str, user_id: &str, content: &str) -> Request<proto::Anal
 async fn analyze_message_rejects_empty_guild_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
+        broadcaster: Arc::new(EventBroadcaster::new()),
     };
     let err = g
         .analyze_message(make_req("", "u", "hello"))
@@ -134,6 +142,7 @@ async fn analyze_message_rejects_empty_guild_id() {
 async fn analyze_message_rejects_too_long_guild_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
+        broadcaster: Arc::new(EventBroadcaster::new()),
     };
     let long = "1".repeat(21);
     let err = g
@@ -147,6 +156,7 @@ async fn analyze_message_rejects_too_long_guild_id() {
 async fn analyze_message_rejects_empty_user_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
+        broadcaster: Arc::new(EventBroadcaster::new()),
     };
     let err = g
         .analyze_message(make_req("g", "", "hello"))
@@ -160,6 +170,7 @@ async fn analyze_message_rejects_empty_user_id() {
 async fn analyze_message_rejects_empty_content() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
+        broadcaster: Arc::new(EventBroadcaster::new()),
     };
     let err = g.analyze_message(make_req("g", "u", "")).await.unwrap_err();
     assert_eq!(err.code(), tonic::Code::InvalidArgument);
@@ -169,7 +180,10 @@ async fn analyze_message_rejects_empty_content() {
 #[tokio::test]
 async fn analyze_message_delegates_to_uc_and_returns_analysis() {
     let uc = Arc::new(MockAnalyzeUc::default());
-    let g = AutomodGrpc { uc: uc.clone() };
+    let g = AutomodGrpc {
+        uc: uc.clone(),
+        broadcaster: Arc::new(EventBroadcaster::new()),
+    };
     let resp = g
         .analyze_message(make_req("g1", "u1", "message content"))
         .await
@@ -187,7 +201,10 @@ async fn analyze_message_delegates_to_uc_and_returns_analysis() {
 #[tokio::test]
 async fn analyze_message_maps_flags_from_proto() {
     let uc = Arc::new(MockAnalyzeUc::default());
-    let g = AutomodGrpc { uc: uc.clone() };
+    let g = AutomodGrpc {
+        uc: uc.clone(),
+        broadcaster: Arc::new(EventBroadcaster::new()),
+    };
     let req = Request::new(proto::AnalyzeMessageRequest {
         guild_id: "g".into(),
         channel_id: "c".into(),
@@ -215,7 +232,10 @@ async fn analyze_message_maps_flags_from_proto() {
 #[tokio::test]
 async fn analyze_message_maps_context_messages() {
     let uc = Arc::new(MockAnalyzeUc::default());
-    let g = AutomodGrpc { uc: uc.clone() };
+    let g = AutomodGrpc {
+        uc: uc.clone(),
+        broadcaster: Arc::new(EventBroadcaster::new()),
+    };
     let req = Request::new(proto::AnalyzeMessageRequest {
         guild_id: "g".into(),
         channel_id: "c".into(),
@@ -245,7 +265,10 @@ async fn analyze_message_maps_context_messages() {
 #[tokio::test]
 async fn analyze_message_flags_none_defaults_all_false() {
     let uc = Arc::new(MockAnalyzeUc::default());
-    let g = AutomodGrpc { uc: uc.clone() };
+    let g = AutomodGrpc {
+        uc: uc.clone(),
+        broadcaster: Arc::new(EventBroadcaster::new()),
+    };
     let _ = g.analyze_message(make_req("g", "u", "hi")).await.unwrap();
     let calls = uc.calls.lock().unwrap();
     assert!(!calls[0].flags.spam);

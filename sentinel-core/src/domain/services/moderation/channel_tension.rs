@@ -119,8 +119,8 @@ mod tests {
     fn entry(score: f64) -> TensionEntry {
         TensionEntry {
             score,
-            user_id: "u1".to_string(),
-            message_id: "m1".to_string(),
+            user_id: UserId::new("u1"),
+            message_id: MessageId::new("m1"),
             timestamp_ms: 0,
         }
     }

@@ -54,7 +54,7 @@ impl TryFrom<ServerRow> for GameServer {
         let rcon_port = r.rcon_port.and_then(|p| u16::try_from(p).ok());
         Ok(GameServer {
             id: r.id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             template_id: r.template_id,
             name: r.name,
             status,

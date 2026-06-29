@@ -103,7 +103,7 @@ async fn reload_model_unknown_type_returns_500() {
     let (status, json) = json_req(app, "POST", "/api/models/reload", Some(body)).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(json["success"], false);
-    assert!(json["message"].as_str().unwrap().len() > 0);
+    assert!(!json["message"].as_str().unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

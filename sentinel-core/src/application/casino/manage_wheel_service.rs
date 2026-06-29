@@ -79,13 +79,12 @@ impl ManageWheelUseCase for ManageWheelService {
         //    cette tirage. Echec silencieux : si le repo casse, on spin
         //    quand meme normalement (le user ne perdra rien de plus).
         let block_licorne = if let Some(curses_repo) = &self.curses_repo {
-            match curses_repo
-                .get_active_for_target(&cmd.guild_id, &cmd.user_id)
-                .await
-            {
-                Ok(Some(c)) if c.kind == CurseKind::Heartbreak => true,
-                _ => false,
-            }
+            matches!(
+                curses_repo
+                    .get_active_for_target(&cmd.guild_id, &cmd.user_id)
+                    .await,
+                Ok(Some(c)) if c.kind == CurseKind::Heartbreak
+            )
         } else {
             false
         };

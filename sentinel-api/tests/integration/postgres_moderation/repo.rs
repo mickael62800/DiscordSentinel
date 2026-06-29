@@ -56,6 +56,7 @@ async fn save_is_noop_phase4() {
         moderator_name: "M".into(),
         target_id: "t".into(),
         target_name: "T".into(),
+        target_display_name: None,
         action_type: "warn".into(),
         reason: "test".into(),
         gravity: None,
@@ -201,8 +202,8 @@ async fn find_bans_global_across_guilds() {
 
     let global = repo.find_bans(None, 50, 0).await.unwrap();
     // Au moins 2 bans (peut y en avoir d'autres d'autres tests).
-    let g1_found = global.iter().any(|b| b.guild_id == g1);
-    let g2_found = global.iter().any(|b| b.guild_id == g2);
+    let g1_found = global.iter().any(|b| b.guild_id.as_str() == g1);
+    let g2_found = global.iter().any(|b| b.guild_id.as_str() == g2);
     assert!(g1_found);
     assert!(g2_found);
 }
@@ -294,8 +295,8 @@ async fn find_all_for_guild_none_returns_cross_guild() {
     seed_audit(&pool, &g1, "mod_warn", &fresh_id(), None, "a").await;
     seed_audit(&pool, &g2, "mod_mute", &fresh_id(), None, "b").await;
     let all = repo.find_all_for_guild(None, 100).await.unwrap();
-    assert!(all.iter().any(|a| a.guild_id == g1));
-    assert!(all.iter().any(|a| a.guild_id == g2));
+    assert!(all.iter().any(|a| a.guild_id.as_str() == g1));
+    assert!(all.iter().any(|a| a.guild_id.as_str() == g2));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

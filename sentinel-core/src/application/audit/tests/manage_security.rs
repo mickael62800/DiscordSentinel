@@ -310,7 +310,7 @@ async fn report_event_persists_event_and_creates_audit_log() {
     let audits = audit.create_calls.lock().unwrap();
     assert_eq!(audits.len(), 1);
     assert_eq!(audits[0].event_type, "security_raid");
-    assert_eq!(audits[0].guild_id, "g1");
+    assert_eq!(audits[0].guild_id.as_str(), "g1");
     // Multi-user : target_id/name None (batch)
     assert!(audits[0].target_id.is_none());
 }
@@ -429,7 +429,7 @@ async fn list_events_with_guild_calls_find_by_guild() {
     });
     let events = svc.list_events(Some("g1")).await.unwrap();
     assert_eq!(events.len(), 1);
-    assert_eq!(events[0].guild_id, "g1");
+    assert_eq!(events[0].guild_id.as_str(), "g1");
 }
 
 #[tokio::test]

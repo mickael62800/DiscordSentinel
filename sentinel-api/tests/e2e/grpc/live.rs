@@ -94,8 +94,8 @@ async fn live_get_or_create_then_get_player() {
 
     // 1. GetOrCreate cree le joueur (premiere fois)
     let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
         username: "live_test_user".into(),
     }));
     let created = client
@@ -113,8 +113,8 @@ async fn live_get_or_create_then_get_player() {
 
     // 2. Get verifie que la creation a bien persiste en DB
     let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
     }));
     let fetched = client
         .get_player(req)
@@ -136,8 +136,8 @@ async fn live_get_or_create_then_get_player() {
 
     // 3. GetOrCreate de nouveau retourne le meme joueur (pas de duplicate)
     let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
         username: "different_name".into(),
     }));
     let again = client.get_or_create_player(req).await.unwrap().into_inner();
@@ -155,8 +155,8 @@ async fn live_add_xp_persists_progression() {
 
     // Cree le joueur
     let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
         username: "xp_test".into(),
     }));
     let initial = client.get_or_create_player(req).await.unwrap().into_inner();
@@ -164,8 +164,8 @@ async fn live_add_xp_persists_progression() {
 
     // Ajoute 75 XP
     let req = auth(Request::new(proto::AddXpRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
         amount: 75,
     }));
     let progress = client.add_xp(req).await.unwrap().into_inner();
@@ -173,8 +173,8 @@ async fn live_add_xp_persists_progression() {
 
     // Re-fetch confirme la persistance
     let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: guild_id.clone().into(),
-        user_id: user_id.clone().into(),
+        guild_id: guild_id.clone(),
+        user_id: user_id.clone(),
     }));
     let after = client.get_player(req).await.unwrap().into_inner();
     assert_eq!(after.xp, initial_xp + 75);
@@ -268,7 +268,7 @@ async fn live_community_list_sponsorships_and_temp_roles() {
 
     let sponsors = client
         .list_sponsorships(auth(Request::new(com_proto::ListSponsorshipsRequest {
-            guild_id: guild.clone().into(),
+            guild_id: guild.clone(),
         })))
         .await
         .expect("list_sponsorships reussi")

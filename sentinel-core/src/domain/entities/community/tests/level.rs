@@ -27,14 +27,12 @@ fn test_xp_progress() {
 fn xp_source_as_str_all_variants() {
     assert_eq!(XpSource::Text.as_str(), "text");
     assert_eq!(XpSource::Voice.as_str(), "voice");
-    assert_eq!(XpSource::Days.as_str(), "days");
 }
 
 #[test]
 fn xp_source_from_str_lossy() {
     assert_eq!(XpSource::from_str("text"), XpSource::Text);
     assert_eq!(XpSource::from_str("voice"), XpSource::Voice);
-    assert_eq!(XpSource::from_str("days"), XpSource::Days);
     // Unknown → Text (fallback).
     assert_eq!(XpSource::from_str(""), XpSource::Text);
     assert_eq!(XpSource::from_str("unknown"), XpSource::Text);

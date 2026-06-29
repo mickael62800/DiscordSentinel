@@ -366,7 +366,6 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     }
     if let Some(conf_id) = cid.strip_prefix(CID_REPORT_BUTTON_PREFIX) {
         open_report_modal(ctx, component, conf_id).await;
-        return;
     }
 }
 
@@ -433,7 +432,6 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
     }
     if let Some(conf_id) = cid.strip_prefix(CID_REPORT_MODAL_PREFIX) {
         handle_report(ctx, modal, conf_id).await;
-        return;
     }
 }
 

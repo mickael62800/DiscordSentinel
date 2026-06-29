@@ -9,6 +9,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::uow::PgTx;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
 use sentinel_api::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
@@ -128,8 +131,10 @@ impl ManageCoudeTauntsUseCase for TestTaunts {
 }
 
 fn build(pool: PgPool) -> ManageWalletService {
-    let repo = Arc::new(PgWalletRepository::new(pool));
-    ManageWalletService::new(repo, Arc::new(TestTaunts))
+    let repo = Arc::new(PgWalletRepository::new(pool.clone()));
+    let member_repo = Arc::new(PgMemberRepository::new(pool.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool));
+    ManageWalletService::new(repo, Arc::new(TestTaunts), member_repo, bot_config_repo)
 }
 
 // ── Mode standalone : credit / debit / transfer / get_balance ──
@@ -234,12 +239,12 @@ async fn credit_tx_updates_balance_and_reports_jackpot_flag() {
         .unwrap();
     let svc = build(pool.clone());
 
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     let mutation = svc
         .credit_tx(&mut tx, &g, &u, 20_000, "test", "d")
         .await
         .unwrap();
-    tx.commit().await.unwrap();
+    tx.0.commit().await.unwrap();
 
     assert_eq!(mutation.previous_balance, 100);
     assert_eq!(mutation.new_balance, 20_100);
@@ -263,12 +268,12 @@ async fn debit_tx_to_zero_marks_bankruptcy() {
         .unwrap();
     let svc = build(pool.clone());
 
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     let mutation = svc
         .debit_tx(&mut tx, &g, &u, 500, "test", "d")
         .await
         .unwrap();
-    tx.commit().await.unwrap();
+    tx.0.commit().await.unwrap();
 
     assert_eq!(mutation.new_balance, 0);
     assert!(mutation.maybe_bankruptcy);
@@ -289,7 +294,7 @@ async fn debit_tx_rejects_insufficient_balance() {
         .unwrap();
     let svc = build(pool.clone());
 
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     let err = svc
         .debit_tx(&mut tx, &g, &u, 500, "test", "d")
         .await
@@ -301,7 +306,7 @@ async fn debit_tx_rejects_insufficient_balance() {
 async fn credit_tx_unknown_wallet_returns_not_found() {
     let pool = pool().await;
     let svc = build(pool.clone());
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     let err = svc
         .credit_tx(&mut tx, &fresh_id(), &fresh_id(), 100, "t", "d")
         .await
@@ -313,7 +318,7 @@ async fn credit_tx_unknown_wallet_returns_not_found() {
 async fn debit_tx_unknown_wallet_returns_not_found() {
     let pool = pool().await;
     let svc = build(pool.clone());
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     let err = svc
         .debit_tx(&mut tx, &fresh_id(), &fresh_id(), 100, "t", "d")
         .await
@@ -325,7 +330,7 @@ async fn debit_tx_unknown_wallet_returns_not_found() {
 async fn credit_tx_rejects_non_positive_amount() {
     let pool = pool().await;
     let svc = build(pool.clone());
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     assert!(svc.credit_tx(&mut tx, "g", "u", 0, "t", "d").await.is_err());
     assert!(svc
         .credit_tx(&mut tx, "g", "u", -5, "t", "d")
@@ -337,7 +342,7 @@ async fn credit_tx_rejects_non_positive_amount() {
 async fn debit_tx_rejects_non_positive_amount() {
     let pool = pool().await;
     let svc = build(pool.clone());
-    let mut tx = pool.begin().await.unwrap();
+    let mut tx = PgTx(pool.begin().await.unwrap());
     assert!(svc.debit_tx(&mut tx, "g", "u", 0, "t", "d").await.is_err());
     assert!(svc.debit_tx(&mut tx, "g", "u", -5, "t", "d").await.is_err());
 }

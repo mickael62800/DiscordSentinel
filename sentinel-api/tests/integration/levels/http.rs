@@ -125,7 +125,7 @@ impl ManageLevelsUseCase for MockLevelsUC {
         let users = self.users.lock().unwrap();
         Ok(users
             .iter()
-            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
+            .find(|u| u.guild_id.as_str() == guild_id && u.user_id.as_str() == user_id)
             .cloned()
             .unwrap_or_else(|| default_user(guild_id, user_id, 0)))
     }
@@ -137,7 +137,7 @@ impl ManageLevelsUseCase for MockLevelsUC {
         let users = self.users.lock().unwrap();
         let mut matching: Vec<UserLevel> = users
             .iter()
-            .filter(|u| u.guild_id == guild_id)
+            .filter(|u| u.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
         matching.sort_by(|a, b| b.xp.cmp(&a.xp));

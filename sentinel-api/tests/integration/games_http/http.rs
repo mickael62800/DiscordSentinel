@@ -63,7 +63,7 @@ impl GameRepository for MockGameRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|g| g.guild_id == guild_id)
+            .filter(|g| g.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -77,7 +77,7 @@ impl GameRepository for MockGameRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|g| g.guild_id == guild_id)
+            .filter(|g| g.guild_id.as_str() == guild_id)
             .filter(|g| category.is_none_or(|c| g.category.as_deref() == Some(c)))
             .cloned()
             .collect())
@@ -118,7 +118,7 @@ impl GameRepository for MockGameRepo {
         let mut games = self.games.lock().unwrap();
         let g = games
             .iter_mut()
-            .find(|g| g.guild_id == guild_id && g.id == game_id);
+            .find(|g| g.guild_id.as_str() == guild_id && g.id == game_id);
         match g {
             Some(g) => {
                 if let Some(n) = name {
@@ -138,7 +138,7 @@ impl GameRepository for MockGameRepo {
     async fn delete(&self, guild_id: &str, game_id: &str) -> Result<bool, DomainError> {
         let mut games = self.games.lock().unwrap();
         let before = games.len();
-        games.retain(|g| !(g.guild_id == guild_id && g.id == game_id));
+        games.retain(|g| !(g.guild_id.as_str() == guild_id && g.id == game_id));
         Ok(before != games.len())
     }
     async fn find_by_name(&self, guild_id: &str, name: &str) -> Result<Option<Game>, DomainError> {
@@ -147,7 +147,7 @@ impl GameRepository for MockGameRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|g| g.guild_id == guild_id && g.game_name.eq_ignore_ascii_case(name))
+            .find(|g| g.guild_id.as_str() == guild_id && g.game_name.eq_ignore_ascii_case(name))
             .cloned())
     }
     async fn set_role_id(
@@ -159,7 +159,7 @@ impl GameRepository for MockGameRepo {
         let mut games = self.games.lock().unwrap();
         let g = games
             .iter_mut()
-            .find(|g| g.guild_id == guild_id && g.id == game_id);
+            .find(|g| g.guild_id.as_str() == guild_id && g.id == game_id);
         match g {
             Some(g) => {
                 g.role_id = role_id.map(str::to_string);
@@ -195,7 +195,7 @@ impl GameRepository for MockGameRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|p| p.guild_id == guild_id && p.message_id == message_id)
+            .find(|p| p.guild_id.as_str() == guild_id && p.message_id.as_str() == message_id)
             .cloned())
     }
     async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, DomainError> {
@@ -204,7 +204,7 @@ impl GameRepository for MockGameRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|p| p.guild_id == guild_id)
+            .filter(|p| p.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }

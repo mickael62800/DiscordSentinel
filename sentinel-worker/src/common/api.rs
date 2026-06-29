@@ -3,7 +3,7 @@
 //!
 //! Centralise le boilerplate `reqwest::Client::new() + bearer_auth(API_KEY)
 //! + send + parse JSON` qui etait duplique dans plusieurs jobs (conduct_regen,
-//! sync_ban_proposals, etc.).
+//!   sync_ban_proposals, etc.).
 //!
 //! `API_URL` (default `http://localhost:3000`) et `API_KEY` (optional) sont
 //! lus depuis l'environnement.

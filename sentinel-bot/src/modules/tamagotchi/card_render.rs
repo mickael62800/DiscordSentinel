@@ -344,8 +344,10 @@ fn build_svg(d: &CardData) -> String {
 /// alors sur l'embed texte).
 pub fn render_card_png(d: &CardData) -> Option<Vec<u8>> {
     let svg = build_svg(d);
-    let mut opt = usvg::Options::default();
-    opt.fontdb = fontdb();
+    let opt = usvg::Options {
+        fontdb: fontdb(),
+        ..Default::default()
+    };
     let tree = match usvg::Tree::from_str(&svg, &opt) {
         Ok(t) => t,
         Err(e) => {

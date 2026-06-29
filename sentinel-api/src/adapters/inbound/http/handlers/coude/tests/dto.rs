@@ -7,10 +7,6 @@ use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::BetPayout;
 use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
 use sentinel_core::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
-use sentinel_core::domain::entities::coude::combat::*;
-use sentinel_core::domain::entities::coude::inventory::*;
-use sentinel_core::domain::entities::coude::player::*;
-use sentinel_core::domain::entities::coude::social::*;
 use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
 use uuid::Uuid;
 
@@ -478,7 +474,7 @@ fn leaderboard_entry_from_domain() {
         username: "Alice".into(),
         value: 12345,
     };
-    let dto: LeaderboardEntry = e.into();
+    let dto: LeaderboardEntry = e;
     assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.value, 12345);
 }

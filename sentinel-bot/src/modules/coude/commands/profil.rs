@@ -75,24 +75,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // Inventaire + assurance active (best-effort : une erreur ne bloque pas l'affichage du profil).
-    let inventory = api
-        .get_inventory(&guild_id, &target.id.to_string())
-        .await
-        .unwrap_or_default();
-    let active_insurance = api
-        .get_active_insurance(&guild_id, &target.id.to_string())
-        .await
-        .ok()
-        .flatten();
-    let active_curse = api
-        .get_active_curse(&guild_id, &target.id.to_string())
-        .await
-        .ok()
-        .flatten();
-    let tor_stats = api
-        .get_user_tout_ou_rien_stats(&guild_id, &target.id.to_string())
-        .await
-        .unwrap_or_default();
+    // Les 4 lectures sont independantes → on les lance en parallele (1 latence au lieu de 4).
+    let tid = target.id.to_string();
+    let (inventory, active_insurance, active_curse, tor_stats) = tokio::join!(
+        api.get_inventory(&guild_id, &tid),
+        api.get_active_insurance(&guild_id, &tid),
+        api.get_active_curse(&guild_id, &tid),
+        api.get_user_tout_ou_rien_stats(&guild_id, &tid),
+    );
+    let inventory = inventory.unwrap_or_default();
+    let active_insurance = active_insurance.ok().flatten();
+    let active_curse = active_curse.ok().flatten();
+    let tor_stats = tor_stats.unwrap_or_default();
 
     let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = catalog.title_for_level(player.level).to_string();

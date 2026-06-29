@@ -26,8 +26,8 @@ async fn get_or_create_initializes_with_starting_coins() {
     let u = fresh_id();
     let w = repo.get_or_create(&g, &u, "Alice", 250).await.unwrap();
     assert_eq!(w.coins, 250);
-    assert_eq!(w.guild_id, g);
-    assert_eq!(w.user_id, u);
+    assert_eq!(w.guild_id.as_str(), g);
+    assert_eq!(w.user_id.as_str(), u);
     assert_eq!(w.username, "Alice");
 }
 

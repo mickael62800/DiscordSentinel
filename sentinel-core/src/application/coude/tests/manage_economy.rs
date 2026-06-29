@@ -10,8 +10,6 @@ use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use async_trait::async_trait;
-use sqlx::Postgres;
-use sqlx::Transaction;
 use std::sync::Arc;
 use std::sync::Mutex;
 

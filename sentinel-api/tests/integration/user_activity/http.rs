@@ -57,7 +57,7 @@ impl UserActivityRepository for MockUserActivityRepo {
         let items = self.items.lock().unwrap();
         let matching: Vec<UserActivity> = items
             .iter()
-            .filter(|a| a.guild_id == guild_id && a.user_id == user_id)
+            .filter(|a| a.guild_id.as_str() == guild_id && a.user_id.as_str() == user_id)
             .filter(|a| event_type.is_none_or(|e| a.event_type == e))
             .skip(offset as usize)
             .take(limit as usize)

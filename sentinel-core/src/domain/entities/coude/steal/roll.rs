@@ -32,13 +32,13 @@ mod tests {
 
     #[test]
     fn afk_range_lower_than_active() {
-        assert!(STEAL_PCT_AFK_MAX_BP <= STEAL_PCT_ACTIVE_MIN_BP);
+        const _: () = assert!(STEAL_PCT_AFK_MAX_BP <= STEAL_PCT_ACTIVE_MIN_BP);
     }
 
     #[test]
     fn ranges_sane() {
-        assert!(STEAL_PCT_AFK_MIN_BP < STEAL_PCT_AFK_MAX_BP);
-        assert!(STEAL_PCT_ACTIVE_MIN_BP < STEAL_PCT_ACTIVE_MAX_BP);
+        const _: () = assert!(STEAL_PCT_AFK_MIN_BP < STEAL_PCT_AFK_MAX_BP);
+        const _: () = assert!(STEAL_PCT_ACTIVE_MIN_BP < STEAL_PCT_ACTIVE_MAX_BP);
         assert_eq!(STEAL_D20_MIN, 1);
         assert_eq!(STEAL_D20_MAX, 20);
     }

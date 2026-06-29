@@ -21,8 +21,8 @@ impl From<WhitelistRow> for VoiceChannelWhitelistEntry {
         Self {
             id: row.id,
             guild_id: row.guild_id.into(),
-            owner_id: row.owner_id.into(),
-            target_id: row.target_id.into(),
+            owner_id: row.owner_id,
+            target_id: row.target_id,
             target_name: row.target_name,
             created_at: row.created_at,
         }

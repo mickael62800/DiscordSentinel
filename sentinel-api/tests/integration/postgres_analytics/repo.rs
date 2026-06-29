@@ -111,7 +111,7 @@ async fn action_distribution_groups_with_percentage() {
 async fn top_infractors_empty() {
     let repo = PgAnalyticsRepository::new(pool().await);
     let got = repo
-        .get_top_infractors(Some(&fresh_id()), 30, 10)
+        .get_top_infractors(Some(&fresh_id()), 30, 10, 0)
         .await
         .unwrap();
     assert!(got.is_empty());
@@ -144,9 +144,9 @@ async fn top_infractors_ranks_by_count() {
     .await
     .unwrap();
 
-    let top = repo.get_top_infractors(Some(&g), 7, 10).await.unwrap();
+    let top = repo.get_top_infractors(Some(&g), 7, 10, 0).await.unwrap();
     assert_eq!(top.len(), 2);
-    assert_eq!(top[0].user_id, u1);
+    assert_eq!(top[0].user_id.as_str(), u1);
     assert_eq!(top[0].total_infractions, 3);
     assert_eq!(top[1].total_infractions, 1);
 }

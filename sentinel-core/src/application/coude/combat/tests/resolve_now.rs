@@ -221,19 +221,24 @@ struct MockPlayersUc {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayersUc {
-    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> {
+    async fn get_or_create(
+        &self,
+        _: crate::domain::entities::system::discord_ids::GuildId,
+        _: crate::domain::entities::system::discord_ids::UserId,
+        _: String,
+    ) -> Result<Player, DomainError> {
         unimplemented!()
     }
     async fn get(&self, _: &str, user_id: &str) -> Result<Player, DomainError> {
         let att = self.attacker.lock().unwrap().clone();
         let def = self.defender.lock().unwrap().clone();
         if let Some(a) = &att {
-            if a.user_id == user_id {
+            if a.user_id.as_str() == user_id {
                 return Ok(a.clone());
             }
         }
         if let Some(d) = &def {
-            if d.user_id == user_id {
+            if d.user_id.as_str() == user_id {
                 return Ok(d.clone());
             }
         }
@@ -483,6 +488,28 @@ impl WalletRepository for MockWalletRepo {
     }
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
+    }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
     }
 }
 
@@ -796,11 +823,11 @@ fn build_service() -> (
     let combats_uc = Arc::new(MockCombatsUc::default());
     let players_uc = Arc::new(MockPlayersUc::default());
     let wallet_repo = Arc::new(MockWalletRepo::default());
-    let bets_uc = Arc::new(MockBetsUc::default());
+    let bets_uc = Arc::new(MockBetsUc);
     let inventory_uc = Arc::new(MockInventoryUc::default());
-    let social_uc = Arc::new(MockSocialUc::default());
+    let social_uc = Arc::new(MockSocialUc);
     let taunts_uc = Arc::new(MockTauntsUc::default());
-    let bot_config_repo = Arc::new(MockBotConfig::default());
+    let bot_config_repo = Arc::new(MockBotConfig);
 
     let svc = ResolveCombatNowService::new(
         combat_repo.clone(),

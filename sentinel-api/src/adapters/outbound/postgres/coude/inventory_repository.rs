@@ -63,7 +63,7 @@ impl From<PrimeRow> for Prime {
         Self {
             id: r.id,
             guild_id: r.guild_id.into(),
-            target_id: r.target_id.into(),
+            target_id: r.target_id,
             target_name: r.target_name,
             placed_by_id: r.placed_by_id,
             placed_by_name: r.placed_by_name,

@@ -56,6 +56,7 @@ fn make_action(
         moderator_name: "ModeratorBob".into(),
         target_id: target_id.into(),
         target_name: target_name.into(),
+        target_display_name: None,
         action_type: action_type.into(),
         reason: reason.into(),
         gravity: gravity.and_then(sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),
@@ -82,6 +83,7 @@ impl ManageModerationUseCase for MockModerationUC {
             moderator_name: cmd.moderator_name,
             target_id: cmd.target_id,
             target_name: cmd.target_name,
+            target_display_name: None,
             action_type: cmd.action_type,
             reason: cmd.reason,
             gravity: cmd.gravity.as_deref().and_then(sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),
@@ -98,7 +100,7 @@ impl ManageModerationUseCase for MockModerationUC {
         let actions: Vec<ModerationAction> = self
             .actions
             .iter()
-            .filter(|a| a.guild_id == guild_id && a.target_id == target_id)
+            .filter(|a| a.guild_id.as_str() == guild_id && a.target_id.as_str() == target_id)
             .cloned()
             .collect();
 
@@ -147,7 +149,7 @@ impl ManageModerationUseCase for MockModerationUC {
             .actions
             .iter()
             .filter(|a| a.action_type.starts_with("ban"))
-            .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
+            .filter(|a| guild_id.is_none_or(|g| a.guild_id.as_str() == g))
             .cloned()
             .collect();
         Ok(bans)

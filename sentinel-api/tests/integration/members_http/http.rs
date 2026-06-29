@@ -61,6 +61,7 @@ fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {
         account_created: None,
         is_bot: false,
         last_seen_at: None,
+        left_at: None,
     }
 }
 
@@ -72,7 +73,7 @@ impl ManageMembersUseCase for MockMembersUC {
             .lock()
             .unwrap()
             .iter()
-            .filter(|m| m.guild_id == guild_id)
+            .filter(|m| m.guild_id == guild_id.into())
             .cloned()
             .collect())
     }
@@ -81,7 +82,7 @@ impl ManageMembersUseCase for MockMembersUC {
             .lock()
             .unwrap()
             .iter()
-            .find(|m| m.guild_id == guild_id && m.user_id == user_id)
+            .find(|m| m.guild_id == guild_id.into() && m.user_id == user_id.into())
             .cloned()
             .ok_or_else(|| DomainError::NotFound("member".into()))
     }
@@ -95,7 +96,7 @@ impl ManageMembersUseCase for MockMembersUC {
             .lock()
             .unwrap()
             .iter()
-            .find(|m| m.guild_id == guild_id && m.user_id == user_id)
+            .find(|m| m.guild_id == guild_id.into() && m.user_id == user_id.into())
             .cloned()
             .ok_or_else(|| DomainError::NotFound("member".into()))?;
         Ok(MemberSummary {
@@ -320,7 +321,7 @@ async fn register_member_stores_it() {
     .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(uc.registered.lock().unwrap().len(), 1);
-    assert_eq!(uc.registered.lock().unwrap()[0].user_id, "newbie");
+    assert_eq!(uc.registered.lock().unwrap()[0].user_id, "newbie".into());
 }
 
 // ══════════════════════════════════════════════════════════

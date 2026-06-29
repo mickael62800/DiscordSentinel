@@ -314,6 +314,28 @@ impl WalletRepository for MockWalletRepo {
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
     }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
 }
 
 // ── MockBotConfig (pour load_balance) ──

@@ -38,6 +38,9 @@ impl MockAnalyzeUC {
                 reason: reason.into(),
                 score: 0.7,
                 duration: None,
+                route: sentinel_core::domain::services::moderation::automod_routing::Routing::None,
+                severe: false,
+                auto_delete_link: false,
             },
             calls: Mutex::new(Vec::new()),
         }
@@ -49,6 +52,14 @@ impl AnalyzeMessageUseCase for MockAnalyzeUC {
     async fn analyze(&self, cmd: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError> {
         self.calls.lock().unwrap().push(cmd);
         Ok(self.response.clone())
+    }
+    async fn evaluate_flood(
+        &self,
+        _: &str,
+        _: i32,
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError>
+    {
+        unimplemented!()
     }
 }
 

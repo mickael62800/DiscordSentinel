@@ -97,7 +97,7 @@ pub(super) async fn apply_auto_protect(
 ) -> Option<String> {
     let guild_id = msg.guild_id?;
     const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
-    let safe = mute_duration_secs.min(MAX_MUTE_SECS).max(60);
+    let safe = mute_duration_secs.clamp(60, MAX_MUTE_SECS);
 
     let now_secs = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

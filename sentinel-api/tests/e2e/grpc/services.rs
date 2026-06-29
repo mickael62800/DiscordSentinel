@@ -42,10 +42,10 @@ use sentinel_api::adapters::inbound::grpc::ai::automod::AutomodGrpc;
 use sentinel_api::adapters::inbound::grpc::ai::images::ImagesGrpc;
 use sentinel_api::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use sentinel_api::adapters::inbound::grpc::audit::stats::StatsGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::members::MembersGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::progression::ProgressionGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::roles::RolePanelsGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::voice::VoiceChannelsGrpc;
+use sentinel_api::adapters::inbound::grpc::community::members::MembersGrpc;
+use sentinel_api::adapters::inbound::grpc::community::progression::ProgressionGrpc;
+use sentinel_api::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
+use sentinel_api::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
@@ -188,7 +188,17 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
             .into(),
             score: if cmd.flags.spam { 0.85 } else { 0.0 },
             duration: None,
+            route: sentinel_core::domain::services::moderation::automod_routing::Routing::None,
+            severe: false,
+            auto_delete_link: false,
         })
+    }
+    async fn evaluate_flood(
+        &self,
+        _: &str,
+        _: i32,
+    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+        unimplemented!()
     }
 }
 
@@ -196,6 +206,7 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
 async fn automod_analyze_returns_action_for_flagged_message() {
     let svc = AutomodServiceServer::new(AutomodGrpc {
         uc: Arc::new(MockAnalyzeMessage),
+        broadcaster: Arc::new(EventBroadcaster::new()),
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = AutomodServiceClient::connect(Endpoint::from_shared(url).unwrap())
@@ -452,6 +463,7 @@ fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {
         account_created: Some(ts()),
         is_bot: false,
         last_seen_at: Some(ts()),
+        left_at: None,
     }
 }
 
@@ -521,6 +533,7 @@ impl ManageModerationUseCase for MockModerationUc {
             moderator_name: cmd.moderator_name,
             target_id: cmd.target_id,
             target_name: cmd.target_name,
+            target_display_name: None,
             action_type: cmd.action_type,
             reason: cmd.reason,
             gravity: None,

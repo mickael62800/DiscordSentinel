@@ -40,7 +40,7 @@ async fn infraction_not_found_maps_to_404() {
 
 #[tokio::test]
 async fn ticket_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Ticket t")))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound("Ticket t".to_string()))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 

@@ -237,6 +237,7 @@ pub async fn is_feature_enabled(
 /// Retourne true si:
 /// - Aucune entree `enabled` trouvee (defaut = active)
 /// - Au moins une entree `enabled = true`
+///
 /// Retourne false si toutes les entrees trouvees sont `enabled = false`.
 pub async fn is_worker_globally_enabled(pool: &PgPool, worker_name: &str) -> bool {
     let rows: Vec<(String,)> = sqlx::query_as(

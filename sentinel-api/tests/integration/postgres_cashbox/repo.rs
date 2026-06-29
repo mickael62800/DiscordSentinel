@@ -6,6 +6,7 @@ use uuid::Uuid;
 use sentinel_api::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
 use sentinel_api::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use sentinel_core::domain::entities::coude::cashbox::CashboxSource;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -25,7 +26,7 @@ async fn get_or_create_initializes_balance_zero() {
     let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     let cb = repo.get_or_create(&g).await.unwrap();
-    assert_eq!(cb.guild_id, g);
+    assert_eq!(cb.guild_id, GuildId::new(g));
     assert_eq!(cb.balance, 0);
     assert_eq!(cb.total_collected, 0);
     assert_eq!(cb.total_redistributed, 0);

@@ -9,7 +9,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
 use sentinel_api::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use sentinel_api::ports::outbound::coude::bet_repository::BetRepository;
@@ -117,9 +119,13 @@ impl ManageCoudeTauntsUseCase for StubTauntsUc {
 
 fn make_repo(p: PgPool) -> PgBetRepository {
     let wallet_repo = Arc::new(PgWalletRepository::new(p.clone()));
+    let member_repo = Arc::new(PgMemberRepository::new(p.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(p.clone()));
     let wallet_uc = Arc::new(ManageWalletService::new(
         wallet_repo,
         Arc::new(StubTauntsUc),
+        member_repo,
+        bot_config_repo,
     ));
     PgBetRepository::new(p, wallet_uc)
 }

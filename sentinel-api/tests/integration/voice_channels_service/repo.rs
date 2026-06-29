@@ -136,8 +136,8 @@ async fn create_channel_persists_and_invalidates_cache() {
         .create_channel(sample_cmd(&g, &ch, &owner))
         .await
         .unwrap();
-    assert_eq!(created.channel_id, ch);
-    assert_eq!(created.guild_id, g);
+    assert_eq!(created.channel_id.as_str(), ch.as_str());
+    assert_eq!(created.guild_id.as_str(), g.as_str());
     assert_eq!(created.channel_status, "open");
     let invs = cache.invalidations.lock().unwrap();
     assert!(invs.iter().any(|k| k == &format!("voice_channels:{g}")));
@@ -173,7 +173,7 @@ async fn get_channel_detail_returns_full_detail() {
         .await
         .unwrap();
     let detail = svc.get_channel_detail(&ch).await.unwrap();
-    assert_eq!(detail.channel.channel_id, ch);
+    assert_eq!(detail.channel.channel_id.as_str(), ch.as_str());
     assert!(detail.co_admins.is_empty());
     assert!(detail.bans.is_empty());
     assert!(detail.invite_links.is_empty());
@@ -197,7 +197,7 @@ async fn close_channel_updates_status() {
     svc.close_channel(&ch).await.unwrap();
     // Le channel ne devrait plus apparaitre dans la liste active
     let list = svc.list_channels(&g).await.unwrap();
-    assert!(list.iter().all(|c| c.channel_id != ch));
+    assert!(list.iter().all(|c| c.channel_id.as_str() != ch));
     // Cache invalide au moins 1 fois (create). Le close invalide le detail :channel: key aussi.
     let invs = cache.invalidations.lock().unwrap();
     assert!(!invs.is_empty());
@@ -225,7 +225,7 @@ async fn list_history_includes_closed_channels() {
         .unwrap();
     svc.close_channel(&ch).await.unwrap();
     let hist = svc.list_history_channels(&g, 100).await.unwrap();
-    assert!(hist.iter().any(|c| c.channel_id == ch));
+    assert!(hist.iter().any(|c| c.channel_id.as_str() == ch));
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -292,7 +292,7 @@ async fn update_channel_not_found_returns_error() {
     let (svc, _) = make_service().await;
     let res = svc
         .update_channel(UpdateVoiceChannelCommand {
-            channel_id: fresh_id(),
+            channel_id: fresh_id().into(),
             visibility: Some("private".into()),
             locked: None,
             queue_enabled: None,
@@ -344,7 +344,7 @@ async fn transfer_ownership_not_found() {
     let (svc, _) = make_service().await;
     let err = svc
         .transfer_ownership(TransferOwnershipCommand {
-            channel_id: fresh_id(),
+            channel_id: fresh_id().into(),
             new_owner_id: "x".into(),
             new_owner_name: "X".into(),
         })
@@ -575,7 +575,7 @@ async fn ban_unknown_channel_returns_not_found() {
     let (svc, _) = make_service().await;
     let err = svc
         .ban_from_channel(BanFromChannelCommand {
-            channel_id: fresh_id(),
+            channel_id: fresh_id().into(),
             user_id: "u".into(),
             user_name: "X".into(),
             banned_by: "o".into(),
@@ -615,7 +615,7 @@ async fn add_co_admin_persists_in_detail() {
     .await
     .unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
-    assert!(d.co_admins.iter().any(|c| c.user_id == target));
+    assert!(d.co_admins.iter().any(|c| c.user_id.as_str() == target));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -636,7 +636,7 @@ async fn remove_co_admin_clears_entry() {
     .unwrap();
     svc.remove_co_admin(&ch, &target).await.unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
-    assert!(!d.co_admins.iter().any(|c| c.user_id == target));
+    assert!(!d.co_admins.iter().any(|c| c.user_id.as_str() == target));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -644,7 +644,7 @@ async fn add_co_admin_unknown_channel_returns_not_found() {
     let (svc, _) = make_service().await;
     let err = svc
         .add_co_admin(ManageCoAdminCommand {
-            channel_id: fresh_id(),
+            channel_id: fresh_id().into(),
             user_id: "u".into(),
             user_name: "X".into(),
         })
@@ -771,7 +771,7 @@ async fn use_invite_link_rejects_when_max_uses_reached() {
     // Premier use OK
     svc.use_invite_link(UseInviteLinkCommand {
         code: link.code.clone(),
-        user_id: fresh_id(),
+        user_id: fresh_id().into(),
         user_name: "U1".into(),
     })
     .await
@@ -780,7 +780,7 @@ async fn use_invite_link_rejects_when_max_uses_reached() {
     let err = svc
         .use_invite_link(UseInviteLinkCommand {
             code: link.code.clone(),
-            user_id: fresh_id(),
+            user_id: fresh_id().into(),
             user_name: "U2".into(),
         })
         .await

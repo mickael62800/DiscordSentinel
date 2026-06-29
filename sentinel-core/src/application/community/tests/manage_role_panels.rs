@@ -105,7 +105,7 @@ async fn create_panel_saves_panel_and_entries_with_uuids() {
     let detail = svc.create_panel(cmd).await.unwrap();
     assert_eq!(detail.panel.title, "T");
     assert_eq!(detail.panel.max_roles, Some(3));
-    assert_eq!(detail.panel.enabled, true);
+    assert!(detail.panel.enabled);
     assert_eq!(detail.entries.len(), 2);
     // Panel saved + entries saved
     assert_eq!(r.saved_panels.lock().unwrap().len(), 1);
@@ -187,7 +187,7 @@ async fn add_auto_role_creates_enabled_with_uuid() {
         })
         .await
         .unwrap();
-    assert_eq!(auto.enabled, true);
+    assert!(auto.enabled);
     assert_eq!(auto.delay_secs, 60);
     assert!(!auto.id.is_nil());
     assert_eq!(r.saved_auto_roles.lock().unwrap().len(), 1);

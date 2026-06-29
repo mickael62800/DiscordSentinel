@@ -686,7 +686,6 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                             ctx, guild_id, user_id, new_level,
                                         )
                                         .await;
-                                        return;
                                     }
                                 }
                                 Err(e) => {

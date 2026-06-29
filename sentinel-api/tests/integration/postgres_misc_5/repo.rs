@@ -76,8 +76,8 @@ async fn temp_role_create_and_list() {
     repo.create(&g, &u, "role1", &future).await.unwrap();
     let list = repo.list_active(&g).await.unwrap();
     assert_eq!(list.len(), 1);
-    assert_eq!(list[0].user_id, u);
-    assert_eq!(list[0].role_id, "role1");
+    assert_eq!(list[0].user_id.as_str(), u);
+    assert_eq!(list[0].role_id.as_str(), "role1");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

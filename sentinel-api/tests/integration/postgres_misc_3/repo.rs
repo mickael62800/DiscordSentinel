@@ -260,7 +260,7 @@ async fn taunts_get_or_init_creates_default_row() {
     let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     let cfg = repo.get_or_init_config(&g).await.unwrap();
-    assert_eq!(cfg.guild_id, g);
+    assert_eq!(cfg.guild_id.as_str(), g);
     assert!(cfg.enabled); // default enabled=true
     assert!(cfg.channel_id.is_none());
 }

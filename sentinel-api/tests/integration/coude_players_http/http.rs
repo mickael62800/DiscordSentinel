@@ -84,9 +84,17 @@ struct MockPlayers {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayers {
-    async fn get_or_create(&self, g: String, u: String, n: String) -> Result<Player, DomainError> {
-        self.created.lock().unwrap().push((g.clone(), u.clone(), n));
-        Ok(sample_player(&g, &u))
+    async fn get_or_create(
+        &self,
+        g: sentinel_core::domain::entities::system::discord_ids::GuildId,
+        u: sentinel_core::domain::entities::system::discord_ids::UserId,
+        n: String,
+    ) -> Result<Player, DomainError> {
+        self.created
+            .lock()
+            .unwrap()
+            .push((g.to_string(), u.to_string(), n));
+        Ok(sample_player(g.as_str(), u.as_str()))
     }
     async fn get(&self, g: &str, u: &str) -> Result<Player, DomainError> {
         if *self.fail_get.lock().unwrap() {

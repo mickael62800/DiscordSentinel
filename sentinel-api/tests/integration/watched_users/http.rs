@@ -58,7 +58,7 @@ impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
         let users = self.users.lock().unwrap();
         let matching: Vec<WatchedUser> = users
             .iter()
-            .filter(|u| guild_id.is_none_or(|g| u.guild_id == g))
+            .filter(|u| guild_id.is_none_or(|g| u.guild_id.as_str() == g))
             .skip(offset as usize)
             .take(limit as usize)
             .cloned()
@@ -76,7 +76,7 @@ impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
         let users = self.users.lock().unwrap();
         let user = users
             .iter()
-            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
+            .find(|u| u.guild_id.as_str() == guild_id && u.user_id.as_str() == user_id)
             .cloned()
             .ok_or_else(|| DomainError::NotFound("user".into()))?;
         Ok(UserDossier {

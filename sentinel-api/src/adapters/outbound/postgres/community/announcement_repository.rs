@@ -60,7 +60,7 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
         let chans: Vec<String> = serde_json::from_value(r.channel_ids).unwrap_or_default();
         Self {
             id: r.id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             name: r.name,
             enabled: r.enabled,
             recurrence_type: RecurrenceType::from_str(&r.recurrence_type)
@@ -84,7 +84,7 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
             channel_ids: chans,
             buttons: serde_json::from_value(r.buttons).unwrap_or_default(),
             auto_reactions: serde_json::from_value(r.auto_reactions).unwrap_or_default(),
-            created_by: r.created_by.into(),
+            created_by: r.created_by,
             created_at: r.created_at,
             updated_at: r.updated_at,
             last_run_at: r.last_run_at,
@@ -111,7 +111,7 @@ impl From<RunRow> for AnnouncementRun {
         Self {
             id: r.id,
             announcement_id: r.announcement_id,
-            guild_id: r.guild_id.into(),
+            guild_id: r.guild_id,
             ran_at: r.ran_at,
             channels_posted: channels,
             status: RunStatus::from_str(&r.status).unwrap_or(RunStatus::Error),
@@ -444,7 +444,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 id: r.id,
                 announcement_id: r.announcement_id,
                 run_id: r.run_id,
-                user_id: r.user_id.into(),
+                user_id: r.user_id,
                 user_name: r.user_name,
                 button_custom_id: r.button_custom_id,
                 button_label: r.button_label,

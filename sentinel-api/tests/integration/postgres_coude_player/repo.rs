@@ -7,6 +7,8 @@ use uuid::Uuid;
 use sentinel_api::adapters::outbound::postgres::coude::player_repository::PgPlayerRepository;
 use sentinel_api::ports::outbound::coude::player_repository::PlayerRepository;
 use sentinel_core::domain::entities::coude::player::CombatStat;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -29,8 +31,8 @@ async fn get_or_create_creates_new_player() {
     let g = fresh_id();
     let u = fresh_id();
     let p = repo.get_or_create(&g, &u, "Alice").await.unwrap();
-    assert_eq!(p.guild_id, g);
-    assert_eq!(p.user_id, u);
+    assert_eq!(p.guild_id, GuildId::new(g));
+    assert_eq!(p.user_id, UserId::new(u));
     assert_eq!(p.username, "Alice");
     assert_eq!(p.level, 1);
 }

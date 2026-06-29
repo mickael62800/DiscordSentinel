@@ -133,6 +133,7 @@ fn sample_inf(action: Action) -> Infraction {
         channel_id: "c".into(),
         user_id: "u".into(),
         username: "u".into(),
+        display_name: None,
         message_id: "m".into(),
         content: "".into(),
         flags: DetectionFlags {
@@ -215,13 +216,30 @@ impl CachePort for MockCache {
     }
 }
 
+struct MockServiceRegistry;
+#[async_trait::async_trait]
+impl crate::ports::outbound::system::service_registry::ServiceRegistry for MockServiceRegistry {
+    async fn count_services(
+        &self,
+    ) -> crate::ports::outbound::system::service_registry::ServiceCounts {
+        crate::ports::outbound::system::service_registry::ServiceCounts {
+            bots_online: 0,
+            bots_total: 0,
+            workers_online: 0,
+            workers_total: 0,
+        }
+    }
+    async fn ping(&self) -> bool {
+        true
+    }
+}
+
 fn make_service(
     stats: Arc<MockStatsRepo>,
     inf: Arc<MockInfractionRepo>,
     cache: Arc<MockCache>,
 ) -> ManageStatsService {
-    let redis = redis::Client::open("redis://127.0.0.1:6379").unwrap();
-    ManageStatsService::new(stats, inf, cache, redis)
+    ManageStatsService::new(stats, inf, cache, Arc::new(MockServiceRegistry))
 }
 
 // ══════════════════════════════════════════════════════════
@@ -332,7 +350,7 @@ async fn get_guild_overview_aggregates_and_counts_infractions_by_action() {
     ];
     let svc = make_service(s, inf, Arc::new(MockCache::default()));
     let ov = svc.get_guild_overview("g").await.unwrap();
-    assert_eq!(ov.guild_id, "g");
+    assert_eq!(ov.guild_id.as_str(), "g");
     assert_eq!(ov.total_messages, 30);
     assert_eq!(ov.total_voice_seconds, 300);
     assert_eq!(ov.active_members, 2);

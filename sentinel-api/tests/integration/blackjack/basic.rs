@@ -6,6 +6,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use sentinel_api::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
 use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use sentinel_api::application::casino::blackjack_service::BlackjackService;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
@@ -113,7 +115,14 @@ fn build_service(pool: PgPool) -> BlackjackService {
     let bj_repo = Arc::new(PgBlackjackRepository::new(pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pool.clone()));
     let taunts_uc: Arc<dyn ManageCoudeTauntsUseCase> = Arc::new(NoopTauntsUc);
-    let wallet_uc = Arc::new(ManageWalletService::new(wallet_repo.clone(), taunts_uc));
+    let member_repo = Arc::new(PgMemberRepository::new(pool.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool.clone()));
+    let wallet_uc = Arc::new(ManageWalletService::new(
+        wallet_repo.clone(),
+        taunts_uc,
+        member_repo,
+        bot_config_repo,
+    ));
     BlackjackService::new(bj_repo, wallet_repo, wallet_uc)
 }
 
@@ -134,7 +143,7 @@ async fn blackjack_start_game_debits_wallet() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             100,
@@ -171,7 +180,7 @@ async fn blackjack_cannot_start_two_games() {
     let svc = build_service(pool.clone());
     let game1 = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             50,
@@ -188,7 +197,7 @@ async fn blackjack_cannot_start_two_games() {
     if game1.status == "playing" {
         let game2 = svc
             .start_game(
-                gid.clone(),
+                gid.clone().into(),
                 "player1".into(),
                 "Alice".into(),
                 50,
@@ -215,7 +224,7 @@ async fn blackjack_hit_and_stand() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             50,
@@ -260,7 +269,7 @@ async fn blackjack_wallet_balance_conserved() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             100,
@@ -306,7 +315,7 @@ async fn blackjack_double_down_debits_additional_bet() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             50,
@@ -347,7 +356,7 @@ async fn blackjack_double_down_rejected_after_hit() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "player1".into(),
             "Alice".into(),
             50,
@@ -393,7 +402,7 @@ async fn blackjack_get_active_returns_playing_game() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "p1".into(),
             "Alice".into(),
             50,
@@ -424,7 +433,7 @@ async fn blackjack_list_games_returns_created_games() {
         .unwrap();
     let svc = build_service(pool.clone());
     svc.start_game(
-        gid.clone(),
+        gid.clone().into(),
         "p1".into(),
         "Alice".into(),
         50,
@@ -451,7 +460,7 @@ async fn blackjack_cancel_game_refunds_wallet() {
     let svc = build_service(pool.clone());
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "p1".into(),
             "Alice".into(),
             50,
@@ -503,7 +512,16 @@ async fn blackjack_start_game_rejects_bet_below_min() {
     let gid = unique_guild();
     let svc = build_service(pool);
     let err = svc
-        .start_game(gid, "p1".into(), "Alice".into(), 5, 10, 10000, 500, 1.5)
+        .start_game(
+            gid.into(),
+            "p1".into(),
+            "Alice".into(),
+            5,
+            10,
+            10000,
+            500,
+            1.5,
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
@@ -516,7 +534,7 @@ async fn blackjack_start_game_rejects_bet_above_max() {
     let svc = build_service(pool);
     let err = svc
         .start_game(
-            gid,
+            gid.into(),
             "p1".into(),
             "Alice".into(),
             99_999,
@@ -542,7 +560,7 @@ async fn blackjack_start_game_conflict_when_game_already_active() {
     let svc = build_service(pool);
     let game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "p1".into(),
             "Alice".into(),
             50,
@@ -558,7 +576,16 @@ async fn blackjack_start_game_conflict_when_game_already_active() {
         return;
     }
     let err = svc
-        .start_game(gid, "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5)
+        .start_game(
+            gid.into(),
+            "p1".into(),
+            "Alice".into(),
+            50,
+            10,
+            10000,
+            1000,
+            1.5,
+        )
         .await
         .unwrap_err();
     assert!(matches!(err, DomainError::Conflict(_)));
@@ -577,7 +604,7 @@ async fn blackjack_hit_rejects_when_game_not_playing() {
     let svc = build_service(pool);
     let mut game = svc
         .start_game(
-            gid.clone(),
+            gid.clone().into(),
             "p1".into(),
             "Alice".into(),
             50,
@@ -617,7 +644,7 @@ async fn blackjack_many_games_cover_various_outcomes() {
     for _ in 0..15 {
         let game = svc
             .start_game(
-                gid.clone(),
+                gid.clone().into(),
                 "p1".into(),
                 "Alice".into(),
                 50,

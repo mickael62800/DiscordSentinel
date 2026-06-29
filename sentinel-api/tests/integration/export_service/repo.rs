@@ -2,9 +2,12 @@
 //! (infractions, audit_logs, moderation_actions) x 2 formats (csv, json) +
 //! les branches d'erreur (job_type inconnu, format inconnu).
 
+use std::sync::Arc;
+
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use sentinel_api::adapters::outbound::postgres::system::export_repository::PgExportRepository;
 use sentinel_api::application::system::export_service::ExecuteExportUseCase;
 use sentinel_api::application::system::export_service::ExportService;
 async fn pool() -> PgPool {
@@ -56,7 +59,7 @@ async fn seed_moderation_action(p: &PgPool, guild: &str) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_unknown_job_type_returns_validation_error() {
-    let svc = ExportService::new(pool().await);
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(pool().await)));
     let err = svc
         .execute(&fresh_id(), "unknown_job", "csv", 100)
         .await
@@ -67,7 +70,7 @@ async fn execute_unknown_job_type_returns_validation_error() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_infractions_csv_includes_header_and_row() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_infraction(&p, &g).await;
     let res = svc.execute(&g, "infractions", "csv", 100).await.unwrap();
@@ -80,7 +83,7 @@ async fn execute_infractions_csv_includes_header_and_row() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_infractions_json_serializes_array() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_infraction(&p, &g).await;
     let res = svc.execute(&g, "infractions", "json", 100).await.unwrap();
@@ -92,7 +95,7 @@ async fn execute_infractions_json_serializes_array() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_audit_logs_csv() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_audit_log(&p, &g).await;
     let res = svc.execute(&g, "audit_logs", "csv", 100).await.unwrap();
@@ -104,7 +107,7 @@ async fn execute_audit_logs_csv() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_moderation_actions_json() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
     let res = svc
@@ -118,7 +121,7 @@ async fn execute_moderation_actions_json() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_unknown_format_returns_validation_error() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_infraction(&p, &g).await;
     let err = svc
@@ -132,7 +135,7 @@ async fn execute_unknown_format_returns_validation_error() {
 async fn execute_max_rows_clamped_to_minimum_one() {
     // max_rows <= 0 est clampe a 1 (min).
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_infraction(&p, &g).await;
     seed_infraction(&p, &g).await;
@@ -142,7 +145,7 @@ async fn execute_max_rows_clamped_to_minimum_one() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_empty_guild_returns_header_only_csv() {
-    let svc = ExportService::new(pool().await);
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(pool().await)));
     let res = svc
         .execute(&fresh_id(), "infractions", "csv", 100)
         .await
@@ -156,7 +159,7 @@ async fn execute_empty_guild_returns_header_only_csv() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_moderation_actions_csv() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
     let res = svc
@@ -171,7 +174,7 @@ async fn execute_moderation_actions_csv() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_audit_logs_json() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_audit_log(&p, &g).await;
     let res = svc.execute(&g, "audit_logs", "json", 100).await.unwrap();
@@ -182,7 +185,7 @@ async fn execute_audit_logs_json() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_audit_logs_unknown_format_returns_error() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_audit_log(&p, &g).await;
     let err = svc.execute(&g, "audit_logs", "xml", 100).await.unwrap_err();
@@ -192,7 +195,7 @@ async fn execute_audit_logs_unknown_format_returns_error() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_moderation_actions_unknown_format_returns_error() {
     let p = pool().await;
-    let svc = ExportService::new(p.clone());
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(p.clone())));
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
     let err = svc
@@ -206,7 +209,7 @@ async fn execute_moderation_actions_unknown_format_returns_error() {
 async fn execute_max_rows_clamped_to_50k_cap() {
     // max_rows > 50_000 est clampe a 50_000. Sans donnees, on verifie juste que
     // l'appel reussit sans depassement numerique.
-    let svc = ExportService::new(pool().await);
+    let svc = ExportService::new(Arc::new(PgExportRepository::new(pool().await)));
     let res = svc
         .execute(&fresh_id(), "infractions", "csv", 1_000_000)
         .await

@@ -332,7 +332,7 @@ async fn get_user_dossier_found_returns_empty_dossier() {
     r.users.lock().unwrap().push(sample_watched("u1"));
     let svc = make_service(r);
     let d = svc.get_user_dossier("g", "u1").await.unwrap();
-    assert_eq!(d.user.user_id, "u1");
+    assert_eq!(d.user.user_id.as_str(), "u1");
     assert!(d.infractions.is_empty());
     assert!(d.moderation_actions.is_empty());
     assert!(d.security_events.is_empty());

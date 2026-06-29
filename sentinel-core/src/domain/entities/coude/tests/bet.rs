@@ -186,7 +186,7 @@ fn rounding_loss_bounded_by_winner_count() {
     ];
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
     let total: i64 = plan.payouts.iter().map(|p| p.payout).sum();
-    assert!(total >= 253 && total <= 256, "total {total} hors tolerance");
+    assert!((253..=256).contains(&total), "total {total} hors tolerance");
 
     // Cas avec rounding : 3 parts de 100 sur pot de 100 ne divise pas exactement.
     // 100*0.85 = 85, part = 100/100 * 85 = 85. OK.

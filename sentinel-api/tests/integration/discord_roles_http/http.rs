@@ -68,7 +68,7 @@ impl DiscordRoleRepository for MockDiscordRoleRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|r| r.guild_id == guild_id)
+            .filter(|r| r.guild_id == guild_id.into())
             .cloned()
             .collect())
     }
@@ -82,7 +82,7 @@ impl DiscordRoleRepository for MockDiscordRoleRepo {
             .lock()
             .unwrap()
             .iter()
-            .find(|r| r.guild_id == guild_id && r.id == role_id)
+            .find(|r| r.guild_id == guild_id.into() && r.id == role_id)
             .cloned())
     }
 }

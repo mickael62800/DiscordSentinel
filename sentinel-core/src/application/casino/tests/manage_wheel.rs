@@ -7,8 +7,6 @@ use std::sync::Mutex as StdMutex;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::Postgres;
-use sqlx::Transaction;
 use uuid::Uuid;
 
 use crate::application::casino::manage_wheel_service::ManageWheelService;
@@ -128,15 +126,24 @@ impl ManageWalletUseCase for MockWalletUc {
     }
 }
 
-fn lazy_pool() -> sqlx::PgPool {
-    sqlx::postgres::PgPoolOptions::new()
-        .max_connections(1)
-        .connect_lazy("postgres://nobody@localhost:5432/none")
-        .expect("lazy pool")
+// UnitOfWork factice : begin() echoue, ce qui permet aux tests de valider les
+// chemins business AVANT toute tx DB et de s'arreter sur une erreur non-validation.
+struct MockUow;
+#[async_trait]
+impl crate::ports::uow::UnitOfWork for MockUow {
+    async fn begin(&self) -> Result<Box<dyn crate::ports::uow::DbTx>, DomainError> {
+        Err(DomainError::Internal("no db in tests".into()))
+    }
+    async fn commit(&self, _tx: Box<dyn crate::ports::uow::DbTx>) -> Result<(), DomainError> {
+        Err(DomainError::Internal("no db in tests".into()))
+    }
+    async fn rollback(&self, _tx: Box<dyn crate::ports::uow::DbTx>) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn make_service(repo: Arc<MockWheelRepo>) -> ManageWheelService {
-    ManageWheelService::new(repo, Arc::new(MockWalletUc), lazy_pool())
+    ManageWheelService::new(repo, Arc::new(MockWalletUc), Arc::new(MockUow))
 }
 
 fn cmd() -> WheelSpinCommand {

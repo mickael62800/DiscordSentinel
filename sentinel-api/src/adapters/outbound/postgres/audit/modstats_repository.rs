@@ -50,7 +50,7 @@ impl ModstatsRepository for PgModstatsRepository {
         Ok(rows
             .into_iter()
             .map(|r| ModeratorStat {
-                moderator_id: r.moderator_id.into(),
+                moderator_id: r.moderator_id,
                 moderator_name: r.moderator_name,
                 action_count: r.action_count,
             })

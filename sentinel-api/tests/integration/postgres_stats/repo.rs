@@ -144,7 +144,7 @@ async fn save_voice_session_and_get_guild_voice_stats() {
     let stats = repo.get_guild_voice_stats(&g, 7, 10).await.unwrap();
     assert_eq!(stats.len(), 1);
     let row = &stats[0];
-    assert_eq!(row.channel_id, channel_id);
+    assert_eq!(row.channel_id.as_str(), channel_id);
     assert_eq!(row.total_sessions, 2);
     assert_eq!(row.total_duration_secs, 180);
     assert_eq!(row.unique_users, 2);

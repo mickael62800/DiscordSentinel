@@ -57,7 +57,7 @@ impl CursesRepository for MockCursesRepo {
             .unwrap()
             .iter()
             .find(|c| {
-                c.guild_id == guild_id
+                c.guild_id.as_str() == guild_id
                     && c.target_id == target_id
                     && c.lifted_at.is_none()
                     && c.expires_at > Utc::now()
@@ -197,6 +197,28 @@ impl WalletRepository for SpyWalletRepo {
     }
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
+    }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
     }
 }
 

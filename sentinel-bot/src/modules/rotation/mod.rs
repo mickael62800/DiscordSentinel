@@ -388,7 +388,7 @@ async fn pick_candidate(
             None => (0, String::new()),          // jamais servi : prioritaire
         }
     };
-    eligible.sort_by(|a, b| rank(*a).cmp(&rank(*b)));
+    eligible.sort_by_key(|a| rank(*a));
     eligible.first().map(|id| UserId::new(*id))
 }
 

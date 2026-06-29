@@ -88,7 +88,7 @@ impl ModerationRepository for InMemoryModerationRepo {
         let actions = self.actions.lock().await;
         Ok(actions
             .iter()
-            .filter(|a| a.guild_id == guild_id && a.target_id == target_id)
+            .filter(|a| a.guild_id.as_str() == guild_id && a.target_id == target_id)
             .cloned()
             .collect())
     }
@@ -103,7 +103,7 @@ impl ModerationRepository for InMemoryModerationRepo {
         Ok(actions
             .iter()
             .filter(|a| a.action_type.starts_with("ban"))
-            .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
+            .filter(|a| guild_id.is_none_or(|g| a.guild_id.as_str() == g))
             .cloned()
             .collect())
     }
@@ -115,7 +115,7 @@ impl ModerationRepository for InMemoryModerationRepo {
     ) -> Result<(), DomainError> {
         let mut actions = self.actions.lock().await;
         actions.retain(|a| {
-            !(a.guild_id == guild_id
+            !(a.guild_id.as_str() == guild_id
                 && a.target_id == target_id
                 && a.action_type.starts_with("ban"))
         });
@@ -284,8 +284,8 @@ async fn log_action_preserves_all_fields() {
         })
         .await
         .unwrap();
-    assert_eq!(action.guild_id, "g1");
-    assert_eq!(action.channel_id, "c1");
+    assert_eq!(action.guild_id.as_str(), "g1");
+    assert_eq!(action.channel_id.as_str(), "c1");
     assert_eq!(action.moderator_id, "m1");
     assert_eq!(action.target_id, "t1");
     assert_eq!(action.action_type, "ban_temp");
@@ -433,7 +433,7 @@ async fn list_bans_filters_by_guild() {
 
     let bans = svc.list_bans(Some("guild1"), 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
-    assert_eq!(bans[0].guild_id, "guild1");
+    assert_eq!(bans[0].guild_id.as_str(), "guild1");
 }
 
 // ══════════════════════════════════════════════════════════

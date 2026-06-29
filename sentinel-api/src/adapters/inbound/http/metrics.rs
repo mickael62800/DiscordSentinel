@@ -111,6 +111,53 @@ pub async fn metrics_middleware(req: Request<axum::body::Body>, next: Next) -> R
     response
 }
 
+/// Démarre une boucle qui échantillonne les métriques runtime tokio toutes les
+/// 10 secondes (configurable via `TOKIO_METRICS_INTERVAL_SECS`).
+///
+/// Métriques exposées (n'utilise que des champs **stables** de `tokio-metrics`,
+/// pas besoin de `RUSTFLAGS="--cfg tokio_unstable"`) :
+/// - `tokio_workers_count` : nombre de workers du runtime
+/// - `tokio_live_tasks_count` : tâches vivantes au moment du snapshot
+/// - `tokio_busy_ratio` : ratio (0..1) du temps total où un worker est busy
+///   (saturation effective du runtime — au-delà de 0.7 = signal d'alerte)
+/// - `tokio_global_queue_depth` : profondeur de la file globale
+/// - `tokio_total_park_count` : nombre cumulé de parks (workers en attente)
+/// - `tokio_max_busy_duration_seconds` : worker le plus chargé sur la fenêtre
+///
+/// Doit être appelée depuis un context tokio actif (typiquement depuis `main`
+/// après `init_prometheus`).
+pub fn spawn_tokio_runtime_sampler() {
+    let monitor = tokio_metrics::RuntimeMonitor::new(&tokio::runtime::Handle::current());
+
+    tokio::spawn(async move {
+        let interval_secs: u64 = std::env::var("TOKIO_METRICS_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(10);
+
+        let mut intervals = monitor.intervals();
+        loop {
+            tokio::time::sleep(Duration::from_secs(interval_secs)).await;
+
+            if let Some(snapshot) = intervals.next() {
+                metrics::gauge!("tokio_workers_count").set(snapshot.workers_count as f64);
+                metrics::gauge!("tokio_live_tasks_count").set(snapshot.live_tasks_count as f64);
+                metrics::gauge!("tokio_global_queue_depth").set(snapshot.global_queue_depth as f64);
+                metrics::gauge!("tokio_total_park_count").set(snapshot.total_park_count as f64);
+                metrics::gauge!("tokio_max_busy_duration_seconds")
+                    .set(snapshot.max_busy_duration.as_secs_f64());
+
+                // busy_ratio = busy_total / (workers * elapsed) sur la fenêtre
+                let busy = snapshot.total_busy_duration.as_secs_f64();
+                let elapsed = snapshot.elapsed.as_secs_f64();
+                let total = (snapshot.workers_count as f64) * elapsed.max(1e-6);
+                let ratio = if total > 0.0 { busy / total } else { 0.0 };
+                metrics::gauge!("tokio_busy_ratio").set(ratio);
+            }
+        }
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,51 +249,4 @@ mod tests {
         let resp = app.oneshot(req).await.unwrap();
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
     }
-}
-
-/// Démarre une boucle qui échantillonne les métriques runtime tokio toutes les
-/// 10 secondes (configurable via `TOKIO_METRICS_INTERVAL_SECS`).
-///
-/// Métriques exposées (n'utilise que des champs **stables** de `tokio-metrics`,
-/// pas besoin de `RUSTFLAGS="--cfg tokio_unstable"`) :
-/// - `tokio_workers_count` : nombre de workers du runtime
-/// - `tokio_live_tasks_count` : tâches vivantes au moment du snapshot
-/// - `tokio_busy_ratio` : ratio (0..1) du temps total où un worker est busy
-///   (saturation effective du runtime — au-delà de 0.7 = signal d'alerte)
-/// - `tokio_global_queue_depth` : profondeur de la file globale
-/// - `tokio_total_park_count` : nombre cumulé de parks (workers en attente)
-/// - `tokio_max_busy_duration_seconds` : worker le plus chargé sur la fenêtre
-///
-/// Doit être appelée depuis un context tokio actif (typiquement depuis `main`
-/// après `init_prometheus`).
-pub fn spawn_tokio_runtime_sampler() {
-    let monitor = tokio_metrics::RuntimeMonitor::new(&tokio::runtime::Handle::current());
-
-    tokio::spawn(async move {
-        let interval_secs: u64 = std::env::var("TOKIO_METRICS_INTERVAL_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(10);
-
-        let mut intervals = monitor.intervals();
-        loop {
-            tokio::time::sleep(Duration::from_secs(interval_secs)).await;
-
-            if let Some(snapshot) = intervals.next() {
-                metrics::gauge!("tokio_workers_count").set(snapshot.workers_count as f64);
-                metrics::gauge!("tokio_live_tasks_count").set(snapshot.live_tasks_count as f64);
-                metrics::gauge!("tokio_global_queue_depth").set(snapshot.global_queue_depth as f64);
-                metrics::gauge!("tokio_total_park_count").set(snapshot.total_park_count as f64);
-                metrics::gauge!("tokio_max_busy_duration_seconds")
-                    .set(snapshot.max_busy_duration.as_secs_f64());
-
-                // busy_ratio = busy_total / (workers * elapsed) sur la fenêtre
-                let busy = snapshot.total_busy_duration.as_secs_f64();
-                let elapsed = snapshot.elapsed.as_secs_f64();
-                let total = (snapshot.workers_count as f64) * elapsed.max(1e-6);
-                let ratio = if total > 0.0 { busy / total } else { 0.0 };
-                metrics::gauge!("tokio_busy_ratio").set(ratio);
-            }
-        }
-    });
 }

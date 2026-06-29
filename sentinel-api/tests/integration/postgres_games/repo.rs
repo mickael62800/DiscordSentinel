@@ -5,6 +5,9 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
 use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
+use sentinel_core::domain::entities::system::discord_ids::ChannelId;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::MessageId;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -34,7 +37,7 @@ async fn create_and_list_returns_game() {
         .await
         .unwrap();
     assert_eq!(created.game_name, "Minecraft");
-    assert_eq!(created.guild_id, g);
+    assert_eq!(created.guild_id, GuildId::new(g.clone()));
 
     let list = repo.list(&g).await.unwrap();
     assert_eq!(list.len(), 1);
@@ -196,15 +199,15 @@ async fn save_and_find_panel_by_message() {
         .save_panel(&g, "chan1", "msg1", Some("MOBA"))
         .await
         .unwrap();
-    assert_eq!(panel.channel_id, "chan1");
-    assert_eq!(panel.message_id, "msg1");
+    assert_eq!(panel.channel_id, ChannelId::new("chan1"));
+    assert_eq!(panel.message_id, MessageId::new("msg1"));
 
     let got = repo
         .find_panel_by_message(&g, "msg1")
         .await
         .unwrap()
         .unwrap();
-    assert_eq!(got.channel_id, "chan1");
+    assert_eq!(got.channel_id, ChannelId::new("chan1"));
     assert!(repo
         .find_panel_by_message(&g, "nonexistent")
         .await

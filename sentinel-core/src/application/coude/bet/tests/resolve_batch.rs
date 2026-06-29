@@ -402,6 +402,28 @@ impl WalletRepository for MockWalletRepo {
     async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
         Ok(0)
     }
+    async fn credit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
+    async fn debit_in_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(i64, i64), DomainError> {
+        unimplemented!()
+    }
 }
 
 #[derive(Default)]
@@ -722,7 +744,7 @@ fn build_service() -> (
     let inventory_uc = Arc::new(MockInventoryUc::default());
     let social_uc = Arc::new(MockSocialUc::default());
     let taunts_uc = Arc::new(MockTauntsUc::default());
-    let bot_config_repo = Arc::new(MockBotConfig::default());
+    let bot_config_repo = Arc::new(MockBotConfig);
 
     let svc = ResolveBettingBatchService::new(
         combat_repo.clone(),
@@ -888,7 +910,7 @@ async fn resolve_batch_output_preserves_combat_metadata() {
 
     let out = svc.resolve_batch().await.unwrap();
     assert_eq!(out[0].combat_id, combat_id.to_string());
-    assert_eq!(out[0].guild_id, "g");
+    assert_eq!(out[0].guild_id.as_str(), "g");
     assert_eq!(out[0].channel_id.as_deref(), Some("c1"));
     assert_eq!(out[0].message_id.as_deref(), Some("msg1"));
 }
@@ -1054,7 +1076,7 @@ fn build_service_cfg(
     let inventory_uc = Arc::new(MockInventoryUc::default());
     let social_uc = Arc::new(MockSocialUc::default());
     let taunts_uc = Arc::new(MockTauntsUc::default());
-    let bot_config_repo = Arc::new(MockBotConfig::default());
+    let bot_config_repo = Arc::new(MockBotConfig);
 
     let mut cfg = BatchCfg {
         inventory: inventory_uc.clone(),

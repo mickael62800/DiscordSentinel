@@ -111,7 +111,7 @@ impl ReviewRepository for MockReviewRepo {
             .lock()
             .unwrap()
             .iter()
-            .filter(|r| r.guild_id == guild_id && r.status == "pending")
+            .filter(|r| r.guild_id.as_str() == guild_id && r.status == "pending")
             .cloned()
             .collect())
     }
@@ -144,7 +144,7 @@ impl ReviewRepository for MockReviewRepo {
             .unwrap()
             .iter()
             .find(|r| r.id == review_id)
-            .map(|r| r.guild_id.clone()))
+            .map(|r| r.guild_id.as_str().to_string()))
     }
 }
 
@@ -196,6 +196,7 @@ fn build_state_with_discord_mock() -> AppState {
                     .and_then(ModerationGravity::from_str_lossy),
                 duration: cmd.duration,
                 created_at: Utc::now(),
+                target_display_name: None,
             })
         }
         async fn get_history(
@@ -1051,6 +1052,7 @@ fn build_state_full_mocks() -> AppState {
                     .and_then(ModerationGravity::from_str_lossy),
                 duration: cmd.duration,
                 created_at: Utc::now(),
+                target_display_name: None,
             })
         }
         async fn get_history(

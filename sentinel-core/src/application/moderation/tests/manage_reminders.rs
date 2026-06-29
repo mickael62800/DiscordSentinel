@@ -68,7 +68,7 @@ impl ReminderRepository for InMemoryReminderRepo {
         let reminders = self.reminders.lock().await;
         Ok(reminders
             .iter()
-            .filter(|r| r.guild_id == guild_id)
+            .filter(|r| r.guild_id.as_str() == guild_id)
             .cloned()
             .collect())
     }
@@ -108,7 +108,7 @@ async fn create_reminder_success() {
     let result = svc.create_reminder(make_cmd(7200, 3600)).await;
     assert!(result.is_ok());
     let r = result.unwrap();
-    assert_eq!(r.guild_id, "g1");
+    assert_eq!(r.guild_id.as_str(), "g1");
     assert_eq!(r.moderator_id, "mod1");
     assert_eq!(r.status, "pending");
     assert!(r.remind_at < r.expires_at);
