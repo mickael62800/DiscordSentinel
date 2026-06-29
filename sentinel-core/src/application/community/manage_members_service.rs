@@ -78,12 +78,28 @@ impl ManageMembersUseCase for ManageMembersService {
             .iter()
             .take(10)
             .map(|i| {
+                // Pour une vraie sanction (warn/mute/ban/delete) on affiche l'action.
+                // Pour une simple detection automod (action `none`), on precise le
+                // motif reel via les flags actifs (spam, insult, link, phishing...)
+                // plutot que d'afficher un "none" trompeur.
+                let action_label = match i.action.as_str() {
+                    "none" => {
+                        let flags: Vec<&str> =
+                            i.flags.active_flags().iter().map(|f| f.as_str()).collect();
+                        if flags.is_empty() {
+                            "détection".to_string()
+                        } else {
+                            format!("détection: {}", flags.join(", "))
+                        }
+                    }
+                    other => other.to_string(),
+                };
                 serde_json::json!({
                     "id": i.id.to_string(),
                     "created_at": i.created_at.to_rfc3339(),
                     "reason": i.reason,
                     "score": i.score,
-                    "action": format!("{:?}", i.action),
+                    "action": action_label,
                     "content": i.content,
                 })
             })
