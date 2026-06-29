@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -91,7 +91,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(game.finished_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("blackjack create ", e))?;
+        .map_err(pg_ctx("blackjack create "))?;
 
         Ok(())
     }
@@ -119,7 +119,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("blackjack get_active ", e))?;
+        .map_err(pg_ctx("blackjack get_active "))?;
 
         Ok(row.map(BlackjackGame::from))
     }
@@ -154,7 +154,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(game.id)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("blackjack update ", e))?;
+        .map_err(pg_ctx("blackjack update "))?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::Conflict(
@@ -174,7 +174,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("blackjack get_by_id ", e))?;
+        .map_err(pg_ctx("blackjack get_by_id "))?;
 
         Ok(row.map(BlackjackGame::from))
     }
@@ -206,7 +206,7 @@ impl BlackjackRepository for PgBlackjackRepository {
             .bind(guild_id)
             .fetch_all(&self.pool).await
         }
-        .map_err(|e| pg_err_ctx("blackjack list_by_guild ", e))?;
+        .map_err(pg_ctx("blackjack list_by_guild "))?;
 
         Ok(rows.into_iter().map(BlackjackGame::from).collect())
     }
@@ -216,7 +216,7 @@ impl BlackjackRepository for PgBlackjackRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| pg_err_ctx("cancel_game begin ", e))?;
+            .map_err(pg_ctx("cancel_game begin "))?;
 
         // Recupere la partie pour obtenir la mise et valider le status.
         let row = sqlx::query_as::<_, BlackjackRow>(
@@ -225,7 +225,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         )
         .bind(id)
         .fetch_optional(&mut *tx).await
-        .map_err(|e| pg_err_ctx("cancel_game select ", e))?
+        .map_err(pg_ctx("cancel_game select "))?
         .ok_or_else(|| DomainError::NotFound(format!("Partie blackjack {id} introuvable")))?;
 
         // Seules les parties en cours sont annulables.
@@ -247,7 +247,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(id)
         .execute(&mut *tx)
         .await
-        .map_err(|e| pg_err_ctx("cancel_game update ", e))?;
+        .map_err(pg_ctx("cancel_game update "))?;
 
         // Rembourse la mise sur le wallet du joueur.
         let refund = row.bet + if row.doubled { row.bet } else { 0 };
@@ -261,7 +261,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(row.user_id.as_str())
         .execute(&mut *tx)
         .await
-        .map_err(|e| pg_err_ctx("cancel_game refund ", e))?;
+        .map_err(pg_ctx("cancel_game refund "))?;
 
         sqlx::query(
             "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at)
@@ -274,11 +274,9 @@ impl BlackjackRepository for PgBlackjackRepository {
         .bind(row.user_id.as_str())
         .bind(refund)
         .execute(&mut *tx).await
-        .map_err(|e| pg_err_ctx("cancel_game audit ", e))?;
+        .map_err(pg_ctx("cancel_game audit "))?;
 
-        tx.commit()
-            .await
-            .map_err(|e| pg_err_ctx("cancel_game commit ", e))?;
+        tx.commit().await.map_err(pg_ctx("cancel_game commit "))?;
 
         tracing::info!(
             game_id = %id, guild_id = %row.guild_id, user_id = %row.user_id,

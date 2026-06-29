@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -57,13 +57,13 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| pg_err_ctx("Transaction error", e))?;
+            .map_err(pg_ctx("Transaction error"))?;
 
         sqlx::query("DELETE FROM discord_roles WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("Delete roles error", e))?;
+            .map_err(pg_ctx("Delete roles error"))?;
 
         for role in &roles {
             sqlx::query(
@@ -82,12 +82,10 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
             .bind(role.member_count)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("Insert role error", e))?;
+            .map_err(pg_ctx("Insert role error"))?;
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| pg_err_ctx("Commit error", e))?;
+        tx.commit().await.map_err(pg_ctx("Commit error"))?;
 
         Ok(())
     }
@@ -100,7 +98,7 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("Query roles error", e))?;
+        .map_err(pg_ctx("Query roles error"))?;
         Ok(rows.into_iter().map(DiscordRole::from).collect())
     }
 
@@ -117,7 +115,7 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
         .bind(role_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("Query role error", e))?;
+        .map_err(pg_ctx("Query role error"))?;
         Ok(row.map(DiscordRole::from))
     }
 }

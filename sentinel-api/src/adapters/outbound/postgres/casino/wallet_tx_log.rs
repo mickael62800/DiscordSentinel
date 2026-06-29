@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use sqlx::Postgres;
 use sqlx::Transaction;
 use uuid::Uuid;
@@ -37,6 +37,6 @@ pub async fn log_wallet_tx(
     .bind(description)
     .execute(&mut **tx)
     .await
-    .map_err(|e| pg_err_ctx("log_wallet_tx", e))?;
+    .map_err(pg_ctx("log_wallet_tx"))?;
     Ok(())
 }

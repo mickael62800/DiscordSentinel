@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -66,7 +66,7 @@ impl NotesRepository for PgNotesRepository {
         .bind(note.updated_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("save_note", e))?;
+        .map_err(pg_ctx("save_note"))?;
         Ok(())
     }
 
@@ -83,7 +83,7 @@ impl NotesRepository for PgNotesRepository {
         .bind(user_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_notes", e))?;
+        .map_err(pg_ctx("find_notes"))?;
 
         Ok(rows.into_iter().map(UserNote::from).collect())
     }
@@ -96,7 +96,7 @@ impl NotesRepository for PgNotesRepository {
             .bind(uuid)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete_note", e))?;
+            .map_err(pg_ctx("delete_note"))?;
         Ok(())
     }
 }

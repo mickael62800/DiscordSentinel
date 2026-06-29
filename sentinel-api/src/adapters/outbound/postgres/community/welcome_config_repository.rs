@@ -1,5 +1,5 @@
+use crate::adapters::outbound::postgres::pg_ctx;
 use crate::adapters::outbound::postgres::pg_err;
-use crate::adapters::outbound::postgres::pg_err_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -303,7 +303,7 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| pg_err_ctx("welcome save tx begin", e))?;
+            .map_err(pg_ctx("welcome save tx begin"))?;
 
         for (k, v) in &kvs {
             sqlx::query(
@@ -322,7 +322,7 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
 
         tx.commit()
             .await
-            .map_err(|e| pg_err_ctx("welcome save tx commit", e))?;
+            .map_err(pg_ctx("welcome save tx commit"))?;
 
         // Relit la config apres upsert pour garantir que get_config renverra bien
         // ce qui vient d'etre ecrit.

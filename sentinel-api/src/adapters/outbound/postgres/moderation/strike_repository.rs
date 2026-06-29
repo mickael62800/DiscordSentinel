@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Duration;
@@ -96,7 +96,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(strike.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("save_strike", e))?;
+        .map_err(pg_ctx("save_strike"))?;
         Ok(())
     }
 
@@ -120,7 +120,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(cutoff)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_active_strikes", e))?;
+        .map_err(pg_ctx("find_active_strikes"))?;
 
         Ok(rows.into_iter().map(UserStrike::from).collect())
     }
@@ -131,7 +131,7 @@ impl StrikeRepository for PgStrikeRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete_strikes", e))?;
+            .map_err(pg_ctx("delete_strikes"))?;
         Ok(())
     }
 
@@ -143,7 +143,7 @@ impl StrikeRepository for PgStrikeRepository {
             .bind(infraction_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete_strike_by_infraction_id", e))?;
+            .map_err(pg_ctx("delete_strike_by_infraction_id"))?;
         Ok(result.rows_affected())
     }
 
@@ -155,7 +155,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(guild_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("get_strike_config", e))?;
+        .map_err(pg_ctx("get_strike_config"))?;
 
         Ok(row.map(StrikeConfig::from))
     }
@@ -179,7 +179,7 @@ impl StrikeRepository for PgStrikeRepository {
         .bind(config.enabled)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("save_strike_config", e))?;
+        .map_err(pg_ctx("save_strike_config"))?;
 
         Ok(())
     }

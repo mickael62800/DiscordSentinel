@@ -1,5 +1,5 @@
+use crate::adapters::outbound::postgres::pg_ctx;
 use crate::adapters::outbound::postgres::pg_err;
-use crate::adapters::outbound::postgres::pg_err_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use std::str::FromStr;
@@ -310,7 +310,7 @@ impl ModerationRepository for PgModerationRepository {
                 .bind(action_id)
                 .fetch_optional(&self.pool)
                 .await
-                .map_err(|e| pg_err_ctx("fetch action guild_id", e))?;
+                .map_err(pg_ctx("fetch action guild_id"))?;
         Ok(row.map(|(g,)| g))
     }
 
@@ -333,7 +333,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(action_id.to_string())
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("fetch action", e))?;
+        .map_err(pg_ctx("fetch action"))?;
 
         Ok(
             row.map(|(guild_id, target_id_opt, target_name_opt, event_type)| {

@@ -27,6 +27,13 @@ pub(crate) fn pg_err_ctx(ctx: &'static str, e: sqlx::Error) -> DomainError {
     DomainError::Internal(format!("{ctx} pg: {e}"))
 }
 
+/// Variante curryfiee de [`pg_err_ctx`] : capture le contexte et renvoie une
+/// closure prete pour `.map_err(...)`. Evite la repetition de
+/// `|e| pg_err_ctx("ctx", e)` sur ~120 sites de repositories.
+pub(crate) fn pg_ctx(ctx: &'static str) -> impl FnOnce(sqlx::Error) -> DomainError {
+    move |e| pg_err_ctx(ctx, e)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

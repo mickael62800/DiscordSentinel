@@ -44,6 +44,25 @@ async fn try_cache_set<T: serde::Serialize>(state: &AppState, key: &str, value: 
     }
 }
 
+/// Wrapper cache-first generique : tente le cache, sinon execute `compute`,
+/// ecrit le resultat en cache (TTL `ANALYTICS_CACHE_TTL`) puis renvoie le Json.
+/// Factorise le pattern repete par les handlers analytics.
+async fn cached<T, F, Fut>(state: &AppState, key: &str, compute: F) -> Result<Json<T>, ApiError>
+where
+    T: serde::Serialize + serde::de::DeserializeOwned,
+    F: FnOnce() -> Fut,
+    Fut: std::future::Future<Output = Result<T, ApiError>>,
+{
+    if let Some(hit) = try_cache_get::<T>(state, key).await {
+        return Ok(Json(hit));
+    }
+
+    let value = compute().await?;
+    try_cache_set(state, key, &value).await;
+
+    Ok(Json(value))
+}
+
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete (cache 5min).
 pub async fn get_full_analytics(
     State(state): State<AppState>,
@@ -54,32 +73,26 @@ pub async fn get_full_analytics(
     let guild_id = params.guild_id.as_deref();
     let key = cache_key("full", guild_id, days, Some(limit));
 
-    // Cache-first
-    if let Some(cached) = try_cache_get::<FullAnalyticsDto>(&state, &key).await {
-        return Ok(Json(cached));
-    }
+    cached(&state, &key, || async {
+        let (heatmap, distribution, infractors, trend, peaks) = tokio::try_join!(
+            state.analytics_repo.get_heatmap(guild_id, days),
+            state.analytics_repo.get_action_distribution(guild_id, days),
+            state
+                .analytics_repo
+                .get_top_infractors(guild_id, days, limit, 0),
+            state.analytics_repo.get_moderation_trend(guild_id, days),
+            state.analytics_repo.get_peak_hours(guild_id, days),
+        )?;
 
-    let (heatmap, distribution, infractors, trend, peaks) = tokio::try_join!(
-        state.analytics_repo.get_heatmap(guild_id, days),
-        state.analytics_repo.get_action_distribution(guild_id, days),
-        state
-            .analytics_repo
-            .get_top_infractors(guild_id, days, limit, 0),
-        state.analytics_repo.get_moderation_trend(guild_id, days),
-        state.analytics_repo.get_peak_hours(guild_id, days),
-    )?;
-
-    let dto = FullAnalyticsDto {
-        heatmap: heatmap.into_iter().map(Into::into).collect(),
-        action_distribution: distribution.into_iter().map(Into::into).collect(),
-        top_infractors: infractors.into_iter().map(Into::into).collect(),
-        moderation_trend: trend.into_iter().map(Into::into).collect(),
-        peak_hours: peaks.into_iter().map(Into::into).collect(),
-    };
-
-    try_cache_set(&state, &key, &dto).await;
-
-    Ok(Json(dto))
+        Ok(FullAnalyticsDto {
+            heatmap: heatmap.into_iter().map(Into::into).collect(),
+            action_distribution: distribution.into_iter().map(Into::into).collect(),
+            top_infractors: infractors.into_iter().map(Into::into).collect(),
+            moderation_trend: trend.into_iter().map(Into::into).collect(),
+            peak_hours: peaks.into_iter().map(Into::into).collect(),
+        })
+    })
+    .await
 }
 
 /// GET /api/analytics/heatmap (cache 5min)
@@ -89,19 +102,14 @@ pub async fn get_heatmap(
 ) -> Result<Json<Vec<HeatmapPointDto>>, ApiError> {
     let key = cache_key("heatmap", params.guild_id.as_deref(), params.days(), None);
 
-    if let Some(cached) = try_cache_get::<Vec<HeatmapPointDto>>(&state, &key).await {
-        return Ok(Json(cached));
-    }
-
-    let data = state
-        .analytics_repo
-        .get_heatmap(params.guild_id.as_deref(), params.days())
-        .await?;
-    let dtos: Vec<HeatmapPointDto> = data.into_iter().map(Into::into).collect();
-
-    try_cache_set(&state, &key, &dtos).await;
-
-    Ok(Json(dtos))
+    cached(&state, &key, || async {
+        let data = state
+            .analytics_repo
+            .get_heatmap(params.guild_id.as_deref(), params.days())
+            .await?;
+        Ok(data.into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 /// GET /api/analytics/actions (cache 5min)
@@ -111,19 +119,14 @@ pub async fn get_action_distribution(
 ) -> Result<Json<Vec<ActionDistributionDto>>, ApiError> {
     let key = cache_key("actions", params.guild_id.as_deref(), params.days(), None);
 
-    if let Some(cached) = try_cache_get::<Vec<ActionDistributionDto>>(&state, &key).await {
-        return Ok(Json(cached));
-    }
-
-    let data = state
-        .analytics_repo
-        .get_action_distribution(params.guild_id.as_deref(), params.days())
-        .await?;
-    let dtos: Vec<ActionDistributionDto> = data.into_iter().map(Into::into).collect();
-
-    try_cache_set(&state, &key, &dtos).await;
-
-    Ok(Json(dtos))
+    cached(&state, &key, || async {
+        let data = state
+            .analytics_repo
+            .get_action_distribution(params.guild_id.as_deref(), params.days())
+            .await?;
+        Ok(data.into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 /// GET /api/analytics/top-infractors (cache 5min)
@@ -183,24 +186,19 @@ pub async fn get_top_infractors(
         Some(effective_limit),
     );
 
-    if let Some(cached) = try_cache_get::<Vec<TopInfractorDto>>(&state, &key).await {
-        return Ok(Json(cached));
-    }
-
-    let data = state
-        .analytics_repo
-        .get_top_infractors(
-            params.guild_id.as_deref(),
-            params.days(),
-            effective_limit,
-            min_total,
-        )
-        .await?;
-    let dtos: Vec<TopInfractorDto> = data.into_iter().map(Into::into).collect();
-
-    try_cache_set(&state, &key, &dtos).await;
-
-    Ok(Json(dtos))
+    cached(&state, &key, || async {
+        let data = state
+            .analytics_repo
+            .get_top_infractors(
+                params.guild_id.as_deref(),
+                params.days(),
+                effective_limit,
+                min_total,
+            )
+            .await?;
+        Ok(data.into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 /// GET /api/analytics/moderation-trend (cache 5min)
@@ -210,19 +208,14 @@ pub async fn get_moderation_trend(
 ) -> Result<Json<Vec<ModerationTrendDto>>, ApiError> {
     let key = cache_key("trend", params.guild_id.as_deref(), params.days(), None);
 
-    if let Some(cached) = try_cache_get::<Vec<ModerationTrendDto>>(&state, &key).await {
-        return Ok(Json(cached));
-    }
-
-    let data = state
-        .analytics_repo
-        .get_moderation_trend(params.guild_id.as_deref(), params.days())
-        .await?;
-    let dtos: Vec<ModerationTrendDto> = data.into_iter().map(Into::into).collect();
-
-    try_cache_set(&state, &key, &dtos).await;
-
-    Ok(Json(dtos))
+    cached(&state, &key, || async {
+        let data = state
+            .analytics_repo
+            .get_moderation_trend(params.guild_id.as_deref(), params.days())
+            .await?;
+        Ok(data.into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 /// GET /api/analytics/peak-hours (cache 5min)
@@ -232,19 +225,14 @@ pub async fn get_peak_hours(
 ) -> Result<Json<Vec<PeakHourDto>>, ApiError> {
     let key = cache_key("peaks", params.guild_id.as_deref(), params.days(), None);
 
-    if let Some(cached) = try_cache_get::<Vec<PeakHourDto>>(&state, &key).await {
-        return Ok(Json(cached));
-    }
-
-    let data = state
-        .analytics_repo
-        .get_peak_hours(params.guild_id.as_deref(), params.days())
-        .await?;
-    let dtos: Vec<PeakHourDto> = data.into_iter().map(Into::into).collect();
-
-    try_cache_set(&state, &key, &dtos).await;
-
-    Ok(Json(dtos))
+    cached(&state, &key, || async {
+        let data = state
+            .analytics_repo
+            .get_peak_hours(params.guild_id.as_deref(), params.days())
+            .await?;
+        Ok(data.into_iter().map(Into::into).collect())
+    })
+    .await
 }
 
 /// POST /api/analytics/reset?guild_id=X

@@ -1,5 +1,5 @@
+use crate::adapters::outbound::postgres::pg_ctx;
 use crate::adapters::outbound::postgres::pg_err;
-use crate::adapters::outbound::postgres::pg_err_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -134,7 +134,7 @@ impl AuditLogRepository for PgAuditLogRepository {
             .bind(days)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete_audit_logs_older", e))?;
+            .map_err(pg_ctx("delete_audit_logs_older"))?;
         Ok(result.rows_affected())
     }
 }

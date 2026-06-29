@@ -1,7 +1,7 @@
 //! Adapter Postgres du port `ExportRepository`. Execute les SELECT
 //! d'export et map vers les DTOs purs du port (sans sqlx::FromRow exposÃ©).
 
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
@@ -82,7 +82,7 @@ impl ExportRepository for PgExportRepository {
         .bind(max_rows)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("query infractions", e))?;
+        .map_err(pg_ctx("query infractions"))?;
         Ok(rows
             .into_iter()
             .map(|r| InfractionExport {
@@ -116,7 +116,7 @@ impl ExportRepository for PgExportRepository {
         .bind(max_rows)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("query audit_logs", e))?;
+        .map_err(pg_ctx("query audit_logs"))?;
         Ok(rows
             .into_iter()
             .map(|r| AuditLogExport {
@@ -148,7 +148,7 @@ impl ExportRepository for PgExportRepository {
         .bind(max_rows)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("query moderation_actions", e))?;
+        .map_err(pg_ctx("query moderation_actions"))?;
         Ok(rows
             .into_iter()
             .map(|r| ModerationActionExport {

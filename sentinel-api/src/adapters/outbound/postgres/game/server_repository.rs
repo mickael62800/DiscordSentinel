@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
@@ -100,7 +100,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(new.idle_shutdown_days)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("create game_server", e))?;
+        .map_err(pg_ctx("create game_server"))?;
         GameServer::try_from(row)
     }
 
@@ -111,7 +111,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find game_server", e))?;
+        .map_err(pg_ctx("find game_server"))?;
         row.map(GameServer::try_from).transpose()
     }
 
@@ -123,7 +123,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("list game_servers", e))?;
+        .map_err(pg_ctx("list game_servers"))?;
         rows.into_iter().map(GameServer::try_from).collect()
     }
 
@@ -134,7 +134,7 @@ impl GameServerRepository for PgGameServerRepository {
         ))
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("list running game_servers", e))?;
+        .map_err(pg_ctx("list running game_servers"))?;
         rows.into_iter().map(GameServer::try_from).collect()
     }
 
@@ -145,7 +145,7 @@ impl GameServerRepository for PgGameServerRepository {
         ))
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("list active game_servers", e))?;
+        .map_err(pg_ctx("list active game_servers"))?;
         rows.into_iter().map(GameServer::try_from).collect()
     }
 
@@ -238,7 +238,7 @@ impl GameServerRepository for PgGameServerRepository {
 
         q.execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("update_runtime", e))?;
+            .map_err(pg_ctx("update_runtime"))?;
         Ok(())
     }
 
@@ -258,7 +258,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(last_error)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("update_status", e))?;
+        .map_err(pg_ctx("update_status"))?;
         Ok(())
     }
 
@@ -275,7 +275,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(player_count)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("update_player_activity", e))?;
+        .map_err(pg_ctx("update_player_activity"))?;
         Ok(())
     }
 
@@ -288,7 +288,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(id)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("soft_delete game_server", e))?;
+        .map_err(pg_ctx("soft_delete game_server"))?;
         Ok(())
     }
 
@@ -301,7 +301,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(guild_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("count_active", e))?;
+        .map_err(pg_ctx("count_active"))?;
         let count = i32::try_from(row.0).unwrap_or(i32::MAX);
         let mem = i32::try_from(row.1.unwrap_or(0)).unwrap_or(i32::MAX);
         Ok((count, mem))
@@ -320,7 +320,7 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(template_id)
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("template_usage", e))?;
+        .map_err(pg_ctx("template_usage"))?;
         Ok(TemplateUsage {
             active_count: i32::try_from(row.0).unwrap_or(i32::MAX),
             last_activity_at: row.1,

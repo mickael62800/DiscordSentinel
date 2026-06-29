@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
@@ -111,7 +111,7 @@ impl GameTemplateRepository for PgGameTemplateRepository {
         ))
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("list templates", e))?;
+        .map_err(pg_ctx("list templates"))?;
         rows.into_iter().map(GameTemplate::try_from).collect()
     }
 
@@ -123,7 +123,7 @@ impl GameTemplateRepository for PgGameTemplateRepository {
         .bind(id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find template by id", e))?;
+        .map_err(pg_ctx("find template by id"))?;
         row.map(GameTemplate::try_from).transpose()
     }
 
@@ -135,7 +135,7 @@ impl GameTemplateRepository for PgGameTemplateRepository {
         .bind(slug)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find template by slug", e))?;
+        .map_err(pg_ctx("find template by slug"))?;
         row.map(GameTemplate::try_from).transpose()
     }
 }

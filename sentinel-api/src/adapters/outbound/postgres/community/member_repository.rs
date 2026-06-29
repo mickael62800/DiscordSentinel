@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -61,7 +61,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_members", e))?;
+        .map_err(pg_ctx("find_members"))?;
 
         Ok(rows.into_iter().map(GuildMember::from).collect())
     }
@@ -79,7 +79,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_member", e))?;
+        .map_err(pg_ctx("find_member"))?;
 
         Ok(row.map(GuildMember::from))
     }
@@ -109,7 +109,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(member.is_bot)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("upsert_member", e))?;
+        .map_err(pg_ctx("upsert_member"))?;
         Ok(())
     }
 
@@ -125,7 +125,7 @@ impl MemberRepository for PgMemberRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| pg_err_ctx("begin tx upsert_many", e))?;
+            .map_err(pg_ctx("begin tx upsert_many"))?;
 
         let mut count = 0u64;
         for member in members {
@@ -157,9 +157,7 @@ impl MemberRepository for PgMemberRepository {
             count += 1;
         }
 
-        tx.commit()
-            .await
-            .map_err(|e| pg_err_ctx("commit tx upsert_many", e))?;
+        tx.commit().await.map_err(pg_ctx("commit tx upsert_many"))?;
 
         tracing::info!(synced = count, "Sync batch membres terminee");
         Ok(count)
@@ -171,7 +169,7 @@ impl MemberRepository for PgMemberRepository {
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete_member", e))?;
+            .map_err(pg_ctx("delete_member"))?;
         Ok(())
     }
 
@@ -183,7 +181,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(user_id)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("update_last_seen", e))?;
+        .map_err(pg_ctx("update_last_seen"))?;
         Ok(())
     }
 
@@ -197,7 +195,7 @@ impl MemberRepository for PgMemberRepository {
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("is_left", e))?;
+        .map_err(pg_ctx("is_left"))?;
         Ok(row.map(|(b,)| b).unwrap_or(false))
     }
 }

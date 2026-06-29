@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
@@ -78,7 +78,7 @@ impl ReminderRepository for PgReminderRepository {
         .bind(r.created_at)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("save_reminder", e))?;
+        .map_err(pg_ctx("save_reminder"))?;
         Ok(())
     }
 
@@ -92,7 +92,7 @@ impl ReminderRepository for PgReminderRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_pending_reminders", e))?;
+        .map_err(pg_ctx("find_pending_reminders"))?;
 
         Ok(rows.into_iter().map(SanctionReminder::from).collect())
     }
@@ -102,7 +102,7 @@ impl ReminderRepository for PgReminderRepository {
             .bind(id)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("mark_sent", e))?;
+            .map_err(pg_ctx("mark_sent"))?;
         Ok(())
     }
 
@@ -111,7 +111,7 @@ impl ReminderRepository for PgReminderRepository {
             .bind(action_id)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("cancel_reminders", e))?;
+            .map_err(pg_ctx("cancel_reminders"))?;
         Ok(())
     }
 
@@ -123,7 +123,7 @@ impl ReminderRepository for PgReminderRepository {
         .bind(guild_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("find_reminders_by_guild", e))?;
+        .map_err(pg_ctx("find_reminders_by_guild"))?;
 
         Ok(rows.into_iter().map(SanctionReminder::from).collect())
     }

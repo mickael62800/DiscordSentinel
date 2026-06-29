@@ -1,5 +1,5 @@
+use crate::adapters::outbound::postgres::pg_ctx;
 use crate::adapters::outbound::postgres::pg_err;
-use crate::adapters::outbound::postgres::pg_err_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
@@ -284,18 +284,18 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .pool
             .begin()
             .await
-            .map_err(|e| pg_err_ctx("reset_activity begin", e))?;
+            .map_err(pg_ctx("reset_activity begin"))?;
         let h = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("reset hourly_activity", e))?
+            .map_err(pg_ctx("reset hourly_activity"))?
             .rows_affected();
         let d = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("reset daily_activity", e))?
+            .map_err(pg_ctx("reset daily_activity"))?
             .rows_affected();
         // Vide aussi la baseline : sans Ã§a, le prochain snapshot calculerait un
         // delta basÃ© sur l'ancienne baseline et reproduirait des chiffres faux.
@@ -303,11 +303,9 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .bind(guild_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("reset analytics_daily_baseline", e))?
+            .map_err(pg_ctx("reset analytics_daily_baseline"))?
             .rows_affected();
-        tx.commit()
-            .await
-            .map_err(|e| pg_err_ctx("reset_activity commit", e))?;
+        tx.commit().await.map_err(pg_ctx("reset_activity commit"))?;
         Ok(h + d + b)
     }
 }

@@ -1,4 +1,4 @@
-use crate::adapters::outbound::postgres::pg_err_ctx;
+use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -26,7 +26,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         .bind(server_id)
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("get_all configs", e))?;
+        .map_err(pg_ctx("get_all configs"))?;
         Ok(rows.into_iter().collect())
     }
 
@@ -51,7 +51,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         .bind(updated_by)
         .execute(&self.pool)
         .await
-        .map_err(|e| pg_err_ctx("upsert config", e))?;
+        .map_err(pg_ctx("upsert config"))?;
         Ok(())
     }
 
@@ -61,7 +61,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
             .bind(key)
             .execute(&self.pool)
             .await
-            .map_err(|e| pg_err_ctx("delete config", e))?;
+            .map_err(pg_ctx("delete config"))?;
         Ok(())
     }
 
@@ -71,16 +71,12 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
         entries: HashMap<String, String>,
         updated_by: Option<&str>,
     ) -> Result<(), DomainError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(|e| pg_err_ctx("tx begin", e))?;
+        let mut tx = self.pool.begin().await.map_err(pg_ctx("tx begin"))?;
         sqlx::query("DELETE FROM game_server_configs WHERE server_id = $1")
             .bind(server_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("replace_all delete", e))?;
+            .map_err(pg_ctx("replace_all delete"))?;
         for (key, value) in &entries {
             sqlx::query(
                 "INSERT INTO game_server_configs (server_id, config_key, config_value, updated_by) \
@@ -92,9 +88,9 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
             .bind(updated_by)
             .execute(&mut *tx)
             .await
-            .map_err(|e| pg_err_ctx("replace_all insert", e))?;
+            .map_err(pg_ctx("replace_all insert"))?;
         }
-        tx.commit().await.map_err(|e| pg_err_ctx("tx commit", e))?;
+        tx.commit().await.map_err(pg_ctx("tx commit"))?;
         Ok(())
     }
 }
