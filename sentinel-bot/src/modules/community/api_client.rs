@@ -98,28 +98,6 @@ impl ApiClient {
 
     // ── Role panels (gRPC) ──
 
-    #[allow(dead_code)]
-    pub async fn get_panel_by_message(
-        &self,
-        message_id: &str,
-    ) -> Result<Option<RolePanelDetail>, String> {
-        let req = proto::GetPanelByMessageRequest {
-            message_id: message_id.to_string(),
-        };
-        let mut client = self.grpc.role_panels();
-        let resp = self
-            .grpc
-            .guarded(|| async move {
-                client
-                    .get_panel_by_message(req)
-                    .await
-                    .map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
-        Ok(resp.panel.map(proto_detail_to_dto))
-    }
-
     pub async fn get_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, String> {
         let req = proto::ListAutoRolesRequest {
             guild_id: guild_id.to_string(),

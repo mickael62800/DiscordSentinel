@@ -301,13 +301,6 @@ impl ApiClient {
             .await
     }
 
-    #[allow(dead_code)]
-    pub async fn list_table_players(&self, table_id: &str) -> Result<Vec<TablePlayerDto>, String> {
-        self.base
-            .get_json(&format!("/api/blackjack/tables/{table_id}/players"))
-            .await
-    }
-
     // ── Migration 139 : hooks taunts blackjack (HTTP) ──
 
     /// Blackjack naturel (21 en 2 cartes). One-shot.

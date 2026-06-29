@@ -124,35 +124,6 @@ impl GameApiClient {
         Ok(())
     }
 
-    /// Associe un role Discord a un jeu (PATCH role_id).
-    #[allow(dead_code)]
-    pub async fn set_role_id(
-        &self,
-        guild_id: &str,
-        game_id: &str,
-        role_id: Option<&str>,
-    ) -> Result<Game, String> {
-        let url = format!(
-            "{}/api/games/{}/{}/role",
-            self.base.base_url(),
-            encode_segment(guild_id),
-            encode_segment(game_id),
-        );
-        let req = self.base.client().patch(url).json(&serde_json::json!({
-            "role_id": role_id,
-        }));
-        let resp = self
-            .base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?;
-        if !resp.status().is_success() {
-            return Err(format!("API error: {}", resp.status()));
-        }
-        resp.json::<Game>().await.map_err(|e| e.to_string())
-    }
-
     pub async fn get_game_by_name(
         &self,
         guild_id: &str,
@@ -197,21 +168,6 @@ impl GameApiClient {
             return Err(format!("API error: {}", resp.status()));
         }
         resp.json::<GamePanel>().await.map_err(|e| e.to_string())
-    }
-
-    #[allow(dead_code)]
-    pub async fn find_panel_by_message(
-        &self,
-        guild_id: &str,
-        message_id: &str,
-    ) -> Result<Option<GamePanel>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/games/{}/panels/by-message/{}",
-                encode_segment(guild_id),
-                encode_segment(message_id)
-            ))
-            .await
     }
 
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, String> {
