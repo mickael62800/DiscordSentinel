@@ -1,11 +1,11 @@
-//! Phase 4 A â€” Handlers de la file d'attente des jobs IA.
+//! Phase 4 A — Handlers de la file d'attente des jobs IA.
 //!
 //! Approche queue async : les bots POSTent un job (retour 202 immediat avec
 //! `job_id`) au lieu d'attendre la reponse synchrone des endpoints `/analyze`.
 //! L'ai-worker depile et appelle les services d'inference. Les bots peuvent
 //! soit poll `GET /api/ai/jobs/:id`, soit ecouter Redis `ai_result:{job_id}`.
 //!
-//! Pragmatique : sqlx direct (comme bot_persistence.rs) â€” la couche est triviale
+//! Pragmatique : sqlx direct (comme bot_persistence.rs) — la couche est triviale
 //! et pas couverte par une use case business.
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
@@ -51,7 +51,7 @@ pub struct AiJobStatusDto {
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-/// POST /api/ai/jobs â€” enqueue un job IA. Retourne 202 immediatement.
+/// POST /api/ai/jobs — enqueue un job IA. Retourne 202 immediatement.
 pub async fn create_ai_job(
     State(state): State<AppState>,
     Json(dto): Json<CreateAiJobDto>,
@@ -89,7 +89,7 @@ pub async fn create_ai_job(
     ))
 }
 
-/// GET /api/ai/jobs/{id} â€” recupere le statut courant d'un job IA.
+/// GET /api/ai/jobs/{id} — recupere le statut courant d'un job IA.
 pub async fn get_ai_job(
     State(state): State<AppState>,
     Path(id): Path<String>,

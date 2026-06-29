@@ -64,11 +64,11 @@ impl From<BlackjackRow> for BlackjackGame {
 impl BlackjackRepository for PgBlackjackRepository {
     async fn create(&self, game: &BlackjackGame) -> Result<(), DomainError> {
         let player_hand = serde_json::to_value(&game.player_hand)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation player_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
         let dealer_hand = serde_json::to_value(&game.dealer_hand)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation dealer_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
         let deck = serde_json::to_value(&game.deck)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation deck : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
 
         sqlx::query(
             "INSERT INTO blackjack_games (id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at)
@@ -104,7 +104,7 @@ impl BlackjackRepository for PgBlackjackRepository {
         // Une partie est reellement "active" uniquement si :
         //  - status = 'playing' ET finished_at IS NULL (pas un blackjack naturel)
         //  - created_at dans les 30 dernieres minutes (au-dela, on considere
-        //    la partie abandonnee suite a crash bot/timeout Discord Ã¢â‚¬â€ ne doit
+        //    la partie abandonnee suite a crash bot/timeout Discord — ne doit
         //    pas bloquer eternellement le user)
         let row = sqlx::query_as::<_, BlackjackRow>(
             "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
@@ -126,11 +126,11 @@ impl BlackjackRepository for PgBlackjackRepository {
 
     async fn update(&self, game: &BlackjackGame) -> Result<(), DomainError> {
         let player_hand = serde_json::to_value(&game.player_hand)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation player_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
         let dealer_hand = serde_json::to_value(&game.dealer_hand)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation dealer_hand : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
         let deck = serde_json::to_value(&game.deck)
-            .map_err(|e| DomainError::Internal(format!("sÃƒÂ©rialisation deck : {e}")))?;
+            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
 
         // Guard : ne mettre a jour que si la partie est encore en cours
         // Empeche les race conditions (deux hit simultanes, hit+stand, etc.)

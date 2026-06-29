@@ -1,5 +1,5 @@
 //! Adapter Postgres du port `ExportRepository`. Execute les SELECT
-//! d'export et map vers les DTOs purs du port (sans sqlx::FromRow exposÃ©).
+//! d'export et map vers les DTOs purs du port (sans sqlx::FromRow exposé).
 
 use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;

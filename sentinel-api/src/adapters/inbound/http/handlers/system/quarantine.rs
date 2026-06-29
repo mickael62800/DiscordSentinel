@@ -1,5 +1,5 @@
-//! Phase 5F Ã¢â‚¬â€ Endpoints minimalistes pour `security_quarantine_pending`.
-//! SQL direct (pas de port/adapter) Ã¢â‚¬â€ meme principe que steal_attempts.
+//! Phase 5F — Endpoints minimalistes pour `security_quarantine_pending`.
+//! SQL direct (pas de port/adapter) — meme principe que steal_attempts.
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
@@ -20,7 +20,7 @@ pub struct CreateQuarantineDto {
     pub timeout_secs: i64,
 }
 
-/// POST /api/security/quarantine Ã¢â‚¬â€ bot enregistre la mise en quarantaine
+/// POST /api/security/quarantine — bot enregistre la mise en quarantaine
 /// d'un user. UPSERT pour idempotence (re-quarantaine reset le timer).
 pub async fn create_quarantine(
     State(state): State<AppState>,
@@ -41,7 +41,7 @@ pub async fn create_quarantine(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/security/quarantine/{guild_id}/{user_id} Ã¢â‚¬â€ bot retire un
+/// DELETE /api/security/quarantine/{guild_id}/{user_id} — bot retire un
 /// user de la quarantaine apres validation captcha (ou suppression par
 /// admin). Idempotent.
 pub async fn delete_quarantine(

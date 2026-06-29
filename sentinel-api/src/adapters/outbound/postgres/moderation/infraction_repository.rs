@@ -61,7 +61,7 @@ impl From<InfractionRow> for Infraction {
             score: row.score,
             action: Action::from_str_lossy(&row.action),
             reason: row.reason,
-            // Negative duration (DB corruption / bogus migration) Ã¢â€ â€™ None au lieu
+            // Negative duration (DB corruption / bogus migration) → None au lieu
             // de wrap silencieusement sur u64::MAX via `as u64`.
             duration: row.duration.and_then(|d| u64::try_from(d).ok()),
             created_at: row.created_at,

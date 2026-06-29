@@ -1,6 +1,6 @@
-//! GET /api/ai-dataset/messages â€” liste paginee des messages utilisateurs
+//! GET /api/ai-dataset/messages — liste paginee des messages utilisateurs
 //! pour construction d'un dataset d'entrainement IA.
-//! DELETE /api/ai-dataset/messages â€” suppression en masse des messages exportes.
+//! DELETE /api/ai-dataset/messages — suppression en masse des messages exportes.
 //!
 //! Gate :
 //!   - GET : admin+ (lecture du contenu de chat)

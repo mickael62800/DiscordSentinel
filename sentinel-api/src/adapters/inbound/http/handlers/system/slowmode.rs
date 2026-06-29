@@ -1,4 +1,4 @@
-//! Phase 5H Ã¢â‚¬â€ Endpoints pour `security_slowmode_active`.
+//! Phase 5H — Endpoints pour `security_slowmode_active`.
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;

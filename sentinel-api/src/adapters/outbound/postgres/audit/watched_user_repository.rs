@@ -34,7 +34,7 @@ struct WatchedUserRow {
 impl From<WatchedUserRow> for WatchedUser {
     fn from(row: WatchedUserRow) -> Self {
         // La regle de classification de risque est en `domain/entities/watched_user.rs`.
-        // Cet adapter se contente de mapper row â†’ entity + appel de la fn pure.
+        // Cet adapter se contente de mapper row → entity + appel de la fn pure.
         let risk_level =
             classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
 
@@ -62,7 +62,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
-        // Phase X â€” surveillance purement MANUELLE : avant, la requete
+        // Phase X — surveillance purement MANUELLE : avant, la requete
         // faisait un UNION entre tous les users avec infractions (auto) et
         // les users dans manual_watched_users. Consequence : impossible de
         // retirer un user avec des infractions (il revenait via la branche

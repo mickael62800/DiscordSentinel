@@ -1,4 +1,4 @@
-//! GET/PUT /api/rbac/component-visibility/{guild_id} â€” gestion des overrides
+//! GET/PUT /api/rbac/component-visibility/{guild_id} — gestion des overrides
 //! de visibilite des composants UI par role.
 //!
 //! Lecture : ouverte a tout role authentifie (chaque utilisateur recupere
@@ -41,7 +41,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     })
 }
 
-/// GET â€” liste tous les overrides de visibilite pour la guild.
+/// GET — liste tous les overrides de visibilite pour la guild.
 pub async fn list_visibility(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
@@ -67,7 +67,7 @@ pub async fn list_visibility(
     Ok(Json(out))
 }
 
-/// PUT â€” upsert batch de tous les overrides envoyes. Les entrees absentes
+/// PUT — upsert batch de tous les overrides envoyes. Les entrees absentes
 /// du payload sont conservees telles quelles (delete explicite via visibility
 /// par defaut : on garde simple, l'UI envoie tout l'etat affiche).
 pub async fn upsert_visibility(

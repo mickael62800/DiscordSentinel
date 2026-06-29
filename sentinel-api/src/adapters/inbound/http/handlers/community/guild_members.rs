@@ -26,7 +26,7 @@ use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
-/// GET /api/guilds/{guild_id}/members â€” liste les membres Discord (cache 10min, fallback Discord API)
+/// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
@@ -62,7 +62,7 @@ pub async fn list_members(
     Ok(Json(members))
 }
 
-/// GET /api/members/{guild_id} â€” liste les membres depuis la BDD
+/// GET /api/members/{guild_id} — liste les membres depuis la BDD
 pub async fn list_members_db(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
@@ -71,7 +71,7 @@ pub async fn list_members_db(
     Ok(Json(members))
 }
 
-/// GET /api/members/{guild_id}/{user_id} â€” profil d'un membre
+/// GET /api/members/{guild_id}/{user_id} — profil d'un membre
 pub async fn get_member(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
@@ -80,7 +80,7 @@ pub async fn get_member(
     Ok(Json(member))
 }
 
-/// GET /api/members/{guild_id}/{user_id}/summary â€” profil complet agrege
+/// GET /api/members/{guild_id}/{user_id}/summary — profil complet agrege
 pub async fn get_member_summary(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
@@ -92,7 +92,7 @@ pub async fn get_member_summary(
     Ok(Json(summary))
 }
 
-/// POST /api/members/sync â€” sync bulk depuis un bot
+/// POST /api/members/sync — sync bulk depuis un bot
 pub async fn sync_members(
     State(state): State<AppState>,
     Json(payload): Json<SyncMembersPayload>,
@@ -107,7 +107,7 @@ pub async fn sync_members(
     Ok(Json(serde_json::json!({ "synced": count })))
 }
 
-/// POST /api/members/register â€” enregistre un nouveau membre
+/// POST /api/members/register — enregistre un nouveau membre
 pub async fn register_member(
     State(state): State<AppState>,
     Json(member): Json<GuildMember>,
@@ -119,13 +119,13 @@ pub async fn register_member(
     Ok(ok_response())
 }
 
-/// DELETE /api/members/{guild_id}/{user_id} â€” supprime un membre
+/// DELETE /api/members/{guild_id}/{user_id} — supprime un membre
 pub async fn remove_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B â€” Gate RBAC : moderator+ requis pour retirer un membre du cache local.
+    // Phase 7 B — Gate RBAC : moderator+ requis pour retirer un membre du cache local.
     if let Some(Extension(ctx)) = rbac {
         require_role(&ctx, Role::Moderator).map_err(|_| {
             ApiError(DomainError::Forbidden(
@@ -137,7 +137,7 @@ pub async fn remove_member(
     Ok(ok_response())
 }
 
-/// PATCH /api/members/{guild_id}/{user_id} â€” met a jour un membre
+/// PATCH /api/members/{guild_id}/{user_id} — met a jour un membre
 pub async fn update_member(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
@@ -163,7 +163,7 @@ pub struct SyncMembersPayload {
     pub members: Vec<GuildMember>,
 }
 
-/// POST /api/members/{guild_id}/{user_id}/reset â€” nettoie TOUTES les donnees
+/// POST /api/members/{guild_id}/{user_id}/reset — nettoie TOUTES les donnees
 /// de moderation d'un membre sur une guild en une seule transaction.
 ///
 /// Supprime :
@@ -176,7 +176,7 @@ pub struct SyncMembersPayload {
 ///
 /// **Operation irreversible**, gatee derriere `Role::Admin` + bypass superadmin.
 /// Tout se fait dans une transaction atomique : en cas d'erreur sur un DELETE,
-/// on rollback et on retourne l'erreur â€” l'etat DB reste coherent.
+/// on rollback et on retourne l'erreur — l'etat DB reste coherent.
 pub async fn reset_member(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,

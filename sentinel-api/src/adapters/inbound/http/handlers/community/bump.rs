@@ -73,7 +73,7 @@ pub struct BumpRewardDto {
     pub vip_just_unlocked: bool,
 }
 
-/// POST /api/bump/{guild_id}/{user_id} Ã¢â‚¬â€ enregistre un bump, calcule la
+/// POST /api/bump/{guild_id}/{user_id} — enregistre un bump, calcule la
 /// recompense graduee de la semaine et credite le wallet.
 pub async fn record_bump(
     State(state): State<AppState>,
@@ -222,7 +222,7 @@ pub struct DueReminderDto {
     pub channel_id: String,
 }
 
-/// GET /api/bump/due-reminders Ã¢â‚¬â€ guilds dont le cooldown est ecoule et dont le
+/// GET /api/bump/due-reminders — guilds dont le cooldown est ecoule et dont le
 /// rappel n'a pas encore ete envoye (poll par le bot).
 pub async fn due_reminders(
     State(state): State<AppState>,
@@ -238,7 +238,7 @@ pub async fn due_reminders(
     Ok(Json(rows))
 }
 
-/// POST /api/bump/{guild_id}/reminder-sent Ã¢â‚¬â€ marque le rappel comme envoye.
+/// POST /api/bump/{guild_id}/reminder-sent — marque le rappel comme envoye.
 pub async fn mark_reminder_sent(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,

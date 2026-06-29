@@ -297,8 +297,8 @@ impl AnalyticsRepository for PgAnalyticsRepository {
             .await
             .map_err(pg_ctx("reset daily_activity"))?
             .rows_affected();
-        // Vide aussi la baseline : sans Ã§a, le prochain snapshot calculerait un
-        // delta basÃ© sur l'ancienne baseline et reproduirait des chiffres faux.
+        // Vide aussi la baseline : sans ça, le prochain snapshot calculerait un
+        // delta basé sur l'ancienne baseline et reproduirait des chiffres faux.
         let b = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1")
             .bind(guild_id)
             .execute(&mut *tx)

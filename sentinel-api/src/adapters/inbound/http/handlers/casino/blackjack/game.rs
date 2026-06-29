@@ -1,6 +1,6 @@
 //! Handlers du jeu solo : start, hit, stand, double, get_active.
 //!
-//! Tous dÃƒÂ©lÃƒÂ¨guent ÃƒÂ  `state.blackjack_svc` et broadcastent un ÃƒÂ©vÃƒÂ©nement
+//! Tous délèguent à `state.blackjack_svc` et broadcastent un événement
 //! `blackjack_result` via le broadcaster quand la partie se termine.
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
@@ -20,7 +20,7 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 
-/// Diffuse un ÃƒÂ©vÃƒÂ©nement `blackjack_result` pour la partie terminÃƒÂ©e.
+/// Diffuse un événement `blackjack_result` pour la partie terminée.
 fn broadcast_result(state: &AppState, game: &BlackjackGame, doubled: bool) {
     let mut payload = serde_json::json!({
         "guild_id": game.guild_id,
@@ -125,7 +125,7 @@ pub async fn stand(
         .await
         .ok();
 
-    // stand termine toujours la partie Ã¢â€ â€™ on broadcast systÃƒÂ©matiquement.
+    // stand termine toujours la partie → on broadcast systématiquement.
     broadcast_result(&state, &game, false);
 
     Ok(Json(to_dto(&game)))

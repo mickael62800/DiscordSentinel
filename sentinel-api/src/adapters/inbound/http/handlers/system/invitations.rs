@@ -1,10 +1,10 @@
 //! Codes d'invitation a usage unique pour onboarder de nouveaux users.
 //!
 //! Endpoints :
-//!   POST /api/invitations              (owner+, scope guild) â€” genere un code
-//!   GET  /api/invitations/{guild_id}   (owner+) â€” liste les codes
-//!   DELETE /api/invitations/{code}     (owner+) â€” revoque un code non utilise
-//!   POST /api/auth/redeem-invitation   (auth Discord token requis) â€” consomme code
+//!   POST /api/invitations              (owner+, scope guild) — genere un code
+//!   GET  /api/invitations/{guild_id}   (owner+) — liste les codes
+//!   DELETE /api/invitations/{code}     (owner+) — revoque un code non utilise
+//!   POST /api/auth/redeem-invitation   (auth Discord token requis) — consomme code
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
@@ -49,7 +49,7 @@ fn generate_code() -> String {
     parts.join("-")
 }
 
-// â”€â”€ Generate â”€â”€
+// ── Generate ──
 
 #[derive(Debug, Deserialize)]
 pub struct CreateInvitationDto {
@@ -170,7 +170,7 @@ pub async fn create_invitation(
     }))
 }
 
-// â”€â”€ List â”€â”€
+// ── List ──
 
 pub async fn list_invitations(
     State(state): State<AppState>,
@@ -267,7 +267,7 @@ pub async fn list_invitations(
     Ok(Json(out))
 }
 
-// â”€â”€ Revoke (delete unused) â”€â”€
+// ── Revoke (delete unused) ──
 
 pub async fn revoke_invitation(
     State(state): State<AppState>,
@@ -325,7 +325,7 @@ pub async fn revoke_invitation(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-// â”€â”€ Check access (apres OAuth, avant dashboard) â”€â”€
+// ── Check access (apres OAuth, avant dashboard) ──
 
 #[derive(Debug, Serialize)]
 pub struct CheckAccessResponse {
@@ -384,7 +384,7 @@ pub async fn check_access(
     }))
 }
 
-// â”€â”€ Redeem (par l'utilisateur invite) â”€â”€
+// ── Redeem (par l'utilisateur invite) ──
 
 #[derive(Debug, Deserialize)]
 pub struct RedeemDto {
@@ -493,6 +493,6 @@ pub async fn redeem_invitation(
     Ok(Json(RedeemResponse {
         guild_id,
         role,
-        message: "Invitation acceptÃ©e".to_string(),
+        message: "Invitation acceptée".to_string(),
     }))
 }

@@ -72,7 +72,7 @@ pub async fn record_server_event(
     }
 }
 
-// â”€â”€ Endpoint : lire les events â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Endpoint : lire les events ──────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 pub struct ServerEventsQuery {

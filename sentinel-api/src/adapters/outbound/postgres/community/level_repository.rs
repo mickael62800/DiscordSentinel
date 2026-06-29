@@ -216,7 +216,7 @@ impl LevelRepository for PgLevelRepository {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<UserLevel>, DomainError> {
-        // Phase 2 A.2 â€” Lit depuis `mv_level_leaderboard` (5 min staleness max).
+        // Phase 2 A.2 — Lit depuis `mv_level_leaderboard` (5 min staleness max).
         let rows = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM mv_level_leaderboard WHERE guild_id = $1 ORDER BY rank LIMIT $2",
         )

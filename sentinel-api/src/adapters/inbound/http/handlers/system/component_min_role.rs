@@ -1,4 +1,4 @@
-//! GET/PUT/DELETE /api/rbac/component-min-role/{guild_id} â€” gestion des
+//! GET/PUT/DELETE /api/rbac/component-min-role/{guild_id} — gestion des
 //! overrides du min_role par composant sensible (db.purge.*, db.reset.*).
 //!
 //! Lecture : ouverte aux Admin+ (visualiser la config).
@@ -48,7 +48,7 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     })
 }
 
-/// GET â€” liste les gates avec leur etat effectif pour cette guild.
+/// GET — liste les gates avec leur etat effectif pour cette guild.
 pub async fn list_min_roles(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
@@ -89,7 +89,7 @@ pub async fn list_min_roles(
     Ok(Json(out))
 }
 
-/// PUT â€” upsert d'un override (component_key + min_role). Le min_role est
+/// PUT — upsert d'un override (component_key + min_role). Le min_role est
 /// clamp au floor du registry cote API au moment du gate.
 pub async fn upsert_min_role(
     State(state): State<AppState>,
@@ -140,7 +140,7 @@ pub async fn upsert_min_role(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
-/// DELETE â€” supprime l'override (retour au default).
+/// DELETE — supprime l'override (retour au default).
 pub async fn delete_min_role(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,

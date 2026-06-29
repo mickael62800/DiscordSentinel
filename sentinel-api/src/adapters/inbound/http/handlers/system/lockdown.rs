@@ -1,4 +1,4 @@
-//! Phase 5G Ã¢â‚¬â€ Endpoints pour `security_lockdown_active`.
+//! Phase 5G — Endpoints pour `security_lockdown_active`.
 //! SQL direct (meme principe que steal_attempts / quarantine).
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
@@ -21,7 +21,7 @@ pub struct CreateLockdownDto {
     pub duration_secs: i64,
 }
 
-/// POST /api/security/lockdown Ã¢â‚¬â€ bot enregistre un lockdown actif.
+/// POST /api/security/lockdown — bot enregistre un lockdown actif.
 /// UPSERT pour idempotence (re-activation reset le timer + states).
 pub async fn create_lockdown(
     State(state): State<AppState>,
@@ -45,7 +45,7 @@ pub async fn create_lockdown(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/security/lockdown/{guild_id} Ã¢â‚¬â€ bot retire un lockdown
+/// DELETE /api/security/lockdown/{guild_id} — bot retire un lockdown
 /// (deactivation manuelle ou via worker).
 pub async fn delete_lockdown(
     State(state): State<AppState>,

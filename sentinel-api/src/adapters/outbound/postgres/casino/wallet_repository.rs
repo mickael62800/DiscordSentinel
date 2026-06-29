@@ -440,7 +440,7 @@ impl WalletRepository for PgWalletRepository {
     }
 
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
-        // Phase 2 A.2 â€” Lit depuis la vue materialisee `mv_wallet_leaderboard`
+        // Phase 2 A.2 — Lit depuis la vue materialisee `mv_wallet_leaderboard`
         // refreshee toutes les 5 min par le cache-worker. Le rang est precalcule
         // donc l'ORDER BY est un index scan O(N) sur (guild_id, rank). Gain
         // typique : 100-1000x sur les hits hot. La staleness max de 5 min est

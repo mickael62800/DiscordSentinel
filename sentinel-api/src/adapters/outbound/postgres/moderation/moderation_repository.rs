@@ -48,7 +48,7 @@ impl From<AuditModRow> for ModerationAction {
             .get("gravity")
             .and_then(|v| v.as_str())
             .and_then(ModerationGravity::from_str_lossy);
-        // Negative duration â†’ None (ne wrap pas sur u64::MAX).
+        // Negative duration → None (ne wrap pas sur u64::MAX).
         let duration = row
             .details
             .get("duration_secs")
@@ -185,7 +185,7 @@ impl ModerationRepository for PgModerationRepository {
         // Pour chaque (guild_id, target_id), on prend la derniere action ban*/unban
         // et on ne garde que celles dont l'event_type final commence par 'mod_ban'.
         // LEFT JOIN guild_members pour enrichir avec le pseudo serveur
-        // (target_display_name) â€” affiche dans la liste "Bannis actifs" cote web.
+        // (target_display_name) — affiche dans la liste "Bannis actifs" cote web.
         let rows = match guild_id {
             Some(gid) => {
                 sqlx::query_as::<_, AuditModRow>(
