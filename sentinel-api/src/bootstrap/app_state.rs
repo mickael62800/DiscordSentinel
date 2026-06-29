@@ -1,24 +1,12 @@
-//! Bootstrap : construction de l'etat applicatif (connexions infra + DI).
-//!
-//! Extrait de `main.rs` pour garder ce dernier concentre sur bind/serve.
-//! Chaque fonction publique represente une phase de l'initialisation :
-//! - `connect_pg` : pool PostgreSQL avec compat pgbouncer transaction pooling.
-//! - `connect_redis` : client Redis + purge cache + liveness check.
-//! - `build_inference` : services ONNX (vision + text + rate limiter).
-//! - `build_broadcaster` : EventBroadcaster connecte a Redis pub/sub.
-//! - `build_app_state` : assemble tous les repos/services dans l'AppState.
+//! Assemblage complet de l'AppState : tous les repos + services (DI).
 
-use std::str::FromStr;
 use std::sync::Arc;
-use std::time::Duration;
 
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::batching::audit_log_batcher::BatchedPgAuditLogRepository;
 use crate::adapters::outbound::batching::batch_writer::BatchWriterConfig;
 use crate::adapters::outbound::batching::log_batcher::BatchedPgLogRepository;
 use crate::adapters::outbound::discord_api::DiscordApiService;
-use crate::adapters::outbound::inference_service::InferenceService;
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::audit::analytics_repository::PgAnalyticsRepository;
 use crate::adapters::outbound::postgres::audit::modstats_repository::PgModstatsRepository;
@@ -68,7 +56,6 @@ use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotCon
 use crate::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
 use crate::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
 use crate::adapters::outbound::redis_cache::RedisCache;
-use crate::adapters::outbound::text_tokenizer::TextTokenizer;
 use crate::application::ai::analyze_image_service::AnalyzeImageService;
 use crate::application::ai::analyze_message_service::AnalyzeMessageService;
 use crate::application::audit::manage_audit_logs_service::ManageAuditLogsService;
@@ -109,117 +96,6 @@ use crate::application::moderation::manage_strikes_service::ManageStrikesService
 use crate::application::system::export_service::ExportService;
 use crate::application::system::manage_tickets_service::ManageTicketsService;
 use crate::config::AppConfig;
-use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
-use sqlx::postgres::PgConnectOptions;
-use sqlx::postgres::PgPoolOptions;
-use tracing::error;
-use tracing::info;
-
-/// Connecte a PostgreSQL avec pgbouncer transaction pooling compat.
-///
-/// Phase 7A opt C.1 : compat pgbouncer transaction pooling.
-///
-/// `.statement_cache_capacity(0)` : pgbouncer en transaction pooling ne
-///   garantit pas que deux requetes consecutives arrivent sur la meme
-///   backend connection, donc les prepared statements caches par sqlx
-///   (via son cache LRU par defaut) peuvent etre invalides silencieusement
-///   et cela declenche `query_wait_timeout` (code 08P01). Desactiver le
-///   cache resout le probleme — cout CPU marginal.
-///
-/// `.application_name("sentinel-api")` : permet a pgbouncer/postgres de
-///   tracer les connexions par service (visible dans `pg_stat_activity`).
-pub async fn connect_pg(config: &AppConfig) -> sqlx::PgPool {
-    let connect_opts = PgConnectOptions::from_str(&config.database_url)
-        .expect("DATABASE_URL invalide")
-        .statement_cache_capacity(0)
-        .application_name("sentinel-api");
-
-    PgPoolOptions::new()
-        .max_connections(20)
-        .min_connections(2)
-        .acquire_timeout(Duration::from_secs(10))
-        .test_before_acquire(false)
-        .connect_with(connect_opts)
-        .await
-        .expect("Impossible de se connecter a PostgreSQL")
-}
-
-/// Ouvre le client Redis + purge cache bot:definitions + check liveness.
-///
-/// Purger le cache des definitions de bots apres migration : les migrations
-/// peuvent modifier les config_schema (ex: 113 = ajout des 4 salons audit),
-/// mais le cache Redis bot:definitions a un TTL d'1h. Sans ca, les changements
-/// n'apparaissent qu'apres expiration du TTL.
-pub async fn connect_redis(config: &AppConfig) -> redis::Client {
-    let redis_client = redis::Client::open(config.redis_url.as_str()).expect("URL Redis invalide");
-
-    if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
-        use redis::AsyncCommands;
-        let _: Result<(), _> = conn.del::<_, ()>("bot:definitions").await;
-        info!("Cache Redis bot:definitions purge (post-migration)");
-    }
-
-    // Verifier la connexion Redis au demarrage
-    match redis_client.get_multiplexed_async_connection().await {
-        Ok(_) => info!("Redis connecte"),
-        Err(e) => error!("Redis indisponible au demarrage: {e} — le cache sera desactive"),
-    }
-
-    redis_client
-}
-
-/// Construit le service d'inference ONNX (vision + text tokenizer + rate limiter).
-pub fn build_inference() -> (
-    Arc<InferenceService>,
-    Arc<TextTokenizer>,
-    Arc<InferenceRateLimiter>,
-) {
-    let vision_model_path = std::env::var("VISION_MODEL_PATH").ok();
-    let text_model_path = std::env::var("TEXT_MODEL_PATH").ok();
-    let tokenizer_path = std::env::var("TEXT_TOKENIZER_PATH").ok();
-    let text_max_length: usize = std::env::var("TEXT_MAX_LENGTH")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(512);
-
-    let inference = Arc::new(InferenceService::new(
-        vision_model_path.as_deref(),
-        text_model_path.as_deref(),
-    ));
-    let tokenizer = Arc::new(TextTokenizer::new(
-        tokenizer_path.as_deref(),
-        text_max_length,
-    ));
-
-    let inference_max_concurrent: usize = std::env::var("INFERENCE_MAX_CONCURRENT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(4);
-    let inference_max_per_sec: u64 = std::env::var("INFERENCE_MAX_PER_SEC")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(20);
-
-    let inference_limiter = Arc::new(InferenceRateLimiter::new(
-        inference_max_concurrent,
-        inference_max_per_sec,
-    ));
-
-    info!(
-        max_concurrent = inference_max_concurrent,
-        max_per_sec = inference_max_per_sec,
-        "Inference rate limiter configure"
-    );
-
-    (inference, tokenizer, inference_limiter)
-}
-
-/// Construit l'EventBroadcaster connecte a Redis pub/sub.
-pub fn build_broadcaster(redis_client: redis::Client) -> Arc<EventBroadcaster> {
-    let redis_channel =
-        std::env::var("REDIS_CHANNEL").unwrap_or_else(|_| "sentinel:events".to_string());
-    Arc::new(EventBroadcaster::new().with_redis(redis_client, redis_channel))
-}
 
 /// Construit l'etat complet de l'application (tous les repos + services).
 /// Consomme le pool et le client Redis (via clones).
@@ -257,10 +133,10 @@ pub async fn build_app_state(
     );
 
     // ── Event broadcaster (Redis pub/sub → gateway WebSocket) ──
-    let broadcaster = build_broadcaster(redis_client.clone());
+    let broadcaster = crate::bootstrap::build_broadcaster(redis_client.clone());
 
     // ── Inference ONNX ──
-    let (inference, tokenizer, inference_limiter) = build_inference();
+    let (inference, tokenizer, inference_limiter) = crate::bootstrap::build_inference();
 
     // Discord API (un seul client partage).
     let discord_api: Arc<dyn crate::adapters::outbound::discord_api::DiscordApi> =
@@ -1023,12 +899,4 @@ pub async fn build_app_state(
             crate::adapters::outbound::system::rate_limiter::RateLimiter::from_env(),
         )),
     }
-}
-
-/// A appeler apres construction de AppState pour lancer les workers de fond.
-pub fn spawn_security_workers(state: &AppState) {
-    crate::adapters::outbound::system::alerts_dispatcher::spawn(
-        state.pg_pool.clone(),
-        state.container_monitor.clone(),
-    );
 }

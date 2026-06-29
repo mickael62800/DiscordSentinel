@@ -1,20 +1,19 @@
-//! Handler HTTP du module Automod (Phase 4).
+//! Handlers HTTP des cartes de review automod (detections, votes, resolution).
 //!
 //! Pas de logique metier ici — on reutilise `ManageInfractionsUseCase`
 //! (port inbound) avec un filtre `action="detection"`. La page
 //! `/automod` cote web consomme ce endpoint pour la timeline des
 //! detections automod.
 
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
-use serde::Serialize;
 
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
@@ -30,6 +29,10 @@ use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::errors::DomainError;
+
+use super::dto::AutomodReviewDto;
+use super::dto::ReviewVoteDto;
+
 #[derive(Debug, Deserialize)]
 pub struct DetectionQuery {
     /// Defaut 50, max 200.
@@ -59,94 +62,6 @@ pub async fn list_detections(
         .list_infractions(&guild_id, filters)
         .await?;
     Ok(map_to_dtos(detections))
-}
-
-/// DTO public d'une carte de review automod.
-#[derive(Debug, Serialize)]
-pub struct AutomodReviewDto {
-    pub id: String,
-    pub guild_id: GuildId,
-    pub channel_id: ChannelId,
-    pub message_id: MessageId,
-    pub user_id: UserId,
-    pub user_name: String,
-    pub content_preview: String,
-    pub suggested_action: String,
-    pub score: f64,
-    pub reason: String,
-    pub flags: serde_json::Value,
-    pub status: String,
-    pub applied_action: Option<String>,
-    pub resolved_by_id: Option<String>,
-    pub resolved_by_name: Option<String>,
-    pub resolved_source: Option<String>,
-    pub created_at: String,
-    pub resolved_at: Option<String>,
-    pub voting_deadline: Option<String>,
-    pub decided_action: Option<String>,
-    pub quorum_met: bool,
-    pub decided_at: Option<String>,
-    pub incident_count: i32,
-    pub cumulative_score: f64,
-    pub incidents: serde_json::Value,
-    /// True si ce POST a ete agrege dans une carte existante (pas une creation).
-    pub merged: bool,
-    /// Salon de discussion lie a cette review (si ouvert), pour la page web.
-    pub discussion_channel_id: Option<String>,
-}
-
-impl From<AutomodReview> for AutomodReviewDto {
-    fn from(r: AutomodReview) -> Self {
-        Self {
-            id: r.id.to_string(),
-            guild_id: r.guild_id,
-            channel_id: r.channel_id,
-            message_id: r.message_id,
-            user_id: r.user_id,
-            user_name: r.user_name,
-            content_preview: r.content_preview,
-            suggested_action: r.suggested_action,
-            score: r.score,
-            reason: r.reason,
-            flags: r.flags,
-            status: r.status,
-            applied_action: r.applied_action,
-            resolved_by_id: r.resolved_by_id,
-            resolved_by_name: r.resolved_by_name,
-            resolved_source: r.resolved_source,
-            created_at: r.created_at.to_rfc3339(),
-            resolved_at: r.resolved_at.map(|d| d.to_rfc3339()),
-            voting_deadline: r.voting_deadline.map(|d| d.to_rfc3339()),
-            decided_action: r.decided_action,
-            quorum_met: r.quorum_met,
-            decided_at: r.decided_at.map(|d| d.to_rfc3339()),
-            incident_count: r.incident_count,
-            cumulative_score: r.cumulative_score,
-            incidents: r.incidents,
-            merged: false,
-            discussion_channel_id: None,
-        }
-    }
-}
-
-/// DTO d'un vote individuel.
-#[derive(Debug, Serialize)]
-pub struct ReviewVoteDto {
-    pub voter_id: String,
-    pub voter_name: String,
-    pub vote_action: String,
-}
-
-impl From<sentinel_core::domain::entities::moderation::review::automod::ReviewVote>
-    for ReviewVoteDto
-{
-    fn from(v: sentinel_core::domain::entities::moderation::review::automod::ReviewVote) -> Self {
-        Self {
-            voter_id: v.voter_id,
-            voter_name: v.voter_name,
-            vote_action: v.vote_action,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -729,230 +644,6 @@ pub async fn decide_review(
     Ok(Json(review.into()))
 }
 
-/// DTO d'un salon de discussion lie a une review.
-#[derive(Debug, Serialize)]
-pub struct DiscussionChannelDto {
-    pub id: String,
-    pub review_id: String,
-    pub guild_id: String,
-    pub channel_id: String,
-    pub opened_by_id: String,
-    pub opened_by_name: String,
-    pub created_at: String,
-    /// True si ce POST vient de creer le salon (false = il existait deja).
-    pub created: bool,
-}
-
-impl DiscussionChannelDto {
-    fn build(
-        d: sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel,
-        created: bool,
-    ) -> Self {
-        Self {
-            id: d.id.to_string(),
-            review_id: d.review_id.to_string(),
-            guild_id: d.guild_id,
-            channel_id: d.channel_id,
-            opened_by_id: d.opened_by_id,
-            opened_by_name: d.opened_by_name,
-            created_at: d.created_at.to_rfc3339(),
-            created,
-        }
-    }
-}
-
-/// GET /api/automod/reviews/{review_id}/discussion
-/// Retourne le salon de discussion existant (ou `null`).
-pub async fn get_discussion(
-    State(state): State<AppState>,
-    Path(review_id): Path<String>,
-) -> Result<Json<Option<DiscussionChannelDto>>, ApiError> {
-    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-    let existing = state.automod_reviews_uc.get_discussion(id).await?;
-    Ok(Json(
-        existing.map(|d| DiscussionChannelDto::build(d, false)),
-    ))
-}
-
-/// DELETE /api/automod/reviews/{review_id}/discussion
-/// Purge l'enregistrement du salon (le salon Discord a ete supprime a la
-/// main) afin de pouvoir en rouvrir un neuf. Idempotent.
-pub async fn delete_discussion(
-    State(state): State<AppState>,
-    Path(review_id): Path<String>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-    state.automod_reviews_uc.delete_discussion(id).await?;
-    Ok(Json(serde_json::json!({ "ok": true })))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct OpenDiscussionBody {
-    pub guild_id: String,
-    pub channel_id: String,
-    pub opened_by_id: String,
-    pub opened_by_name: String,
-    // Faits Discord du demandeur (la decision d'acces est prise par le domaine).
-    #[serde(default)]
-    pub is_admin: bool,
-    #[serde(default)]
-    pub has_moderate_members: bool,
-    #[serde(default)]
-    pub has_manage_messages: bool,
-    #[serde(default)]
-    pub has_mod_role: bool,
-}
-
-/// POST /api/automod/reviews/{review_id}/discussion
-/// Enregistre (idempotent) un salon de discussion apres application de la
-/// regle d'acces (`can_open_discussion`). `403` si non autorise.
-pub async fn open_discussion(
-    State(state): State<AppState>,
-    Path(review_id): Path<String>,
-    Json(body): Json<OpenDiscussionBody>,
-) -> Result<Json<DiscussionChannelDto>, ApiError> {
-    use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
-    use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
-
-    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-
-    let (discussion, created) = state
-        .automod_reviews_uc
-        .open_discussion(OpenDiscussionCommand {
-            review_id: id,
-            guild_id: body.guild_id.clone(),
-            channel_id: body.channel_id,
-            opened_by_id: body.opened_by_id.clone(),
-            opened_by_name: body.opened_by_name,
-            requester: ModeratorFacts {
-                is_admin: body.is_admin,
-                has_moderate_members: body.has_moderate_members,
-                has_manage_messages: body.has_manage_messages,
-                has_mod_role: body.has_mod_role,
-                has_admin_role: false,
-            },
-        })
-        .await?;
-
-    if created {
-        state.broadcaster.broadcast(
-            "automod_discussion_opened",
-            serde_json::json!({
-                "review_id": review_id,
-                "guild_id": &body.guild_id,
-                "channel_id": &discussion.channel_id,
-                "opened_by_id": &body.opened_by_id,
-            }),
-        );
-    }
-
-    Ok(Json(DiscussionChannelDto::build(discussion, created)))
-}
-
-// ── Transcript du salon de discussion (trace persistante) ──
-
-#[derive(Debug, Deserialize)]
-pub struct DiscussionMessageIn {
-    pub discord_message_id: String,
-    pub author_id: String,
-    #[serde(default)]
-    pub author_name: String,
-    #[serde(default)]
-    pub author_is_bot: bool,
-    #[serde(default)]
-    pub content: String,
-    /// RFC3339.
-    pub sent_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct AppendDiscussionMessagesBody {
-    pub messages: Vec<DiscussionMessageIn>,
-}
-
-#[derive(Debug, Serialize)]
-pub struct DiscussionMessageDto {
-    pub discord_message_id: String,
-    pub author_id: String,
-    pub author_name: String,
-    pub author_is_bot: bool,
-    pub content: String,
-    pub sent_at: String,
-}
-
-/// POST /api/automod/reviews/{review_id}/discussion/messages
-/// Persiste un lot de messages du salon (appele par le bot a l'archivage).
-pub async fn append_discussion_messages(
-    State(state): State<AppState>,
-    Path(review_id): Path<String>,
-    Json(body): Json<AppendDiscussionMessagesBody>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
-    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-
-    let messages: Vec<DiscussionMessage> = body
-        .messages
-        .into_iter()
-        .filter_map(|m| {
-            let sent_at = chrono::DateTime::parse_from_rfc3339(&m.sent_at)
-                .ok()?
-                .with_timezone(&chrono::Utc);
-            Some(DiscussionMessage {
-                review_id: id,
-                discord_message_id: m.discord_message_id,
-                author_id: m.author_id,
-                author_name: m.author_name,
-                author_is_bot: m.author_is_bot,
-                content: m.content,
-                sent_at,
-            })
-        })
-        .collect();
-
-    let inserted = state
-        .automod_reviews_uc
-        .append_discussion_messages(messages)
-        .await?;
-    Ok(Json(serde_json::json!({ "inserted": inserted })))
-}
-
-#[derive(Debug, Deserialize)]
-pub struct CleanupCardsQuery {
-    /// Age minimum (jours) d'une carte close pour etre supprimee. Defaut 30.
-    pub days: Option<i64>,
-}
-
-/// POST /api/automod/cleanup-expired-cards — appele par le worker (24h).
-/// Pour chaque carte de review CLOSE (applied|ignored) resolue depuis plus de
-/// `days` jours et encore mappee a un message Discord : broadcast un event
-/// `automod_card_expired` (le bot supprime le message) et retire le mapping.
-/// La review + le transcript restent en DB (trace web conservee).
-pub async fn cleanup_expired_cards(
-    State(state): State<AppState>,
-    Query(q): Query<CleanupCardsQuery>,
-) -> Result<Json<serde_json::Value>, ApiError> {
-    // Le use case trouve les cartes expirees et retire leur mapping ; le
-    // handler ne fait que diffuser l'event d'expiration (le bot supprime le
-    // message Discord correspondant).
-    let cards = state
-        .automod_reviews_uc
-        .expired_review_cards(q.days.unwrap_or(30), 200)
-        .await?;
-
-    let count = cards.len() as u32;
-    for c in &cards {
-        state.broadcaster.broadcast(
-            "automod_card_expired",
-            serde_json::json!({
-                "action_id": c.action_id.to_string(),
-                "channel_id": c.channel_id,
-                "message_id": c.message_id,
-            }),
-        );
-    }
-    Ok(Json(serde_json::json!({ "expired": count })))
-}
-
 /// GET /api/automod/{guild_id}/reviews/by-message/{message_id}
 /// Retrouve la review associee a un message Discord (pour retrouver le
 /// review_id depuis une carte 1-clic dont les boutons ne le portent pas).
@@ -965,29 +656,4 @@ pub async fn find_review_by_message(
         .find_by_message_id(&guild_id, &message_id)
         .await?;
     Ok(Json(review.map(Into::into)))
-}
-
-/// GET /api/automod/reviews/{review_id}/discussion/messages
-/// Liste le transcript (trace) pour affichage web.
-pub async fn list_discussion_messages(
-    State(state): State<AppState>,
-    Path(review_id): Path<String>,
-) -> Result<Json<Vec<DiscussionMessageDto>>, ApiError> {
-    let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-    let msgs = state
-        .automod_reviews_uc
-        .list_discussion_messages(id)
-        .await?;
-    let dtos = msgs
-        .into_iter()
-        .map(|m| DiscussionMessageDto {
-            discord_message_id: m.discord_message_id,
-            author_id: m.author_id,
-            author_name: m.author_name,
-            author_is_bot: m.author_is_bot,
-            content: m.content,
-            sent_at: m.sent_at.to_rfc3339(),
-        })
-        .collect();
-    Ok(Json(dtos))
 }

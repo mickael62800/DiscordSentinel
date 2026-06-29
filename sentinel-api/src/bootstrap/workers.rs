@@ -1,0 +1,11 @@
+//! Workers de fond lances apres construction de l'AppState.
+
+use crate::adapters::inbound::http::state::AppState;
+
+/// A appeler apres construction de AppState pour lancer les workers de fond.
+pub fn spawn_security_workers(state: &AppState) {
+    crate::adapters::outbound::system::alerts_dispatcher::spawn(
+        state.pg_pool.clone(),
+        state.container_monitor.clone(),
+    );
+}
