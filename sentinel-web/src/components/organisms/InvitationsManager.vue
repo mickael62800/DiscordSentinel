@@ -5,9 +5,11 @@ import { computed, onMounted, ref, watch } from "vue";
 import { invitationsService, type InvitationDto } from "@/services/invitationsService";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { selectedGuildId } = useGuildSelector();
 const { success, error: showError } = useToast();
+const { formatDateTimeShort } = useFormatDate();
 
 const invitations = ref<InvitationDto[]>([]);
 const loading = ref(false);
@@ -93,7 +95,7 @@ async function copyCode(code: string) {
 
 function fmtDate(s: string | null): string {
   if (!s) return "—";
-  return new Date(s).toLocaleString("fr-FR");
+  return formatDateTimeShort(s);
 }
 
 function statusLabel(s: string): string {

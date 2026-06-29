@@ -8,8 +8,10 @@ import type { TempRole } from "@/types/polish";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import NumberInputWithUnit from "@/components/atoms/NumberInputWithUnit.vue";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { guildIdFilter } = useGuildSelector();
+const { formatDateTimeShort: formatDate } = useFormatDate();
 const { success, error: showError } = useToast();
 const tempRoles = ref<TempRole[]>([]);
 const loading = ref(true);
@@ -78,10 +80,6 @@ async function onDelete(t: TempRole) {
 
 onMounted(fetchTempRoles);
 watch(guildIdFilter, fetchTempRoles);
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
 
 function timeRemaining(iso: string): string {
   const ms = new Date(iso).getTime() - Date.now();

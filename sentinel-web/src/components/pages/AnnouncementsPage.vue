@@ -10,6 +10,7 @@ import {
   type RenderedAnnouncement,
 } from "@/services/announcementsService";
 import { guildsService, type DiscordTextChannel } from "@/services/guildsService";
+import { useFormatDate } from "@/composables/useFormatDate";
 import { discordRolesService } from "@/services/discordRolesService";
 import type { DiscordRole } from "@/types";
 import AnnouncementFormModal from "../organisms/AnnouncementFormModal.vue";
@@ -134,9 +135,10 @@ function recurrenceLabel(a: ScheduledAnnouncement): string {
   }
 }
 
+const { formatDateTimeShort } = useFormatDate();
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 </script>
 

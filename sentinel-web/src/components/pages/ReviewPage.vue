@@ -6,8 +6,10 @@ import { reviewService } from "@/services/moderationAdvancedService";
 import type { ReviewQueueEntry } from "@/types/moderation-advanced";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { guildIdFilter } = useGuildSelector();
+const { formatDateTimeShort: formatDate } = useFormatDate();
 const { success, error: showError } = useToast();
 
 const pending = ref<ReviewQueueEntry[]>([]);
@@ -56,9 +58,6 @@ async function confirmResolve() {
 onMounted(fetchPending);
 watch(guildIdFilter, fetchPending);
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
 </script>
 
 <template>

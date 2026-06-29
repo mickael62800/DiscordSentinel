@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { httpGet } from "@/api/http";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 interface NameHistoryEntry {
   id: string;
@@ -39,9 +40,7 @@ async function lookup() {
   }
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
+const { formatDateTimeShort: formatDate } = useFormatDate();
 </script>
 
 <template>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useNotes } from "@/composables/useNotes";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { notes, loading, remove } = useNotes();
+const { formatDateTimeNumeric: formatDate } = useFormatDate();
 
 const CATEGORIES = [
   { key: "general", label: "Général", color: "#7F8C8D" },
@@ -15,13 +17,6 @@ function categoryColor(key: string): string {
 }
 function categoryLabel(key: string): string {
   return CATEGORIES.find((c) => c.key === key)?.label ?? key;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR", {
-    day: "2-digit", month: "2-digit", year: "numeric",
-    hour: "2-digit", minute: "2-digit",
-  });
 }
 </script>
 

@@ -2,13 +2,15 @@
 import { useConfessions } from "@/composables/useConfessions";
 import { useConfirm } from "@/composables/useConfirm";
 import type { ConfessionReply } from "@/services/confessionsService";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { repliesTarget, replies, closeReplies, deleteReply } = useConfessions();
 const { confirm } = useConfirm();
+const { formatDateTimeShort } = useFormatDate();
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 
 async function onDelete(r: ConfessionReply) {

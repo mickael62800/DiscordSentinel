@@ -13,6 +13,7 @@ import {
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
 import { useMyRole } from "@/composables/useMyRole";
+import { useFormatDate } from "@/composables/useFormatDate";
 import AppTabs from "@/components/molecules/AppTabs.vue";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import SecurityAttacksTab from "@/components/organisms/SecurityAttacksTab.vue";
@@ -133,7 +134,7 @@ async function runCleanup() {
 
 onMounted(refreshAll);
 
-function fmtDate(s: string): string { return new Date(s).toLocaleString("fr-FR"); }
+const { formatDateTimeShort: fmtDate } = useFormatDate();
 function truncate(s: string, n: number): string { return s.length > n ? s.slice(0, n) + "…" : s; }
 
 const totalFailedRequests = computed(() =>

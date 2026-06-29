@@ -11,6 +11,9 @@ import {
   type TlsErrorsResponse,
   type TopIpEntry,
 } from "@/services/serverSecurityService";
+import { useFormatDate } from "@/composables/useFormatDate";
+
+const { formatDateTimeShort: fmtDate } = useFormatDate();
 import { useToast } from "@/composables/useToast";
 import { useMyRole } from "@/composables/useMyRole";
 
@@ -113,7 +116,6 @@ async function refresh() {
 
 defineExpose({ refresh });
 
-function fmtDate(s: string): string { return new Date(s).toLocaleString("fr-FR"); }
 function truncate(s: string, n: number): string { return s.length > n ? s.slice(0, n) + "…" : s; }
 
 onMounted(refresh);

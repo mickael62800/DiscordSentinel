@@ -1,18 +1,9 @@
 <script setup lang="ts">
 import { useAutomod } from "@/composables/useAutomod";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { detections, loading, userFilter, fetchDetections } = useAutomod();
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const { formatDateTimeNumeric: formatDate } = useFormatDate();
 
 function severityLabel(s: number): { label: string; color: string } {
   if (s >= 8) return { label: "Critique", color: "#E74C3C" };

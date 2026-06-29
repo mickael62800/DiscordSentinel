@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { useAiDataset } from "@/composables/useAiDataset";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { items, total, limit, offset, loading, getLabel, setLabel, nextPage, prevPage } = useAiDataset();
+const { formatDateTimeShort: fmtDate } = useFormatDate();
 
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + "…" : s;
-}
-function fmtDate(s: string): string {
-  return new Date(s).toLocaleString("fr-FR");
 }
 </script>
 

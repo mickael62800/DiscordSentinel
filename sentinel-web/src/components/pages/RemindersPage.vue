@@ -5,8 +5,10 @@ import { useToast } from "@/composables/useToast";
 import { remindersService } from "@/services/moderationAdvancedService";
 import type { SanctionReminder } from "@/types/moderation-advanced";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { guildIdFilter } = useGuildSelector();
+const { formatDateTimeShort: formatDate } = useFormatDate();
 const { error: showError } = useToast();
 const reminders = ref<SanctionReminder[]>([]);
 const loading = ref(true);
@@ -31,9 +33,6 @@ async function fetchReminders() {
 onMounted(fetchReminders);
 watch(guildIdFilter, fetchReminders);
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
 function statusColor(s: string): string {
   if (s === "pending") return "#F1C40F";
   if (s === "sent") return "#2ECC71";

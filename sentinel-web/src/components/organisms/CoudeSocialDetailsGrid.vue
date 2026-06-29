@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useCoudeSocial } from "@/composables/useCoudeSocial";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { curse, bounty, coalition, vendettasAsChallenger, liftCurse } = useCoudeSocial();
+const { formatDateTimeShort } = useFormatDate();
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 
 function statusColor(s: string): string {

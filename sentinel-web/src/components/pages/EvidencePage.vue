@@ -7,6 +7,7 @@ import { evidenceService } from "@/services/moderationAdvancedService";
 import type { EvidenceEntry } from "@/types/moderation-advanced";
 import type { Infraction } from "@/types";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 interface Props {
   /** Quand true, cache l'en-tete et le champ de recherche (utilise dans le
@@ -85,9 +86,7 @@ async function onAdd() {
   }
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
+const { formatDateTimeShort: formatDate } = useFormatDate();
 
 // Reset si l'user change. En embedded, fetch automatiquement les actions.
 watch(lookupUserId, async (id) => {

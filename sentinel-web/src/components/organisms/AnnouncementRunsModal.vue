@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import type { ScheduledAnnouncement, AnnouncementRun } from "@/services/announcementsService";
 import AppModal from "../atoms/AppModal.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
+
+const { formatDateTimeShort } = useFormatDate();
 
 defineProps<{
   target: ScheduledAnnouncement | null;
@@ -11,7 +14,7 @@ const emit = defineEmits<{ close: [] }>();
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 </script>
 

@@ -51,5 +51,30 @@ export function useFormatDate() {
     });
   }
 
-  return { formatDate, formatDateTime, formatTime, formatShortDateTime };
+  // Reproduit exactement `new Date(x).toLocaleString("fr-FR")` (variante la
+  // plus réinventée localement). Pas de garde : comportement byte-identique
+  // aux copies locales pour toute entrée valide.
+  function formatDateTimeShort(raw: string): string {
+    return new Date(raw).toLocaleString("fr-FR");
+  }
+
+  // Reproduit `toLocaleString("fr-FR", { jj/mm/aaaa hh:mm })`.
+  function formatDateTimeNumeric(raw: string): string {
+    return new Date(raw).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  return {
+    formatDate,
+    formatDateTime,
+    formatTime,
+    formatShortDateTime,
+    formatDateTimeShort,
+    formatDateTimeNumeric,
+  };
 }

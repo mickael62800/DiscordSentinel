@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { useConfessions } from "@/composables/useConfessions";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { reports, resolveReport } = useConfessions();
+const { formatDateTimeShort } = useFormatDate();
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 
 function truncate(s: string, n = 80): string {

@@ -6,8 +6,10 @@ import { useToast } from "@/composables/useToast";
 import { sponsorshipsService } from "@/services/polishServices";
 import type { Sponsorship } from "@/types/polish";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { guildIdFilter } = useGuildSelector();
+const { formatDateTimeShort: formatDate } = useFormatDate();
 const { success, error: showError } = useToast();
 const sponsorships = ref<Sponsorship[]>([]);
 const loading = ref(true);
@@ -59,9 +61,6 @@ async function onCreate() {
 onMounted(fetchSponsorships);
 watch(guildIdFilter, fetchSponsorships);
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString("fr-FR");
-}
 </script>
 
 <template>

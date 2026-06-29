@@ -4,15 +4,17 @@ import { useConfessions } from "@/composables/useConfessions";
 import { useConfirm } from "@/composables/useConfirm";
 import { useMyRole } from "@/composables/useMyRole";
 import type { Confession } from "@/services/confessionsService";
+import { useFormatDate } from "@/composables/useFormatDate";
 
 const { confessions, showReplies, deleteConfession } = useConfessions();
 const { confirm } = useConfirm();
 const { isSuper, role } = useMyRole();
 const isOwner = computed(() => isSuper.value || role.value === "owner");
+const { formatDateTimeShort } = useFormatDate();
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
-  return new Date(iso).toLocaleString("fr-FR");
+  return formatDateTimeShort(iso);
 }
 
 function truncate(s: string, n = 100): string {
