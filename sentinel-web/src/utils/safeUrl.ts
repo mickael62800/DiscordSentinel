@@ -15,8 +15,6 @@ const ALLOWED_IMAGE_HOSTS = new Set<string>([
   "avatars.githubusercontent.com",
 ]);
 
-const ALLOWED_LINK_PROTOCOLS = new Set<string>(["https:", "http:", "mailto:"]);
-
 /**
  * Valide une URL d'image (`<img :src>`). Retourne l'URL si elle pointe vers
  * un domaine whitelist en HTTPS, sinon `null`.
@@ -31,22 +29,6 @@ export function safeImageUrl(url: string | null | undefined): string | null {
     const u = new URL(url);
     if (u.protocol !== "https:") return null;
     if (!ALLOWED_IMAGE_HOSTS.has(u.host)) return null;
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Valide une URL pour href (`<a :href>`). Plus permissif (autorise n'importe
- * quel domaine en https/http/mailto), mais bloque toujours les protocoles
- * dangereux comme javascript:, data:, vbscript:, blob:, file:.
- */
-export function safeLinkUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  try {
-    const u = new URL(url);
-    if (!ALLOWED_LINK_PROTOCOLS.has(u.protocol)) return null;
     return u.toString();
   } catch {
     return null;

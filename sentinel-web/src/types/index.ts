@@ -67,11 +67,6 @@ export interface BotGuildConfig {
   config_value: string;
 }
 
-export interface DiscordConfig {
-  client_id: string;
-  client_secret: string;
-}
-
 export interface ApiConfig {
   api_url: string;
   api_key: string;
@@ -189,19 +184,6 @@ export interface SecurityEvent {
   description: string;
   user_ids: string[];
   created_at: string;
-}
-
-export interface ModerationActionRequest {
-  guild_id: string;
-  channel_id: string;
-  moderator_id: string;
-  moderator_name: string;
-  target_id: string;
-  target_name: string;
-  action_type: string;
-  reason: string;
-  gravity?: string;
-  duration?: number;
 }
 
 export interface ModerationActionResponse {

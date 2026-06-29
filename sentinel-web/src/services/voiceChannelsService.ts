@@ -1,18 +1,9 @@
 import { httpDelete, httpGet, httpPatch, httpPost } from "@/api/http";
 import type { VoiceChannel, VoiceChannelDetail } from "@/types";
 import type {
-  AddCoAdminPayload,
-  AddWhitelistPayload,
-  BanFromChannelPayload,
-  ChannelBan,
-  CoAdmin,
-  CreateInvitePayload,
   CreateThemePayload,
-  InviteLink,
-  TransferOwnershipPayload,
   UpdateThemePayload,
   VoiceChannelTheme,
-  WhitelistEntry,
 } from "@/types/voice-extended";
 import { q } from "./_query";
 
@@ -33,75 +24,6 @@ export const voiceThemesService = {
   },
   remove(guildId: string, themeId: string): Promise<unknown> {
     return httpDelete(`/api/voice-channels/themes/${guildId}/${themeId}`);
-  },
-};
-
-// ── Whitelists / Bans / Invites / Co-admins / Transfer ────────
-export const voiceManageService = {
-  // Whitelist par owner.
-  getWhitelist(guildId: string, ownerId: string): Promise<WhitelistEntry[]> {
-    return httpGet(`/api/voice-channels/whitelist/${guildId}/${ownerId}`);
-  },
-  addWhitelist(body: AddWhitelistPayload): Promise<WhitelistEntry> {
-    return httpPost(`/api/voice-channels/whitelist`, body);
-  },
-  removeWhitelist(
-    guildId: string,
-    ownerId: string,
-    targetId: string,
-  ): Promise<unknown> {
-    return httpDelete(
-      `/api/voice-channels/whitelist/${guildId}/${ownerId}/${targetId}`,
-    );
-  },
-  // Bans par channel.
-  banFromChannel(
-    channelId: string,
-    body: BanFromChannelPayload,
-  ): Promise<ChannelBan> {
-    return httpPost(`/api/voice-channels/by-channel/${channelId}/bans`, body);
-  },
-  unbanFromChannel(channelId: string, userId: string): Promise<unknown> {
-    return httpDelete(
-      `/api/voice-channels/by-channel/${channelId}/bans/${userId}`,
-    );
-  },
-  // Invites custom par channel.
-  listInvites(channelId: string): Promise<InviteLink[]> {
-    return httpGet(`/api/voice-channels/by-channel/${channelId}/invites`);
-  },
-  createInvite(
-    channelId: string,
-    body: CreateInvitePayload,
-  ): Promise<InviteLink> {
-    return httpPost(`/api/voice-channels/by-channel/${channelId}/invites`, body);
-  },
-  revokeInvite(channelId: string, linkId: string): Promise<unknown> {
-    return httpDelete(
-      `/api/voice-channels/by-channel/${channelId}/invites/${linkId}`,
-    );
-  },
-  // Co-admins.
-  addCoAdmin(channelId: string, body: AddCoAdminPayload): Promise<CoAdmin> {
-    return httpPost(
-      `/api/voice-channels/by-channel/${channelId}/co-admins`,
-      body,
-    );
-  },
-  removeCoAdmin(channelId: string, userId: string): Promise<unknown> {
-    return httpDelete(
-      `/api/voice-channels/by-channel/${channelId}/co-admins/${userId}`,
-    );
-  },
-  // Transfer ownership.
-  transferOwnership(
-    channelId: string,
-    body: TransferOwnershipPayload,
-  ): Promise<unknown> {
-    return httpPatch(
-      `/api/voice-channels/by-channel/${channelId}/transfer`,
-      body,
-    );
   },
 };
 

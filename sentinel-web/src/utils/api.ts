@@ -14,7 +14,3 @@ export async function getApiBaseUrl(): Promise<string> {
   cachedUrl = url;
   return url;
 }
-
-export function resetApiBaseUrlCache() {
-  cachedUrl = null;
-}

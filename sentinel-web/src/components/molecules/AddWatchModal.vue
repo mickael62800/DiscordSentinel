@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useGuildMembers } from "../../composables/useGuildMembers";
 import { useToast } from "../../composables/useToast";
-import { getApiBaseUrl } from "../../utils/api";
+import { watchedUsersService } from "../../services/watchedUsersService";
 import { safeImageUrl } from "../../utils/safeUrl";
 import type { GuildMember } from "../../types";
 import AppModal from "../atoms/AppModal.vue";
@@ -58,17 +58,12 @@ async function confirmAddWatch() {
   if (!addSelectedMember.value || !props.guildId) return;
   addLoading.value = true;
   try {
-    const baseUrl = await getApiBaseUrl();
-    await fetch(`${baseUrl}/api/watched-users`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        guild_id: props.guildId,
-        user_id: addSelectedMember.value.id,
-        username: addSelectedMember.value.display_name || addSelectedMember.value.username,
-        reason: addReason.value,
-      }),
-    });
+    await watchedUsersService.add(
+      props.guildId,
+      addSelectedMember.value.id,
+      addSelectedMember.value.display_name || addSelectedMember.value.username,
+      addReason.value,
+    );
     success("Membre mis en surveillance avec succes");
     closeModal();
     emit("added");

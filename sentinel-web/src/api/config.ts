@@ -4,7 +4,6 @@
 
 const K_API = "ds.api.config";
 const K_DISCORD_USER = "ds.discord.user";
-const K_BOT_TOKENS = "ds.bot.tokens";
 
 export interface ApiConfig { api_url: string; api_key: string }
 export interface DiscordUser { id: string; username: string; avatar?: string | null; global_name?: string | null }
@@ -24,41 +23,6 @@ export function getDiscordUser(): DiscordUser | null {
 export function setDiscordUser(u: DiscordUser | null) {
   if (u) localStorage.setItem(K_DISCORD_USER, JSON.stringify(u));
   else localStorage.removeItem(K_DISCORD_USER);
-}
-
-interface BotTokens { [name: string]: string }
-// SECURITE : les tokens de bots sont des secrets. On les garde en
-// sessionStorage (et non localStorage) pour limiter l'exfiltration en cas de
-// XSS persistant (purge a la fermeture du tab). Migration douce : on rapatrie
-// l'ancienne valeur localStorage une fois, puis on la supprime.
-function migrateBotTokensFromLocalStorage(): void {
-  const legacy = localStorage.getItem(K_BOT_TOKENS);
-  if (legacy && !sessionStorage.getItem(K_BOT_TOKENS)) {
-    sessionStorage.setItem(K_BOT_TOKENS, legacy);
-  }
-  if (legacy) localStorage.removeItem(K_BOT_TOKENS);
-}
-function readBotTokens(): BotTokens {
-  migrateBotTokensFromLocalStorage();
-  const raw = sessionStorage.getItem(K_BOT_TOKENS);
-  return raw ? JSON.parse(raw) : {};
-}
-function writeBotTokens(t: BotTokens) {
-  sessionStorage.setItem(K_BOT_TOKENS, JSON.stringify(t));
-  localStorage.removeItem(K_BOT_TOKENS);
-}
-export function saveBotToken(name: string, token: string) {
-  const t = readBotTokens();
-  t[name] = token;
-  writeBotTokens(t);
-}
-export function deleteBotToken(name: string) {
-  const t = readBotTokens();
-  delete t[name];
-  writeBotTokens(t);
-}
-export function listBotTokens(): Array<[string, boolean]> {
-  return Object.keys(readBotTokens()).map((k) => [k, true] as [string, boolean]);
 }
 
 // Token Discord OAuth (renseigne apres callback OAuth) envoye en header X-Discord-Token.
