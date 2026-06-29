@@ -144,6 +144,21 @@ pub async fn reply_ephemeral_embed(
     }
 }
 
+/// Reponse publique (non ephemere) embed a une slash command.
+pub async fn reply_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().embed(embed),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec response Discord");
+    }
+}
+
 /// Reponse ephemere texte a un component interaction (bouton/menu).
 pub async fn component_reply_ephemeral(
     ctx: &Context,

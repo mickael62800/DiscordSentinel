@@ -3,6 +3,7 @@ use serenity::all::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, CreateMessage,
 };
 
+use crate::shared::discord_helpers::reply_embed;
 use crate::shared::discord_helpers::reply_ephemeral as reply;
 
 /// Verifie que la commande est utilisee dans le bon salon.
@@ -75,17 +76,7 @@ pub async fn post_activity(
         }
         None => {
             // Pas de salon configure → poster ici
-            if let Err(e) = command
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new().embed(embed),
-                    ),
-                )
-                .await
-            {
-                tracing::warn!(error = %e, "Echec response Discord");
-            }
+            reply_embed(ctx, command, embed).await;
         }
     }
 }

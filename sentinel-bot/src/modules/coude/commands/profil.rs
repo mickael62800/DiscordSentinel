@@ -1,10 +1,12 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
+use crate::shared::discord_helpers::{
+    reply_api_err, reply_embed, reply_ephemeral, require_guild_id,
+};
+use crate::shared::parsers::format_duration_remaining;
 
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
@@ -134,30 +136,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Format assurance active : duree restante (expires_at est une string
     // RFC3339, on la parse pour calculer le delta avec now).
     let insurance_field = active_insurance.and_then(|ins| {
-        chrono::DateTime::parse_from_rfc3339(&ins.expires_at)
-            .ok()
-            .map(|expires| {
-                let remaining = expires
-                    .with_timezone(&chrono::Utc)
-                    .signed_duration_since(chrono::Utc::now());
-                let remaining_str = if remaining.num_days() >= 1 {
-                    format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
-                } else if remaining.num_hours() >= 1 {
-                    format!(
-                        "{}h {}m",
-                        remaining.num_hours(),
-                        remaining.num_minutes() % 60
-                    )
-                } else if remaining.num_minutes() >= 1 {
-                    format!("{}m", remaining.num_minutes())
-                } else {
-                    "<1m".to_string()
-                };
-                format!(
-                    "\u{1f6e1}\u{fe0f} Active — expire dans **{}**",
-                    remaining_str
-                )
-            })
+        format_duration_remaining(&ins.expires_at).map(|remaining_str| {
+            format!(
+                "\u{1f6e1}\u{fe0f} Active — expire dans **{}**",
+                remaining_str
+            )
+        })
     });
 
     let mut embed = CreateEmbed::new()
@@ -261,27 +245,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Malediction OU sabotage actif (cf. COUPE_AMELIORATIONS 5.1 / 5.2).
     if let Some(curse) = active_curse {
-        let remaining_str = chrono::DateTime::parse_from_rfc3339(&curse.expires_at)
-            .ok()
-            .map(|expires| {
-                let remaining = expires
-                    .with_timezone(&chrono::Utc)
-                    .signed_duration_since(chrono::Utc::now());
-                if remaining.num_days() >= 1 {
-                    format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
-                } else if remaining.num_hours() >= 1 {
-                    format!(
-                        "{}h {}m",
-                        remaining.num_hours(),
-                        remaining.num_minutes() % 60
-                    )
-                } else if remaining.num_minutes() >= 1 {
-                    format!("{}m", remaining.num_minutes())
-                } else {
-                    "<1m".to_string()
-                }
-            })
-            .unwrap_or_else(|| "?".to_string());
+        let remaining_str =
+            format_duration_remaining(&curse.expires_at).unwrap_or_else(|| "?".to_string());
 
         // Pancarte / Graisser = sabotages (format dedie).
         match curse.kind.as_str() {
@@ -338,15 +303,5 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
+    reply_embed(ctx, command, embed).await;
 }

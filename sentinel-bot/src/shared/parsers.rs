@@ -76,6 +76,31 @@ pub fn lookup_u64(entries: &[(u64, u64)], id: u64) -> Option<u64> {
     entries.iter().find(|(k, _)| *k == id).map(|(_, v)| *v)
 }
 
+/// Formate le temps restant jusqu'a un instant RFC3339 sous forme d'echelle
+/// `Xj Yh` / `Xh Ym` / `Xm` / `<1m`. Retourne `None` si le parsing echoue.
+pub fn format_duration_remaining(expires_at_rfc3339: &str) -> Option<String> {
+    chrono::DateTime::parse_from_rfc3339(expires_at_rfc3339)
+        .ok()
+        .map(|expires| {
+            let remaining = expires
+                .with_timezone(&chrono::Utc)
+                .signed_duration_since(chrono::Utc::now());
+            if remaining.num_days() >= 1 {
+                format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
+            } else if remaining.num_hours() >= 1 {
+                format!(
+                    "{}h {}m",
+                    remaining.num_hours(),
+                    remaining.num_minutes() % 60
+                )
+            } else if remaining.num_minutes() >= 1 {
+                format!("{}m", remaining.num_minutes())
+            } else {
+                "<1m".to_string()
+            }
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,5 +173,45 @@ mod tests {
     #[test]
     fn lookup_u64_none() {
         assert_eq!(lookup_u64(&[(1, 100)], 99), None);
+    }
+
+    #[test]
+    fn duration_remaining_invalid_parse() {
+        assert_eq!(format_duration_remaining("pas une date"), None);
+    }
+
+    #[test]
+    fn duration_remaining_days() {
+        // Buffer de 30min pour absorber la troncature (now() avance pendant le calcul).
+        let future =
+            (chrono::Utc::now() + chrono::Duration::hours(50) + chrono::Duration::minutes(30))
+                .to_rfc3339();
+        assert_eq!(format_duration_remaining(&future).as_deref(), Some("2j 2h"));
+    }
+
+    #[test]
+    fn duration_remaining_hours() {
+        let future = (chrono::Utc::now()
+            + chrono::Duration::minutes(3 * 60 + 20)
+            + chrono::Duration::seconds(30))
+        .to_rfc3339();
+        assert_eq!(
+            format_duration_remaining(&future).as_deref(),
+            Some("3h 20m")
+        );
+    }
+
+    #[test]
+    fn duration_remaining_minutes() {
+        let future =
+            (chrono::Utc::now() + chrono::Duration::minutes(45) + chrono::Duration::seconds(30))
+                .to_rfc3339();
+        assert_eq!(format_duration_remaining(&future).as_deref(), Some("45m"));
+    }
+
+    #[test]
+    fn duration_remaining_past_is_under_one_minute() {
+        let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        assert_eq!(format_duration_remaining(&past).as_deref(), Some("<1m"));
     }
 }

@@ -1,9 +1,8 @@
-use serenity::all::{
-    CommandInteraction, Context, CreateCommand, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
-};
+use serenity::all::{CommandInteraction, Context, CreateCommand, CreateEmbed, CreateEmbedFooter};
 
-use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
+use crate::shared::discord_helpers::{
+    reply_api_err, reply_embed, reply_ephemeral, require_guild_id,
+};
 
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
@@ -99,15 +98,5 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ))
         .timestamp(serenity::model::Timestamp::now());
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
+    reply_embed(ctx, command, embed).await;
 }
