@@ -61,11 +61,7 @@ impl ManageCoudeBetsService {
 #[async_trait]
 impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
     async fn place(&self, new: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> {
-        if new.amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Le montant du pari doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(new.amount, "Le montant du pari")?;
 
         let combat = self.combat_query.get(new.combat_id).await?;
 

@@ -52,21 +52,24 @@ impl ManageLevelsUseCase for ManageLevelsService {
 
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
         // Validation des bornes
-        if cmd.xp_per_message < 1 || cmd.xp_per_message > 1000 {
-            return Err(DomainError::ValidationError(
-                "xp_per_message doit etre entre 1 et 1000".into(),
-            ));
-        }
-        if cmd.xp_per_voice_minute < 1 || cmd.xp_per_voice_minute > 1000 {
-            return Err(DomainError::ValidationError(
-                "xp_per_voice_minute doit etre entre 1 et 1000".into(),
-            ));
-        }
-        if cmd.xp_cooldown_secs < 0 || cmd.xp_cooldown_secs > 3600 {
-            return Err(DomainError::ValidationError(
-                "xp_cooldown_secs doit etre entre 0 et 3600".into(),
-            ));
-        }
+        crate::application::validation::validate_range(
+            cmd.xp_per_message.into(),
+            1,
+            1000,
+            "xp_per_message",
+        )?;
+        crate::application::validation::validate_range(
+            cmd.xp_per_voice_minute.into(),
+            1,
+            1000,
+            "xp_per_voice_minute",
+        )?;
+        crate::application::validation::validate_range(
+            cmd.xp_cooldown_secs.into(),
+            0,
+            3600,
+            "xp_cooldown_secs",
+        )?;
 
         let now = Utc::now();
         let config = LevelConfig {
@@ -87,11 +90,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
 
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         // Validation
-        if cmd.amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Le montant XP doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(cmd.amount, "Le montant XP")?;
         if cmd.amount > 10000 {
             return Err(DomainError::ValidationError(
                 "Le montant XP ne peut pas depasser 10000".into(),

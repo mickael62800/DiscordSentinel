@@ -47,9 +47,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         user_id: &str,
         item_key: &str,
     ) -> Result<(), DomainError> {
-        if item_key.trim().is_empty() {
-            return Err(DomainError::ValidationError("item_key requis".into()));
-        }
+        crate::application::validation::validate_non_empty(item_key, "item_key")?;
         self.repo.add_item(guild_id, user_id, item_key).await
     }
 
@@ -72,11 +70,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
     }
 
     async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {
-        if new.amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Le montant d'une prime doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(new.amount, "Le montant d'une prime")?;
         if new.target_id == new.placed_by_id {
             return Err(DomainError::ValidationError(
                 "Impossible de placer une prime sur soi-meme".into(),

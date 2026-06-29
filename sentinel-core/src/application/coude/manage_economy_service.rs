@@ -107,13 +107,7 @@ impl ManageCoudeEconomyService {
 }
 
 fn require_positive(amount: i64) -> Result<(), DomainError> {
-    if amount <= 0 {
-        Err(DomainError::ValidationError(
-            "Le montant doit etre positif".into(),
-        ))
-    } else {
-        Ok(())
-    }
+    crate::application::validation::validate_positive(amount, "Le montant")
 }
 
 #[async_trait]

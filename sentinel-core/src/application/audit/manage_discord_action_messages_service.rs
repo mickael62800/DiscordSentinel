@@ -29,9 +29,7 @@ impl ManageDiscordActionMessagesService {
 #[async_trait]
 impl ManageDiscordActionMessagesUseCase for ManageDiscordActionMessagesService {
     async fn register(&self, msg: NewDiscordActionMessage) -> Result<(), DomainError> {
-        if msg.kind.trim().is_empty() {
-            return Err(DomainError::ValidationError("kind requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&msg.kind, "kind")?;
         if msg.guild_id.trim().is_empty()
             || msg.channel_id.trim().is_empty()
             || msg.message_id.trim().is_empty()

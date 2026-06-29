@@ -104,9 +104,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 "resolved_source doit etre 'web' ou 'discord'".into(),
             ));
         }
-        if cmd.resolved_by_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("resolved_by_id requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.resolved_by_id, "resolved_by_id")?;
         // Regle d'acces (domaine) : finalisation Discord reservee aux admins.
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -133,9 +131,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 "source doit etre 'web' ou 'discord'".into(),
             ));
         }
-        if cmd.actor_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("actor_id requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.actor_id, "actor_id")?;
         // Regle d'acces (domaine) : tout moderateur peut clore (source discord).
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -151,9 +147,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     }
 
     async fn reopen(&self, cmd: ReopenReviewCommand) -> Result<AutomodReview, DomainError> {
-        if cmd.actor_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("actor_id requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.actor_id, "actor_id")?;
         if let Some(facts) = &cmd.requester {
             if !crate::domain::entities::moderation::review::automod::is_moderator(facts) {
                 return Err(DomainError::Forbidden(
@@ -178,9 +172,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 cmd.vote_action
             )));
         }
-        if cmd.voter_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("voter_id requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.voter_id, "voter_id")?;
         self.repo
             .upsert_vote(
                 cmd.review_id,
@@ -259,9 +251,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 "Tu n'es pas autorise a ouvrir une discussion.".into(),
             ));
         }
-        if cmd.channel_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("channel_id requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.channel_id, "channel_id")?;
         // Pas de discussion sur une affaire deja close (sanction appliquee ou ignoree).
         if let Some(review) = self.repo.get(cmd.review_id).await? {
             if matches!(review.status.as_str(), "applied" | "ignored") {

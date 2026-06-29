@@ -53,9 +53,7 @@ impl ManageAnnouncementsService {
     }
 
     fn validate_create(&self, cmd: &CreateAnnouncementCommand) -> Result<(), DomainError> {
-        if cmd.name.trim().is_empty() {
-            return Err(DomainError::ValidationError("name requis".into()));
-        }
+        crate::application::validation::validate_non_empty(&cmd.name, "name")?;
         if cmd.recurrence_hour > 23 {
             return Err(DomainError::ValidationError("hour doit etre 0-23".into()));
         }

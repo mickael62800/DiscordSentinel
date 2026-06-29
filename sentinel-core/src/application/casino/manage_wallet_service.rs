@@ -109,11 +109,7 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<WalletMutation, DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Montant credit doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(amount, "Montant credit")?;
 
         let previous = self.read_balance(guild_id, user_id).await?;
         let wallet = self
@@ -144,11 +140,7 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<WalletMutation, DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Montant debit doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(amount, "Montant debit")?;
 
         let previous = self.read_balance(guild_id, user_id).await?;
         let wallet = self
@@ -181,11 +173,7 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<Vec<TauntEvent>, DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Montant transfer doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(amount, "Montant transfer")?;
         if from_user == to_user {
             return Err(DomainError::ValidationError(
                 "Impossible de se transferer a soi-meme".into(),

@@ -195,11 +195,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         user_id: &str,
         amount: i64,
     ) -> Result<(), DomainError> {
-        if amount <= 0 {
-            return Err(DomainError::ValidationError(
-                "Le montant doit etre positif".into(),
-            ));
-        }
+        crate::application::validation::validate_positive(amount, "Le montant")?;
         let updated = self
             .repo
             .record_coins_earned(guild_id, user_id, amount)

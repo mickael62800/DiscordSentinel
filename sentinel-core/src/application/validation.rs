@@ -18,3 +18,25 @@ pub fn validate_non_empty(value: &str, field: &str) -> Result<(), DomainError> {
         Ok(())
     }
 }
+
+/// Valide qu'un montant est strictement positif.
+pub fn validate_positive(amount: i64, label: &str) -> Result<(), DomainError> {
+    if amount <= 0 {
+        Err(DomainError::ValidationError(format!(
+            "{label} doit etre positif"
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+/// Valide qu'une valeur est dans l'intervalle inclusif `[lo, hi]`.
+pub fn validate_range(value: i64, lo: i64, hi: i64, field: &str) -> Result<(), DomainError> {
+    if value < lo || value > hi {
+        Err(DomainError::ValidationError(format!(
+            "{field} doit etre entre {lo} et {hi}"
+        )))
+    } else {
+        Ok(())
+    }
+}
