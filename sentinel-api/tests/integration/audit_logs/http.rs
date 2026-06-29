@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_audit_logs;
 
 // ══════════════════════════════════════════════════════════
@@ -33,7 +33,9 @@ struct MockAuditLogsUC {
 }
 
 impl MockAuditLogsUC {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
     fn with(self, log: AuditLog) -> Self {
         self.items.lock().unwrap().push(log);
         self
@@ -59,14 +61,33 @@ impl ManageAuditLogsUseCase for MockAuditLogsUC {
         self.items.lock().unwrap().push(log.clone());
         Ok(log)
     }
-    async fn list(&self, guild_id: Option<&str>, filters: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> {
+    async fn list(
+        &self,
+        guild_id: Option<&str>,
+        filters: AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
         let all = self.items.lock().unwrap();
         let matching: Vec<AuditLog> = all
             .iter()
             .filter(|l| guild_id.is_none_or(|g| l.guild_id == g))
-            .filter(|l| filters.event_type.as_deref().is_none_or(|e| l.event_type == e))
-            .filter(|l| filters.actor_id.as_deref().is_none_or(|a| l.actor_id.as_deref() == Some(a)))
-            .filter(|l| filters.target_id.as_deref().is_none_or(|t| l.target_id.as_deref() == Some(t)))
+            .filter(|l| {
+                filters
+                    .event_type
+                    .as_deref()
+                    .is_none_or(|e| l.event_type == e)
+            })
+            .filter(|l| {
+                filters
+                    .actor_id
+                    .as_deref()
+                    .is_none_or(|a| l.actor_id.as_deref() == Some(a))
+            })
+            .filter(|l| {
+                filters
+                    .target_id
+                    .as_deref()
+                    .is_none_or(|t| l.target_id.as_deref() == Some(t))
+            })
             .skip(filters.offset as usize)
             .take(filters.limit as usize)
             .cloned()
@@ -90,30 +111,53 @@ fn build_app(uc: MockAuditLogsUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("POST").uri(uri)
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn sample_log(guild_id: &str, event_type: &str, actor: Option<&str>) -> AuditLog {
@@ -200,7 +244,11 @@ async fn list_audit_logs_filter_by_event_type() {
         .with(sample_log("111111111111111111", "ban", None))
         .with(sample_log("111111111111111111", "unban", None));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/audit-logs?guild_id=111111111111111111&event_type=ban").await;
+    let (status, json) = get(
+        app,
+        "/api/audit-logs?guild_id=111111111111111111&event_type=ban",
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     let arr = json.as_array().unwrap();
     assert_eq!(arr.len(), 1);
@@ -213,7 +261,11 @@ async fn list_audit_logs_filter_by_actor_id() {
         .with(sample_log("111111111111111111", "ban", Some("a1")))
         .with(sample_log("111111111111111111", "ban", Some("a2")));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/audit-logs?guild_id=111111111111111111&actor_id=a1").await;
+    let (status, json) = get(
+        app,
+        "/api/audit-logs?guild_id=111111111111111111&actor_id=a1",
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 1);
 }

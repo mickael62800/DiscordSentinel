@@ -168,7 +168,9 @@ pub async fn shutdown_signal() {
     #[cfg(unix)]
     let terminate = async {
         match signal::unix::signal(signal::unix::SignalKind::terminate()) {
-            Ok(mut sig) => { sig.recv().await; }
+            Ok(mut sig) => {
+                sig.recv().await;
+            }
             Err(e) => error!(error = %e, "Impossible d'ecouter SIGTERM"),
         }
     };
@@ -313,7 +315,10 @@ const WORKER_MODULES: &[&str] = &[
 ///
 /// La migration 204 a converti les anciens noms (`coude-worker`,
 /// `ticket-bot`, etc.) vers ces noms de modules.
-pub async fn load_worker_config(pool: &PgPool, worker_name: &str) -> std::collections::HashMap<String, String> {
+pub async fn load_worker_config(
+    pool: &PgPool,
+    worker_name: &str,
+) -> std::collections::HashMap<String, String> {
     let mut all_names: Vec<&str> = Vec::with_capacity(1 + WORKER_MODULES.len());
     all_names.push(worker_name);
     all_names.extend_from_slice(WORKER_MODULES);
@@ -415,8 +420,14 @@ pub async fn send_worker_log(
         serde_json::Value::Object(m) => m,
         _ => serde_json::Map::new(),
     };
-    details_obj.insert("job".to_string(), serde_json::Value::String(job_name.to_string()));
-    details_obj.insert("event_type".to_string(), serde_json::Value::String(format!("job.{}", level)));
+    details_obj.insert(
+        "job".to_string(),
+        serde_json::Value::String(job_name.to_string()),
+    );
+    details_obj.insert(
+        "event_type".to_string(),
+        serde_json::Value::String(format!("job.{}", level)),
+    );
 
     let mut req = client
         .post(format!("{}/api/logs", api_url))
@@ -451,7 +462,10 @@ pub fn spawn_periodic<F>(
     worker_name: &'static str,
     task_fn: F,
 ) where
-    F: Fn(PgPool) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send>>
+    F: Fn(
+            PgPool,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), String>> + Send>>
         + Send
         + 'static,
 {
@@ -466,7 +480,8 @@ pub fn spawn_periodic<F>(
             name,
             &format!("Job {} planifie (intervalle {}s)", name, interval_secs),
             serde_json::json!({ "interval_secs": interval_secs, "event_type": "job.scheduled" }),
-        ).await;
+        )
+        .await;
 
         let interval = Duration::from_secs(interval_secs);
         let slow_threshold = Duration::from_secs(5);
@@ -478,10 +493,14 @@ pub fn spawn_periodic<F>(
             if *shutdown.borrow() {
                 info!(task = name, "Tache periodique arretee (shutdown)");
                 send_worker_log(
-                    &api_url, worker_name, "info", name,
+                    &api_url,
+                    worker_name,
+                    "info",
+                    name,
                     &format!("Job {} arrete (shutdown)", name),
                     serde_json::json!({ "ticks": tick_count, "event_type": "job.stopped" }),
-                ).await;
+                )
+                .await;
                 break;
             }
 
@@ -503,7 +522,11 @@ pub fn spawn_periodic<F>(
 
             match result {
                 Ok(()) => {
-                    let level = if elapsed > slow_threshold { "warn" } else { "info" };
+                    let level = if elapsed > slow_threshold {
+                        "warn"
+                    } else {
+                        "info"
+                    };
                     let msg = if elapsed > slow_threshold {
                         format!("Job {} lent ({} ms)", name, elapsed_ms)
                     } else {
@@ -521,7 +544,10 @@ pub fn spawn_periodic<F>(
                 Err(e) => {
                     error!(task = name, error = %e, elapsed_ms, "Erreur tache periodique");
                     send_worker_log(
-                        &api_url, worker_name, "error", name,
+                        &api_url,
+                        worker_name,
+                        "error",
+                        name,
                         &format!("Erreur job {} : {}", name, e),
                         serde_json::json!({
                             "error": e.to_string(),
@@ -529,7 +555,8 @@ pub fn spawn_periodic<F>(
                             "tick": tick_count,
                             "event_type": "job.error",
                         }),
-                    ).await;
+                    )
+                    .await;
                 }
             }
         }
@@ -583,27 +610,52 @@ mod tests {
     fn config_or_env_bool_db_true() {
         let mut db = std::collections::HashMap::new();
         db.insert("flag".into(), "true".into());
-        assert!(config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", false));
+        assert!(config_or_env_bool(
+            &db,
+            "flag",
+            "NONEXISTENT_ENV_VAR_XYZ",
+            false
+        ));
     }
 
     #[test]
     fn config_or_env_bool_db_false() {
         let mut db = std::collections::HashMap::new();
         db.insert("flag".into(), "false".into());
-        assert!(!config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", true));
+        assert!(!config_or_env_bool(
+            &db,
+            "flag",
+            "NONEXISTENT_ENV_VAR_XYZ",
+            true
+        ));
     }
 
     #[test]
     fn config_or_env_bool_db_one() {
         let mut db = std::collections::HashMap::new();
         db.insert("flag".into(), "1".into());
-        assert!(config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", false));
+        assert!(config_or_env_bool(
+            &db,
+            "flag",
+            "NONEXISTENT_ENV_VAR_XYZ",
+            false
+        ));
     }
 
     #[test]
     fn config_or_env_bool_missing_uses_default() {
         let db = std::collections::HashMap::new();
-        assert!(config_or_env_bool(&db, "missing", "NONEXISTENT_ENV_VAR_XYZ", true));
-        assert!(!config_or_env_bool(&db, "missing", "NONEXISTENT_ENV_VAR_XYZ", false));
+        assert!(config_or_env_bool(
+            &db,
+            "missing",
+            "NONEXISTENT_ENV_VAR_XYZ",
+            true
+        ));
+        assert!(!config_or_env_bool(
+            &db,
+            "missing",
+            "NONEXISTENT_ENV_VAR_XYZ",
+            false
+        ));
     }
 }

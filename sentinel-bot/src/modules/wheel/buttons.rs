@@ -57,7 +57,10 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    let req = WheelSpinRequest { user_id, username: username.clone() };
+    let req = WheelSpinRequest {
+        user_id,
+        username: username.clone(),
+    };
 
     let response = match api_client::spin(&base, &guild_id, &req).await {
         Ok(r) => r,
@@ -100,14 +103,22 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
     super::setup::repost_panel(ctx, component.channel_id).await;
 
     // Acquitte le clic ephemeral.
-    let edit = serenity::builder::EditInteractionResponse::new()
-        .content(format!("\u{1f300} Tu as tire la roue : {} ({})",
-            response.case_label, format_payout(response.payout)));
+    let edit = serenity::builder::EditInteractionResponse::new().content(format!(
+        "\u{1f300} Tu as tire la roue : {} ({})",
+        response.case_label,
+        format_payout(response.payout)
+    ));
     let _ = component.edit_response(&ctx.http, edit).await;
 }
 
 fn format_payout(p: i64) -> String {
-    if p > 0 { format!("+{p}c") } else if p < 0 { format!("{p}c") } else { "0c".into() }
+    if p > 0 {
+        format!("+{p}c")
+    } else if p < 0 {
+        format!("{p}c")
+    } else {
+        "0c".into()
+    }
 }
 
 async fn get_api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
@@ -116,8 +127,8 @@ async fn get_api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
 }
 
 async fn edit_ephemeral_error(ctx: &Context, component: &ComponentInteraction, message: &str) {
-    let edit = serenity::builder::EditInteractionResponse::new()
-        .embed(embeds::build_error_embed(message));
+    let edit =
+        serenity::builder::EditInteractionResponse::new().embed(embeds::build_error_embed(message));
     if let Err(e) = component.edit_response(&ctx.http, edit).await {
         warn!(error = %e, "Echec edit error wheel");
     }

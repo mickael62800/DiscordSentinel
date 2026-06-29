@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use sentinel_core::domain::entities::coude::inventory::Insurance;
 use sentinel_core::domain::entities::coude::inventory::InventoryItem;
-use sentinel_core::domain::entities::coude::inventory::Prime;
 use sentinel_core::domain::entities::coude::inventory::NewCoudePrime;
+use sentinel_core::domain::entities::coude::inventory::Prime;
 use sentinel_core::domain::errors::DomainError;
 
 use super::super::pg_err;
@@ -22,7 +22,6 @@ impl PgInventoryRepository {
         Self { pool }
     }
 }
-
 
 #[derive(sqlx::FromRow)]
 struct InventoryRow {
@@ -255,7 +254,11 @@ impl InventoryRepository for PgInventoryRepository {
         duration_seconds: i64,
     ) -> Result<bool, DomainError> {
         // 0 = defaut historique 1h (3600s) pour retrocompat.
-        let secs = if duration_seconds <= 0 { 3600 } else { duration_seconds };
+        let secs = if duration_seconds <= 0 {
+            3600
+        } else {
+            duration_seconds
+        };
         // Atomique : INSERT uniquement si aucune assurance active. Evite la
         // race ou deux /assurance simultanees passent le check get_active et
         // creent chacune une ligne (coins perdus pour la 2e).
@@ -287,7 +290,11 @@ impl InventoryRepository for PgInventoryRepository {
         duration_seconds: i64,
         max_slots: i32,
     ) -> Result<bool, DomainError> {
-        let secs = if duration_seconds <= 0 { 3600 } else { duration_seconds };
+        let secs = if duration_seconds <= 0 {
+            3600
+        } else {
+            duration_seconds
+        };
         let max = max_slots.max(1);
         // Insert seulement si le nombre d assurances actives < max_slots.
         let inserted = sqlx::query_scalar::<_, Uuid>(

@@ -4,13 +4,19 @@
 use sqlx::PgPool;
 
 async fn setup_pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
-    PgPool::connect(&url).await.expect("Impossible de se connecter a la base de test")
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
+    PgPool::connect(&url)
+        .await
+        .expect("Impossible de se connecter a la base de test")
 }
 
 fn unique_guild() -> String {
-    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 /// Cree un joueur coude avec un solde initial.
@@ -30,8 +36,12 @@ async fn get_coins(pool: &PgPool, guild_id: &str, user_id: &str) -> i64 {
     sqlx::query_as::<_, (i64,)>(
         "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(guild_id).bind(user_id)
-    .fetch_one(pool).await.unwrap().0
+    .bind(guild_id)
+    .bind(user_id)
+    .fetch_one(pool)
+    .await
+    .unwrap()
+    .0
 }
 
 // ══════════════════════════════════════════════════════════
@@ -99,16 +109,30 @@ async fn steal_caps_to_victim_balance() {
 
     let mut tx = pool.begin().await.unwrap();
     sqlx::query("UPDATE coude_players SET coins = coins - $3 WHERE guild_id = $1 AND user_id = $2")
-        .bind(&gid).bind("victim").bind(actual_stolen).execute(&mut *tx).await.unwrap();
+        .bind(&gid)
+        .bind("victim")
+        .bind(actual_stolen)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
     sqlx::query("UPDATE coude_players SET coins = coins + $3 WHERE guild_id = $1 AND user_id = $2")
-        .bind(&gid).bind("thief").bind(actual_stolen).execute(&mut *tx).await.unwrap();
+        .bind(&gid)
+        .bind("thief")
+        .bind(actual_stolen)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
     tx.commit().await.unwrap();
 
     let thief = get_coins(&pool, &gid, "thief").await;
     let victim = get_coins(&pool, &gid, "victim").await;
     assert_eq!(victim, 0);
     assert_eq!(thief, 130);
-    assert_eq!(thief + victim, 130, "Total = 100+30 = 130, pas de creation de coins");
+    assert_eq!(
+        thief + victim,
+        130,
+        "Total = 100+30 = 130, pas de creation de coins"
+    );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -127,7 +151,13 @@ async fn record_loss_caps_to_balance() {
            coins = coins - LEAST(coins, $3),
            total_lost = total_lost + LEAST(coins, $3)
            WHERE guild_id = $1 AND user_id = $2"#,
-    ).bind(&gid).bind("loser").bind(200i64).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .bind("loser")
+    .bind(200i64)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let coins = get_coins(&pool, &gid, "loser").await;
     assert_eq!(coins, 0, "Coins ne doit pas etre negatif");
@@ -144,18 +174,39 @@ async fn casino_log_tracks_gains_today() {
 
     // Inserer quelques logs casino
     sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
-        .bind(&gid).bind("player1").bind(100i64).execute(&pool).await.unwrap();
+        .bind(&gid)
+        .bind("player1")
+        .bind(100i64)
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
-        .bind(&gid).bind("player1").bind(-50i64).execute(&pool).await.unwrap();
+        .bind(&gid)
+        .bind("player1")
+        .bind(-50i64)
+        .execute(&pool)
+        .await
+        .unwrap();
     sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
-        .bind(&gid).bind("player1").bind(200i64).execute(&pool).await.unwrap();
+        .bind(&gid)
+        .bind("player1")
+        .bind(200i64)
+        .execute(&pool)
+        .await
+        .unwrap();
 
     // Somme des gains positifs dans les 24h
     let total: i64 = sqlx::query_as::<_, (i64,)>(
         r#"SELECT COALESCE(SUM(amount), 0)::bigint FROM coude_casino_log
            WHERE guild_id = $1 AND user_id = $2
            AND amount > 0 AND created_at > NOW() - INTERVAL '24 hours'"#,
-    ).bind(&gid).bind("player1").fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .bind("player1")
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(total, 300); // 100 + 200 (les -50 sont ignores)
 }
@@ -181,5 +232,8 @@ async fn blackjack_unique_active_game_enforced_by_db() {
            VALUES (gen_random_uuid(), $1, $2, 'Alice', 100, '[]', '[]', '[]', 'playing', 0, 0, false, 0, NOW())"#,
     ).bind(&gid).bind("player1").execute(&pool).await;
 
-    assert!(result.is_err(), "La DB doit refuser un deuxieme jeu actif pour le meme joueur");
+    assert!(
+        result.is_err(),
+        "La DB doit refuser un deuxieme jeu actif pour le meme joueur"
+    );
 }

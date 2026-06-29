@@ -25,14 +25,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_combats()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_combats())
+        .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -90,12 +99,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(r) => r,
         Err(e) => {
-            crate::modules::coude::interaction_helper::followup_text(
-                ctx,
-                command,
-                &e,
-            )
-            .await;
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &e).await;
             return;
         }
     };

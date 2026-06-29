@@ -58,7 +58,10 @@ fn ws_event_without_guild_id_omits_field() {
         data: json!({}),
     };
     let json = serde_json::to_string(&e).unwrap();
-    assert!(!json.contains("guild_id"), "None doit etre omis grace a skip_serializing_if");
+    assert!(
+        !json.contains("guild_id"),
+        "None doit etre omis grace a skip_serializing_if"
+    );
     assert!(json.contains("\"event\":\"system\""));
 }
 
@@ -77,10 +80,13 @@ fn broadcast_extracts_guild_id_from_payload() {
 #[test]
 fn broadcast_with_complex_nested_payload() {
     let b = EventBroadcaster::new();
-    b.broadcast("complex", json!({
-        "guild_id": "g1",
-        "nested": {
-            "field": [1, 2, {"inner": true}]
-        }
-    }));
+    b.broadcast(
+        "complex",
+        json!({
+            "guild_id": "g1",
+            "nested": {
+                "field": [1, 2, {"inner": true}]
+            }
+        }),
+    );
 }

@@ -1,20 +1,27 @@
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
-use crate::ports::uow::DbTx;
 use crate::domain::entities::casino::slot::SlotJackpotPool;
 use crate::domain::entities::casino::slot::SlotSpin;
 use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::errors::DomainError;
+use crate::ports::uow::DbTx;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 
 #[async_trait]
 pub trait SlotRepository: Send + Sync {
     /// Recupere l etat du pool jackpot pour une guild. None si pas encore initialise.
-    async fn get_jackpot_pool(&self, guild_id: &str) -> Result<Option<SlotJackpotPool>, DomainError>;
+    async fn get_jackpot_pool(
+        &self,
+        guild_id: &str,
+    ) -> Result<Option<SlotJackpotPool>, DomainError>;
 
     /// Insere une row pool si absente, avec `starting` comme valeur initiale.
     /// Idempotent : ne touche pas une row existante.
-    async fn init_jackpot_pool_if_absent(&self, guild_id: &str, starting: i64) -> Result<(), DomainError>;
+    async fn init_jackpot_pool_if_absent(
+        &self,
+        guild_id: &str,
+        starting: i64,
+    ) -> Result<(), DomainError>;
 
     /// Ajoute `amount` au pool dans une tx en cours. Retourne le nouveau total.
     /// Si la row n existe pas, elle est creee a `starting + amount`.
@@ -39,11 +46,7 @@ pub trait SlotRepository: Send + Sync {
 
     /// Persiste un spin dans la tx en cours (cf. flow atomique :
     /// debit wallet + spin log + jackpot ops dans la meme tx).
-    async fn log_spin_in_tx(
-        &self,
-        tx: &mut dyn DbTx,
-        spin: &SlotSpin,
-    ) -> Result<(), DomainError>;
+    async fn log_spin_in_tx(&self, tx: &mut dyn DbTx, spin: &SlotSpin) -> Result<(), DomainError>;
 
     /// Timestamp du dernier spin du joueur dans cette guild. Utilise pour
     /// l enforcement du cooldown.
@@ -71,11 +74,7 @@ pub trait SlotRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     /// Liste les N derniers spins d une guild (tous joueurs confondus).
-    async fn recent_spins(
-        &self,
-        guild_id: &str,
-        limit: i64,
-    ) -> Result<Vec<SlotSpin>, DomainError>;
+    async fn recent_spins(&self, guild_id: &str, limit: i64) -> Result<Vec<SlotSpin>, DomainError>;
 
     /// Top winners sur les `days` derniers jours, classe par total_payout.
     async fn top_winners(

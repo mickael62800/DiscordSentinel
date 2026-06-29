@@ -2,18 +2,14 @@
 //! Instancie le vrai service avec PgVoiceChannelRepository + stubs cache/config
 //! pour exercer les chemins application/voice_channels/crud.rs.
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use sqlx::PgPool;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
 use sentinel_api::application::community::voice_channels::ManageVoiceChannelsService;
-use sentinel_core::domain::entities::system::bot_config::BotDefinition;
-use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
 use sentinel_api::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
 use sentinel_api::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
@@ -26,6 +22,10 @@ use sentinel_api::ports::inbound::community::manage_voice_channels::UpdateVoiceC
 use sentinel_api::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sentinel_api::ports::outbound::system::cache::CachePort;
+use sentinel_core::domain::entities::system::bot_config::BotDefinition;
+use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::errors::DomainError;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
@@ -34,7 +34,10 @@ async fn pool() -> PgPool {
 }
 
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ── Stub cache : compte les invalidations pour verifier les effets de bord ──
@@ -46,16 +49,28 @@ struct SpyCache {
 
 #[async_trait]
 impl CachePort for SpyCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn invalidate(&self, key: &str) -> Result<(), DomainError> {
         self.invalidations.lock().unwrap().push(key.into());
         Ok(())
     }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ── Stub bot config : retourne vec vide (defaults) ──
@@ -64,11 +79,21 @@ struct StubBotConfig;
 
 #[async_trait]
 impl BotConfigRepository for StubBotConfig {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
-    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 async fn make_service() -> (ManageVoiceChannelsService, Arc<SpyCache>) {
@@ -107,7 +132,10 @@ async fn create_channel_persists_and_invalidates_cache() {
     let g = fresh_id();
     let ch = fresh_id();
     let owner = fresh_id();
-    let created = svc.create_channel(sample_cmd(&g, &ch, &owner)).await.unwrap();
+    let created = svc
+        .create_channel(sample_cmd(&g, &ch, &owner))
+        .await
+        .unwrap();
     assert_eq!(created.channel_id, ch);
     assert_eq!(created.guild_id, g);
     assert_eq!(created.channel_status, "open");
@@ -119,8 +147,12 @@ async fn create_channel_persists_and_invalidates_cache() {
 async fn list_channels_returns_created_channels() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
-    svc.create_channel(sample_cmd(&g, &fresh_id(), &fresh_id())).await.unwrap();
-    svc.create_channel(sample_cmd(&g, &fresh_id(), &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
+    svc.create_channel(sample_cmd(&g, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
     let list = svc.list_channels(&g).await.unwrap();
     assert_eq!(list.len(), 2);
 }
@@ -137,7 +169,9 @@ async fn get_channel_detail_returns_full_detail() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     let detail = svc.get_channel_detail(&ch).await.unwrap();
     assert_eq!(detail.channel.channel_id, ch);
     assert!(detail.co_admins.is_empty());
@@ -157,7 +191,9 @@ async fn close_channel_updates_status() {
     let (svc, cache) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     svc.close_channel(&ch).await.unwrap();
     // Le channel ne devrait plus apparaitre dans la liste active
     let list = svc.list_channels(&g).await.unwrap();
@@ -172,7 +208,9 @@ async fn delete_channel_is_soft_delete_like_close() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     svc.delete_channel(&ch).await.unwrap();
     assert!(svc.list_channels(&g).await.unwrap().is_empty());
 }
@@ -182,7 +220,9 @@ async fn list_history_includes_closed_channels() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     svc.close_channel(&ch).await.unwrap();
     let hist = svc.list_history_channels(&g, 100).await.unwrap();
     assert!(hist.iter().any(|c| c.channel_id == ch));
@@ -197,7 +237,9 @@ async fn update_channel_applies_visibility() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
         channel_id: ch.clone().into(),
@@ -222,7 +264,9 @@ async fn update_channel_applies_locked_and_queue_flags() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
         channel_id: ch.clone().into(),
@@ -277,7 +321,9 @@ async fn transfer_ownership_updates_owner() {
     let g = fresh_id();
     let ch = fresh_id();
     let old_owner = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &old_owner)).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &old_owner))
+        .await
+        .unwrap();
 
     let new_owner = fresh_id();
     svc.transfer_ownership(TransferOwnershipCommand {
@@ -316,7 +362,9 @@ async fn update_channel_applies_name_status_limit_stage_queue_ch() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
 
     svc.update_channel(UpdateVoiceChannelCommand {
         channel_id: ch.clone().into(),
@@ -344,27 +392,39 @@ async fn update_channel_clears_member_limit_with_some_none() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
 
     // D'abord mettre un limit
     svc.update_channel(UpdateVoiceChannelCommand {
         channel_id: ch.clone().into(),
-        visibility: None, locked: None, queue_enabled: None, stage_enabled: None,
+        visibility: None,
+        locked: None,
+        queue_enabled: None,
+        stage_enabled: None,
         name: None,
         member_limit: Some(Some(5)),
         queue_channel_id: None,
         status: None,
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     // Puis le clear (Some(None))
     svc.update_channel(UpdateVoiceChannelCommand {
         channel_id: ch.clone().into(),
-        visibility: None, locked: None, queue_enabled: None, stage_enabled: None,
+        visibility: None,
+        locked: None,
+        queue_enabled: None,
+        stage_enabled: None,
         name: None,
         member_limit: Some(None),
         queue_channel_id: None,
         status: None,
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let d = svc.get_channel_detail(&ch).await.unwrap();
     assert!(d.channel.member_limit.is_none());
@@ -389,8 +449,12 @@ async fn list_all_channels_returns_across_guilds() {
     let (svc, _) = make_service().await;
     let g1 = fresh_id();
     let g2 = fresh_id();
-    svc.create_channel(sample_cmd(&g1, &fresh_id(), &fresh_id())).await.unwrap();
-    svc.create_channel(sample_cmd(&g2, &fresh_id(), &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g1, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
+    svc.create_channel(sample_cmd(&g2, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
     let all = svc.list_all_channels().await.unwrap();
     // On a au minimum les 2 qu'on vient de creer (peut y en avoir d'autres).
     assert!(all.len() >= 2);
@@ -407,13 +471,19 @@ async fn whitelist_add_list_remove_flow() {
     let owner = fresh_id();
     let target = fresh_id();
     svc.add_to_whitelist(ManageWhitelistCommand {
-        guild_id: g.clone().into(), owner_id: owner.clone(),
-        target_id: target.clone(), target_name: "Friend".into(),
-    }).await.unwrap();
+        guild_id: g.clone().into(),
+        owner_id: owner.clone(),
+        target_id: target.clone(),
+        target_name: "Friend".into(),
+    })
+    .await
+    .unwrap();
     let wl = svc.get_whitelist(&g, &owner).await.unwrap();
     assert_eq!(wl.len(), 1);
     assert_eq!(wl[0].target_id, target);
-    svc.remove_from_whitelist(&g, &owner, &target).await.unwrap();
+    svc.remove_from_whitelist(&g, &owner, &target)
+        .await
+        .unwrap();
     let wl = svc.get_whitelist(&g, &owner).await.unwrap();
     assert!(wl.is_empty());
 }
@@ -434,7 +504,9 @@ async fn ban_from_channel_persists_and_is_banned_returns_true() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
 
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
@@ -444,7 +516,9 @@ async fn ban_from_channel_persists_and_is_banned_returns_true() {
         banned_by: "owner".into(),
         reason: Some("spam".into()),
         duration_secs: Some(3600),
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     assert!(svc.is_banned(&ch, &target).await.unwrap());
     // Autre user n'est pas ban
@@ -456,7 +530,9 @@ async fn ban_permanent_without_expires() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
         channel_id: ch.clone().into(),
@@ -465,7 +541,9 @@ async fn ban_permanent_without_expires() {
         banned_by: "owner".into(),
         reason: None,
         duration_secs: None, // permanent
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     assert!(svc.is_banned(&ch, &target).await.unwrap());
 }
 
@@ -474,12 +552,20 @@ async fn unban_removes_ban() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     let target = fresh_id();
     svc.ban_from_channel(BanFromChannelCommand {
-        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "X".into(),
-        banned_by: "o".into(), reason: None, duration_secs: Some(3600),
-    }).await.unwrap();
+        channel_id: ch.clone().into(),
+        user_id: target.clone().into(),
+        user_name: "X".into(),
+        banned_by: "o".into(),
+        reason: None,
+        duration_secs: Some(3600),
+    })
+    .await
+    .unwrap();
     svc.unban_from_channel(&ch, &target).await.unwrap();
     assert!(!svc.is_banned(&ch, &target).await.unwrap());
 }
@@ -487,10 +573,17 @@ async fn unban_removes_ban() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ban_unknown_channel_returns_not_found() {
     let (svc, _) = make_service().await;
-    let err = svc.ban_from_channel(BanFromChannelCommand {
-        channel_id: fresh_id(), user_id: "u".into(), user_name: "X".into(),
-        banned_by: "o".into(), reason: None, duration_secs: None,
-    }).await.unwrap_err();
+    let err = svc
+        .ban_from_channel(BanFromChannelCommand {
+            channel_id: fresh_id(),
+            user_id: "u".into(),
+            user_name: "X".into(),
+            banned_by: "o".into(),
+            reason: None,
+            duration_secs: None,
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::NotFound(_)));
 }
 
@@ -510,11 +603,17 @@ async fn add_co_admin_persists_in_detail() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     let target = fresh_id();
     svc.add_co_admin(ManageCoAdminCommand {
-        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "CoMod".into(),
-    }).await.unwrap();
+        channel_id: ch.clone().into(),
+        user_id: target.clone().into(),
+        user_name: "CoMod".into(),
+    })
+    .await
+    .unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
     assert!(d.co_admins.iter().any(|c| c.user_id == target));
 }
@@ -524,11 +623,17 @@ async fn remove_co_admin_clears_entry() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
     let target = fresh_id();
     svc.add_co_admin(ManageCoAdminCommand {
-        channel_id: ch.clone().into(), user_id: target.clone().into(), user_name: "X".into(),
-    }).await.unwrap();
+        channel_id: ch.clone().into(),
+        user_id: target.clone().into(),
+        user_name: "X".into(),
+    })
+    .await
+    .unwrap();
     svc.remove_co_admin(&ch, &target).await.unwrap();
     let d = svc.get_channel_detail(&ch).await.unwrap();
     assert!(!d.co_admins.iter().any(|c| c.user_id == target));
@@ -537,9 +642,14 @@ async fn remove_co_admin_clears_entry() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_co_admin_unknown_channel_returns_not_found() {
     let (svc, _) = make_service().await;
-    let err = svc.add_co_admin(ManageCoAdminCommand {
-        channel_id: fresh_id(), user_id: "u".into(), user_name: "X".into(),
-    }).await.unwrap_err();
+    let err = svc
+        .add_co_admin(ManageCoAdminCommand {
+            channel_id: fresh_id(),
+            user_id: "u".into(),
+            user_name: "X".into(),
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::NotFound(_)));
 }
 
@@ -552,12 +662,19 @@ async fn create_invite_link_generates_code_and_list_returns_it() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
-    let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone().into(),
-        created_by: "owner".into(), created_by_name: "Owner".into(),
-        duration_secs: Some(3600), max_uses: Some(5),
-    }).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
+    let link = svc
+        .create_invite_link(CreateInviteLinkCommand {
+            channel_id: ch.clone().into(),
+            created_by: "owner".into(),
+            created_by_name: "Owner".into(),
+            duration_secs: Some(3600),
+            max_uses: Some(5),
+        })
+        .await
+        .unwrap();
     assert!(!link.code.is_empty());
     assert_eq!(link.max_uses, Some(5));
     let list = svc.list_invite_links(&ch).await.unwrap();
@@ -569,12 +686,19 @@ async fn create_invite_link_defaults_when_fields_absent() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
-    let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone().into(),
-        created_by: "o".into(), created_by_name: "O".into(),
-        duration_secs: None, max_uses: None,
-    }).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
+    let link = svc
+        .create_invite_link(CreateInviteLinkCommand {
+            channel_id: ch.clone().into(),
+            created_by: "o".into(),
+            created_by_name: "O".into(),
+            duration_secs: None,
+            max_uses: None,
+        })
+        .await
+        .unwrap();
     assert_eq!(link.current_uses, 0);
 }
 
@@ -584,16 +708,28 @@ async fn use_invite_link_increments_and_whitelists() {
     let g = fresh_id();
     let ch = fresh_id();
     let owner = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &owner)).await.unwrap();
-    let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone().into(),
-        created_by: owner.clone(), created_by_name: "O".into(),
-        duration_secs: Some(3600), max_uses: Some(3),
-    }).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &owner))
+        .await
+        .unwrap();
+    let link = svc
+        .create_invite_link(CreateInviteLinkCommand {
+            channel_id: ch.clone().into(),
+            created_by: owner.clone(),
+            created_by_name: "O".into(),
+            duration_secs: Some(3600),
+            max_uses: Some(3),
+        })
+        .await
+        .unwrap();
     let user = fresh_id();
-    let used = svc.use_invite_link(UseInviteLinkCommand {
-        code: link.code.clone(), user_id: user.clone().into(), user_name: "Visitor".into(),
-    }).await.unwrap();
+    let used = svc
+        .use_invite_link(UseInviteLinkCommand {
+            code: link.code.clone(),
+            user_id: user.clone().into(),
+            user_name: "Visitor".into(),
+        })
+        .await
+        .unwrap();
     assert_eq!(used.current_uses, 1);
     // Whitelist automatique
     let wl = svc.get_whitelist(&g, &owner).await.unwrap();
@@ -603,9 +739,14 @@ async fn use_invite_link_increments_and_whitelists() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn use_invite_link_rejects_unknown_code() {
     let (svc, _) = make_service().await;
-    let err = svc.use_invite_link(UseInviteLinkCommand {
-        code: "INVALID".into(), user_id: "u".into(), user_name: "X".into(),
-    }).await.unwrap_err();
+    let err = svc
+        .use_invite_link(UseInviteLinkCommand {
+            code: "INVALID".into(),
+            user_id: "u".into(),
+            user_name: "X".into(),
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::NotFound(_)));
 }
 
@@ -614,20 +755,36 @@ async fn use_invite_link_rejects_when_max_uses_reached() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
-    let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone().into(),
-        created_by: "o".into(), created_by_name: "O".into(),
-        duration_secs: Some(3600), max_uses: Some(1),
-    }).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
+    let link = svc
+        .create_invite_link(CreateInviteLinkCommand {
+            channel_id: ch.clone().into(),
+            created_by: "o".into(),
+            created_by_name: "O".into(),
+            duration_secs: Some(3600),
+            max_uses: Some(1),
+        })
+        .await
+        .unwrap();
     // Premier use OK
     svc.use_invite_link(UseInviteLinkCommand {
-        code: link.code.clone(), user_id: fresh_id(), user_name: "U1".into(),
-    }).await.unwrap();
+        code: link.code.clone(),
+        user_id: fresh_id(),
+        user_name: "U1".into(),
+    })
+    .await
+    .unwrap();
     // Deuxieme use doit echouer
-    let err = svc.use_invite_link(UseInviteLinkCommand {
-        code: link.code.clone(), user_id: fresh_id(), user_name: "U2".into(),
-    }).await.unwrap_err();
+    let err = svc
+        .use_invite_link(UseInviteLinkCommand {
+            code: link.code.clone(),
+            user_id: fresh_id(),
+            user_name: "U2".into(),
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
@@ -636,18 +793,34 @@ async fn revoke_invite_link_removes_it() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
     let ch = fresh_id();
-    svc.create_channel(sample_cmd(&g, &ch, &fresh_id())).await.unwrap();
-    let link = svc.create_invite_link(CreateInviteLinkCommand {
-        channel_id: ch.clone().into(),
-        created_by: "o".into(), created_by_name: "O".into(),
-        duration_secs: Some(3600), max_uses: Some(5),
-    }).await.unwrap();
-    svc.revoke_invite_link(&ch, &link.id.to_string()).await.unwrap();
+    svc.create_channel(sample_cmd(&g, &ch, &fresh_id()))
+        .await
+        .unwrap();
+    let link = svc
+        .create_invite_link(CreateInviteLinkCommand {
+            channel_id: ch.clone().into(),
+            created_by: "o".into(),
+            created_by_name: "O".into(),
+            duration_secs: Some(3600),
+            max_uses: Some(5),
+        })
+        .await
+        .unwrap();
+    svc.revoke_invite_link(&ch, &link.id.to_string())
+        .await
+        .unwrap();
     // Use doit echouer apres revoke
-    let err = svc.use_invite_link(UseInviteLinkCommand {
-        code: link.code, user_id: "u".into(), user_name: "X".into(),
-    }).await.unwrap_err();
-    assert!(matches!(err, DomainError::NotFound(_)) || matches!(err, DomainError::ValidationError(_)));
+    let err = svc
+        .use_invite_link(UseInviteLinkCommand {
+            code: link.code,
+            user_id: "u".into(),
+            user_name: "X".into(),
+        })
+        .await
+        .unwrap_err();
+    assert!(
+        matches!(err, DomainError::NotFound(_)) || matches!(err, DomainError::ValidationError(_))
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -690,7 +863,10 @@ async fn update_theme_changes_fields() {
     let mut updated_cmd = sample_theme_cmd(&g);
     updated_cmd.name = "Chess".into();
     updated_cmd.emoji = Some("♟️".into());
-    let updated = svc.update_theme(&theme.id.to_string(), updated_cmd).await.unwrap();
+    let updated = svc
+        .update_theme(&theme.id.to_string(), updated_cmd)
+        .await
+        .unwrap();
     assert_eq!(updated.name, "Chess");
 }
 
@@ -708,7 +884,9 @@ async fn delete_theme_removes_it() {
 async fn update_theme_unknown_id_returns_not_found() {
     let (svc, _) = make_service().await;
     let g = fresh_id();
-    let res = svc.update_theme(&Uuid::new_v4().to_string(), sample_theme_cmd(&g)).await;
+    let res = svc
+        .update_theme(&Uuid::new_v4().to_string(), sample_theme_cmd(&g))
+        .await;
     assert!(res.is_err());
 }
 

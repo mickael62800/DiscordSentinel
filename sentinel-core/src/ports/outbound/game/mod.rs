@@ -4,11 +4,11 @@
 //! implementations concretes (postgres, docker via bollard, RCON) sont
 //! sous adapters/outbound/.
 
-pub mod game_template_repository;
-pub mod game_server_repository;
-pub mod game_server_config_repository;
-pub mod player_session_repository;
-pub mod game_audit_repository;
 pub mod container_runtime;
-pub mod rcon_client;
+pub mod game_audit_repository;
+pub mod game_server_config_repository;
+pub mod game_server_repository;
+pub mod game_template_repository;
+pub mod player_session_repository;
 pub mod port_allocator;
+pub mod rcon_client;

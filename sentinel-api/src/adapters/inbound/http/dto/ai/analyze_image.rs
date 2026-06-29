@@ -1,10 +1,10 @@
-use serde::Deserialize;
-use serde::Serialize;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyzeImageRequestDto {
@@ -60,4 +60,3 @@ impl From<ImageAnalysis> for AnalyzeImageResponseDto {
 #[cfg(test)]
 #[path = "tests/analyze_image.rs"]
 mod tests;
-

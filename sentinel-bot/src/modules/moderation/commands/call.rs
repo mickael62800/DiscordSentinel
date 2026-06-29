@@ -1,6 +1,6 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction,
-    Context, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, PermissionOverwrite, PermissionOverwriteType,
 };
 use serenity::builder::{CreateActionRow, CreateButton, CreateChannel, CreateMessage};
@@ -21,46 +21,85 @@ pub fn register() -> CreateCommand {
     CreateCommand::new("call")
         .description("Convoquer un membre dans un salon prive")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Membre a convoquer (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID du membre (alternative au selecteur)",
+        ))
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Membre a convoquer (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID du membre (alternative au selecteur)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison de la convocation")
-                .required(false),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "reason",
+                "Raison de la convocation",
+            )
+            .required(false),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
-        reply_ephemeral(ctx, command, "❌ Permission MODERATE_MEMBERS requise pour /call.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "❌ Permission MODERATE_MEMBERS requise pour /call.",
+        )
+        .await;
         warn!(user = %command.user.name, "Tentative /call sans permission");
         return;
     }
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            reply_ephemeral(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
-    let reason = command.data.options.iter().find(|o| o.name == "reason")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let reason = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "reason")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
         .unwrap_or("Convocation par un moderateur");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply_ephemeral(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => {
+            reply_ephemeral(ctx, command, "Utilisateur introuvable.").await;
+            return;
+        }
     };
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
-        reply_ephemeral(ctx, command, &super::immunity_message(role_id, "Convocation")).await;
+        reply_ephemeral(
+            ctx,
+            command,
+            &super::immunity_message(role_id, "Convocation"),
+        )
+        .await;
         return;
     }
 
@@ -69,14 +108,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let category_id = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await {
+            let gc = match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::moderation::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(config) => config,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for call");
                     std::collections::HashMap::new()
                 }
             };
-            gc.get("call_category_id").and_then(|v| v.parse::<u64>().ok())
+            gc.get("call_category_id")
+                .and_then(|v| v.parse::<u64>().ok())
         } else {
             None
         }
@@ -86,25 +132,37 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let mut builder = CreateChannel::new(&channel_name)
         .kind(ChannelType::Text)
-        .topic(format!("[call:{}:{}] {}", command.user.id, target.id, reason))
+        .topic(format!(
+            "[call:{}:{}] {}",
+            command.user.id, target.id, reason
+        ))
         .permissions(vec![
             PermissionOverwrite {
                 allow: Permissions::empty(),
                 deny: Permissions::VIEW_CHANNEL,
-                kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(guild_id.get())),
+                kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(
+                    guild_id.get(),
+                )),
             },
             PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(target.id),
             },
             PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY | Permissions::MANAGE_MESSAGES,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY
+                    | Permissions::MANAGE_MESSAGES,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(command.user.id),
             },
             PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::MANAGE_CHANNELS,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(bot_id),
             },
@@ -136,10 +194,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Membre", format!("<@{}>", target.id), true);
 
-    if let Err(e) = channel.send_message(
-        &ctx.http,
-        CreateMessage::new().embed(embed).components(vec![row]),
-    ).await {
+    if let Err(e) = channel
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embed).components(vec![row]),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send call welcome message");
     }
 
@@ -147,7 +208,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let data = ctx.data.read().await;
         let api = match data.get::<ModerationApiKey>() {
             Some(a) => a,
-            None => { tracing::error!("ModerationApiKey manquant"); return; }
+            None => {
+                tracing::error!("ModerationApiKey manquant");
+                return;
+            }
         };
         let action = ModerationAction {
             guild_id: guild_id.to_string(),
@@ -166,14 +230,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!("Convocation creee dans <#{}>", channel.id))
-                .ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!("Convocation creee dans <#{}>", channel.id))
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send call response");
     }
 
@@ -192,7 +259,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Raison", reason, false)
         .thumbnail(target.face())
         .timestamp(serenity::model::Timestamp::now())
-        .footer(serenity::builder::CreateEmbedFooter::new("Moderation | Sentinel"));
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Moderation | Sentinel",
+        ));
     super::log_to_channel(ctx, &guild_id.to_string(), call_log_embed).await;
 }
 
@@ -213,7 +282,10 @@ pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
         .member
         .as_ref()
         .and_then(|m| m.permissions)
-        .map(|p| p.contains(serenity::all::Permissions::MODERATE_MEMBERS) || p.contains(serenity::all::Permissions::ADMINISTRATOR))
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
         .unwrap_or(false);
 
     if !is_original_mod && !has_mod_permission {

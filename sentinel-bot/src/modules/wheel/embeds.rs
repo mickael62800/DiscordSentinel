@@ -6,11 +6,19 @@ use super::api_client::WheelSpinResponse;
 
 /// Couleur en fonction du type de resultat.
 fn color_for(payout: i64, is_memorable: bool) -> u32 {
-    if is_memorable && payout > 0 { return 0xf1c40f; }   // or
-    if is_memorable && payout < 0 { return 0x8b0000; }   // rouge sombre apocalypse
-    if payout > 0 { return 0x2ecc71; }                   // vert
-    if payout < 0 { return 0xe74c3c; }                   // rouge
-    0x95a5a6                                              // gris (blanche)
+    if is_memorable && payout > 0 {
+        return 0xf1c40f;
+    } // or
+    if is_memorable && payout < 0 {
+        return 0x8b0000;
+    } // rouge sombre apocalypse
+    if payout > 0 {
+        return 0x2ecc71;
+    } // vert
+    if payout < 0 {
+        return 0xe74c3c;
+    } // rouge
+    0x95a5a6 // gris (blanche)
 }
 
 /// Embed du spin pendant l animation (pas encore revele).
@@ -27,7 +35,11 @@ pub fn build_spinning_embed(username: &str) -> CreateEmbed {
 
 /// Embed final avec le resultat.
 pub fn build_result_embed(resp: &WheelSpinResponse, username: &str) -> CreateEmbed {
-    let net_str = if resp.payout > 0 { format!("+{}", resp.payout) } else { resp.payout.to_string() };
+    let net_str = if resp.payout > 0 {
+        format!("+{}", resp.payout)
+    } else {
+        resp.payout.to_string()
+    };
     let title = if resp.is_memorable {
         format!("\u{1f300} {} a tire... LE DESTIN PARLE !", username)
     } else {
@@ -43,15 +55,18 @@ pub fn build_result_embed(resp: &WheelSpinResponse, username: &str) -> CreateEmb
 
     if resp.is_memorable && resp.payout > 0 {
         embed = embed.footer(CreateEmbedFooter::new(format!(
-            "🎉 GROS COUP pour {} ! Reviens demain pour ton prochain spin.", username
+            "🎉 GROS COUP pour {} ! Reviens demain pour ton prochain spin.",
+            username
         )));
     } else if resp.is_memorable && resp.payout < 0 {
         embed = embed.footer(CreateEmbedFooter::new(format!(
-            "💀 Le destin a frappe fort. Reviens demain {}.", username
+            "💀 Le destin a frappe fort. Reviens demain {}.",
+            username
         )));
     } else {
         embed = embed.footer(CreateEmbedFooter::new(format!(
-            "Reviens demain pour ton prochain spin, {}", username
+            "Reviens demain pour ton prochain spin, {}",
+            username
         )));
     }
     embed

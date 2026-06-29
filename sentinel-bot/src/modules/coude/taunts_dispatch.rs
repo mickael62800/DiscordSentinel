@@ -46,8 +46,8 @@ async fn post_taunt_message(ctx: &Context, ev: &TauntEvent) {
         .title("\u{1f525} Raillerie automatique")
         .description(&ev.message)
         .color(match ev.streak_kind.as_str() {
-            "win" => 0xF1C40F,        // or
-            "loss" => 0xE74C3C,       // rouge
+            "win" => 0xF1C40F,          // or
+            "loss" => 0xE74C3C,         // rouge
             "steal_victim" => 0x9B59B6, // violet
             _ => 0x95A5A6,
         })
@@ -66,12 +66,7 @@ async fn post_taunt_message(ctx: &Context, ev: &TauntEvent) {
 /// Renomme un membre en ajoutant un suffixe (best-effort, log+ignore en
 /// cas d echec). Utilise par le branchement Chicken (cf. COUPE_AMELIORATIONS
 /// 5.1) pour appliquer " le Poulet" au pseudo de la cible.
-pub async fn apply_suffix_to_user(
-    ctx: &Context,
-    guild_id: GuildId,
-    user_id: UserId,
-    suffix: &str,
-) {
+pub async fn apply_suffix_to_user(ctx: &Context, guild_id: GuildId, user_id: UserId, suffix: &str) {
     if suffix.is_empty() {
         return;
     }

@@ -9,17 +9,26 @@ fn normalize_name_accepts_valid() {
 
 #[test]
 fn normalize_name_trims_whitespace() {
-    assert_eq!(normalize_game_name("  League of Legends  ").unwrap(), "League of Legends");
+    assert_eq!(
+        normalize_game_name("  League of Legends  ").unwrap(),
+        "League of Legends"
+    );
 }
 
 #[test]
 fn normalize_name_rejects_empty() {
-    assert_eq!(normalize_game_name("").unwrap_err(), "Le nom du jeu ne peut pas etre vide");
+    assert_eq!(
+        normalize_game_name("").unwrap_err(),
+        "Le nom du jeu ne peut pas etre vide"
+    );
 }
 
 #[test]
 fn normalize_name_rejects_whitespace_only() {
-    assert_eq!(normalize_game_name("   \t\n  ").unwrap_err(), "Le nom du jeu ne peut pas etre vide");
+    assert_eq!(
+        normalize_game_name("   \t\n  ").unwrap_err(),
+        "Le nom du jeu ne peut pas etre vide"
+    );
 }
 
 #[test]
@@ -61,7 +70,10 @@ fn optional_tag_empty_becomes_none() {
 
 #[test]
 fn optional_tag_trims_and_preserves() {
-    assert_eq!(normalize_optional_tag(Some("  fps  ")), Some("fps".to_string()));
+    assert_eq!(
+        normalize_optional_tag(Some("  fps  ")),
+        Some("fps".to_string())
+    );
 }
 
 // ── parse_role_color_hex ──
@@ -83,7 +95,10 @@ fn parse_color_trims_whitespace() {
 
 #[test]
 fn parse_color_fallback_on_invalid() {
-    assert_eq!(parse_role_color_hex("not-hex", DEFAULT_GAME_ROLE_COLOR), DEFAULT_GAME_ROLE_COLOR);
+    assert_eq!(
+        parse_role_color_hex("not-hex", DEFAULT_GAME_ROLE_COLOR),
+        DEFAULT_GAME_ROLE_COLOR
+    );
     assert_eq!(parse_role_color_hex("", 0x123), 0x123);
 }
 
@@ -180,7 +195,10 @@ fn slugify_digits_preserved() {
 
 #[test]
 fn format_emoji_static() {
-    assert_eq!(format_custom_emoji("smile", "12345", false), "<:smile:12345>");
+    assert_eq!(
+        format_custom_emoji("smile", "12345", false),
+        "<:smile:12345>"
+    );
 }
 
 #[test]

@@ -16,17 +16,20 @@ use crate::modules::coude::GameApiKey;
 pub const CLASS_SELECT_PREFIX: &str = "classe_select:";
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("classe")
-        .description("Choisis ou change ta classe de combat !")
+    CreateCommand::new("classe").description("Choisis ou change ta classe de combat !")
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let user_id = command.user.id.to_string();
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -40,7 +43,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => return,
     };
 
-    let player = match api.get_or_create_player(&guild_id, &user_id, &command.user.name).await {
+    let player = match api
+        .get_or_create_player(&guild_id, &user_id, &command.user.name)
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             reply_api_err(ctx, command, e).await;
@@ -55,13 +61,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if has_chosen {
         if let Some(ref changed_at) = player.class_changed_at {
             if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(changed_at) {
-                let elapsed = chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
+                let elapsed =
+                    chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
                 if elapsed.num_days() < 7 {
                     let remaining = 7 - elapsed.num_days();
                     reply_ephemeral(
-                        ctx, command,
-                        &format!("Tu dois attendre encore **{} jour(s)** avant de changer de classe !", remaining),
-                    ).await;
+                        ctx,
+                        command,
+                        &format!(
+                            "Tu dois attendre encore **{} jour(s)** avant de changer de classe !",
+                            remaining
+                        ),
+                    )
+                    .await;
                     return;
                 }
             }
@@ -71,9 +83,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let cost = config.class_change_cost();
         if player.coins < cost {
             reply_ephemeral(
-                ctx, command,
-                &format!("Changer de classe coute **{} coins**. Tu n'as que {} coins.", cost, player.coins),
-            ).await;
+                ctx,
+                command,
+                &format!(
+                    "Changer de classe coute **{} coins**. Tu n'as que {} coins.",
+                    cost, player.coins
+                ),
+            )
+            .await;
             return;
         }
     }
@@ -87,7 +104,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     );
 
     if has_chosen {
-        description.push_str(&format!("**Changer de classe coute {} coins.**\n\n", config.class_change_cost()));
+        description.push_str(&format!(
+            "**Changer de classe coute {} coins.**\n\n",
+            config.class_change_cost()
+        ));
     } else {
         description.push_str("**Premier choix gratuit !**\n\n");
     }
@@ -100,30 +120,41 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     for c in &catalog.classes {
         embed = embed.field(
             format!("{} {}", c.emoji, capitalize(&c.name)),
-            format!("ATK {} | DEF {} | {}", c.base_atk, c.base_def, c.passif_description),
+            format!(
+                "ATK {} | DEF {} | {}",
+                c.base_atk, c.base_def, c.passif_description
+            ),
             false,
         );
     }
-    let embed = embed
-        .color(0x3498DB)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT));
+    let embed = embed.color(0x3498DB).footer(CreateEmbedFooter::new(
+        crate::shared::branding::COUDE_TAGLINE_SHORT,
+    ));
 
     let buttons = vec![
         CreateButton::new(format!("{CLASS_SELECT_PREFIX}bourrin"))
             .label("Bourrin")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f4aa}".to_string()))
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{1f4aa}".to_string(),
+            ))
             .style(ButtonStyle::Danger),
         CreateButton::new(format!("{CLASS_SELECT_PREFIX}agile"))
             .label("Agile")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3c3}".to_string()))
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{1f3c3}".to_string(),
+            ))
             .style(ButtonStyle::Primary),
         CreateButton::new(format!("{CLASS_SELECT_PREFIX}fourbe"))
             .label("Fourbe")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f5e1}\u{fe0f}".to_string()))
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{1f5e1}\u{fe0f}".to_string(),
+            ))
             .style(ButtonStyle::Secondary),
         CreateButton::new(format!("{CLASS_SELECT_PREFIX}tank"))
             .label("Tank")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f6e1}\u{fe0f}".to_string()))
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{1f6e1}\u{fe0f}".to_string(),
+            ))
             .style(ButtonStyle::Success),
     ];
 
@@ -200,7 +231,10 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
             .await;
     }
 
-    let player = match api.get_or_create_player(&guild_id, &user_id, &component.user.name).await {
+    let player = match api
+        .get_or_create_player(&guild_id, &user_id, &component.user.name)
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             followup_err(ctx, component, e).await;
@@ -216,10 +250,18 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     let class_cost = config.class_change_cost();
     if has_chosen {
         if player.coins < class_cost {
-            followup_err(ctx, component, format!("Pas assez de coins ! ({} requis)", class_cost)).await;
+            followup_err(
+                ctx,
+                component,
+                format!("Pas assez de coins ! ({} requis)", class_cost),
+            )
+            .await;
             return;
         }
-        if let Err(e) = api.update_player_coins(&guild_id, &user_id, -class_cost).await {
+        if let Err(e) = api
+            .update_player_coins(&guild_id, &user_id, -class_cost)
+            .await
+        {
             followup_err(ctx, component, e).await;
             return;
         }
@@ -237,23 +279,36 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Changer la classe
-    if let Err(e) = api.update_player_class(&guild_id, &user_id, &class_name).await {
+    if let Err(e) = api
+        .update_player_class(&guild_id, &user_id, &class_name)
+        .await
+    {
         followup_err(ctx, component, e).await;
         return;
     }
 
     let class_info = catalog_early.get_class(&class_name);
 
-    let cost_msg = if has_chosen { format!(" (-{} coins)", class_cost) } else { " (gratuit)".to_string() };
+    let cost_msg = if has_chosen {
+        format!(" (-{} coins)", class_cost)
+    } else {
+        " (gratuit)".to_string()
+    };
 
     let embed = CreateEmbed::new()
         .title("\u{2728} Classe choisie !")
         .description(format!(
             "{} Tu es maintenant un **{}** !{}\n\n**{}**\n\n_{}_",
-            class_info.emoji, class_info.name, cost_msg, class_info.passif_description, class_info.description
+            class_info.emoji,
+            class_info.name,
+            cost_msg,
+            class_info.passif_description,
+            class_info.description
         ))
         .color(0x57F287)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT));
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ));
 
     // Apres Acknowledge (DEFERRED_UPDATE_MESSAGE), on edite le message d'origine.
     component

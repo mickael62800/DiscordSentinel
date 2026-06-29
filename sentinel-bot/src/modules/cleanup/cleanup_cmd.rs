@@ -1,11 +1,11 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption,
 };
 use tracing::error;
 
 use crate::shared::discord_helpers::reply_ephemeral_embed;
-use crate::shared::embeds::{success_embed, moderate_embed};
+use crate::shared::embeds::{moderate_embed, success_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ApiClient;
@@ -71,14 +71,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_error(ctx, command, "Cette commande ne peut etre utilisee que sur un serveur.").await;
+            reply_error(
+                ctx,
+                command,
+                "Cette commande ne peut etre utilisee que sur un serveur.",
+            )
+            .await;
             return;
         }
     };
 
     // Verifier la permission ADMINISTRATOR
     if !has_administrator(ctx, command).await {
-        reply_error(ctx, command, "Vous n'avez pas la permission **Administrateur**.").await;
+        reply_error(
+            ctx,
+            command,
+            "Vous n'avez pas la permission **Administrateur**.",
+        )
+        .await;
         return;
     }
 
@@ -122,51 +132,42 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_str = guild_id.to_string();
 
     match sub {
-        "logs" => {
-            match api.purge_logs(jours).await {
-                Ok(count) => {
-                    let embed = success_embed("Nettoyage des logs")
-                        .description(format!(
-                            "{} log(s) de plus de {} jour(s) supprime(s).",
-                            count, jours
-                        ));
-                    reply_ephemeral_embed(ctx, command, embed).await;
-                }
-                Err(e) => {
-                    reply_error(ctx, command, &format!("Erreur : {}", e)).await;
-                }
+        "logs" => match api.purge_logs(jours).await {
+            Ok(count) => {
+                let embed = success_embed("Nettoyage des logs").description(format!(
+                    "{} log(s) de plus de {} jour(s) supprime(s).",
+                    count, jours
+                ));
+                reply_ephemeral_embed(ctx, command, embed).await;
             }
-        }
-        "infractions" => {
-            match api.purge_infractions(&guild_str, jours).await {
-                Ok(count) => {
-                    let embed = success_embed("Nettoyage des infractions")
-                        .description(format!(
-                            "{} infraction(s) de plus de {} jour(s) supprimee(s).",
-                            count, jours
-                        ));
-                    reply_ephemeral_embed(ctx, command, embed).await;
-                }
-                Err(e) => {
-                    reply_error(ctx, command, &format!("Erreur : {}", e)).await;
-                }
+            Err(e) => {
+                reply_error(ctx, command, &format!("Erreur : {}", e)).await;
             }
-        }
-        "audit" => {
-            match api.purge_audit_logs(&guild_str, jours).await {
-                Ok(count) => {
-                    let embed = success_embed("Nettoyage des logs d'audit")
-                        .description(format!(
-                            "{} entree(s) d'audit de plus de {} jour(s) supprimee(s).",
-                            count, jours
-                        ));
-                    reply_ephemeral_embed(ctx, command, embed).await;
-                }
-                Err(e) => {
-                    reply_error(ctx, command, &format!("Erreur : {}", e)).await;
-                }
+        },
+        "infractions" => match api.purge_infractions(&guild_str, jours).await {
+            Ok(count) => {
+                let embed = success_embed("Nettoyage des infractions").description(format!(
+                    "{} infraction(s) de plus de {} jour(s) supprimee(s).",
+                    count, jours
+                ));
+                reply_ephemeral_embed(ctx, command, embed).await;
             }
-        }
+            Err(e) => {
+                reply_error(ctx, command, &format!("Erreur : {}", e)).await;
+            }
+        },
+        "audit" => match api.purge_audit_logs(&guild_str, jours).await {
+            Ok(count) => {
+                let embed = success_embed("Nettoyage des logs d'audit").description(format!(
+                    "{} entree(s) d'audit de plus de {} jour(s) supprimee(s).",
+                    count, jours
+                ));
+                reply_ephemeral_embed(ctx, command, embed).await;
+            }
+            Err(e) => {
+                reply_error(ctx, command, &format!("Erreur : {}", e)).await;
+            }
+        },
         _ => {
             reply_error(ctx, command, "Sous-commande inconnue.").await;
         }

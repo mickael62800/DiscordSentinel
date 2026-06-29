@@ -8,8 +8,8 @@
 
 use async_trait::async_trait;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]
 pub struct FriendlyDuelInput {

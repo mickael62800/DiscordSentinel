@@ -74,8 +74,14 @@ impl ModerationActionType {
 
     /// Liste des valeurs valides.
     pub const VALID_VALUES: &'static [&'static str] = &[
-        "warn", "mute_temp", "mute_permanent", "unmute",
-        "ban_temp", "ban_permanent", "unban", "call",
+        "warn",
+        "mute_temp",
+        "mute_permanent",
+        "unmute",
+        "ban_temp",
+        "ban_permanent",
+        "unban",
+        "call",
     ];
 }
 

@@ -86,10 +86,7 @@ pub async fn load_game_portal_config(
             "minecraft-vanilla,valheim,terraria,factorio,palworld,ark,7dtd",
         ),
         default_idle_shutdown_days: parse_i32(find(&entries, "default_idle_shutdown_days"), 7),
-        docker_network_name: parse_string(
-            find(&entries, "docker_network_name"),
-            "sentinel-games",
-        ),
+        docker_network_name: parse_string(find(&entries, "docker_network_name"), "sentinel-games"),
         container_user: parse_string(find(&entries, "container_user"), "1000:1000"),
         host_data_dir: parse_string(find(&entries, "host_data_dir"), "/var/lib/sentinel/games"),
         auto_create_world_volume: parse_bool(find(&entries, "auto_create_world_volume"), true),

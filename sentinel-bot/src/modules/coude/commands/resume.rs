@@ -4,10 +4,10 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 const MAX_EVENTS: i64 = 15;
 
@@ -21,14 +21,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -161,7 +170,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             )
         }
     } else {
-        format!("\u{1fa99} Solde apres derniere operation : **{}** coins", ending_balance)
+        format!(
+            "\u{1fa99} Solde apres derniere operation : **{}** coins",
+            ending_balance
+        )
     };
 
     let embed = CreateEmbed::new()
@@ -255,4 +267,3 @@ fn truncate(s: &str, max: usize) -> String {
         s.chars().take(max - 1).collect::<String>() + "\u{2026}"
     }
 }
-

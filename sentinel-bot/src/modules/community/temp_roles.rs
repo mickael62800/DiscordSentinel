@@ -22,7 +22,13 @@ impl TempRoleTracker {
     }
 
     /// Ajoute un role temporaire avec un timestamp d'expiration absolu (pour le reload depuis l'API).
-    pub fn add_with_expiry_timestamp(&self, guild_id: u64, user_id: u64, role_id: u64, expires_at: &str) {
+    pub fn add_with_expiry_timestamp(
+        &self,
+        guild_id: u64,
+        user_id: u64,
+        role_id: u64,
+        expires_at: &str,
+    ) {
         if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(expires_at) {
             let now = chrono::Utc::now();
             let remaining = dt.signed_duration_since(now);

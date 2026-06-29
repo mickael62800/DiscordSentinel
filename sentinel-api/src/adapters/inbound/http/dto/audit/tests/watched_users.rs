@@ -1,8 +1,8 @@
 use super::*;
-use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
 use chrono::TimeZone;
 use chrono::Utc;
+use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 fn sample_user(last: Option<chrono::DateTime<Utc>>) -> WatchedUser {
     WatchedUser {
         user_id: "u".into(),
@@ -28,7 +28,10 @@ fn from_watched_user_preserves_fields_and_formats_dates() {
     assert_eq!(dto.risk_level, "high");
     assert_eq!(dto.total_mutes, 2);
     assert_eq!(dto.security_events_count, 3);
-    assert_eq!(dto.last_incident_at.as_deref(), Some("2024-06-15T12:30:00+00:00"));
+    assert_eq!(
+        dto.last_incident_at.as_deref(),
+        Some("2024-06-15T12:30:00+00:00")
+    );
     assert!(dto.first_seen_at.starts_with("2024-01-01T"));
 }
 

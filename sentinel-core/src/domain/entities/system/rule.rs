@@ -2,8 +2,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::enums::moderation::flag_type::FlagType;
 
 #[derive(Debug, Clone)]
 pub struct Rule {

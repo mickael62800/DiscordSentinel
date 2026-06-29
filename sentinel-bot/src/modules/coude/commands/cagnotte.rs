@@ -6,8 +6,8 @@ use serenity::all::{
 
 use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 /// custom_id du bouton "Mettre a jour" du panneau de cagnotte. Comme le
 /// leaderboard : message unique persistant, le bouton edite ce meme message.
@@ -19,11 +19,18 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -77,9 +84,21 @@ async fn build_cagnotte_embed(ctx: &Context, guild_id: &str) -> CreateEmbed {
         Ok(c) => CreateEmbed::new()
             .title("\u{1f3e6} Caisse communautaire")
             .color(0x2ECC71)
-            .field("\u{1fa99} Solde actuel", format!("**{}** coins", c.balance), false)
-            .field("\u{1f4e5} Total collecte", format!("{} coins", c.total_collected), true)
-            .field("\u{1f4e4} Total redistribue", format!("{} coins", c.total_redistributed), true)
+            .field(
+                "\u{1fa99} Solde actuel",
+                format!("**{}** coins", c.balance),
+                false,
+            )
+            .field(
+                "\u{1f4e5} Total collecte",
+                format!("{} coins", c.total_collected),
+                true,
+            )
+            .field(
+                "\u{1f4e4} Total redistribue",
+                format!("{} coins", c.total_redistributed),
+                true,
+            )
             .footer(CreateEmbedFooter::new(format!(
                 "{} \u{2014} clique sur Mettre a jour pour rafraichir",
                 crate::shared::branding::COUDE_TAGLINE_SHORT
@@ -98,10 +117,10 @@ async fn build_cagnotte_embed(ctx: &Context, guild_id: &str) -> CreateEmbed {
 
 /// Row contenant le bouton "Mettre a jour".
 fn refresh_row() -> CreateActionRow {
-    CreateActionRow::Buttons(vec![
-        CreateButton::new(REFRESH_ID)
-            .label("Mettre a jour")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f504}".into()))
-            .style(ButtonStyle::Primary),
-    ])
+    CreateActionRow::Buttons(vec![CreateButton::new(REFRESH_ID)
+        .label("Mettre a jour")
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f504}".into(),
+        ))
+        .style(ButtonStyle::Primary)])
 }

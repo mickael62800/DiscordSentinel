@@ -8,7 +8,7 @@
 //! - Apres `cooldown`, passe en HalfOpen et autorise UN appel.
 //! - Succes en HalfOpen -> referme. Echec -> reouvre pour un nouveau cooldown.
 
-use std::sync::atomic::{AtomicI64, AtomicU8, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicI64, AtomicU32, AtomicU8, Ordering};
 use std::time::{Duration, Instant};
 
 const STATE_CLOSED: u8 = 0;
@@ -54,7 +54,12 @@ impl CircuitBreaker {
                     // Tentative de transition vers HalfOpen — un seul thread y arrive.
                     if self
                         .state
-                        .compare_exchange(STATE_OPEN, STATE_HALF_OPEN, Ordering::AcqRel, Ordering::Acquire)
+                        .compare_exchange(
+                            STATE_OPEN,
+                            STATE_HALF_OPEN,
+                            Ordering::AcqRel,
+                            Ordering::Acquire,
+                        )
                         .is_ok()
                     {
                         return true;

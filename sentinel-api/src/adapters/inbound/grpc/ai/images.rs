@@ -4,18 +4,18 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::images::v1 as proto;
+use sentinel_proto::images::v1::images_service_server::ImagesService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::images::v1 as proto;
-use sentinel_proto::images::v1::images_service_server::ImagesService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
 use sentinel_core::domain::enums::moderation::action::Action;
-use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
-use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 pub struct ImagesGrpc {
     pub uc: Arc<dyn AnalyzeImageUseCase>,
 }
@@ -68,10 +68,13 @@ fn analysis_to_proto(a: ImageAnalysis) -> proto::AnalyzeImageResponse {
         reason: a.reason,
         score: a.score,
         duration: a.duration,
-        classifications: a.classifications.into_iter().map(classification_to_proto).collect(),
+        classifications: a
+            .classifications
+            .into_iter()
+            .map(classification_to_proto)
+            .collect(),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/images.rs"]

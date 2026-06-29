@@ -25,8 +25,5 @@ pub trait ManageCoudeSafetyNetUseCase: Send + Sync {
     ) -> Result<Option<ActiveSafetyNet>, DomainError>;
 
     /// Liste tous les filets actifs d une guild (pour message quotidien).
-    async fn list_active(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<ActiveSafetyNet>, DomainError>;
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<ActiveSafetyNet>, DomainError>;
 }

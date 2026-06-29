@@ -1,14 +1,14 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::game::server::{GameServer, GameServerStatus};
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::game_server_repository::{
     GameServerRepository, GameServerRuntimeUpdate, NewGameServer, TemplateUsage,
 };
+use sentinel_core::domain::entities::game::server::{GameServer, GameServerStatus};
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgGameServerRepository {
     pool: PgPool,
@@ -78,8 +78,7 @@ impl TryFrom<ServerRow> for GameServer {
     }
 }
 
-const SELECT_COLS: &str =
-    "id, guild_id, template_id, name, status, container_id, container_name, \
+const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id, container_name, \
      host_port, rcon_port, rcon_password, volume_name, allocated_memory_mb, \
      owner_user_id, idle_shutdown_days, last_active_at, last_player_count, \
      last_error, created_at, updated_at, started_at, stopped_at";
@@ -263,11 +262,7 @@ impl GameServerRepository for PgGameServerRepository {
         Ok(())
     }
 
-    async fn update_player_activity(
-        &self,
-        id: Uuid,
-        player_count: i32,
-    ) -> Result<(), DomainError> {
+    async fn update_player_activity(&self, id: Uuid, player_count: i32) -> Result<(), DomainError> {
         // last_active_at est mis a jour seulement si player_count > 0.
         sqlx::query(
             "UPDATE game_servers SET \
@@ -297,10 +292,7 @@ impl GameServerRepository for PgGameServerRepository {
         Ok(())
     }
 
-    async fn count_active_for_guild(
-        &self,
-        guild_id: &str,
-    ) -> Result<(i32, i32), DomainError> {
+    async fn count_active_for_guild(&self, guild_id: &str) -> Result<(i32, i32), DomainError> {
         let row: (i64, Option<i64>) = sqlx::query_as(
             "SELECT COUNT(*)::bigint, COALESCE(SUM(allocated_memory_mb), 0)::bigint \
              FROM game_servers \
@@ -315,10 +307,7 @@ impl GameServerRepository for PgGameServerRepository {
         Ok((count, mem))
     }
 
-    async fn template_usage(
-        &self,
-        template_id: uuid::Uuid,
-    ) -> Result<TemplateUsage, DomainError> {
+    async fn template_usage(&self, template_id: uuid::Uuid) -> Result<TemplateUsage, DomainError> {
         // active_count : serveurs non-deletes utilisant ce template.
         // last_activity : MAX(updated_at) sur TOUS les serveurs ayant utilise
         // le template (incluant deletes), pour respecter la grace period.

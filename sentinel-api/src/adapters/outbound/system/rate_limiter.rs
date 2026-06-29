@@ -23,9 +23,13 @@ pub struct RateLimiter {
 impl RateLimiter {
     pub fn from_env() -> Self {
         let threshold = std::env::var("RATE_LIMIT_THRESHOLD")
-            .ok().and_then(|s| s.parse().ok()).unwrap_or(200);
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(200);
         let window_secs = std::env::var("RATE_LIMIT_WINDOW_SECS")
-            .ok().and_then(|s| s.parse().ok()).unwrap_or(60);
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(60);
         Self {
             threshold,
             window: Duration::from_secs(window_secs),
@@ -37,17 +41,28 @@ impl RateLimiter {
     /// A appeler dans le middleware pour chaque requete. Retourne true si
     /// l'IP doit etre bannie maintenant (pour declenchement async).
     pub async fn observe(&self, ip: &str) -> bool {
-        if ip.is_empty() || ip == "unknown" { return false; }
+        if ip.is_empty() || ip == "unknown" {
+            return false;
+        }
         // Skip si deja banni dans les 5 dernieres minutes
         if let Some(t) = self.recent_bans.get(ip) {
-            if t.elapsed() < Duration::from_secs(300) { return false; }
+            if t.elapsed() < Duration::from_secs(300) {
+                return false;
+            }
         }
         let now = Instant::now();
-        let entry = self.counts.entry(ip.to_string()).or_insert_with(|| Mutex::new(VecDeque::new()));
+        let entry = self
+            .counts
+            .entry(ip.to_string())
+            .or_insert_with(|| Mutex::new(VecDeque::new()));
         let mut q = entry.value().lock().await;
         // Purge les entrees hors fenetre
         while let Some(front) = q.front() {
-            if now.duration_since(*front) > self.window { q.pop_front(); } else { break; }
+            if now.duration_since(*front) > self.window {
+                q.pop_front();
+            } else {
+                break;
+            }
         }
         q.push_back(now);
         if q.len() >= self.threshold {
@@ -68,7 +83,9 @@ impl RateLimiter {
         });
         // Append a la liste si fichier existe, sinon cree
         let existing: Vec<serde_json::Value> = std::fs::read_to_string(path)
-            .ok().and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default();
         let mut all = existing;
         all.push(entry);
         if let Ok(s) = serde_json::to_string_pretty(&all) {

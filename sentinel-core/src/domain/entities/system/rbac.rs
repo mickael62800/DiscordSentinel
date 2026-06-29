@@ -22,11 +22,7 @@ pub const RBAC_DISPLAY_NAME_MAX: usize = 100;
 /// d'un owner (caller modifie son propre role vers autre chose qu'owner).
 ///
 /// Usage : refuser l'update avec une ValidationError explicite ("lockout risk").
-pub fn is_owner_self_demotion(
-    caller_id: &str,
-    target_user_id: &str,
-    new_role: &str,
-) -> bool {
+pub fn is_owner_self_demotion(caller_id: &str, target_user_id: &str, new_role: &str) -> bool {
     caller_id == target_user_id && new_role != "owner"
 }
 
@@ -35,10 +31,7 @@ pub fn is_owner_self_demotion(
 /// de lignes `api_user_guilds` avec `role = 'owner'` pour la guild.
 ///
 /// Usage : refuser le DELETE avec une ValidationError.
-pub fn would_revoke_last_owner(
-    is_target_owner: bool,
-    total_owners_for_guild: i64,
-) -> bool {
+pub fn would_revoke_last_owner(is_target_owner: bool, total_owners_for_guild: i64) -> bool {
     is_target_owner && total_owners_for_guild <= 1
 }
 

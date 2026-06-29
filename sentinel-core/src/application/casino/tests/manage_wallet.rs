@@ -1,18 +1,18 @@
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::casino::manage_wallet_service::ManageWalletService;
-use crate::domain::entities::coude::taunt::TauntsConfig;
-use crate::domain::entities::coude::taunt::StreakKind;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::taunt::StreakKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 
 struct MockWalletRepo {
@@ -54,19 +54,39 @@ impl MockWalletRepo {
 }
 #[async_trait]
 impl WalletRepository for MockWalletRepo {
-    async fn get_or_create(&self, _g: &str, _u: &str, _n: &str, s: i64) -> Result<Wallet, DomainError> {
+    async fn get_or_create(
+        &self,
+        _g: &str,
+        _u: &str,
+        _n: &str,
+        s: i64,
+    ) -> Result<Wallet, DomainError> {
         *self.last_starting_coins.lock().unwrap() = Some(s);
         Ok(self.wallet(*self.balance.lock().unwrap()))
     }
     async fn get(&self, _g: &str, _u: &str) -> Result<Option<Wallet>, DomainError> {
         Ok(Some(self.wallet(*self.balance.lock().unwrap())))
     }
-    async fn credit(&self, _g: &str, _u: &str, amount: i64, _s: &str, _d: &str) -> Result<Wallet, DomainError> {
+    async fn credit(
+        &self,
+        _g: &str,
+        _u: &str,
+        amount: i64,
+        _s: &str,
+        _d: &str,
+    ) -> Result<Wallet, DomainError> {
         let mut b = self.balance.lock().unwrap();
         *b += amount;
         Ok(self.wallet(*b))
     }
-    async fn debit(&self, _g: &str, _u: &str, amount: i64, _s: &str, _d: &str) -> Result<Wallet, DomainError> {
+    async fn debit(
+        &self,
+        _g: &str,
+        _u: &str,
+        amount: i64,
+        _s: &str,
+        _d: &str,
+    ) -> Result<Wallet, DomainError> {
         let mut b = self.balance.lock().unwrap();
         if *b < amount {
             return Err(DomainError::ValidationError("insuffisant".into()));
@@ -74,7 +94,15 @@ impl WalletRepository for MockWalletRepo {
         *b -= amount;
         Ok(self.wallet(*b))
     }
-    async fn transfer(&self, _g: &str, _f: &str, _t: &str, amount: i64, _s: &str, _d: &str) -> Result<(), DomainError> {
+    async fn transfer(
+        &self,
+        _g: &str,
+        _f: &str,
+        _t: &str,
+        amount: i64,
+        _s: &str,
+        _d: &str,
+    ) -> Result<(), DomainError> {
         let mut b = self.balance.lock().unwrap();
         if *b < amount {
             return Err(DomainError::ValidationError("insuffisant".into()));
@@ -82,11 +110,27 @@ impl WalletRepository for MockWalletRepo {
         *b -= amount;
         Ok(())
     }
-    async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn pay_combat_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn leaderboard(&self, _g: &str, _l: i64) -> Result<Vec<Wallet>, DomainError> {
         Ok(self.leaderboard_return.lock().unwrap().clone())
     }
-    async fn get_transactions(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<WalletTransaction>, DomainError> {
+    async fn get_transactions(
+        &self,
+        _g: &str,
+        _u: &str,
+        _l: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
         Ok(self.txs_return.lock().unwrap().clone())
     }
     async fn list_by_guild(&self, _g: &str) -> Result<Vec<Wallet>, DomainError> {
@@ -129,19 +173,44 @@ impl MockTaunts {
 }
 #[async_trait]
 impl ManageCoudeTauntsUseCase for MockTaunts {
-    async fn on_player_won(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_lost(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_drew(&self, _g: &str, _u: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn on_player_stolen_from(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_defended_steal(&self, _g: &str, _u: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn on_bj_natural(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_bj_hand_won(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_bj_hand_bust(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
+    async fn on_player_won(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_lost(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_drew(&self, _g: &str, _u: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn on_player_stolen_from(
+        &self,
+        _g: &str,
+        _u: &str,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_defended_steal(&self, _g: &str, _u: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn on_bj_natural(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_bj_hand_won(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_bj_hand_bust(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
     async fn on_bankruptcy(&self, _g: &str, _u: &str) -> Result<Option<TauntEvent>, DomainError> {
         *self.bankruptcy_calls.lock().unwrap() += 1;
         Ok(Some(Self::fake_event(StreakKind::EcoBankruptcy)))
     }
-    async fn on_jackpot(&self, _g: &str, _u: &str, amount: i64) -> Result<Option<TauntEvent>, DomainError> {
+    async fn on_jackpot(
+        &self,
+        _g: &str,
+        _u: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
         *self.jackpot_calls.lock().unwrap() += 1;
         *self.last_jackpot_amount.lock().unwrap() = Some(amount);
         if amount >= 10_000 {
@@ -150,17 +219,44 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
             Ok(None)
         }
     }
-    async fn on_generous_donor(&self, _g: &str, _u: &str, _a: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn get_config(&self, _g: &str) -> Result<TauntsConfig, DomainError> {
-        Ok(TauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
+    async fn on_generous_donor(
+        &self,
+        _g: &str,
+        _u: &str,
+        _a: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
     }
-    async fn set_channel(&self, _g: &str, _c: Option<&str>) -> Result<(), DomainError> { Ok(()) }
-    async fn set_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_rename_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_messages_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_opt_out(&self, _g: &str, _u: &str, _o: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn is_opted_out(&self, _g: &str, _u: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn list_opt_outs(&self, _g: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn get_config(&self, _g: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(TauntsConfig {
+            guild_id: "g".into(),
+            channel_id: None,
+            enabled: false,
+            rename_enabled: true,
+            messages_enabled: true,
+        })
+    }
+    async fn set_channel(&self, _g: &str, _c: Option<&str>) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_rename_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_messages_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_opt_out(&self, _g: &str, _u: &str, _o: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn is_opted_out(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn list_opt_outs(&self, _g: &str) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 #[tokio::test]
@@ -263,7 +359,10 @@ async fn transfer_rejects_self_transfer() {
     let repo = Arc::new(MockWalletRepo::new(500));
     let taunts = Arc::new(MockTaunts::new());
     let svc = ManageWalletService::new(repo, taunts);
-    let err = svc.transfer("g", "alice", "alice", 100, "t", "d").await.unwrap_err();
+    let err = svc
+        .transfer("g", "alice", "alice", 100, "t", "d")
+        .await
+        .unwrap_err();
     match err {
         DomainError::ValidationError(m) => assert!(m.contains("soi-meme")),
         o => panic!("expected ValidationError, got {:?}", o),
@@ -276,7 +375,10 @@ async fn transfer_full_balance_triggers_bankruptcy_and_jackpot() {
     let repo = Arc::new(MockWalletRepo::new(15_000));
     let taunts = Arc::new(MockTaunts::new());
     let svc = ManageWalletService::new(repo, taunts.clone());
-    let events = svc.transfer("g", "alice", "bob", 15_000, "t", "d").await.unwrap();
+    let events = svc
+        .transfer("g", "alice", "bob", 15_000, "t", "d")
+        .await
+        .unwrap();
     // Mock uses shared balance: sender before=15000, after=0. Receiver amount >= 10000 → jackpot.
     assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), 1);
     assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 1);

@@ -1,6 +1,6 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption,
 };
 
 use crate::shared::discord_helpers::reply_ephemeral_embed;
@@ -21,12 +21,8 @@ pub fn register() -> CreateCommand {
                 "Rechercher dans les logs d'audit",
             )
             .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::User,
-                    "user",
-                    "Utilisateur cible",
-                )
-                .required(true),
+                CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur cible")
+                    .required(true),
             )
             .add_sub_option(
                 CreateCommandOption::new(
@@ -47,13 +43,11 @@ pub fn register() -> CreateCommand {
                 .required(false),
             ),
         )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "stats",
-                "Affiche les statistiques hebdomadaires",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "stats",
+            "Affiche les statistiques hebdomadaires",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -91,16 +85,13 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
         })
         .unwrap_or_default();
 
-    let target_id = sub_opts
-        .iter()
-        .find(|o| o.name == "user")
-        .and_then(|o| {
-            if let CommandDataOptionValue::User(id) = &o.value {
-                Some(id.to_string())
-            } else {
-                None
-            }
-        });
+    let target_id = sub_opts.iter().find(|o| o.name == "user").and_then(|o| {
+        if let CommandDataOptionValue::User(id) = &o.value {
+            Some(id.to_string())
+        } else {
+            None
+        }
+    });
 
     let event_type = sub_opts
         .iter()
@@ -140,14 +131,8 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
                             .get("event_type")
                             .and_then(|v| v.as_str())
                             .unwrap_or("inconnu");
-                        let actor = e
-                            .get("actor_name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("?");
-                        let target = e
-                            .get("target_name")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("?");
+                        let actor = e.get("actor_name").and_then(|v| v.as_str()).unwrap_or("?");
+                        let target = e.get("target_name").and_then(|v| v.as_str()).unwrap_or("?");
                         format!("{}. **{}** par {} sur {}", i + 1, etype, actor, target)
                     })
                     .collect::<Vec<_>>()
@@ -158,8 +143,7 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
             reply_ephemeral_embed(ctx, command, embed).await;
         }
         Err(e) => {
-            let embed = info_embed("Audit -- Recherche")
-                .description(format!("Erreur : {}", e));
+            let embed = info_embed("Audit -- Recherche").description(format!("Erreur : {}", e));
             reply_ephemeral_embed(ctx, command, embed).await;
         }
     }
@@ -173,8 +157,14 @@ async fn handle_stats(ctx: &Context, command: &CommandInteraction) {
 
     // Sub-feature gate : weekly_report_enabled (toggle UI sous audit-bot).
     if !crate::shared::discord_helpers::is_feature_enabled(
-        ctx, &guild_id.to_string(), "audit-bot", "weekly_report_enabled", true,
-    ).await {
+        ctx,
+        &guild_id.to_string(),
+        "audit-bot",
+        "weekly_report_enabled",
+        true,
+    )
+    .await
+    {
         let embed = info_embed("Audit -- Statistiques hebdomadaires")
             .description("Le rapport hebdomadaire est desactive pour ce serveur.");
         reply_ephemeral_embed(ctx, command, embed).await;

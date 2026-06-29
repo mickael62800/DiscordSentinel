@@ -9,8 +9,8 @@ use crate::ports::inbound::moderation::manage_rules::CreateRuleCommand;
 use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use tracing::warn;
 
-use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
+use crate::ports::outbound::system::cache::CachePort;
 pub struct ManageRulesService {
     rule_repo: Arc<dyn RuleRepository>,
     cache: Arc<dyn CachePort>,
@@ -47,7 +47,9 @@ impl ManageRulesUseCase for ManageRulesService {
 
     async fn create_or_update_rule(&self, cmd: CreateRuleCommand) -> Result<Rule, DomainError> {
         if cmd.weight < 0.0 {
-            return Err(DomainError::ValidationError("Le poids ne peut pas être négatif".into()));
+            return Err(DomainError::ValidationError(
+                "Le poids ne peut pas être négatif".into(),
+            ));
         }
         if cmd.threshold_warn >= cmd.threshold_delete
             || cmd.threshold_delete >= cmd.threshold_mute

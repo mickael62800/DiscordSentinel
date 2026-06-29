@@ -25,7 +25,10 @@ impl ManageRemindersService {
 
 #[async_trait]
 impl ManageRemindersUseCase for ManageRemindersService {
-    async fn create_reminder(&self, cmd: CreateReminderCommand) -> Result<SanctionReminder, DomainError> {
+    async fn create_reminder(
+        &self,
+        cmd: CreateReminderCommand,
+    ) -> Result<SanctionReminder, DomainError> {
         let now = Utc::now();
         let expires_at = now + Duration::seconds(cmd.duration_secs as i64);
         let remind_before = if cmd.remind_before_secs > 0 {

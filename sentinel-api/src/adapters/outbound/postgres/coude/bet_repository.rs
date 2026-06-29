@@ -4,14 +4,14 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::BetPayoutOutcome;
 use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
-use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_core::domain::entities::coude::bet::RefundSummary;
 use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 
 use super::super::pg_err;
 use super::super::uow::PgTx;
@@ -112,7 +112,6 @@ impl From<BetRow> for Bet {
     }
 }
 
-
 #[async_trait]
 impl BetRepository for PgBetRepository {
     async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError> {
@@ -138,13 +137,12 @@ impl BetRepository for PgBetRepository {
         // Si worker detient deja le lock sur coude_combats (FOR UPDATE SKIP
         // LOCKED), on attend — sauf que worker utilise SKIP LOCKED donc on
         // n'est JAMAIS bloque (c'est le worker qui skip si on lock).
-        let combat_status: Option<(String,)> = sqlx::query_as(
-            "SELECT status FROM coude_combats WHERE id = $1 FOR UPDATE",
-        )
-        .bind(new.combat_id)
-        .fetch_optional(&mut *tx.0)
-        .await
-        .map_err(pg_err)?;
+        let combat_status: Option<(String,)> =
+            sqlx::query_as("SELECT status FROM coude_combats WHERE id = $1 FOR UPDATE")
+                .bind(new.combat_id)
+                .fetch_optional(&mut *tx.0)
+                .await
+                .map_err(pg_err)?;
         let combat_status = combat_status
             .ok_or_else(|| DomainError::NotFound("Combat introuvable".into()))?
             .0;
@@ -160,7 +158,14 @@ impl BetRepository for PgBetRepository {
         let desc = format!("Pari combat {} sur {}", new.combat_id, new.backed_id);
         let debit_mut = self
             .wallet_uc
-            .debit_tx(&mut tx, &new.guild_id, &new.bettor_id, new.amount, "coude_bet_place", &desc)
+            .debit_tx(
+                &mut tx,
+                &new.guild_id,
+                &new.bettor_id,
+                new.amount,
+                "coude_bet_place",
+                &desc,
+            )
             .await?;
 
         // Insert bet.
@@ -210,10 +215,18 @@ impl BetRepository for PgBetRepository {
                     let desc = format!("Pari gagne combat {}", payout.bet_id);
                     let m = self
                         .wallet_uc
-                        .credit_tx(&mut tx, guild_id, &payout.bettor_id, amount, "coude_bet_win", &desc)
+                        .credit_tx(
+                            &mut tx,
+                            guild_id,
+                            &payout.bettor_id,
+                            amount,
+                            "coude_bet_win",
+                            &desc,
+                        )
                         .await?;
                     pending_taunts.push((payout.bettor_id.clone(), m));
-                    bump_player_earned_in_tx(&mut tx.0, guild_id, &payout.bettor_id, amount).await?;
+                    bump_player_earned_in_tx(&mut tx.0, guild_id, &payout.bettor_id, amount)
+                        .await?;
                 }
                 BetPayoutOutcome::Refund { amount } => {
                     // Egalite : credit sans total_earned, pas de taunt.
@@ -256,7 +269,8 @@ impl BetRepository for PgBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.winner_id.clone(), m));
-                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.winner_id, bonus.winner_bonus).await?;
+                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.winner_id, bonus.winner_bonus)
+                    .await?;
             }
             if bonus.loser_bonus > 0 {
                 let m = self
@@ -271,7 +285,8 @@ impl BetRepository for PgBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.loser_id.clone(), m));
-                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.loser_id, bonus.loser_bonus).await?;
+                bump_player_earned_in_tx(&mut tx.0, guild_id, &bonus.loser_id, bonus.loser_bonus)
+                    .await?;
             }
         }
 

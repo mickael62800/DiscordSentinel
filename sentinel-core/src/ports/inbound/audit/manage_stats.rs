@@ -4,10 +4,10 @@ use crate::domain::entities::audit::dashboard_stats::DashboardStats;
 use crate::domain::entities::audit::user_stats::GuildStatsOverview;
 use crate::domain::entities::audit::user_stats::GuildVoiceStats;
 use crate::domain::entities::audit::user_stats::UserStats;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 pub struct RecordMessagesCommand {
     pub guild_id: GuildId,
@@ -29,9 +29,22 @@ pub struct RecordVoiceCommand {
 pub trait ManageStatsUseCase: Send + Sync {
     async fn record_messages(&self, command: RecordMessagesCommand) -> Result<(), DomainError>;
     async fn record_voice(&self, command: RecordVoiceCommand) -> Result<(), DomainError>;
-    async fn get_user_stats(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError>;
+    async fn get_user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserStats>, DomainError>;
     async fn get_guild_overview(&self, guild_id: &str) -> Result<GuildStatsOverview, DomainError>;
-    async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError>;
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<UserStats>, DomainError>;
     async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError>;
-    async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<GuildVoiceStats, DomainError>;
+    async fn get_guild_voice_stats(
+        &self,
+        guild_id: &str,
+        days: u32,
+        limit: u32,
+    ) -> Result<GuildVoiceStats, DomainError>;
 }

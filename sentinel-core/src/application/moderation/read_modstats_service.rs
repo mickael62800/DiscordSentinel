@@ -23,12 +23,20 @@ impl ReadModstatsService {
 
 #[async_trait]
 impl ReadModstatsUseCase for ReadModstatsService {
-    async fn modstats(&self, guild_id: &str, days: i32) -> Result<Vec<ModeratorBreakdown>, DomainError> {
+    async fn modstats(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<Vec<ModeratorBreakdown>, DomainError> {
         let days = days.clamp(1, 90);
         self.repo.breakdown(guild_id, days, TOP_LIMIT).await
     }
 
-    async fn modstats_trend(&self, guild_id: &str, days: i32) -> Result<Vec<ModstatsTrendDay>, DomainError> {
+    async fn modstats_trend(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<Vec<ModstatsTrendDay>, DomainError> {
         let days = days.clamp(1, 90);
         self.repo.daily_trend(guild_id, days).await
     }

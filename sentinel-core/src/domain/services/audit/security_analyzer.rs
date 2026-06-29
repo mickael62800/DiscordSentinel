@@ -26,15 +26,23 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     let a_chars: Vec<char> = a.chars().collect();
     let b_chars: Vec<char> = b.chars().collect();
     let (a_len, b_len) = (a_chars.len(), b_chars.len());
-    if a_len == 0 { return b_len; }
-    if b_len == 0 { return a_len; }
+    if a_len == 0 {
+        return b_len;
+    }
+    if b_len == 0 {
+        return a_len;
+    }
 
     let mut prev: Vec<usize> = (0..=b_len).collect();
     let mut curr = vec![0usize; b_len + 1];
     for i in 1..=a_len {
         curr[0] = i;
         for j in 1..=b_len {
-            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
             curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
@@ -45,8 +53,14 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 // ── Noms similaires ──
 
 pub fn has_similar_usernames(names: &[String], max_distance: usize) -> bool {
-    if names.len() < 2 { return false; }
-    let capped = if names.len() > 50 { &names[..50] } else { names };
+    if names.len() < 2 {
+        return false;
+    }
+    let capped = if names.len() > 50 {
+        &names[..50]
+    } else {
+        names
+    };
     let lowered: Vec<String> = capped.iter().map(|n| n.to_lowercase()).collect();
     for i in 0..lowered.len() {
         for j in (i + 1)..lowered.len() {
@@ -61,7 +75,9 @@ pub fn has_similar_usernames(names: &[String], max_distance: usize) -> bool {
 // ── Cluster de creation ──
 
 pub fn are_creations_clustered(timestamps: &[i64], max_spread_secs: i64) -> bool {
-    if timestamps.len() < 2 { return false; }
+    if timestamps.len() < 2 {
+        return false;
+    }
     let min = timestamps.iter().min().copied().unwrap_or(0);
     let max = timestamps.iter().max().copied().unwrap_or(0);
     (max - min) <= max_spread_secs
@@ -93,11 +109,22 @@ pub fn analyze_joins(
     let clustered_creation = are_creations_clustered(&timestamps, creation_spread_secs);
 
     let mut score: u32 = 0;
-    if similar_names { score += 40; }
-    if high_default_avatar_ratio { score += 30; }
-    if clustered_creation { score += 30; }
+    if similar_names {
+        score += 40;
+    }
+    if high_default_avatar_ratio {
+        score += 30;
+    }
+    if clustered_creation {
+        score += 30;
+    }
 
-    RaidAnalysis { similar_names, high_default_avatar_ratio, clustered_creation, score }
+    RaidAnalysis {
+        similar_names,
+        high_default_avatar_ratio,
+        clustered_creation,
+        score,
+    }
 }
 
 // ── Check age compte ──
@@ -105,7 +132,9 @@ pub fn analyze_joins(
 pub fn is_account_suspicious(account_created_timestamp: i64, min_age_secs: u64) -> bool {
     let now = chrono::Utc::now().timestamp();
     let age = now - account_created_timestamp;
-    if age < 0 { return true; }
+    if age < 0 {
+        return true;
+    }
     (age as u64) < min_age_secs
 }
 
@@ -154,7 +183,10 @@ pub fn check_alt_account(
         }
     }
 
-    AltAnalysis { similar_to_banned, creation_near_banned }
+    AltAnalysis {
+        similar_to_banned,
+        creation_near_banned,
+    }
 }
 
 #[cfg(test)]

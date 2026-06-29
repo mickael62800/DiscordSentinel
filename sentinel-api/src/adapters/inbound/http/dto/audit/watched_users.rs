@@ -1,13 +1,13 @@
 use serde::Serialize;
 
-use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
-use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseDto;
+use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
+use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
-use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Serialize)]
 pub struct WatchedUserResponseDto {
@@ -55,9 +55,21 @@ impl From<UserDossier> for UserDossierResponseDto {
     fn from(d: UserDossier) -> Self {
         Self {
             user: WatchedUserResponseDto::from(d.user),
-            infractions: d.infractions.into_iter().map(InfractionResponseDto::from).collect(),
-            moderation_actions: d.moderation_actions.into_iter().map(ModerationActionResponseDto::from).collect(),
-            security_events: d.security_events.into_iter().map(SecurityEventResponseDto::from).collect(),
+            infractions: d
+                .infractions
+                .into_iter()
+                .map(InfractionResponseDto::from)
+                .collect(),
+            moderation_actions: d
+                .moderation_actions
+                .into_iter()
+                .map(ModerationActionResponseDto::from)
+                .collect(),
+            security_events: d
+                .security_events
+                .into_iter()
+                .map(SecurityEventResponseDto::from)
+                .collect(),
             notes: d.notes.into_iter().map(UserNoteDto::from).collect(),
         }
     }

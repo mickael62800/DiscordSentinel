@@ -4,10 +4,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannel {
@@ -151,12 +151,36 @@ impl VoiceChannelConfig {
         let mut cfg = Self::default();
         for (k, v) in pairs {
             match k.as_str() {
-                "voice_creation_cooldown_secs" => { if let Ok(n) = v.parse() { cfg.creation_cooldown_secs = n; } }
-                "voice_flood_max_messages" => { if let Ok(n) = v.parse() { cfg.flood_max_messages = n; } }
-                "voice_flood_time_window_secs" => { if let Ok(n) = v.parse() { cfg.flood_time_window_secs = n; } }
-                "voice_empty_cleanup_delay_secs" => { if let Ok(n) = v.parse() { cfg.empty_cleanup_delay_secs = n; } }
-                "voice_flood_mute_duration_secs" => { if let Ok(n) = v.parse() { cfg.flood_mute_duration_secs = n; } }
-                "voice_vote_kick_timeout_secs" => { if let Ok(n) = v.parse() { cfg.vote_kick_timeout_secs = n; } }
+                "voice_creation_cooldown_secs" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.creation_cooldown_secs = n;
+                    }
+                }
+                "voice_flood_max_messages" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.flood_max_messages = n;
+                    }
+                }
+                "voice_flood_time_window_secs" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.flood_time_window_secs = n;
+                    }
+                }
+                "voice_empty_cleanup_delay_secs" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.empty_cleanup_delay_secs = n;
+                    }
+                }
+                "voice_flood_mute_duration_secs" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.flood_mute_duration_secs = n;
+                    }
+                }
+                "voice_vote_kick_timeout_secs" => {
+                    if let Ok(n) = v.parse() {
+                        cfg.vote_kick_timeout_secs = n;
+                    }
+                }
                 _ => {}
             }
         }

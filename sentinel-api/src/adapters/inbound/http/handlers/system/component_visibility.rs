@@ -6,8 +6,8 @@
 //! Ecriture : Owner+ (modifie ce que les modos/admins voient).
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -98,11 +98,7 @@ pub async fn upsert_visibility(
         }
     }
 
-    let mut tx = state
-        .pg_pool
-        .begin()
-        .await
-        .map_err(sqlx_internal("tx"))?;
+    let mut tx = state.pg_pool.begin().await.map_err(sqlx_internal("tx"))?;
 
     for e in &body.entries {
         sqlx::query(
@@ -124,9 +120,9 @@ pub async fn upsert_visibility(
         .map_err(sqlx_internal("upsert"))?;
     }
 
-    tx.commit()
-        .await
-        .map_err(sqlx_internal("commit"))?;
+    tx.commit().await.map_err(sqlx_internal("commit"))?;
 
-    Ok(Json(serde_json::json!({ "ok": true, "count": body.entries.len() })))
+    Ok(Json(
+        serde_json::json!({ "ok": true, "count": body.entries.len() }),
+    ))
 }

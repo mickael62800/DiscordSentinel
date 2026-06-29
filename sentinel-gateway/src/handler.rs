@@ -17,7 +17,10 @@ use crate::logger::GatewayLogger;
 const TOKEN_CACHE_TTL: Duration = Duration::from_secs(300);
 
 #[derive(Clone)]
-pub struct CachedAuth { authorized: bool, expires_at: Instant }
+pub struct CachedAuth {
+    authorized: bool,
+    expires_at: Instant,
+}
 
 /// WebSocket close code: "Try Again Later" (server at capacity)
 const WS_CLOSE_TRY_AGAIN_LATER: u16 = 1013;
@@ -57,7 +60,10 @@ async fn discord_token_authorized(state: &GatewayState, discord_token: &str) -> 
 
     // Hit /api/auth/check-access avec Bearer API_KEY (services internes)
     // + X-Discord-Token. L'API renvoie 200/403 selon le whitelist.
-    let url = format!("{}/api/auth/check-access", state.api_url.trim_end_matches('/'));
+    let url = format!(
+        "{}/api/auth/check-access",
+        state.api_url.trim_end_matches('/')
+    );
     let result = state
         .http_client
         .get(&url)
@@ -78,7 +84,10 @@ async fn discord_token_authorized(state: &GatewayState, discord_token: &str) -> 
     let mut cache = state.token_cache.lock().await;
     cache.insert(
         discord_token.to_string(),
-        CachedAuth { authorized, expires_at: Instant::now() + TOKEN_CACHE_TTL },
+        CachedAuth {
+            authorized,
+            expires_at: Instant::now() + TOKEN_CACHE_TTL,
+        },
     );
     // Nettoyage opportuniste : retire les entrees expirees pour eviter une
     // croissance illimitee si beaucoup de tokens differents transitent.
@@ -157,11 +166,14 @@ async fn handle_socket(
 
     let clients = broadcaster.connected_count();
     info!(clients, client_ip = %client_ip, "WebSocket client connected");
-    logger.info("Client WebSocket connecte", serde_json::json!({
-        "event_type": "websocket.client_connected",
-        "client_ip": &client_ip,
-        "total_clients": clients,
-    }));
+    logger.info(
+        "Client WebSocket connecte",
+        serde_json::json!({
+            "event_type": "websocket.client_connected",
+            "client_ip": &client_ip,
+            "total_clients": clients,
+        }),
+    );
 
     let mut events_relayed: u64 = 0;
     let mut events_skipped: u64 = 0;
@@ -218,11 +230,14 @@ async fn handle_socket(
     broadcaster.unsubscribe();
     let clients = broadcaster.connected_count();
     info!(clients, client_ip = %client_ip, events_relayed, events_skipped, "WebSocket client disconnected");
-    logger.info("Client WebSocket deconnecte", serde_json::json!({
-        "event_type": "websocket.client_disconnected",
-        "client_ip": &client_ip,
-        "total_clients": clients,
-        "events_relayed": events_relayed,
-        "skipped_events": events_skipped,
-    }));
+    logger.info(
+        "Client WebSocket deconnecte",
+        serde_json::json!({
+            "event_type": "websocket.client_disconnected",
+            "client_ip": &client_ip,
+            "total_clients": clients,
+            "events_relayed": events_relayed,
+            "skipped_events": events_skipped,
+        }),
+    );
 }

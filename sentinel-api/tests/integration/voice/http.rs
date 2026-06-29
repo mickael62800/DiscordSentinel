@@ -16,9 +16,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::community::manage_voice_channels::*;
 use sentinel_core::domain::entities::community::voice_channel::*;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::community::manage_voice_channels::*;
 
 use test_helpers::build_test_state;
 
@@ -69,7 +69,8 @@ fn make_channel(guild_id: &str, channel_id: &str) -> VoiceChannel {
         queue_channel_id: None,
         category_id: None,
         channel_name: "Test".into(),
-        kind: sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind::Private,
+        kind:
+            sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind::Private,
         visibility: "visible".into(),
         queue_enabled: false,
         locked: false,
@@ -126,13 +127,29 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
     }
 
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
-        Ok(self.channels.iter().filter(|c| c.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .channels
+            .iter()
+            .filter(|c| c.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
 
-    async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError> {
-        let ch = self.channels.iter().find(|c| c.channel_id == channel_id)
+    async fn get_channel_detail(
+        &self,
+        channel_id: &str,
+    ) -> Result<VoiceChannelDetail, DomainError> {
+        let ch = self
+            .channels
+            .iter()
+            .find(|c| c.channel_id == channel_id)
             .ok_or_else(|| DomainError::NotFound(format!("Channel {channel_id}")))?;
-        let links = self.invite_links.iter().filter(|l| l.channel_id == channel_id).cloned().collect();
+        let links = self
+            .invite_links
+            .iter()
+            .filter(|l| l.channel_id == channel_id)
+            .cloned()
+            .collect();
         Ok(VoiceChannelDetail {
             channel: ch.clone(),
             co_admins: vec![],
@@ -141,7 +158,10 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
-    async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError> {
+    async fn create_channel(
+        &self,
+        cmd: CreateVoiceChannelCommand,
+    ) -> Result<VoiceChannel, DomainError> {
         Ok(VoiceChannel {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -166,24 +186,77 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
-    async fn list_history_channels(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
-    async fn get_voice_config(&self, _: &str) -> Result<VoiceChannelConfig, DomainError> { Ok(VoiceChannelConfig::default()) }
-    async fn close_channel(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_channel(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn transfer_ownership(&self, _: TransferOwnershipCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn add_co_admin(&self, _: ManageCoAdminCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_co_admin(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { Ok(vec![]) }
-    async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_preset(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { Ok(None) }
-    async fn save_preset(&self, _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn is_banned(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn list_history_channels(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<VoiceChannel>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_voice_config(&self, _: &str) -> Result<VoiceChannelConfig, DomainError> {
+        Ok(VoiceChannelConfig::default())
+    }
+    async fn close_channel(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_channel(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn transfer_ownership(&self, _: TransferOwnershipCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn add_co_admin(&self, _: ManageCoAdminCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_co_admin(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_whitelist(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_preset(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+    async fn save_preset(
+        &self,
+        _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn is_banned(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
 
-    async fn create_invite_link(&self, cmd: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
+    async fn create_invite_link(
+        &self,
+        cmd: CreateInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
         Ok(VoiceChannelInviteLink {
             id: Uuid::new_v4(),
             voice_channel_id: Uuid::new_v4(),
@@ -200,23 +273,46 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
-    async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
-        Ok(self.invite_links.iter().filter(|l| l.channel_id == channel_id).cloned().collect())
+    async fn list_invite_links(
+        &self,
+        channel_id: &str,
+    ) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
+        Ok(self
+            .invite_links
+            .iter()
+            .filter(|l| l.channel_id == channel_id)
+            .cloned()
+            .collect())
     }
 
-    async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
-        self.invite_links.iter().find(|l| l.code == cmd.code)
+    async fn use_invite_link(
+        &self,
+        cmd: UseInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
+        self.invite_links
+            .iter()
+            .find(|l| l.code == cmd.code)
             .cloned()
             .ok_or_else(|| DomainError::NotFound(format!("Code {}", cmd.code)))
     }
 
-    async fn revoke_invite_link(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-
-    async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
-        Ok(self.themes.iter().filter(|t| t.guild_id == guild_id).cloned().collect())
+    async fn revoke_invite_link(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
     }
 
-    async fn create_theme(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
+        Ok(self
+            .themes
+            .iter()
+            .filter(|t| t.guild_id == guild_id)
+            .cloned()
+            .collect())
+    }
+
+    async fn create_theme(
+        &self,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         if cmd.name.trim().is_empty() {
             return Err(DomainError::ValidationError("Nom vide".into()));
         }
@@ -239,18 +335,32 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
-    async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    async fn update_theme(
+        &self,
+        theme_id: &str,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         Ok(VoiceChannelTheme {
             id: uuid::Uuid::parse_str(theme_id).unwrap_or_else(|_| Uuid::new_v4()),
-            guild_id: cmd.guild_id, name: cmd.name, emoji: cmd.emoji,
-            channel_name_template: cmd.channel_name_template, member_limit: cmd.member_limit,
-            visibility: cmd.visibility, locked: cmd.locked, queue_enabled: cmd.queue_enabled,
-            bitrate: cmd.bitrate, slowmode_secs: cmd.slowmode_secs,
-            stage_enabled: cmd.stage_enabled, is_default: cmd.is_default,
-            sort_order: cmd.sort_order, created_at: Utc::now(),
+            guild_id: cmd.guild_id,
+            name: cmd.name,
+            emoji: cmd.emoji,
+            channel_name_template: cmd.channel_name_template,
+            member_limit: cmd.member_limit,
+            visibility: cmd.visibility,
+            locked: cmd.locked,
+            queue_enabled: cmd.queue_enabled,
+            bitrate: cmd.bitrate,
+            slowmode_secs: cmd.slowmode_secs,
+            stage_enabled: cmd.stage_enabled,
+            is_default: cmd.is_default,
+            sort_order: cmd.sort_order,
+            created_at: Utc::now(),
         })
     }
-    async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -275,7 +385,11 @@ async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
     (status, json)
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
         .method("POST")
         .uri(uri)
@@ -298,7 +412,11 @@ async fn delete(app: axum::Router, uri: &str) -> StatusCode {
     app.oneshot(req).await.unwrap().status()
 }
 
-async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn patch_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
         .method("PATCH")
         .uri(uri)
@@ -391,7 +509,12 @@ async fn create_channel_success() {
 async fn close_channel_success() {
     let uc = MockVoiceUC::new().with_channel(make_channel("g1", "c1"));
     let app = build_app(uc);
-    let (status, json) = patch_json(app, "/api/voice-channels/by-channel/c1/close", serde_json::json!({})).await;
+    let (status, json) = patch_json(
+        app,
+        "/api/voice-channels/by-channel/c1/close",
+        serde_json::json!({}),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["ok"], true);
 }
@@ -476,7 +599,11 @@ async fn revoke_invite_link_success() {
     let uc = MockVoiceUC::new().with_channel(make_channel("g1", "c1"));
     let app = build_app(uc);
     let id = Uuid::new_v4();
-    let status = delete(app, &format!("/api/voice-channels/by-channel/c1/invites/{id}")).await;
+    let status = delete(
+        app,
+        &format!("/api/voice-channels/by-channel/c1/invites/{id}"),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -631,7 +758,11 @@ async fn add_co_admin_success() {
 async fn remove_co_admin_success() {
     let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
     let app = build_app(uc);
-    let status = delete(app, "/api/voice-channels/by-channel/c1/co-admins/555555555555555555").await;
+    let status = delete(
+        app,
+        "/api/voice-channels/by-channel/c1/co-admins/555555555555555555",
+    )
+    .await;
     assert!(status.is_success() || status == StatusCode::NO_CONTENT);
 }
 
@@ -651,7 +782,11 @@ async fn add_to_whitelist_success() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remove_from_whitelist_success() {
     let app = build_app(MockVoiceUC::new());
-    let status = delete(app, "/api/voice-channels/whitelist/111111111111111111/444444444444444444/555555555555555555").await;
+    let status = delete(
+        app,
+        "/api/voice-channels/whitelist/111111111111111111/444444444444444444/555555555555555555",
+    )
+    .await;
     assert!(status.is_success() || status == StatusCode::NO_CONTENT);
 }
 
@@ -673,7 +808,11 @@ async fn ban_from_channel_success() {
 async fn unban_from_channel_success() {
     let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
     let app = build_app(uc);
-    let status = delete(app, "/api/voice-channels/by-channel/c1/bans/555555555555555555").await;
+    let status = delete(
+        app,
+        "/api/voice-channels/by-channel/c1/bans/555555555555555555",
+    )
+    .await;
     assert!(status.is_success() || status == StatusCode::NO_CONTENT);
 }
 
@@ -697,30 +836,49 @@ async fn update_theme_success() {
         "is_default": false,
         "sort_order": 0
     });
-    let (status, _) = patch_json(app, &format!("/api/voice-channels/themes/111111111111111111/{theme_id}"), body).await;
+    let (status, _) = patch_json(
+        app,
+        &format!("/api/voice-channels/themes/111111111111111111/{theme_id}"),
+        body,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
 // ── RBAC injecte ────────────────────────────────────────
 
-async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+async fn send_request(
+    app: axum::Router,
+    req: axum::http::Request<Body>,
+) -> (StatusCode, serde_json::Value) {
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     sqlx::PgPool::connect(&url).await.unwrap()
 }
 
 async fn seed_role(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &str) {
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'T') ON CONFLICT DO NOTHING")
         .bind(user_id).execute(pool).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, $3)")
-        .bind(user_id).bind(guild_id).bind(role).execute(pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, $3)",
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .bind(role)
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &str) {
@@ -735,8 +893,14 @@ async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &st
 async fn create_channel_with_rbac_moderator_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_role(&p, &user_id, &guild_id, "moderator").await;
 
     let app = build_app(MockVoiceUC::new());
@@ -752,8 +916,12 @@ async fn create_channel_with_rbac_moderator_succeeds() {
         "stage_enabled": false
     });
     let req = test_helpers::request_with_rbac(
-        "POST", "/api/voice-channels",
-        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+        "POST",
+        "/api/voice-channels",
+        &user_id,
+        Some(Role::Moderator),
+        Some(guild_id),
+        Some(body),
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);
@@ -763,18 +931,31 @@ async fn create_channel_with_rbac_moderator_succeeds() {
 async fn delete_channel_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_role(&p, &user_id, &guild_id, "viewer").await;
     // gate_by_channel_id fait un SELECT sur voice_channels → il faut une row en DB.
-    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let channel_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_voice_channel(&p, &guild_id, &channel_id).await;
 
     let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
     let app = build_app(uc);
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/voice-channels/by-channel/{channel_id}"),
-        &user_id, Some(Role::Viewer), Some(guild_id), None,
+        "DELETE",
+        &format!("/api/voice-channels/by-channel/{channel_id}"),
+        &user_id,
+        Some(Role::Viewer),
+        Some(guild_id),
+        None,
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -783,35 +964,64 @@ async fn delete_channel_with_rbac_viewer_forbidden() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_channel_closed_deletes_row() {
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let channel_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query(
         "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, channel_status, closed_at) \
          VALUES ($1, $2, 'o', 'Owner', $3, 'VC', 'closed', NOW())",
     ).bind(Uuid::new_v4()).bind(&guild_id).bind(&channel_id).execute(&p).await.unwrap();
 
     let app = build_app(MockVoiceUC::new());
-    let status = delete(app, &format!("/api/voice-channels/by-channel/{channel_id}/purge")).await;
+    let status = delete(
+        app,
+        &format!("/api/voice-channels/by-channel/{channel_id}/purge"),
+    )
+    .await;
     assert!(status.is_success() || status == StatusCode::NO_CONTENT);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_channel_still_open_returns_error() {
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let channel_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_voice_channel(&p, &guild_id, &channel_id).await;
     let app = build_app(MockVoiceUC::new());
-    let status = delete(app, &format!("/api/voice-channels/by-channel/{channel_id}/purge")).await;
+    let status = delete(
+        app,
+        &format!("/api/voice-channels/by-channel/{channel_id}/purge"),
+    )
+    .await;
     assert!(status.is_client_error() || status.is_server_error());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_history_deletes_closed_channels() {
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let cid1 = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let cid2 = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let cid1 = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let cid2 = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query(
         "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, channel_status, closed_at) \
          VALUES ($1, $2, 'o', 'O', $3, 'A', 'closed', NOW())",
@@ -828,9 +1038,16 @@ async fn purge_history_deletes_closed_channels() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_channel_events_empty_returns_array() {
-    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let channel_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let app = build_app(MockVoiceUC::new());
-    let (status, json) = get(app, &format!("/api/voice-channels/by-channel/{channel_id}/events")).await;
+    let (status, json) = get(
+        app,
+        &format!("/api/voice-channels/by-channel/{channel_id}/events"),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(json.as_array().is_some());
 }
@@ -839,11 +1056,20 @@ async fn list_channel_events_empty_returns_array() {
 async fn transfer_ownership_with_rbac_moderator_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
     let p = pool().await;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_role(&p, &user_id, &guild_id, "moderator").await;
 
-    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let channel_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     seed_voice_channel(&p, &guild_id, &channel_id).await;
     let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
     let app = build_app(uc);
@@ -852,8 +1078,12 @@ async fn transfer_ownership_with_rbac_moderator_succeeds() {
         "new_owner_name": "NewOwner"
     });
     let req = test_helpers::request_with_rbac(
-        "PATCH", &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
-        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+        "PATCH",
+        &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
+        &user_id,
+        Some(Role::Moderator),
+        Some(guild_id),
+        Some(body),
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);

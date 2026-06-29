@@ -81,8 +81,10 @@ impl SlaTracker {
     pub fn cleanup_stale(&self) {
         let now = Instant::now();
         let max_age = Duration::from_secs(48 * 3600);
-        self.created.retain(|_, ts| now.duration_since(*ts) < max_age);
-        self.first_response.retain(|id, _| self.created.contains_key(id));
+        self.created
+            .retain(|_, ts| now.duration_since(*ts) < max_age);
+        self.first_response
+            .retain(|id, _| self.created.contains_key(id));
         self.escalated.retain(|id, _| self.created.contains_key(id));
     }
 }

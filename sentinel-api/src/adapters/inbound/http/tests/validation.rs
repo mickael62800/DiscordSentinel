@@ -209,7 +209,14 @@ fn moderation_action_all_valid() {
 
 #[test]
 fn moderation_action_invalid_guild() {
-    assert!(validate_moderation_action("abc", "1".repeat(18).as_str(), "1".repeat(18).as_str(), "r", "ban").is_err());
+    assert!(validate_moderation_action(
+        "abc",
+        "1".repeat(18).as_str(),
+        "1".repeat(18).as_str(),
+        "r",
+        "ban"
+    )
+    .is_err());
 }
 
 #[test]

@@ -15,7 +15,9 @@ async fn edit_response_text(ctx: &Context, component: &ComponentInteraction, con
     if let Err(e) = component
         .edit_response(
             &ctx.http,
-            EditInteractionResponse::new().content(content).components(vec![]),
+            EditInteractionResponse::new()
+                .content(content)
+                .components(vec![]),
         )
         .await
     {
@@ -93,7 +95,9 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
     // Filtrer les items defensifs disponibles
     let mut options: Vec<CreateSelectMenuOption> = Vec::new();
     for item_key in DEFENSIVE_ITEMS {
-        let has = inventory.iter().any(|i| i.item_key == *item_key && i.quantity > 0);
+        let has = inventory
+            .iter()
+            .any(|i| i.item_key == *item_key && i.quantity > 0);
         if has {
             if let Some(shop_item) = catalog.get_item(item_key) {
                 let qty = inventory
@@ -131,7 +135,10 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
 
     // custom_id format : coude_defend_select:{combat_id}|{challenge_message_id}
     let select = CreateSelectMenu::new(
-        format!("{}{}|{}", DEFEND_SELECT_PREFIX, combat_id_str, challenge_message_id),
+        format!(
+            "{}{}|{}",
+            DEFEND_SELECT_PREFIX, combat_id_str, challenge_message_id
+        ),
         CreateSelectMenuKind::String { options },
     )
     .placeholder("Choisis un objet pour te defendre...");
@@ -177,7 +184,8 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         None => return,
     };
     // Parse "combat_id|challenge_message_id" — fallback retrocompat si seul combat_id.
-    let (combat_id_str, challenge_message_id_opt): (&str, Option<&str>) = match rest.split_once('|') {
+    let (combat_id_str, challenge_message_id_opt): (&str, Option<&str>) = match rest.split_once('|')
+    {
         Some((cid, mid)) => (cid, Some(mid)),
         None => (rest, None),
     };
@@ -237,7 +245,10 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         }
 
         // Enregistrer l'objet defensif dans le combat
-        if let Err(e) = api.set_defender_special(combat_id_str, &selected_item).await {
+        if let Err(e) = api
+            .set_defender_special(combat_id_str, &selected_item)
+            .await
+        {
             tracing::warn!(error = %e, "Erreur set_defender_special");
         }
     }
@@ -283,10 +294,7 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         if !edited {
             if let Err(e) = component
                 .channel_id
-                .send_message(
-                    &ctx.http,
-                    serenity::all::CreateMessage::new().embed(embed),
-                )
+                .send_message(&ctx.http, serenity::all::CreateMessage::new().embed(embed))
                 .await
             {
                 tracing::warn!(error = %e, "Echec send_message resultat combat");
@@ -294,4 +302,3 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         }
     }
 }
-

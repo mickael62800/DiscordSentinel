@@ -27,7 +27,10 @@ impl ManageRolePanelsService {
 
 #[async_trait]
 impl ManageRolePanelsUseCase for ManageRolePanelsService {
-    async fn create_panel(&self, cmd: CreateRolePanelCommand) -> Result<RolePanelDetail, DomainError> {
+    async fn create_panel(
+        &self,
+        cmd: CreateRolePanelCommand,
+    ) -> Result<RolePanelDetail, DomainError> {
         let now = Utc::now();
         let panel_id = Uuid::new_v4();
 
@@ -73,7 +76,10 @@ impl ManageRolePanelsUseCase for ManageRolePanelsService {
             .ok_or_else(|| DomainError::NotFound(format!("Panel introuvable : {panel_id}")))
     }
 
-    async fn get_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
+    async fn get_panel_by_message(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<RolePanelDetail>, DomainError> {
         self.repo.find_panel_by_message(message_id).await
     }
 
@@ -82,7 +88,9 @@ impl ManageRolePanelsUseCase for ManageRolePanelsService {
     }
 
     async fn set_message_id(&self, cmd: SetMessageIdCommand) -> Result<(), DomainError> {
-        self.repo.update_message_id(&cmd.panel_id, &cmd.message_id).await
+        self.repo
+            .update_message_id(&cmd.panel_id, &cmd.message_id)
+            .await
     }
 
     async fn delete_panel(&self, panel_id: &str) -> Result<(), DomainError> {

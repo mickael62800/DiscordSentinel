@@ -1,13 +1,13 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgAuditLogRepository {
     pool: PgPool,
@@ -123,10 +123,7 @@ impl AuditLogRepository for PgAuditLogRepository {
 
         q = q.bind(filters.limit).bind(filters.offset);
 
-        let rows = q
-            .fetch_all(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        let rows = q.fetch_all(&self.pool).await.map_err(pg_err)?;
 
         Ok(rows.into_iter().map(AuditLog::from).collect())
     }

@@ -49,8 +49,7 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
             .unwrap_or(30)
     };
     let until = chrono::Utc::now() + chrono::Duration::seconds(mute_secs);
-    let edit = serenity::builder::EditMember::new()
-        .disable_communication_until(until.to_rfc3339());
+    let edit = serenity::builder::EditMember::new().disable_communication_until(until.to_rfc3339());
     match guild_id.edit_member(&ctx.http, user_id, edit).await {
         Ok(_) => info!(user = %user_id, mute_secs, "Anti-flood: mute"),
         Err(why) => error!(error = %why, "Erreur mute anti-flood"),

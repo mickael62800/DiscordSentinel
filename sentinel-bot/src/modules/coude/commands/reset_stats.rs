@@ -3,12 +3,11 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
-
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("reset-stats")
@@ -16,10 +15,14 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -51,16 +54,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     if player.coins < config.reset_stats_cost() {
-        reply_ephemeral(ctx, command, &format!(
-            "Le reset coute **{} coins**. Tu n'as que {} coins.", config.reset_stats_cost(), player.coins
-        )).await;
+        reply_ephemeral(
+            ctx,
+            command,
+            &format!(
+                "Le reset coute **{} coins**. Tu n'as que {} coins.",
+                config.reset_stats_cost(),
+                player.coins
+            ),
+        )
+        .await;
         return;
     }
 
     // Reset atomique cote API : deduit le cout, remet ATK/DEF a 0,
     // et restitue les points dans stat_points en une seule UPDATE.
     if let Err(e) = api
-        .reset_stats(&guild_id, &command.user.id.to_string(), config.reset_stats_cost())
+        .reset_stats(
+            &guild_id,
+            &command.user.id.to_string(),
+            config.reset_stats_cost(),
+        )
         .await
     {
         reply_api_err(ctx, command, e).await;
@@ -88,11 +102,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             **{} points** ont ete recuperes.\n\
             Utilise `/train atk` ou `/train def` pour les reassigner.\n\n\
             Stats de base ({} {}) : ATK {} | DEF {}",
-            command.user.id, config.reset_stats_cost(), total_points_spent,
-            class.emoji, class.name, class.base_atk, class.base_def
+            command.user.id,
+            config.reset_stats_cost(),
+            total_points_spent,
+            class.emoji,
+            class.name,
+            class.base_atk,
+            class.base_def
         ))
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     command
@@ -105,4 +126,3 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .await
         .ok();
 }
-

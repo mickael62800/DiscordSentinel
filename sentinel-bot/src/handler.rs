@@ -4,7 +4,9 @@ use std::panic::AssertUnwindSafe;
 
 use futures_util::FutureExt;
 use serenity::async_trait;
-use serenity::model::application::{CommandData, CommandDataOption, CommandDataOptionValue, Interaction};
+use serenity::model::application::{
+    CommandData, CommandDataOption, CommandDataOptionValue, Interaction,
+};
 use serenity::model::channel::{GuildChannel, Message};
 use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
@@ -35,10 +37,11 @@ fn command_module(name: &str) -> &'static str {
         "rotation" => "rotation",
         "security" => "security",
         "automod" => "automod",
-        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-        | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
-        | "modstats" | "evidence" | "review" | "template" | "transcript"
-        | "export" | "massmute" | "massban" => "moderation",
+        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history" | "note" | "call"
+        | "signalement" | "context" | "appeal" | "expirations" | "compare" | "modstats"
+        | "evidence" | "review" | "template" | "transcript" | "export" | "massmute" | "massban" => {
+            "moderation"
+        }
         "ticket" => "tickets",
         "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
@@ -85,11 +88,8 @@ impl EventHandler for Handler {
         // une commande d'un module desactive.
         // On vide aussi les commandes globales heritees (set vide) car elles
         // sont visibles partout meme apres bascule per-guild.
-        let _ = serenity::model::application::Command::set_global_commands(
-            &ctx.http,
-            Vec::new(),
-        )
-        .await;
+        let _ =
+            serenity::model::application::Command::set_global_commands(&ctx.http, Vec::new()).await;
         let guild_ids: Vec<_> = ready.guilds.iter().map(|g| g.id).collect();
         crate::command_registry::refresh_all_guilds(&ctx, &guild_ids).await;
 
@@ -251,7 +251,8 @@ impl EventHandler for Handler {
         let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
         if let Some(api) = api {
             let path = format!("/api/members/{guild_id}/{user_id}/rejoin");
-            api.post_fire_and_forget(&path, &serde_json::json!({})).await;
+            api.post_fire_and_forget(&path, &serde_json::json!({}))
+                .await;
         }
     }
 
@@ -273,7 +274,8 @@ impl EventHandler for Handler {
         let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
         if let Some(api) = api {
             let path = format!("/api/members/{g}/{u}/leave");
-            api.post_fire_and_forget(&path, &serde_json::json!({})).await;
+            api.post_fire_and_forget(&path, &serde_json::json!({}))
+                .await;
         }
     }
 
@@ -312,22 +314,12 @@ impl EventHandler for Handler {
         modules::audit::on_channel_delete(&ctx, &channel, messages).await;
     }
 
-    async fn guild_ban_addition(
-        &self,
-        ctx: Context,
-        guild_id: GuildId,
-        banned_user: User,
-    ) {
+    async fn guild_ban_addition(&self, ctx: Context, guild_id: GuildId, banned_user: User) {
         modules::audit::on_ban_add(&ctx, guild_id, &banned_user).await;
         modules::security::on_ban_add(&ctx, guild_id, &banned_user).await;
     }
 
-    async fn guild_ban_removal(
-        &self,
-        ctx: Context,
-        guild_id: GuildId,
-        unbanned_user: User,
-    ) {
+    async fn guild_ban_removal(&self, ctx: Context, guild_id: GuildId, unbanned_user: User) {
         modules::audit::on_ban_remove(&ctx, guild_id, &unbanned_user).await;
         modules::security::on_ban_remove(&ctx, guild_id, &unbanned_user).await;
     }
@@ -374,7 +366,12 @@ impl EventHandler for Handler {
                 let member_count = guild.member_count as i32;
                 let owner_id = guild.owner_id.to_string();
                 if let Err(e) = api
-                    .register_guild(&guild.id.to_string(), &guild.name, member_count, Some(&owner_id))
+                    .register_guild(
+                        &guild.id.to_string(),
+                        &guild.name,
+                        member_count,
+                        Some(&owner_id),
+                    )
                     .await
                 {
                     tracing::warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
@@ -472,32 +469,42 @@ impl EventHandler for Handler {
                 let log_telemetry = name != "confess";
 
                 if let Some(ref api) = api {
-                  if log_telemetry {
-                    api.send_bot_log_with_details(
-                        "info",
-                        &format!("Commande invoquée : {full_cmd} (par @{user_name})"),
-                        serde_json::json!({
-                            "event_type": "command.invoked",
-                            "command": full_cmd,
-                            "module": module,
-                            "user_id": user_id,
-                            "user_name": user_name,
-                            "guild_id": guild_id,
-                        }),
-                    );
-                  }
+                    if log_telemetry {
+                        api.send_bot_log_with_details(
+                            "info",
+                            &format!("Commande invoquée : {full_cmd} (par @{user_name})"),
+                            serde_json::json!({
+                                "event_type": "command.invoked",
+                                "command": full_cmd,
+                                "module": module,
+                                "user_id": user_id,
+                                "user_name": user_name,
+                                "guild_id": guild_id,
+                            }),
+                        );
+                    }
                 }
 
                 let start = std::time::Instant::now();
 
                 let dispatch = AssertUnwindSafe(async {
                     match name {
-                        "purge" | "cleanup" => modules::cleanup::handle_command(&ctx, &command).await,
-                        "game" | "game-admin" => modules::games::handle_command(&ctx, &command).await,
-                        "roles-panel" | "parrain" => modules::community::handle_command(&ctx, &command).await,
+                        "purge" | "cleanup" => {
+                            modules::cleanup::handle_command(&ctx, &command).await
+                        }
+                        "game" | "game-admin" => {
+                            modules::games::handle_command(&ctx, &command).await
+                        }
+                        "roles-panel" | "parrain" => {
+                            modules::community::handle_command(&ctx, &command).await
+                        }
                         "audit" => modules::audit::handle_command(&ctx, &command).await,
-                        "level" | "stats" | "progression-resync" => modules::progression::handle_command(&ctx, &command).await,
-                        "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
+                        "level" | "stats" | "progression-resync" => {
+                            modules::progression::handle_command(&ctx, &command).await
+                        }
+                        "blackjack-setup" => {
+                            modules::blackjack::handle_command(&ctx, &command).await
+                        }
                         "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
                         "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
                         "tama-setup" => modules::tamagotchi::handle_command(&ctx, &command).await,
@@ -505,13 +512,15 @@ impl EventHandler for Handler {
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-                        | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
-                        | "modstats" | "evidence" | "review" | "template" | "transcript"
-                        | "export" | "massmute" | "massban" => {
+                        | "note" | "call" | "signalement" | "context" | "appeal"
+                        | "expirations" | "compare" | "modstats" | "evidence" | "review"
+                        | "template" | "transcript" | "export" | "massmute" | "massban" => {
                             modules::moderation::handle_command(&ctx, &command).await
                         }
                         "ticket" => modules::tickets::handle_command(&ctx, &command).await,
-                        "confess" | "confess-admin" => modules::confessions::handle_command(&ctx, &command).await,
+                        "confess" | "confess-admin" => {
+                            modules::confessions::handle_command(&ctx, &command).await
+                        }
                         _ if modules::coude::handles_command(name) => {
                             modules::coude::handle_command(&ctx, &command).await
                         }
@@ -525,35 +534,35 @@ impl EventHandler for Handler {
 
                 if let Some(ref api) = api {
                     if log_telemetry {
-                    match dispatch {
-                        Ok(()) => api.send_bot_log_with_details(
-                            "info",
-                            &format!("Commande OK : {full_cmd} ({elapsed_ms} ms)"),
-                            serde_json::json!({
-                                "event_type": "command.success",
-                                "command": full_cmd,
-                                "module": module,
-                                "user_id": user_id,
-                                "user_name": user_name,
-                                "guild_id": guild_id,
-                                "elapsed_ms": elapsed_ms,
-                            }),
-                        ),
-                        Err(_) => api.send_bot_log_with_details(
-                            "error",
-                            &format!("Commande PANIC : {full_cmd}"),
-                            serde_json::json!({
-                                "event_type": "command.error",
-                                "command": full_cmd,
-                                "module": module,
-                                "user_id": user_id,
-                                "user_name": user_name,
-                                "guild_id": guild_id,
-                                "elapsed_ms": elapsed_ms,
-                                "kind": "panic",
-                            }),
-                        ),
-                    }
+                        match dispatch {
+                            Ok(()) => api.send_bot_log_with_details(
+                                "info",
+                                &format!("Commande OK : {full_cmd} ({elapsed_ms} ms)"),
+                                serde_json::json!({
+                                    "event_type": "command.success",
+                                    "command": full_cmd,
+                                    "module": module,
+                                    "user_id": user_id,
+                                    "user_name": user_name,
+                                    "guild_id": guild_id,
+                                    "elapsed_ms": elapsed_ms,
+                                }),
+                            ),
+                            Err(_) => api.send_bot_log_with_details(
+                                "error",
+                                &format!("Commande PANIC : {full_cmd}"),
+                                serde_json::json!({
+                                    "event_type": "command.error",
+                                    "command": full_cmd,
+                                    "module": module,
+                                    "user_id": user_id,
+                                    "user_name": user_name,
+                                    "guild_id": guild_id,
+                                    "elapsed_ms": elapsed_ms,
+                                    "kind": "panic",
+                                }),
+                            ),
+                        }
                     }
                 }
             }

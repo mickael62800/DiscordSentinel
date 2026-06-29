@@ -1,9 +1,9 @@
 use super::*;
+use chrono::Utc;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::entities::audit::user_stats::VoiceSessionStats;
-use chrono::Utc;
 use uuid::Uuid;
 
 fn user_stats(voice_seconds: u64) -> UserStats {
@@ -139,7 +139,10 @@ fn guild_overview_dto_aggregates() {
 #[test]
 fn record_messages_dto_to_command() {
     let dto = RecordMessagesDto {
-        guild_id: "g".into(), user_id: "u".into(), username: "alice".into(), count: 42,
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
+        count: 42,
     };
     let cmd: RecordMessagesCommand = dto.into();
     assert_eq!(cmd.count, 42);

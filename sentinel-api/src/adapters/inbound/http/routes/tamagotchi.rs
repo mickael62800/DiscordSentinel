@@ -12,8 +12,14 @@ fn inner() -> Router<AppState> {
         .route("/tick", post(handlers::tamagotchi::pets::tick_all))
         // Admin web : liste des compagnons de la guild + suppression.
         // (Toutes les interactions du bot passent par le TamagotchiService gRPC.)
-        .route("/{guild_id}/pets", get(handlers::tamagotchi::pets::list_pets))
-        .route("/{guild_id}/pets/{pet_id}", delete(handlers::tamagotchi::pets::delete_pet))
+        .route(
+            "/{guild_id}/pets",
+            get(handlers::tamagotchi::pets::list_pets),
+        )
+        .route(
+            "/{guild_id}/pets/{pet_id}",
+            delete(handlers::tamagotchi::pets::delete_pet),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

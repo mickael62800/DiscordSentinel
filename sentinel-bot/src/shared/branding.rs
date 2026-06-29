@@ -23,7 +23,9 @@ mod tests {
     fn all_taglines_non_empty() {
         for t in [
             COUDE_TAGLINE_SHORT,
-            BLACKJACK_TAGLINE, SLOT_TAGLINE, WHEEL_TAGLINE,
+            BLACKJACK_TAGLINE,
+            SLOT_TAGLINE,
+            WHEEL_TAGLINE,
         ] {
             assert!(!t.is_empty());
         }
@@ -33,7 +35,9 @@ mod tests {
     fn taglines_distinct() {
         let all = [
             COUDE_TAGLINE_SHORT,
-            BLACKJACK_TAGLINE, SLOT_TAGLINE, WHEEL_TAGLINE,
+            BLACKJACK_TAGLINE,
+            SLOT_TAGLINE,
+            WHEEL_TAGLINE,
         ];
         for i in 0..all.len() {
             for j in (i + 1)..all.len() {

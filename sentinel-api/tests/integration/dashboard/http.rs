@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
+use sentinel_api::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
-use sentinel_api::ports::outbound::system::log_repository::LogRepository;
 // ══════════════════════════════════════════════════════════
 // Mocks
 // ══════════════════════════════════════════════════════════
@@ -32,8 +32,13 @@ struct MockLogRepo {
 }
 
 impl MockLogRepo {
-    fn new() -> Self { Self::default() }
-    fn with(self, e: LogEntry) -> Self { self.entries.lock().unwrap().push(e); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with(self, e: LogEntry) -> Self {
+        self.entries.lock().unwrap().push(e);
+        self
+    }
 }
 
 #[async_trait]
@@ -46,13 +51,18 @@ impl LogRepository for MockLogRepo {
         Ok(self.entries.lock().unwrap().clone())
     }
     async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError> {
-        self.deleted_by_category.lock().unwrap().push(category.into());
+        self.deleted_by_category
+            .lock()
+            .unwrap()
+            .push(category.into());
         let mut e = self.entries.lock().unwrap();
         let before = e.len();
         e.retain(|x| x.category != category);
         Ok((before - e.len()) as u64)
     }
-    async fn delete_older_than_days(&self, _: i32) -> Result<u64, DomainError> { Ok(0) }
+    async fn delete_older_than_days(&self, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[derive(Default)]
@@ -61,8 +71,13 @@ struct MockGuildRepo {
 }
 
 impl MockGuildRepo {
-    fn new() -> Self { Self::default() }
-    fn with(self, g: Guild) -> Self { self.guilds.lock().unwrap().push(g); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with(self, g: Guild) -> Self {
+        self.guilds.lock().unwrap().push(g);
+        self
+    }
 }
 
 #[async_trait]
@@ -77,7 +92,13 @@ impl GuildRepository for MockGuildRepo {
         Ok(self.guilds.lock().unwrap().clone())
     }
     async fn find_by_id(&self, id: &str) -> Result<Option<Guild>, DomainError> {
-        Ok(self.guilds.lock().unwrap().iter().find(|g| g.guild_id == id).cloned())
+        Ok(self
+            .guilds
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|g| g.guild_id == id)
+            .cloned())
     }
     async fn delete(&self, id: &str) -> Result<(), DomainError> {
         self.guilds.lock().unwrap().retain(|g| g.guild_id != id);
@@ -119,29 +140,53 @@ fn sample_guild(id: &str) -> Guild {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -150,7 +195,9 @@ async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value)
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_logs_empty() {
-    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(MockLogRepo::new())));
+    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(
+        MockLogRepo::new(),
+    )));
     let (status, json) = get(app, "/api/logs").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 0);
@@ -204,10 +251,12 @@ async fn create_log_infers_category_worker_from_bot_name() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_logs_by_category_removes_matching() {
-    let repo = Arc::new(MockLogRepo::new()
-        .with(sample_log("bot", "g"))
-        .with(sample_log("bot", "g"))
-        .with(sample_log("worker", "g")));
+    let repo = Arc::new(
+        MockLogRepo::new()
+            .with(sample_log("bot", "g"))
+            .with(sample_log("bot", "g"))
+            .with(sample_log("worker", "g")),
+    );
     let app = router::build_for_test(test_helpers::build_test_state_logs(repo.clone()));
     let (status, json) = delete(app, "/api/logs/bot").await;
     assert_eq!(status, StatusCode::OK);
@@ -217,7 +266,9 @@ async fn delete_logs_by_category_removes_matching() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_logs_category_discord_forbidden() {
-    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(MockLogRepo::new())));
+    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(
+        MockLogRepo::new(),
+    )));
     let (status, _) = delete(app, "/api/logs/discord").await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
@@ -272,7 +323,9 @@ async fn register_guild_member_count_defaults_to_zero() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bot_heartbeat_returns_204() {
     // Redis sur compose test : SET + SADD s'executent reellement.
-    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(MockLogRepo::new())));
+    let app = router::build_for_test(test_helpers::build_test_state_logs(Arc::new(
+        MockLogRepo::new(),
+    )));
     let body = serde_json::json!({"name": "automod-bot"});
     let (status, _) = post_json(app, "/api/bots/heartbeat", body).await;
     assert_eq!(status, StatusCode::NO_CONTENT);
@@ -304,8 +357,14 @@ async fn register_guild_with_owner_id_triggers_rbac_insert() {
     // direct sqlx dans api_user_guilds (ON CONFLICT DO NOTHING).
     let repo = Arc::new(MockGuildRepo::new());
     let app = router::build_for_test(test_helpers::build_test_state_guilds(repo.clone()));
-    let guild_id = format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let owner_id = format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let owner_id = format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let body = serde_json::json!({
         "guild_id": guild_id, "name": "Owned", "owner_id": owner_id
     });

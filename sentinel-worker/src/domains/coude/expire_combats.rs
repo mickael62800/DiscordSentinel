@@ -9,16 +9,19 @@ use sqlx::PgPool;
 use tonic::Request;
 use tracing::{error, info, warn};
 
+use crate::common::grpc;
 use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
 use sentinel_proto::coude::v1::Empty as ProtoEmpty;
-use crate::common::grpc;
 
 pub async fn run(_pool: &PgPool) -> Result<(), String> {
     let channel = grpc::connect().await?;
     let interceptor = grpc::bearer_interceptor()?;
     let mut client = CoudeCombatsServiceClient::with_interceptor(channel, interceptor);
 
-    match client.expire_combats_batch(Request::new(ProtoEmpty {})).await {
+    match client
+        .expire_combats_batch(Request::new(ProtoEmpty {}))
+        .await
+    {
         Ok(resp) => {
             let combats = resp.into_inner().combats;
             if !combats.is_empty() {

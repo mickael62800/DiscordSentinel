@@ -1,12 +1,12 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// DTO de la requête reçue depuis le bot automod.
 #[derive(Debug, Deserialize)]
@@ -64,10 +64,12 @@ impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
         let context_messages = dto
             .context_messages
             .into_iter()
-            .map(|m| crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
-                username: m.username,
-                content: m.content,
-            })
+            .map(
+                |m| crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
+                    username: m.username,
+                    content: m.content,
+                },
+            )
             .collect();
 
         Self {

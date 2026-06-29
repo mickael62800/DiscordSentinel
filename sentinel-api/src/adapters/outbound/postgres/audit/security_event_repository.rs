@@ -1,11 +1,11 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 
 pub struct PgSecurityEventRepository {
     pool: PgPool,

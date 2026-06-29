@@ -19,8 +19,8 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::coude::taunt::TauntEvent;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 /// Sortie retournee pour chaque combat resolu.
 /// Le worker l'utilise pour poster le resultat sur Discord (edit message ou

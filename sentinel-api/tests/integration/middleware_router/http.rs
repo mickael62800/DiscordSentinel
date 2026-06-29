@@ -69,8 +69,13 @@ async fn auth_rejects_missing_bearer_when_api_key_set() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn auth_rejects_wrong_bearer() {
     let app = router::build_for_test(with_api_key("correct-key"));
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[("authorization", "Bearer wrong-key")]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[("authorization", "Bearer wrong-key")],
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
@@ -78,8 +83,13 @@ async fn auth_rejects_wrong_bearer() {
 async fn auth_accepts_correct_bearer() {
     let key = "correct-key-1234567890";
     let app = router::build_for_test(with_api_key(key));
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[("authorization", &format!("Bearer {key}"))]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[("authorization", &format!("Bearer {key}"))],
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -87,8 +97,13 @@ async fn auth_accepts_correct_bearer() {
 async fn auth_rejects_malformed_authorization() {
     let app = router::build_for_test(with_api_key("key"));
     // Pas "Bearer " prefix → 401
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[("authorization", "Basic dXNlcjpwYXNz")]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[("authorization", "Basic dXNlcjpwYXNz")],
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
@@ -159,8 +174,13 @@ async fn wrong_method_on_existing_route_returns_method_not_allowed_or_404() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn auth_rejects_bearer_without_space() {
     let app = router::build_for_test(with_api_key("k"));
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[("authorization", "Bearer")]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[("authorization", "Bearer")],
+    )
+    .await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
 }
 
@@ -168,8 +188,13 @@ async fn auth_rejects_bearer_without_space() {
 async fn auth_accepts_key_short_but_matching() {
     // API key short mais egale a ce qui est configure → passe quand meme
     let app = router::build_for_test(with_api_key("abc"));
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[("authorization", "Bearer abc")]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[("authorization", "Bearer abc")],
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -194,7 +219,12 @@ async fn auth_header_case_insensitive() {
     let key = "mykey";
     let app = router::build_for_test(with_api_key(key));
     // Axum lower-case les headers, "Authorization" vs "authorization" equivalent
-    let (status, _) = do_req(app, "GET", "/api/cache/stats",
-        &[(header::AUTHORIZATION.as_str(), &format!("Bearer {key}"))]).await;
+    let (status, _) = do_req(
+        app,
+        "GET",
+        "/api/cache/stats",
+        &[(header::AUTHORIZATION.as_str(), &format!("Bearer {key}"))],
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }

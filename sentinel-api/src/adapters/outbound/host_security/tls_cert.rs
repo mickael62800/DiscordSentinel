@@ -50,7 +50,14 @@ fn fetch_cert_via_openssl(domain: &str) -> Result<String, String> {
     use std::process::Stdio;
 
     let mut child = Command::new("openssl")
-        .args(["s_client", "-connect", "web:443", "-servername", domain, "-showcerts"])
+        .args([
+            "s_client",
+            "-connect",
+            "web:443",
+            "-servername",
+            domain,
+            "-showcerts",
+        ])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

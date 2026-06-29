@@ -3,11 +3,11 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::catalog::CatalogCacheKey;
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("train")
@@ -21,14 +21,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -47,7 +56,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "attaque" => "atk",
         "defense" => "def",
         _ => {
-            reply_ephemeral(ctx, command, "Choix invalide. Utilise `attaque` ou `defense`.").await;
+            reply_ephemeral(
+                ctx,
+                command,
+                "Choix invalide. Utilise `attaque` ou `defense`.",
+            )
+            .await;
             return;
         }
     };
@@ -98,7 +112,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let hp = catalog.display_hp(effective_def);
 
     let stat_label = if db_stat == "atk" { "ATK" } else { "DEF" };
-    let stat_emoji = if db_stat == "atk" { "\u{2694}\u{fe0f}" } else { "\u{1f6e1}\u{fe0f}" };
+    let stat_emoji = if db_stat == "atk" {
+        "\u{2694}\u{fe0f}"
+    } else {
+        "\u{1f6e1}\u{fe0f}"
+    };
 
     let embed = CreateEmbed::new()
         .title(format!("{} Entrainement : {} +1 !", stat_emoji, stat_label))
@@ -117,6 +135,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
-    crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+    crate::modules::coude::channel_check::post_activity(
+        ctx,
+        command,
+        config.channel_activites(),
+        embed,
+    )
+    .await;
 }
-

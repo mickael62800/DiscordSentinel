@@ -22,8 +22,8 @@ use chrono::Utc;
 use rand::Rng;
 use tracing::info;
 
-use crate::domain::entities::coude::heist::compute_success_chance;
 use crate::domain::entities::coude::balance::BalanceParams;
+use crate::domain::entities::coude::heist::compute_success_chance;
 use crate::domain::entities::coude::heist::HeistOutcome;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MAX_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MIN_PERCENT;
@@ -33,11 +33,11 @@ use crate::ports::inbound::coude::manage_heist::HeistCooldownStatus;
 use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
 use crate::ports::inbound::coude::manage_heist::PrisonStatusInfo;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::coude::heist_repository::HeistRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeHeistService {
     heist_repo: Arc<dyn HeistRepository>,
     cashbox_repo: Arc<dyn CashboxRepository>,
@@ -81,9 +81,16 @@ impl ManageCoudeHeistService {
         user_id: &str,
         base_cooldown_days: i64,
     ) -> i64 {
-        let Some(repo) = &self.player_repo else { return base_cooldown_days; };
-        let Ok(Some(player)) = repo.get(guild_id, user_id).await else { return base_cooldown_days; };
-        crate::domain::entities::coude::season_theme::apply_season_braquage_cooldown(player.season, base_cooldown_days)
+        let Some(repo) = &self.player_repo else {
+            return base_cooldown_days;
+        };
+        let Ok(Some(player)) = repo.get(guild_id, user_id).await else {
+            return base_cooldown_days;
+        };
+        crate::domain::entities::coude::season_theme::apply_season_braquage_cooldown(
+            player.season,
+            base_cooldown_days,
+        )
     }
 
     async fn load_balance(&self, guild_id: &str) -> BalanceParams {
@@ -165,11 +172,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
         let cooldown = self.get_cooldown_status(guild_id, user_id).await?;
         if !cooldown.ready {
             let effective_days = self
-                .effective_cooldown_days(
-                    guild_id,
-                    user_id,
-                    params_early.heist_cooldown_days as i64,
-                )
+                .effective_cooldown_days(guild_id, user_id, params_early.heist_cooldown_days as i64)
                 .await;
             return Err(DomainError::Forbidden(format!(
                 "Cooldown {} jours non ecoule.",
@@ -189,10 +192,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
 
         // 4. Lister les outils de braquage actifs dans l'inventaire.
         //    Chaque tool key present (quantity > 0) compte une fois.
-        let inventory = self
-            .inventory_uc
-            .list_inventory(guild_id, user_id)
-            .await?;
+        let inventory = self.inventory_uc.list_inventory(guild_id, user_id).await?;
         let tool_keys: Vec<String> = inventory
             .iter()
             .filter(|i| i.quantity > 0)
@@ -261,9 +261,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             // puis on re-deposit la difference. C'est atomique cote DB
             // mais moche. Alternative propre : ajouter une methode
             // withdraw au CashboxRepository. Faisons-le.
-            self.cashbox_repo
-                .withdraw(guild_id, amount_stolen)
-                .await?;
+            self.cashbox_repo.withdraw(guild_id, amount_stolen).await?;
 
             // Credit le wallet du joueur
             self.wallet_repo

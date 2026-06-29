@@ -1,20 +1,31 @@
 use super::*;
 
 #[test]
-fn csv_escape_simple() { assert_eq!(csv_escape("hello"), "hello"); }
+fn csv_escape_simple() {
+    assert_eq!(csv_escape("hello"), "hello");
+}
 
 #[test]
-fn csv_escape_comma() { assert_eq!(csv_escape("a,b"), "\"a,b\""); }
+fn csv_escape_comma() {
+    assert_eq!(csv_escape("a,b"), "\"a,b\"");
+}
 
 #[test]
-fn csv_escape_quote() { assert_eq!(csv_escape("a\"b"), "\"a\"\"b\""); }
+fn csv_escape_quote() {
+    assert_eq!(csv_escape("a\"b"), "\"a\"\"b\"");
+}
 
 #[test]
-fn csv_escape_newline() { assert_eq!(csv_escape("a\nb"), "\"a\nb\""); }
+fn csv_escape_newline() {
+    assert_eq!(csv_escape("a\nb"), "\"a\nb\"");
+}
 
 #[test]
 fn to_csv_basic() {
-    let rows = vec![("1".to_string(), "hello".to_string()), ("2".to_string(), "a,b".to_string())];
+    let rows = vec![
+        ("1".to_string(), "hello".to_string()),
+        ("2".to_string(), "a,b".to_string()),
+    ];
     let csv = to_csv(&rows, &["id", "val"], |r| vec![r.0.clone(), r.1.clone()]);
     assert_eq!(csv, "id,val\n1,hello\n2,\"a,b\"\n");
 }
@@ -97,9 +108,14 @@ async fn execute_rejects_unknown_job_type() {
     // Pool inutile pour cette branche : ValidationError se leve avant la requete.
     // On construit un pool bidon avec lazy_connect qui ne touche pas la DB.
     let options = sqlx::postgres::PgPoolOptions::new().max_connections(1);
-    let pool = options.connect_lazy("postgres://none@localhost/none").unwrap();
+    let pool = options
+        .connect_lazy("postgres://none@localhost/none")
+        .unwrap();
     let svc = ExportService::new(pool);
-    let err = svc.execute("g", "unknown_type", "csv", 100).await.unwrap_err();
+    let err = svc
+        .execute("g", "unknown_type", "csv", 100)
+        .await
+        .unwrap_err();
     match err {
         DomainError::ValidationError(m) => assert!(m.contains("job_type inconnu")),
         other => panic!("Expected ValidationError, got {:?}", other),

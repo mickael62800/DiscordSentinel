@@ -1,10 +1,10 @@
-use std::path::Path;
-use std::sync::Mutex;
-use std::sync::RwLock;
 use ndarray::Array2;
 use ndarray::Array4;
 use ort::session::Session;
 use ort::value::Value;
+use std::path::Path;
+use std::sync::Mutex;
+use std::sync::RwLock;
 use tracing::info;
 use tracing::warn;
 
@@ -28,7 +28,9 @@ impl InferenceService {
         }
         let result = (|| -> Result<Session, Box<dyn std::error::Error>> {
             let builder = Session::builder()?;
-            let mut builder = builder.with_intra_threads(4).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+            let mut builder = builder
+                .with_intra_threads(4)
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             let session = builder.commit_from_file(path)?;
             Ok(session)
         })();
@@ -66,7 +68,10 @@ impl InferenceService {
                 }
                 let session = Self::load_session(&path, "text");
                 let loaded = session.is_some();
-                *self.text_session.write().map_err(|e| format!("Lock error: {e}"))? = session;
+                *self
+                    .text_session
+                    .write()
+                    .map_err(|e| format!("Lock error: {e}"))? = session;
                 if loaded {
                     Ok(format!("Modele text recharge depuis {}", path))
                 } else {
@@ -80,7 +85,10 @@ impl InferenceService {
                 }
                 let session = Self::load_session(&path, "vision");
                 let loaded = session.is_some();
-                *self.vision_session.write().map_err(|e| format!("Lock error: {e}"))? = session;
+                *self
+                    .vision_session
+                    .write()
+                    .map_err(|e| format!("Lock error: {e}"))? = session;
                 if loaded {
                     Ok(format!("Modele vision recharge depuis {}", path))
                 } else {
@@ -92,36 +100,59 @@ impl InferenceService {
     }
 
     pub fn vision_available(&self) -> bool {
-        self.vision_session.read().map(|s| s.is_some()).unwrap_or(false)
+        self.vision_session
+            .read()
+            .map(|s| s.is_some())
+            .unwrap_or(false)
     }
 
     pub fn text_available(&self) -> bool {
-        self.text_session.read().map(|s| s.is_some()).unwrap_or(false)
+        self.text_session
+            .read()
+            .map(|s| s.is_some())
+            .unwrap_or(false)
     }
 }
 
 impl InferenceServicePort for InferenceService {
-    fn vision_available(&self) -> bool { InferenceService::vision_available(self) }
-    fn text_available(&self) -> bool { InferenceService::text_available(self) }
+    fn vision_available(&self) -> bool {
+        InferenceService::vision_available(self)
+    }
+    fn text_available(&self) -> bool {
+        InferenceService::text_available(self)
+    }
     fn classify_image(&self, t: Array4<f32>) -> Result<Vec<InferenceClassification>, String> {
         InferenceService::classify_image(self, t)
     }
-    fn classify_text(&self, ids: Array2<i64>, mask: Array2<i64>) -> Result<Vec<InferenceClassification>, String> {
+    fn classify_text(
+        &self,
+        ids: Array2<i64>,
+        mask: Array2<i64>,
+    ) -> Result<Vec<InferenceClassification>, String> {
         InferenceService::classify_text(self, ids, mask)
     }
 }
 
 impl InferenceService {
     /// Inference vision : prend une image preprocessee (1, 3, 224, 224) normalisee.
-    pub fn classify_image(&self, image_tensor: Array4<f32>) -> Result<Vec<InferenceClassification>, String> {
-        let guard = self.vision_session.read().map_err(|e| format!("RwLock error: {e}"))?;
+    pub fn classify_image(
+        &self,
+        image_tensor: Array4<f32>,
+    ) -> Result<Vec<InferenceClassification>, String> {
+        let guard = self
+            .vision_session
+            .read()
+            .map_err(|e| format!("RwLock error: {e}"))?;
         let mutex = guard.as_ref().ok_or("Modele vision non charge")?;
-        let mut session = mutex.lock().map_err(|e| format!("Lock session vision: {e}"))?;
+        let mut session = mutex
+            .lock()
+            .map_err(|e| format!("Lock session vision: {e}"))?;
 
-        let input = Value::from_array(image_tensor)
-            .map_err(|e| format!("Erreur creation tensor: {e}"))?;
+        let input =
+            Value::from_array(image_tensor).map_err(|e| format!("Erreur creation tensor: {e}"))?;
 
-        let outputs = session.run(ort::inputs![input])
+        let outputs = session
+            .run(ort::inputs![input])
             .map_err(|e| format!("Erreur inference vision: {e}"))?;
 
         let output_view = outputs[0]
@@ -132,8 +163,13 @@ impl InferenceService {
         let probabilities = softmax(logits);
 
         let labels = ["safe", "nsfw", "illicit"];
-        Ok(labels.iter().zip(probabilities.iter())
-            .map(|(label, &confidence)| InferenceClassification { label: label.to_string(), confidence })
+        Ok(labels
+            .iter()
+            .zip(probabilities.iter())
+            .map(|(label, &confidence)| InferenceClassification {
+                label: label.to_string(),
+                confidence,
+            })
             .collect())
     }
 
@@ -143,16 +179,22 @@ impl InferenceService {
         input_ids: Array2<i64>,
         attention_mask: Array2<i64>,
     ) -> Result<Vec<InferenceClassification>, String> {
-        let guard = self.text_session.read().map_err(|e| format!("RwLock error: {e}"))?;
+        let guard = self
+            .text_session
+            .read()
+            .map_err(|e| format!("RwLock error: {e}"))?;
         let mutex = guard.as_ref().ok_or("Modele text non charge")?;
-        let mut session = mutex.lock().map_err(|e| format!("Lock session text: {e}"))?;
+        let mut session = mutex
+            .lock()
+            .map_err(|e| format!("Lock session text: {e}"))?;
 
         let ids_value = Value::from_array(input_ids)
             .map_err(|e| format!("Erreur creation tensor input_ids: {e}"))?;
         let mask_value = Value::from_array(attention_mask)
             .map_err(|e| format!("Erreur creation tensor attention_mask: {e}"))?;
 
-        let outputs = session.run(ort::inputs![ids_value, mask_value])
+        let outputs = session
+            .run(ort::inputs![ids_value, mask_value])
             .map_err(|e| format!("Erreur inference text: {e}"))?;
 
         let output_view = outputs[0]
@@ -165,8 +207,13 @@ impl InferenceService {
         // Nouveau modele 2 classes (cf. sentinel-ml/text/configs/train_config.yaml).
         // 0 = safe (neutral + anger + harassment leger), 1 = severe (rage + threat).
         let labels = ["safe", "severe"];
-        Ok(labels.iter().zip(probabilities.iter())
-            .map(|(label, &confidence)| InferenceClassification { label: label.to_string(), confidence })
+        Ok(labels
+            .iter()
+            .zip(probabilities.iter())
+            .map(|(label, &confidence)| InferenceClassification {
+                label: label.to_string(),
+                confidence,
+            })
             .collect())
     }
 }
@@ -178,7 +225,6 @@ fn softmax(logits: &[f32]) -> Vec<f32> {
     let sum: f32 = exps.iter().sum();
     exps.into_iter().map(|e| e / sum).collect()
 }
-
 
 #[cfg(test)]
 #[path = "tests/inference_service.rs"]

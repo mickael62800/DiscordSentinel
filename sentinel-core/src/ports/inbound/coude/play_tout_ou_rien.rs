@@ -20,9 +20,9 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 /// Solde minimum requis pour declencher un tout-ou-rien (centralise ici
 /// plutot que cote bot pour cloturer Phase 1 / 12 magic constants).
@@ -52,8 +52,5 @@ pub trait PlayToutOuRienUseCase: Send + Sync {
     /// - `RateLimited` si cooldown weekly encore actif.
     /// - `ValidationError("Solde insuffisant ...")` si `coins < MIN_BALANCE_FOR_PLAY`.
     /// - `Internal` sur erreur DB / wallet.
-    async fn play(
-        &self,
-        cmd: PlayToutOuRienCommand,
-    ) -> Result<ToutOuRienResolution, DomainError>;
+    async fn play(&self, cmd: PlayToutOuRienCommand) -> Result<ToutOuRienResolution, DomainError>;
 }

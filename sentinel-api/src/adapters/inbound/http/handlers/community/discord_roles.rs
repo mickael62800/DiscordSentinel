@@ -1,17 +1,17 @@
-use axum::extract::Path;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Extension;
-use axum::Json;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::middleware::rbac::check_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::system::discord_role::DiscordRole;
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_role::DiscordRole;
+use sentinel_core::domain::enums::system::role::Role;
+use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
     pub id: String,
@@ -63,8 +63,14 @@ pub async fn create_role(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let result = state.discord_api
-        .create_role(&guild_id, &body.name, body.color, body.permissions.as_deref())
+    let result = state
+        .discord_api
+        .create_role(
+            &guild_id,
+            &body.name,
+            body.color,
+            body.permissions.as_deref(),
+        )
         .await?;
     Ok(Json(result))
 }
@@ -75,8 +81,17 @@ pub async fn edit_role(
     Path((guild_id, role_id)): Path<(String, String)>,
     Json(body): Json<EditRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let result = state.discord_api
-        .edit_role(&guild_id, &role_id, body.name.as_deref(), body.color, body.permissions.as_deref(), body.mentionable, body.hoist)
+    let result = state
+        .discord_api
+        .edit_role(
+            &guild_id,
+            &role_id,
+            body.name.as_deref(),
+            body.color,
+            body.permissions.as_deref(),
+            body.mentionable,
+            body.hoist,
+        )
         .await?;
     Ok(Json(result))
 }

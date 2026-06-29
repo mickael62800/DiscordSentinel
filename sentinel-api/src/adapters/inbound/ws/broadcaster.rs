@@ -4,7 +4,9 @@ mod tests;
 
 use tracing::warn;
 
-pub use sentinel_core::ports::outbound::system::event_broadcaster::{EventBroadcaster as EventBroadcasterPort, WsEvent};
+pub use sentinel_core::ports::outbound::system::event_broadcaster::{
+    EventBroadcaster as EventBroadcasterPort, WsEvent,
+};
 
 /// Nom de la stream Redis partagee par tous les producers.
 /// Phase 5B : doit rester synchronise avec `sentinel-bot/src/shared/event_bus.rs` (STREAM_KEY).
@@ -40,7 +42,10 @@ impl EventBroadcaster {
     /// Publie un evenement sur la stream Redis.
     /// Le `guild_id` est extrait automatiquement du payload JSON pour le filtrage server-side.
     pub fn broadcast(&self, event: &str, data: serde_json::Value) {
-        let guild_id = data.get("guild_id").and_then(|v| v.as_str()).map(String::from);
+        let guild_id = data
+            .get("guild_id")
+            .and_then(|v| v.as_str())
+            .map(String::from);
 
         let ws_event = WsEvent {
             event: event.to_string(),

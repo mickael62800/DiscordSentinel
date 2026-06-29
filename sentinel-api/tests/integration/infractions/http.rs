@@ -16,12 +16,12 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_infractions;
 
 // ══════════════════════════════════════════════════════════
@@ -34,7 +34,9 @@ struct MockInfractionsUC {
 }
 
 impl MockInfractionsUC {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
     fn with(self, inf: Infraction) -> Self {
         self.items.lock().unwrap().push(inf);
         self
@@ -43,13 +45,22 @@ impl MockInfractionsUC {
 
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfractionsUC {
-    async fn list_infractions(&self, guild_id: &str, filters: InfractionFilters) -> Result<Vec<Infraction>, DomainError> {
+    async fn list_infractions(
+        &self,
+        guild_id: &str,
+        filters: InfractionFilters,
+    ) -> Result<Vec<Infraction>, DomainError> {
         let all = self.items.lock().unwrap();
         let matching: Vec<Infraction> = all
             .iter()
             .filter(|i| i.guild_id == guild_id)
             .filter(|i| filters.user_id.as_deref().is_none_or(|u| i.user_id == u))
-            .filter(|i| filters.action.as_deref().is_none_or(|a| i.action.as_str() == a))
+            .filter(|i| {
+                filters
+                    .action
+                    .as_deref()
+                    .is_none_or(|a| i.action.as_str() == a)
+            })
             .skip(filters.offset as usize)
             .take(filters.limit as usize)
             .cloned()
@@ -59,19 +70,33 @@ impl ManageInfractionsUseCase for MockInfractionsUC {
     async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> {
         Ok(self.items.lock().unwrap().clone())
     }
-    async fn count_today(&self) -> Result<u64, DomainError> { Ok(0) }
+    async fn count_today(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError> {
-        let uuid = Uuid::parse_str(id).map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
-        Ok(self.items.lock().unwrap().iter().find(|i| i.id == uuid).cloned())
+        let uuid =
+            Uuid::parse_str(id).map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
+        Ok(self
+            .items
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|i| i.id == uuid)
+            .cloned())
     }
     async fn delete_infraction(&self, id: &str) -> Result<bool, DomainError> {
-        let uuid = match Uuid::parse_str(id) { Ok(u) => u, Err(_) => return Ok(false) };
+        let uuid = match Uuid::parse_str(id) {
+            Ok(u) => u,
+            Err(_) => return Ok(false),
+        };
         let mut items = self.items.lock().unwrap();
         let before = items.len();
         items.retain(|i| i.id != uuid);
         Ok(before != items.len())
     }
-    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -83,19 +108,33 @@ fn build_app(uc: MockInfractionsUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn sample_infraction(guild_id: &str, user_id: &str, action: Action) -> Infraction {
@@ -107,7 +146,12 @@ fn sample_infraction(guild_id: &str, user_id: &str, action: Action) -> Infractio
         username: "alice".into(),
         message_id: "666666666666666666".into(),
         content: "bad".into(),
-        flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
         score: 0.8,
         action,
         reason: "reason".into(),

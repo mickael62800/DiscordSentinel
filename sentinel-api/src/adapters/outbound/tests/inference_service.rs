@@ -165,7 +165,10 @@ fn load_session_with_invalid_file_content_fails_gracefully() {
     let path = dir.join("sentinel_invalid.onnx");
     std::fs::write(&path, b"not-a-real-onnx-model").unwrap();
     let service = InferenceService::new(Some(path.to_str().unwrap()), None);
-    assert!(!service.vision_available(), "file invalide doit etre rejete");
+    assert!(
+        !service.vision_available(),
+        "file invalide doit etre rejete"
+    );
     let _ = std::fs::remove_file(&path);
 }
 
@@ -184,20 +187,26 @@ fn load_real_pipeline() -> Option<(InferenceService, TextTokenizer)> {
     }
 }
 
-fn classify(service: &InferenceService, tokenizer: &TextTokenizer, text: &str) -> Vec<InferenceClassification> {
+fn classify(
+    service: &InferenceService,
+    tokenizer: &TextTokenizer,
+    text: &str,
+) -> Vec<InferenceClassification> {
     let (ids, mask) = tokenizer.tokenize(text).unwrap();
     service.classify_text(ids, mask).unwrap()
 }
 
 fn top_label(classifications: &[InferenceClassification]) -> &str {
-    classifications.iter()
+    classifications
+        .iter()
         .max_by(|a, b| a.confidence.partial_cmp(&b.confidence).unwrap())
         .map(|c| c.label.as_str())
         .unwrap_or("unknown")
 }
 
 fn confidence_of(classifications: &[InferenceClassification], label: &str) -> f32 {
-    classifications.iter()
+    classifications
+        .iter()
         .find(|c| c.label == label)
         .map(|c| c.confidence)
         .unwrap_or(0.0)
@@ -207,12 +216,17 @@ fn confidence_of(classifications: &[InferenceClassification], label: &str) -> f3
 #[ignore = "Necessite le fichier ONNX sur le disque"]
 fn real_model_loads_successfully() {
     let service = InferenceService::new(None, Some(ONNX_PATH));
-    assert!(service.text_available(), "Modele ONNX introuvable a {ONNX_PATH}");
+    assert!(
+        service.text_available(),
+        "Modele ONNX introuvable a {ONNX_PATH}"
+    );
 }
 
 #[test]
 fn real_model_returns_5_labels() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let cls = classify(&service, &tokenizer, "bonjour");
     assert_eq!(cls.len(), 5);
     let labels: Vec<&str> = cls.iter().map(|c| c.label.as_str()).collect();
@@ -225,7 +239,9 @@ fn real_model_returns_5_labels() {
 
 #[test]
 fn real_model_probabilities_sum_to_one() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let cls = classify(&service, &tokenizer, "salut comment ca va");
     let sum: f32 = cls.iter().map(|c| c.confidence).sum();
     assert!((sum - 1.0).abs() < 0.01, "Softmax sum = {sum}");
@@ -233,35 +249,61 @@ fn real_model_probabilities_sum_to_one() {
 
 #[test]
 fn real_model_neutral_greeting() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
-    let cls = classify(&service, &tokenizer, "Bonjour tout le monde, comment allez-vous ?");
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
+    let cls = classify(
+        &service,
+        &tokenizer,
+        "Bonjour tout le monde, comment allez-vous ?",
+    );
     assert_eq!(top_label(&cls), "neutral");
 }
 
 #[test]
 fn real_model_neutral_question() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
-    let cls = classify(&service, &tokenizer, "Est-ce que quelqu'un peut m'aider avec ce probleme ?");
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
+    let cls = classify(
+        &service,
+        &tokenizer,
+        "Est-ce que quelqu'un peut m'aider avec ce probleme ?",
+    );
     assert_eq!(top_label(&cls), "neutral");
 }
 
 #[test]
 fn real_model_neutral_thanks() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
-    let cls = classify(&service, &tokenizer, "Merci beaucoup pour votre aide, c'est super gentil");
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
+    let cls = classify(
+        &service,
+        &tokenizer,
+        "Merci beaucoup pour votre aide, c'est super gentil",
+    );
     assert_eq!(top_label(&cls), "neutral");
 }
 
 #[test]
 fn real_model_neutral_casual() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
-    let cls = classify(&service, &tokenizer, "Je joue a Minecraft en ce moment, tu veux rejoindre ?");
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
+    let cls = classify(
+        &service,
+        &tokenizer,
+        "Je joue a Minecraft en ce moment, tu veux rejoindre ?",
+    );
     assert_eq!(top_label(&cls), "neutral");
 }
 
 #[test]
 fn real_model_insult_anger_higher_than_neutral_baseline() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let neutral_cls = classify(&service, &tokenizer, "Bonjour, comment ca va ?");
     let insult_cls = classify(&service, &tokenizer, "ferme ta gueule espece de connard");
     let neutral_anger = confidence_of(&neutral_cls, "anger");
@@ -271,9 +313,15 @@ fn real_model_insult_anger_higher_than_neutral_baseline() {
 
 #[test]
 fn real_model_threat_scores_higher_than_greeting() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let greeting = classify(&service, &tokenizer, "Salut, on joue ensemble ?");
-    let threat = classify(&service, &tokenizer, "je vais te retrouver et te casser la gueule");
+    let threat = classify(
+        &service,
+        &tokenizer,
+        "je vais te retrouver et te casser la gueule",
+    );
     let g_toxic: f32 = 1.0 - confidence_of(&greeting, "neutral");
     let t_toxic: f32 = 1.0 - confidence_of(&threat, "neutral");
     assert!(t_toxic > g_toxic);
@@ -282,9 +330,15 @@ fn real_model_threat_scores_higher_than_greeting() {
 #[test]
 #[ignore = "test de qualite modele ML"]
 fn real_model_rage_scores_higher_than_mild_annoyance() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let mild = classify(&service, &tokenizer, "c'est un peu nul quand meme");
-    let rage = classify(&service, &tokenizer, "JE VAIS TOUS VOUS NIQUER BANDE DE FILS DE PUTE");
+    let rage = classify(
+        &service,
+        &tokenizer,
+        "JE VAIS TOUS VOUS NIQUER BANDE DE FILS DE PUTE",
+    );
     let m_anger = confidence_of(&mild, "anger");
     let r_anger = confidence_of(&rage, "anger");
     assert!(r_anger > m_anger);
@@ -292,9 +346,15 @@ fn real_model_rage_scores_higher_than_mild_annoyance() {
 
 #[test]
 fn real_model_harassment_has_higher_harassment_signal() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let neutral = classify(&service, &tokenizer, "Merci beaucoup pour ton aide");
-    let harass = classify(&service, &tokenizer, "t'es vraiment qu'une merde, tout le monde te deteste ici, degage");
+    let harass = classify(
+        &service,
+        &tokenizer,
+        "t'es vraiment qu'une merde, tout le monde te deteste ici, degage",
+    );
     let n_h = confidence_of(&neutral, "harassment");
     let h_h = confidence_of(&harass, "harassment");
     assert!(h_h > n_h);
@@ -302,7 +362,9 @@ fn real_model_harassment_has_higher_harassment_signal() {
 
 #[test]
 fn real_model_toxicity_gradient() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let mild = classify(&service, &tokenizer, "c'est nul");
     let medium = classify(&service, &tokenizer, "t'es vraiment un idiot");
     let severe = classify(&service, &tokenizer, "je vais te buter sale fils de pute");
@@ -314,7 +376,9 @@ fn real_model_toxicity_gradient() {
 
 #[test]
 fn real_model_mild_frustration_mostly_neutral() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let cls = classify(&service, &tokenizer, "c'est un peu nul quand meme ce jeu");
     let neutral_conf = confidence_of(&cls, "neutral");
     assert!(neutral_conf >= 0.4);
@@ -322,17 +386,27 @@ fn real_model_mild_frustration_mostly_neutral() {
 
 #[test]
 fn real_pipeline_neutral_message_no_flags() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
     let cls = classify(&service, &tokenizer, "Salut, on fait une partie ce soir ?");
-    let result = crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.5);
+    let result =
+        crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.5);
     assert!(result.is_none());
 }
 
 #[test]
 fn real_pipeline_neutral_no_flags_even_low_threshold() {
-    let Some((service, tokenizer)) = load_real_pipeline() else { return };
-    let cls = classify(&service, &tokenizer, "Bonjour tout le monde, bonne journee !");
-    let result = crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.1);
+    let Some((service, tokenizer)) = load_real_pipeline() else {
+        return;
+    };
+    let cls = classify(
+        &service,
+        &tokenizer,
+        "Bonjour tout le monde, bonne journee !",
+    );
+    let result =
+        crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.1);
     if let Some((score, _, _)) = result {
         assert!(score < 5.0);
     }

@@ -8,7 +8,7 @@ pub mod transfer;
 // Re-exports pour les enfants de interactions/ (evite les super::super::)
 pub(super) use super::api_client;
 pub(super) use super::handlers;
-pub(super) use super::{VoiceOwnerMapKey, TextToVoiceMapKey};
+pub(super) use super::{TextToVoiceMapKey, VoiceOwnerMapKey};
 
 use serenity::model::application::ComponentInteraction;
 use serenity::model::application::ModalInteraction;
@@ -49,7 +49,12 @@ pub async fn require_admin(
     let voice_channel_id = match find_voice_from_text(ctx, channel_id).await {
         Some(vc) => vc,
         None => {
-            respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+            respond_ephemeral(
+                ctx,
+                component,
+                "Ce salon n'est pas lie a un salon vocal temporaire.",
+            )
+            .await;
             return None;
         }
     };
@@ -78,7 +83,12 @@ pub async fn require_admin(
     };
 
     if ch.owner_id != user_id.get().to_string() {
-        respond_ephemeral(ctx, component, "Seul le proprietaire du salon peut effectuer cette action.").await;
+        respond_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire du salon peut effectuer cette action.",
+        )
+        .await;
         return None;
     }
 
@@ -86,11 +96,7 @@ pub async fn require_admin(
 }
 
 /// Send an ephemeral response to a component interaction.
-pub async fn respond_ephemeral(
-    ctx: &Context,
-    component: &ComponentInteraction,
-    content: &str,
-) {
+pub async fn respond_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
     use serenity::builder::CreateInteractionResponse;
     use serenity::builder::CreateInteractionResponseMessage;
 
@@ -111,9 +117,8 @@ pub async fn defer_ephemeral(ctx: &Context, component: &ComponentInteraction) {
     use serenity::builder::CreateInteractionResponse;
     use serenity::builder::CreateInteractionResponseMessage;
 
-    let response = CreateInteractionResponse::Defer(
-        CreateInteractionResponseMessage::new().ephemeral(true),
-    );
+    let response =
+        CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true));
 
     if let Err(e) = component.create_response(&ctx.http, response).await {
         warn!(error = %e, "Erreur defer ephemere");
@@ -149,7 +154,12 @@ pub async fn require_admin_deferred(
     let voice_channel_id = match find_voice_from_text(ctx, channel_id).await {
         Some(vc) => vc,
         None => {
-            respond_followup_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+            respond_followup_ephemeral(
+                ctx,
+                component,
+                "Ce salon n'est pas lie a un salon vocal temporaire.",
+            )
+            .await;
             return None;
         }
     };
@@ -158,7 +168,8 @@ pub async fn require_admin_deferred(
         let data = ctx.data.read().await;
         let Some(api) = ApiClient::from_data(&data) else {
             warn!("ApiClient ou GrpcClient manquants dans TypeMap");
-            respond_followup_ephemeral(ctx, component, "Erreur interne (client API indisponible).").await;
+            respond_followup_ephemeral(ctx, component, "Erreur interne (client API indisponible).")
+                .await;
             return None;
         };
         api.get_channel(&voice_channel_id.get().to_string()).await
@@ -167,18 +178,33 @@ pub async fn require_admin_deferred(
     let ch = match channel_resp {
         Ok(Some(ch)) => ch,
         Ok(None) => {
-            respond_followup_ephemeral(ctx, component, "Ce salon vocal n'existe plus dans la base.").await;
+            respond_followup_ephemeral(
+                ctx,
+                component,
+                "Ce salon vocal n'existe plus dans la base.",
+            )
+            .await;
             return None;
         }
         Err(e) => {
             warn!(error = %e, "Erreur API get_channel dans require_admin_deferred");
-            respond_followup_ephemeral(ctx, component, "Erreur lors de la verification des droits.").await;
+            respond_followup_ephemeral(
+                ctx,
+                component,
+                "Erreur lors de la verification des droits.",
+            )
+            .await;
             return None;
         }
     };
 
     if ch.owner_id != user_id.get().to_string() {
-        respond_followup_ephemeral(ctx, component, "Seul le proprietaire du salon peut effectuer cette action.").await;
+        respond_followup_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire du salon peut effectuer cette action.",
+        )
+        .await;
         return None;
     }
 
@@ -186,11 +212,7 @@ pub async fn require_admin_deferred(
 }
 
 /// Send an ephemeral response to a modal interaction.
-pub async fn respond_ephemeral_modal(
-    ctx: &Context,
-    modal: &ModalInteraction,
-    content: &str,
-) {
+pub async fn respond_ephemeral_modal(ctx: &Context, modal: &ModalInteraction, content: &str) {
     use serenity::builder::CreateInteractionResponse;
     use serenity::builder::CreateInteractionResponseMessage;
 

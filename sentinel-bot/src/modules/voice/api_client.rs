@@ -7,9 +7,9 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
+use serde::{Deserialize, Serialize};
 
 use sentinel_proto::moderation::v1 as proto_mod;
 use sentinel_proto::voice::v1 as proto;
@@ -181,19 +181,14 @@ impl ApiClient {
 
     // ── Channels (gRPC) ──
 
-    pub async fn list_channels(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<VoiceChannelResponse>, String> {
+    pub async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannelResponse>, String> {
         let req = proto::ListChannelsRequest {
             guild_id: guild_id.to_string(),
         };
         let g = &self.grpc;
         let mut client = g.voice_channels();
         let list = g
-            .guarded(|| async move {
-                client.list_channels(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_channels(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list.channels.into_iter().map(proto_to_response).collect())
@@ -220,9 +215,7 @@ impl ApiClient {
         let g = &self.grpc;
         let mut client = g.voice_channels();
         let c = g
-            .guarded(|| async move {
-                client.create_channel(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.create_channel(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(proto_to_response(c))
@@ -251,7 +244,9 @@ impl ApiClient {
             queue_enabled: request.queue_enabled,
             name: request.name.clone(),
             status: request.status.clone(),
-            member_limit: request.member_limit.map(|opt| proto::MemberLimitUpdate { value: opt }),
+            member_limit: request
+                .member_limit
+                .map(|opt| proto::MemberLimitUpdate { value: opt }),
             queue_channel_id: request
                 .queue_channel_id
                 .clone()
@@ -281,10 +276,7 @@ impl ApiClient {
     }
 
     /// Retourne le channel + la liste des co-admins (user_ids).
-    pub async fn get_channel_co_admins(
-        &self,
-        channel_id: &str,
-    ) -> Result<Vec<String>, String> {
+    pub async fn get_channel_co_admins(&self, channel_id: &str) -> Result<Vec<String>, String> {
         let req = proto::GetChannelRequest {
             channel_id: channel_id.to_string(),
         };
@@ -354,11 +346,7 @@ impl ApiClient {
     // ── Presets + whitelist (HTTP via BaseApiClient) ──
 
     /// Lit le preset memorise par ce proprietaire (gRPC). `None` si aucun.
-    pub async fn get_preset(
-        &self,
-        guild_id: &str,
-        owner_id: &str,
-    ) -> Option<VoicePresetResponse> {
+    pub async fn get_preset(&self, guild_id: &str, owner_id: &str) -> Option<VoicePresetResponse> {
         let req = proto::GetPresetRequest {
             guild_id: guild_id.to_string(),
             owner_id: owner_id.to_string(),
@@ -477,19 +465,14 @@ impl ApiClient {
 
     // ── Config voice-bot par guild (gRPC) ──
 
-    pub async fn get_voice_config(
-        &self,
-        guild_id: &str,
-    ) -> Result<VoiceConfigResponse, String> {
+    pub async fn get_voice_config(&self, guild_id: &str) -> Result<VoiceConfigResponse, String> {
         let req = proto::GetVoiceConfigRequest {
             guild_id: guild_id.to_string(),
         };
         let g = &self.grpc;
         let mut client = g.voice_channels();
         let cfg = g
-            .guarded(|| async move {
-                client.get_voice_config(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_voice_config(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(VoiceConfigResponse {
@@ -503,25 +486,24 @@ impl ApiClient {
 
     // ── Themes (gRPC) ──
 
-    pub async fn list_themes(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<VoiceThemeResponse>, String> {
+    pub async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceThemeResponse>, String> {
         let req = proto::ListThemesRequest {
             guild_id: guild_id.to_string(),
         };
         let g = &self.grpc;
         let mut client = g.voice_channels();
         let list = g
-            .guarded(|| async move {
-                client.list_themes(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_themes(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(list.themes.into_iter().map(|t| VoiceThemeResponse {
-            name: t.name,
-            member_limit: t.member_limit,
-        }).collect())
+        Ok(list
+            .themes
+            .into_iter()
+            .map(|t| VoiceThemeResponse {
+                name: t.name,
+                member_limit: t.member_limit,
+            })
+            .collect())
     }
 }
 

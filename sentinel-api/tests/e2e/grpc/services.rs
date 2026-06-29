@@ -40,49 +40,21 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::grpc::ai::automod::AutomodGrpc;
 use sentinel_api::adapters::inbound::grpc::ai::images::ImagesGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::members::MembersGrpc;
-use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::progression::ProgressionGrpc;
-use sentinel_api::adapters::inbound::grpc::community::sponsorships::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use sentinel_api::adapters::inbound::grpc::audit::stats::StatsGrpc;
+use sentinel_api::adapters::inbound::grpc::community::sponsorships::members::MembersGrpc;
+use sentinel_api::adapters::inbound::grpc::community::sponsorships::progression::ProgressionGrpc;
+use sentinel_api::adapters::inbound::grpc::community::sponsorships::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::community::sponsorships::voice::VoiceChannelsGrpc;
+use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_core::domain::entities::community::role_panel::AutoRole;
-use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::system::discord_role::DiscordRole;
-use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
-use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
-use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
-use sentinel_core::domain::entities::community::level::LevelConfig;
-use sentinel_core::domain::entities::community::guild_member::MemberSummary;
-use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::entities::community::role_panel::RolePanel;
-use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
-use sentinel_core::domain::entities::community::level::UserLevel;
-use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
-use sentinel_core::domain::entities::community::level::XpSource;
-use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use sentinel_api::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use sentinel_api::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
@@ -107,7 +79,35 @@ use sentinel_api::ports::inbound::community::manage_voice_channels::ManageWhitel
 use sentinel_api::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use sentinel_api::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use sentinel_api::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
+use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
+use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
+use sentinel_core::domain::entities::audit::user_stats::UserStats;
+use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::entities::community::guild_member::MemberSummary;
+use sentinel_core::domain::entities::community::level::LevelConfig;
+use sentinel_core::domain::entities::community::level::UserLevel;
+use sentinel_core::domain::entities::community::level::XpSource;
+use sentinel_core::domain::entities::community::role_panel::AutoRole;
+use sentinel_core::domain::entities::community::role_panel::RolePanel;
+use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
+use sentinel_core::domain::entities::system::discord_role::DiscordRole;
+use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_proto::automod::v1 as automod_proto;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
@@ -126,15 +126,15 @@ use sentinel_proto::progression::v1::progression_service_server::ProgressionServ
 use sentinel_proto::roles::v1 as roles_proto;
 use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClient;
 use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
-use sentinel_proto::voice::v1 as voice_proto;
-use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
-use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 use sentinel_proto::security::v1 as sec_proto;
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
 use sentinel_proto::stats::v1 as stats_proto;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
 use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
+use sentinel_proto::voice::v1 as voice_proto;
+use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
+use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 
 fn ts() -> chrono::DateTime<Utc> {
     Utc.with_ymd_and_hms(2026, 4, 11, 12, 0, 0).unwrap()
@@ -173,10 +173,19 @@ struct MockAnalyzeMessage;
 impl AnalyzeMessageUseCase for MockAnalyzeMessage {
     async fn analyze(&self, cmd: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError> {
         // Logique de mock : flag spam -> Warn, sinon None.
-        let action = if cmd.flags.spam { Action::Warn } else { Action::None };
+        let action = if cmd.flags.spam {
+            Action::Warn
+        } else {
+            Action::None
+        };
         Ok(MessageAnalysis {
             action,
-            reason: if cmd.flags.spam { "spam detecte" } else { "ras" }.into(),
+            reason: if cmd.flags.spam {
+                "spam detecte"
+            } else {
+                "ras"
+            }
+            .into(),
             score: if cmd.flags.spam { 0.85 } else { 0.0 },
             duration: None,
         })
@@ -185,37 +194,54 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
 
 #[tokio::test]
 async fn automod_analyze_returns_action_for_flagged_message() {
-    let svc = AutomodServiceServer::new(AutomodGrpc { uc: Arc::new(MockAnalyzeMessage) });
+    let svc = AutomodServiceServer::new(AutomodGrpc {
+        uc: Arc::new(MockAnalyzeMessage),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = AutomodServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // Message flagge spam
-    let resp = client.analyze_message(automod_proto::AnalyzeMessageRequest {
-        guild_id: "g".into(),
-        channel_id: "c".into(),
-        user_id: "u".into(),
-        username: "joe".into(),
-        content: "buy now!!!".into(),
-        flags: Some(automod_proto::DetectionFlags {
-            spam: true, insult: false, link: false, phishing: false,
-        }),
-        message_id: "m".into(),
-        timestamp: ts().to_rfc3339(),
-        context_messages: vec![],
-    }).await.unwrap().into_inner();
+    let resp = client
+        .analyze_message(automod_proto::AnalyzeMessageRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            user_id: "u".into(),
+            username: "joe".into(),
+            content: "buy now!!!".into(),
+            flags: Some(automod_proto::DetectionFlags {
+                spam: true,
+                insult: false,
+                link: false,
+                phishing: false,
+            }),
+            message_id: "m".into(),
+            timestamp: ts().to_rfc3339(),
+            context_messages: vec![],
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(resp.action, automod_proto::Action::Warn as i32);
     assert!(resp.reason.contains("spam"));
 
     // Message clean
-    let clean = client.analyze_message(automod_proto::AnalyzeMessageRequest {
-        guild_id: "g".into(), channel_id: "c".into(),
-        user_id: "u".into(), username: "joe".into(),
-        content: "Hi everyone".into(),
-        flags: Some(automod_proto::DetectionFlags::default()),
-        message_id: "m".into(), timestamp: ts().to_rfc3339(),
-        context_messages: vec![],
-    }).await.unwrap().into_inner();
+    let clean = client
+        .analyze_message(automod_proto::AnalyzeMessageRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            user_id: "u".into(),
+            username: "joe".into(),
+            content: "Hi everyone".into(),
+            flags: Some(automod_proto::DetectionFlags::default()),
+            message_id: "m".into(),
+            timestamp: ts().to_rfc3339(),
+            context_messages: vec![],
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(clean.action, automod_proto::Action::None as i32);
 
     let _ = shutdown.send(());
@@ -253,30 +279,45 @@ impl AnalyzeImageUseCase for MockAnalyzeImage {
 
 #[tokio::test]
 async fn images_analyze_classifies_by_filename() {
-    let svc = ImagesServiceServer::new(ImagesGrpc { uc: Arc::new(MockAnalyzeImage) });
+    let svc = ImagesServiceServer::new(ImagesGrpc {
+        uc: Arc::new(MockAnalyzeImage),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = ImagesServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
-    let dangerous = client.analyze_image(images_proto::AnalyzeImageRequest {
-        guild_id: "g".into(), channel_id: "c".into(),
-        user_id: "u".into(), username: "joe".into(),
-        message_id: "m".into(),
-        image_data: b"fake png bytes".to_vec(),
-        content_type: "image/png".into(),
-        filename: "weapon.png".into(),
-    }).await.unwrap().into_inner();
+    let dangerous = client
+        .analyze_image(images_proto::AnalyzeImageRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            user_id: "u".into(),
+            username: "joe".into(),
+            message_id: "m".into(),
+            image_data: b"fake png bytes".to_vec(),
+            content_type: "image/png".into(),
+            filename: "weapon.png".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(dangerous.action, images_proto::Action::Ban as i32);
     assert!(dangerous.reason.contains("arme"));
 
-    let safe = client.analyze_image(images_proto::AnalyzeImageRequest {
-        guild_id: "g".into(), channel_id: "c".into(),
-        user_id: "u".into(), username: "joe".into(),
-        message_id: "m".into(),
-        image_data: b"png".to_vec(),
-        content_type: "image/png".into(),
-        filename: "cat.png".into(),
-    }).await.unwrap().into_inner();
+    let safe = client
+        .analyze_image(images_proto::AnalyzeImageRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            user_id: "u".into(),
+            username: "joe".into(),
+            message_id: "m".into(),
+            image_data: b"png".to_vec(),
+            content_type: "image/png".into(),
+            filename: "cat.png".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(safe.action, images_proto::Action::None as i32);
 
     let _ = shutdown.send(());
@@ -290,7 +331,10 @@ struct MockSecurityUc;
 
 #[async_trait]
 impl ManageSecurityUseCase for MockSecurityUc {
-    async fn report_event(&self, cmd: ReportSecurityEventCommand) -> Result<SecurityEvent, DomainError> {
+    async fn report_event(
+        &self,
+        cmd: ReportSecurityEventCommand,
+    ) -> Result<SecurityEvent, DomainError> {
         Ok(SecurityEvent {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -301,7 +345,13 @@ impl ManageSecurityUseCase for MockSecurityUc {
             created_at: ts(),
         })
     }
-    async fn analyze_new_member(&self, _: sentinel_api::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand) -> Result<sentinel_api::ports::inbound::audit::manage_security::SecurityDecision, DomainError> { unimplemented!() }
+    async fn analyze_new_member(
+        &self,
+        _: sentinel_api::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand,
+    ) -> Result<sentinel_api::ports::inbound::audit::manage_security::SecurityDecision, DomainError>
+    {
+        unimplemented!()
+    }
     async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(vec![SecurityEvent {
             id: Uuid::nil(),
@@ -317,25 +367,36 @@ impl ManageSecurityUseCase for MockSecurityUc {
 
 #[tokio::test]
 async fn security_report_and_list_round_trip() {
-    let svc = SecurityServiceServer::new(SecurityGrpc { uc: Arc::new(MockSecurityUc) });
+    let svc = SecurityServiceServer::new(SecurityGrpc {
+        uc: Arc::new(MockSecurityUc),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = SecurityServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
-    let reported = client.report_event(sec_proto::ReportEventRequest {
-        guild_id: "g".into(),
-        event_type: "scan".into(),
-        severity: "info".into(),
-        description: "Daily scan complete".into(),
-        user_ids: vec!["u1".into(), "u2".into()],
-    }).await.unwrap().into_inner();
+    let reported = client
+        .report_event(sec_proto::ReportEventRequest {
+            guild_id: "g".into(),
+            event_type: "scan".into(),
+            severity: "info".into(),
+            description: "Daily scan complete".into(),
+            user_ids: vec!["u1".into(), "u2".into()],
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(reported.event_type, "scan");
     assert_eq!(reported.severity, "info");
     assert_eq!(reported.user_ids.len(), 2);
 
-    let list = client.list_events(sec_proto::ListEventsRequest {
-        guild_id: Some("g".into()),
-    }).await.unwrap().into_inner();
+    let list = client
+        .list_events(sec_proto::ListEventsRequest {
+            guild_id: Some("g".into()),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(list.events.len(), 1);
     assert_eq!(list.events[0].event_type, "raid");
 
@@ -351,7 +412,10 @@ struct MockMembersUc;
 #[async_trait]
 impl ManageMembersUseCase for MockMembersUc {
     async fn list_members(&self, guild_id: &str) -> Result<Vec<GuildMember>, DomainError> {
-        Ok(vec![sample_member(guild_id, "u1"), sample_member(guild_id, "u2")])
+        Ok(vec![
+            sample_member(guild_id, "u1"),
+            sample_member(guild_id, "u2"),
+        ])
     }
     async fn get_member(&self, guild_id: &str, user_id: &str) -> Result<GuildMember, DomainError> {
         if user_id == "missing" {
@@ -359,11 +423,21 @@ impl ManageMembersUseCase for MockMembersUc {
         }
         Ok(sample_member(guild_id, user_id))
     }
-    async fn get_member_summary(&self, _: &str, _: &str) -> Result<MemberSummary, DomainError> { unimplemented!() }
-    async fn sync_members(&self, _: SyncMembersCommand) -> Result<u64, DomainError> { Ok(2) }
-    async fn register_member(&self, _: RegisterMemberCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn remove_member(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn update_member(&self, _: UpdateMemberCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_member_summary(&self, _: &str, _: &str) -> Result<MemberSummary, DomainError> {
+        unimplemented!()
+    }
+    async fn sync_members(&self, _: SyncMembersCommand) -> Result<u64, DomainError> {
+        Ok(2)
+    }
+    async fn register_member(&self, _: RegisterMemberCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn remove_member(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn update_member(&self, _: UpdateMemberCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {
@@ -383,15 +457,23 @@ fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {
 
 #[tokio::test]
 async fn members_list_and_get_round_trip() {
-    let svc = MembersServiceServer::new(MembersGrpc { uc: Arc::new(MockMembersUc) });
+    let svc = MembersServiceServer::new(MembersGrpc {
+        uc: Arc::new(MockMembersUc),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = MembersServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // MembersService n'expose pas list_members en gRPC — seulement get_member.
-    let one = client.get_member(members_proto::GetMemberRequest {
-        guild_id: "g1".into(), user_id: "u1".into(),
-    }).await.unwrap().into_inner();
+    let one = client
+        .get_member(members_proto::GetMemberRequest {
+            guild_id: "g1".into(),
+            user_id: "u1".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert!(one.member.is_some());
     let m = one.member.unwrap();
     assert_eq!(m.user_id, "u1");
@@ -399,10 +481,18 @@ async fn members_list_and_get_round_trip() {
 
     // Le handler convertit volontairement NotFound -> Option::None (compat
     // avec le contrat HTTP 404 que welcome-bot consomme).
-    let missing = client.get_member(members_proto::GetMemberRequest {
-        guild_id: "g".into(), user_id: "missing".into(),
-    }).await.unwrap().into_inner();
-    assert!(missing.member.is_none(), "missing doit etre Ok(None), pas une erreur");
+    let missing = client
+        .get_member(members_proto::GetMemberRequest {
+            guild_id: "g".into(),
+            user_id: "missing".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(
+        missing.member.is_none(),
+        "missing doit etre Ok(None), pas une erreur"
+    );
 
     let _ = shutdown.send(());
 }
@@ -415,7 +505,13 @@ struct MockModerationUc;
 
 #[async_trait]
 impl ManageModerationUseCase for MockModerationUc {
-    async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn list_actions(
+        &self,
+        _: Option<&str>,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(vec![])
+    }
     async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
         Ok(ModerationAction {
             id: Uuid::new_v4(),
@@ -432,7 +528,11 @@ impl ManageModerationUseCase for MockModerationUc {
             created_at: ts(),
         })
     }
-    async fn get_history(&self, _: &str, target_id: &str) -> Result<UserModerationHistory, DomainError> {
+    async fn get_history(
+        &self,
+        _: &str,
+        target_id: &str,
+    ) -> Result<UserModerationHistory, DomainError> {
         Ok(UserModerationHistory {
             target_id: target_id.into(),
             target_name: "Joe".into(),
@@ -442,37 +542,59 @@ impl ManageModerationUseCase for MockModerationUc {
             actions: vec![],
         })
     }
-    async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
-    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    async fn list_bans(
+        &self,
+        _: Option<&str>,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
 }
 
 #[tokio::test]
 async fn moderation_log_action_and_get_history() {
-    let svc = ModerationServiceServer::new(ModerationGrpc { moderation_uc: Arc::new(MockModerationUc) });
+    let svc = ModerationServiceServer::new(ModerationGrpc {
+        moderation_uc: Arc::new(MockModerationUc),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = ModerationServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
-    let logged = client.log_action(mod_proto::LogActionRequest {
-        guild_id: "g".into(),
-        channel_id: "c".into(),
-        moderator_id: "mod1".into(),
-        moderator_name: "Mod".into(),
-        target_id: "u".into(),
-        target_name: "Joe".into(),
-        action_type: "warn".into(),
-        reason: "spam".into(),
-        gravity: None,
-        duration: None,
-    }).await.unwrap().into_inner();
+    let logged = client
+        .log_action(mod_proto::LogActionRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            moderator_id: "mod1".into(),
+            moderator_name: "Mod".into(),
+            target_id: "u".into(),
+            target_name: "Joe".into(),
+            action_type: "warn".into(),
+            reason: "spam".into(),
+            gravity: None,
+            duration: None,
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(logged.action_type, "warn");
     assert_eq!(logged.target_name, "Joe");
 
-    let history = client.get_history(mod_proto::GetHistoryRequest {
-        guild_id: "g".into(),
-        user_id: "u".into(),
-    }).await.unwrap().into_inner();
+    let history = client
+        .get_history(mod_proto::GetHistoryRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(history.total_warns, 2);
     assert_eq!(history.total_mutes, 1);
     assert_eq!(history.total_bans, 0);
@@ -488,10 +610,20 @@ struct MockStatsUc;
 
 #[async_trait]
 impl ManageStatsUseCase for MockStatsUc {
-    async fn record_messages(&self, _: RecordMessagesCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn record_voice(&self, _: RecordVoiceCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn get_user_stats(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError> {
-        if user_id == "missing" { return Ok(None); }
+    async fn record_messages(&self, _: RecordMessagesCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_voice(&self, _: RecordVoiceCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserStats>, DomainError> {
+        if user_id == "missing" {
+            return Ok(None);
+        }
         Ok(Some(UserStats {
             id: Uuid::nil(),
             guild_id: guild_id.into(),
@@ -502,10 +634,23 @@ impl ManageStatsUseCase for MockStatsUc {
             updated_at: ts(),
         }))
     }
-    async fn get_guild_overview(&self, _: &str) -> Result<GuildStatsOverview, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: u32) -> Result<Vec<UserStats>, DomainError> { Ok(vec![]) }
-    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> { unimplemented!() }
-    async fn get_guild_voice_stats(&self, _: &str, _: u32, _: u32) -> Result<GuildVoiceStats, DomainError> { unimplemented!() }
+    async fn get_guild_overview(&self, _: &str) -> Result<GuildStatsOverview, DomainError> {
+        unimplemented!()
+    }
+    async fn get_leaderboard(&self, _: &str, _: u32) -> Result<Vec<UserStats>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> {
+        unimplemented!()
+    }
+    async fn get_guild_voice_stats(
+        &self,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<GuildVoiceStats, DomainError> {
+        unimplemented!()
+    }
 }
 
 #[tokio::test]
@@ -516,29 +661,41 @@ async fn stats_record_messages_and_get_user_stats() {
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = StatsServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // Record messages — Ok
-    client.record_messages(stats_proto::RecordMessagesRequest {
-        guild_id: "g".into(),
-        user_id: "u".into(),
-        username: "alice".into(),
-        count: 5,
-    }).await.unwrap();
+    client
+        .record_messages(stats_proto::RecordMessagesRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            username: "alice".into(),
+            count: 5,
+        })
+        .await
+        .unwrap();
 
     // Get user stats
-    let resp = client.get_user_stats(stats_proto::GetUserStatsRequest {
-        guild_id: "g".into(),
-        user_id: "u".into(),
-    }).await.unwrap().into_inner();
+    let resp = client
+        .get_user_stats(stats_proto::GetUserStatsRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert!(resp.stats.is_some());
     assert_eq!(resp.stats.unwrap().message_count, 42);
 
     // Missing user -> reponse vide
-    let missing = client.get_user_stats(stats_proto::GetUserStatsRequest {
-        guild_id: "g".into(),
-        user_id: "missing".into(),
-    }).await.unwrap().into_inner();
+    let missing = client
+        .get_user_stats(stats_proto::GetUserStatsRequest {
+            guild_id: "g".into(),
+            user_id: "missing".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert!(missing.stats.is_none());
 
     let _ = shutdown.send(());
@@ -562,20 +719,53 @@ impl ManageLevelsUseCase for MockLevelsUc {
             source: cmd.source,
         })
     }
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError> {
+    async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserLevel, DomainError> {
         if user_id == "missing" {
             return Err(DomainError::NotFound("user level absent".into()));
         }
         Ok(sample_user_level(guild_id, user_id, 250))
     }
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
-        Ok((0..limit.min(3)).map(|i| sample_user_level(guild_id, &format!("u{i}"), 1000 - i * 100)).collect())
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
+        Ok((0..limit.min(3))
+            .map(|i| sample_user_level(guild_id, &format!("u{i}"), 1000 - i * 100))
+            .collect())
     }
-    async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> { unimplemented!() }
-    async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> { unimplemented!() }
-    async fn get_leaderboard_by_source(&self, _: &str, _: XpSource, _: i64) -> Result<Vec<UserLevel>, DomainError> { Ok(vec![]) }
-    async fn set_user_xp(&self, _: sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
-    async fn reset_user_xp(&self, _: &str, _: &str, _: sentinel_api::ports::inbound::community::manage_levels::ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
+    async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> {
+        unimplemented!()
+    }
+    async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
+        unimplemented!()
+    }
+    async fn get_leaderboard_by_source(
+        &self,
+        _: &str,
+        _: XpSource,
+        _: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_user_xp(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand,
+    ) -> Result<UserLevel, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_user_xp(
+        &self,
+        _: &str,
+        _: &str,
+        _: sentinel_api::ports::inbound::community::manage_levels::ResetTarget,
+    ) -> Result<UserLevel, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn sample_user_level(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
@@ -604,37 +794,55 @@ async fn progression_add_xp_and_get_level_round_trip() {
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = ProgressionServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // Add xp avec levelup
-    let added = client.add_xp(prog_proto::AddXpRequest {
-        guild_id: "g".into(),
-        user_id: "u".into(),
-        username: "alice".into(),
-        amount: 150,
-        source: 0,
-    }).await.unwrap().into_inner();
+    let added = client
+        .add_xp(prog_proto::AddXpRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            username: "alice".into(),
+            amount: 150,
+            source: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert!(added.leveled_up);
     assert_eq!(added.old_level, 1);
 
     // Get level existant
-    let level = client.get_user_level(prog_proto::GetUserLevelRequest {
-        guild_id: "g".into(),
-        user_id: "u".into(),
-    }).await.unwrap().into_inner();
+    let level = client
+        .get_user_level(prog_proto::GetUserLevelRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(level.xp, 250);
 
     // Get level absent
-    let err = client.get_user_level(prog_proto::GetUserLevelRequest {
-        guild_id: "g".into(),
-        user_id: "missing".into(),
-    }).await.unwrap_err();
+    let err = client
+        .get_user_level(prog_proto::GetUserLevelRequest {
+            guild_id: "g".into(),
+            user_id: "missing".into(),
+        })
+        .await
+        .unwrap_err();
     assert_eq!(err.code(), tonic::Code::NotFound);
 
     // Leaderboard
-    let lb = client.get_leaderboard(prog_proto::GetLeaderboardRequest {
-        guild_id: "g".into(), limit: 10, source: 0,
-    }).await.unwrap().into_inner();
+    let lb = client
+        .get_leaderboard(prog_proto::GetLeaderboardRequest {
+            guild_id: "g".into(),
+            limit: 10,
+            source: 0,
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(lb.users.len(), 3);
 
     let _ = shutdown.send(());
@@ -671,12 +879,27 @@ impl ManageRolePanelsUseCase for MockRolePanelsUc {
             enabled: true,
         })
     }
-    async fn create_panel(&self, _: CreateRolePanelCommand) -> Result<RolePanelDetail, DomainError> { unimplemented!() }
-    async fn get_panel(&self, _: &str) -> Result<RolePanelDetail, DomainError> { unimplemented!() }
-    async fn get_panel_by_message(&self, _: &str) -> Result<Option<RolePanelDetail>, DomainError> { Ok(None) }
-    async fn set_message_id(&self, _: SetMessageIdCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_panel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn delete_auto_role(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn create_panel(
+        &self,
+        _: CreateRolePanelCommand,
+    ) -> Result<RolePanelDetail, DomainError> {
+        unimplemented!()
+    }
+    async fn get_panel(&self, _: &str) -> Result<RolePanelDetail, DomainError> {
+        unimplemented!()
+    }
+    async fn get_panel_by_message(&self, _: &str) -> Result<Option<RolePanelDetail>, DomainError> {
+        Ok(None)
+    }
+    async fn set_message_id(&self, _: SetMessageIdCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_panel(&self, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn delete_auto_role(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 fn sample_role_panel(guild_id: &str) -> RolePanel {
@@ -699,9 +922,15 @@ struct MockDiscordRoleRepo;
 
 #[async_trait]
 impl DiscordRoleRepository for MockDiscordRoleRepo {
-    async fn sync_roles(&self, _: &str, _: Vec<DiscordRole>) -> Result<(), DomainError> { Ok(()) }
-    async fn find_by_guild(&self, _: &str) -> Result<Vec<DiscordRole>, DomainError> { Ok(vec![]) }
-    async fn find_by_id(&self, _: &str, _: &str) -> Result<Option<DiscordRole>, DomainError> { Ok(None) }
+    async fn sync_roles(&self, _: &str, _: Vec<DiscordRole>) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn find_by_guild(&self, _: &str) -> Result<Vec<DiscordRole>, DomainError> {
+        Ok(vec![])
+    }
+    async fn find_by_id(&self, _: &str, _: &str) -> Result<Option<DiscordRole>, DomainError> {
+        Ok(None)
+    }
 }
 
 #[tokio::test]
@@ -712,20 +941,29 @@ async fn role_panels_list_and_add_auto_role() {
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = RolePanelsServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // List panels
-    let panels = client.list_panels(roles_proto::ListPanelsRequest {
-        guild_id: "g1".into(),
-    }).await.unwrap().into_inner();
+    let panels = client
+        .list_panels(roles_proto::ListPanelsRequest {
+            guild_id: "g1".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(panels.panels.len(), 1);
     assert_eq!(panels.panels[0].title, "Choisis ton role");
     assert!(panels.panels[0].enabled);
 
     // List auto roles
-    let auto = client.list_auto_roles(roles_proto::ListAutoRolesRequest {
-        guild_id: "g1".into(),
-    }).await.unwrap().into_inner();
+    let auto = client
+        .list_auto_roles(roles_proto::ListAutoRolesRequest {
+            guild_id: "g1".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(auto.roles.len(), 1);
     assert_eq!(auto.roles[0].role_name, "Member");
     assert_eq!(auto.roles[0].delay_secs, 60);
@@ -741,15 +979,32 @@ struct MockVoiceChannelsUc;
 
 #[async_trait]
 impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
-    async fn list_history_channels(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
-    async fn get_voice_config(&self, _: &str) -> Result<sentinel_core::domain::entities::community::voice_channel::VoiceChannelConfig, DomainError> { Ok(Default::default()) }
+    async fn list_history_channels(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<VoiceChannel>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_voice_config(
+        &self,
+        _: &str,
+    ) -> Result<
+        sentinel_core::domain::entities::community::voice_channel::VoiceChannelConfig,
+        DomainError,
+    > {
+        Ok(Default::default())
+    }
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
         Ok(vec![
             sample_voice_channel(guild_id, "ch1", "Salon de Joe"),
             sample_voice_channel(guild_id, "ch2", "Salon de Bob"),
         ])
     }
-    async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError> {
+    async fn create_channel(
+        &self,
+        cmd: CreateVoiceChannelCommand,
+    ) -> Result<VoiceChannel, DomainError> {
         Ok(VoiceChannel {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -778,29 +1033,99 @@ impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
     }
 
     // Toutes les autres methodes ne sont pas appelees dans nos tests.
-    async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError> { unimplemented!() }
-    async fn get_channel_detail(&self, _: &str) -> Result<VoiceChannelDetail, DomainError> { unimplemented!() }
-    async fn close_channel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn delete_channel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn transfer_ownership(&self, _: TransferOwnershipCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn add_co_admin(&self, _: ManageCoAdminCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn remove_co_admin(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn get_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { unimplemented!() }
-    async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn get_preset(&self, _: &str, _: &str) -> Result<Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>, DomainError> { unimplemented!() }
-    async fn save_preset(&self, _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> { unimplemented!() }
-    async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn create_invite_link(&self, _: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> { unimplemented!() }
-    async fn list_invite_links(&self, _: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> { unimplemented!() }
-    async fn use_invite_link(&self, _: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> { unimplemented!() }
-    async fn revoke_invite_link(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn list_themes(&self, _: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> { unimplemented!() }
-    async fn create_theme(&self, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> { unimplemented!() }
-    async fn update_theme(&self, _: &str, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> { unimplemented!() }
-    async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError> {
+        unimplemented!()
+    }
+    async fn get_channel_detail(&self, _: &str) -> Result<VoiceChannelDetail, DomainError> {
+        unimplemented!()
+    }
+    async fn close_channel(&self, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn delete_channel(&self, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn transfer_ownership(&self, _: TransferOwnershipCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn add_co_admin(&self, _: ManageCoAdminCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn remove_co_admin(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn get_whitelist(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
+        unimplemented!()
+    }
+    async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn get_preset(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset>,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn save_preset(
+        &self,
+        _: sentinel_core::ports::inbound::community::manage_voice_channels::SavePresetCommand,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn create_invite_link(
+        &self,
+        _: CreateInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
+        unimplemented!()
+    }
+    async fn list_invite_links(&self, _: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
+        unimplemented!()
+    }
+    async fn use_invite_link(
+        &self,
+        _: UseInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
+        unimplemented!()
+    }
+    async fn revoke_invite_link(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn list_themes(&self, _: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
+        unimplemented!()
+    }
+    async fn create_theme(&self, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+        unimplemented!()
+    }
+    async fn update_theme(
+        &self,
+        _: &str,
+        _: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
+        unimplemented!()
+    }
+    async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 fn sample_voice_channel(guild_id: &str, channel_id: &str, name: &str) -> VoiceChannel {
@@ -830,35 +1155,46 @@ fn sample_voice_channel(guild_id: &str, channel_id: &str, name: &str) -> VoiceCh
 
 #[tokio::test]
 async fn voice_channels_list_and_create_round_trip() {
-    let svc = VoiceChannelsServiceServer::new(VoiceChannelsGrpc { uc: Arc::new(MockVoiceChannelsUc) });
+    let svc = VoiceChannelsServiceServer::new(VoiceChannelsGrpc {
+        uc: Arc::new(MockVoiceChannelsUc),
+    });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = VoiceChannelsServiceClient::connect(Endpoint::from_shared(url).unwrap())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     // List
-    let list = client.list_channels(voice_proto::ListChannelsRequest {
-        guild_id: "g1".into(),
-    }).await.unwrap().into_inner();
+    let list = client
+        .list_channels(voice_proto::ListChannelsRequest {
+            guild_id: "g1".into(),
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(list.channels.len(), 2);
     assert_eq!(list.channels[0].channel_name, "Salon de Joe");
     assert_eq!(list.channels[1].channel_name, "Salon de Bob");
     assert_eq!(list.channels[0].kind, "public");
 
     // Create
-    let created = client.create_channel(voice_proto::CreateChannelRequest {
-        guild_id: "g1".into(),
-        owner_id: "u".into(),
-        owner_name: "Joe".into(),
-        channel_id: "new_ch".into(),
-        text_channel_id: None,
-        members_channel_id: None,
-        queue_channel_id: None,
-        category_id: Some("cat".into()),
-        channel_name: "Mon Salon".into(),
-        kind: "public".into(),
-        visibility: "public".into(),
-        queue_enabled: false,
-    }).await.unwrap().into_inner();
+    let created = client
+        .create_channel(voice_proto::CreateChannelRequest {
+            guild_id: "g1".into(),
+            owner_id: "u".into(),
+            owner_name: "Joe".into(),
+            channel_id: "new_ch".into(),
+            text_channel_id: None,
+            members_channel_id: None,
+            queue_channel_id: None,
+            category_id: Some("cat".into()),
+            channel_name: "Mon Salon".into(),
+            kind: "public".into(),
+            visibility: "public".into(),
+            queue_enabled: false,
+        })
+        .await
+        .unwrap()
+        .into_inner();
     assert_eq!(created.channel_name, "Mon Salon");
     assert_eq!(created.member_limit, Some(10));
     assert_eq!(created.kind, "public");

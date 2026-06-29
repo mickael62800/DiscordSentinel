@@ -6,9 +6,9 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
+use serde::{Deserialize, Serialize};
 
 use sentinel_proto::tickets::v1 as proto;
 
@@ -148,15 +148,11 @@ impl ApiClient {
 
     #[allow(dead_code)]
     pub async fn get_ticket(&self, id: &str) -> Result<TicketDetail, String> {
-        let req = proto::GetTicketDetailRequest {
-            id: id.to_string(),
-        };
+        let req = proto::GetTicketDetailRequest { id: id.to_string() };
         let mut client = self.grpc.tickets();
         let detail = self
             .grpc
-            .guarded(|| async move {
-                client.get_ticket_detail(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_ticket_detail(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(proto_ticket_detail_to_dto(detail))
@@ -196,9 +192,7 @@ impl ApiClient {
     }
 
     pub async fn close_ticket(&self, id: &str) -> Result<(), String> {
-        let req = proto::CloseTicketRequest {
-            id: id.to_string(),
-        };
+        let req = proto::CloseTicketRequest { id: id.to_string() };
         let mut client = self.grpc.tickets();
         self.grpc
             .guarded(|| async move { client.close_ticket(req).await.map(|_| ()) })
@@ -232,9 +226,7 @@ impl ApiClient {
         };
         let mut client = self.grpc.tickets();
         self.grpc
-            .guarded(|| async move {
-                client.update_ticket_channel(req).await.map(|_| ())
-            })
+            .guarded(|| async move { client.update_ticket_channel(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
     }
@@ -307,7 +299,11 @@ fn proto_ticket_detail_to_dto(d: proto::TicketDetail) -> TicketDetail {
             .ticket
             .map(proto_ticket_to_dto)
             .unwrap_or_else(empty_ticket),
-        messages: d.messages.into_iter().map(proto_ticket_message_to_dto).collect(),
+        messages: d
+            .messages
+            .into_iter()
+            .map(proto_ticket_message_to_dto)
+            .collect(),
     }
 }
 

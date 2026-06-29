@@ -1,8 +1,8 @@
 use serenity::model::id::{ChannelId, GuildId};
 use serenity::prelude::*;
 
-use super::{ConfigKey, SessionCardKey};
 use super::session_card::SessionCard;
+use super::{ConfigKey, SessionCardKey};
 use crate::shared::heartbeat::ApiClientKey;
 
 /// Si le clone a obtenu un log_message_id (renvoi initial), le reecrit dans le DashMap.
@@ -31,7 +31,10 @@ async fn resolve_log_channel(ctx: &Context, guild_id: GuildId) -> Option<Channel
     let data = ctx.data.read().await;
     if let Some(api) = data.get::<ApiClientKey>() {
         if let Ok(cfg) = api
-            .get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME)
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::voice::MODULE_BOT_NAME,
+            )
             .await
         {
             if let Some(id) = cfg
@@ -117,7 +120,10 @@ pub async fn ensure_card_and_member_joined(
     );
     card.current_members = current_member_count.max(1);
     card.add_event("\u{1f3a4} **Session demarree** (salon permanent observe)".to_string());
-    card.add_event(format!("\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
+    card.add_event(format!(
+        "\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint",
+        user_name
+    ));
     card.send_initial(ctx).await;
 
     let data = ctx.data.read().await;
@@ -139,7 +145,10 @@ pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, u
             None => return,
         };
         entry.current_members += 1;
-        entry.add_event(format!("\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
+        entry.add_event(format!(
+            "\u{1f7e2}\u{27a1}\u{fe0f} **{}** a rejoint",
+            user_name
+        ));
         entry.clone()
     };
     card_clone.update(ctx).await;
@@ -147,7 +156,12 @@ pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, u
 }
 
 /// Ajoute un evenement "membre parti" a la carte de session.
-pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, user_name: &str, duration_text: &str) {
+pub async fn session_member_left(
+    ctx: &Context,
+    voice_channel_id: ChannelId,
+    user_name: &str,
+    duration_text: &str,
+) {
     let mut card_clone = {
         let data = ctx.data.read().await;
         let cards = match data.get::<SessionCardKey>() {
@@ -159,7 +173,10 @@ pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, use
             None => return,
         };
         entry.current_members = entry.current_members.saturating_sub(1);
-        entry.add_event(format!("\u{1f534}\u{2b05}\u{fe0f} **{}** a quitte ({})", user_name, duration_text));
+        entry.add_event(format!(
+            "\u{1f534}\u{2b05}\u{fe0f} **{}** a quitte ({})",
+            user_name, duration_text
+        ));
         entry.clone()
     };
     card_clone.update(ctx).await;
@@ -181,7 +198,10 @@ pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_du
         entry.closed = true;
         entry.closed_at_unix = Some(chrono::Utc::now().timestamp());
         entry.total_duration = Some(total_duration.to_string());
-        entry.add_event(format!("\u{1f6d1} **Salon supprime** | Duree : {}", total_duration));
+        entry.add_event(format!(
+            "\u{1f6d1} **Salon supprime** | Duree : {}",
+            total_duration
+        ));
         entry.clone()
     };
     card_clone.update(ctx).await;
@@ -228,4 +248,11 @@ pub async fn get_channel_name(ctx: &Context, channel_id: ChannelId) -> String {
 
 // Legacy stub -- still called by afk_sweep
 #[allow(dead_code)]
-pub async fn log_afk_move(_ctx: &Context, _user_id: u64, _from_channel: &str, _to_channel: &str, _afk_minutes: u64) {}
+pub async fn log_afk_move(
+    _ctx: &Context,
+    _user_id: u64,
+    _from_channel: &str,
+    _to_channel: &str,
+    _afk_minutes: u64,
+) {
+}

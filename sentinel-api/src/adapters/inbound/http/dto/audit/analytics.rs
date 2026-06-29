@@ -1,7 +1,7 @@
-use serde::Deserialize;
-use serde::Serialize;
 use sentinel_core::domain::entities::system::analytics::*;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyticsQuery {

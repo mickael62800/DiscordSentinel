@@ -2,16 +2,20 @@ use serenity::model::channel::{GuildChannel, Message};
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::{WeeklyTrackerKey, send_event, log};
 use super::weekly_report::StatField;
+use super::{log, send_event, WeeklyTrackerKey};
 
 pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
     let gid = channel.guild_id;
     let gid_str = gid.to_string();
 
-    log(ctx, "info", &gid_str, &format!(
-        "Salon cree : #{} ({:?})", channel.name, channel.kind
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid_str,
+        &format!("Salon cree : #{} ({:?})", channel.name, channel.kind),
+    )
+    .await;
 
     send_event(
         ctx,
@@ -30,17 +34,17 @@ pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
     }
 }
 
-pub async fn handle_delete(
-    ctx: &Context,
-    channel: &GuildChannel,
-    _messages: Option<Vec<Message>>,
-) {
+pub async fn handle_delete(ctx: &Context, channel: &GuildChannel, _messages: Option<Vec<Message>>) {
     let gid = channel.guild_id;
     let gid_str = gid.to_string();
 
-    log(ctx, "warn", &gid_str, &format!(
-        "Salon supprime : #{}", channel.name
-    )).await;
+    log(
+        ctx,
+        "warn",
+        &gid_str,
+        &format!("Salon supprime : #{}", channel.name),
+    )
+    .await;
 
     send_event(
         ctx,

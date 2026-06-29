@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::moderation::manage_strikes::*;
 use sentinel_core::domain::entities::moderation::action::strikes::*;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::moderation::manage_strikes::*;
 
 use test_helpers::build_test_state_strikes;
 
@@ -94,8 +94,13 @@ impl ManageStrikesUseCase for MockStrikesUC {
         })
     }
 
-    async fn get_active_strikes(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserStrike>, DomainError> {
-        Ok(self.strikes
+    async fn get_active_strikes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<UserStrike>, DomainError> {
+        Ok(self
+            .strikes
             .iter()
             .filter(|s| s.guild_id == guild_id && s.user_id == user_id)
             .cloned()
@@ -107,7 +112,10 @@ impl ManageStrikesUseCase for MockStrikesUC {
     }
 
     async fn get_config(&self, guild_id: &str) -> Result<StrikeConfig, DomainError> {
-        Ok(self.config.clone().unwrap_or_else(|| StrikeConfig::default_for_guild(guild_id)))
+        Ok(self
+            .config
+            .clone()
+            .unwrap_or_else(|| StrikeConfig::default_for_guild(guild_id)))
     }
 
     async fn save_config(&self, cmd: SaveStrikeConfigCommand) -> Result<StrikeConfig, DomainError> {
@@ -132,41 +140,73 @@ fn build_app(uc: MockStrikesUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("POST").uri(uri)
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn put_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn put_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("PUT").uri(uri)
+        .method("PUT")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════

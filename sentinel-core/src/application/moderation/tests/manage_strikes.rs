@@ -1,7 +1,6 @@
 //! Tests unitaires du ManageStrikesService.
 //! Teste la logique metier : add_strike (escalation), get_active_strikes, reset, config.
 
-
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -51,7 +50,12 @@ impl StrikeRepository for InMemoryStrikeRepo {
         Ok(())
     }
 
-    async fn find_active_strikes(&self, guild_id: &str, user_id: &str, window_secs: i64) -> Result<Vec<UserStrike>, DomainError> {
+    async fn find_active_strikes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        window_secs: i64,
+    ) -> Result<Vec<UserStrike>, DomainError> {
         let now = Utc::now();
         let cutoff = now - Duration::seconds(window_secs);
         let strikes = self.strikes.lock().await;
@@ -70,7 +74,10 @@ impl StrikeRepository for InMemoryStrikeRepo {
         Ok(())
     }
 
-    async fn delete_strike_by_infraction_id(&self, infraction_id: uuid::Uuid) -> Result<u64, DomainError> {
+    async fn delete_strike_by_infraction_id(
+        &self,
+        infraction_id: uuid::Uuid,
+    ) -> Result<u64, DomainError> {
         let mut strikes = self.strikes.lock().await;
         let before = strikes.len();
         strikes.retain(|s| s.infraction_id != Some(infraction_id));
@@ -115,7 +122,11 @@ fn make_config(guild_id: &str, thresholds: Vec<StrikeThreshold>, enabled: bool) 
 }
 
 fn threshold(strikes: u32, action: &str, duration: Option<u64>) -> StrikeThreshold {
-    StrikeThreshold { strikes, action: action.into(), duration }
+    StrikeThreshold {
+        strikes,
+        action: action.into(),
+        duration,
+    }
 }
 
 fn make_cmd(guild_id: &str, user_id: &str) -> AddStrikeCommand {
@@ -159,10 +170,11 @@ async fn add_strike_triggers_escalation_at_threshold() {
 
 #[tokio::test]
 async fn add_strike_picks_highest_matching_threshold() {
-    let config = make_config("g1", vec![
-        threshold(3, "mute", Some(600)),
-        threshold(5, "ban", None),
-    ], true);
+    let config = make_config(
+        "g1",
+        vec![threshold(3, "mute", Some(600)), threshold(5, "ban", None)],
+        true,
+    );
     let svc = build_service_with_config(config);
 
     for _ in 0..5 {

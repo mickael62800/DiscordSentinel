@@ -1,8 +1,8 @@
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use serde::Deserialize;
 use serde::Serialize;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAuditLogDto {

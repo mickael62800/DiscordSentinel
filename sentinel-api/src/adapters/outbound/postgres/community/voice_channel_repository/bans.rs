@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceBanStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceBanStore;
 
 #[derive(sqlx::FromRow)]
 struct BanRow {
@@ -47,7 +47,11 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         Ok(rows.into_iter().map(VoiceChannelBan::from).collect())
     }
 
-    async fn find_active_ban(&self, voice_channel_id: Uuid, user_id: &str) -> Result<Option<VoiceChannelBan>, DomainError> {
+    async fn find_active_ban(
+        &self,
+        voice_channel_id: Uuid,
+        user_id: &str,
+    ) -> Result<Option<VoiceChannelBan>, DomainError> {
         let row = sqlx::query_as::<_, BanRow>(
             "SELECT * FROM voice_channel_bans WHERE voice_channel_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > NOW())",
         )
@@ -99,10 +103,12 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
     }
 
     async fn cleanup_expired_bans(&self) -> Result<u64, DomainError> {
-        let result = sqlx::query("DELETE FROM voice_channel_bans WHERE expires_at IS NOT NULL AND expires_at <= NOW()")
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        let result = sqlx::query(
+            "DELETE FROM voice_channel_bans WHERE expires_at IS NOT NULL AND expires_at <= NOW()",
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
         Ok(result.rows_affected())
     }

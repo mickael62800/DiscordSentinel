@@ -1,18 +1,14 @@
-use async_trait::async_trait;
-use crate::ports::uow::DbTx;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
+use crate::ports::uow::DbTx;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait WheelRepository: Send + Sync {
     async fn has_claimed_today(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 
-    async fn log_spin_in_tx(
-        &self,
-        tx: &mut dyn DbTx,
-        spin: &WheelSpin,
-    ) -> Result<(), DomainError>;
+    async fn log_spin_in_tx(&self, tx: &mut dyn DbTx, spin: &WheelSpin) -> Result<(), DomainError>;
 
     async fn mark_claimed_in_tx(
         &self,
@@ -21,11 +17,8 @@ pub trait WheelRepository: Send + Sync {
         user_id: &str,
     ) -> Result<(), DomainError>;
 
-    async fn recent_spins(
-        &self,
-        guild_id: &str,
-        limit: i64,
-    ) -> Result<Vec<WheelSpin>, DomainError>;
+    async fn recent_spins(&self, guild_id: &str, limit: i64)
+        -> Result<Vec<WheelSpin>, DomainError>;
 
     async fn top_winners(
         &self,

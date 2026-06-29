@@ -32,14 +32,20 @@ fn validate_default_config_ok() {
 fn validate_rejects_lengths_mismatch() {
     let mut c = default_config();
     c.weights.pop();
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::LengthsMismatch));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::LengthsMismatch)
+    );
 }
 
 #[test]
 fn validate_rejects_multipliers_mismatch() {
     let mut c = default_config();
     c.multipliers_3x.pop();
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::LengthsMismatch));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::LengthsMismatch)
+    );
 }
 
 #[test]
@@ -64,21 +70,30 @@ fn validate_rejects_empty_symbols() {
 fn validate_rejects_all_weights_zero() {
     let mut c = default_config();
     c.weights = vec![0; c.weights.len()];
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::AllWeightsZero));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::AllWeightsZero)
+    );
 }
 
 #[test]
 fn validate_rejects_min_bet_zero() {
     let mut c = default_config();
     c.min_bet = 0;
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::BetRangeInvalid));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::BetRangeInvalid)
+    );
 }
 
 #[test]
 fn validate_rejects_min_bet_negative() {
     let mut c = default_config();
     c.min_bet = -10;
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::BetRangeInvalid));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::BetRangeInvalid)
+    );
 }
 
 #[test]
@@ -86,7 +101,10 @@ fn validate_rejects_min_bet_above_max_bet() {
     let mut c = default_config();
     c.min_bet = 100;
     c.max_bet = 50;
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::BetRangeInvalid));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::BetRangeInvalid)
+    );
 }
 
 #[test]
@@ -101,14 +119,20 @@ fn validate_accepts_min_equal_to_max() {
 fn validate_rejects_share_pct_above_100() {
     let mut c = default_config();
     c.jackpot_pool_share_pct = 101.0;
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::SharePctOutOfRange));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::SharePctOutOfRange)
+    );
 }
 
 #[test]
 fn validate_rejects_share_pct_negative() {
     let mut c = default_config();
     c.jackpot_pool_share_pct = -1.0;
-    assert_eq!(validate_slot_config(&c), Err(SlotConfigError::SharePctOutOfRange));
+    assert_eq!(
+        validate_slot_config(&c),
+        Err(SlotConfigError::SharePctOutOfRange)
+    );
 }
 
 #[test]
@@ -120,7 +144,9 @@ fn validate_accepts_share_pct_zero() {
 
 #[test]
 fn config_error_strings_are_descriptive() {
-    assert!(SlotConfigError::LengthsMismatch.as_str().contains("longueur"));
+    assert!(SlotConfigError::LengthsMismatch
+        .as_str()
+        .contains("longueur"));
     assert!(SlotConfigError::AllWeightsZero.as_str().contains("poids"));
 }
 
@@ -133,7 +159,10 @@ fn spin_with_seed_42_is_deterministic() {
     let cfg = default_config();
     let mut rng1 = StdRng::seed_from_u64(42);
     let mut rng2 = StdRng::seed_from_u64(42);
-    assert_eq!(spin_with_rng(&mut rng1, &cfg), spin_with_rng(&mut rng2, &cfg));
+    assert_eq!(
+        spin_with_rng(&mut rng1, &cfg),
+        spin_with_rng(&mut rng2, &cfg)
+    );
 }
 
 #[test]
@@ -147,7 +176,10 @@ fn spin_with_different_seeds_can_differ() {
             diff_count += 1;
         }
     }
-    assert!(diff_count > 0, "deux seeds differents devraient produire des spins differents");
+    assert!(
+        diff_count > 0,
+        "deux seeds differents devraient produire des spins differents"
+    );
 }
 
 #[test]
@@ -182,12 +214,17 @@ fn spin_weighted_distribution_respects_proportions() {
     let dist = rand::distributions::WeightedIndex::new(&cfg.weights).unwrap();
     let mut counts = vec![0u32; cfg.symbols.len()];
     for _ in 0..10_000 {
-        counts[<rand::distributions::WeightedIndex<u32> as rand::prelude::Distribution<usize>>::sample(&dist, &mut rng)] += 1;
+        counts[<rand::distributions::WeightedIndex<u32> as rand::prelude::Distribution<
+            usize,
+        >>::sample(&dist, &mut rng)] += 1;
     }
     let cherry = counts[0] as f64;
     let jackpot = (counts[cfg.symbols.len() - 1] as f64).max(1.0);
     let ratio = cherry / jackpot;
-    assert!(ratio > 15.0 && ratio < 60.0, "ratio cerise/jackpot = {ratio}, attendu ~30");
+    assert!(
+        ratio > 15.0 && ratio < 60.0,
+        "ratio cerise/jackpot = {ratio}, attendu ~30"
+    );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -198,7 +235,13 @@ fn spin_weighted_distribution_respects_proportions() {
 fn evaluate_three_cherries_is_three_of_a_kind() {
     let cfg = default_config();
     let r = evaluate_spin(&[0, 0, 0], &cfg);
-    assert_eq!(r, SpinOutcome::ThreeOfAKind { symbol_index: 0, multiplier: 2.0 });
+    assert_eq!(
+        r,
+        SpinOutcome::ThreeOfAKind {
+            symbol_index: 0,
+            multiplier: 2.0
+        }
+    );
 }
 
 #[test]
@@ -212,20 +255,29 @@ fn evaluate_three_jackpot_symbols_is_jackpot() {
 #[test]
 fn evaluate_two_of_a_kind_first_two_when_enabled() {
     let cfg = default_config();
-    assert_eq!(evaluate_spin(&[2, 2, 5], &cfg), SpinOutcome::RefundTwoOfAKind);
+    assert_eq!(
+        evaluate_spin(&[2, 2, 5], &cfg),
+        SpinOutcome::RefundTwoOfAKind
+    );
 }
 
 #[test]
 fn evaluate_two_of_a_kind_last_two_when_enabled() {
     let cfg = default_config();
-    assert_eq!(evaluate_spin(&[5, 2, 2], &cfg), SpinOutcome::RefundTwoOfAKind);
+    assert_eq!(
+        evaluate_spin(&[5, 2, 2], &cfg),
+        SpinOutcome::RefundTwoOfAKind
+    );
 }
 
 #[test]
 fn evaluate_two_of_a_kind_first_and_last_when_enabled() {
     // 1ere et 3eme position identiques mais pas la 2eme : compte aussi.
     let cfg = default_config();
-    assert_eq!(evaluate_spin(&[3, 1, 3], &cfg), SpinOutcome::RefundTwoOfAKind);
+    assert_eq!(
+        evaluate_spin(&[3, 1, 3], &cfg),
+        SpinOutcome::RefundTwoOfAKind
+    );
 }
 
 #[test]
@@ -245,8 +297,13 @@ fn evaluate_three_distinct_is_loss() {
 fn evaluate_three_of_a_kind_picks_correct_multiplier() {
     let cfg = default_config();
     // index 4 = bell, multiplier 12.0 par defaut
-    assert_eq!(evaluate_spin(&[4, 4, 4], &cfg),
-               SpinOutcome::ThreeOfAKind { symbol_index: 4, multiplier: 12.0 });
+    assert_eq!(
+        evaluate_spin(&[4, 4, 4], &cfg),
+        SpinOutcome::ThreeOfAKind {
+            symbol_index: 4,
+            multiplier: 12.0
+        }
+    );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -260,19 +317,28 @@ fn payout_loss_is_zero() {
 
 #[test]
 fn payout_refund_returns_full_mise() {
-    assert_eq!(compute_payout(150, &SpinOutcome::RefundTwoOfAKind, 5000), 150);
+    assert_eq!(
+        compute_payout(150, &SpinOutcome::RefundTwoOfAKind, 5000),
+        150
+    );
 }
 
 #[test]
 fn payout_three_of_a_kind_multiplies_mise() {
-    let outcome = SpinOutcome::ThreeOfAKind { symbol_index: 2, multiplier: 5.0 };
+    let outcome = SpinOutcome::ThreeOfAKind {
+        symbol_index: 2,
+        multiplier: 5.0,
+    };
     assert_eq!(compute_payout(100, &outcome, 0), 500);
 }
 
 #[test]
 fn payout_three_of_a_kind_rounds_to_int() {
     // 17 * 1.5 = 25.5 -> arrondi a 26
-    let outcome = SpinOutcome::ThreeOfAKind { symbol_index: 0, multiplier: 1.5 };
+    let outcome = SpinOutcome::ThreeOfAKind {
+        symbol_index: 0,
+        multiplier: 1.5,
+    };
     assert_eq!(compute_payout(17, &outcome, 0), 26);
 }
 
@@ -332,13 +398,19 @@ fn jackpot_contribution_zero_mise_returns_zero() {
 #[test]
 fn parse_symbols_emojis() {
     let s = parse_csv_symbols("🍒,🍋,🍊");
-    assert_eq!(s, vec!["🍒".to_string(), "🍋".to_string(), "🍊".to_string()]);
+    assert_eq!(
+        s,
+        vec!["🍒".to_string(), "🍋".to_string(), "🍊".to_string()]
+    );
 }
 
 #[test]
 fn parse_symbols_trims_whitespace() {
     let s = parse_csv_symbols(" 🍒 , 🍋,🍊 ");
-    assert_eq!(s, vec!["🍒".to_string(), "🍋".to_string(), "🍊".to_string()]);
+    assert_eq!(
+        s,
+        vec!["🍒".to_string(), "🍋".to_string(), "🍊".to_string()]
+    );
 }
 
 #[test]
@@ -424,7 +496,10 @@ fn three_of_a_kind_non_jackpot_no_pool_added() {
     let outcome = evaluate_spin(&[0, 0, 0], &cfg);
     let payout_with_pool = compute_payout(50, &outcome, 99999);
     let payout_no_pool = compute_payout(50, &outcome, 0);
-    assert_eq!(payout_with_pool, payout_no_pool, "pool ignore sur ThreeOfAKind non-jackpot");
+    assert_eq!(
+        payout_with_pool, payout_no_pool,
+        "pool ignore sur ThreeOfAKind non-jackpot"
+    );
     assert_eq!(payout_no_pool, 100); // 50 * 2.0
 }
 

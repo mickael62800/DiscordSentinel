@@ -99,7 +99,6 @@ pub fn roll_chaos_with_multiplier(multiplier: f64) -> Option<ChaosEvent> {
     }
 }
 
-
 #[cfg(test)]
 #[path = "tests/chaos.rs"]
 mod tests;

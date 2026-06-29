@@ -1,11 +1,11 @@
 //! Port outbound pour le systeme de braquage (Phase 10).
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
 use crate::domain::entities::coude::heist::HeistAttempt;
 use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::errors::DomainError;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 
 #[async_trait]
 pub trait HeistRepository: Send + Sync {

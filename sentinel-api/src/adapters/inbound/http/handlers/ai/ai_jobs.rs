@@ -8,8 +8,8 @@
 //! Pragmatique : sqlx direct (comme bot_persistence.rs) â€” la couche est triviale
 //! et pas couverte par une use case business.
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
@@ -56,7 +56,8 @@ pub async fn create_ai_job(
     State(state): State<AppState>,
     Json(dto): Json<CreateAiJobDto>,
 ) -> Result<(StatusCode, Json<AiJobCreatedDto>), ApiError> {
-    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_ai_job_type(&dto.job_type) {
+    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_ai_job_type(&dto.job_type)
+    {
         return Err(ApiError::from(DomainError::ValidationError(format!(
             "job_type invalide : '{}', attendu 'analyze_text' ou 'analyze_image'",
             dto.job_type

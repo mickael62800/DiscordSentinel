@@ -3,12 +3,18 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
 
 // ══════════════════════════════════════════════════════════
 //  Config CRUD
@@ -20,15 +26,18 @@ async fn welcome_config_defaults() {
     let gid = ugid();
 
     sqlx::query("INSERT INTO welcome_config (guild_id) VALUES ($1)")
-        .bind(&gid).execute(&p).await.unwrap();
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
     let row = sqlx::query_as::<_, (bool, bool, bool, bool, bool)>(
         "SELECT welcome_enabled, welcome_dm_enabled, leave_enabled, rules_enabled, counter_enabled FROM welcome_config WHERE guild_id = $1",
     ).bind(&gid).fetch_one(&p).await.unwrap();
 
-    assert!(row.0);  // welcome_enabled = true
+    assert!(row.0); // welcome_enabled = true
     assert!(!row.1); // dm_enabled = false
-    assert!(row.2);  // leave_enabled = true
+    assert!(row.2); // leave_enabled = true
     assert!(!row.3); // rules_enabled = false
     assert!(!row.4); // counter_enabled = false
 }
@@ -44,7 +53,11 @@ async fn welcome_config_custom_message() {
 
     let row = sqlx::query_as::<_, (String, Option<String>)>(
         "SELECT welcome_message, welcome_channel_id FROM welcome_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "Hello {user} !");
     assert_eq!(row.1.unwrap(), "123456789");
@@ -56,7 +69,10 @@ async fn welcome_config_update_partial() {
     let gid = ugid();
 
     sqlx::query("INSERT INTO welcome_config (guild_id) VALUES ($1)")
-        .bind(&gid).execute(&p).await.unwrap();
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
     // Update seulement le message
     sqlx::query("UPDATE welcome_config SET welcome_message = 'Yo {user}!', updated_at = NOW() WHERE guild_id = $1")
@@ -64,7 +80,12 @@ async fn welcome_config_update_partial() {
 
     let msg = sqlx::query_as::<_, (String,)>(
         "SELECT welcome_message FROM welcome_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(msg, "Yo {user}!");
 }
@@ -130,11 +151,18 @@ async fn welcome_config_guild_isolation() {
     let gid2 = ugid();
 
     sqlx::query("INSERT INTO welcome_config (guild_id, welcome_message) VALUES ($1, 'A')")
-        .bind(&gid1).execute(&p).await.unwrap();
+        .bind(&gid1)
+        .execute(&p)
+        .await
+        .unwrap();
 
-    let exists = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM welcome_config WHERE guild_id = $1",
-    ).bind(&gid2).fetch_one(&p).await.unwrap().0;
+    let exists =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM welcome_config WHERE guild_id = $1")
+            .bind(&gid2)
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(exists, 0);
 }
@@ -145,11 +173,19 @@ async fn welcome_config_embed_color() {
     let gid = ugid();
 
     sqlx::query("INSERT INTO welcome_config (guild_id, welcome_embed_color) VALUES ($1, 'ff5733')")
-        .bind(&gid).execute(&p).await.unwrap();
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
     let color = sqlx::query_as::<_, (String,)>(
         "SELECT welcome_embed_color FROM welcome_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(color, "ff5733");
     // Verifier le parsing
@@ -165,11 +201,24 @@ async fn welcome_config_embed_color() {
 async fn welcome_rejoin_message_default() {
     let p = pool().await;
     let gid = ugid();
-    sqlx::query("INSERT INTO welcome_config (guild_id) VALUES ($1)").bind(&gid).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO welcome_config (guild_id) VALUES ($1)")
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
-    let msg = sqlx::query_as::<_, (String,)>("SELECT rejoin_message FROM welcome_config WHERE guild_id = $1")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
-    assert!(msg.contains("{user}"), "Le message de retour par defaut doit contenir le placeholder user");
+    let msg = sqlx::query_as::<_, (String,)>(
+        "SELECT rejoin_message FROM welcome_config WHERE guild_id = $1",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
+    assert!(
+        msg.contains("{user}"),
+        "Le message de retour par defaut doit contenir le placeholder user"
+    );
 }
 
 #[tokio::test]
@@ -179,8 +228,14 @@ async fn welcome_rejoin_message_custom() {
     sqlx::query("INSERT INTO welcome_config (guild_id, rejoin_message) VALUES ($1, 'Re {user} ! Tu reviens deja ?')")
         .bind(&gid).execute(&p).await.unwrap();
 
-    let msg = sqlx::query_as::<_, (String,)>("SELECT rejoin_message FROM welcome_config WHERE guild_id = $1")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let msg = sqlx::query_as::<_, (String,)>(
+        "SELECT rejoin_message FROM welcome_config WHERE guild_id = $1",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(msg, "Re {user} ! Tu reviens deja ?");
 }
 
@@ -192,7 +247,12 @@ async fn detect_rejoin_via_guild_members() {
     // Premiere visite — pas dans guild_members
     let exists = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM guild_members WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(exists, 0);
 
     // Enregistrer le membre (simule le premier join)
@@ -202,6 +262,11 @@ async fn detect_rejoin_via_guild_members() {
     // Deuxieme visite — maintenant present dans guild_members
     let exists = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM guild_members WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(exists, 1, "Le membre doit etre connu apres le premier join");
 }

@@ -14,12 +14,12 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
-use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
+use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 struct OkAnalyzeImage;
 #[async_trait]
 impl AnalyzeImageUseCase for OkAnalyzeImage {
@@ -29,19 +29,28 @@ impl AnalyzeImageUseCase for OkAnalyzeImage {
             reason: String::new(),
             score: 0.0,
             duration: None,
-            classifications: vec![ImageClassification { label: "safe".into(), confidence: 0.99 }],
+            classifications: vec![ImageClassification {
+                label: "safe".into(),
+                confidence: 0.99,
+            }],
         })
     }
 }
 
 async fn post(app: axum::Router, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri("/analyze/image")
+    let req = Request::builder()
+        .method("POST")
+        .uri("/analyze/image")
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn payload(image_data: &str, content_type: &str) -> serde_json::Value {
@@ -113,7 +122,10 @@ impl AnalyzeImageUseCase for FlaggedAnalyzeImage {
             reason: "NSFW detecte".into(),
             score: 0.95,
             duration: None,
-            classifications: vec![ImageClassification { label: "nsfw".into(), confidence: 0.95 }],
+            classifications: vec![ImageClassification {
+                label: "nsfw".into(),
+                confidence: 0.95,
+            }],
         })
     }
 }
@@ -141,6 +153,10 @@ async fn analyze_image_accepts_webp_and_gif() {
     let data = base64::engine::general_purpose::STANDARD.encode(b"x");
     for ct in ["image/webp", "image/gif", "image/jpeg"] {
         let (status, _) = post(app.clone(), payload(&data, ct)).await;
-        assert_eq!(status, StatusCode::OK, "content_type {ct} devrait etre accepte");
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "content_type {ct} devrait etre accepte"
+        );
     }
 }

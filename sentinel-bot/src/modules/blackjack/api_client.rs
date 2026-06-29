@@ -22,9 +22,9 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+use serde::{Deserialize, Serialize};
 
 use sentinel_proto::blackjack::v1 as proto;
 
@@ -121,11 +121,7 @@ impl ApiClient {
     // ── Catalogue flavor (Phase 3 #9 audit) ────────────────────────────
     /// Tirage d'un template aleatoire pour `(key, locale)`. `Ok(None)` si
     /// aucun template (404), `Err` sur autre erreur reseau/serveur.
-    pub async fn random_flavor(
-        &self,
-        key: &str,
-        locale: &str,
-    ) -> Result<Option<String>, String> {
+    pub async fn random_flavor(&self, key: &str, locale: &str) -> Result<Option<String>, String> {
         #[derive(Deserialize)]
         struct Resp {
             content: String,
@@ -162,15 +158,24 @@ impl ApiClient {
         Ok(proto_result_to_dto(result))
     }
 
-    pub async fn hit(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
+    pub async fn hit(
+        &self,
+        game_id: &str,
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Hit).await
     }
 
-    pub async fn stand(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
+    pub async fn stand(
+        &self,
+        game_id: &str,
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Stand).await
     }
 
-    pub async fn double_down(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
+    pub async fn double_down(
+        &self,
+        game_id: &str,
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Double).await
     }
 
@@ -218,11 +223,7 @@ impl ApiClient {
 
     // ── Wallet (gRPC) ──
 
-    pub async fn get_wallet(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<WalletDto, String> {
+    pub async fn get_wallet(&self, guild_id: &str, user_id: &str) -> Result<WalletDto, String> {
         let req = proto::GetWalletRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -282,27 +283,26 @@ impl ApiClient {
             .client()
             .post(url)
             .json(&serde_json::json!({ "user_id": user_id, "user_name": user_name }));
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
         Ok(())
     }
 
-    pub async fn get_table_by_channel(
-        &self,
-        channel_id: &str,
-    ) -> Result<Option<TableDto>, String> {
+    pub async fn get_table_by_channel(&self, channel_id: &str) -> Result<Option<TableDto>, String> {
         self.base
             .get_json(&format!("/api/blackjack/tables/by-channel/{channel_id}"))
             .await
     }
 
     #[allow(dead_code)]
-    pub async fn list_table_players(
-        &self,
-        table_id: &str,
-    ) -> Result<Vec<TablePlayerDto>, String> {
+    pub async fn list_table_players(&self, table_id: &str) -> Result<Vec<TablePlayerDto>, String> {
         self.base
             .get_json(&format!("/api/blackjack/tables/{table_id}/players"))
             .await
@@ -385,7 +385,12 @@ impl ApiClient {
             self.base.base_url(),
             table_id
         ));
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
@@ -417,9 +422,7 @@ fn proto_taunt_to_dto(t: proto::TauntEvent) -> TauntEvent {
 /// tuple (game, taunts) consomme par le game_logic. La partie est
 /// obligatoire (l'absence serait une erreur serveur) — defaut a un
 /// squelette vide si jamais le champ manque pour robustesse.
-fn proto_result_to_dto(
-    r: proto::BlackjackGameResult,
-) -> (BlackjackGameDto, Vec<TauntEvent>, i64) {
+fn proto_result_to_dto(r: proto::BlackjackGameResult) -> (BlackjackGameDto, Vec<TauntEvent>, i64) {
     let wallet_balance = r.wallet_balance;
     let game = r.game.map(proto_game_to_dto).unwrap_or(BlackjackGameDto {
         id: String::new(),
@@ -489,9 +492,9 @@ fn grpc_err_to_string(e: GrpcCallError) -> String {
                 .trim_start_matches("Conflit : ")
                 .trim_start_matches("Introuvable : ");
             match s.code() {
-                tonic::Code::InvalidArgument | tonic::Code::AlreadyExists | tonic::Code::NotFound => {
-                    clean.to_string()
-                }
+                tonic::Code::InvalidArgument
+                | tonic::Code::AlreadyExists
+                | tonic::Code::NotFound => clean.to_string(),
                 tonic::Code::Unauthenticated | tonic::Code::PermissionDenied => {
                     format!("Accès refusé : {clean}")
                 }

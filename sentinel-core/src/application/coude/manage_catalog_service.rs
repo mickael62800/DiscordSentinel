@@ -11,8 +11,8 @@ use crate::domain::services::coude::coude_combat_engine::classes;
 use crate::domain::services::coude::coude_combat_engine::progression;
 use crate::domain::services::coude::coude_combat_engine::shop;
 use crate::ports::inbound::coude::manage_catalog::AntiTheftItemInfo;
-use crate::ports::inbound::coude::manage_catalog::ClassInfo;
 use crate::ports::inbound::coude::manage_catalog::Catalog;
+use crate::ports::inbound::coude::manage_catalog::ClassInfo;
 use crate::ports::inbound::coude::manage_catalog::LevelEntry;
 use crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase;
 use crate::ports::inbound::coude::manage_catalog::MatchmakingBucket;
@@ -91,10 +91,30 @@ impl ManageCoudeCatalogUseCase for ManageCoudeCatalogService {
         // ── Matchmaking buckets ──
         // Derive des buckets statiques utilises par `matchmaking_handicap`.
         let matchmaking_buckets = vec![
-            MatchmakingBucket { gap_min: 0, gap_max: 2, handicap: 1.0, blocked: false },
-            MatchmakingBucket { gap_min: 3, gap_max: 5, handicap: 0.8, blocked: false },
-            MatchmakingBucket { gap_min: 6, gap_max: 9, handicap: 0.6, blocked: false },
-            MatchmakingBucket { gap_min: 10, gap_max: 999, handicap: 0.0, blocked: true },
+            MatchmakingBucket {
+                gap_min: 0,
+                gap_max: 2,
+                handicap: 1.0,
+                blocked: false,
+            },
+            MatchmakingBucket {
+                gap_min: 3,
+                gap_max: 5,
+                handicap: 0.8,
+                blocked: false,
+            },
+            MatchmakingBucket {
+                gap_min: 6,
+                gap_max: 9,
+                handicap: 0.6,
+                blocked: false,
+            },
+            MatchmakingBucket {
+                gap_min: 10,
+                gap_max: 999,
+                handicap: 0.0,
+                blocked: true,
+            },
         ];
 
         // ── Anti-vol items ──

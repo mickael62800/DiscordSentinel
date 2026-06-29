@@ -7,10 +7,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::adapters::outbound::postgres::pg_err;
+use crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
 use sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage;
 use sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
 
 pub struct PgDiscordActionMessageRepository {
     pool: PgPool,
@@ -51,23 +51,38 @@ impl DiscordActionMessageRepository for PgDiscordActionMessageRepository {
         &self,
         action_id: Uuid,
     ) -> Result<Vec<DiscordActionMessage>, DomainError> {
-        let rows: Vec<(Uuid, String, String, String, String, DateTime<Utc>, Option<DateTime<Utc>>)> =
-            sqlx::query_as(
-                r#"SELECT action_id, kind, guild_id, channel_id, message_id, posted_at, last_edited_at
+        let rows: Vec<(
+            Uuid,
+            String,
+            String,
+            String,
+            String,
+            DateTime<Utc>,
+            Option<DateTime<Utc>>,
+        )> = sqlx::query_as(
+            r#"SELECT action_id, kind, guild_id, channel_id, message_id, posted_at, last_edited_at
                    FROM discord_action_messages
                    WHERE action_id = $1
                    ORDER BY posted_at"#,
-            )
-            .bind(action_id)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        )
+        .bind(action_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(rows.into_iter().map(row_to_entity).collect())
     }
 }
 
 fn row_to_entity(
-    row: (Uuid, String, String, String, String, DateTime<Utc>, Option<DateTime<Utc>>),
+    row: (
+        Uuid,
+        String,
+        String,
+        String,
+        String,
+        DateTime<Utc>,
+        Option<DateTime<Utc>>,
+    ),
 ) -> DiscordActionMessage {
     DiscordActionMessage {
         action_id: row.0,

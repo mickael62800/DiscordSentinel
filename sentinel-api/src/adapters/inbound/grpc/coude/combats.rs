@@ -8,25 +8,28 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::coude::combat::CombatResolution;
-use sentinel_core::domain::entities::coude::combat::Combat;
-use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use sentinel_core::domain::entities::coude::combat::Combat;
+use sentinel_core::domain::entities::coude::combat::CombatResolution;
+use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
 
 use super::parse_uuid;
 use super::taunt_event_to_proto;
 pub struct CombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
-    pub resolve_batch_uc: Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
-    pub expire_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
-    pub resolve_now_uc: Arc<dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase>,
+    pub resolve_batch_uc:
+        Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
+    pub expire_batch_uc:
+        Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
+    pub resolve_now_uc:
+        Arc<dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase>,
 }
 
 #[cfg(test)]
@@ -66,7 +69,11 @@ impl CoudeCombatsService for CombatsGrpc {
         request: Request<proto::ListCombatsRequest>,
     ) -> Result<Response<proto::CombatList>, Status> {
         let req = request.into_inner();
-        let limit = if req.limit <= 0 { 50 } else { req.limit.min(500) };
+        let limit = if req.limit <= 0 {
+            50
+        } else {
+            req.limit.min(500)
+        };
         let list = self
             .uc
             .list(&req.guild_id, req.status.as_deref(), limit)
@@ -257,7 +264,11 @@ impl CoudeCombatsService for CombatsGrpc {
                 loser_id: c.loser_id,
                 coins_transferred: c.coins_transferred,
                 is_draw: c.is_draw,
-                taunt_events: c.taunt_events.into_iter().map(taunt_event_to_proto).collect(),
+                taunt_events: c
+                    .taunt_events
+                    .into_iter()
+                    .map(taunt_event_to_proto)
+                    .collect(),
             })
             .collect();
         Ok(Response::new(proto::ResolvedBettingBatch { combats }))
@@ -317,14 +328,12 @@ impl CoudeCombatsService for CombatsGrpc {
                 .into_iter()
                 .map(taunt_event_to_proto)
                 .collect(),
-            vendetta_humiliation: out.vendetta_humiliation.map(|h| {
-                proto::VendettaHumiliation {
+            vendetta_humiliation: out
+                .vendetta_humiliation
+                .map(|h| proto::VendettaHumiliation {
                     target_user_id: h.target_user_id,
                     challenger_user_id: h.challenger_user_id,
-                }
-            }),
+                }),
         }))
     }
 }
-
-

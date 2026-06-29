@@ -3,21 +3,21 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::tickets::v1 as proto;
+use sentinel_proto::tickets::v1::tickets_service_server::TicketsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::tickets::v1 as proto;
-use sentinel_proto::tickets::v1::tickets_service_server::TicketsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::system::ticket::Ticket;
-use sentinel_core::domain::entities::system::ticket::TicketDetail;
-use sentinel_core::domain::entities::system::ticket::TicketMessage;
 use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
 use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
 use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
+use sentinel_core::domain::entities::system::ticket::Ticket;
+use sentinel_core::domain::entities::system::ticket::TicketDetail;
+use sentinel_core::domain::entities::system::ticket::TicketMessage;
 pub struct TicketsGrpc {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
 }
@@ -29,11 +29,22 @@ impl TicketsService for TicketsGrpc {
         request: Request<proto::ListTicketsRequest>,
     ) -> Result<Response<proto::TicketList>, Status> {
         let req = request.into_inner();
-        let limit = if req.limit <= 0 { 50 } else { req.limit.min(200) };
+        let limit = if req.limit <= 0 {
+            50
+        } else {
+            req.limit.min(200)
+        };
         let offset = req.offset.max(0);
         let tickets = self
             .tickets_uc
-            .list_tickets(req.status, req.priority, req.search, req.author_id, limit, offset)
+            .list_tickets(
+                req.status,
+                req.priority,
+                req.search,
+                req.author_id,
+                limit,
+                offset,
+            )
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::TicketList {
@@ -213,10 +224,13 @@ fn ticket_message_to_proto(m: TicketMessage) -> proto::TicketMessage {
 fn ticket_detail_to_proto(d: TicketDetail) -> proto::TicketDetail {
     proto::TicketDetail {
         ticket: Some(ticket_to_proto(d.ticket)),
-        messages: d.messages.into_iter().map(ticket_message_to_proto).collect(),
+        messages: d
+            .messages
+            .into_iter()
+            .map(ticket_message_to_proto)
+            .collect(),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/tickets.rs"]

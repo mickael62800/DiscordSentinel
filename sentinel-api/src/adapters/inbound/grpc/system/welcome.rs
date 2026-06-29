@@ -5,11 +5,11 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::welcome::v1 as proto;
+use sentinel_proto::welcome::v1::welcome_service_server::WelcomeService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::welcome::v1 as proto;
-use sentinel_proto::welcome::v1::welcome_service_server::WelcomeService;
 
 use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
 
@@ -23,7 +23,10 @@ impl WelcomeService for WelcomeGrpc {
         &self,
         request: Request<proto::GetConfigRequest>,
     ) -> Result<Response<proto::WelcomeConfig>, Status> {
-        let cfg = self.uc.get(&request.into_inner().guild_id).await
+        let cfg = self
+            .uc
+            .get(&request.into_inner().guild_id)
+            .await
             .map_err(|e| Status::internal(format!("get welcome config: {e}")))?;
 
         Ok(Response::new(proto::WelcomeConfig {

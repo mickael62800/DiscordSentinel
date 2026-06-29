@@ -329,8 +329,16 @@ pub fn resolve_combat(
     params: &BalanceParams,
 ) -> CombatResult {
     resolve_combat_with_curses(
-        attacker, defender, attacker_current_hp, defender_current_hp, mise, special,
-        defender_special, active_events, params, CombatCurses::default(),
+        attacker,
+        defender,
+        attacker_current_hp,
+        defender_current_hp,
+        mise,
+        special,
+        defender_special,
+        active_events,
+        params,
+        CombatCurses::default(),
     )
 }
 
@@ -446,8 +454,16 @@ pub fn resolve_combat_with_curses(
     let multiplier = if happy_hour { 2 } else { 1 };
 
     // Cowardice penalty
-    let coward_penalty_atk = if attacker.cowardice_count >= 5 { 0.80 } else { 1.0 };
-    let coward_penalty_def = if defender.cowardice_count >= 5 { 0.80 } else { 1.0 };
+    let coward_penalty_atk = if attacker.cowardice_count >= 5 {
+        0.80
+    } else {
+        1.0
+    };
+    let coward_penalty_def = if defender.cowardice_count >= 5 {
+        0.80
+    } else {
+        1.0
+    };
 
     let atk_name = format!("<@{}>", attacker.user_id);
     let def_name = format!("<@{}>", defender.user_id);
@@ -599,17 +615,13 @@ pub fn resolve_combat_with_curses(
             def_dmg = 0;
             atk_passif = Some("esquive".to_string());
             attacker_class_revealed = Some("agile".to_string());
-            round_msg.push_str(&format!(
-                "\u{1f3c3} {} esquive le coup !\n", atk_name
-            ));
+            round_msg.push_str(&format!("\u{1f3c3} {} esquive le coup !\n", atk_name));
         }
         if def_dodged {
             atk_dmg = 0;
             def_passif = Some("esquive".to_string());
             defender_class_revealed = Some("agile".to_string());
-            round_msg.push_str(&format!(
-                "\u{1f3c3} {} esquive le coup !\n", def_name
-            ));
+            round_msg.push_str(&format!("\u{1f3c3} {} esquive le coup !\n", def_name));
         }
 
         // ── Chaos event (8% per round) ──
@@ -626,13 +638,17 @@ pub fn resolve_combat_with_curses(
                         atk_dmg *= 2;
                         round_msg.push_str(&format!(
                             "{} **{}** — {} inflige x2 degats ce round !\n",
-                            ce.emoji(), ce.label(), atk_name
+                            ce.emoji(),
+                            ce.label(),
+                            atk_name
                         ));
                     } else {
                         def_dmg *= 2;
                         round_msg.push_str(&format!(
                             "{} **{}** — {} inflige x2 degats ce round !\n",
-                            ce.emoji(), ce.label(), def_name
+                            ce.emoji(),
+                            ce.label(),
+                            def_name
                         ));
                     }
                 }
@@ -642,7 +658,9 @@ pub fn resolve_combat_with_curses(
                     def_dmg = (def_dmg as f64 * 1.5) as i32;
                     round_msg.push_str(&format!(
                         "{} **{}** — {} esquive et contre-attaque a +50% !\n",
-                        ce.emoji(), ce.label(), def_name
+                        ce.emoji(),
+                        ce.label(),
+                        def_name
                     ));
                 }
                 ChaosEvent::AccidentDebile => {
@@ -653,7 +671,10 @@ pub fn resolve_combat_with_curses(
                     def_hp -= def_self_dmg;
                     round_msg.push_str(&format!(
                         "{} **{}** — Les deux prennent des degats ! ({} et {} HP perdus)\n",
-                        ce.emoji(), ce.label(), atk_self_dmg, def_self_dmg
+                        ce.emoji(),
+                        ce.label(),
+                        atk_self_dmg,
+                        def_self_dmg
                     ));
                 }
                 ChaosEvent::Glissade => {
@@ -662,7 +683,9 @@ pub fn resolve_combat_with_curses(
                     atk_dmg = 0;
                     round_msg.push_str(&format!(
                         "{} **{}** — {} se frappe lui-meme !\n",
-                        ce.emoji(), ce.label(), atk_name
+                        ce.emoji(),
+                        ce.label(),
+                        atk_name
                     ));
                 }
                 ChaosEvent::Vol => {
@@ -671,7 +694,9 @@ pub fn resolve_combat_with_curses(
                     vol_coins_total += steal_amount;
                     round_msg.push_str(&format!(
                         "{} **{}** — {} coins voles en bonus !\n",
-                        ce.emoji(), ce.label(), steal_amount
+                        ce.emoji(),
+                        ce.label(),
+                        steal_amount
                     ));
                 }
             }
@@ -681,13 +706,15 @@ pub fn resolve_combat_with_curses(
         if atk_poison {
             def_hp -= poison_dmg;
             round_msg.push_str(&format!(
-                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n", def_name, poison_dmg
+                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n",
+                def_name, poison_dmg
             ));
         }
         if def_poison {
             atk_hp -= poison_dmg;
             round_msg.push_str(&format!(
-                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n", atk_name, poison_dmg
+                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n",
+                atk_name, poison_dmg
             ));
         }
 
@@ -721,7 +748,8 @@ pub fn resolve_combat_with_curses(
             attacker_class_revealed = Some("fourbe".to_string());
             if heal > 0 {
                 round_msg.push_str(&format!(
-                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n", atk_name, heal
+                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n",
+                    atk_name, heal
                 ));
             }
         }
@@ -734,7 +762,8 @@ pub fn resolve_combat_with_curses(
             defender_class_revealed = Some("fourbe".to_string());
             if heal > 0 {
                 round_msg.push_str(&format!(
-                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n", def_name, heal
+                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n",
+                    def_name, heal
                 ));
             }
         }
@@ -745,7 +774,11 @@ pub fn resolve_combat_with_curses(
 
         // ── Round flavor text ──
         if atk_dmg > 0 {
-            let templates = if atk_dmg < 5 { ROUND_WEAK } else { ROUND_ATTACK };
+            let templates = if atk_dmg < 5 {
+                ROUND_WEAK
+            } else {
+                ROUND_ATTACK
+            };
             let txt = fmt_template(
                 pick_random(templates),
                 &[
@@ -758,7 +791,11 @@ pub fn resolve_combat_with_curses(
             round_msg.push('\n');
         }
         if def_dmg > 0 {
-            let templates = if def_dmg < 5 { ROUND_WEAK } else { ROUND_ATTACK };
+            let templates = if def_dmg < 5 {
+                ROUND_WEAK
+            } else {
+                ROUND_ATTACK
+            };
             let txt = fmt_template(
                 pick_random(templates),
                 &[
@@ -825,7 +862,8 @@ pub fn resolve_combat_with_curses(
     let ko = atk_hp <= 0 || def_hp <= 0;
 
     // Determine winner/loser
-    let (winner_id, loser_id, winner_pct, loser_pct, winner_coward) = if atk_hp <= 0 && def_hp <= 0 {
+    let (winner_id, loser_id, winner_pct, loser_pct, winner_coward) = if atk_hp <= 0 && def_hp <= 0
+    {
         // Both KO at same time -> compare who had more HP% before last round
         // Treat as draw
         (None, None, atk_hp_pct, def_hp_pct, 1.0)
@@ -880,7 +918,8 @@ pub fn resolve_combat_with_curses(
     };
 
     // ── Resume des items utilises (prepend both winner + draw paths) ──
-    let items_summary = build_items_summary(&atk_name, &def_name, special, defender_special, params);
+    let items_summary =
+        build_items_summary(&atk_name, &def_name, special, defender_special, params);
 
     if is_draw {
         // ── Draw path ──
@@ -895,7 +934,11 @@ pub fn resolve_combat_with_curses(
         if chaos_count > 0 {
             let chaos_list: Vec<String> = rounds
                 .iter()
-                .filter_map(|r| r.chaos_event.as_ref().map(|ce| format!("{} {}", ce.emoji(), ce.label())))
+                .filter_map(|r| {
+                    r.chaos_event
+                        .as_ref()
+                        .map(|ce| format!("{} {}", ce.emoji(), ce.label()))
+                })
                 .collect();
             final_msg.push_str(&format!(
                 "\n\n\u{1f300} **Chaos ({})** : {}",
@@ -938,8 +981,16 @@ pub fn resolve_combat_with_curses(
 
     // Giant killer: 3+ level gap underdog winning
     let is_giant = if let (Some(ref wid), Some(ref lid)) = (&winner_id, &loser_id) {
-        let winner_lvl = if *wid == attacker.user_id { attacker.level } else { defender.level };
-        let loser_lvl = if *lid == attacker.user_id { attacker.level } else { defender.level };
+        let winner_lvl = if *wid == attacker.user_id {
+            attacker.level
+        } else {
+            defender.level
+        };
+        let loser_lvl = if *lid == attacker.user_id {
+            attacker.level
+        } else {
+            defender.level
+        };
         level_gap >= 3 && winner_lvl < loser_lvl
     } else {
         false
@@ -1058,7 +1109,11 @@ pub fn resolve_combat_with_curses(
     if chaos_count > 0 {
         let chaos_list: Vec<String> = rounds
             .iter()
-            .filter_map(|r| r.chaos_event.as_ref().map(|ce| format!("{} {}", ce.emoji(), ce.label())))
+            .filter_map(|r| {
+                r.chaos_event
+                    .as_ref()
+                    .map(|ce| format!("{} {}", ce.emoji(), ce.label()))
+            })
             .collect();
         final_msg.push_str(&format!(
             "\n\n\u{1f300} **Chaos ({})** : {}",
@@ -1156,7 +1211,6 @@ fn build_items_summary(
 // ══════════════════════════════════════════════════════════════════════
 // ── Tests ──
 // ══════════════════════════════════════════════════════════════════════
-
 
 #[cfg(test)]
 #[path = "tests/combat.rs"]

@@ -12,21 +12,38 @@ use tower::ServiceExt;
 use sentinel_api::adapters::inbound::http::router;
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -37,7 +54,8 @@ async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (St
 async fn models_status_returns_two_entries() {
     // StubAnalyzeImage / base_state utilisent un InferenceService::new(None, None)
     // → vision et text pas charges.
-    let state = test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
+    let state =
+        test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
     let app = router::build_for_test(state);
     let (status, json) = get(app, "/api/models/status").await;
     assert_eq!(status, StatusCode::OK);
@@ -56,7 +74,8 @@ async fn models_status_name_indicates_non_configure_when_env_empty() {
         std::env::remove_var("VISION_MODEL_PATH");
         std::env::remove_var("TEXT_MODEL_PATH");
     }
-    let state = test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
+    let state =
+        test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
     let app = router::build_for_test(state);
     let (status, json) = get(app, "/api/models/status").await;
     assert_eq!(status, StatusCode::OK);
@@ -71,7 +90,8 @@ async fn models_status_name_indicates_non_configure_when_env_empty() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reload_unknown_type_returns_500_with_message() {
-    let state = test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
+    let state =
+        test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
     let app = router::build_for_test(state);
     let body = serde_json::json!({"model_type": "something-unknown"});
     let (status, json) = post_json(app, "/api/models/reload", body).await;
@@ -82,14 +102,20 @@ async fn reload_unknown_type_returns_500_with_message() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reload_text_without_env_returns_500() {
-    unsafe { std::env::remove_var("TEXT_MODEL_PATH"); }
-    let state = test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
+    unsafe {
+        std::env::remove_var("TEXT_MODEL_PATH");
+    }
+    let state =
+        test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
     let app = router::build_for_test(state);
     let body = serde_json::json!({"model_type": "text"});
     let (status, json) = post_json(app, "/api/models/reload", body).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     assert_eq!(json["success"], false);
-    assert!(json["message"].as_str().unwrap().contains("TEXT_MODEL_PATH"));
+    assert!(json["message"]
+        .as_str()
+        .unwrap()
+        .contains("TEXT_MODEL_PATH"));
 }
 
 // ══════════════════════════════════════════════════════════
@@ -99,7 +125,8 @@ async fn reload_text_without_env_returns_500() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cache_stats_returns_zeros_when_no_cache() {
     // base_state initialise state.cache = None
-    let state = test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
+    let state =
+        test_helpers::build_test_state(std::sync::Arc::new(test_helpers::StubVoiceChannels));
     let app = router::build_for_test(state);
     let (status, json) = get(app, "/api/cache/stats").await;
     assert_eq!(status, StatusCode::OK);

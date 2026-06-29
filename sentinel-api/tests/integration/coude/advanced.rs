@@ -4,12 +4,18 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
 
 async fn create_player(p: &PgPool, gid: &str, uid: &str, coins: i64) {
     sqlx::query("INSERT INTO coude_players (guild_id, user_id, username, coins) VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING")
@@ -35,7 +41,11 @@ async fn bet_on_combat() {
     ).bind(&gid).bind(combat_id).execute(&p).await.unwrap();
 
     let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM coude_bets WHERE combat_id = $1")
-        .bind(combat_id).fetch_one(&p).await.unwrap().0;
+        .bind(combat_id)
+        .fetch_one(&p)
+        .await
+        .unwrap()
+        .0;
     assert_eq!(count, 1);
 }
 
@@ -53,7 +63,12 @@ async fn multiple_bets_on_same_combat() {
 
     let total = sqlx::query_as::<_, (i64,)>(
         "SELECT COALESCE(SUM(amount), 0)::bigint FROM coude_bets WHERE combat_id = $1",
-    ).bind(combat_id).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(combat_id)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(total, 150);
 }
 
@@ -68,7 +83,11 @@ async fn cooldown_set_and_check() {
         r#"INSERT INTO coude_cooldowns (guild_id, user_id, action, expires_at)
            VALUES ($1, '444', 'voler', NOW() + INTERVAL '30 minutes')
            ON CONFLICT (guild_id, user_id, action) DO UPDATE SET expires_at = EXCLUDED.expires_at"#,
-    ).bind(&gid).execute(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let active = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM coude_cooldowns WHERE guild_id = $1 AND user_id = '444' AND action = 'voler' AND expires_at > NOW()",
@@ -147,8 +166,13 @@ async fn prime_create_and_claim() {
     sqlx::query("UPDATE coude_primes SET claimed = true, claimed_by_id = '333', claimed_by_name = 'Hunter', claimed_at = NOW() WHERE id = $1")
         .bind(id).execute(&p).await.unwrap();
 
-    let row = sqlx::query_as::<_, (bool, Option<String>)>("SELECT claimed, claimed_by_name FROM coude_primes WHERE id = $1")
-        .bind(id).fetch_one(&p).await.unwrap();
+    let row = sqlx::query_as::<_, (bool, Option<String>)>(
+        "SELECT claimed, claimed_by_name FROM coude_primes WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert!(row.0);
     assert_eq!(row.1.unwrap(), "Hunter");
 }
@@ -183,7 +207,11 @@ async fn chaos_event_create() {
 
     let active = sqlx::query_as::<_, (String, bool)>(
         "SELECT event_type, active FROM coude_events WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(active.0, "happy_hour");
     assert!(active.1);
 }
@@ -195,13 +223,17 @@ async fn season_create() {
     let p = pool().await;
     let gid = ugid();
 
-    sqlx::query(
-        "INSERT INTO coude_seasons (guild_id, season_number) VALUES ($1, 1)",
-    ).bind(&gid).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO coude_seasons (guild_id, season_number) VALUES ($1, 1)")
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
-    let row = sqlx::query_as::<_, (i32,)>(
-        "SELECT season_number FROM coude_seasons WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
+    let row =
+        sqlx::query_as::<_, (i32,)>("SELECT season_number FROM coude_seasons WHERE guild_id = $1")
+            .bind(&gid)
+            .fetch_one(&p)
+            .await
+            .unwrap();
     assert_eq!(row.0, 1);
 }
-

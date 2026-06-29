@@ -10,11 +10,11 @@
 
 use serenity::all::{
     CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
@@ -98,7 +98,9 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     // Detecte la sous-commande choisie (attaque/defense/braquage) et
     // l'argument optionnel `acheter`.
@@ -116,7 +118,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -226,7 +230,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     command.user.id, item.emoji, item.name, price, item.description
                 ))
                 .color(category_color(category))
-                .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+                .footer(CreateEmbedFooter::new(
+                    crate::shared::branding::COUDE_TAGLINE_SHORT,
+                ))
                 .timestamp(serenity::model::Timestamp::now());
 
             crate::modules::coude::channel_check::post_activity(
@@ -302,7 +308,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .title(title)
                 .description(desc)
                 .color(category_color(category))
-                .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+                .footer(CreateEmbedFooter::new(
+                    crate::shared::branding::COUDE_TAGLINE_SHORT,
+                ))
                 .timestamp(serenity::model::Timestamp::now());
 
             if let Err(e) = command
@@ -353,4 +361,3 @@ fn category_color(category: &str) -> u32 {
         _ => 0x95A5A6,
     }
 }
-

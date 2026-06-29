@@ -53,13 +53,19 @@ impl ManageLevelsUseCase for ManageLevelsService {
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
         // Validation des bornes
         if cmd.xp_per_message < 1 || cmd.xp_per_message > 1000 {
-            return Err(DomainError::ValidationError("xp_per_message doit etre entre 1 et 1000".into()));
+            return Err(DomainError::ValidationError(
+                "xp_per_message doit etre entre 1 et 1000".into(),
+            ));
         }
         if cmd.xp_per_voice_minute < 1 || cmd.xp_per_voice_minute > 1000 {
-            return Err(DomainError::ValidationError("xp_per_voice_minute doit etre entre 1 et 1000".into()));
+            return Err(DomainError::ValidationError(
+                "xp_per_voice_minute doit etre entre 1 et 1000".into(),
+            ));
         }
         if cmd.xp_cooldown_secs < 0 || cmd.xp_cooldown_secs > 3600 {
-            return Err(DomainError::ValidationError("xp_cooldown_secs doit etre entre 0 et 3600".into()));
+            return Err(DomainError::ValidationError(
+                "xp_cooldown_secs doit etre entre 0 et 3600".into(),
+            ));
         }
 
         let now = Utc::now();
@@ -82,22 +88,29 @@ impl ManageLevelsUseCase for ManageLevelsService {
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         // Validation
         if cmd.amount <= 0 {
-            return Err(DomainError::ValidationError("Le montant XP doit etre positif".into()));
+            return Err(DomainError::ValidationError(
+                "Le montant XP doit etre positif".into(),
+            ));
         }
         if cmd.amount > 10000 {
-            return Err(DomainError::ValidationError("Le montant XP ne peut pas depasser 10000".into()));
+            return Err(DomainError::ValidationError(
+                "Le montant XP ne peut pas depasser 10000".into(),
+            ));
         }
 
         // UPDATE atomique. RETURNING retourne les levels PRE-update (le SQL
         // ne modifie pas les colonnes level_*), ce qui elimine la race condition
         // entre lecture de l'ancien etat et l'update.
-        let user_level_pre = self.repo.add_xp_atomic(
-            &cmd.guild_id,
-            &cmd.user_id,
-            &cmd.username,
-            cmd.amount,
-            cmd.source,
-        ).await?;
+        let user_level_pre = self
+            .repo
+            .add_xp_atomic(
+                &cmd.guild_id,
+                &cmd.user_id,
+                &cmd.username,
+                cmd.amount,
+                cmd.source,
+            )
+            .await?;
 
         // Anciens niveaux = ceux retournes par RETURNING (non touches par l'UPDATE).
         let old_level_text = user_level_pre.level_text;
@@ -140,19 +153,34 @@ impl ManageLevelsUseCase for ManageLevelsService {
         })
     }
 
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError> {
+    async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserLevel, DomainError> {
         self.repo
             .get_user_level(guild_id, user_id)
             .await?
             .ok_or_else(|| DomainError::NotFound(format!("Niveau introuvable pour {user_id}")))
     }
 
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
         self.repo.get_leaderboard(guild_id, limit).await
     }
 
-    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
-        self.repo.get_leaderboard_by_source(guild_id, source, limit).await
+    async fn get_leaderboard_by_source(
+        &self,
+        guild_id: &str,
+        source: XpSource,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
+        self.repo
+            .get_leaderboard_by_source(guild_id, source, limit)
+            .await
     }
 
     async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError> {
@@ -160,21 +188,28 @@ impl ManageLevelsUseCase for ManageLevelsService {
             .repo
             .get_user_level(cmd.guild_id.as_ref(), cmd.user_id.as_ref())
             .await?
-            .ok_or_else(|| DomainError::NotFound(format!(
-                "User {} n'a pas encore de progression sur la guild {}",
-                cmd.user_id.as_ref(), cmd.guild_id.as_ref()
-            )))?;
+            .ok_or_else(|| {
+                DomainError::NotFound(format!(
+                    "User {} n'a pas encore de progression sur la guild {}",
+                    cmd.user_id.as_ref(),
+                    cmd.guild_id.as_ref()
+                ))
+            })?;
 
         if let Some(xp_t) = cmd.xp_text {
             if xp_t < 0 {
-                return Err(DomainError::ValidationError("xp_text doit etre >= 0".into()));
+                return Err(DomainError::ValidationError(
+                    "xp_text doit etre >= 0".into(),
+                ));
             }
             user.xp_text = xp_t;
             user.level_text = level_from_xp(xp_t);
         }
         if let Some(xp_v) = cmd.xp_voice {
             if xp_v < 0 {
-                return Err(DomainError::ValidationError("xp_voice doit etre >= 0".into()));
+                return Err(DomainError::ValidationError(
+                    "xp_voice doit etre >= 0".into(),
+                ));
             }
             user.xp_voice = xp_v;
             user.level_voice = level_from_xp(xp_v);
@@ -188,14 +223,21 @@ impl ManageLevelsUseCase for ManageLevelsService {
         Ok(user)
     }
 
-    async fn reset_user_xp(&self, guild_id: &str, user_id: &str, target: ResetTarget) -> Result<UserLevel, DomainError> {
+    async fn reset_user_xp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        target: ResetTarget,
+    ) -> Result<UserLevel, DomainError> {
         let mut user = self
             .repo
             .get_user_level(guild_id, user_id)
             .await?
-            .ok_or_else(|| DomainError::NotFound(format!(
-                "User {user_id} n'a pas encore de progression sur la guild {guild_id}"
-            )))?;
+            .ok_or_else(|| {
+                DomainError::NotFound(format!(
+                    "User {user_id} n'a pas encore de progression sur la guild {guild_id}"
+                ))
+            })?;
 
         match target {
             ResetTarget::Text => {

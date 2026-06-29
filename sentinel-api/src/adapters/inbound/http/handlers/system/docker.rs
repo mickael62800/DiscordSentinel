@@ -337,7 +337,9 @@ pub async fn start_container(
     gate_super(&state, &rbac)?;
     audit_docker(&state, &rbac, "container.start", &id);
     let d = docker()?;
-    d.start_container::<String>(&id, None).await.map_err(map_err)?;
+    d.start_container::<String>(&id, None)
+        .await
+        .map_err(map_err)?;
     Ok(ok_response())
 }
 
@@ -375,7 +377,9 @@ pub async fn restart_container(
     let opts = RestartContainerOptions {
         t: q.timeout.unwrap_or(10) as isize,
     };
-    d.restart_container(&id, Some(opts)).await.map_err(map_err)?;
+    d.restart_container(&id, Some(opts))
+        .await
+        .map_err(map_err)?;
     Ok(ok_response())
 }
 
@@ -450,9 +454,7 @@ pub async fn container_logs(
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Images Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-pub async fn list_images(
-    State(_state): State<AppState>,
-) -> Result<Json<Vec<ImageDto>>, ApiError> {
+pub async fn list_images(State(_state): State<AppState>) -> Result<Json<Vec<ImageDto>>, ApiError> {
     let d = docker()?;
     let opts = ListImagesOptions::<String> {
         all: false,
@@ -463,8 +465,7 @@ pub async fn list_images(
         .into_iter()
         .map(|i| {
             let repo_tags = i.repo_tags.clone();
-            let dangling = repo_tags.is_empty()
-                || repo_tags.iter().all(|t| t == "<none>:<none>");
+            let dangling = repo_tags.is_empty() || repo_tags.iter().all(|t| t == "<none>:<none>");
             ImageDto {
                 id: i.id,
                 repo_tags,
@@ -502,7 +503,9 @@ pub async fn remove_image(
         force: q.force.unwrap_or(false),
         noprune: q.no_prune.unwrap_or(false),
     };
-    d.remove_image(&id, Some(opts), None).await.map_err(map_err)?;
+    d.remove_image(&id, Some(opts), None)
+        .await
+        .map_err(map_err)?;
     Ok(ok_response())
 }
 
@@ -617,11 +620,19 @@ pub async fn prune_images(
         &state,
         &rbac,
         "prune.images",
-        if q.all.unwrap_or(false) { "all=true" } else { "dangling=true" },
+        if q.all.unwrap_or(false) {
+            "all=true"
+        } else {
+            "dangling=true"
+        },
     );
     let d = docker()?;
     let mut filters: HashMap<String, Vec<String>> = HashMap::new();
-    let dangling = if q.all.unwrap_or(false) { "false" } else { "true" };
+    let dangling = if q.all.unwrap_or(false) {
+        "false"
+    } else {
+        "true"
+    };
     filters.insert("dangling".to_string(), vec![dangling.to_string()]);
     let opts = bollard::image::PruneImagesOptions { filters };
     let r = d.prune_images(Some(opts)).await.map_err(map_err)?;
@@ -714,7 +725,11 @@ pub async fn prune_system(
         .map_err(map_err)?;
 
     let mut img_filters: HashMap<String, Vec<String>> = HashMap::new();
-    let dangling = if q.all_images.unwrap_or(false) { "false" } else { "true" };
+    let dangling = if q.all_images.unwrap_or(false) {
+        "false"
+    } else {
+        "true"
+    };
     img_filters.insert("dangling".to_string(), vec![dangling.to_string()]);
     let images = d
         .prune_images(Some(bollard::image::PruneImagesOptions {

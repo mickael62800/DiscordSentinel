@@ -18,14 +18,14 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::coude::social::Season;
-use sentinel_core::domain::entities::coude::social::Event;
-use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
-use sentinel_core::domain::entities::coude::social::DailyChaosOutcome;
-use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
-use sentinel_core::domain::entities::coude::social::NewDailyChaos;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use sentinel_core::domain::entities::coude::social::DailyChaosOutcome;
+use sentinel_core::domain::entities::coude::social::Event;
+use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
+use sentinel_core::domain::entities::coude::social::NewDailyChaos;
+use sentinel_core::domain::entities::coude::social::Season;
+use sentinel_core::domain::errors::DomainError;
 
 #[derive(Default)]
 struct MockSocial {
@@ -38,23 +38,46 @@ struct MockSocial {
 
 #[async_trait]
 impl ManageCoudeSocialUseCase for MockSocial {
-    async fn check_cooldown(&self, g: &str, u: &str, a: &str)
-        -> Result<Option<DateTime<Utc>>, DomainError>
-    {
-        self.cooldown_hits.lock().unwrap().push((g.into(), u.into(), a.into()));
+    async fn check_cooldown(
+        &self,
+        g: &str,
+        u: &str,
+        a: &str,
+    ) -> Result<Option<DateTime<Utc>>, DomainError> {
+        self.cooldown_hits
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), a.into()));
         Ok(*self.fixed_cooldown.lock().unwrap())
     }
     async fn set_cooldown(&self, g: &str, u: &str, a: &str, d: i64) -> Result<(), DomainError> {
-        self.cooldown_set.lock().unwrap().push((g.into(), u.into(), a.into(), d));
+        self.cooldown_set
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), a.into(), d));
         Ok(())
     }
-    async fn leaderboard(&self, g: &str, cat: LeaderboardCategory, limit: i64)
-        -> Result<Vec<LeaderboardEntry>, DomainError>
-    {
-        self.leaderboard_calls.lock().unwrap().push((g.into(), cat, limit));
+    async fn leaderboard(
+        &self,
+        g: &str,
+        cat: LeaderboardCategory,
+        limit: i64,
+    ) -> Result<Vec<LeaderboardEntry>, DomainError> {
+        self.leaderboard_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), cat, limit));
         Ok(vec![
-            LeaderboardEntry { user_id: "1".into(), username: "Alice".into(), value: 1000 },
-            LeaderboardEntry { user_id: "2".into(), username: "Bob".into(), value: 500 },
+            LeaderboardEntry {
+                user_id: "1".into(),
+                username: "Alice".into(),
+                value: 1000,
+            },
+            LeaderboardEntry {
+                user_id: "2".into(),
+                username: "Bob".into(),
+                value: 500,
+            },
         ])
     }
     async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> {
@@ -84,9 +107,12 @@ fn state_with(uc: Arc<MockSocial>) -> sentinel_api::adapters::inbound::http::sta
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
         Some(v) => {
@@ -99,7 +125,10 @@ async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Cooldowns ──
@@ -108,8 +137,7 @@ async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde
 async fn check_cooldown_none_returns_null() {
     let uc = Arc::new(MockSocial::default());
     let app = router::build_for_test(state_with(uc.clone()));
-    let (status, json) = req_json(app, "GET",
-        "/api/coude/999/cooldown/111/steal", None).await;
+    let (status, json) = req_json(app, "GET", "/api/coude/999/cooldown/111/steal", None).await;
     assert_eq!(status, StatusCode::OK);
     assert!(json["expires_at"].is_null());
     let hits = uc.cooldown_hits.lock().unwrap();
@@ -122,8 +150,7 @@ async fn check_cooldown_some_returns_rfc3339() {
     let ts = Utc.with_ymd_and_hms(2026, 6, 15, 12, 0, 0).unwrap();
     *uc.fixed_cooldown.lock().unwrap() = Some(ts);
     let app = router::build_for_test(state_with(uc));
-    let (status, json) = req_json(app, "GET",
-        "/api/coude/999/cooldown/111/steal", None).await;
+    let (status, json) = req_json(app, "GET", "/api/coude/999/cooldown/111/steal", None).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["expires_at"], "2026-06-15T12:00:00+00:00");
 }
@@ -133,12 +160,17 @@ async fn set_cooldown_forwards_duration() {
     let uc = Arc::new(MockSocial::default());
     let app = router::build_for_test(state_with(uc.clone()));
     let body = serde_json::json!({ "duration_secs": 3600 });
-    let resp = app.oneshot(
-        Request::builder().method("POST")
-            .uri("/api/coude/999/cooldown/111/steal")
-            .header("content-type", "application/json")
-            .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap()
-    ).await.unwrap();
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/coude/999/cooldown/111/steal")
+                .header("content-type", "application/json")
+                .body(Body::from(serde_json::to_string(&body).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
     let set = uc.cooldown_set.lock().unwrap();
     assert_eq!(set[0], ("999".into(), "111".into(), "steal".into(), 3600));
@@ -150,8 +182,7 @@ async fn set_cooldown_forwards_duration() {
 async fn leaderboard_richest_returns_entries() {
     let uc = Arc::new(MockSocial::default());
     let app = router::build_for_test(state_with(uc.clone()));
-    let (status, json) = req_json(app, "GET",
-        "/api/coude/999/leaderboard/richest", None).await;
+    let (status, json) = req_json(app, "GET", "/api/coude/999/leaderboard/richest", None).await;
     assert_eq!(status, StatusCode::OK);
     let arr = json.as_array().unwrap();
     assert_eq!(arr.len(), 2);
@@ -167,8 +198,13 @@ async fn leaderboard_richest_returns_entries() {
 async fn leaderboard_custom_limit_passed_through() {
     let uc = Arc::new(MockSocial::default());
     let app = router::build_for_test(state_with(uc.clone()));
-    let (status, _) = req_json(app, "GET",
-        "/api/coude/999/leaderboard/chaos?limit=25", None).await;
+    let (status, _) = req_json(
+        app,
+        "GET",
+        "/api/coude/999/leaderboard/chaos?limit=25",
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(uc.leaderboard_calls.lock().unwrap()[0].2, 25);
 }
@@ -177,8 +213,7 @@ async fn leaderboard_custom_limit_passed_through() {
 async fn leaderboard_invalid_category_422() {
     let uc = Arc::new(MockSocial::default());
     let app = router::build_for_test(state_with(uc));
-    let (status, json) = req_json(app, "GET",
-        "/api/coude/999/leaderboard/unknown", None).await;
+    let (status, json) = req_json(app, "GET", "/api/coude/999/leaderboard/unknown", None).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(json["error"].as_str().unwrap().contains("Categorie"));
 }
@@ -188,9 +223,18 @@ async fn leaderboard_all_valid_categories_accepted() {
     for cat in ["richest", "thieves", "cowards", "chaos", "level"] {
         let uc = Arc::new(MockSocial::default());
         let app = router::build_for_test(state_with(uc));
-        let (status, _) = req_json(app, "GET",
-            &format!("/api/coude/999/leaderboard/{cat}"), None).await;
-        assert_eq!(status, StatusCode::OK, "categorie {cat} devrait etre acceptee");
+        let (status, _) = req_json(
+            app,
+            "GET",
+            &format!("/api/coude/999/leaderboard/{cat}"),
+            None,
+        )
+        .await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "categorie {cat} devrait etre acceptee"
+        );
     }
 }
 
@@ -234,5 +278,8 @@ async fn get_current_season_returns_dto() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["season_number"], 3);
     assert_eq!(json["days_remaining"], 45);
-    assert!(json["started_at"].as_str().unwrap().starts_with("2026-01-01"));
+    assert!(json["started_at"]
+        .as_str()
+        .unwrap()
+        .starts_with("2026-01-01"));
 }

@@ -6,13 +6,15 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 use sentinel_core::domain::entities::coude::safety_net::ActiveSafetyNet;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_safety_nets";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgSafetyNetRepository {
     pool: PgPool,
@@ -87,10 +89,7 @@ impl SafetyNetRepository for PgSafetyNetRepository {
         Ok(row.map(Into::into))
     }
 
-    async fn list_active(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<ActiveSafetyNet>, DomainError> {
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<ActiveSafetyNet>, DomainError> {
         let rows: Vec<Row> = sqlx::query_as(
             r#"SELECT id, guild_id, user_id, activated_at, expires_at
                FROM coude_safety_nets

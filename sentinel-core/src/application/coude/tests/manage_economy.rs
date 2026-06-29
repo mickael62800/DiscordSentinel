@@ -1,19 +1,19 @@
-use std::sync::Arc;
-use std::sync::Mutex;
-use async_trait::async_trait;
-use sqlx::Postgres;
-use sqlx::Transaction;
 use crate::application::coude::manage_economy_service::ManageCoudeEconomyService;
-use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
+use async_trait::async_trait;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 struct MockEconomyRepo {
     coins: Mutex<std::collections::HashMap<String, i64>>,
@@ -35,38 +35,92 @@ impl MockEconomyRepo {
         }
     }
     fn set_coins(&self, guild_id: &str, user_id: &str, coins: i64) {
-        self.coins.lock().unwrap().insert(format!("{}:{}", guild_id, user_id), coins);
+        self.coins
+            .lock()
+            .unwrap()
+            .insert(format!("{}:{}", guild_id, user_id), coins);
     }
 }
 #[async_trait]
 impl EconomyRepository for MockEconomyRepo {
-    async fn record_steal_stats(&self, g: &str, thief: &str, victim: &str, amount: i64) -> Result<(), DomainError> {
-        self.stats_calls.lock().unwrap().push((g.into(), thief.into(), victim.into(), amount));
+    async fn record_steal_stats(
+        &self,
+        g: &str,
+        thief: &str,
+        victim: &str,
+        amount: i64,
+    ) -> Result<(), DomainError> {
+        self.stats_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), thief.into(), victim.into(), amount));
         Ok(())
     }
-    async fn record_steal_fail_stats(&self, g: &str, thief: &str, amount: i64) -> Result<(), DomainError> {
-        self.fail_stats_calls.lock().unwrap().push((g.into(), thief.into(), amount));
+    async fn record_steal_fail_stats(
+        &self,
+        g: &str,
+        thief: &str,
+        amount: i64,
+    ) -> Result<(), DomainError> {
+        self.fail_stats_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), thief.into(), amount));
         Ok(())
     }
     async fn get_coins(&self, g: &str, u: &str) -> Result<i64, DomainError> {
-        self.coins.lock().unwrap().get(&format!("{}:{}", g, u)).copied()
+        self.coins
+            .lock()
+            .unwrap()
+            .get(&format!("{}:{}", g, u))
+            .copied()
             .ok_or_else(|| DomainError::NotFound("Wallet introuvable".into()))
     }
-    async fn record_casino_win_stats(&self, g: &str, u: &str, gain: i64) -> Result<(), DomainError> {
-        self.casino_win_stats.lock().unwrap().push((g.into(), u.into(), gain));
+    async fn record_casino_win_stats(
+        &self,
+        g: &str,
+        u: &str,
+        gain: i64,
+    ) -> Result<(), DomainError> {
+        self.casino_win_stats
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), gain));
         Ok(())
     }
-    async fn record_casino_loss_stats(&self, g: &str, u: &str, lost: i64) -> Result<(), DomainError> {
-        self.casino_loss_stats.lock().unwrap().push((g.into(), u.into(), lost));
+    async fn record_casino_loss_stats(
+        &self,
+        g: &str,
+        u: &str,
+        lost: i64,
+    ) -> Result<(), DomainError> {
+        self.casino_loss_stats
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), lost));
         Ok(())
     }
-    async fn record_casino_faillite_stats(&self, g: &str, u: &str, cleared: i64) -> Result<i64, DomainError> {
-        self.casino_faillite_stats.lock().unwrap().push((g.into(), u.into(), cleared));
+    async fn record_casino_faillite_stats(
+        &self,
+        g: &str,
+        u: &str,
+        cleared: i64,
+    ) -> Result<i64, DomainError> {
+        self.casino_faillite_stats
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), cleared));
         Ok(cleared)
     }
-    async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
-    async fn sum_casino_gains_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
-    async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
+    async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        unimplemented!()
+    }
+    async fn sum_casino_gains_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        unimplemented!()
+    }
+    async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn fake_taunt(kind: StreakKind, user: &str) -> TauntEvent {
@@ -92,43 +146,119 @@ struct MockWalletUc {
 }
 impl MockWalletUc {
     fn set_balance(&self, guild_id: &str, user_id: &str, coins: i64) {
-        self.balances.lock().unwrap().insert(format!("{}:{}", guild_id, user_id), coins);
+        self.balances
+            .lock()
+            .unwrap()
+            .insert(format!("{}:{}", guild_id, user_id), coins);
     }
 }
 #[async_trait]
 impl ManageWalletUseCase for MockWalletUc {
-    async fn credit(&self, guild_id: &str, user: &str, amount: i64, source: &str, _desc: &str) -> Result<WalletMutation, DomainError> {
+    async fn credit(
+        &self,
+        guild_id: &str,
+        user: &str,
+        amount: i64,
+        source: &str,
+        _desc: &str,
+    ) -> Result<WalletMutation, DomainError> {
         if self.should_fail {
             return Err(DomainError::ValidationError("wallet fail".into()));
         }
-        self.credit_calls.lock().unwrap().push((guild_id.into(), user.into(), amount, source.into()));
+        self.credit_calls.lock().unwrap().push((
+            guild_id.into(),
+            user.into(),
+            amount,
+            source.into(),
+        ));
         let key = format!("{}:{}", guild_id, user);
         let mut map = self.balances.lock().unwrap();
         let prev = *map.get(&key).unwrap_or(&0);
         let new_balance = prev + amount;
         map.insert(key, new_balance);
-        Ok(WalletMutation { new_balance, previous_balance: prev, triggered_taunts: self.credit_returned.clone() })
+        Ok(WalletMutation {
+            new_balance,
+            previous_balance: prev,
+            triggered_taunts: self.credit_returned.clone(),
+        })
     }
-    async fn debit(&self, guild_id: &str, user: &str, amount: i64, source: &str, _desc: &str) -> Result<WalletMutation, DomainError> {
+    async fn debit(
+        &self,
+        guild_id: &str,
+        user: &str,
+        amount: i64,
+        source: &str,
+        _desc: &str,
+    ) -> Result<WalletMutation, DomainError> {
         if self.should_fail {
             return Err(DomainError::ValidationError("Solde insuffisant".into()));
         }
-        self.debit_calls.lock().unwrap().push((guild_id.into(), user.into(), amount, source.into()));
-        Ok(WalletMutation { new_balance: 0, previous_balance: amount, triggered_taunts: self.debit_returned.clone() })
+        self.debit_calls.lock().unwrap().push((
+            guild_id.into(),
+            user.into(),
+            amount,
+            source.into(),
+        ));
+        Ok(WalletMutation {
+            new_balance: 0,
+            previous_balance: amount,
+            triggered_taunts: self.debit_returned.clone(),
+        })
     }
-    async fn transfer(&self, guild_id: &str, from: &str, to: &str, amount: i64, source: &str, _desc: &str) -> Result<Vec<TauntEvent>, DomainError> {
+    async fn transfer(
+        &self,
+        guild_id: &str,
+        from: &str,
+        to: &str,
+        amount: i64,
+        source: &str,
+        _desc: &str,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
         if self.should_fail {
             return Err(DomainError::ValidationError("Solde insuffisant".into()));
         }
-        self.calls.lock().unwrap().push((guild_id.into(), from.into(), to.into(), amount, source.into()));
+        self.calls.lock().unwrap().push((
+            guild_id.into(),
+            from.into(),
+            to.into(),
+            amount,
+            source.into(),
+        ));
         Ok(self.returned.clone())
     }
     async fn get_balance(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
-        Ok(*self.balances.lock().unwrap().get(&format!("{}:{}", guild_id, user_id)).unwrap_or(&0))
+        Ok(*self
+            .balances
+            .lock()
+            .unwrap()
+            .get(&format!("{}:{}", guild_id, user_id))
+            .unwrap_or(&0))
     }
-    async fn credit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    async fn credit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> {
+        vec![]
+    }
 }
 
 struct MockTauntsUc {
@@ -137,18 +267,55 @@ struct MockTauntsUc {
 }
 #[async_trait]
 impl ManageCoudeTauntsUseCase for MockTauntsUc {
-    async fn on_player_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_lost(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_drew(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn on_player_stolen_from(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_defended_steal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn on_bj_natural(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_bj_hand_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_bj_hand_bust(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_jackpot(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_generous_donor(&self, guild_id: &str, user_id: &str, amount: i64) -> Result<Option<TauntEvent>, DomainError> {
-        self.donor_calls.lock().unwrap().push((guild_id.into(), user_id.into(), amount));
+    async fn on_player_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_lost(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_drew(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn on_player_stolen_from(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_defended_steal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn on_bj_natural(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_bj_hand_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_bj_hand_bust(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_jackpot(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_generous_donor(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        self.donor_calls
+            .lock()
+            .unwrap()
+            .push((guild_id.into(), user_id.into(), amount));
         if amount >= self.donor_threshold {
             Ok(Some(fake_taunt(StreakKind::EcoGenerousDonor, user_id)))
         } else {
@@ -156,22 +323,47 @@ impl ManageCoudeTauntsUseCase for MockTauntsUc {
         }
     }
     async fn get_config(&self, _: &str) -> Result<TauntsConfig, DomainError> {
-        Ok(TauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
+        Ok(TauntsConfig {
+            guild_id: "g".into(),
+            channel_id: None,
+            enabled: false,
+            rename_enabled: true,
+            messages_enabled: true,
+        })
     }
-    async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
-    async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_rename_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_messages_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn set_opt_out(&self, _: &str, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
-    async fn is_opted_out(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_rename_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_messages_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_opt_out(&self, _: &str, _: &str, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn is_opted_out(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 fn build_service(
     wallet_taunts: Vec<TauntEvent>,
     wallet_fail: bool,
     donor_threshold: i64,
-) -> (ManageCoudeEconomyService, Arc<MockEconomyRepo>, Arc<MockWalletUc>, Arc<MockTauntsUc>) {
+) -> (
+    ManageCoudeEconomyService,
+    Arc<MockEconomyRepo>,
+    Arc<MockWalletUc>,
+    Arc<MockTauntsUc>,
+) {
     build_service_with_debit_taunts(wallet_taunts, vec![], wallet_fail, donor_threshold)
 }
 
@@ -180,7 +372,12 @@ fn build_service_with_debit_taunts(
     debit_taunts: Vec<TauntEvent>,
     wallet_fail: bool,
     donor_threshold: i64,
-) -> (ManageCoudeEconomyService, Arc<MockEconomyRepo>, Arc<MockWalletUc>, Arc<MockTauntsUc>) {
+) -> (
+    ManageCoudeEconomyService,
+    Arc<MockEconomyRepo>,
+    Arc<MockWalletUc>,
+    Arc<MockTauntsUc>,
+) {
     let repo = Arc::new(MockEconomyRepo::new());
     let wallet = Arc::new(MockWalletUc {
         returned: wallet_taunts,
@@ -192,7 +389,10 @@ fn build_service_with_debit_taunts(
         balances: Mutex::new(std::collections::HashMap::new()),
         should_fail: wallet_fail,
     });
-    let taunts = Arc::new(MockTauntsUc { donor_threshold, donor_calls: Mutex::new(Vec::new()) });
+    let taunts = Arc::new(MockTauntsUc {
+        donor_threshold,
+        donor_calls: Mutex::new(Vec::new()),
+    });
     let svc = ManageCoudeEconomyService::new(repo.clone(), wallet.clone(), taunts.clone());
     (svc, repo, wallet, taunts)
 }
@@ -255,7 +455,10 @@ async fn steal_success_delegates_to_wallet_transfer() {
     let outcome = svc.steal("g1", "thief", "victim", 1000).await.unwrap();
     assert_eq!(outcome.stolen, 1000);
     assert_eq!(outcome.taunt_events.len(), 1);
-    assert_eq!(outcome.taunt_events[0].streak_kind, StreakKind::EcoJackpot.as_str());
+    assert_eq!(
+        outcome.taunt_events[0].streak_kind,
+        StreakKind::EcoJackpot.as_str()
+    );
     let calls = wallet.calls.lock().unwrap().clone();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].0, "g1");
@@ -422,7 +625,10 @@ async fn casino_faillite_on_empty_wallet_only_records_stats() {
 #[tokio::test]
 async fn casino_win_rejects_negative_gain() {
     let (svc, _, _, _) = build_service(vec![], false, 1);
-    let err = svc.record_casino_win("g1", "alice", -100).await.unwrap_err();
+    let err = svc
+        .record_casino_win("g1", "alice", -100)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
@@ -438,7 +644,10 @@ async fn casino_win_zero_gain_skips_credit_but_records_stats() {
 #[tokio::test]
 async fn casino_loss_rejects_negative() {
     let (svc, _, _, _) = build_service(vec![], false, 1);
-    let err = svc.record_casino_loss("g1", "alice", -50).await.unwrap_err();
+    let err = svc
+        .record_casino_loss("g1", "alice", -50)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 

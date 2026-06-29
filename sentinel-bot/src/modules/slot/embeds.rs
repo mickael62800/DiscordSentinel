@@ -4,10 +4,10 @@ use serenity::all::{CreateEmbed, CreateEmbedFooter};
 
 use super::api_client::SpinResponse;
 
-const COLOR_LOSS: u32 = 0x95a5a6;     // gris
-const COLOR_REFUND: u32 = 0x3498db;   // bleu
-const COLOR_WIN: u32 = 0x2ecc71;      // vert
-const COLOR_JACKPOT: u32 = 0xf1c40f;  // or
+const COLOR_LOSS: u32 = 0x95a5a6; // gris
+const COLOR_REFUND: u32 = 0x3498db; // bleu
+const COLOR_WIN: u32 = 0x2ecc71; // vert
+const COLOR_JACKPOT: u32 = 0xf1c40f; // or
 
 /// Construit l embed du resultat d un spin. Format : 3 emojis geants au
 /// centre, puis details mise/gain/multiplier/balance.
@@ -24,7 +24,11 @@ pub fn build_spin_result_embed(resp: &SpinResponse, username: &str) -> CreateEmb
     };
 
     let net = resp.payout - resp.mise;
-    let net_str = if net >= 0 { format!("+{net}") } else { format!("{net}") };
+    let net_str = if net >= 0 {
+        format!("+{net}")
+    } else {
+        format!("{net}")
+    };
 
     let mut embed = CreateEmbed::new()
         .title(title)

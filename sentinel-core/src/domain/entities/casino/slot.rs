@@ -13,14 +13,14 @@
 //! La fonction `spin_with_rng` accepte un `RngCore` -> seedable et donc
 //! testable de maniere deterministe (cf. tests).
 
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
 use rand::RngCore;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Entree persistee dans `slot_spin_log` : trace d un spin.
 #[derive(Debug, Clone)]
@@ -81,8 +81,13 @@ impl Default for SlotConfig {
     fn default() -> Self {
         Self {
             symbols: vec![
-                "🍒".into(), "🍋".into(), "🍊".into(), "🍇".into(),
-                "🔔".into(), "⭐".into(), "7️⃣".into(),
+                "🍒".into(),
+                "🍋".into(),
+                "🍊".into(),
+                "🍇".into(),
+                "🔔".into(),
+                "⭐".into(),
+                "7️⃣".into(),
             ],
             weights: vec![30, 25, 20, 15, 7, 2, 1],
             multipliers_3x: vec![2.0, 3.0, 5.0, 8.0, 12.0, 25.0, 100.0],
@@ -107,7 +112,10 @@ pub enum SpinOutcome {
     /// 2 symboles identiques sur 3 -> remboursement de la mise.
     RefundTwoOfAKind,
     /// 3 symboles identiques (non-jackpot) -> mise * multiplier.
-    ThreeOfAKind { symbol_index: usize, multiplier: f64 },
+    ThreeOfAKind {
+        symbol_index: usize,
+        multiplier: f64,
+    },
     /// 3 fois le symbole jackpot (= dernier index) -> mise * multiplier + pool.
     Jackpot { multiplier: f64 },
 }
@@ -125,11 +133,15 @@ pub enum SlotConfigError {
 impl SlotConfigError {
     pub fn as_str(&self) -> &'static str {
         match self {
-            SlotConfigError::LengthsMismatch => "symbols, weights et multipliers_3x doivent avoir la meme longueur",
+            SlotConfigError::LengthsMismatch => {
+                "symbols, weights et multipliers_3x doivent avoir la meme longueur"
+            }
             SlotConfigError::EmptySymbols => "il faut au moins 2 symboles",
             SlotConfigError::AllWeightsZero => "la somme des poids doit etre > 0",
             SlotConfigError::BetRangeInvalid => "min_bet > 0 et min_bet <= max_bet requis",
-            SlotConfigError::SharePctOutOfRange => "jackpot_pool_share_pct doit etre entre 0 et 100",
+            SlotConfigError::SharePctOutOfRange => {
+                "jackpot_pool_share_pct doit etre entre 0 et 100"
+            }
         }
     }
 }
@@ -160,7 +172,8 @@ pub fn validate_slot_config(c: &SlotConfig) -> Result<(), SlotConfigError> {
 ///
 /// Retourne un array de 3 indices (vers `config.symbols`).
 pub fn spin_with_rng(rng: &mut impl RngCore, config: &SlotConfig) -> [usize; 3] {
-    let dist = WeightedIndex::new(&config.weights).expect("validate_slot_config doit etre appele avant");
+    let dist =
+        WeightedIndex::new(&config.weights).expect("validate_slot_config doit etre appele avant");
     [dist.sample(rng), dist.sample(rng), dist.sample(rng)]
 }
 
@@ -175,7 +188,10 @@ pub fn evaluate_spin(symbols: &[usize; 3], config: &SlotConfig) -> SpinOutcome {
         return if idx == jackpot_idx {
             SpinOutcome::Jackpot { multiplier }
         } else {
-            SpinOutcome::ThreeOfAKind { symbol_index: idx, multiplier }
+            SpinOutcome::ThreeOfAKind {
+                symbol_index: idx,
+                multiplier,
+            }
         };
     }
 
@@ -195,9 +211,7 @@ pub fn compute_payout(mise: i64, outcome: &SpinOutcome, current_jackpot_pool: i6
     match outcome {
         SpinOutcome::Loss => 0,
         SpinOutcome::RefundTwoOfAKind => mise,
-        SpinOutcome::ThreeOfAKind { multiplier, .. } => {
-            ((mise as f64) * multiplier).round() as i64
-        }
+        SpinOutcome::ThreeOfAKind { multiplier, .. } => ((mise as f64) * multiplier).round() as i64,
         SpinOutcome::Jackpot { multiplier } => {
             // saturating_add : evite un wrap i64 si payout + pool depasse i64::MAX.
             (((mise as f64) * multiplier).round() as i64).saturating_add(current_jackpot_pool)

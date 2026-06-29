@@ -10,34 +10,34 @@
 //! Les chemins complexes (raid detection, alt detection) delegueraient
 //! au domain::security_analyzer qui est deja teste en isolation.
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::audit::manage_security_service::ManageSecurityService;
 use crate::domain::entities::audit::audit_log::AuditLog;
-use crate::domain::entities::system::bot_config::BotDefinition;
-use crate::domain::entities::system::bot_config::BotGuildConfig;
-use crate::domain::entities::moderation::action::applied::ModerationAction;
-use crate::domain::entities::system::rule::Rule;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::entities::audit::watched_user::WatchedUser;
+use crate::domain::entities::moderation::action::applied::ModerationAction;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
+#[allow(unused_imports)]
+use crate::domain::services::audit::security_analyzer::JoinInfo;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-#[allow(unused_imports)]
-use crate::domain::services::audit::security_analyzer::JoinInfo;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::system::cache::CachePort;
-use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
 // ── Mocks ──
 
 #[derive(Default)]
@@ -68,16 +68,28 @@ struct MockCache {
 
 #[async_trait]
 impl CachePort for MockCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn invalidate(&self, key: &str) -> Result<(), DomainError> {
         self.invalidate_calls.lock().unwrap().push(key.into());
         Ok(())
     }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -87,14 +99,34 @@ struct MockWatchedRepo {
 
 #[async_trait]
 impl WatchedUserRepository for MockWatchedRepo {
-    async fn find_watched_users(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<WatchedUser>, DomainError> { Ok(vec![]) }
+    async fn find_watched_users(
+        &self,
+        _: Option<&str>,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<WatchedUser>, DomainError> {
+        Ok(vec![])
+    }
     async fn add_manual_watch(
-        &self, g: &str, u: &str, uname: &str, reason: &str, source: &str,
+        &self,
+        g: &str,
+        u: &str,
+        uname: &str,
+        reason: &str,
+        source: &str,
     ) -> Result<(), DomainError> {
-        self.watch_calls.lock().unwrap().push((g.into(), u.into(), uname.into(), reason.into(), source.into()));
+        self.watch_calls.lock().unwrap().push((
+            g.into(),
+            u.into(),
+            uname.into(),
+            reason.into(),
+            source.into(),
+        ));
         Ok(())
     }
-    async fn remove_manual_watch(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn remove_manual_watch(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -112,15 +144,26 @@ impl ManageAuditLogsUseCase for MockAuditLogsUc {
             id: Uuid::new_v4(),
             guild_id,
             event_type,
-            actor_id: None, actor_name: None,
-            target_id: None, target_name: None,
-            channel_id: None, channel_name: None,
+            actor_id: None,
+            actor_name: None,
+            target_id: None,
+            target_name: None,
+            channel_id: None,
+            channel_name: None,
             details: serde_json::json!({}),
             created_at: Utc::now(),
         })
     }
-    async fn list(&self, _: Option<&str>, _: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { Ok(vec![]) }
-    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+    async fn list(
+        &self,
+        _: Option<&str>,
+        _: AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[derive(Default)]
@@ -130,13 +173,21 @@ struct MockBotConfig {
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfig {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.rows.lock().unwrap().clone())
     }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -146,20 +197,48 @@ struct MockModerationRepo {
 
 #[async_trait]
 impl ModerationRepository for MockModerationRepo {
-    async fn save(&self, _: &ModerationAction) -> Result<(), DomainError> { Ok(()) }
-    async fn find_by_id(&self, _: Uuid) -> Result<Option<ModerationAction>, DomainError> { Ok(None) }
-    async fn find_by_target(&self, _: &str, _: &str, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
-    async fn find_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn save(&self, _: &ModerationAction) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn find_by_id(&self, _: Uuid) -> Result<Option<ModerationAction>, DomainError> {
+        Ok(None)
+    }
+    async fn find_by_target(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn find_bans(
+        &self,
+        _: Option<&str>,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         Ok(self.bans.lock().unwrap().clone())
     }
-    async fn find_all_for_guild(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
-    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    async fn find_all_for_guild(
+        &self,
+        _: Option<&str>,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
 }
 
 // ── Builder ──
 
-fn build_service(with_audit: bool) -> (
+fn build_service(
+    with_audit: bool,
+) -> (
     ManageSecurityService,
     Arc<MockSecurityRepo>,
     Arc<MockCache>,
@@ -174,7 +253,11 @@ fn build_service(with_audit: bool) -> (
     let moderation = Arc::new(MockModerationRepo::default());
 
     let mut svc = ManageSecurityService::new(
-        repo.clone(), cache.clone(), watched.clone(), bot_config, moderation,
+        repo.clone(),
+        cache.clone(),
+        watched.clone(),
+        bot_config,
+        moderation,
     );
     if with_audit {
         svc = svc.with_audit_logs_uc(audit.clone());
@@ -189,13 +272,16 @@ fn build_service(with_audit: bool) -> (
 #[tokio::test]
 async fn report_event_errors_without_audit_logs_uc() {
     let (svc, _, _, _, _) = build_service(false);
-    let err = svc.report_event(ReportSecurityEventCommand {
-        guild_id: "g".into(),
-        event_type: "raid".into(),
-        severity: "high".into(),
-        description: "x".into(),
-        user_ids: vec!["u1".into()],
-    }).await.unwrap_err();
+    let err = svc
+        .report_event(ReportSecurityEventCommand {
+            guild_id: "g".into(),
+            event_type: "raid".into(),
+            severity: "high".into(),
+            description: "x".into(),
+            user_ids: vec!["u1".into()],
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::Internal(_)));
     assert!(format!("{err:?}").contains("audit_logs_uc"));
 }
@@ -203,13 +289,16 @@ async fn report_event_errors_without_audit_logs_uc() {
 #[tokio::test]
 async fn report_event_persists_event_and_creates_audit_log() {
     let (svc, repo, _, _, audit) = build_service(true);
-    let event = svc.report_event(ReportSecurityEventCommand {
-        guild_id: "g1".into(),
-        event_type: "raid".into(),
-        severity: "critical".into(),
-        description: "mass join".into(),
-        user_ids: vec!["u1".into(), "u2".into()],
-    }).await.unwrap();
+    let event = svc
+        .report_event(ReportSecurityEventCommand {
+            guild_id: "g1".into(),
+            event_type: "raid".into(),
+            severity: "critical".into(),
+            description: "mass join".into(),
+            user_ids: vec!["u1".into(), "u2".into()],
+        })
+        .await
+        .unwrap();
 
     assert_eq!(event.event_type, "raid");
     assert_eq!(event.severity, "critical");
@@ -235,7 +324,9 @@ async fn report_event_single_user_sets_target_fields() {
         severity: "medium".into(),
         description: "".into(),
         user_ids: vec!["u1".into()],
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let audits = audit.create_calls.lock().unwrap();
     assert_eq!(audits[0].target_id.as_deref(), Some("u1"));
@@ -251,7 +342,9 @@ async fn report_event_adds_all_users_to_watch_list() {
         severity: "high".into(),
         description: "x".into(),
         user_ids: vec!["u1".into(), "u2".into(), "u3".into()],
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let calls = watched.watch_calls.lock().unwrap();
     assert_eq!(calls.len(), 3);
@@ -271,7 +364,9 @@ async fn report_event_invalidates_both_cache_keys() {
         severity: "low".into(),
         description: "".into(),
         user_ids: vec![],
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let invs = cache.invalidate_calls.lock().unwrap();
     assert!(invs.iter().any(|k| k == "security:all"));
@@ -366,14 +461,19 @@ async fn list_events_empty_on_fresh_repo() {
 
 fn cfg_entry(key: &str, value: &str) -> BotGuildConfig {
     BotGuildConfig {
-        id: Uuid::new_v4(), guild_id: "g".into(),
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
         bot_name: "security-bot".into(),
-        config_key: key.into(), config_value: value.into(),
+        config_key: key.into(),
+        config_value: value.into(),
         updated_at: Utc::now(),
     }
 }
 
-fn build_service_with_configs(configs: Vec<BotGuildConfig>, bans: Vec<ModerationAction>) -> (
+fn build_service_with_configs(
+    configs: Vec<BotGuildConfig>,
+    bans: Vec<ModerationAction>,
+) -> (
     ManageSecurityService,
     Arc<MockSecurityRepo>,
     Arc<MockWatchedRepo>,
@@ -388,9 +488,9 @@ fn build_service_with_configs(configs: Vec<BotGuildConfig>, bans: Vec<Moderation
     let moderation = Arc::new(MockModerationRepo::default());
     *moderation.bans.lock().unwrap() = bans;
 
-    let svc = ManageSecurityService::new(
-        repo.clone(), cache, watched.clone(), bot_config, moderation,
-    ).with_audit_logs_uc(audit.clone());
+    let svc =
+        ManageSecurityService::new(repo.clone(), cache, watched.clone(), bot_config, moderation)
+            .with_audit_logs_uc(audit.clone());
     (svc, repo, watched, audit)
 }
 
@@ -398,11 +498,16 @@ fn build_service_with_configs(configs: Vec<BotGuildConfig>, bans: Vec<Moderation
 async fn analyze_new_member_suspicious_account_triggers_event() {
     // min_account_age_secs par defaut = 86400 (1 jour). Compte cree il y a 1h.
     let (svc, repo, watched, audit) = build_service_with_configs(
-        vec![cfg_entry("quarantine_enabled", "true"), cfg_entry("captcha_enabled", "true")],
+        vec![
+            cfg_entry("quarantine_enabled", "true"),
+            cfg_entry("captcha_enabled", "true"),
+        ],
         vec![],
     );
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: "g".into(), user_id: "u".into(), username: "alice".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
         has_avatar: false,
         account_created_timestamp: Utc::now().timestamp() - 3600, // 1h -> suspect
         is_bot: false,
@@ -436,14 +541,28 @@ async fn analyze_new_member_raid_pattern_overrides_suspicious() {
     );
     let now = Utc::now().timestamp();
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: "g".into(), user_id: "u".into(), username: "alice".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
         has_avatar: true,
         account_created_timestamp: now - 3600, // compte jeune mais RAID prioritaire
         is_bot: false,
         recent_joins: vec![
-            JoinInfo { username: "alice01".into(), account_created_timestamp: now - 3600, has_avatar: false },
-            JoinInfo { username: "alice02".into(), account_created_timestamp: now - 3600, has_avatar: false },
-            JoinInfo { username: "alice03".into(), account_created_timestamp: now - 3600, has_avatar: false },
+            JoinInfo {
+                username: "alice01".into(),
+                account_created_timestamp: now - 3600,
+                has_avatar: false,
+            },
+            JoinInfo {
+                username: "alice02".into(),
+                account_created_timestamp: now - 3600,
+                has_avatar: false,
+            },
+            JoinInfo {
+                username: "alice03".into(),
+                account_created_timestamp: now - 3600,
+                has_avatar: false,
+            },
         ],
     };
     let decision = svc.analyze_new_member(cmd).await.unwrap();
@@ -469,10 +588,13 @@ async fn analyze_new_member_config_bool_various_formats() {
     );
     // Compte suspect pour declencher le chemin
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: "g".into(), user_id: "u".into(), username: "x".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "x".into(),
         has_avatar: true,
         account_created_timestamp: Utc::now().timestamp() - 60,
-        is_bot: false, recent_joins: vec![],
+        is_bot: false,
+        recent_joins: vec![],
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(d.quarantine);
@@ -490,10 +612,13 @@ async fn analyze_new_member_invalid_numeric_config_falls_back_to_defaults() {
     );
     // Compte ancien → pas suspect (default 86400).
     let cmd = AnalyzeNewMemberCommand {
-        guild_id: "g".into(), user_id: "u".into(), username: "x".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "x".into(),
         has_avatar: true,
         account_created_timestamp: Utc::now().timestamp() - 86400 * 30,
-        is_bot: false, recent_joins: vec![],
+        is_bot: false,
+        recent_joins: vec![],
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(!d.is_suspicious_account);

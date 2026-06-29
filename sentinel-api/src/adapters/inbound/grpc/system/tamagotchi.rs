@@ -13,10 +13,10 @@ use sentinel_proto::tamagotchi::v1::tamagotchi_service_server::TamagotchiService
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::grpc::parse_uuid;
-use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
 use crate::ports::inbound::tamagotchi::manage_pets::{
     CareCommand, CombatCommand, CreatePetCommand, ManagePetsUseCase, TrainCommand, VisitCommand,
 };
+use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
 
 pub struct TamagotchiGrpc {
     pub uc: Arc<dyn ManagePetsUseCase>,
@@ -181,7 +181,12 @@ impl TamagotchiService for TamagotchiGrpc {
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
         self.uc
-            .set_card_location(&req.guild_id, &req.owner_id, &req.channel_id, &req.message_id)
+            .set_card_location(
+                &req.guild_id,
+                &req.owner_id,
+                &req.channel_id,
+                &req.message_id,
+            )
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))

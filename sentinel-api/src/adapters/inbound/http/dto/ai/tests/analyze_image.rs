@@ -10,15 +10,22 @@ fn sample_analysis(action: Action, reason: &str, duration: Option<u64>) -> Image
         score: 0.9,
         duration,
         classifications: vec![
-            ImageClassification { label: "nsfw".into(), confidence: 0.87 },
-            ImageClassification { label: "safe".into(), confidence: 0.13 },
+            ImageClassification {
+                label: "nsfw".into(),
+                confidence: 0.87,
+            },
+            ImageClassification {
+                label: "safe".into(),
+                confidence: 0.13,
+            },
         ],
     }
 }
 
 #[test]
 fn response_from_analysis_maps_action_and_classifications() {
-    let dto: AnalyzeImageResponseDto = sample_analysis(Action::Delete, "nsfw detected", None).into();
+    let dto: AnalyzeImageResponseDto =
+        sample_analysis(Action::Delete, "nsfw detected", None).into();
     assert_eq!(dto.action, "delete");
     assert_eq!(dto.reason.as_deref(), Some("nsfw detected"));
     assert_eq!(dto.duration, None);

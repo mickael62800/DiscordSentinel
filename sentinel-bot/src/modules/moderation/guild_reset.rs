@@ -21,16 +21,30 @@ pub async fn handle_guild_reset_event(ctx: &Context, payload: &str) {
         None => return,
     };
 
-    let gid = match data.get("guild_id").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+    let gid = match data
+        .get("guild_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
         Some(v) => GuildId::new(v),
         None => return,
     };
     let unban = data.get("unban").and_then(|v| v.as_bool()).unwrap_or(false);
-    let unmute = data.get("unmute").and_then(|v| v.as_bool()).unwrap_or(false);
-    let remove_roles = data.get("remove_roles").and_then(|v| v.as_bool()).unwrap_or(false);
+    let unmute = data
+        .get("unmute")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let remove_roles = data
+        .get("remove_roles")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     let mut role_ids: Vec<RoleId> = Vec::new();
-    if let Some(q) = data.get("quarantine_role_id").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+    if let Some(q) = data
+        .get("quarantine_role_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
         role_ids.push(RoleId::new(q));
     }
     if let Some(arr) = data.get("temp_role_ids").and_then(|v| v.as_array()) {

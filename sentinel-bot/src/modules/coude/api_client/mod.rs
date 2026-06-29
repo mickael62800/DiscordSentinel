@@ -15,9 +15,9 @@
 
 use std::sync::Arc;
 
-use serde::Deserialize;
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
+use serde::Deserialize;
 
 use sentinel_proto::coude::v1 as proto_coude;
 
@@ -419,11 +419,7 @@ impl ApiClient {
         Self { base, grpc }
     }
 
-
-
-
     // Methodes braquage (Phase 10) deplacees dans `heist.rs`.
-
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -512,31 +508,31 @@ fn proto_prime_to_dto(p: proto_coude::Prime) -> Prime {
 pub(in crate::modules::coude::api_client) use crate::shared::grpc_client::grpc_err_to_string;
 
 // ── Sous-modules (refactor god-object api_client.rs) ──
-mod heist;
-mod steal_protections;
-mod steal_boosts;
-mod steal_attempts;
-mod taunts;
-mod cashbox;
 mod bets;
-mod primes_insurance;
-mod inventory;
-mod leaderboards;
+mod cashbox;
 mod combats;
-mod players;
+mod curses;
 mod economy;
 mod events;
-mod utility;
-mod curses;
-mod vendetta;
+mod heist;
+mod inventory;
+mod leaderboards;
+mod players;
+mod primes_insurance;
+mod steal_attempts;
+mod steal_boosts;
+mod steal_protections;
+mod taunts;
 mod tout_ou_rien;
+mod utility;
+mod vendetta;
 pub use tout_ou_rien::PlayToutOuRienResp;
-mod steal_roll;
-mod flavor;
-mod prank;
 mod bounty;
-mod refusal;
 mod coalition;
-mod ultimate;
-mod prestige;
+mod flavor;
 mod friendly_duel;
+mod prank;
+mod prestige;
+mod refusal;
+mod steal_roll;
+mod ultimate;

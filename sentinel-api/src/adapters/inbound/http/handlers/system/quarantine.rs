@@ -1,9 +1,9 @@
 //! Phase 5F Ã¢â‚¬â€ Endpoints minimalistes pour `security_quarantine_pending`.
 //! SQL direct (pas de port/adapter) Ã¢â‚¬â€ meme principe que steal_attempts.
 
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::extract::State;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::{DateTime, Utc};
@@ -26,8 +26,7 @@ pub async fn create_quarantine(
     State(state): State<AppState>,
     Json(dto): Json<CreateQuarantineDto>,
 ) -> Result<StatusCode, ApiError> {
-    let expires_at: DateTime<Utc> =
-        Utc::now() + chrono::Duration::seconds(dto.timeout_secs.max(1));
+    let expires_at: DateTime<Utc> = Utc::now() + chrono::Duration::seconds(dto.timeout_secs.max(1));
     sqlx::query(
         "INSERT INTO security_quarantine_pending (guild_id, user_id, expires_at) \
          VALUES ($1, $2, $3) \
@@ -49,13 +48,11 @@ pub async fn delete_quarantine(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
-    sqlx::query(
-        "DELETE FROM security_quarantine_pending WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("delete quarantine"))?;
+    sqlx::query("DELETE FROM security_quarantine_pending WHERE guild_id = $1 AND user_id = $2")
+        .bind(&guild_id)
+        .bind(&user_id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(sqlx_internal("delete quarantine"))?;
     Ok(StatusCode::NO_CONTENT)
 }

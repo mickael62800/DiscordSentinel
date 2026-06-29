@@ -2,13 +2,13 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wheel::WheelCase;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]
 pub struct WheelSpinCommand {
@@ -32,7 +32,8 @@ pub trait ManageWheelUseCase: Send + Sync {
     /// 1 spin par jour. Erreurs : ValidationError("deja reclame aujourd hui")
     async fn spin(&self, cmd: WheelSpinCommand) -> Result<WheelSpinResult, DomainError>;
 
-    async fn recent_spins(&self, guild_id: &str, limit: i64) -> Result<Vec<WheelSpin>, DomainError>;
+    async fn recent_spins(&self, guild_id: &str, limit: i64)
+        -> Result<Vec<WheelSpin>, DomainError>;
 
     async fn top_winners(
         &self,

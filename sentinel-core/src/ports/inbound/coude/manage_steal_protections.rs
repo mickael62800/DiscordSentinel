@@ -5,12 +5,12 @@
 //! expire. Plusieurs items peuvent etre actifs en parallele et rollent
 //! dans l'ordre decroissant de block_chance sur une tentative de vol.
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
 use crate::domain::entities::coude::steal::protection::StealProtection;
 use crate::domain::entities::coude::steal::protection::StealProtectionDuration;
 use crate::domain::errors::DomainError;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 
 /// Resultat d'une tentative de blocage d'un vol : indique quel item
 /// (s'il y en a) a bloque. Utilise par le bot pour afficher un message

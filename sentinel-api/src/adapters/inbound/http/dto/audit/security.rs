@@ -1,8 +1,8 @@
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use serde::Deserialize;
 use serde::Serialize;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
-use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct ReportEventDto {

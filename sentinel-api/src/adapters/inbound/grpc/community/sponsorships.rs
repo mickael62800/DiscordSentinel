@@ -4,12 +4,12 @@
 //! pas de use case unifie cote API. Permet au community-bot de faire tous
 //! ses appels metier via gRPC (plus de HTTP fallback sur ce domaine).
 
+use crate::adapters::inbound::grpc::errors::sqlx_to_status;
 use chrono::DateTime;
 use chrono::Utc;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use crate::adapters::inbound::grpc::errors::sqlx_to_status;
 
 use sentinel_proto::community::v1 as proto;
 use sentinel_proto::community::v1::community_service_server::CommunityService;
@@ -145,15 +145,13 @@ impl CommunityService for CommunityGrpc {
         request: Request<proto::DeleteTempRoleRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        sqlx::query(
-            "DELETE FROM temp_roles WHERE guild_id = $1 AND user_id = $2 AND role_id = $3",
-        )
-        .bind(&req.guild_id)
-        .bind(&req.user_id)
-        .bind(&req.role_id)
-        .execute(&self.pg_pool)
-        .await
-        .map_err(sqlx_to_status("DELETE temp_role"))?;
+        sqlx::query("DELETE FROM temp_roles WHERE guild_id = $1 AND user_id = $2 AND role_id = $3")
+            .bind(&req.guild_id)
+            .bind(&req.user_id)
+            .bind(&req.role_id)
+            .execute(&self.pg_pool)
+            .await
+            .map_err(sqlx_to_status("DELETE temp_role"))?;
         Ok(Response::new(proto::Empty {}))
     }
 }

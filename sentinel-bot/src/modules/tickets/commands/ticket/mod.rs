@@ -1,18 +1,18 @@
+pub mod close;
 pub mod constants;
 pub mod helpers;
-pub mod panel;
-pub mod close;
 pub mod interactions;
+pub mod panel;
 
+pub use close::*;
 pub use constants::*;
 pub use helpers::*;
-pub use panel::*;
-pub use close::*;
 pub use interactions::*;
+pub use panel::*;
 
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption,
 };
 use tracing::error;
 
@@ -36,13 +36,11 @@ fn register_admin() -> CreateCommand {
     CreateCommand::new("ticket-admin")
         .description("Administration des tickets (staff)")
         .default_member_permissions(serenity::all::Permissions::MANAGE_CHANNELS)
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "panel",
-                "Deployer le panneau de creation de ticket dans ce salon",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "panel",
+            "Deployer le panneau de creation de ticket dans ce salon",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -50,12 +48,8 @@ fn register_admin() -> CreateCommand {
                 "Inviter un membre dans ce ticket",
             )
             .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::User,
-                    "membre",
-                    "Membre a inviter",
-                )
-                .required(true),
+                CreateCommandOption::new(CommandOptionType::User, "membre", "Membre a inviter")
+                    .required(true),
             ),
         )
 }
@@ -77,31 +71,38 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// /ticket panel — Envoie le message permanent avec le bouton "Creer un ticket"
-async fn handle_panel(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+async fn handle_panel(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     if let Some(guild_id) = command.guild_id {
         let is_staff = helpers::is_staff_member(ctx, guild_id, command.user.id).await;
         if !is_staff {
-            return reply(ctx, command, "Seuls les administrateurs et moderateurs peuvent deployer le panel.").await;
+            return reply(
+                ctx,
+                command,
+                "Seuls les administrateurs et moderateurs peuvent deployer le panel.",
+            )
+            .await;
         }
     } else {
-        return reply(ctx, command, "Cette commande doit etre utilisee dans un serveur.").await;
+        return reply(
+            ctx,
+            command,
+            "Cette commande doit etre utilisee dans un serveur.",
+        )
+        .await;
     }
 
-    command.channel_id.send_message(&ctx.http, build_panel_message()).await?;
+    command
+        .channel_id
+        .send_message(&ctx.http, build_panel_message())
+        .await?;
     reply(ctx, command, "Panneau de tickets deploye !").await
 }
 
 /// Commande /ticket close
-async fn handle_close(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
-    use serenity::model::channel::ChannelType;
-    use crate::shared::heartbeat::ApiClientKey;
+async fn handle_close(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     use super::api_client::ApiClient;
+    use crate::shared::heartbeat::ApiClientKey;
+    use serenity::model::channel::ChannelType;
     use tracing::{info, warn};
 
     let channel_name = command
@@ -114,20 +115,33 @@ async fn handle_close(
         .unwrap_or_default();
 
     if !channel_name.starts_with("ticket-") {
-        return reply(ctx, command, "Cette commande ne fonctionne que dans un salon de ticket.").await;
+        return reply(
+            ctx,
+            command,
+            "Cette commande ne fonctionne que dans un salon de ticket.",
+        )
+        .await;
     }
 
     if let Some(guild_id) = command.guild_id {
         let is_staff = helpers::is_staff_member(ctx, guild_id, command.user.id).await;
         if !is_staff {
-            let topic = command.channel_id
-                .to_channel(&ctx.http).await.ok()
+            let topic = command
+                .channel_id
+                .to_channel(&ctx.http)
+                .await
+                .ok()
                 .and_then(|c| c.guild())
                 .and_then(|c| c.topic)
                 .unwrap_or_default();
             let is_author = topic.contains(&command.user.id.to_string());
             if !is_author {
-                return reply(ctx, command, "Seul le staff ou l'auteur du ticket peut le fermer.").await;
+                return reply(
+                    ctx,
+                    command,
+                    "Seul le staff ou l'auteur du ticket peut le fermer.",
+                )
+                .await;
             }
         }
     }
@@ -185,10 +199,7 @@ async fn handle_close(
 }
 
 /// Commande /ticket invite <membre>
-async fn handle_invite(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+async fn handle_invite(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     use serenity::all::PermissionOverwrite;
     use serenity::all::PermissionOverwriteType;
     use serenity::model::Permissions;
@@ -203,13 +214,23 @@ async fn handle_invite(
         .unwrap_or_default();
 
     if !channel_name.starts_with("ticket-") {
-        return reply(ctx, command, "Cette commande ne fonctionne que dans un salon de ticket.").await;
+        return reply(
+            ctx,
+            command,
+            "Cette commande ne fonctionne que dans un salon de ticket.",
+        )
+        .await;
     }
 
     if let Some(guild_id) = command.guild_id {
         let is_staff = helpers::is_staff_member(ctx, guild_id, command.user.id).await;
         if !is_staff {
-            return reply(ctx, command, "Seul le staff peut inviter des membres dans un ticket.").await;
+            return reply(
+                ctx,
+                command,
+                "Seul le staff peut inviter des membres dans un ticket.",
+            )
+            .await;
         }
     }
 
@@ -228,12 +249,17 @@ async fn handle_invite(
     };
 
     let overwrite = PermissionOverwrite {
-        allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+        allow: Permissions::VIEW_CHANNEL
+            | Permissions::SEND_MESSAGES
+            | Permissions::READ_MESSAGE_HISTORY,
         deny: Permissions::empty(),
         kind: PermissionOverwriteType::Member(user_id),
     };
 
-    command.channel_id.create_permission(&ctx.http, overwrite).await?;
+    command
+        .channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await?;
 
     reply(
         ctx,

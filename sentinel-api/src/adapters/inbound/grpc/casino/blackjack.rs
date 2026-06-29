@@ -8,22 +8,22 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::blackjack::v1 as proto;
+use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackService as BlackjackGrpcTrait;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::blackjack::v1 as proto;
-use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackService as BlackjackGrpcTrait;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::application::casino::blackjack_service::BlackjackService as BlackjackApp;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 use sentinel_core::domain::entities::casino::blackjack::Card;
-use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::entities::casino::wallet::Wallet;
-use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 pub struct BlackjackGrpc {
     pub svc: Arc<BlackjackApp>,
     pub wallet_repo: Arc<dyn WalletRepository>,
@@ -242,7 +242,11 @@ fn action_result_to_proto(
 ) -> proto::BlackjackGameResult {
     proto::BlackjackGameResult {
         game: Some(blackjack_game_to_proto(result.game)),
-        taunt_events: result.taunt_events.into_iter().map(taunt_to_proto).collect(),
+        taunt_events: result
+            .taunt_events
+            .into_iter()
+            .map(taunt_to_proto)
+            .collect(),
         wallet_balance: result.wallet_balance,
     }
 }
@@ -258,7 +262,6 @@ fn wallet_to_proto(w: Wallet) -> proto::Wallet {
         total_spent: w.total_spent,
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/blackjack.rs"]

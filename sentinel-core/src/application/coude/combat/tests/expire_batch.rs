@@ -2,32 +2,32 @@
 //! penalty debit → cashbox deposit → stats record → refund bets, avec les
 //! chemins degrades (debit echoue → pas de deposit, pas de stats).
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::coude::combat::expire_batch::ExpireCombatsBatchService;
-use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::bet::Bet;
-use crate::domain::entities::coude::cashbox::Cashbox;
-use crate::domain::entities::coude::combat::Combat;
-use crate::domain::entities::coude::combat::NewCoudeCombat;
-use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::bet::Bet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::cashbox::Cashbox;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
-use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 // ── MockCombatRepo (seul claim_expired_pending_combats est exerce) ──
 
 #[derive(Default)]
@@ -37,24 +37,66 @@ struct MockCombatRepo {
 
 #[async_trait]
 impl CombatRepository for MockCombatRepo {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn get_pending_for_attacker(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn get_pending_for_defender(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
     async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
         Ok(self.expired.lock().unwrap().clone())
     }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
-    async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> { Ok(true) }
-    async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn expire(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
-    async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
-    async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn get_betting_for_participant(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> {
+        unimplemented!()
+    }
+    async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn expire(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ── MockPlayerRepo (seules record_coins_lost + increment_cowardice sont exercees) ──
@@ -67,39 +109,132 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::coude::player::Player, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> { Ok(vec![]) }
-    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: crate::domain::entities::coude::player::CombatStat) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
-    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_coins_lost(&self, g: &str, u: &str, amount: i64) -> Result<bool, DomainError> {
-        self.record_lost_calls.lock().unwrap().push((g.into(), u.into(), amount));
+    async fn get_or_create(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<crate::domain::entities::coude::player::Player, DomainError> {
+        unimplemented!()
+    }
+    async fn get(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> {
+        Ok(None)
+    }
+    async fn list(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn random_active(
+        &self,
+        _: &str,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
+    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(true)
     }
-    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_steal_victim_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn add_xp(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Option<crate::domain::entities::coude::player::XpProgress>, DomainError> {
+        Ok(None)
+    }
+    async fn spend_stat_point(
+        &self,
+        _: &str,
+        _: &str,
+        _: crate::domain::entities::coude::player::CombatStat,
+    ) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_stats(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> {
+        Ok(None)
+    }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_coins_lost(&self, g: &str, u: &str, amount: i64) -> Result<bool, DomainError> {
+        self.record_lost_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), amount));
+        Ok(true)
+    }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_steal_victim_streak(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn increment_cowardice(&self, g: &str, u: &str) -> Result<Option<i32>, DomainError> {
-        self.cowardice_calls.lock().unwrap().push((g.into(), u.into()));
+        self.cowardice_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into()));
         Ok(Some(1))
     }
-    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── MockWalletRepo ──
@@ -112,27 +247,98 @@ struct MockWalletRepo {
 
 #[async_trait]
 impl WalletRepository for MockWalletRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> { Ok(None) }
-    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn debit(&self, g: &str, u: &str, amount: i64, _: &str, _: &str) -> Result<Wallet, DomainError> {
+    async fn get_or_create(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> {
+        Ok(None)
+    }
+    async fn credit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn debit(
+        &self,
+        g: &str,
+        u: &str,
+        amount: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
         if *self.debit_should_fail.lock().unwrap() {
             return Err(DomainError::ValidationError("Solde insuffisant".into()));
         }
-        self.debit_calls.lock().unwrap().push((g.into(), u.into(), amount));
+        self.debit_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), amount));
         Ok(Wallet {
-            id: Uuid::new_v4(), guild_id: g.into(), user_id: u.into(), username: "x".into(),
-            coins: 0, total_earned: 0, total_spent: amount,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            id: Uuid::new_v4(),
+            guild_id: g.into(),
+            user_id: u.into(),
+            username: "x".into(),
+            coins: 0,
+            total_earned: 0,
+            total_spent: amount,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         })
     }
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
-    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> { Ok(0) }
+    async fn transfer(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn pay_combat_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_transactions(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── MockCashboxRepo ──
@@ -146,21 +352,66 @@ struct MockCashboxRepo {
 impl CashboxRepository for MockCashboxRepo {
     async fn get_or_create(&self, g: &str) -> Result<Cashbox, DomainError> {
         Ok(Cashbox {
-            guild_id: g.into(), balance: 0, total_collected: 0, total_redistributed: 0,
-            last_redistribution_at: None, created_at: Utc::now(), updated_at: Utc::now(),
+            guild_id: g.into(),
+            balance: 0,
+            total_collected: 0,
+            total_redistributed: 0,
+            last_redistribution_at: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         })
     }
-    async fn deposit(&self, g: &str, amount: i64, source: CashboxSource) -> Result<(), DomainError> {
-        self.deposit_calls.lock().unwrap().push((g.into(), amount, source));
+    async fn deposit(
+        &self,
+        g: &str,
+        amount: i64,
+        source: CashboxSource,
+    ) -> Result<(), DomainError> {
+        self.deposit_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), amount, source));
         Ok(())
     }
-    async fn claim_all_for_redistribution(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn withdraw(&self, _: &str, _: i64) -> Result<i64, DomainError> { Ok(0) }
-    async fn record_redistribution(&self, _: &str, _: i64, _: Vec<(String, String, i64)>) -> Result<Uuid, DomainError> { Ok(Uuid::new_v4()) }
-    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistribution>, DomainError> { Ok(vec![]) }
-    async fn list_entries(&self, _: Uuid) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistributionEntry>, DomainError> { Ok(vec![]) }
-    async fn list_active_players(&self, _: &str, _: i64) -> Result<Vec<(String, String)>, DomainError> { Ok(vec![]) }
-    async fn list_guilds_due_for_redistribution(&self, _: i64) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn claim_all_for_redistribution(&self, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn withdraw(&self, _: &str, _: i64) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn record_redistribution(
+        &self,
+        _: &str,
+        _: i64,
+        _: Vec<(String, String, i64)>,
+    ) -> Result<Uuid, DomainError> {
+        Ok(Uuid::new_v4())
+    }
+    async fn list_redistributions(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistribution>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn list_entries(
+        &self,
+        _: Uuid,
+    ) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistributionEntry>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn list_active_players(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<(String, String)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_guilds_due_for_redistribution(&self, _: i64) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 // ── MockBetsUc ──
@@ -172,12 +423,21 @@ struct MockBetsUc {
 
 #[async_trait]
 impl ManageCoudeBetsUseCase for MockBetsUc {
-    async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> { unimplemented!() }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> { Ok(vec![]) }
-    async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> { unimplemented!() }
+    async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> {
+        unimplemented!()
+    }
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> {
+        unimplemented!()
+    }
     async fn refund(&self, combat_id: Uuid) -> Result<RefundSummary, DomainError> {
         self.refund_calls.lock().unwrap().push(combat_id);
-        Ok(RefundSummary { refunded_count: 0, refunded_total: 0 })
+        Ok(RefundSummary {
+            refunded_count: 0,
+            refunded_total: 0,
+        })
     }
 }
 
@@ -195,11 +455,17 @@ fn make_combat(guild: &str, defender: &str, mise: i64) -> Combat {
         mise,
         status: "expired".into(),
         winner_id: None,
-        attacker_roll: None, defender_roll: None,
-        chaos_event: None, special_attack: None, defender_special: None,
-        coins_transferred: None, result_message: None, message_id: None,
+        attacker_roll: None,
+        defender_roll: None,
+        chaos_event: None,
+        special_attack: None,
+        defender_special: None,
+        coins_transferred: None,
+        result_message: None,
+        message_id: None,
         created_at: Utc::now(),
-        accepted_at: None, resolved_at: None,
+        accepted_at: None,
+        resolved_at: None,
     }
 }
 
@@ -233,13 +499,23 @@ async fn expire_batch_empty_returns_no_outputs() {
 #[tokio::test]
 async fn expire_batch_happy_path_penalty_deposit_stats_refund() {
     let combat = Arc::new(MockCombatRepo::default());
-    combat.expired.lock().unwrap().push(make_combat("g1", "lazy-def", 1000));
+    combat
+        .expired
+        .lock()
+        .unwrap()
+        .push(make_combat("g1", "lazy-def", 1000));
     let player = Arc::new(MockPlayerRepo::default());
     let wallet = Arc::new(MockWalletRepo::default());
     let cashbox = Arc::new(MockCashboxRepo::default());
     let bets = Arc::new(MockBetsUc::default());
 
-    let svc = build_service(combat.clone(), player.clone(), wallet.clone(), cashbox.clone(), bets.clone());
+    let svc = build_service(
+        combat.clone(),
+        player.clone(),
+        wallet.clone(),
+        cashbox.clone(),
+        bets.clone(),
+    );
     let out = svc.expire_batch().await.unwrap();
 
     assert_eq!(out.len(), 1);
@@ -276,7 +552,11 @@ async fn expire_batch_happy_path_penalty_deposit_stats_refund() {
 #[tokio::test]
 async fn expire_batch_small_mise_penalty_clamped_to_minimum_one() {
     let combat = Arc::new(MockCombatRepo::default());
-    combat.expired.lock().unwrap().push(make_combat("g", "d", 3)); // 20% of 3 = 0.6 → clamp 1
+    combat
+        .expired
+        .lock()
+        .unwrap()
+        .push(make_combat("g", "d", 3)); // 20% of 3 = 0.6 → clamp 1
     let wallet = Arc::new(MockWalletRepo::default());
     let svc = build_service(
         combat,
@@ -294,14 +574,24 @@ async fn expire_batch_small_mise_penalty_clamped_to_minimum_one() {
 #[tokio::test]
 async fn expire_batch_debit_failure_skips_deposit_and_stats() {
     let combat = Arc::new(MockCombatRepo::default());
-    combat.expired.lock().unwrap().push(make_combat("g", "broke", 500));
+    combat
+        .expired
+        .lock()
+        .unwrap()
+        .push(make_combat("g", "broke", 500));
     let wallet = Arc::new(MockWalletRepo::default());
     *wallet.debit_should_fail.lock().unwrap() = true;
     let cashbox = Arc::new(MockCashboxRepo::default());
     let player = Arc::new(MockPlayerRepo::default());
     let bets = Arc::new(MockBetsUc::default());
 
-    let svc = build_service(combat, player.clone(), wallet.clone(), cashbox.clone(), bets.clone());
+    let svc = build_service(
+        combat,
+        player.clone(),
+        wallet.clone(),
+        cashbox.clone(),
+        bets.clone(),
+    );
     let out = svc.expire_batch().await.unwrap();
 
     // Output encore emis (le combat est quand meme expire)
@@ -351,7 +641,11 @@ async fn expire_batch_multiple_combats_processes_all() {
 #[tokio::test]
 async fn expire_batch_output_preserves_channel_id() {
     let combat = Arc::new(MockCombatRepo::default());
-    combat.expired.lock().unwrap().push(make_combat("g", "d", 100));
+    combat
+        .expired
+        .lock()
+        .unwrap()
+        .push(make_combat("g", "d", 100));
     let svc = build_service(
         combat,
         Arc::new(MockPlayerRepo::default()),

@@ -131,7 +131,9 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
     };
 
     for ar in &auto_roles {
-        if !ar.enabled { continue; }
+        if !ar.enabled {
+            continue;
+        }
 
         if ar.delay_secs > 0 {
             let ctx_clone = ctx.clone();
@@ -267,7 +269,8 @@ async fn handle_temp_role_expire(ctx: &Context, payload_json: &str) {
         tracker.remove(guild_id_u64, user_id_u64, role_id_u64);
     }
     if let Some(api) = bot_data.get::<RolesApiKey>() {
-        api.delete_temp_role(guild_id_str, user_id_str, role_id_str).await;
+        api.delete_temp_role(guild_id_str, user_id_str, role_id_str)
+            .await;
     }
 }
 
@@ -305,7 +308,10 @@ pub async fn sync_all_guild_roles(ctx: &Context) {
             .collect();
 
         let count = sync_roles.len();
-        if let Err(e) = api.sync_discord_roles(&guild_id.to_string(), sync_roles).await {
+        if let Err(e) = api
+            .sync_discord_roles(&guild_id.to_string(), sync_roles)
+            .await
+        {
             warn!(error = %e, guild = %guild_id, "Erreur sync roles vers API");
         } else {
             info!(guild = %guild_id, roles = count, "Roles Discord synchronises");
@@ -321,9 +327,7 @@ pub async fn send_role_panel(
     channel_id: serenity::model::id::ChannelId,
     panel: &RolePanelDetail,
 ) -> Result<Message, serenity::Error> {
-    let mut embed = CreateEmbed::new()
-        .title(&panel.panel.title)
-        .color(0x5865F2);
+    let mut embed = CreateEmbed::new().title(&panel.panel.title).color(0x5865F2);
 
     if !panel.panel.description.is_empty() {
         embed = embed.description(&panel.panel.description);
@@ -366,7 +370,10 @@ pub async fn send_role_panel(
         .collect();
 
     channel_id
-        .send_message(&ctx.http, CreateMessage::new().embed(embed).components(rows))
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embed).components(rows),
+        )
         .await
 }
 
@@ -414,7 +421,10 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
+            match base
+                .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+                .await
+            {
                 Ok(c) => c,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for role button");
@@ -439,17 +449,22 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         let prereqs_raw = BaseApiClient::config_or(&guild_config, "role_prerequisites", "");
         let prereqs = prerequisites::parse_prerequisites(&prereqs_raw);
         let user_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
-        let joined_days = member.joined_at
+        let joined_days = member
+            .joined_at
             .map(|j| {
                 let now = serenity::model::Timestamp::now().unix_timestamp();
                 ((now - j.unix_timestamp()) / 86400).max(0) as u64
             })
             .unwrap_or(0);
 
-        if let Err(msg) = prerequisites::check_prerequisites(&prereqs, role_id, &user_roles, joined_days) {
+        if let Err(msg) =
+            prerequisites::check_prerequisites(&prereqs, role_id, &user_roles, joined_days)
+        {
             let embed = neutral_embed("Prerequis non remplis").description(msg);
             let response = CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             );
             if let Err(e) = component.create_response(&ctx.http, response).await {
                 warn!(error = %e, "Failed to send prerequisite check response");
@@ -463,7 +478,8 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         let temp_duration = temp_roles::get_temp_duration(&temp_roles_config, role_id);
 
         if let Some(duration) = temp_duration {
-            let expires_at = (chrono::Utc::now() + chrono::Duration::seconds(duration as i64)).to_rfc3339();
+            let expires_at =
+                (chrono::Utc::now() + chrono::Duration::seconds(duration as i64)).to_rfc3339();
             let api_result = {
                 let data = ctx.data.read().await;
                 if let Some(api) = data.get::<RolesApiKey>() {
@@ -472,7 +488,8 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
                         &component.user.id.to_string(),
                         &role_id.to_string(),
                         &expires_at,
-                    ).await
+                    )
+                    .await
                 } else {
                     Err("ApiClient indisponible".to_string())
                 }
@@ -483,7 +500,9 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
                 let embed = neutral_embed("Erreur")
                     .description("Impossible d'enregistrer le role temporaire cote serveur.");
                 let response = CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                    CreateInteractionResponseMessage::new()
+                        .embed(embed)
+                        .ephemeral(true),
                 );
                 let _ = component.create_response(&ctx.http, response).await;
                 return;
@@ -523,7 +542,8 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
                             &guild_id.to_string(),
                             &component.user.id.to_string(),
                             &role_id.to_string(),
-                        ).await;
+                        )
+                        .await;
                     }
                 }
             }

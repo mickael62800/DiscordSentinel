@@ -40,7 +40,11 @@ impl RollStealUseCase for RollStealService {
             let pct = rng.gen_range(lo..=hi);
             (thief, victim, pct)
         };
-        Ok(StealRoll { thief_d20, victim_d20, steal_pct_bp })
+        Ok(StealRoll {
+            thief_d20,
+            victim_d20,
+            steal_pct_bp,
+        })
     }
 }
 

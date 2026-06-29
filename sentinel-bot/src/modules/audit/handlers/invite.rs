@@ -2,7 +2,7 @@ use serenity::model::event::{InviteCreateEvent, InviteDeleteEvent};
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::{send_event, log};
+use super::{log, send_event};
 
 pub async fn handle_create(ctx: &Context, data: &InviteCreateEvent) {
     let gid = match data.guild_id {
@@ -10,15 +10,25 @@ pub async fn handle_create(ctx: &Context, data: &InviteCreateEvent) {
         None => return,
     };
 
-    let inviter_name = data.inviter.as_ref().map(|u| u.name.clone()).unwrap_or_else(|| "?".into());
+    let inviter_name = data
+        .inviter
+        .as_ref()
+        .map(|u| u.name.clone())
+        .unwrap_or_else(|| "?".into());
     let inviter_id = data.inviter.as_ref().map(|u| u.id.to_string());
     let max_uses = data.max_uses;
     let max_age = data.max_age;
 
-    log(ctx, "info", &gid, &format!(
-        "Invitation creee par {} -- code: {}, max uses: {}, expire: {}s",
-        inviter_name, data.code, max_uses, max_age
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid,
+        &format!(
+            "Invitation creee par {} -- code: {}, max uses: {}, expire: {}s",
+            inviter_name, data.code, max_uses, max_age
+        ),
+    )
+    .await;
 
     let mut evt = audit_event::simple(gid, "invite_create")
         .with_channel(data.channel_id, None)
@@ -40,9 +50,13 @@ pub async fn handle_delete(ctx: &Context, data: &InviteDeleteEvent) {
         None => return,
     };
 
-    log(ctx, "info", &gid, &format!(
-        "Invitation supprimee -- code: {}", data.code
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid,
+        &format!("Invitation supprimee -- code: {}", data.code),
+    )
+    .await;
 
     send_event(
         ctx,

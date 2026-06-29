@@ -102,17 +102,12 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<AutomodReview>, DomainError>;
-    async fn resolve(
-        &self,
-        cmd: ResolveAutomodReviewCommand,
-    ) -> Result<AutomodReview, DomainError>;
+    async fn resolve(&self, cmd: ResolveAutomodReviewCommand)
+        -> Result<AutomodReview, DomainError>;
 
     /// Clore immediatement en "ignore" (statut pending|voting|decided ->
     /// ignored). Reserve aux moderateurs (`is_moderator`).
-    async fn close_ignored(
-        &self,
-        cmd: CloseIgnoredCommand,
-    ) -> Result<AutomodReview, DomainError>;
+    async fn close_ignored(&self, cmd: CloseIgnoredCommand) -> Result<AutomodReview, DomainError>;
 
     /// Rouvrir un dossier (applied|ignored -> voting), reinitialise les votes
     /// et fixe une nouvelle echeance. Reserve aux moderateurs (`is_moderator`).
@@ -148,7 +143,10 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
 
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.
-    async fn get_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError>;
+    async fn get_discussion(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Option<DiscussionChannel>, DomainError>;
 
     /// Ouvre (enregistre) un salon de discussion : applique la regle d'acces
     /// (`can_open_discussion`) puis persiste de facon idempotente. Retourne

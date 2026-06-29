@@ -16,16 +16,16 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_api::ports::inbound::community::manage_levels::ResetTarget;
+use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand;
 use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
-use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
-use sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand;
-use sentinel_api::ports::inbound::community::manage_levels::ResetTarget;
 use test_helpers::build_test_state_levels;
 
 #[derive(Default)]
@@ -36,8 +36,13 @@ struct MockLevelsUC {
 }
 
 impl MockLevelsUC {
-    fn new() -> Self { Self::default() }
-    fn with_user(self, u: UserLevel) -> Self { self.users.lock().unwrap().push(u); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with_user(self, u: UserLevel) -> Self {
+        self.users.lock().unwrap().push(u);
+        self
+    }
 }
 
 fn default_config(guild_id: &str) -> LevelConfig {
@@ -78,7 +83,12 @@ fn default_user(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
 #[async_trait]
 impl ManageLevelsUseCase for MockLevelsUC {
     async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError> {
-        Ok(self.config.lock().unwrap().clone().unwrap_or_else(|| default_config(guild_id)))
+        Ok(self
+            .config
+            .lock()
+            .unwrap()
+            .clone()
+            .unwrap_or_else(|| default_config(guild_id)))
     }
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
         let now = Utc::now();
@@ -107,24 +117,53 @@ impl ManageLevelsUseCase for MockLevelsUC {
             source: cmd.source,
         })
     }
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError> {
+    async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserLevel, DomainError> {
         let users = self.users.lock().unwrap();
-        Ok(users.iter().find(|u| u.guild_id == guild_id && u.user_id == user_id).cloned()
+        Ok(users
+            .iter()
+            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
+            .cloned()
             .unwrap_or_else(|| default_user(guild_id, user_id, 0)))
     }
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
         let users = self.users.lock().unwrap();
-        let mut matching: Vec<UserLevel> = users.iter().filter(|u| u.guild_id == guild_id).cloned().collect();
+        let mut matching: Vec<UserLevel> = users
+            .iter()
+            .filter(|u| u.guild_id == guild_id)
+            .cloned()
+            .collect();
         matching.sort_by(|a, b| b.xp.cmp(&a.xp));
         matching.truncate(limit as usize);
         Ok(matching)
     }
-    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+    async fn get_leaderboard_by_source(
+        &self,
+        guild_id: &str,
+        source: XpSource,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
         *self.last_source.lock().unwrap() = Some(source);
         self.get_leaderboard(guild_id, limit).await
     }
-    async fn set_user_xp(&self, _: SetUserXpCommand) -> Result<UserLevel, DomainError> { unimplemented!() }
-    async fn reset_user_xp(&self, _: &str, _: &str, _: ResetTarget) -> Result<UserLevel, DomainError> { unimplemented!() }
+    async fn set_user_xp(&self, _: SetUserXpCommand) -> Result<UserLevel, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_user_xp(
+        &self,
+        _: &str,
+        _: &str,
+        _: ResetTarget,
+    ) -> Result<UserLevel, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn build_app(uc: Arc<MockLevelsUC>) -> axum::Router {
@@ -132,21 +171,38 @@ fn build_app(uc: Arc<MockLevelsUC>) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -242,7 +298,11 @@ async fn leaderboard_sorted_desc_by_xp() {
 async fn leaderboard_source_voice_calls_by_source_path() {
     let uc = Arc::new(MockLevelsUC::new().with_user(default_user("111111111111111111", "u1", 10)));
     let app = build_app(uc.clone());
-    let (status, _) = get(app, "/api/levels/111111111111111111/leaderboard?source=voice").await;
+    let (status, _) = get(
+        app,
+        "/api/levels/111111111111111111/leaderboard?source=voice",
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(*uc.last_source.lock().unwrap(), Some(XpSource::Voice));
 }
@@ -251,7 +311,11 @@ async fn leaderboard_source_voice_calls_by_source_path() {
 async fn leaderboard_source_text_calls_by_source_path() {
     let uc = Arc::new(MockLevelsUC::new().with_user(default_user("111111111111111111", "u1", 10)));
     let app = build_app(uc.clone());
-    let (status, _) = get(app, "/api/levels/111111111111111111/leaderboard?source=text").await;
+    let (status, _) = get(
+        app,
+        "/api/levels/111111111111111111/leaderboard?source=text",
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(*uc.last_source.lock().unwrap(), Some(XpSource::Text));
 }

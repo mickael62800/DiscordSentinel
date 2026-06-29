@@ -49,7 +49,7 @@ async fn test_acquire_succeeds_after_permit_dropped() {
         let _p1 = limiter.acquire().await.unwrap();
         // Semaphore plein ici.
     } // p1 drop → permit libere.
-    // Doit reussir immediatement (pas de timeout).
+      // Doit reussir immediatement (pas de timeout).
     assert!(limiter.acquire().await.is_ok());
 }
 

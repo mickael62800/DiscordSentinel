@@ -11,9 +11,9 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
+use serde::{Deserialize, Serialize};
 
 use sentinel_proto::community::v1 as proto_community;
 use sentinel_proto::roles::v1 as proto;
@@ -110,7 +110,10 @@ impl ApiClient {
         let resp = self
             .grpc
             .guarded(|| async move {
-                client.get_panel_by_message(req).await.map(|r| r.into_inner())
+                client
+                    .get_panel_by_message(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -124,19 +127,13 @@ impl ApiClient {
         let mut client = self.grpc.role_panels();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_auto_roles(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_auto_roles(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list.roles.into_iter().map(proto_auto_role_to_dto).collect())
     }
 
-    pub async fn set_message_id(
-        &self,
-        panel_id: &str,
-        message_id: &str,
-    ) -> Result<(), String> {
+    pub async fn set_message_id(&self, panel_id: &str, message_id: &str) -> Result<(), String> {
         let req = proto::SetMessageIdRequest {
             panel_id: panel_id.to_string(),
             message_id: message_id.to_string(),
@@ -155,9 +152,7 @@ impl ApiClient {
         let mut client = self.grpc.role_panels();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_panels(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_panels(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list.panels.into_iter().map(proto_panel_to_dto).collect())
@@ -228,10 +223,7 @@ impl ApiClient {
     }
 
     /// gRPC `CommunityService.ListTempRoles`.
-    pub async fn list_temp_roles(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<TempRoleApiEntry>, String> {
+    pub async fn list_temp_roles(&self, guild_id: &str) -> Result<Vec<TempRoleApiEntry>, String> {
         let req = proto_community::ListTempRolesRequest {
             guild_id: guild_id.to_string(),
         };

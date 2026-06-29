@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::log_repository::LogRepository;
 
 pub struct PgLogRepository {
     pool: PgPool,
@@ -118,11 +118,12 @@ impl LogRepository for PgLogRepository {
     }
 
     async fn delete_older_than_days(&self, days: i32) -> Result<u64, DomainError> {
-        let result = sqlx::query("DELETE FROM logs WHERE timestamp < NOW() - make_interval(days => $1)")
-            .bind(days)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| pg_err_ctx("delete_logs_older", e))?;
+        let result =
+            sqlx::query("DELETE FROM logs WHERE timestamp < NOW() - make_interval(days => $1)")
+                .bind(days)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| pg_err_ctx("delete_logs_older", e))?;
         Ok(result.rows_affected())
     }
 }

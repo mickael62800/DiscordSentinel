@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::moderation::manage_notes::*;
 use sentinel_core::domain::entities::moderation::user_note::*;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::moderation::manage_notes::*;
 
 // ══════════════════════════════════════════════════════════
 // Mock Notes Use Case
@@ -57,7 +57,10 @@ impl ManageNotesUseCase for MockNotesUC {
     async fn add_note(&self, cmd: AddNoteCommand) -> Result<UserNote, DomainError> {
         let valid = ["general", "warning", "positive", "context"];
         if !valid.contains(&cmd.category.as_str()) {
-            return Err(DomainError::ValidationError(format!("Categorie invalide '{}'", cmd.category)));
+            return Err(DomainError::ValidationError(format!(
+                "Categorie invalide '{}'",
+                cmd.category
+            )));
         }
         Ok(UserNote {
             id: Uuid::new_v4(),
@@ -73,7 +76,9 @@ impl ManageNotesUseCase for MockNotesUC {
     }
 
     async fn get_notes(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserNote>, DomainError> {
-        Ok(self.notes.iter()
+        Ok(self
+            .notes
+            .iter()
             .filter(|n| n.guild_id == guild_id && n.user_id == user_id)
             .cloned()
             .collect())
@@ -95,30 +100,53 @@ fn build_app(uc: MockNotesUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("POST").uri(uri)
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -200,8 +228,18 @@ async fn get_notes_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_notes_with_data() {
     let uc = MockNotesUC::new()
-        .with_note(make_note("111111111111111111", "444444444444444444", "Note 1", "general"))
-        .with_note(make_note("111111111111111111", "444444444444444444", "Note 2", "warning"));
+        .with_note(make_note(
+            "111111111111111111",
+            "444444444444444444",
+            "Note 1",
+            "general",
+        ))
+        .with_note(make_note(
+            "111111111111111111",
+            "444444444444444444",
+            "Note 2",
+            "warning",
+        ));
     let app = build_app(uc);
     let (status, json) = get(app, "/api/notes/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
@@ -226,8 +264,9 @@ async fn delete_note_success() {
 // ══════════════════════════════════════════════════════════
 
 async fn pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     sqlx::PgPool::connect(&url).await.unwrap()
 }
 
@@ -241,20 +280,32 @@ async fn insert_note(pool: &sqlx::PgPool, guild_id: &str) -> Uuid {
     id
 }
 
-async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+async fn send_request(
+    app: axum::Router,
+    req: axum::http::Request<Body>,
+) -> (StatusCode, serde_json::Value) {
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_moderator_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let p = pool().await;
     let note_id = insert_note(&p, &guild_id).await;
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'M') ON CONFLICT DO NOTHING")
         .bind(&user_id).execute(&p).await.unwrap();
     sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
@@ -262,8 +313,11 @@ async fn delete_note_with_rbac_moderator_succeeds() {
 
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/notes/{note_id}"),
-        &user_id, Some(Role::Moderator), Some(guild_id),
+        "DELETE",
+        &format!("/api/notes/{note_id}"),
+        &user_id,
+        Some(Role::Moderator),
+        Some(guild_id),
         None,
     );
     let (status, _) = send_request(app, req).await;
@@ -275,8 +329,10 @@ async fn delete_note_with_rbac_invalid_uuid_422() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/notes/not-a-uuid",
-        "444444444444444444", Some(Role::Moderator),
+        "DELETE",
+        "/api/notes/not-a-uuid",
+        "444444444444444444",
+        Some(Role::Moderator),
         Some("111111111111111111".into()),
         None,
     );
@@ -287,9 +343,15 @@ async fn delete_note_with_rbac_invalid_uuid_422() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_note_with_rbac_moderator_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let p = pool().await;
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'M') ON CONFLICT DO NOTHING")
         .bind(&user_id).execute(&p).await.unwrap();
     sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
@@ -305,8 +367,12 @@ async fn add_note_with_rbac_moderator_succeeds() {
         "category": "general"
     });
     let req = test_helpers::request_with_rbac(
-        "POST", "/api/notes",
-        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+        "POST",
+        "/api/notes",
+        &user_id,
+        Some(Role::Moderator),
+        Some(guild_id),
+        Some(body),
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);
@@ -315,13 +381,25 @@ async fn add_note_with_rbac_moderator_succeeds() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_note_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let p = pool().await;
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'V') ON CONFLICT DO NOTHING")
         .bind(&user_id).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')")
-        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')",
+    )
+    .bind(&user_id)
+    .bind(&guild_id)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let app = build_app(MockNotesUC::new());
     let body = serde_json::json!({
@@ -333,8 +411,12 @@ async fn add_note_with_rbac_viewer_forbidden() {
         "category": "general"
     });
     let req = test_helpers::request_with_rbac(
-        "POST", "/api/notes",
-        &user_id, Some(Role::Viewer), Some(guild_id), Some(body),
+        "POST",
+        "/api/notes",
+        &user_id,
+        Some(Role::Viewer),
+        Some(guild_id),
+        Some(body),
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -345,8 +427,12 @@ async fn get_notes_with_rbac_moderator_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
-        "GET", "/api/notes/111111111111111111/444444444444444444",
-        "555555555555555555", Some(Role::Moderator), Some("111111111111111111".into()), None,
+        "GET",
+        "/api/notes/111111111111111111/444444444444444444",
+        "555555555555555555",
+        Some(Role::Moderator),
+        Some("111111111111111111".into()),
+        None,
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);
@@ -357,8 +443,12 @@ async fn get_notes_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
-        "GET", "/api/notes/111111111111111111/444444444444444444",
-        "555555555555555555", Some(Role::Viewer), Some("111111111111111111".into()), None,
+        "GET",
+        "/api/notes/111111111111111111/444444444444444444",
+        "555555555555555555",
+        Some(Role::Viewer),
+        Some("111111111111111111".into()),
+        None,
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
@@ -367,19 +457,34 @@ async fn get_notes_with_rbac_viewer_forbidden() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let p = pool().await;
     let note_id = insert_note(&p, &guild_id).await;
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'V') ON CONFLICT DO NOTHING")
         .bind(&user_id).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')")
-        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')",
+    )
+    .bind(&user_id)
+    .bind(&guild_id)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/notes/{note_id}"),
-        &user_id, Some(Role::Viewer), Some(guild_id),
+        "DELETE",
+        &format!("/api/notes/{note_id}"),
+        &user_id,
+        Some(Role::Viewer),
+        Some(guild_id),
         None,
     );
     let (status, _) = send_request(app, req).await;

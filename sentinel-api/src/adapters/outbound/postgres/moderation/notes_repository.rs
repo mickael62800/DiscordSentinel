@@ -1,13 +1,13 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::moderation::notes_repository::NotesRepository;
 use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::moderation::notes_repository::NotesRepository;
 
 pub struct PgNotesRepository {
     pool: PgPool,
@@ -70,7 +70,11 @@ impl NotesRepository for PgNotesRepository {
         Ok(())
     }
 
-    async fn find_by_user(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserNote>, DomainError> {
+    async fn find_by_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<UserNote>, DomainError> {
         let rows = sqlx::query_as::<_, NoteRow>(
             "SELECT id, guild_id, user_id, author_id, author_name, content, category, created_at, updated_at
              FROM user_notes WHERE guild_id = $1 AND user_id = $2 ORDER BY created_at DESC"

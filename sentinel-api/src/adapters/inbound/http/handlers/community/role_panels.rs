@@ -1,17 +1,17 @@
-use axum::extract::Path;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::community::role_panels::*;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 pub async fn create_panel(
@@ -34,7 +34,10 @@ pub async fn get_panel_by_message(
     State(state): State<AppState>,
     Path(message_id): Path<String>,
 ) -> Result<Json<Option<RolePanelDetailDto>>, ApiError> {
-    let detail = state.role_panels_uc.get_panel_by_message(&message_id).await?;
+    let detail = state
+        .role_panels_uc
+        .get_panel_by_message(&message_id)
+        .await?;
     Ok(Json(detail.map(RolePanelDetailDto::from)))
 }
 
@@ -100,9 +103,15 @@ pub async fn delete_auto_role(
 ) -> Result<Json<()>, ApiError> {
     // Phase 7 B — Gate RBAC : admin+ pour toucher aux auto-roles.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin)
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un auto-role".into())))?;
+        require_role(&ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour supprimer un auto-role".into(),
+            ))
+        })?;
     }
-    state.role_panels_uc.delete_auto_role(&guild_id, &role_id).await?;
+    state
+        .role_panels_uc
+        .delete_auto_role(&guild_id, &role_id)
+        .await?;
     Ok(Json(()))
 }

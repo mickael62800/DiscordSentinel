@@ -3,15 +3,13 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::voice::v1 as proto;
+use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::voice::v1 as proto;
-use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
@@ -20,6 +18,8 @@ use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistComm
 use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
+use sentinel_core::domain::errors::DomainError;
 pub struct VoiceChannelsGrpc {
     pub uc: Arc<dyn ManageVoiceChannelsUseCase>,
 }
@@ -290,7 +290,9 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
     }
 }
 
-fn voice_theme_to_proto(t: sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme) -> proto::VoiceChannelTheme {
+fn voice_theme_to_proto(
+    t: sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme,
+) -> proto::VoiceChannelTheme {
     proto::VoiceChannelTheme {
         id: t.id.to_string(),
         guild_id: t.guild_id.into(),
@@ -331,7 +333,6 @@ fn voice_channel_to_proto(c: VoiceChannel) -> proto::VoiceChannel {
         created_at: c.created_at.to_rfc3339(),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/voice.rs"]

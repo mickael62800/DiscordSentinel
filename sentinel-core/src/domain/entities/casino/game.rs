@@ -26,7 +26,9 @@ pub fn normalize_game_name(raw: &str) -> Result<String, &'static str> {
 /// Normalise un tag optionnel (emoji, category) : trim + filter empty.
 /// Si apres trim le tag est vide, retourne `None`.
 pub fn normalize_optional_tag(raw: Option<&str>) -> Option<String> {
-    raw.map(str::trim).filter(|s| !s.is_empty()).map(str::to_string)
+    raw.map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
 }
 
 /// Parse une couleur hex Discord (`#RRGGBB` ou `RRGGBB`) avec fallback en
@@ -69,10 +71,9 @@ pub fn slugify_emoji_name(raw: &str) -> String {
             out.push(ch.to_ascii_lowercase());
         } else if ch == '_' {
             out.push('_');
-        } else if (ch.is_whitespace() || ch == '-' || ch == '.')
-            && !out.ends_with('_') {
-                out.push('_');
-            }
+        } else if (ch.is_whitespace() || ch == '-' || ch == '.') && !out.ends_with('_') {
+            out.push('_');
+        }
     }
     let trimmed = out.trim_matches('_').to_string();
     let mut s = trimmed;

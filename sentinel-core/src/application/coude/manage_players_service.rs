@@ -5,11 +5,11 @@ use async_trait::async_trait;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct ManageCoudePlayersService {
     repo: Arc<dyn PlayerRepository>,
@@ -20,11 +20,7 @@ impl ManageCoudePlayersService {
         Self { repo }
     }
 
-    async fn require_player(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<Player, DomainError> {
+    async fn require_player(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
         self.repo
             .get(guild_id, user_id)
             .await?
@@ -40,7 +36,9 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         user_id: UserId,
         username: String,
     ) -> Result<Player, DomainError> {
-        self.repo.get_or_create(&guild_id, &user_id, &username).await
+        self.repo
+            .get_or_create(&guild_id, &user_id, &username)
+            .await
     }
 
     async fn get(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
@@ -52,11 +50,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         self.repo.list(guild_id, 200).await
     }
 
-    async fn random_active(
-        &self,
-        guild_id: &str,
-        count: i64,
-    ) -> Result<Vec<Player>, DomainError> {
+    async fn random_active(&self, guild_id: &str, count: i64) -> Result<Vec<Player>, DomainError> {
         let count = count.clamp(1, 50);
         // 50 coins minimum = comportement historique (filtre les comptes "vides").
         self.repo.random_active(guild_id, count, 50).await
@@ -144,7 +138,10 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
                 "Les montants ne peuvent pas etre negatifs".into(),
             ));
         }
-        let updated = self.repo.record_win(guild_id, user_id, earned, stolen).await?;
+        let updated = self
+            .repo
+            .record_win(guild_id, user_id, earned, stolen)
+            .await?;
         if !updated {
             return Err(DomainError::NotFound("Joueur introuvable".into()));
         }
@@ -177,11 +174,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         Ok(())
     }
 
-    async fn increment_cowardice(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i32, DomainError> {
+    async fn increment_cowardice(&self, guild_id: &str, user_id: &str) -> Result<i32, DomainError> {
         self.repo
             .increment_cowardice(guild_id, user_id)
             .await?

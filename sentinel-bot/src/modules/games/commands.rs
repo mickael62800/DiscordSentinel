@@ -37,9 +37,11 @@ fn register_public() -> CreateCommand {
     CreateCommand::new("game")
         .description("Consulter et s'inscrire aux jeux")
         .default_member_permissions(serenity::all::Permissions::empty())
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "list", "Lister les jeux disponibles"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "list",
+            "Lister les jeux disponibles",
+        ))
         .add_option(
             CreateCommandOption::new(CommandOptionType::SubCommand, "join", "S'inscrire a un jeu")
                 .add_sub_option(
@@ -48,11 +50,15 @@ fn register_public() -> CreateCommand {
                 ),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "leave", "Se desinscrire d'un jeu")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
-                        .required(true),
-                ),
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "leave",
+                "Se desinscrire d'un jeu",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
+                    .required(true),
+            ),
         )
 }
 
@@ -67,12 +73,20 @@ fn register_admin() -> CreateCommand {
                         .required(true),
                 )
                 .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "emoji", "Emoji optionnel (unicode ou <:name:id>)")
-                        .required(false),
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "emoji",
+                        "Emoji optionnel (unicode ou <:name:id>)",
+                    )
+                    .required(false),
                 )
                 .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "category", "Categorie (ex: RPG)")
-                        .required(false),
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "category",
+                        "Categorie (ex: RPG)",
+                    )
+                    .required(false),
                 ),
         )
         .add_option(
@@ -83,18 +97,34 @@ fn register_admin() -> CreateCommand {
                 ),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "panel", "Deployer le panneau d'une categorie")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "category", "Categorie (vide = jeux sans categorie)")
-                        .required(false),
-                ),
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "panel",
+                "Deployer le panneau d'une categorie",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "category",
+                    "Categorie (vide = jeux sans categorie)",
+                )
+                .required(false),
+            ),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "refresh", "Rafraichir le panneau d'une categorie")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "category", "Categorie (vide = jeux sans categorie)")
-                        .required(false),
-                ),
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "refresh",
+                "Rafraichir le panneau d'une categorie",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "category",
+                    "Categorie (vide = jeux sans categorie)",
+                )
+                .required(false),
+            ),
         )
 }
 
@@ -102,7 +132,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(g) => g.to_string(),
         None => {
-            reply(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await;
+            reply(
+                ctx,
+                command,
+                "Cette commande ne fonctionne que dans un serveur.",
+            )
+            .await;
             return;
         }
     };
@@ -134,9 +169,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
 // ── Sub-commands ──
 
-async fn handle_create(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
+async fn handle_create(
+    ctx: &Context,
+    cmd: &CommandInteraction,
+    api: &GameApiClient,
+    guild_id: &str,
+) {
     if !has_manage_guild(ctx, cmd).await {
-        reply(ctx, cmd, "Tu as besoin de la permission **Gerer le serveur** pour creer un jeu.").await;
+        reply(
+            ctx,
+            cmd,
+            "Tu as besoin de la permission **Gerer le serveur** pour creer un jeu.",
+        )
+        .await;
         return;
     }
 
@@ -158,7 +203,10 @@ async fn handle_create(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCli
 
     let guild_id_obj = match cmd.guild_id {
         Some(g) => g,
-        None => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
+        None => {
+            reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await;
+            return;
+        }
     };
 
     // Lit la couleur de role configuree pour game-bot (hex sans #).
@@ -233,24 +281,41 @@ async fn load_role_color(base: &crate::shared::api_client::BaseApiClient, guild_
     u32::from_str_radix(trimmed, 16).unwrap_or(0x3498db)
 }
 
-async fn handle_delete(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
+async fn handle_delete(
+    ctx: &Context,
+    cmd: &CommandInteraction,
+    api: &GameApiClient,
+    guild_id: &str,
+) {
     if !has_manage_guild(ctx, cmd).await {
-        reply(ctx, cmd, "Tu as besoin de la permission **Gerer le serveur** pour supprimer un jeu.").await;
+        reply(
+            ctx,
+            cmd,
+            "Tu as besoin de la permission **Gerer le serveur** pour supprimer un jeu.",
+        )
+        .await;
         return;
     }
 
     let name = get_string_option(cmd, "name").unwrap_or_default();
     let game = match api.get_game_by_name(guild_id, &name).await {
         Ok(Some(g)) => g,
-        Ok(None) => { reply(ctx, cmd, &format!("Jeu **{}** introuvable.", name)).await; return; }
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        Ok(None) => {
+            reply(ctx, cmd, &format!("Jeu **{}** introuvable.", name)).await;
+            return;
+        }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
     };
 
     match api.delete_game(guild_id, &game.id).await {
         Ok(()) => {
             // Supprime le role Discord associe (best-effort : si l'admin
             // l'a deja supprime a la main, on ignore).
-            if let (Some(role_id_str), Some(guild_id_obj)) = (game.role_id.as_deref(), cmd.guild_id) {
+            if let (Some(role_id_str), Some(guild_id_obj)) = (game.role_id.as_deref(), cmd.guild_id)
+            {
                 if let Ok(rid) = role_id_str.parse::<u64>() {
                     if let Err(e) = guild_id_obj.delete_role(&ctx.http, RoleId::new(rid)).await {
                         warn!(error = %e, role = %role_id_str, game = %game.game_name, "Erreur delete_role (le role a peut-etre deja ete supprime manuellement)");
@@ -268,10 +333,22 @@ async fn handle_list(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClien
     match api.list_games(guild_id).await {
         Ok(games) => {
             if games.is_empty() {
-                reply(ctx, cmd, "Aucun jeu configure. Un admin peut en creer avec `/game-admin create`.").await;
+                reply(
+                    ctx,
+                    cmd,
+                    "Aucun jeu configure. Un admin peut en creer avec `/game-admin create`.",
+                )
+                .await;
             } else {
-                let list: String = games.iter()
-                    .map(|g| format!("- {} **{}**", g.emoji.clone().unwrap_or_default(), g.game_name))
+                let list: String = games
+                    .iter()
+                    .map(|g| {
+                        format!(
+                            "- {} **{}**",
+                            g.emoji.clone().unwrap_or_default(),
+                            g.game_name
+                        )
+                    })
                     .collect::<Vec<_>>()
                     .join("\n");
                 let embed = info_embed("Jeux disponibles")
@@ -287,11 +364,28 @@ async fn handle_join(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClien
     let name = get_string_option(cmd, "name").unwrap_or_default();
     let game = match api.get_game_by_name(guild_id, &name).await {
         Ok(Some(g)) => g,
-        Ok(None) => { reply(ctx, cmd, &format!("Jeu **{}** introuvable. Utilise `/game list` pour voir les jeux.", name)).await; return; }
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        Ok(None) => {
+            reply(
+                ctx,
+                cmd,
+                &format!(
+                    "Jeu **{}** introuvable. Utilise `/game list` pour voir les jeux.",
+                    name
+                ),
+            )
+            .await;
+            return;
+        }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
     };
 
-    let (guild_id_obj, role_id) = match (cmd.guild_id, game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok())) {
+    let (guild_id_obj, role_id) = match (
+        cmd.guild_id,
+        game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()),
+    ) {
         (Some(g), Some(rid)) => (g, RoleId::new(rid)),
         (Some(_), None) => {
             reply(ctx, cmd, &format!(
@@ -300,71 +394,140 @@ async fn handle_join(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClien
             )).await;
             return;
         }
-        _ => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
+        _ => {
+            reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await;
+            return;
+        }
     };
 
     let member = match guild_id_obj.member(&ctx.http, cmd.user.id).await {
         Ok(m) => m,
-        Err(e) => { reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await;
+            return;
+        }
     };
     match member.add_role(&ctx.http, role_id).await {
-        Ok(()) => reply(ctx, cmd, &format!(
-            "Tu es inscrit a **{}** ! Utilise <@&{}> pour pinger les joueurs.",
-            game.game_name, role_id.get()
-        )).await,
+        Ok(()) => {
+            reply(
+                ctx,
+                cmd,
+                &format!(
+                    "Tu es inscrit a **{}** ! Utilise <@&{}> pour pinger les joueurs.",
+                    game.game_name,
+                    role_id.get()
+                ),
+            )
+            .await
+        }
         Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
     }
 }
 
-async fn handle_leave(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
+async fn handle_leave(
+    ctx: &Context,
+    cmd: &CommandInteraction,
+    api: &GameApiClient,
+    guild_id: &str,
+) {
     let name = get_string_option(cmd, "name").unwrap_or_default();
     let game = match api.get_game_by_name(guild_id, &name).await {
         Ok(Some(g)) => g,
-        Ok(None) => { reply(ctx, cmd, &format!("Jeu **{}** introuvable.", name)).await; return; }
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
-    };
-
-    let (guild_id_obj, role_id) = match (cmd.guild_id, game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok())) {
-        (Some(g), Some(rid)) => (g, RoleId::new(rid)),
-        (Some(_), None) => {
-            reply(ctx, cmd, &format!("Le jeu **{}** n'a pas de role Discord associe.", game.game_name)).await;
+        Ok(None) => {
+            reply(ctx, cmd, &format!("Jeu **{}** introuvable.", name)).await;
             return;
         }
-        _ => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
+    };
+
+    let (guild_id_obj, role_id) = match (
+        cmd.guild_id,
+        game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()),
+    ) {
+        (Some(g), Some(rid)) => (g, RoleId::new(rid)),
+        (Some(_), None) => {
+            reply(
+                ctx,
+                cmd,
+                &format!(
+                    "Le jeu **{}** n'a pas de role Discord associe.",
+                    game.game_name
+                ),
+            )
+            .await;
+            return;
+        }
+        _ => {
+            reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await;
+            return;
+        }
     };
 
     let member = match guild_id_obj.member(&ctx.http, cmd.user.id).await {
         Ok(m) => m,
-        Err(e) => { reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await;
+            return;
+        }
     };
     match member.remove_role(&ctx.http, role_id).await {
-        Ok(()) => reply(ctx, cmd, &format!("Tu es desinscrit de **{}**.", game.game_name)).await,
+        Ok(()) => {
+            reply(
+                ctx,
+                cmd,
+                &format!("Tu es desinscrit de **{}**.", game.game_name),
+            )
+            .await
+        }
         Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
     }
 }
 
 // ── Panels ──
 
-async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
+async fn handle_panel(
+    ctx: &Context,
+    cmd: &CommandInteraction,
+    api: &GameApiClient,
+    guild_id: &str,
+) {
     if !has_manage_guild(ctx, cmd).await {
         reply(ctx, cmd, "Permission **Gerer le serveur** requise.").await;
         return;
     }
 
     let category = get_string_option(cmd, "category");
-    let games = match api.list_games_by_category(guild_id, category.as_deref()).await {
+    let games = match api
+        .list_games_by_category(guild_id, category.as_deref())
+        .await
+    {
         Ok(g) => g,
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
     };
 
     if games.is_empty() {
-        reply(ctx, cmd, "Aucun jeu dans cette categorie. Ajoute-en avec `/game-admin create`.").await;
+        reply(
+            ctx,
+            cmd,
+            "Aucun jeu dans cette categorie. Ajoute-en avec `/game-admin create`.",
+        )
+        .await;
         return;
     }
 
     let games_slice: Vec<&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
     if games.len() > MAX_BUTTONS_PER_PANEL {
-        warn!(total = games.len(), shown = MAX_BUTTONS_PER_PANEL, "Panel tronque : trop de jeux pour un seul message (max 25 boutons)");
+        warn!(
+            total = games.len(),
+            shown = MAX_BUTTONS_PER_PANEL,
+            "Panel tronque : trop de jeux pour un seul message (max 25 boutons)"
+        );
     }
 
     let embed = build_panel_embed(category.as_deref(), &games_slice);
@@ -376,7 +539,10 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         .await
     {
         Ok(m) => m,
-        Err(e) => { reply(ctx, cmd, &format!("Erreur envoi message : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur envoi message : {e}")).await;
+            return;
+        }
     };
 
     // 2) Sauve le panel en DB pour obtenir son UUID.
@@ -391,7 +557,12 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
     {
         Ok(p) => p,
         Err(e) => {
-            reply(ctx, cmd, &format!("Panel envoye mais erreur de sauvegarde : {e}")).await;
+            reply(
+                ctx,
+                cmd,
+                &format!("Panel envoye mais erreur de sauvegarde : {e}"),
+            )
+            .await;
             return;
         }
     };
@@ -407,10 +578,20 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         warn!(error = %e, "Erreur attachement components au panel");
     }
 
-    reply(ctx, cmd, &format!("Panneau deploye ({} jeux).", games_slice.len())).await;
+    reply(
+        ctx,
+        cmd,
+        &format!("Panneau deploye ({} jeux).", games_slice.len()),
+    )
+    .await;
 }
 
-async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
+async fn handle_refresh(
+    ctx: &Context,
+    cmd: &CommandInteraction,
+    api: &GameApiClient,
+    guild_id: &str,
+) {
     if !has_manage_guild(ctx, cmd).await {
         reply(ctx, cmd, "Permission **Gerer le serveur** requise.").await;
         return;
@@ -421,20 +602,37 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
     // Trouve le panel existant via list_panels
     let panels = match api.list_panels(guild_id).await {
         Ok(p) => p,
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
     };
     let cat_norm = category.as_deref().map(str::to_lowercase);
-    let panel = panels.into_iter().find(|p| {
-        p.category.as_deref().map(str::to_lowercase) == cat_norm
-    });
+    let panel = panels
+        .into_iter()
+        .find(|p| p.category.as_deref().map(str::to_lowercase) == cat_norm);
     let panel = match panel {
         Some(p) => p,
-        None => { reply(ctx, cmd, "Aucun panneau existant pour cette categorie. Utilise `/game-admin panel` d'abord.").await; return; }
+        None => {
+            reply(
+                ctx,
+                cmd,
+                "Aucun panneau existant pour cette categorie. Utilise `/game-admin panel` d'abord.",
+            )
+            .await;
+            return;
+        }
     };
 
-    let games = match api.list_games_by_category(guild_id, category.as_deref()).await {
+    let games = match api
+        .list_games_by_category(guild_id, category.as_deref())
+        .await
+    {
         Ok(g) => g,
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+            return;
+        }
     };
     let games_slice: Vec<&Game> = games.iter().take(MAX_BUTTONS_PER_PANEL).collect();
 
@@ -444,16 +642,25 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
 
     let channel_id: serenity::model::id::ChannelId = match panel.channel_id.parse::<u64>() {
         Ok(id) => serenity::model::id::ChannelId::new(id),
-        Err(_) => { reply(ctx, cmd, "channel_id invalide en DB.").await; return; }
+        Err(_) => {
+            reply(ctx, cmd, "channel_id invalide en DB.").await;
+            return;
+        }
     };
     let message_id: serenity::model::id::MessageId = match panel.message_id.parse::<u64>() {
         Ok(id) => serenity::model::id::MessageId::new(id),
-        Err(_) => { reply(ctx, cmd, "message_id invalide en DB.").await; return; }
+        Err(_) => {
+            reply(ctx, cmd, "message_id invalide en DB.").await;
+            return;
+        }
     };
 
     let mut msg = match channel_id.message(&ctx.http, message_id).await {
         Ok(m) => m,
-        Err(e) => { reply(ctx, cmd, &format!("Message panneau introuvable : {e}")).await; return; }
+        Err(e) => {
+            reply(ctx, cmd, &format!("Message panneau introuvable : {e}")).await;
+            return;
+        }
     };
 
     // Retire les eventuelles vieilles reactions (legacy panels pre-select-menu).
@@ -470,7 +677,12 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
         return;
     }
 
-    reply(ctx, cmd, &format!("Panneau rafraichi ({} jeux).", games_slice.len())).await;
+    reply(
+        ctx,
+        cmd,
+        &format!("Panneau rafraichi ({} jeux).", games_slice.len()),
+    )
+    .await;
 }
 
 pub(crate) fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
@@ -547,9 +759,12 @@ pub(crate) async fn deploy_or_refresh_panel(
         if let Ok(mut msg) = ch.message(&ctx.http, mid).await {
             let embed = build_panel_embed(category, &games_slice);
             let components = build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
-            msg.edit(&ctx.http, EditMessage::new().embed(embed).components(components))
-                .await
-                .map_err(|e| format!("edition message : {e}"))?;
+            msg.edit(
+                &ctx.http,
+                EditMessage::new().embed(embed).components(components),
+            )
+            .await
+            .map_err(|e| format!("edition message : {e}"))?;
             return Ok(format!("Panneau rafraichi ({} jeux).", games_slice.len()));
         }
         // Message disparu -> on repost en neuf ci-dessous.
@@ -562,12 +777,20 @@ pub(crate) async fn deploy_or_refresh_panel(
         .await
         .map_err(|e| format!("envoi message : {e}"))?;
     let panel = api
-        .save_panel(&guild_id_str, &msg.channel_id.to_string(), &msg.id.to_string(), category)
+        .save_panel(
+            &guild_id_str,
+            &msg.channel_id.to_string(),
+            &msg.id.to_string(),
+            category,
+        )
         .await
         .map_err(|e| format!("sauvegarde panel : {e}"))?;
     let components = build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
     let mut msg_mut = msg;
-    if let Err(e) = msg_mut.edit(&ctx.http, EditMessage::new().components(components)).await {
+    if let Err(e) = msg_mut
+        .edit(&ctx.http, EditMessage::new().components(components))
+        .await
+    {
         warn!(error = %e, "Erreur attachement boutons au panel (deploy web)");
     }
     Ok(format!("Panneau deploye ({} jeux).", games_slice.len()))
@@ -590,7 +813,12 @@ pub(crate) fn build_panel_button_components(
     // Compte les abonnes de chaque role en UN seul passage du cache membres.
     let role_ids: Vec<RoleId> = games
         .iter()
-        .filter_map(|g| g.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()).map(RoleId::new))
+        .filter_map(|g| {
+            g.role_id
+                .as_deref()
+                .and_then(|s| s.parse::<u64>().ok())
+                .map(RoleId::new)
+        })
         .collect();
     let counts = role_member_counts(ctx, guild_id, &role_ids);
 
@@ -662,7 +890,11 @@ fn get_string_option(cmd: &CommandInteraction, name: &str) -> Option<String> {
     let sub = cmd.data.options.first()?;
     if let CommandDataOptionValue::SubCommand(opts) = &sub.value {
         opts.iter().find(|o| o.name == name).and_then(|o| {
-            if let CommandDataOptionValue::String(s) = &o.value { Some(s.clone()) } else { None }
+            if let CommandDataOptionValue::String(s) = &o.value {
+                Some(s.clone())
+            } else {
+                None
+            }
         })
     } else {
         None
@@ -683,7 +915,9 @@ async fn has_manage_guild(ctx: &Context, cmd: &CommandInteraction) -> bool {
 
 async fn reply_embed(ctx: &Context, cmd: &CommandInteraction, embed: CreateEmbed) {
     let response = CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+        CreateInteractionResponseMessage::new()
+            .embed(embed)
+            .ephemeral(true),
     );
     if let Err(e) = cmd.create_response(&ctx.http, response).await {
         warn!(error = %e, "Erreur reponse embed commande game");

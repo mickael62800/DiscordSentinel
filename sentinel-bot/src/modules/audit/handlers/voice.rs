@@ -3,9 +3,9 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::{WeeklyTrackerKey, watched_users};
-use super::{send_event, log, post_to_channel};
 use super::weekly_report::StatField;
+use super::{log, post_to_channel, send_event};
+use super::{watched_users, WeeklyTrackerKey};
 
 /// Salons de log vocal : cle dediee puis fallback log_channel_id (gere par
 /// post_to_channel).
@@ -37,7 +37,9 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
     let voice_msg = match (event_type, old_channel, new_channel) {
         ("voice_join", _, Some(ch)) => format!("{} a rejoint le salon vocal {}", user_name, ch),
         ("voice_leave", Some(ch), _) => format!("{} a quitte le salon vocal {}", user_name, ch),
-        ("voice_move", Some(old), Some(new)) => format!("{} a change de salon vocal {} -> {}", user_name, old, new),
+        ("voice_move", Some(old), Some(new)) => {
+            format!("{} a change de salon vocal {} -> {}", user_name, old, new)
+        }
         _ => String::new(),
     };
     log(ctx, "info", &gid, &voice_msg).await;
@@ -49,24 +51,35 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         ("voice_join", _, Some(ch)) => (
             "Connexion vocale",
             0x57F287, // vert
-            format!("\u{1f7e2}\u{27a1}\u{fe0f} <@{}> a rejoint <#{}>", user_id, ch),
+            format!(
+                "\u{1f7e2}\u{27a1}\u{fe0f} <@{}> a rejoint <#{}>",
+                user_id, ch
+            ),
         ),
         ("voice_leave", Some(ch), _) => (
             "Deconnexion vocale",
             0xED4245, // rouge
-            format!("\u{1f534}\u{2b05}\u{fe0f} <@{}> a quitte <#{}>", user_id, ch),
+            format!(
+                "\u{1f534}\u{2b05}\u{fe0f} <@{}> a quitte <#{}>",
+                user_id, ch
+            ),
         ),
         ("voice_move", Some(a), Some(b)) => (
             "Changement de vocal",
             0x5865F2, // bleu
-            format!("\u{1f504} <@{}> a change : <#{}> \u{2192} <#{}>", user_id, a, b),
+            format!(
+                "\u{1f504} <@{}> a change : <#{}> \u{2192} <#{}>",
+                user_id, a, b
+            ),
         ),
         _ => ("Vocal", 0x95A5A6, voice_msg.clone()),
     };
     let embed = CreateEmbed::new()
         .description(line)
         .color(color)
-        .footer(serenity::builder::CreateEmbedFooter::new(format!("{title} · {user_name}")))
+        .footer(serenity::builder::CreateEmbedFooter::new(format!(
+            "{title} · {user_name}"
+        )))
         .timestamp(serenity::model::Timestamp::now());
     post_to_channel(ctx, &gid, VOICE_LOG_KEYS, embed).await;
 

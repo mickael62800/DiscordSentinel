@@ -13,7 +13,8 @@ fn test_preprocess_valid_png() {
     {
         use image::ImageBuffer;
         use image::Rgb;
-        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(2, 2, |_, _| Rgb([128, 64, 200]));
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_fn(2, 2, |_, _| Rgb([128, 64, 200]));
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
     }
@@ -27,7 +28,8 @@ fn test_preprocess_normalization_range() {
     {
         use image::ImageBuffer;
         use image::Rgb;
-        let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(1, 1, |_, _| Rgb([255, 255, 255]));
+        let img: ImageBuffer<Rgb<u8>, Vec<u8>> =
+            ImageBuffer::from_fn(1, 1, |_, _| Rgb([255, 255, 255]));
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
     }

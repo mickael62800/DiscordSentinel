@@ -1,6 +1,5 @@
 use serenity::builder::{
-    CreateActionRow, CreateInteractionResponse, CreateModal, CreateInputText,
-    EditChannel,
+    CreateActionRow, CreateInputText, CreateInteractionResponse, CreateModal, EditChannel,
 };
 use serenity::model::application::{ComponentInteraction, InputTextStyle, ModalInteraction};
 use serenity::model::Permissions;
@@ -91,11 +90,18 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
     let everyone_role = serenity::model::id::RoleId::new(guild_id.get());
 
     let currently_hidden = ch.visibility == "hidden";
-    let new_visibility = if currently_hidden { "visible" } else { "hidden" };
+    let new_visibility = if currently_hidden {
+        "visible"
+    } else {
+        "hidden"
+    };
 
     if currently_hidden {
         if let Err(e) = voice_channel_id
-            .delete_permission(&ctx.http, serenity::model::channel::PermissionOverwriteType::Role(everyone_role))
+            .delete_permission(
+                &ctx.http,
+                serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
+            )
             .await
         {
             tracing::warn!(error = %e, "failed to delete permission when making channel visible");
@@ -106,7 +112,10 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::VIEW_CHANNEL,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
             tracing::warn!(error = %e, "failed to set permission when hiding channel");
         }
     }
@@ -127,7 +136,10 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
             error!("ApiClient ou GrpcClient manquants dans TypeMap");
             return;
         };
-        if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
+        if let Err(e) = api
+            .update_channel(&voice_channel_id.get().to_string(), &update)
+            .await
+        {
             error!(error = %e, "Erreur API update visibility");
         }
     }
@@ -162,11 +174,17 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
     let new_locked = !currently_locked;
 
     let existing_overwrite = voice_channel_id
-        .to_channel(&ctx.http).await.ok()
+        .to_channel(&ctx.http)
+        .await
+        .ok()
         .and_then(|c| c.guild())
         .and_then(|c| {
-            c.permission_overwrites.iter()
-                .find(|ow| ow.kind == serenity::model::channel::PermissionOverwriteType::Role(everyone_role))
+            c.permission_overwrites
+                .iter()
+                .find(|ow| {
+                    ow.kind
+                        == serenity::model::channel::PermissionOverwriteType::Role(everyone_role)
+                })
                 .cloned()
         });
 
@@ -181,7 +199,10 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             deny: base_deny - Permissions::CONNECT,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
             tracing::warn!(error = %e, "failed to set permission when unlocking channel");
         }
     } else {
@@ -199,11 +220,19 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
 
         for user_id in current_members {
             let existing_user = voice_channel_id
-                .to_channel(&ctx.http).await.ok()
+                .to_channel(&ctx.http)
+                .await
+                .ok()
                 .and_then(|c| c.guild())
                 .and_then(|c| {
-                    c.permission_overwrites.iter()
-                        .find(|ow| ow.kind == serenity::model::channel::PermissionOverwriteType::Member(user_id))
+                    c.permission_overwrites
+                        .iter()
+                        .find(|ow| {
+                            ow.kind
+                                == serenity::model::channel::PermissionOverwriteType::Member(
+                                    user_id,
+                                )
+                        })
                         .cloned()
                 });
             let (u_allow, u_deny) = match existing_user {
@@ -211,11 +240,17 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
                 None => (Permissions::empty(), Permissions::empty()),
             };
             let overwrite = serenity::model::channel::PermissionOverwrite {
-                allow: u_allow | Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+                allow: u_allow
+                    | Permissions::VIEW_CHANNEL
+                    | Permissions::CONNECT
+                    | Permissions::SPEAK,
                 deny: u_deny - Permissions::CONNECT,
                 kind: serenity::model::channel::PermissionOverwriteType::Member(user_id),
             };
-            if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            if let Err(e) = voice_channel_id
+                .create_permission(&ctx.http, overwrite)
+                .await
+            {
                 tracing::warn!(error = %e, user = %user_id, "failed to whitelist member on lock");
             }
         }
@@ -225,7 +260,10 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             deny: base_deny | Permissions::CONNECT,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
             tracing::warn!(error = %e, "failed to set permission when locking channel");
         }
     }
@@ -246,7 +284,10 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             error!("ApiClient ou GrpcClient manquants dans TypeMap");
             return;
         };
-        if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
+        if let Err(e) = api
+            .update_channel(&voice_channel_id.get().to_string(), &update)
+            .await
+        {
             error!(error = %e, "Erreur API update lock");
         }
     }
@@ -271,11 +312,15 @@ async fn handle_limit_modal(ctx: &Context, component: &ComponentInteraction) {
 
     let modal = CreateModal::new("modal_limit", "Limite de membres").components(vec![
         CreateActionRow::InputText(
-            CreateInputText::new(InputTextStyle::Short, "Nombre (0 = aucune limite)", "limit_input")
-                .placeholder("Ex: 8 -- laisser 0 pour supprimer la limite")
-                .min_length(1)
-                .max_length(3)
-                .required(true),
+            CreateInputText::new(
+                InputTextStyle::Short,
+                "Nombre (0 = aucune limite)",
+                "limit_input",
+            )
+            .placeholder("Ex: 8 -- laisser 0 pour supprimer la limite")
+            .min_length(1)
+            .max_length(3)
+            .required(true),
         ),
     ]);
 
@@ -307,7 +352,8 @@ async fn modal_submitter_is_owner(
 
 async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
     let text_channel_id = modal.channel_id;
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
         super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
@@ -315,7 +361,8 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
     };
 
     if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
-        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.")
+            .await;
         return;
     }
 
@@ -348,7 +395,8 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
     let edit = EditChannel::new().user_limit(limit as u32);
     if let Err(e) = voice_channel_id.edit(&ctx.http, edit).await {
         error!(error = %e, "Erreur modification limite Discord");
-        super::respond_ephemeral_modal(ctx, modal, "Erreur lors de la modification de la limite.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Erreur lors de la modification de la limite.")
+            .await;
         return;
     }
 
@@ -369,7 +417,10 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
             error!("ApiClient ou GrpcClient manquants dans TypeMap");
             return;
         };
-        if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
+        if let Err(e) = api
+            .update_channel(&voice_channel_id.get().to_string(), &update)
+            .await
+        {
             error!(error = %e, "Erreur API update limit");
         }
     }
@@ -388,10 +439,16 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
 async fn handle_rename_modal(ctx: &Context, component: &ComponentInteraction) {
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Ce salon n'est pas lie a un salon vocal temporaire.",
+        )
+        .await;
         return;
     };
 
@@ -408,7 +465,12 @@ async fn handle_rename_modal(ctx: &Context, component: &ComponentInteraction) {
     };
 
     if !is_owner {
-        super::respond_ephemeral(ctx, component, "Seul le proprietaire peut renommer le salon.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut renommer le salon.",
+        )
+        .await;
         return;
     }
 
@@ -433,10 +495,16 @@ async fn handle_rename_modal(ctx: &Context, component: &ComponentInteraction) {
 async fn handle_status_modal(ctx: &Context, component: &ComponentInteraction) {
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Ce salon n'est pas lie a un salon vocal temporaire.",
+        )
+        .await;
         return;
     };
 
@@ -453,7 +521,12 @@ async fn handle_status_modal(ctx: &Context, component: &ComponentInteraction) {
     };
 
     if !is_owner {
-        super::respond_ephemeral(ctx, component, "Seul le proprietaire peut changer le statut.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut changer le statut.",
+        )
+        .await;
         return;
     }
 
@@ -477,7 +550,8 @@ async fn handle_status_modal(ctx: &Context, component: &ComponentInteraction) {
 async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
     let text_channel_id = modal.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
         super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
@@ -485,7 +559,8 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
     };
 
     if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
-        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.")
+            .await;
         return;
     }
 
@@ -540,7 +615,10 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
             error!("ApiClient ou GrpcClient manquants dans TypeMap");
             return;
         };
-        if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
+        if let Err(e) = api
+            .update_channel(&voice_channel_id.get().to_string(), &update)
+            .await
+        {
             error!(error = %e, "Erreur API update name");
         }
     }
@@ -558,7 +636,8 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
 async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
     let text_channel_id = modal.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
         super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
@@ -566,7 +645,8 @@ async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
     };
 
     if !modal_submitter_is_owner(ctx, voice_channel_id, modal.user.id).await {
-        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Seul le proprietaire peut modifier ce salon.")
+            .await;
         return;
     }
 
@@ -615,7 +695,10 @@ async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
             error!("ApiClient ou GrpcClient manquants dans TypeMap");
             return;
         };
-        if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
+        if let Err(e) = api
+            .update_channel(&voice_channel_id.get().to_string(), &update)
+            .await
+        {
             error!(error = %e, "Erreur API update status");
         }
     }

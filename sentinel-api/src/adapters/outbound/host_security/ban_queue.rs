@@ -26,7 +26,8 @@ impl FileBanQueue {
         let parent = Path::new(path)
             .parent()
             .ok_or_else(|| DomainError::Internal(format!("chemin file invalide: {path}")))?;
-        std::fs::create_dir_all(parent).map_err(|e| DomainError::Internal(format!("mkdir: {e}")))?;
+        std::fs::create_dir_all(parent)
+            .map_err(|e| DomainError::Internal(format!("mkdir: {e}")))?;
         let line = format!(
             "{}\t{}\t{}\n",
             ip,

@@ -4,11 +4,11 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::catalog::CatalogCacheKey;
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("profil")
@@ -20,14 +20,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -54,7 +63,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let api = data.get::<GameApiKey>().unwrap();
     let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
-    let player = match api.get_or_create_player(&guild_id, &target.id.to_string(), &target.name).await {
+    let player = match api
+        .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             reply_api_err(ctx, command, e).await;
@@ -137,13 +149,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 let remaining_str = if remaining.num_days() >= 1 {
                     format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
                 } else if remaining.num_hours() >= 1 {
-                    format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
+                    format!(
+                        "{}h {}m",
+                        remaining.num_hours(),
+                        remaining.num_minutes() % 60
+                    )
                 } else if remaining.num_minutes() >= 1 {
                     format!("{}m", remaining.num_minutes())
                 } else {
                     "<1m".to_string()
                 };
-                format!("\u{1f6e1}\u{fe0f} Active — expire dans **{}**", remaining_str)
+                format!(
+                    "\u{1f6e1}\u{fe0f} Active — expire dans **{}**",
+                    remaining_str
+                )
             })
     });
 
@@ -196,8 +215,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Paliers visibles (cf. COUPE_AMELIORATIONS 3.2) — debloques par
     // niveau, declaratif uniquement pour l instant.
-    let milestones_text =
-        crate::modules::coude::milestones::format_profile_section(player.level);
+    let milestones_text = crate::modules::coude::milestones::format_profile_section(player.level);
     embed = embed.field("\u{1f4ca} Paliers", milestones_text, false);
 
     // Stats /tout-ou-rien (cf. COUPE_AMELIORATIONS 6.1) — affichees
@@ -235,15 +253,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — derives de
     // l etat actuel du joueur, aucune persistance dediee.
-    let achievements_text =
-        crate::modules::coude::achievements::format_unlocked_compact(&player);
+    let achievements_text = crate::modules::coude::achievements::format_unlocked_compact(&player);
     embed = embed.field("\u{1f3c5} Succes", achievements_text, false);
 
     // Theme de la saison courante (cf. COUPE_AMELIORATIONS 6.3) —
     // calcule deterministe depuis le numero de saison du joueur.
-    let theme = crate::shared::season_theme::theme_for_season(
-        player.season.unwrap_or(1),
-    );
+    let theme = crate::shared::season_theme::theme_for_season(player.season.unwrap_or(1));
     embed = embed.field(
         format!("{} {}", theme.emoji, theme.label),
         theme.tagline.to_string(),
@@ -261,7 +276,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 if remaining.num_days() >= 1 {
                     format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
                 } else if remaining.num_hours() >= 1 {
-                    format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
+                    format!(
+                        "{}h {}m",
+                        remaining.num_hours(),
+                        remaining.num_minutes() % 60
+                    )
                 } else if remaining.num_minutes() >= 1 {
                     format!("{}m", remaining.num_minutes())
                 } else {
@@ -337,4 +356,3 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         tracing::warn!(error = %e, "Echec response Discord");
     }
 }
-

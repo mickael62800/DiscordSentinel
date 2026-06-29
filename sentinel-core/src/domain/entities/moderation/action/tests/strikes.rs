@@ -23,7 +23,10 @@ fn default_created_at_matches_updated_at() {
 
 // ── StrikeResult::should_trigger_escalation_broadcast ────────────────
 
-fn sample_strike_result(escalation_action: Option<&str>, escalation_duration: Option<u64>) -> StrikeResult {
+fn sample_strike_result(
+    escalation_action: Option<&str>,
+    escalation_duration: Option<u64>,
+) -> StrikeResult {
     let now = chrono::Utc::now();
     StrikeResult {
         strike: UserStrike {

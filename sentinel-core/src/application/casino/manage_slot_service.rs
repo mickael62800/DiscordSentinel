@@ -35,8 +35,8 @@ use crate::ports::inbound::casino::manage_slot::ManageSlotUseCase;
 use crate::ports::inbound::casino::manage_slot::SpinCommand;
 use crate::ports::inbound::casino::manage_slot::SpinResult;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::casino::slot_repository::SlotRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::uow::UnitOfWork;
 const MODULE_BOT_NAME: &str = "slot-bot";
 
@@ -54,7 +54,12 @@ impl ManageSlotService {
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         uow: Arc<dyn UnitOfWork>,
     ) -> Self {
-        Self { repo, bot_config_repo, wallet_uc, uow }
+        Self {
+            repo,
+            bot_config_repo,
+            wallet_uc,
+            uow,
+        }
     }
 
     /// Charge la config du bot 'slot-bot' pour la guild et la decode en
@@ -90,26 +95,60 @@ impl ManageSlotService {
                 "symbols" => symbols_raw = Some(entry.config_value.clone()),
                 "weights" => weights_raw = Some(entry.config_value.clone()),
                 "payout_3x_multipliers" => multipliers_raw = Some(entry.config_value.clone()),
-                "payout_2x_enabled" => cfg.payout_2x_enabled = parse_bool(&entry.config_value, true),
+                "payout_2x_enabled" => {
+                    cfg.payout_2x_enabled = parse_bool(&entry.config_value, true)
+                }
                 "jackpot_pool_share_pct" => {
-                    if let Ok(v) = entry.config_value.parse() { cfg.jackpot_pool_share_pct = v; }
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.jackpot_pool_share_pct = v;
+                    }
                 }
                 "jackpot_starting_pool" => {
-                    if let Ok(v) = entry.config_value.parse() { cfg.jackpot_starting_pool = v; }
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.jackpot_starting_pool = v;
+                    }
                 }
-                "min_bet" => if let Ok(v) = entry.config_value.parse() { cfg.min_bet = v; },
-                "max_bet" => if let Ok(v) = entry.config_value.parse() { cfg.max_bet = v; },
-                "default_bet" => if let Ok(v) = entry.config_value.parse() { cfg.default_bet = v; },
-                "cooldown_secs" => if let Ok(v) = entry.config_value.parse() { cfg.cooldown_secs = v; },
-                "daily_bonus_enabled" => cfg.daily_bonus_enabled = parse_bool(&entry.config_value, true),
-                "daily_bonus_mise" => if let Ok(v) = entry.config_value.parse() { cfg.daily_bonus_mise = v; },
+                "min_bet" => {
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.min_bet = v;
+                    }
+                }
+                "max_bet" => {
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.max_bet = v;
+                    }
+                }
+                "default_bet" => {
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.default_bet = v;
+                    }
+                }
+                "cooldown_secs" => {
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.cooldown_secs = v;
+                    }
+                }
+                "daily_bonus_enabled" => {
+                    cfg.daily_bonus_enabled = parse_bool(&entry.config_value, true)
+                }
+                "daily_bonus_mise" => {
+                    if let Ok(v) = entry.config_value.parse() {
+                        cfg.daily_bonus_mise = v;
+                    }
+                }
                 _ => {}
             }
         }
 
-        if let Some(s) = symbols_raw { cfg.symbols = parse_csv_symbols(&s); }
-        if let Some(w) = weights_raw { cfg.weights = parse_csv_weights(&w); }
-        if let Some(m) = multipliers_raw { cfg.multipliers_3x = parse_csv_multipliers(&m); }
+        if let Some(s) = symbols_raw {
+            cfg.symbols = parse_csv_symbols(&s);
+        }
+        if let Some(w) = weights_raw {
+            cfg.weights = parse_csv_weights(&w);
+        }
+        if let Some(m) = multipliers_raw {
+            cfg.multipliers_3x = parse_csv_multipliers(&m);
+        }
 
         validate_slot_config(&cfg).map_err(|e| {
             DomainError::ValidationError(format!("Config slot-bot invalide : {}", e.as_str()))
@@ -119,8 +158,16 @@ impl ManageSlotService {
     }
 
     /// Flow interne commun a `spin` (payant) et `claim_daily_bonus` (gratuit).
-    async fn run_spin(&self, cmd: &SpinCommand, cfg: &SlotConfig) -> Result<SpinResult, DomainError> {
-        let mise = if cmd.is_daily { cfg.daily_bonus_mise } else { cmd.mise };
+    async fn run_spin(
+        &self,
+        cmd: &SpinCommand,
+        cfg: &SlotConfig,
+    ) -> Result<SpinResult, DomainError> {
+        let mise = if cmd.is_daily {
+            cfg.daily_bonus_mise
+        } else {
+            cmd.mise
+        };
 
         // RNG OS-driven (non-deterministe).
         let mut rng = rand::rngs::StdRng::from_entropy();
@@ -138,9 +185,16 @@ impl ManageSlotService {
 
         // 1. Debit la mise (sauf daily bonus) en utilisant wallet_uc dans la tx.
         if !cmd.is_daily && mise > 0 {
-            let dm = self.wallet_uc
-                .debit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, mise, "slot_bet",
-                    "Mise slot-machine")
+            let dm = self
+                .wallet_uc
+                .debit_tx(
+                    &mut *tx,
+                    &cmd.guild_id,
+                    &cmd.user_id,
+                    mise,
+                    "slot_bet",
+                    "Mise slot-machine",
+                )
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), dm));
         }
@@ -149,11 +203,18 @@ impl ManageSlotService {
         //    via daily_bonus_mise).
         let jackpot_contribution = compute_jackpot_contribution(mise, cfg.jackpot_pool_share_pct);
         let pool_after_contribution = if jackpot_contribution > 0 {
-            self.repo.add_to_jackpot_pool_in_tx(
-                &mut *tx, &cmd.guild_id, jackpot_contribution, cfg.jackpot_starting_pool,
-            ).await?
+            self.repo
+                .add_to_jackpot_pool_in_tx(
+                    &mut *tx,
+                    &cmd.guild_id,
+                    jackpot_contribution,
+                    cfg.jackpot_starting_pool,
+                )
+                .await?
         } else {
-            self.repo.get_jackpot_pool(&cmd.guild_id).await?
+            self.repo
+                .get_jackpot_pool(&cmd.guild_id)
+                .await?
                 .map(|p| p.current_pool)
                 .unwrap_or(cfg.jackpot_starting_pool)
         };
@@ -171,18 +232,30 @@ impl ManageSlotService {
         // 4. Si Jackpot : claim et reset le pool.
         let mut jackpot_pool_after = pool_after_contribution;
         if is_jackpot {
-            self.repo.claim_jackpot_pool_in_tx(
-                &mut *tx, &cmd.guild_id, &cmd.user_id,
-                pool_after_contribution, cfg.jackpot_starting_pool,
-            ).await?;
+            self.repo
+                .claim_jackpot_pool_in_tx(
+                    &mut *tx,
+                    &cmd.guild_id,
+                    &cmd.user_id,
+                    pool_after_contribution,
+                    cfg.jackpot_starting_pool,
+                )
+                .await?;
             jackpot_pool_after = cfg.jackpot_starting_pool;
         }
 
         // 5. Credit du payout (si > 0).
         if payout > 0 {
-            let cm = self.wallet_uc
-                .credit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, payout, "slot_payout",
-                    &format!("Gain slot-machine ({}x)", multiplier))
+            let cm = self
+                .wallet_uc
+                .credit_tx(
+                    &mut *tx,
+                    &cmd.guild_id,
+                    &cmd.user_id,
+                    payout,
+                    "slot_payout",
+                    &format!("Gain slot-machine ({}x)", multiplier),
+                )
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), cm));
         }
@@ -205,7 +278,9 @@ impl ManageSlotService {
 
         // 7. Mark daily claimed si applicable.
         if cmd.is_daily {
-            self.repo.mark_daily_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id).await?;
+            self.repo
+                .mark_daily_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
+                .await?;
         }
 
         self.uow.commit(tx).await?;
@@ -213,14 +288,25 @@ impl ManageSlotService {
         // 8. Post-commit : taunts faillite/jackpot eco.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();
         for (user_id, mutation) in &taunt_mutations {
-            let evs = self.wallet_uc.post_commit_taunts(&cmd.guild_id, user_id, mutation).await;
+            let evs = self
+                .wallet_uc
+                .post_commit_taunts(&cmd.guild_id, user_id, mutation)
+                .await;
             triggered_taunts.extend(evs);
         }
 
         // 9. Solde apres operation.
-        let balance_after = self.wallet_uc.get_balance(&cmd.guild_id, &cmd.user_id).await?;
+        let balance_after = self
+            .wallet_uc
+            .get_balance(&cmd.guild_id, &cmd.user_id)
+            .await?;
 
-        Ok(SpinResult { spin, jackpot_pool_after, balance_after, triggered_taunts })
+        Ok(SpinResult {
+            spin,
+            jackpot_pool_after,
+            balance_after,
+            triggered_taunts,
+        })
     }
 }
 
@@ -232,7 +318,8 @@ impl ManageSlotUseCase for ManageSlotService {
         // Validation mise.
         if cmd.mise < cfg.min_bet || cmd.mise > cfg.max_bet {
             return Err(DomainError::ValidationError(format!(
-                "Mise hors borne (autorise : {} - {})", cfg.min_bet, cfg.max_bet
+                "Mise hors borne (autorise : {} - {})",
+                cfg.min_bet, cfg.max_bet
             )));
         }
 
@@ -243,14 +330,17 @@ impl ManageSlotUseCase for ManageSlotService {
                 if elapsed < cfg.cooldown_secs as i64 {
                     let remaining = cfg.cooldown_secs as i64 - elapsed;
                     return Err(DomainError::ValidationError(format!(
-                        "Cooldown actif : encore {} secondes", remaining
+                        "Cooldown actif : encore {} secondes",
+                        remaining
                     )));
                 }
             }
         }
 
         // Init pool jackpot si premiere fois.
-        self.repo.init_jackpot_pool_if_absent(&cmd.guild_id, cfg.jackpot_starting_pool).await?;
+        self.repo
+            .init_jackpot_pool_if_absent(&cmd.guild_id, cfg.jackpot_starting_pool)
+            .await?;
 
         let mut payable = cmd.clone();
         payable.is_daily = false;
@@ -261,15 +351,25 @@ impl ManageSlotUseCase for ManageSlotService {
         let cfg = self.load_config(&cmd.guild_id).await?;
 
         if !cfg.daily_bonus_enabled {
-            return Err(DomainError::ValidationError("Daily bonus desactive sur ce serveur".into()));
+            return Err(DomainError::ValidationError(
+                "Daily bonus desactive sur ce serveur".into(),
+            ));
         }
 
-        if self.repo.has_claimed_daily_today(&cmd.guild_id, &cmd.user_id).await? {
-            return Err(DomainError::ValidationError("Daily bonus deja reclame aujourd hui".into()));
+        if self
+            .repo
+            .has_claimed_daily_today(&cmd.guild_id, &cmd.user_id)
+            .await?
+        {
+            return Err(DomainError::ValidationError(
+                "Daily bonus deja reclame aujourd hui".into(),
+            ));
         }
 
         // Init pool jackpot si premiere fois.
-        self.repo.init_jackpot_pool_if_absent(&cmd.guild_id, cfg.jackpot_starting_pool).await?;
+        self.repo
+            .init_jackpot_pool_if_absent(&cmd.guild_id, cfg.jackpot_starting_pool)
+            .await?;
 
         let mut daily = cmd.clone();
         daily.is_daily = true;
@@ -277,7 +377,10 @@ impl ManageSlotUseCase for ManageSlotService {
     }
 
     async fn get_jackpot_pool(&self, guild_id: &str) -> Result<i64, DomainError> {
-        Ok(self.repo.get_jackpot_pool(guild_id).await?
+        Ok(self
+            .repo
+            .get_jackpot_pool(guild_id)
+            .await?
             .map(|p| p.current_pool)
             .unwrap_or(0))
     }

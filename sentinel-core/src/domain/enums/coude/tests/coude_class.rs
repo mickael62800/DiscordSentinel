@@ -2,7 +2,12 @@ use super::*;
 
 #[test]
 fn roundtrip() {
-    for c in [PlayerClass::Bourrin, PlayerClass::Agile, PlayerClass::Fourbe, PlayerClass::Tank] {
+    for c in [
+        PlayerClass::Bourrin,
+        PlayerClass::Agile,
+        PlayerClass::Fourbe,
+        PlayerClass::Tank,
+    ] {
         assert_eq!(PlayerClass::from_str_lossy(c.as_str()), Some(c));
     }
 }

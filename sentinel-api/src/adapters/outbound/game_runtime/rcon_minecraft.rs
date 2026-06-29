@@ -15,10 +15,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{timeout, Duration};
 
+use crate::ports::outbound::game::rcon_client::{RconClient, RconConnectionParams, RconResponse};
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::game::rcon_client::{
-    RconClient, RconConnectionParams, RconResponse,
-};
 
 const PKT_TYPE_LOGIN: i32 = 3;
 const PKT_TYPE_COMMAND: i32 = 2;
@@ -91,13 +89,10 @@ impl RconClient for MinecraftRconClient {
     ) -> Result<RconResponse, DomainError> {
         let dur = Duration::from_secs(params.timeout_secs.max(1) as u64);
 
-        let mut stream = timeout(
-            dur,
-            TcpStream::connect((params.host.as_str(), params.port)),
-        )
-        .await
-        .map_err(|_| DomainError::Internal("rcon connect timeout".into()))?
-        .map_err(|e| DomainError::Internal(format!("rcon connect: {e}")))?;
+        let mut stream = timeout(dur, TcpStream::connect((params.host.as_str(), params.port)))
+            .await
+            .map_err(|_| DomainError::Internal("rcon connect timeout".into()))?
+            .map_err(|e| DomainError::Internal(format!("rcon connect: {e}")))?;
 
         // Auth
         let auth_pkt = build_packet(REQ_ID, PKT_TYPE_LOGIN, &params.password);

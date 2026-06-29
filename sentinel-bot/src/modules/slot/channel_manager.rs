@@ -35,7 +35,9 @@ impl Default for SlotChannelManager {
 
 impl SlotChannelManager {
     pub fn new() -> Self {
-        Self { active: DashMap::new() }
+        Self {
+            active: DashMap::new(),
+        }
     }
 
     pub fn register(&self, user_id: UserId, channel_id: ChannelId, guild_id: GuildId) {

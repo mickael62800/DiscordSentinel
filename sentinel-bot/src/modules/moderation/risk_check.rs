@@ -71,39 +71,33 @@ pub async fn check_target_risk(ctx: &Context, guild_id: GuildId, target: &User) 
 
     // 3. Membre de l'equipe de moderation (role avec MODERATE_MEMBERS)
     match guild_id.member(&ctx.http, target.id).await {
-        Ok(member) => {
-            match guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()) {
-                Some(guild) => {
-                    let is_moderator = member.roles.iter().any(|role_id| {
-                        guild
-                            .roles
-                            .get(role_id)
-                            .map(|r| {
-                                r.permissions.moderate_members()
-                                    || r.permissions.ban_members()
-                                    || r.permissions.kick_members()
-                                    || r.permissions.administrator()
-                            })
-                            .unwrap_or(false)
-                    });
-                    if is_moderator {
-                        return Some(
-                            "cible fait partie de l'equipe de moderation".to_string(),
-                        );
-                    }
-                }
-                None => {
-                    warn!(
-                        guild_id = %guild_id,
-                        target_id = %target.id,
-                        "risk check: guild cache miss, forcing confirmation (fail-safe)"
-                    );
-                    return Some(
-                        "impossible de verifier les permissions (cache manquant)".to_string(),
-                    );
+        Ok(member) => match guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()) {
+            Some(guild) => {
+                let is_moderator = member.roles.iter().any(|role_id| {
+                    guild
+                        .roles
+                        .get(role_id)
+                        .map(|r| {
+                            r.permissions.moderate_members()
+                                || r.permissions.ban_members()
+                                || r.permissions.kick_members()
+                                || r.permissions.administrator()
+                        })
+                        .unwrap_or(false)
+                });
+                if is_moderator {
+                    return Some("cible fait partie de l'equipe de moderation".to_string());
                 }
             }
-        }
+            None => {
+                warn!(
+                    guild_id = %guild_id,
+                    target_id = %target.id,
+                    "risk check: guild cache miss, forcing confirmation (fail-safe)"
+                );
+                return Some("impossible de verifier les permissions (cache manquant)".to_string());
+            }
+        },
         Err(e) => {
             warn!(error = %e, target_id = %target.id, "risk check: member fetch failed");
         }
@@ -126,9 +120,7 @@ fn account_age_days_from_ts(created_ts: i64, now_ts: i64) -> i64 {
 /// Purge les pending confirmations expirees.
 pub fn purge_expired(store: &DashMap<String, RiskyPending>) {
     let now = Instant::now();
-    store.retain(|_, p| {
-        now.duration_since(p.created_at).as_secs() < PENDING_TTL_SECS
-    });
+    store.retain(|_, p| now.duration_since(p.created_at).as_secs() < PENDING_TTL_SECS);
 }
 
 #[cfg(test)]

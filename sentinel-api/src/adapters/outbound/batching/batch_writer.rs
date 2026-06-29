@@ -57,11 +57,7 @@ impl<T: Send + 'static> BatchWriter<T> {
     /// `label` est utilise dans les logs (ex: "logs", "audit_logs").
     /// `flush_fn` recoit un `Vec<T>` non-vide a chaque flush, doit retourner
     /// `Ok(())` ou une erreur (qui sera logguee, sans retry — les entries sont perdues).
-    pub fn spawn<F, Fut>(
-        label: &'static str,
-        config: BatchWriterConfig,
-        flush_fn: F,
-    ) -> Self
+    pub fn spawn<F, Fut>(label: &'static str, config: BatchWriterConfig, flush_fn: F) -> Self
     where
         F: Fn(Vec<T>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), String>> + Send + 'static,
@@ -168,7 +164,6 @@ where
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/batch_writer.rs"]

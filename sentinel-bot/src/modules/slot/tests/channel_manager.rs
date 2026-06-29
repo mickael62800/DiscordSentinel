@@ -67,9 +67,7 @@ fn touch_updates_timestamp() {
     // Force timestamp dans le passe.
     // Sur Windows fresh boot, Instant::now() peut etre < 3600s -> overflow.
     // On skip le test si on ne peut pas reculer (rarissime mais robuste).
-    let past = match std::time::Instant::now()
-        .checked_sub(std::time::Duration::from_secs(3600))
-    {
+    let past = match std::time::Instant::now().checked_sub(std::time::Duration::from_secs(3600)) {
         Some(p) => p,
         None => return, // skip silencieux : uptime systeme trop bas
     };
@@ -97,9 +95,7 @@ fn afk_channels_returns_old_entries() {
     let user = UserId::new(1);
     mgr.register(user, ChannelId::new(100), GuildId::new(200));
 
-    let past = match std::time::Instant::now()
-        .checked_sub(std::time::Duration::from_secs(3600))
-    {
+    let past = match std::time::Instant::now().checked_sub(std::time::Duration::from_secs(3600)) {
         Some(p) => p,
         None => return, // skip si uptime trop bas (Windows fresh boot)
     };

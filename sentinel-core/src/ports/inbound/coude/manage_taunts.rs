@@ -7,8 +7,8 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -32,11 +32,7 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
     ) -> Result<Option<TauntEvent>, DomainError>;
 
     /// Apres un egalite : reset les deux streaks de combat. Jamais d'event.
-    async fn on_player_drew(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn on_player_drew(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     /// Appele apres un vol reussi (victim perd des coins).
     async fn on_player_stolen_from(
@@ -120,9 +116,17 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
 
     async fn set_enabled(&self, guild_id: &str, enabled: bool) -> Result<(), DomainError>;
 
-    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError>;
+    async fn set_rename_enabled(
+        &self,
+        guild_id: &str,
+        rename_enabled: bool,
+    ) -> Result<(), DomainError>;
 
-    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError>;
+    async fn set_messages_enabled(
+        &self,
+        guild_id: &str,
+        messages_enabled: bool,
+    ) -> Result<(), DomainError>;
 
     async fn set_opt_out(
         &self,

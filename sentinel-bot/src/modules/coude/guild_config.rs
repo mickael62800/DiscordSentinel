@@ -2,8 +2,8 @@
 //! Lecture de la configuration per-guild depuis l'API (table bot_guild_config).
 //! Fournit des valeurs par defaut si non configurees.
 
-use std::collections::HashMap;
 use crate::shared::api_client::BaseApiClient;
+use std::collections::HashMap;
 
 /// Mode d'agregation des deux d20 de Double Coup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -44,7 +44,10 @@ pub struct Config {
 impl Config {
     /// Charge la config guild depuis l'API.
     pub async fn load(api: &BaseApiClient, guild_id: &str) -> Self {
-        let raw = match api.get_guild_config_for(guild_id, crate::modules::coude::MODULE_BOT_NAME).await {
+        let raw = match api
+            .get_guild_config_for(guild_id, crate::modules::coude::MODULE_BOT_NAME)
+            .await
+        {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec get_guild_config");
@@ -71,7 +74,11 @@ impl Config {
 
     pub fn max_bet(&self) -> i64 {
         let v = BaseApiClient::config_u64(&self.raw, "max_bet", 0) as i64;
-        if v == 0 { i64::MAX } else { v }
+        if v == 0 {
+            i64::MAX
+        } else {
+            v
+        }
     }
 
     pub fn default_bet(&self) -> i64 {
@@ -301,14 +308,22 @@ impl Config {
 
     pub fn log_channel_id(&self) -> Option<String> {
         let v = BaseApiClient::config_or(&self.raw, "log_channel_id", "");
-        if v.is_empty() { None } else { Some(v) }
+        if v.is_empty() {
+            None
+        } else {
+            Some(v)
+        }
     }
 
     // ── Salons par groupe de commandes ──
 
     fn channel_opt(&self, key: &str) -> Option<String> {
         let v = BaseApiClient::config_or(&self.raw, key, "");
-        if v.is_empty() { None } else { Some(v) }
+        if v.is_empty() {
+            None
+        } else {
+            Some(v)
+        }
     }
 
     // ── Balance (Phase 132 : parametres rendus configurables) ──
@@ -451,12 +466,24 @@ impl Config {
         BaseApiClient::config_u64(&self.raw, "assurance_tier_month_mult", 22) as i64
     }
 
-    pub fn channel_combats(&self) -> Option<String> { self.channel_opt("channel_combats") }
-    pub fn channel_leaderboard(&self) -> Option<String> { self.channel_opt("channel_leaderboard") }
-    pub fn channel_profil(&self) -> Option<String> { self.channel_opt("channel_profil") }
-    pub fn channel_activites(&self) -> Option<String> { self.channel_opt("channel_activites") }
-    pub fn channel_announcements(&self) -> Option<String> { self.channel_opt("channel_announcements") }
-    pub fn channel_notifications(&self) -> Option<String> { self.channel_opt("channel_notifications") }
+    pub fn channel_combats(&self) -> Option<String> {
+        self.channel_opt("channel_combats")
+    }
+    pub fn channel_leaderboard(&self) -> Option<String> {
+        self.channel_opt("channel_leaderboard")
+    }
+    pub fn channel_profil(&self) -> Option<String> {
+        self.channel_opt("channel_profil")
+    }
+    pub fn channel_activites(&self) -> Option<String> {
+        self.channel_opt("channel_activites")
+    }
+    pub fn channel_announcements(&self) -> Option<String> {
+        self.channel_opt("channel_announcements")
+    }
+    pub fn channel_notifications(&self) -> Option<String> {
+        self.channel_opt("channel_notifications")
+    }
 
     /// Salon dedie au post de l'embed tournoi hebdomadaire.
     /// Fallback sur `channel_activites` si non defini.
@@ -481,7 +508,11 @@ mod tests {
 
     #[test]
     fn smart_default_20_pct_within_bounds() {
-        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000"), ("default_bet", "50")]);
+        let cfg = make_config(&[
+            ("min_bet", "10"),
+            ("max_bet", "1000"),
+            ("default_bet", "50"),
+        ]);
         // 1000 * 20% = 200, dans [10, 1000] -> 200
         assert_eq!(cfg.smart_default_bet(1000), 200);
     }

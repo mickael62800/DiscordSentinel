@@ -5,6 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
+use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
@@ -13,10 +14,11 @@ use sentinel_core::domain::entities::moderation::review::automod::NewAutomodRevi
 use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
 const TBL: &str = "automod_reviews";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 /// Construit l'entree JSON d'un incident (pour la liste agregee `incidents`).
 fn incident_json(r: &NewAutomodReview) -> serde_json::Value {
@@ -91,7 +93,11 @@ impl From<Row> for AutomodReview {
             decided_at: r.decided_at,
             incident_count: r.incident_count,
             cumulative_score: r.cumulative_score,
-            incidents: if r.incidents.is_null() { serde_json::json!([]) } else { r.incidents },
+            incidents: if r.incidents.is_null() {
+                serde_json::json!([])
+            } else {
+                r.incidents
+            },
         }
     }
 }
@@ -151,14 +157,20 @@ pub struct PgAutomodReviewRepository {
 }
 
 impl PgAutomodReviewRepository {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[async_trait]
 impl AutomodReviewRepository for PgAutomodReviewRepository {
     async fn create(&self, r: NewAutomodReview) -> Result<AutomodReview, DomainError> {
         // Mode vote si une echeance est fournie : statut 'voting'.
-        let status = if r.voting_deadline.is_some() { "voting" } else { "pending" };
+        let status = if r.voting_deadline.is_some() {
+            "voting"
+        } else {
+            "pending"
+        };
         let incidents = serde_json::json!([incident_json(&r)]);
         let row: Row = sqlx::query_as(
             "INSERT INTO automod_reviews \
@@ -203,7 +215,11 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             // ou perdre un incident (read-modify-write sur le tableau JSON).
             let mut tx = self.pool.begin().await.map_err(pg_err)?;
             sqlx::query("SELECT pg_advisory_xact_lock(hashtext($1))")
-                .bind(format!("automod_review:{}:{}", r.guild_id.as_str(), r.user_id.as_str()))
+                .bind(format!(
+                    "automod_review:{}:{}",
+                    r.guild_id.as_str(),
+                    r.user_id.as_str()
+                ))
                 .execute(&mut *tx)
                 .await
                 .map_err(pg_err)?;
@@ -274,7 +290,11 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
 
             // Aucune carte ouverte : on cree dans la meme transaction (sous le
             // verrou) pour eviter une creation concurrente en double.
-            let status = if r.voting_deadline.is_some() { "voting" } else { "pending" };
+            let status = if r.voting_deadline.is_some() {
+                "voting"
+            } else {
+                "pending"
+            };
             let incidents = serde_json::json!([incident_json(&r)]);
             let row: Row = sqlx::query_as(
                 "INSERT INTO automod_reviews \
@@ -380,7 +400,11 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         resolved_by_name: &str,
         resolved_source: &str,
     ) -> Result<AutomodReview, DomainError> {
-        let new_status = if applied_action == "ignore" { "ignored" } else { "applied" };
+        let new_status = if applied_action == "ignore" {
+            "ignored"
+        } else {
+            "applied"
+        };
         let row: Option<Row> = sqlx::query_as(
             "UPDATE automod_reviews SET \
                 status = $1, applied_action = $2, resolved_by_id = $3, \
@@ -526,7 +550,11 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .await
                 .map_err(pg_err)?;
         match status {
-            None => return Err(DomainError::NotFound(format!("review {review_id} introuvable"))),
+            None => {
+                return Err(DomainError::NotFound(format!(
+                    "review {review_id} introuvable"
+                )))
+            }
             Some((s,)) if s != "voting" => {
                 return Err(DomainError::Conflict(format!("vote ferme (status={s})")))
             }
@@ -612,14 +640,16 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn find_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError> {
-        let row: Option<DiscussionRow> = sqlx::query_as(
-            "SELECT * FROM automod_discussion_channels WHERE review_id = $1",
-        )
-        .bind(review_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+    async fn find_discussion(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Option<DiscussionChannel>, DomainError> {
+        let row: Option<DiscussionRow> =
+            sqlx::query_as("SELECT * FROM automod_discussion_channels WHERE review_id = $1")
+                .bind(review_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
 
@@ -649,13 +679,12 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             return Ok((row.into(), true));
         }
         // Conflit : un salon existait deja -> on le renvoie.
-        let existing: DiscussionRow = sqlx::query_as(
-            "SELECT * FROM automod_discussion_channels WHERE review_id = $1",
-        )
-        .bind(d.review_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let existing: DiscussionRow =
+            sqlx::query_as("SELECT * FROM automod_discussion_channels WHERE review_id = $1")
+                .bind(d.review_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(pg_err)?;
         Ok((existing.into(), false))
     }
 

@@ -3,10 +3,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -25,21 +25,14 @@ pub trait CashboxRepository: Send + Sync {
 
     /// Vide la caisse atomiquement et retourne le montant. Utilise par le
     /// job worker hebdomadaire avant redistribution.
-    async fn claim_all_for_redistribution(
-        &self,
-        guild_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn claim_all_for_redistribution(&self, guild_id: &str) -> Result<i64, DomainError>;
 
     /// Retire un montant de la caisse (Phase 10 /braquage). Clamp au
     /// solde courant — jamais de balance negative. Retourne le montant
     /// effectivement retire (peut etre < `amount` si la caisse etait
     /// moins grosse). `total_collected` n'est PAS incremente (c'est une
     /// sortie, pas une entree).
-    async fn withdraw(
-        &self,
-        guild_id: &str,
-        amount: i64,
-    ) -> Result<i64, DomainError>;
+    async fn withdraw(&self, guild_id: &str, amount: i64) -> Result<i64, DomainError>;
 
     /// Persiste une redistribution terminee + entries gagnantes dans l'audit.
     async fn record_redistribution(

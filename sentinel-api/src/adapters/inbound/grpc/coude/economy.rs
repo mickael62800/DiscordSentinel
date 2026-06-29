@@ -5,11 +5,11 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyService;
 
 use crate::adapters::inbound::grpc::coude::taunt_event_to_proto;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
@@ -182,4 +182,3 @@ impl CoudeEconomyService for EconomyGrpc {
 #[cfg(test)]
 #[path = "tests/economy.rs"]
 mod tests;
-

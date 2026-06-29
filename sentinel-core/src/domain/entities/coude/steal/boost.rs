@@ -9,8 +9,8 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::steal::protection::StealProtectionDuration;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone)]
 pub struct StealBoost {

@@ -2,7 +2,6 @@
 //! Teste la logique metier : log_action, get_history, list_bans, delete_bans_for_user.
 //! Utilise des mocks in-memory pour le repo et le cache.
 
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -16,13 +15,16 @@ use crate::domain::entities::moderation::action::strikes::*;
 use crate::domain::entities::system::rule::*;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_moderation::*;
-use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
+use crate::ports::outbound::system::cache::CachePort;
 struct NoOpAuditLogs;
 #[async_trait]
 impl crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase for NoOpAuditLogs {
-    async fn create(&self, cmd: crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
+    async fn create(
+        &self,
+        cmd: crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand,
+    ) -> Result<AuditLog, DomainError> {
         Ok(AuditLog {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -37,8 +39,16 @@ impl crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase for
             created_at: chrono::Utc::now(),
         })
     }
-    async fn list(&self, _: Option<&str>, _: crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { Ok(vec![]) }
-    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+    async fn list(
+        &self,
+        _: Option<&str>,
+        _: crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -51,7 +61,9 @@ struct InMemoryModerationRepo {
 
 impl InMemoryModerationRepo {
     fn new() -> Self {
-        Self { actions: Mutex::new(vec![]) }
+        Self {
+            actions: Mutex::new(vec![]),
+        }
     }
 }
 
@@ -67,7 +79,12 @@ impl ModerationRepository for InMemoryModerationRepo {
         Ok(actions.iter().find(|a| a.id == id).cloned())
     }
 
-    async fn find_by_target(&self, guild_id: &str, target_id: &str, _limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_by_target(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         let actions = self.actions.lock().await;
         Ok(actions
             .iter()
@@ -76,7 +93,12 @@ impl ModerationRepository for InMemoryModerationRepo {
             .collect())
     }
 
-    async fn find_bans(&self, guild_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_bans(
+        &self,
+        guild_id: Option<&str>,
+        _limit: i64,
+        _offset: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         let actions = self.actions.lock().await;
         Ok(actions
             .iter()
@@ -86,13 +108,27 @@ impl ModerationRepository for InMemoryModerationRepo {
             .collect())
     }
 
-    async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
+    async fn delete_bans_for_user(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError> {
         let mut actions = self.actions.lock().await;
-        actions.retain(|a| !(a.guild_id == guild_id && a.target_id == target_id && a.action_type.starts_with("ban")));
+        actions.retain(|a| {
+            !(a.guild_id == guild_id
+                && a.target_id == target_id
+                && a.action_type.starts_with("ban"))
+        });
         Ok(())
     }
 
-    async fn find_all_for_guild(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn find_all_for_guild(
+        &self,
+        _: Option<&str>,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(vec![])
+    }
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
         let mut actions = self.actions.lock().await;
         let len_before = actions.len();
@@ -109,12 +145,29 @@ struct NoOpStrikeRepo;
 
 #[async_trait]
 impl StrikeRepository for NoOpStrikeRepo {
-    async fn save_strike(&self, _: &UserStrike) -> Result<(), DomainError> { Ok(()) }
-    async fn find_active_strikes(&self, _: &str, _: &str, _: i64) -> Result<Vec<UserStrike>, DomainError> { Ok(vec![]) }
-    async fn delete_strikes(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_strike_by_infraction_id(&self, _: uuid::Uuid) -> Result<u64, DomainError> { Ok(0) }
-    async fn get_config(&self, _: &str) -> Result<Option<StrikeConfig>, DomainError> { Ok(None) }
-    async fn save_config(&self, _: &StrikeConfig) -> Result<(), DomainError> { Ok(()) }
+    async fn save_strike(&self, _: &UserStrike) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn find_active_strikes(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<UserStrike>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_strikes(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_strike_by_infraction_id(&self, _: uuid::Uuid) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn get_config(&self, _: &str) -> Result<Option<StrikeConfig>, DomainError> {
+        Ok(None)
+    }
+    async fn save_config(&self, _: &StrikeConfig) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -125,13 +178,27 @@ struct NoOpCache;
 
 #[async_trait]
 impl CachePort for NoOpCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -142,15 +209,22 @@ fn build_service() -> (ManageModerationService, Arc<InMemoryModerationRepo>) {
     let repo = Arc::new(InMemoryModerationRepo::new());
     let cache = Arc::new(NoOpCache);
     let strike_repo = Arc::new(NoOpStrikeRepo);
-    let svc = ManageModerationService::new(
-        repo.clone() as Arc<dyn ModerationRepository>,
-        strike_repo as Arc<dyn StrikeRepository>,
-        cache as Arc<dyn CachePort>,
-    ).with_audit_logs_uc(Arc::new(NoOpAuditLogs) as Arc<dyn crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase>);
+    let svc =
+        ManageModerationService::new(
+            repo.clone() as Arc<dyn ModerationRepository>,
+            strike_repo as Arc<dyn StrikeRepository>,
+            cache as Arc<dyn CachePort>,
+        )
+        .with_audit_logs_uc(Arc::new(NoOpAuditLogs)
+            as Arc<dyn crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase>);
     (svc, repo)
 }
 
-fn make_command(action_type: &str, gravity: Option<&str>, duration: Option<u64>) -> LogModerationCommand {
+fn make_command(
+    action_type: &str,
+    gravity: Option<&str>,
+    duration: Option<u64>,
+) -> LogModerationCommand {
     LogModerationCommand {
         guild_id: "guild1".into(),
         channel_id: "chan1".into(),
@@ -172,7 +246,9 @@ fn make_command(action_type: &str, gravity: Option<&str>, duration: Option<u64>)
 #[tokio::test]
 async fn log_action_saves_to_repo() {
     let (svc, repo) = build_service();
-    let result = svc.log_action(make_command("warn", Some("medium"), None)).await;
+    let result = svc
+        .log_action(make_command("warn", Some("medium"), None))
+        .await;
     assert!(result.is_ok());
     let actions = repo.actions.lock().await;
     assert_eq!(actions.len(), 1);
@@ -183,25 +259,31 @@ async fn log_action_saves_to_repo() {
 #[tokio::test]
 async fn log_action_returns_valid_uuid() {
     let (svc, _) = build_service();
-    let action = svc.log_action(make_command("warn", None, None)).await.unwrap();
+    let action = svc
+        .log_action(make_command("warn", None, None))
+        .await
+        .unwrap();
     assert_ne!(action.id, Uuid::nil());
 }
 
 #[tokio::test]
 async fn log_action_preserves_all_fields() {
     let (svc, _) = build_service();
-    let action = svc.log_action(LogModerationCommand {
-        guild_id: "g1".into(),
-        channel_id: "c1".into(),
-        moderator_id: "m1".into(),
-        moderator_name: "Mod".into(),
-        target_id: "t1".into(),
-        target_name: "Target".into(),
-        action_type: "ban_temp".into(),
-        reason: "Raison ici".into(),
-        gravity: Some("high".into()),
-        duration: Some(7200),
-    }).await.unwrap();
+    let action = svc
+        .log_action(LogModerationCommand {
+            guild_id: "g1".into(),
+            channel_id: "c1".into(),
+            moderator_id: "m1".into(),
+            moderator_name: "Mod".into(),
+            target_id: "t1".into(),
+            target_name: "Target".into(),
+            action_type: "ban_temp".into(),
+            reason: "Raison ici".into(),
+            gravity: Some("high".into()),
+            duration: Some(7200),
+        })
+        .await
+        .unwrap();
     assert_eq!(action.guild_id, "g1");
     assert_eq!(action.channel_id, "c1");
     assert_eq!(action.moderator_id, "m1");
@@ -229,10 +311,18 @@ async fn get_history_empty_user() {
 #[tokio::test]
 async fn get_history_counts_correctly() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
-    svc.log_action(make_command("warn", Some("medium"), None)).await.unwrap();
-    svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("warn", Some("low"), None))
+        .await
+        .unwrap();
+    svc.log_action(make_command("warn", Some("medium"), None))
+        .await
+        .unwrap();
+    svc.log_action(make_command("mute_temp", None, Some(600)))
+        .await
+        .unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
 
     let history = svc.get_history("guild1", "user1").await.unwrap();
     assert_eq!(history.total_warns, 2);
@@ -244,8 +334,12 @@ async fn get_history_counts_correctly() {
 #[tokio::test]
 async fn get_history_counts_mute_types() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
-    svc.log_action(make_command("mute_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("mute_temp", None, Some(600)))
+        .await
+        .unwrap();
+    svc.log_action(make_command("mute_permanent", None, None))
+        .await
+        .unwrap();
 
     let history = svc.get_history("guild1", "user1").await.unwrap();
     assert_eq!(history.total_mutes, 2);
@@ -254,8 +348,12 @@ async fn get_history_counts_mute_types() {
 #[tokio::test]
 async fn get_history_counts_ban_types() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("ban_temp", None, Some(3600))).await.unwrap();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("ban_temp", None, Some(3600)))
+        .await
+        .unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
 
     let history = svc.get_history("guild1", "user1").await.unwrap();
     assert_eq!(history.total_bans, 2);
@@ -264,7 +362,9 @@ async fn get_history_counts_ban_types() {
 #[tokio::test]
 async fn get_history_isolates_guilds() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("warn", None, None)).await.unwrap();
+    svc.log_action(make_command("warn", None, None))
+        .await
+        .unwrap();
 
     let history = svc.get_history("other_guild", "user1").await.unwrap();
     assert_eq!(history.total_warns, 0);
@@ -273,7 +373,9 @@ async fn get_history_isolates_guilds() {
 #[tokio::test]
 async fn get_history_isolates_users() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("warn", None, None)).await.unwrap();
+    svc.log_action(make_command("warn", None, None))
+        .await
+        .unwrap();
 
     let history = svc.get_history("guild1", "other_user").await.unwrap();
     assert_eq!(history.total_warns, 0);
@@ -293,9 +395,15 @@ async fn list_bans_empty() {
 #[tokio::test]
 async fn list_bans_excludes_non_bans() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
-    svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("warn", Some("low"), None))
+        .await
+        .unwrap();
+    svc.log_action(make_command("mute_temp", None, Some(600)))
+        .await
+        .unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
 
     let bans = svc.list_bans(None, 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
@@ -305,7 +413,9 @@ async fn list_bans_excludes_non_bans() {
 #[tokio::test]
 async fn list_bans_filters_by_guild() {
     let (svc, _) = build_service();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
     svc.log_action(LogModerationCommand {
         guild_id: "guild2".into(),
         channel_id: "c".into(),
@@ -317,7 +427,9 @@ async fn list_bans_filters_by_guild() {
         reason: "R".into(),
         gravity: None,
         duration: None,
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     let bans = svc.list_bans(Some("guild1"), 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
@@ -331,8 +443,12 @@ async fn list_bans_filters_by_guild() {
 #[tokio::test]
 async fn delete_bans_removes_ban_entries() {
     let (svc, repo) = build_service();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
-    svc.log_action(make_command("warn", Some("low"), None)).await.unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
+    svc.log_action(make_command("warn", Some("low"), None))
+        .await
+        .unwrap();
     assert_eq!(repo.actions.lock().await.len(), 2);
 
     svc.delete_bans_for_user("guild1", "user1").await.unwrap();
@@ -345,7 +461,9 @@ async fn delete_bans_removes_ban_entries() {
 #[tokio::test]
 async fn delete_bans_only_for_specific_user() {
     let (svc, _repo) = build_service();
-    svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
+    svc.log_action(make_command("ban_permanent", None, None))
+        .await
+        .unwrap();
     svc.log_action(LogModerationCommand {
         guild_id: "guild1".into(),
         channel_id: "c".into(),
@@ -357,7 +475,9 @@ async fn delete_bans_only_for_specific_user() {
         reason: "R".into(),
         gravity: None,
         duration: None,
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 
     svc.delete_bans_for_user("guild1", "user1").await.unwrap();
 

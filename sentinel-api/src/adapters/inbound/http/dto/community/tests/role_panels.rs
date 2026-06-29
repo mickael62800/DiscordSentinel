@@ -1,10 +1,10 @@
 use super::*;
+use chrono::TimeZone;
+use chrono::Utc;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
-use chrono::TimeZone;
-use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_panel() -> RolePanel {
@@ -40,7 +40,8 @@ fn sample_entry(panel_id: Uuid, pos: i32) -> RolePanelEntry {
 fn default_mode_is_button() {
     let dto: CreateRolePanelDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "channel_id": "c", "title": "t", "entries": []
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.mode, "button");
     assert_eq!(dto.description, "");
     assert!(dto.max_roles.is_none());
@@ -50,7 +51,8 @@ fn default_mode_is_button() {
 fn default_entry_style_is_primary() {
     let dto: CreateEntryDto = serde_json::from_value(serde_json::json!({
         "role_id": "r", "role_name": "n"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.style, "primary");
     assert_eq!(dto.label, "");
     assert_eq!(dto.position, 0);
@@ -60,11 +62,29 @@ fn default_entry_style_is_primary() {
 #[test]
 fn create_role_panel_dto_to_command_maps_entries() {
     let dto = CreateRolePanelDto {
-        guild_id: "g".into(), channel_id: "c".into(), title: "t".into(),
-        description: "d".into(), mode: "dropdown".into(), max_roles: Some(5),
+        guild_id: "g".into(),
+        channel_id: "c".into(),
+        title: "t".into(),
+        description: "d".into(),
+        mode: "dropdown".into(),
+        max_roles: Some(5),
         entries: vec![
-            CreateEntryDto { role_id: "r1".into(), role_name: "R1".into(), emoji: None, label: "L".into(), style: "success".into(), position: 1 },
-            CreateEntryDto { role_id: "r2".into(), role_name: "R2".into(), emoji: Some("x".into()), label: "".into(), style: "primary".into(), position: 2 },
+            CreateEntryDto {
+                role_id: "r1".into(),
+                role_name: "R1".into(),
+                emoji: None,
+                label: "L".into(),
+                style: "success".into(),
+                position: 1,
+            },
+            CreateEntryDto {
+                role_id: "r2".into(),
+                role_name: "R2".into(),
+                emoji: Some("x".into()),
+                label: "".into(),
+                style: "primary".into(),
+                position: 2,
+            },
         ],
     };
     let cmd: CreateRolePanelCommand = dto.into();
@@ -78,7 +98,10 @@ fn create_role_panel_dto_to_command_maps_entries() {
 
 #[test]
 fn set_message_id_dto_to_command() {
-    let dto = SetMessageIdDto { panel_id: "p".into(), message_id: "m".into() };
+    let dto = SetMessageIdDto {
+        panel_id: "p".into(),
+        message_id: "m".into(),
+    };
     let cmd: SetMessageIdCommand = dto.into();
     assert_eq!(cmd.panel_id, "p");
     assert_eq!(cmd.message_id, "m".into());
@@ -88,7 +111,8 @@ fn set_message_id_dto_to_command() {
 fn create_auto_role_dto_to_command_default_delay() {
     let dto: CreateAutoRoleDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "role_id": "r", "role_name": "n"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.delay_secs, 0);
     let cmd: CreateAutoRoleCommand = dto.into();
     assert_eq!(cmd.guild_id, "g".into());
@@ -136,8 +160,12 @@ fn from_role_panel_detail_aggregates() {
 #[test]
 fn from_auto_role_preserves_fields() {
     let a = AutoRole {
-        id: Uuid::new_v4(), guild_id: "g".into(), role_id: "r".into(),
-        role_name: "Member".into(), delay_secs: 30, enabled: false,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        role_id: "r".into(),
+        role_name: "Member".into(),
+        delay_secs: 30,
+        enabled: false,
     };
     let id = a.id.to_string();
     let dto = AutoRoleDto::from(a);

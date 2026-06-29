@@ -16,14 +16,14 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use test_helpers::build_test_state_stats;
 
 // ══════════════════════════════════════════════════════════
@@ -38,8 +38,13 @@ struct MockStatsUC {
 }
 
 impl MockStatsUC {
-    fn new() -> Self { Self::default() }
-    fn with_user(self, u: UserStats) -> Self { self.users.lock().unwrap().push(u); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with_user(self, u: UserStats) -> Self {
+        self.users.lock().unwrap().push(u);
+        self
+    }
 }
 
 fn sample_user(guild_id: &str, user_id: &str, msgs: u64, voice: u64) -> UserStats {
@@ -64,13 +69,26 @@ impl ManageStatsUseCase for MockStatsUC {
         self.voice_calls.lock().unwrap().push(cmd);
         Ok(())
     }
-    async fn get_user_stats(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError> {
-        Ok(self.users.lock().unwrap().iter()
-            .find(|u| u.guild_id == guild_id && u.user_id == user_id).cloned())
+    async fn get_user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserStats>, DomainError> {
+        Ok(self
+            .users
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
+            .cloned())
     }
     async fn get_guild_overview(&self, guild_id: &str) -> Result<GuildStatsOverview, DomainError> {
         let users = self.users.lock().unwrap();
-        let gu: Vec<UserStats> = users.iter().filter(|u| u.guild_id == guild_id).cloned().collect();
+        let gu: Vec<UserStats> = users
+            .iter()
+            .filter(|u| u.guild_id == guild_id)
+            .cloned()
+            .collect();
         Ok(GuildStatsOverview {
             guild_id: guild_id.into(),
             total_messages: gu.iter().map(|u| u.message_count).sum(),
@@ -83,15 +101,30 @@ impl ManageStatsUseCase for MockStatsUC {
             top_members: gu,
         })
     }
-    async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError> {
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<UserStats>, DomainError> {
         let users = self.users.lock().unwrap();
-        let mut matching: Vec<UserStats> = users.iter().filter(|u| u.guild_id == guild_id).cloned().collect();
+        let mut matching: Vec<UserStats> = users
+            .iter()
+            .filter(|u| u.guild_id == guild_id)
+            .cloned()
+            .collect();
         matching.sort_by(|a, b| b.message_count.cmp(&a.message_count));
         matching.truncate(limit as usize);
         Ok(matching)
     }
-    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> { unimplemented!() }
-    async fn get_guild_voice_stats(&self, _: &str, _: u32, _: u32) -> Result<GuildVoiceStats, DomainError> {
+    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> {
+        unimplemented!()
+    }
+    async fn get_guild_voice_stats(
+        &self,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<GuildVoiceStats, DomainError> {
         Ok(GuildVoiceStats {
             total_channels: 3,
             total_sessions: 10,
@@ -110,21 +143,38 @@ fn build_app(uc: Arc<MockStatsUC>) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -216,7 +266,12 @@ async fn get_leaderboard_sorted_desc_by_messages() {
 async fn get_leaderboard_caps_limit_at_50() {
     let mut uc = MockStatsUC::new();
     for i in 0..10 {
-        uc = uc.with_user(sample_user("111111111111111111", &format!("u{i}"), i as u64, 0));
+        uc = uc.with_user(sample_user(
+            "111111111111111111",
+            &format!("u{i}"),
+            i as u64,
+            0,
+        ));
     }
     let app = build_app(Arc::new(uc));
     let (status, json) = get(app, "/api/stats/111111111111111111/leaderboard?limit=100").await;

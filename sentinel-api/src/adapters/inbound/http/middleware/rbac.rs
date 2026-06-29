@@ -172,11 +172,12 @@ pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode>
 /// Si la liste est vide (pas configuree), TOUS les appels sont refuses par
 /// securite — c'est volontaire : mieux vaut bloquer que laisser passer.
 #[allow(dead_code)]
-pub fn require_superadmin(
-    state: &AppState,
-    ctx: &RoleContext,
-) -> Result<(), StatusCode> {
-    if state.superadmin_user_ids.iter().any(|id| id == &ctx.discord_user_id) {
+pub fn require_superadmin(state: &AppState, ctx: &RoleContext) -> Result<(), StatusCode> {
+    if state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &ctx.discord_user_id)
+    {
         Ok(())
     } else {
         tracing::warn!(
@@ -351,7 +352,9 @@ async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<St
 
     // Cache (best-effort)
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        let _: Result<(), _> = conn.set_ex(&cache_key, &user.id, USER_ID_CACHE_TTL_SECS).await;
+        let _: Result<(), _> = conn
+            .set_ex(&cache_key, &user.id, USER_ID_CACHE_TTL_SECS)
+            .await;
     }
 
     Ok(user.id)
@@ -369,8 +372,9 @@ async fn lookup_role(state: &AppState, user_id: &str, guild_id: &str) -> Result<
     .map_err(|e| format!("lookup role: {e}"))?;
 
     match row {
-        Some((role_str,)) => Role::from_str(&role_str)
-            .ok_or_else(|| format!("role DB invalide: {role_str}")),
+        Some((role_str,)) => {
+            Role::from_str(&role_str).ok_or_else(|| format!("role DB invalide: {role_str}"))
+        }
         // Fallback : si pas de row mais user dans la guild (guild_auth l'a deja valide),
         // on lui donne viewer par defaut. Principe du moindre privilege.
         None => Ok(Role::Viewer),
@@ -413,7 +417,6 @@ fn short_hash(input: &str) -> String {
     input.hash(&mut hasher);
     format!("{:x}", hasher.finish())
 }
-
 
 #[cfg(test)]
 #[path = "tests/rbac.rs"]

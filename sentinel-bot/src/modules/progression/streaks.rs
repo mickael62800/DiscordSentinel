@@ -28,14 +28,24 @@ pub struct StreakTracker {
 
 impl StreakTracker {
     /// Precharge un streak depuis les donnees API (au premier message apres restart).
-    pub fn seed(&self, guild_id: u64, user_id: u64, current: u32, best: u32, last_day: u32, last_year: i32) {
+    pub fn seed(
+        &self,
+        guild_id: u64,
+        user_id: u64,
+        current: u32,
+        best: u32,
+        last_day: u32,
+        last_year: i32,
+    ) {
         // Ne pas ecraser si deja present (activite en cours)
-        self.streaks.entry((guild_id, user_id)).or_insert(StreakData {
-            last_active_day: last_day,
-            last_active_year: last_year,
-            current_streak: current,
-            best_streak: best,
-        });
+        self.streaks
+            .entry((guild_id, user_id))
+            .or_insert(StreakData {
+                last_active_day: last_day,
+                last_active_year: last_year,
+                current_streak: current,
+                best_streak: best,
+            });
     }
 
     pub fn new() -> Self {
@@ -46,13 +56,22 @@ impl StreakTracker {
 
     /// Enregistre l'activite d'un utilisateur.
     /// Retourne les infos de streak mises a jour.
-    pub fn record_activity(&self, guild_id: u64, user_id: u64, day_of_year: u32, year: i32) -> StreakUpdate {
-        let mut entry = self.streaks.entry((guild_id, user_id)).or_insert(StreakData {
-            last_active_day: 0,
-            last_active_year: 0,
-            current_streak: 0,
-            best_streak: 0,
-        });
+    pub fn record_activity(
+        &self,
+        guild_id: u64,
+        user_id: u64,
+        day_of_year: u32,
+        year: i32,
+    ) -> StreakUpdate {
+        let mut entry = self
+            .streaks
+            .entry((guild_id, user_id))
+            .or_insert(StreakData {
+                last_active_day: 0,
+                last_active_year: 0,
+                current_streak: 0,
+                best_streak: 0,
+            });
 
         let data = entry.value_mut();
 
@@ -67,8 +86,10 @@ impl StreakTracker {
 
         // Jour suivant (ou premier jour de la nouvelle annee) → streak continue
         let is_consecutive = is_next_day(
-            data.last_active_day, data.last_active_year,
-            day_of_year, year,
+            data.last_active_day,
+            data.last_active_year,
+            day_of_year,
+            year,
         );
 
         if is_consecutive {

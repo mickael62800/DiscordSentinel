@@ -17,13 +17,19 @@ fn parse_permissions_fallback_on_invalid() {
 #[test]
 fn parse_permissions_accepts_large_bigint() {
     // Les permissions Discord peuvent depasser Number.MAX_SAFE_INTEGER (2^53).
-    assert_eq!(parse_discord_permissions_bitfield("9007199254740993"), 9007199254740993);
+    assert_eq!(
+        parse_discord_permissions_bitfield("9007199254740993"),
+        9007199254740993
+    );
 }
 
 #[test]
 fn parse_permissions_rejects_overflow_falls_back_to_zero() {
     // > i64::MAX → fallback 0.
-    assert_eq!(parse_discord_permissions_bitfield("999999999999999999999"), 0);
+    assert_eq!(
+        parse_discord_permissions_bitfield("999999999999999999999"),
+        0
+    );
 }
 
 #[test]

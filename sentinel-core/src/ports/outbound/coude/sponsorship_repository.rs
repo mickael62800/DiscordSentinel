@@ -3,8 +3,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct Sponsorship {
@@ -17,6 +17,11 @@ pub struct Sponsorship {
 
 #[async_trait]
 pub trait SponsorshipRepository: Send + Sync {
-    async fn create(&self, guild_id: &str, sponsor_id: &str, sponsored_id: &str) -> Result<(), DomainError>;
+    async fn create(
+        &self,
+        guild_id: &str,
+        sponsor_id: &str,
+        sponsored_id: &str,
+    ) -> Result<(), DomainError>;
     async fn list(&self, guild_id: &str) -> Result<Vec<Sponsorship>, DomainError>;
 }

@@ -7,8 +7,7 @@
 use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{
-    grpc_err_to_string, ApiClient, StealProtection, StealProtectionDuration,
-    StealProtectionTrigger,
+    grpc_err_to_string, ApiClient, StealProtection, StealProtectionDuration, StealProtectionTrigger,
 };
 
 impl ApiClient {
@@ -54,7 +53,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.price_steal_protection(req).await.map(|r| r.into_inner())
+                client
+                    .price_steal_protection(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -79,7 +81,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.buy_steal_protection(req).await.map(|r| r.into_inner())
+                client
+                    .buy_steal_protection(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;

@@ -113,11 +113,7 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
         user_id: &str,
     ) -> Result<i64, DomainError>;
 
-    async fn count_casino_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
 
     async fn sum_casino_gains_today(
         &self,
@@ -125,9 +121,5 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
         user_id: &str,
     ) -> Result<i64, DomainError>;
 
-    async fn count_steal_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
 }

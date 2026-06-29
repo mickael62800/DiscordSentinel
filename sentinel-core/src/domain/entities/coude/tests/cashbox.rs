@@ -3,13 +3,22 @@ use super::*;
 #[test]
 fn cashbox_source_as_str_all_variants() {
     assert_eq!(CashboxSource::ShopPurchase.as_str(), "shop_purchase");
-    assert_eq!(CashboxSource::InsurancePurchase.as_str(), "insurance_purchase");
-    assert_eq!(CashboxSource::ProtectionPurchase.as_str(), "protection_purchase");
+    assert_eq!(
+        CashboxSource::InsurancePurchase.as_str(),
+        "insurance_purchase"
+    );
+    assert_eq!(
+        CashboxSource::ProtectionPurchase.as_str(),
+        "protection_purchase"
+    );
     assert_eq!(CashboxSource::BoostPurchase.as_str(), "boost_purchase");
     assert_eq!(CashboxSource::ClassChangeCost.as_str(), "class_change");
     assert_eq!(CashboxSource::ResetStatsCost.as_str(), "reset_stats");
     assert_eq!(CashboxSource::DonationTax.as_str(), "donation_tax");
-    assert_eq!(CashboxSource::CowardicePenalty.as_str(), "cowardice_penalty");
+    assert_eq!(
+        CashboxSource::CowardicePenalty.as_str(),
+        "cowardice_penalty"
+    );
     assert_eq!(CashboxSource::BetCommission.as_str(), "bet_commission");
 }
 
@@ -31,7 +40,9 @@ fn cashbox_source_labels_are_snake_case() {
         assert!(!label.is_empty(), "{:?} produces empty label", s);
         assert!(
             label.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
-            "{:?} not snake_case: {}", s, label
+            "{:?} not snake_case: {}",
+            s,
+            label
         );
     }
 }

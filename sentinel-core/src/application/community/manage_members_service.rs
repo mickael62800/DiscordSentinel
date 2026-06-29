@@ -8,14 +8,14 @@ use crate::domain::entities::community::guild_member::MemberModeration;
 use crate::domain::entities::community::guild_member::MemberStats;
 use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
-use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
-use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::outbound::community::member_repository::MemberRepository;
 
 pub struct ManageMembersService {
@@ -32,7 +32,12 @@ impl ManageMembersService {
         moderation_uc: Arc<dyn ManageModerationUseCase>,
         stats_uc: Arc<dyn ManageStatsUseCase>,
     ) -> Self {
-        Self { member_repo, infractions_uc, moderation_uc, stats_uc }
+        Self {
+            member_repo,
+            infractions_uc,
+            moderation_uc,
+            stats_uc,
+        }
     }
 }
 
@@ -43,11 +48,19 @@ impl ManageMembersUseCase for ManageMembersService {
     }
 
     async fn get_member(&self, guild_id: &str, user_id: &str) -> Result<GuildMember, DomainError> {
-        self.member_repo.find_one(guild_id, user_id).await?
-            .ok_or_else(|| DomainError::NotFound(format!("Membre {user_id} introuvable dans {guild_id}")))
+        self.member_repo
+            .find_one(guild_id, user_id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::NotFound(format!("Membre {user_id} introuvable dans {guild_id}"))
+            })
     }
 
-    async fn get_member_summary(&self, guild_id: &str, user_id: &str) -> Result<MemberSummary, DomainError> {
+    async fn get_member_summary(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<MemberSummary, DomainError> {
         let member = self.get_member(guild_id, user_id).await?;
 
         // Infractions
@@ -61,15 +74,19 @@ impl ManageMembersUseCase for ManageMembersService {
             vec![]
         });
         let infractions_total = infractions_list.len() as i64;
-        let infractions_recent: Vec<serde_json::Value> = infractions_list.iter().take(10)
-            .map(|i| serde_json::json!({
-                "id": i.id.to_string(),
-                "created_at": i.created_at.to_rfc3339(),
-                "reason": i.reason,
-                "score": i.score,
-                "action": format!("{:?}", i.action),
-                "content": i.content,
-            }))
+        let infractions_recent: Vec<serde_json::Value> = infractions_list
+            .iter()
+            .take(10)
+            .map(|i| {
+                serde_json::json!({
+                    "id": i.id.to_string(),
+                    "created_at": i.created_at.to_rfc3339(),
+                    "reason": i.reason,
+                    "score": i.score,
+                    "action": format!("{:?}", i.action),
+                    "content": i.content,
+                })
+            })
             .collect();
 
         // Moderation
@@ -84,14 +101,19 @@ impl ManageMembersUseCase for ManageMembersService {
             let warns = h.actions.iter().filter(|a| a.action_type == "warn").count() as i64;
             let mutes = h.actions.iter().filter(|a| a.action_type == "mute").count() as i64;
             let bans = h.actions.iter().filter(|a| a.action_type == "ban").count() as i64;
-            let actions: Vec<serde_json::Value> = h.actions.iter().take(10)
-                .map(|a| serde_json::json!({
-                    "action_type": a.action_type,
-                    "reason": a.reason,
-                    "moderator_name": a.moderator_name,
-                    "created_at": a.created_at.to_rfc3339(),
-                    "duration": a.duration,
-                }))
+            let actions: Vec<serde_json::Value> = h
+                .actions
+                .iter()
+                .take(10)
+                .map(|a| {
+                    serde_json::json!({
+                        "action_type": a.action_type,
+                        "reason": a.reason,
+                        "moderator_name": a.moderator_name,
+                        "created_at": a.created_at.to_rfc3339(),
+                        "duration": a.duration,
+                    })
+                })
                 .collect();
             (warns, mutes, bans, actions)
         } else {
@@ -99,16 +121,39 @@ impl ManageMembersUseCase for ManageMembersService {
         };
 
         // Stats
-        let user_stats = self.stats_uc.get_user_stats(guild_id, user_id).await.ok().flatten();
+        let user_stats = self
+            .stats_uc
+            .get_user_stats(guild_id, user_id)
+            .await
+            .ok()
+            .flatten();
         let (message_count, voice_seconds, last_active) = user_stats
-            .map(|s| (s.message_count as i64, s.voice_seconds as i64, Some(s.updated_at)))
+            .map(|s| {
+                (
+                    s.message_count as i64,
+                    s.voice_seconds as i64,
+                    Some(s.updated_at),
+                )
+            })
             .unwrap_or((0, 0, None));
 
         Ok(MemberSummary {
             member,
-            infractions: MemberInfractions { total: infractions_total, recent: infractions_recent },
-            moderation: MemberModeration { total_warns, total_mutes, total_bans, actions: mod_actions },
-            stats: MemberStats { message_count, voice_seconds, last_active },
+            infractions: MemberInfractions {
+                total: infractions_total,
+                recent: infractions_recent,
+            },
+            moderation: MemberModeration {
+                total_warns,
+                total_mutes,
+                total_bans,
+                actions: mod_actions,
+            },
+            stats: MemberStats {
+                message_count,
+                voice_seconds,
+                last_active,
+            },
         })
     }
 
@@ -126,10 +171,18 @@ impl ManageMembersUseCase for ManageMembersService {
 
     async fn update_member(&self, cmd: UpdateMemberCommand) -> Result<(), DomainError> {
         let mut member = self.get_member(&cmd.guild_id, &cmd.user_id).await?;
-        if let Some(username) = cmd.username { member.username = username; }
-        if let Some(display_name) = cmd.display_name { member.display_name = Some(display_name); }
-        if let Some(avatar) = cmd.avatar { member.avatar = Some(avatar); }
-        if let Some(roles) = cmd.roles { member.roles = roles; }
+        if let Some(username) = cmd.username {
+            member.username = username;
+        }
+        if let Some(display_name) = cmd.display_name {
+            member.display_name = Some(display_name);
+        }
+        if let Some(avatar) = cmd.avatar {
+            member.avatar = Some(avatar);
+        }
+        if let Some(roles) = cmd.roles {
+            member.roles = roles;
+        }
         self.member_repo.upsert(&member).await
     }
 }

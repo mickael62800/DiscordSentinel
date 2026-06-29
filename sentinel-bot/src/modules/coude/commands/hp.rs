@@ -35,15 +35,18 @@ fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32, config: &Config) -
 }
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("hp")
-        .description("Affiche tes points de vie actuels")
+    CreateCommand::new("hp").description("Affiche tes points de vie actuels")
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -135,7 +138,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             hp_current, hp_max, hp_pct, bar_full, bar_empty, status, regen_msg
         ))
         .color(color)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command
@@ -152,4 +157,3 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         tracing::warn!(error = %e, "Echec response Discord");
     }
 }
-

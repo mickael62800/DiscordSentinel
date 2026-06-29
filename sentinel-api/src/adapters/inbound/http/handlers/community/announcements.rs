@@ -1,7 +1,7 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use chrono::Utc;
 use uuid::Uuid;
@@ -15,10 +15,10 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
+use sentinel_core::domain::errors::DomainError;
 
 const ANNOUNCEMENTS_BOT: &str = "announcements";
 
@@ -316,11 +316,10 @@ pub async fn fetch_due(
 pub async fn retention_cleanup_all(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let guilds: Vec<(String,)> =
-        sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
-            .fetch_all(&state.pg_pool)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+    let guilds: Vec<(String,)> = sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
+        .fetch_all(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
 
     let mut processed = 0u64;
     let mut skipped = 0u64;

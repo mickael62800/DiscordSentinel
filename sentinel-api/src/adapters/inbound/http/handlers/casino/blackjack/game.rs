@@ -3,10 +3,10 @@
 //! Tous dÃƒÂ©lÃƒÂ¨guent ÃƒÂ  `state.blackjack_svc` et broadcastent un ÃƒÂ©vÃƒÂ©nement
 //! `blackjack_result` via le broadcaster quand la partie se termine.
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Extension;
 use axum::Json;
 
@@ -52,7 +52,8 @@ pub async fn start_game(
         .into_iter()
         .map(|c| (c.config_key, c.config_value))
         .collect();
-    let cfg = sentinel_core::domain::entities::casino::blackjack::BlackjackConfig::from_kv_pairs(&pairs);
+    let cfg =
+        sentinel_core::domain::entities::casino::blackjack::BlackjackConfig::from_kv_pairs(&pairs);
 
     let result = state
         .blackjack_svc
@@ -172,7 +173,10 @@ pub async fn list_games(
     ValidatedGuild { guild_id }: ValidatedGuild,
     axum::extract::Query(q): axum::extract::Query<ListGamesQuery>,
 ) -> Result<Json<Vec<BlackjackGameDto>>, ApiError> {
-    let games = state.blackjack_svc.list_games(&guild_id, q.status.as_deref()).await?;
+    let games = state
+        .blackjack_svc
+        .list_games(&guild_id, q.status.as_deref())
+        .await?;
     Ok(Json(games.iter().map(to_dto).collect()))
 }
 
@@ -185,7 +189,10 @@ pub async fn purge_all(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.purge.blackjack",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.purge.blackjack",
         "role insuffisant pour purger blackjack",
     )
     .await?;

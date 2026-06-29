@@ -1,6 +1,6 @@
+use crate::domain::enums::moderation::flag_type::FlagType;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::domain::enums::moderation::flag_type::FlagType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionFlags {

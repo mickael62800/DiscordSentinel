@@ -41,7 +41,8 @@ pub struct FloodDecision {
 
 #[async_trait]
 pub trait AnalyzeMessageUseCase: Send + Sync {
-    async fn analyze(&self, command: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError>;
+    async fn analyze(&self, command: AnalyzeMessageCommand)
+        -> Result<MessageAnalysis, DomainError>;
 
     /// Evalue un signal de flood (nombre de messages dans la fenetre) et
     /// renvoie la decision d'auto-protection. La regle (seuil severe, toggle)

@@ -12,18 +12,18 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use sentinel_core::domain::entities::coude::inventory::Insurance;
 use sentinel_core::domain::entities::coude::inventory::InventoryItem;
-use sentinel_core::domain::entities::coude::inventory::Prime;
 use sentinel_core::domain::entities::coude::inventory::NewCoudePrime;
-use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use sentinel_core::domain::entities::coude::inventory::Prime;
 
 use super::parse_uuid;
 
@@ -164,7 +164,12 @@ impl CoudeInventoryService for InventoryGrpc {
         let req = request.into_inner();
         let total = self
             .uc
-            .claim_primes(&req.guild_id, &req.target_id, &req.claimer_id, &req.claimer_name)
+            .claim_primes(
+                &req.guild_id,
+                &req.target_id,
+                &req.claimer_id,
+                &req.claimer_name,
+            )
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Int64Value { value: total }))
@@ -175,7 +180,8 @@ impl CoudeInventoryService for InventoryGrpc {
         request: Request<proto::BuyInsuranceRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        let inserted = self.uc
+        let inserted = self
+            .uc
             .buy_insurance_for_level(
                 &req.guild_id,
                 &req.user_id,
@@ -370,7 +376,9 @@ impl CoudeInventoryService for InventoryGrpc {
 #[path = "tests/inventory.rs"]
 mod tests;
 
-pub(super) fn steal_boost_to_proto(b: sentinel_core::domain::entities::coude::steal::boost::StealBoost) -> proto::StealBoost {
+pub(super) fn steal_boost_to_proto(
+    b: sentinel_core::domain::entities::coude::steal::boost::StealBoost,
+) -> proto::StealBoost {
     proto::StealBoost {
         id: b.id.to_string(),
         guild_id: b.guild_id.into(),
@@ -397,8 +405,8 @@ pub(super) fn steal_protection_to_proto(
 pub(super) fn proto_steal_duration_to_domain(
     v: i32,
 ) -> Option<sentinel_core::domain::entities::coude::steal::protection::StealProtectionDuration> {
-    use sentinel_core::domain::entities::coude::steal::protection::StealProtectionDuration as D;
     use proto::StealProtectionDurationKind as P;
+    use sentinel_core::domain::entities::coude::steal::protection::StealProtectionDuration as D;
     match P::try_from(v).ok()? {
         P::StealProtectionDurationUnspecified => None,
         P::StealProtectionDurationOneDay => Some(D::OneDay),
@@ -407,4 +415,3 @@ pub(super) fn proto_steal_duration_to_domain(
         P::StealProtectionDurationSevenDays => Some(D::SevenDays),
     }
 }
-

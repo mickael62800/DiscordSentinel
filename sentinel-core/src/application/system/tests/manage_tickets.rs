@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::Mutex;
-use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::application::system::manage_tickets_service::ManageTicketsService;
@@ -27,11 +27,21 @@ struct MockTicketRepo {
 
 #[async_trait]
 impl TicketRepository for MockTicketRepo {
-    async fn find_all(&self, status: Option<&str>, _priority: Option<&str>, _search: Option<&str>, _author_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<Ticket>, DomainError> {
+    async fn find_all(
+        &self,
+        status: Option<&str>,
+        _priority: Option<&str>,
+        _search: Option<&str>,
+        _author_id: Option<&str>,
+        _limit: i64,
+        _offset: i64,
+    ) -> Result<Vec<Ticket>, DomainError> {
         let tickets = self.tickets.lock().unwrap();
-        Ok(tickets.iter().filter(|t| {
-            status.is_none_or(|s| t.status == s)
-        }).cloned().collect())
+        Ok(tickets
+            .iter()
+            .filter(|t| status.is_none_or(|s| t.status == s))
+            .cloned()
+            .collect())
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Ticket>, DomainError> {
@@ -60,7 +70,11 @@ impl TicketRepository for MockTicketRepo {
 
     async fn find_messages(&self, ticket_id: Uuid) -> Result<Vec<TicketMessage>, DomainError> {
         let msgs = self.messages.lock().unwrap();
-        Ok(msgs.iter().filter(|m| m.ticket_id == ticket_id).cloned().collect())
+        Ok(msgs
+            .iter()
+            .filter(|m| m.ticket_id == ticket_id)
+            .cloned()
+            .collect())
     }
 
     async fn save_message(&self, message: &TicketMessage) -> Result<(), DomainError> {
@@ -77,8 +91,18 @@ impl TicketRepository for MockTicketRepo {
         *self.last_invited_user.lock().unwrap() = Some((id, inv_id.map(|s| s.to_string())));
         Ok(())
     }
-    async fn update_priority(&self, _id: Uuid, _priority: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn update_sla(&self, _id: Uuid, _fr: Option<&str>, _ra: Option<&str>, _rating: Option<i32>) -> Result<(), DomainError> { Ok(()) }
+    async fn update_priority(&self, _id: Uuid, _priority: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_sla(
+        &self,
+        _id: Uuid,
+        _fr: Option<&str>,
+        _ra: Option<&str>,
+        _rating: Option<i32>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -86,13 +110,27 @@ struct MockCache;
 
 #[async_trait]
 impl CachePort for MockCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn make_service() -> (ManageTicketsService, Arc<MockTicketRepo>) {
@@ -138,7 +176,10 @@ async fn test_list_tickets_no_filters() {
     let (service, _repo) = make_service();
     service.create_ticket(make_create_cmd()).await.unwrap();
 
-    let tickets = service.list_tickets(None, None, None, None, 50, 0).await.unwrap();
+    let tickets = service
+        .list_tickets(None, None, None, None, 50, 0)
+        .await
+        .unwrap();
     assert_eq!(tickets.len(), 1);
 }
 
@@ -147,10 +188,16 @@ async fn test_list_tickets_filter_by_status() {
     let (service, _repo) = make_service();
     service.create_ticket(make_create_cmd()).await.unwrap();
 
-    let open = service.list_tickets(Some("open".to_string()), None, None, None, 50, 0).await.unwrap();
+    let open = service
+        .list_tickets(Some("open".to_string()), None, None, None, 50, 0)
+        .await
+        .unwrap();
     assert_eq!(open.len(), 1);
 
-    let closed = service.list_tickets(Some("closed".to_string()), None, None, None, 50, 0).await.unwrap();
+    let closed = service
+        .list_tickets(Some("closed".to_string()), None, None, None, 50, 0)
+        .await
+        .unwrap();
     assert_eq!(closed.len(), 0);
 }
 
@@ -192,12 +239,15 @@ async fn test_reply_ticket_sets_pending() {
     let (service, repo) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
 
-    service.reply_ticket(ReplyTicketCommand {
-        ticket_id: ticket.id.to_string(),
-        content: "Hello".to_string(),
-        author_name: "user".to_string(),
-        author_role: "user".to_string(),
-    }).await.unwrap();
+    service
+        .reply_ticket(ReplyTicketCommand {
+            ticket_id: ticket.id.to_string(),
+            content: "Hello".to_string(),
+            author_name: "user".to_string(),
+            author_role: "user".to_string(),
+        })
+        .await
+        .unwrap();
 
     let msgs = repo.messages.lock().unwrap();
     assert_eq!(msgs.len(), 1);
@@ -212,10 +262,13 @@ async fn test_assign_ticket() {
     let (service, repo) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
 
-    service.assign_ticket(AssignTicketCommand {
-        ticket_id: ticket.id.to_string(),
-        assignee: "modo123".to_string(),
-    }).await.unwrap();
+    service
+        .assign_ticket(AssignTicketCommand {
+            ticket_id: ticket.id.to_string(),
+            assignee: "modo123".to_string(),
+        })
+        .await
+        .unwrap();
 
     let (uuid, assignee) = repo.last_assignee.lock().unwrap().clone().unwrap();
     assert_eq!(uuid, ticket.id);
@@ -227,11 +280,14 @@ async fn test_update_ticket_channel_voice() {
     let (service, repo) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
 
-    service.update_ticket_channel(UpdateTicketChannelCommand {
-        ticket_id: ticket.id.to_string(),
-        voice_channel_id: Some("vc123".to_string()),
-        invited_user_id: None,
-    }).await.unwrap();
+    service
+        .update_ticket_channel(UpdateTicketChannelCommand {
+            ticket_id: ticket.id.to_string(),
+            voice_channel_id: Some("vc123".to_string()),
+            invited_user_id: None,
+        })
+        .await
+        .unwrap();
 
     let (uuid, vc_id) = repo.last_voice_channel.lock().unwrap().clone().unwrap();
     assert_eq!(uuid, ticket.id);
@@ -244,11 +300,14 @@ async fn test_update_ticket_channel_invite() {
     let (service, repo) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
 
-    service.update_ticket_channel(UpdateTicketChannelCommand {
-        ticket_id: ticket.id.to_string(),
-        voice_channel_id: None,
-        invited_user_id: Some("user456".to_string()),
-    }).await.unwrap();
+    service
+        .update_ticket_channel(UpdateTicketChannelCommand {
+            ticket_id: ticket.id.to_string(),
+            voice_channel_id: None,
+            invited_user_id: Some("user456".to_string()),
+        })
+        .await
+        .unwrap();
 
     assert!(repo.last_voice_channel.lock().unwrap().is_none());
     let (uuid, inv_id) = repo.last_invited_user.lock().unwrap().clone().unwrap();
@@ -261,7 +320,10 @@ async fn test_get_ticket_detail() {
     let (service, _) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
 
-    let detail = service.get_ticket_detail(&ticket.id.to_string()).await.unwrap();
+    let detail = service
+        .get_ticket_detail(&ticket.id.to_string())
+        .await
+        .unwrap();
     assert_eq!(detail.ticket.id, ticket.id);
     assert!(detail.messages.is_empty());
 }
@@ -312,7 +374,10 @@ async fn update_sla_with_all_fields() {
 async fn update_sla_with_none_fields() {
     let (service, _) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
-    assert!(service.update_sla(ticket.id, None, None, None).await.is_ok());
+    assert!(service
+        .update_sla(ticket.id, None, None, None)
+        .await
+        .is_ok());
 }
 
 // ── reply_ticket / assign_ticket / update_ticket_channel avec ID invalide ──
@@ -320,33 +385,42 @@ async fn update_sla_with_none_fields() {
 #[tokio::test]
 async fn reply_ticket_invalid_uuid_returns_error() {
     let (service, _) = make_service();
-    let err = service.reply_ticket(ReplyTicketCommand {
-        ticket_id: "not-a-uuid".into(),
-        content: "".into(),
-        author_name: "".into(),
-        author_role: "".into(),
-    }).await.unwrap_err();
+    let err = service
+        .reply_ticket(ReplyTicketCommand {
+            ticket_id: "not-a-uuid".into(),
+            content: "".into(),
+            author_name: "".into(),
+            author_role: "".into(),
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
 async fn assign_ticket_invalid_uuid_returns_error() {
     let (service, _) = make_service();
-    let err = service.assign_ticket(AssignTicketCommand {
-        ticket_id: "bad".into(),
-        assignee: "x".into(),
-    }).await.unwrap_err();
+    let err = service
+        .assign_ticket(AssignTicketCommand {
+            ticket_id: "bad".into(),
+            assignee: "x".into(),
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
 async fn update_ticket_channel_invalid_uuid_returns_error() {
     let (service, _) = make_service();
-    let err = service.update_ticket_channel(UpdateTicketChannelCommand {
-        ticket_id: "xyz".into(),
-        voice_channel_id: Some("v".into()),
-        invited_user_id: None,
-    }).await.unwrap_err();
+    let err = service
+        .update_ticket_channel(UpdateTicketChannelCommand {
+            ticket_id: "xyz".into(),
+            voice_channel_id: Some("v".into()),
+            invited_user_id: None,
+        })
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
@@ -363,13 +437,17 @@ async fn update_status_invalid_uuid_returns_error() {
 async fn list_tickets_with_all_filters_bypasses_cache() {
     let (service, _repo) = make_service();
     // Les filtres actifs forcent un read repo direct (pas de cache set/get).
-    let tickets = service.list_tickets(
-        Some("open".into()),
-        Some("high".into()),
-        Some("search".into()),
-        Some("author".into()),
-        10, 0,
-    ).await.unwrap();
+    let tickets = service
+        .list_tickets(
+            Some("open".into()),
+            Some("high".into()),
+            Some("search".into()),
+            Some("author".into()),
+            10,
+            0,
+        )
+        .await
+        .unwrap();
     assert!(tickets.is_empty());
 }
 
@@ -377,6 +455,9 @@ async fn list_tickets_with_all_filters_bypasses_cache() {
 async fn list_tickets_with_offset_skips_cache() {
     let (service, _repo) = make_service();
     // offset != 0 → pas de cache
-    let tickets = service.list_tickets(None, None, None, None, 10, 50).await.unwrap();
+    let tickets = service
+        .list_tickets(None, None, None, None, 10, 50)
+        .await
+        .unwrap();
     assert!(tickets.is_empty());
 }

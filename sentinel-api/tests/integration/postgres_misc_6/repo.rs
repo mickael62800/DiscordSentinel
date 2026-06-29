@@ -3,21 +3,25 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
 use sentinel_api::adapters::outbound::postgres::audit::modstats_repository::PgModstatsRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::review_repository::PgReviewRepository;
-use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
 use sentinel_api::ports::outbound::audit::modstats_repository::ModstatsRepository;
+use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
 use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
 use sentinel_api::ports::outbound::moderation::review_repository::ReviewRepository;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 async fn seed_moderation_action(p: &PgPool, guild: &str) -> Uuid {
@@ -25,8 +29,13 @@ async fn seed_moderation_action(p: &PgPool, guild: &str) -> Uuid {
     sqlx::query(
         "INSERT INTO moderation_actions (id, guild_id, channel_id, moderator_id, moderator_name, \
           target_id, target_name, action_type, reason, gravity, duration, created_at) \
-         VALUES ($1, $2, 'ch', 'mod', 'Mod', 't', 'Target', 'ban', 'test', NULL, NULL, NOW())"
-    ).bind(id).bind(guild).execute(p).await.unwrap();
+         VALUES ($1, $2, 'ch', 'mod', 'Mod', 't', 'Target', 'ban', 'test', NULL, NULL, NOW())",
+    )
+    .bind(id)
+    .bind(guild)
+    .execute(p)
+    .await
+    .unwrap();
     id
 }
 
@@ -40,7 +49,16 @@ async fn evidence_add_and_list() {
     let repo = PgEvidenceRepository::new(p.clone());
     let g = fresh_id();
     let action_id = seed_moderation_action(&p, &g).await;
-    let e = repo.add(action_id, "https://example.com/evidence1.png", Some("desc"), "mod1", "Mod").await.unwrap();
+    let e = repo
+        .add(
+            action_id,
+            "https://example.com/evidence1.png",
+            Some("desc"),
+            "mod1",
+            "Mod",
+        )
+        .await
+        .unwrap();
     assert_eq!(e.action_id, action_id);
     assert_eq!(e.url, "https://example.com/evidence1.png");
     assert_eq!(e.description.as_deref(), Some("desc"));
@@ -60,9 +78,13 @@ async fn evidence_list_ordered_asc() {
     let repo = PgEvidenceRepository::new(p.clone());
     let g = fresh_id();
     let action_id = seed_moderation_action(&p, &g).await;
-    repo.add(action_id, "https://a/1", None, "m", "M").await.unwrap();
+    repo.add(action_id, "https://a/1", None, "m", "M")
+        .await
+        .unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    repo.add(action_id, "https://a/2", None, "m", "M").await.unwrap();
+    repo.add(action_id, "https://a/2", None, "m", "M")
+        .await
+        .unwrap();
     let list = repo.list(action_id).await.unwrap();
     assert_eq!(list[0].url, "https://a/1");
     assert_eq!(list[1].url, "https://a/2");
@@ -76,7 +98,20 @@ async fn evidence_list_ordered_asc() {
 async fn pending_create_and_list() {
     let repo = PgPendingActionRepository::new(pool().await);
     let g = fresh_id();
-    let id = repo.create(&g, "mod1", "Mod", "target1", "Target", "ban", "reason", Some("high"), Some(3600)).await.unwrap();
+    let id = repo
+        .create(
+            &g,
+            "mod1",
+            "Mod",
+            "target1",
+            "Target",
+            "ban",
+            "reason",
+            Some("high"),
+            Some(3600),
+        )
+        .await
+        .unwrap();
     assert!(!id.is_nil());
     let list = repo.list_pending(&g).await.unwrap();
     assert_eq!(list.len(), 1);
@@ -86,7 +121,10 @@ async fn pending_create_and_list() {
 async fn pending_get_guild_id() {
     let repo = PgPendingActionRepository::new(pool().await);
     let g = fresh_id();
-    let id = repo.create(&g, "mod1", "Mod", "t", "T", "ban", "r", None, None).await.unwrap();
+    let id = repo
+        .create(&g, "mod1", "Mod", "t", "T", "ban", "r", None, None)
+        .await
+        .unwrap();
     let got = repo.get_guild_id(id).await.unwrap().unwrap();
     assert_eq!(got, g);
     assert!(repo.get_guild_id(Uuid::new_v4()).await.unwrap().is_none());
@@ -96,7 +134,10 @@ async fn pending_get_guild_id() {
 async fn pending_resolve_removes_from_pending() {
     let repo = PgPendingActionRepository::new(pool().await);
     let g = fresh_id();
-    let id = repo.create(&g, "mod1", "Mod", "t", "T", "ban", "r", None, None).await.unwrap();
+    let id = repo
+        .create(&g, "mod1", "Mod", "t", "T", "ban", "r", None, None)
+        .await
+        .unwrap();
     repo.resolve(id, "approved", "reviewer1").await.unwrap();
     let list = repo.list_pending(&g).await.unwrap();
     // N'apparait plus dans les pending.
@@ -113,7 +154,10 @@ async fn review_add_and_list_pending() {
     let repo = PgReviewRepository::new(p.clone());
     let g = fresh_id();
     let action_id = seed_moderation_action(&p, &g).await;
-    let entry = repo.add(action_id, &g, "mod1", "Mod", Some("too harsh")).await.unwrap();
+    let entry = repo
+        .add(action_id, &g, "mod1", "Mod", Some("too harsh"))
+        .await
+        .unwrap();
     assert_eq!(entry.status, "pending");
     let list = repo.list_pending(&g).await.unwrap();
     assert_eq!(list.len(), 1);
@@ -138,7 +182,10 @@ async fn review_resolve_updates_status() {
     let g = fresh_id();
     let action_id = seed_moderation_action(&p, &g).await;
     let entry = repo.add(action_id, &g, "m", "M", None).await.unwrap();
-    assert!(repo.resolve(entry.id, "reviewer1", "Reviewer", Some("ok"), "approved").await.unwrap());
+    assert!(repo
+        .resolve(entry.id, "reviewer1", "Reviewer", Some("ok"), "approved")
+        .await
+        .unwrap());
     let pending = repo.list_pending(&g).await.unwrap();
     assert!(!pending.iter().any(|r| r.id == entry.id));
 }
@@ -146,7 +193,10 @@ async fn review_resolve_updates_status() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn review_resolve_unknown_returns_false() {
     let repo = PgReviewRepository::new(pool().await);
-    assert!(!repo.resolve(Uuid::new_v4(), "r", "R", None, "approved").await.unwrap());
+    assert!(!repo
+        .resolve(Uuid::new_v4(), "r", "R", None, "approved")
+        .await
+        .unwrap());
 }
 
 // ══════════════════════════════════════════════════════════
@@ -176,8 +226,13 @@ async fn modstats_top_moderators_groups_and_orders() {
     sqlx::query(
         "INSERT INTO moderation_actions (id, guild_id, channel_id, moderator_id, moderator_name, \
           target_id, target_name, action_type, reason, gravity, duration, created_at) \
-         VALUES ($1, $2, 'ch', 'mod2', 'Bob', 't', 'T', 'warn', 'x', NULL, NULL, NOW())"
-    ).bind(Uuid::new_v4()).bind(&g).execute(&p).await.unwrap();
+         VALUES ($1, $2, 'ch', 'mod2', 'Bob', 't', 'T', 'warn', 'x', NULL, NULL, NOW())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(&g)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let top = repo.top_moderators(&g, 30, 10).await.unwrap();
     assert_eq!(top.len(), 2);

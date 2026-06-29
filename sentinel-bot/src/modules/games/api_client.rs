@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
 use crate::shared::api_client::BaseApiClient;
+use serde::{Deserialize, Serialize};
 
 /// URL-encode un segment de path pour eviter qu'un nom de jeu avec `/` ou
 /// caracteres speciaux ne casse le routing ou ne permette une injection.
@@ -67,7 +67,11 @@ impl GameApiClient {
     }
 
     /// Liste les jeux d'une categorie (None => jeux sans categorie).
-    pub async fn list_games_by_category(&self, guild_id: &str, category: Option<&str>) -> Result<Vec<Game>, String> {
+    pub async fn list_games_by_category(
+        &self,
+        guild_id: &str,
+        category: Option<&str>,
+    ) -> Result<Vec<Game>, String> {
         let mut url = format!("/api/games/{}/by-category", encode_segment(guild_id));
         if let Some(cat) = category {
             url.push_str(&format!("?category={}", encode_segment(cat)));
@@ -85,14 +89,19 @@ impl GameApiClient {
         emoji: Option<&str>,
         category: Option<&str>,
     ) -> Result<Game, String> {
-        self.base.post_json("/api/games", &serde_json::json!({
-            "guild_id": guild_id,
-            "game_name": game_name,
-            "created_by": created_by,
-            "emoji": emoji,
-            "category": category,
-            "role_id": role_id,
-        })).await
+        self.base
+            .post_json(
+                "/api/games",
+                &serde_json::json!({
+                    "guild_id": guild_id,
+                    "game_name": game_name,
+                    "created_by": created_by,
+                    "emoji": emoji,
+                    "category": category,
+                    "role_id": role_id,
+                }),
+            )
+            .await
     }
 
     /// Supprime un jeu.
@@ -103,7 +112,12 @@ impl GameApiClient {
             encode_segment(guild_id),
             encode_segment(game_id),
         ));
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
@@ -127,14 +141,23 @@ impl GameApiClient {
         let req = self.base.client().patch(url).json(&serde_json::json!({
             "role_id": role_id,
         }));
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
         resp.json::<Game>().await.map_err(|e| e.to_string())
     }
 
-    pub async fn get_game_by_name(&self, guild_id: &str, game_name: &str) -> Result<Option<Game>, String> {
+    pub async fn get_game_by_name(
+        &self,
+        guild_id: &str,
+        game_name: &str,
+    ) -> Result<Option<Game>, String> {
         self.base
             .get_json(&format!(
                 "/api/games/{}/by-name/{}",
@@ -158,9 +181,18 @@ impl GameApiClient {
             self.base.base_url(),
             encode_segment(guild_id),
         );
-        let body = SavePanelReq { channel_id, message_id, category };
+        let body = SavePanelReq {
+            channel_id,
+            message_id,
+            category,
+        };
         let req = self.base.client().post(url).json(&body);
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
@@ -184,10 +216,7 @@ impl GameApiClient {
 
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, String> {
         self.base
-            .get_json(&format!(
-                "/api/games/{}/panels",
-                encode_segment(guild_id)
-            ))
+            .get_json(&format!("/api/games/{}/panels", encode_segment(guild_id)))
             .await
     }
 }

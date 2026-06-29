@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
@@ -62,11 +62,7 @@ pub trait ManageCoudeCombatsUseCase: Send + Sync {
 
     async fn expire(&self, id: Uuid) -> Result<(), DomainError>;
 
-    async fn set_defender_special(
-        &self,
-        id: Uuid,
-        item_key: &str,
-    ) -> Result<(), DomainError>;
+    async fn set_defender_special(&self, id: Uuid, item_key: &str) -> Result<(), DomainError>;
 
     /// Lecture rapide du `guild_id` rattache a un combat. Renvoie `None` si le
     /// combat n'existe pas — utile pour les pre-checks RBAC `ressource-based`

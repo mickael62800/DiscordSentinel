@@ -24,10 +24,7 @@ impl ManageSecurityAuditService {
 
 #[async_trait]
 impl ManageSecurityAuditUseCase for ManageSecurityAuditService {
-    async fn audit_logs(
-        &self,
-        filter: AuditLogFilter,
-    ) -> Result<Vec<AuditLogEntry>, DomainError> {
+    async fn audit_logs(&self, filter: AuditLogFilter) -> Result<Vec<AuditLogEntry>, DomainError> {
         self.repo.list_audit_logs(filter).await
     }
 

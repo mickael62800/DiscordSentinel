@@ -1,6 +1,6 @@
+use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use serde::Deserialize;
 use serde::Serialize;
-use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 
 #[derive(Debug, Deserialize)]
 pub struct ChartQueryParams {

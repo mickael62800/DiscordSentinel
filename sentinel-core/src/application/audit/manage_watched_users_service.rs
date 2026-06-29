@@ -4,13 +4,13 @@ use async_trait::async_trait;
 
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
-use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct ManageWatchedUsersService {
@@ -47,7 +47,9 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
-        self.watched_repo.find_watched_users(guild_id, limit, offset).await
+        self.watched_repo
+            .find_watched_users(guild_id, limit, offset)
+            .await
     }
 
     async fn get_user_dossier(
@@ -55,7 +57,10 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<UserDossier, DomainError> {
-        let users = self.watched_repo.find_watched_users(Some(guild_id), 1000, 0).await?;
+        let users = self
+            .watched_repo
+            .find_watched_users(Some(guild_id), 1000, 0)
+            .await?;
         let user = users
             .into_iter()
             .find(|u| u.user_id.as_str() == user_id)
@@ -67,7 +72,10 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             limit: 100,
             offset: 0,
         };
-        let infractions = self.infractions_uc.list_infractions(guild_id, filters).await?;
+        let infractions = self
+            .infractions_uc
+            .list_infractions(guild_id, filters)
+            .await?;
 
         let history = self.moderation_uc.get_history(guild_id, user_id).await?;
 
@@ -103,11 +111,7 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             .await
     }
 
-    async fn remove_manual_watch(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn remove_manual_watch(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         self.watched_repo
             .remove_manual_watch(guild_id, user_id)
             .await

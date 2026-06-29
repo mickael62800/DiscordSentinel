@@ -77,7 +77,8 @@ pub async fn connect() -> Result<Channel, String> {
 ///
 /// Si `API_KEY` est vide ou invalide en metadata, l'interceptor laisse
 /// passer la requete sans auth (l'API repondra 401).
-pub fn bearer_interceptor() -> Result<impl Fn(Request<()>) -> Result<Request<()>, tonic::Status> + Clone, String> {
+pub fn bearer_interceptor(
+) -> Result<impl Fn(Request<()>) -> Result<Request<()>, tonic::Status> + Clone, String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
     let auth: Option<MetadataValue<_>> = if api_key.is_empty() {
         None
@@ -88,12 +89,14 @@ pub fn bearer_interceptor() -> Result<impl Fn(Request<()>) -> Result<Request<()>
                 .map_err(|e| format!("invalid api_key: {e}"))?,
         )
     };
-    Ok(move |mut req: Request<()>| -> Result<Request<()>, tonic::Status> {
-        if let Some(ref v) = auth {
-            req.metadata_mut().insert("authorization", v.clone());
-        }
-        Ok(req)
-    })
+    Ok(
+        move |mut req: Request<()>| -> Result<Request<()>, tonic::Status> {
+            if let Some(ref v) = auth {
+                req.metadata_mut().insert("authorization", v.clone());
+            }
+            Ok(req)
+        },
+    )
 }
 
 /// Helper pour ajouter le header Bearer a une requete tonic specifique

@@ -30,7 +30,10 @@ fn substitutes_attacker_name() {
 
 #[test]
 fn at_least_20_lines_in_catalog() {
-    assert!(FLAVOR_LINES.len() >= 20, "ambition : >= 20 lignes pour la rejouabilite");
+    assert!(
+        FLAVOR_LINES.len() >= 20,
+        "ambition : >= 20 lignes pour la rejouabilite"
+    );
 }
 
 #[test]
@@ -38,8 +41,14 @@ fn no_template_contains_unbalanced_placeholders() {
     for tmpl in FLAVOR_LINES {
         // Pas de placeholders inconnus type {foo}.
         let cleaned = tmpl.replace("{atk}", "").replace("{def}", "");
-        assert!(!cleaned.contains('{'), "template avec placeholder inconnu : {tmpl}");
-        assert!(!cleaned.contains('}'), "template avec placeholder inconnu : {tmpl}");
+        assert!(
+            !cleaned.contains('{'),
+            "template avec placeholder inconnu : {tmpl}"
+        );
+        assert!(
+            !cleaned.contains('}'),
+            "template avec placeholder inconnu : {tmpl}"
+        );
     }
 }
 
@@ -52,7 +61,11 @@ fn distribution_picks_different_lines() {
             seen.insert(line);
         }
     }
-    assert!(seen.len() >= 10, "doit varier sur 500 tirages forced (got {})", seen.len());
+    assert!(
+        seen.len() >= 10,
+        "doit varier sur 500 tirages forced (got {})",
+        seen.len()
+    );
 }
 
 #[test]

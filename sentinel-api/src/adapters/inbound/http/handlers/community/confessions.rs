@@ -11,11 +11,11 @@ use crate::adapters::inbound::http::dto::community::confessions::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::community::confession::{ConfessionConfig, ReportStatus};
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_confessions::{
     CreateConfessionCommand, CreateReplyCommand, CreateReportCommand,
 };
+use sentinel_core::domain::entities::community::confession::{ConfessionConfig, ReportStatus};
+use sentinel_core::domain::errors::DomainError;
 
 #[derive(serde::Deserialize)]
 pub struct ListConfessionsQuery {
@@ -182,7 +182,10 @@ pub async fn delete_reply(
     Path(id): Path<Uuid>,
     Json(dto): Json<DeleteConfessionDto>,
 ) -> Result<Json<ReplyDto>, ApiError> {
-    let r = state.confessions_uc.delete_reply(id, dto.deleted_by).await?;
+    let r = state
+        .confessions_uc
+        .delete_reply(id, dto.deleted_by)
+        .await?;
     state.broadcaster.broadcast(
         "confession_reply_deleted",
         serde_json::json!({
@@ -232,7 +235,10 @@ pub async fn list_reports(
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(500);
     let status = params.status.as_deref().and_then(ReportStatus::from_str);
-    let list = state.confessions_uc.list_reports(&guild_id, status, limit).await?;
+    let list = state
+        .confessions_uc
+        .list_reports(&guild_id, status, limit)
+        .await?;
     Ok(map_to_dtos(list))
 }
 
@@ -241,8 +247,8 @@ pub async fn resolve_report(
     Path(id): Path<Uuid>,
     Json(dto): Json<ResolveReportDto>,
 ) -> Result<Json<()>, ApiError> {
-    let status = parse_report_status(&dto.status)
-        .map_err(|m| ApiError(DomainError::ValidationError(m)))?;
+    let status =
+        parse_report_status(&dto.status).map_err(|m| ApiError(DomainError::ValidationError(m)))?;
     state
         .confessions_uc
         .resolve_report(id, status, dto.resolved_by)

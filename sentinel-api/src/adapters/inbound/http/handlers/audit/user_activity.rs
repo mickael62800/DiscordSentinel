@@ -1,7 +1,7 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::Json;
 use serde::Deserialize;
 
@@ -9,8 +9,8 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::audit::user_activity::UserActivity;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateActivityDto {
@@ -82,7 +82,13 @@ pub async fn get_activity(
 
     let activities = state
         .user_activity_repo
-        .list(&guild_id, &user_id, params.event_type.as_deref(), limit, offset)
+        .list(
+            &guild_id,
+            &user_id,
+            params.event_type.as_deref(),
+            limit,
+            offset,
+        )
         .await?;
     Ok(Json(activities))
 }

@@ -1,7 +1,7 @@
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -18,13 +18,13 @@ use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -41,8 +41,13 @@ pub async fn log_action(
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
     // Validation
     validation::validate_moderation_action(
-        &dto.guild_id, &dto.moderator_id, &dto.target_id, &dto.reason, &dto.action_type,
-    ).map_err(ApiError)?;
+        &dto.guild_id,
+        &dto.moderator_id,
+        &dto.target_id,
+        &dto.reason,
+        &dto.action_type,
+    )
+    .map_err(ApiError)?;
 
     // Phase 7B — Gate RBAC (pass-through pour les appels bot/internal sans token Discord).
     check_role_for_guild(
@@ -272,14 +277,19 @@ pub async fn execute_mute(
     )
     .await?;
 
-    let duration = sentinel_core::domain::entities::moderation::review::manual::resolve_mute_duration(dto.duration);
+    let duration =
+        sentinel_core::domain::entities::moderation::review::manual::resolve_mute_duration(
+            dto.duration,
+        );
     state
         .discord_api
         .apply_timeout(&dto.guild_id, &dto.user_id, duration)
         .await
         .map_err(ApiError)?;
 
-    let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone().into());
+    let target_name = dto
+        .target_name
+        .unwrap_or_else(|| dto.user_id.clone().into());
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
@@ -399,10 +409,7 @@ pub async fn get_history(
 ) -> Result<Json<UserHistoryDto>, ApiError> {
     // Validation
 
-    let history = state
-        .moderation_uc
-        .get_history(&guild_id, &user_id)
-        .await?;
+    let history = state.moderation_uc.get_history(&guild_id, &user_id).await?;
     Ok(single_dto(history))
 }
 
@@ -453,13 +460,27 @@ pub async fn add_evidence(
     }
     // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
     sentinel_core::domain::entities::moderation::review::manual::validate_evidence_url(&dto.url)
-        .map_err(|m| ApiError(sentinel_core::domain::errors::DomainError::ValidationError(m.into())))?;
+        .map_err(|m| {
+            ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
+                m.into(),
+            ))
+        })?;
     let action_uuid = validation::parse_uuid("action_id", &dto.action_id).map_err(ApiError)?;
     validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
-    let description = dto.description.as_deref().map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
+    let description = dto
+        .description
+        .as_deref()
+        .map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
 
-    let entry = state.evidence_repo
-        .add(action_uuid, &dto.url, description.as_deref(), &dto.uploaded_by, &dto.uploaded_by_name)
+    let entry = state
+        .evidence_repo
+        .add(
+            action_uuid,
+            &dto.url,
+            description.as_deref(),
+            &dto.uploaded_by,
+            &dto.uploaded_by_name,
+        )
         .await?;
 
     Ok(Json(EvidenceEntryDto {
@@ -530,7 +551,9 @@ pub struct ReviewQueueEntryDto {
     pub action_reason: Option<String>,
 }
 
-fn review_entry_to_dto(e: crate::ports::outbound::moderation::review_repository::ReviewEntry) -> ReviewQueueEntryDto {
+fn review_entry_to_dto(
+    e: crate::ports::outbound::moderation::review_repository::ReviewEntry,
+) -> ReviewQueueEntryDto {
     ReviewQueueEntryDto {
         id: e.id.to_string(),
         action_id: e.action_id.to_string(),
@@ -567,10 +590,20 @@ pub async fn add_review(
         "moderator+ requis pour ajouter une review",
     )
     .await?;
-    let reason = dto.reason.as_deref().map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
+    let reason = dto
+        .reason
+        .as_deref()
+        .map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
 
-    let entry = state.review_repo
-        .add(action_uuid, &dto.guild_id, &dto.added_by, &dto.added_by_name, reason.as_deref())
+    let entry = state
+        .review_repo
+        .add(
+            action_uuid,
+            &dto.guild_id,
+            &dto.added_by,
+            &dto.added_by_name,
+            reason.as_deref(),
+        )
         .await?;
 
     Ok(Json(review_entry_to_dto(entry)))
@@ -586,7 +619,11 @@ pub async fn list_pending_reviews(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    check_role(&rbac, Role::Moderator, "moderator+ requis pour lister les reviews")?;
+    check_role(
+        &rbac,
+        Role::Moderator,
+        "moderator+ requis pour lister les reviews",
+    )?;
 
     let entries = state.review_repo.list_pending(&guild_id).await?;
     Ok(Json(entries.into_iter().map(review_entry_to_dto).collect()))
@@ -613,26 +650,49 @@ pub async fn resolve_review(
     // RBAC via le repo.
     if rbac.is_some() {
         if let Some(guild_id) = state.review_repo.get_guild_id(review_uuid).await? {
-            check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour resoudre une review").await?;
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour resoudre une review",
+            )
+            .await?;
         }
     }
 
-    if !sentinel_core::domain::entities::moderation::review::manual::is_valid_review_status(&dto.status) {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "status doit etre approved/rejected/changed".into(),
-        )));
+    if !sentinel_core::domain::entities::moderation::review::manual::is_valid_review_status(
+        &dto.status,
+    ) {
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "status doit etre approved/rejected/changed".into(),
+            ),
+        ));
     }
     validation::validate_discord_id("reviewer_id", &dto.reviewer_id).map_err(ApiError)?;
-    let notes = dto.reviewer_notes.as_deref().map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
+    let notes = dto
+        .reviewer_notes
+        .as_deref()
+        .map(sentinel_core::domain::entities::moderation::review::manual::truncate_review_text);
 
-    let resolved = state.review_repo
-        .resolve(review_uuid, &dto.reviewer_id, &dto.reviewer_name, notes.as_deref(), &dto.status)
+    let resolved = state
+        .review_repo
+        .resolve(
+            review_uuid,
+            &dto.reviewer_id,
+            &dto.reviewer_name,
+            notes.as_deref(),
+            &dto.status,
+        )
         .await?;
 
     if !resolved {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound(
-            "review introuvable ou deja resolue".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound(
+                "review introuvable ou deja resolue".into(),
+            ),
+        ));
     }
 
     Ok(Json(serde_json::json!({ "ok": true })))
@@ -649,9 +709,16 @@ pub async fn get_modstats(
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
-) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>, ApiError> {
+) -> Result<
+    Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>,
+    ApiError,
+> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
+    check_role(
+        &rbac,
+        Role::Moderator,
+        "moderator+ requis pour voir les stats de moderation",
+    )?;
     let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats(&guild_id, days).await?;
@@ -686,7 +753,11 @@ pub async fn get_modstats_trend(
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
+    check_role(
+        &rbac,
+        Role::Moderator,
+        "moderator+ requis pour voir les stats de moderation",
+    )?;
 
     let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
 
@@ -739,7 +810,9 @@ pub async fn delete_action(
     // stocke dans `details->>'action_id'`. action_type derive de
     // event_type en strippant le prefixe 'mod_'.
     let Some(info) = state.moderation_uc.find_action_for_reversal(uuid).await? else {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into())));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into()),
+        ));
     };
     let guild_id = info.guild_id;
     let target_id = info.target_id;
@@ -777,7 +850,11 @@ pub async fn delete_action(
             ),
         }
     } else if lower.starts_with("mute") || lower == "timeout" {
-        match state.discord_api.remove_timeout(&guild_id, &target_id).await {
+        match state
+            .discord_api
+            .remove_timeout(&guild_id, &target_id)
+            .await
+        {
             Ok(()) => tracing::info!(
                 guild_id = %guild_id,
                 target_id = %target_id,
@@ -797,7 +874,9 @@ pub async fn delete_action(
     if deleted {
         Ok(axum::http::StatusCode::NO_CONTENT)
     } else {
-        Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into())))
+        Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into()),
+        ))
     }
 }
 

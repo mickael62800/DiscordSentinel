@@ -18,11 +18,35 @@ pub const ADMIN_ONLY_TYPES: &[&str] = &["probleme_moderateur"];
 pub const URGENT_TYPES: &[&str] = &["urgence_detresse"];
 
 pub const TICKET_TYPES: &[(&str, &str, &str)] = &[
-    ("probleme_serveur", "Probleme serveur", "Un souci technique ou de configuration du serveur"),
-    ("probleme_membre", "Probleme avec un membre", "Signaler le comportement d'un membre"),
-    ("probleme_moderateur", "Probleme avec un moderateur", "Signaler un abus ou probleme avec un moderateur (confidentiel, admins uniquement)"),
-    ("appel_sanction", "Appel de sanction", "Contester une sanction recue"),
-    ("urgence_detresse", "Situation urgente / detresse", "Vous traversez une situation grave et avez besoin d'aide rapidement"),
+    (
+        "probleme_serveur",
+        "Probleme serveur",
+        "Un souci technique ou de configuration du serveur",
+    ),
+    (
+        "probleme_membre",
+        "Probleme avec un membre",
+        "Signaler le comportement d'un membre",
+    ),
+    (
+        "probleme_moderateur",
+        "Probleme avec un moderateur",
+        "Signaler un abus ou probleme avec un moderateur (confidentiel, admins uniquement)",
+    ),
+    (
+        "appel_sanction",
+        "Appel de sanction",
+        "Contester une sanction recue",
+    ),
+    (
+        "urgence_detresse",
+        "Situation urgente / detresse",
+        "Vous traversez une situation grave et avez besoin d'aide rapidement",
+    ),
     ("question", "Question", "Poser une question au staff"),
-    ("autre", "Autre", "Demande qui ne rentre pas dans les autres categories"),
+    (
+        "autre",
+        "Autre",
+        "Demande qui ne rentre pas dans les autres categories",
+    ),
 ];

@@ -1,6 +1,6 @@
 use serenity::builder::{
-    CreateActionRow, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+    CreateActionRow, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu,
+    CreateSelectMenuKind, CreateSelectMenuOption,
 };
 use serenity::model::application::ComponentInteraction;
 use serenity::model::id::{ChannelId, UserId};
@@ -8,7 +8,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::api_client::{ApiClient, AddCoAdminRequest};
+use super::api_client::{AddCoAdminRequest, ApiClient};
 
 /// Handle co-admin interactions: promote/demote.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -34,7 +34,12 @@ async fn handle_coadmin_menu(ctx: &Context, component: &ComponentInteraction) {
     let members = get_voice_members(ctx, guild_id, voice_channel_id, Some(owner_id)).await;
 
     if members.is_empty() {
-        super::respond_ephemeral(ctx, component, "Aucun membre disponible pour devenir co-admin.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Aucun membre disponible pour devenir co-admin.",
+        )
+        .await;
         return;
     }
 
@@ -43,11 +48,8 @@ async fn handle_coadmin_menu(ctx: &Context, component: &ComponentInteraction) {
         .map(|(id, name)| CreateSelectMenuOption::new(name, id.get().to_string()))
         .collect();
 
-    let select = CreateSelectMenu::new(
-        "select_coadmin",
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez un co-admin");
+    let select = CreateSelectMenu::new("select_coadmin", CreateSelectMenuKind::String { options })
+        .placeholder("Choisissez un co-admin");
 
     let row = CreateActionRow::SelectMenu(select);
 
@@ -66,10 +68,16 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
     super::defer_ephemeral(ctx, component).await;
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Impossible de trouver le salon vocal associe.",
+        )
+        .await;
         return;
     };
 
@@ -89,7 +97,12 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
     };
 
     if ch.owner_id != component.user.id.get().to_string() {
-        super::respond_followup_ephemeral(ctx, component, "Seul le proprietaire peut gerer les co-admins.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut gerer les co-admins.",
+        )
+        .await;
         return;
     }
 
@@ -98,7 +111,8 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
             match values.first() {
                 Some(v) => v.clone(),
                 None => {
-                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.").await;
+                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.")
+                        .await;
                     return;
                 }
             }
@@ -133,7 +147,10 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await
+    {
         error!(error = %e, "Erreur permission coadmin");
     }
 

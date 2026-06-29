@@ -1,28 +1,24 @@
 //! Slash command /security (status, history).
 
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CommandDataOptionValue,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption,
 };
 
 use crate::shared::discord_helpers::reply_ephemeral_embed;
 use crate::shared::embeds::info_embed;
 
-use super::{
-    LockdownKey, QuarantineKey, RaidDetectorKey, RecentJoinsKey, SecurityApiKey,
-};
+use super::{LockdownKey, QuarantineKey, RaidDetectorKey, RecentJoinsKey, SecurityApiKey};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("security")
         .description("Commandes du security bot")
         .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "status",
-                "Affiche l'etat actuel de la securite",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "status",
+            "Affiche l'etat actuel de la securite",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -86,14 +82,26 @@ async fn handle_status(ctx: &Context, command: &CommandInteraction) {
         .unwrap_or(0);
 
     let embed = info_embed("Security — Statut")
-        .field("Joins recents (raid detector)", recent_joins.to_string(), true)
+        .field(
+            "Joins recents (raid detector)",
+            recent_joins.to_string(),
+            true,
+        )
         .field(
             "Lockdown",
             if lockdown_active { "Actif" } else { "Inactif" },
             true,
         )
-        .field("Utilisateurs en quarantaine", quarantined_count.to_string(), true)
-        .field("Joins recents (tracker)", recent_joins_tracker.to_string(), true);
+        .field(
+            "Utilisateurs en quarantaine",
+            quarantined_count.to_string(),
+            true,
+        )
+        .field(
+            "Joins recents (tracker)",
+            recent_joins_tracker.to_string(),
+            true,
+        );
 
     reply_ephemeral_embed(ctx, command, embed).await;
 }
@@ -138,14 +146,9 @@ async fn handle_history(ctx: &Context, command: &CommandInteraction) {
                             .get("event_type")
                             .and_then(|v| v.as_str())
                             .unwrap_or("inconnu");
-                        let severity = e
-                            .get("severity")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("info");
-                        let description = e
-                            .get("description")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("");
+                        let severity = e.get("severity").and_then(|v| v.as_str()).unwrap_or("info");
+                        let description =
+                            e.get("description").and_then(|v| v.as_str()).unwrap_or("");
                         let desc_preview = if description.chars().count() > 80 {
                             let truncated: String = description.chars().take(80).collect();
                             format!("{}...", truncated)

@@ -4,8 +4,8 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::coude::combat::CombatResolution;
 use sentinel_core::domain::entities::coude::combat::Combat;
+use sentinel_core::domain::entities::coude::combat::CombatResolution;
 use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
 use sentinel_core::domain::entities::coude::purge::COUDE_PURGE_TABLES;
 use sentinel_core::domain::errors::DomainError;
@@ -83,7 +83,6 @@ impl From<CombatRow> for Combat {
         }
     }
 }
-
 
 #[async_trait]
 impl CombatRepository for PgCombatRepository {
@@ -345,11 +344,7 @@ impl CombatRepository for PgCombatRepository {
         Ok(row.into())
     }
 
-    async fn resolve(
-        &self,
-        id: Uuid,
-        resolution: CombatResolution,
-    ) -> Result<bool, DomainError> {
+    async fn resolve(&self, id: Uuid, resolution: CombatResolution) -> Result<bool, DomainError> {
         // Garde : ne résout que les combats encore actifs.
         let result = sqlx::query(
             r#"UPDATE coude_combats
@@ -415,30 +410,22 @@ impl CombatRepository for PgCombatRepository {
         Ok(result.rows_affected() > 0)
     }
 
-    async fn set_defender_special(
-        &self,
-        id: Uuid,
-        item_key: &str,
-    ) -> Result<bool, DomainError> {
-        let result = sqlx::query(
-            "UPDATE coude_combats SET defender_special = $1 WHERE id = $2",
-        )
-        .bind(item_key)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+    async fn set_defender_special(&self, id: Uuid, item_key: &str) -> Result<bool, DomainError> {
+        let result = sqlx::query("UPDATE coude_combats SET defender_special = $1 WHERE id = $2")
+            .bind(item_key)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
     async fn mark_unresolved_bets_lost(&self, combat_id: Uuid) -> Result<(), DomainError> {
-        sqlx::query(
-            "UPDATE coude_bets SET won = false WHERE combat_id = $1 AND won IS NULL",
-        )
-        .bind(combat_id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        sqlx::query("UPDATE coude_bets SET won = false WHERE combat_id = $1 AND won IS NULL")
+            .bind(combat_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -461,11 +448,7 @@ impl CombatRepository for PgCombatRepository {
         Ok(out)
     }
 
-    async fn count_defeats_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn count_defeats_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         let count: Option<i64> = sqlx::query_scalar(
             "SELECT COUNT(*)::bigint FROM coude_combats
              WHERE guild_id = $1

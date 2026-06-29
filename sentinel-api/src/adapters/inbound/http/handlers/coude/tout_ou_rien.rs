@@ -3,25 +3,25 @@
 //! - POST /api/coude/{g}/tout-ou-rien/record : log une tentative
 //! - GET  /api/coude/{g}/tout-ou-rien/memorial : top N pertes
 
+use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
+use crate::adapters::inbound::http::state::AppState;
+use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
+use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 use chrono::DateTime;
 use chrono::Utc;
-use serde::Deserialize;
-use serde::Serialize;
-use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
-use sentinel_core::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
-use sentinel_core::domain::errors::DomainError;
-use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
-use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::errors::DomainError;
+use serde::Deserialize;
+use serde::Serialize;
 #[derive(Debug, Deserialize)]
 pub struct RecordToutOuRienDto {
     pub user_id: UserId,

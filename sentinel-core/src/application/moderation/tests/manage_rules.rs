@@ -46,28 +46,54 @@ struct SpyCache {
 }
 #[async_trait]
 impl CachePort for SpyCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn invalidate_rules(&self, g: &str) -> Result<(), DomainError> {
         self.invalidations.lock().unwrap().push(g.into());
         Ok(())
     }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 struct NoOpCache;
 #[async_trait]
 impl CachePort for NoOpCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<Rule>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_rules(&self, _: &str, _: &[Rule]) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn make_svc() -> ManageRulesService {
@@ -119,7 +145,10 @@ async fn create_rejects_warn_gte_delete() {
     let mut cmd = valid_cmd();
     cmd.threshold_warn = 4.0;
     cmd.threshold_delete = 4.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.create_or_update_rule(cmd).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -128,7 +157,10 @@ async fn create_rejects_delete_gte_mute() {
     let mut cmd = valid_cmd();
     cmd.threshold_delete = 6.0;
     cmd.threshold_mute = 6.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.create_or_update_rule(cmd).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -137,7 +169,10 @@ async fn create_rejects_mute_gte_ban() {
     let mut cmd = valid_cmd();
     cmd.threshold_mute = 9.0;
     cmd.threshold_ban = 9.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.create_or_update_rule(cmd).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -148,7 +183,10 @@ async fn create_rejects_inverted_thresholds() {
     cmd.threshold_delete = 8.0;
     cmd.threshold_mute = 6.0;
     cmd.threshold_ban = 4.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.create_or_update_rule(cmd).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 // ── get_rules / get_all_rules ──
@@ -159,7 +197,10 @@ fn sample_rule(guild: &str) -> Rule {
         guild_id: guild.into(),
         flag_type: FlagType::Spam,
         weight: 1.0,
-        threshold_warn: 1.0, threshold_delete: 2.0, threshold_mute: 3.0, threshold_ban: 4.0,
+        threshold_warn: 1.0,
+        threshold_delete: 2.0,
+        threshold_mute: 3.0,
+        threshold_ban: 4.0,
         enabled: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),

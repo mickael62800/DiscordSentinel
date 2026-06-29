@@ -32,20 +32,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
              ton Daily Bonus quotidien.\n\n\
              3 symboles identiques = jackpot (multiplie ta mise).\n\
              2 identiques = mise remboursee.\n\
-             3x \u{0037}\u{fe0f}\u{20e3} = pool jackpot progressif !"
+             3x \u{0037}\u{fe0f}\u{20e3} = pool jackpot progressif !",
         )
         .color(0xf1c40f)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::SLOT_TAGLINE));
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::SLOT_TAGLINE,
+        ));
 
     let open_btn = CreateButton::new(PANEL_OPEN_ID)
         .label("Ouvrir ma machine")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3b0}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f3b0}".into(),
+        ))
         .style(ButtonStyle::Success);
 
     let row = CreateActionRow::Buttons(vec![open_btn]);
 
     if let Err(e) = channel_id
-        .send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row]))
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embed).components(vec![row]),
+        )
         .await
     {
         warn!(error = %e, "Echec envoi panel slot");

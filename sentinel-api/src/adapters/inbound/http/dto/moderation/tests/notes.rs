@@ -1,6 +1,6 @@
 use super::*;
-use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use chrono::Utc;
+use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use uuid::Uuid;
 
 #[test]
@@ -51,7 +51,8 @@ fn add_note_dto_deserializes_with_default_category() {
         "guild_id": "g", "user_id": "u",
         "author_id": "m", "author_name": "Mod",
         "content": "note sans category"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.category, "general");
 }
 
@@ -62,7 +63,8 @@ fn add_note_dto_deserializes_with_custom_category() {
         "author_id": "m", "author_name": "Mod",
         "content": "security note",
         "category": "security"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.category, "security");
 }
 

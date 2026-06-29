@@ -24,9 +24,9 @@ pub const MODULE_BOT_NAME: &str = "confessions";
 
 // ── Custom IDs ──────────────────────────────────────────────────────────
 
-pub const CID_SUBMIT_BUTTON: &str = "conf_submit";          // bouton panel
-pub const CID_REPLY_BUTTON_PREFIX: &str = "conf_reply:";    // conf_reply:<conf_id>
-pub const CID_REPORT_BUTTON_PREFIX: &str = "conf_report:";  // conf_report:<conf_id>
+pub const CID_SUBMIT_BUTTON: &str = "conf_submit"; // bouton panel
+pub const CID_REPLY_BUTTON_PREFIX: &str = "conf_reply:"; // conf_reply:<conf_id>
+pub const CID_REPORT_BUTTON_PREFIX: &str = "conf_report:"; // conf_report:<conf_id>
 pub const CID_SUBMIT_MODAL: &str = "conf_modal_submit";
 pub const CID_REPLY_MODAL_PREFIX: &str = "conf_modal_reply:";
 pub const CID_REPORT_MODAL_PREFIX: &str = "conf_modal_report:";
@@ -56,25 +56,40 @@ pub fn register_commands() -> Vec<CreateCommand> {
         CreateCommand::new("confess-admin")
             .description("Administration des confessions (admin only)")
             .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
+            .add_option(CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "deploy-panel",
+                "Poste le bouton 'Poster une confession' dans ce canal",
+            ))
             .add_option(
-                CreateCommandOption::new(CommandOptionType::SubCommand, "deploy-panel",
-                    "Poste le bouton 'Poster une confession' dans ce canal")
+                CreateCommandOption::new(
+                    CommandOptionType::SubCommand,
+                    "delete",
+                    "Supprime une confession par numero",
+                )
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::Integer,
+                        "number",
+                        "Numero de confession (ex: 350)",
+                    )
+                    .required(true),
+                ),
             )
             .add_option(
-                CreateCommandOption::new(CommandOptionType::SubCommand, "delete",
-                    "Supprime une confession par numero")
-                    .add_sub_option(
-                        CreateCommandOption::new(CommandOptionType::Integer, "number",
-                            "Numero de confession (ex: 350)").required(true)
+                CreateCommandOption::new(
+                    CommandOptionType::SubCommand,
+                    "reveal",
+                    "Revele l'auteur d'une confession (owner only)",
+                )
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::Integer,
+                        "number",
+                        "Numero de confession",
                     )
-            )
-            .add_option(
-                CreateCommandOption::new(CommandOptionType::SubCommand, "reveal",
-                    "Revele l'auteur d'une confession (owner only)")
-                    .add_sub_option(
-                        CreateCommandOption::new(CommandOptionType::Integer, "number",
-                            "Numero de confession").required(true)
-                    )
+                    .required(true),
+                ),
             ),
     ]
 }
@@ -96,7 +111,12 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     // explicitement, sinon n'importe qui pourrait /confess-admin reveal et
     // de-anonymiser une confession (cf. revue securite).
     if !confess_admin_allowed(command) {
-        reply_ephemeral(ctx, command, "Permission MANAGE_GUILD requise pour /confess-admin.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Permission MANAGE_GUILD requise pour /confess-admin.",
+        )
+        .await;
         warn!(user = %command.user.name, user_id = %command.user.id, "Tentative /confess-admin sans permission");
         return;
     }
@@ -126,13 +146,14 @@ fn confess_admin_allowed(command: &CommandInteraction) -> bool {
 }
 
 async fn open_submit_modal(ctx: &Context, command: &CommandInteraction) {
-    let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme")
-        .components(vec![CreateActionRow::InputText(
+    let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme").components(vec![
+        CreateActionRow::InputText(
             CreateInputText::new(InputTextStyle::Paragraph, "Ton message", "content")
                 .min_length(1)
                 .max_length(2000)
                 .required(true),
-        )]);
+        ),
+    ]);
     let resp = CreateInteractionResponse::Modal(modal);
     if let Err(e) = command.create_response(&ctx.http, resp).await {
         warn!(error = %e, "Echec ouverture modale confess");
@@ -145,24 +166,26 @@ fn panel_embed() -> CreateEmbed {
         .title("📝 Confessions anonymes")
         .description(
             "Clique sur le bouton ci-dessous pour poster une confession **anonyme**.\n\
-             Personne (sauf le bot) ne saura qui a écrit. Sois respectueux et lis les règles."
+             Personne (sauf le bot) ne saura qui a écrit. Sois respectueux et lis les règles.",
         )
         .color(0x5865f2)
 }
 
 /// Composants (bouton) du panneau.
 fn panel_components() -> Vec<CreateActionRow> {
-    vec![CreateActionRow::Buttons(vec![
-        CreateButton::new(CID_SUBMIT_BUTTON)
-            .label("Poster une confession")
-            .style(ButtonStyle::Primary)
-            .emoji('📝'),
-    ])]
+    vec![CreateActionRow::Buttons(vec![CreateButton::new(
+        CID_SUBMIT_BUTTON,
+    )
+    .label("Poster une confession")
+    .style(ButtonStyle::Primary)
+    .emoji('📝')])]
 }
 
 async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
     let channel = command.channel_id;
-    let msg = CreateMessage::new().embed(panel_embed()).components(panel_components());
+    let msg = CreateMessage::new()
+        .embed(panel_embed())
+        .components(panel_components());
     match channel.send_message(&ctx.http, msg).await {
         Ok(message) => {
             let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
@@ -180,7 +203,8 @@ async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
                     "automod_enabled": true,
                     "banned_user_ids": Vec::<String>::new(),
                 });
-                let _: Result<serde_json::Value, _> = api.post_json("/api/confessions/config", &body).await;
+                let _: Result<serde_json::Value, _> =
+                    api.post_json("/api/confessions/config", &body).await;
             }
             reply_ephemeral(ctx, command, "✅ Panel deploye dans ce canal.").await;
         }
@@ -203,7 +227,10 @@ async fn admin_delete(ctx: &Context, command: &CommandInteraction) {
         None => return,
     };
     // Trouve la confession par numero
-    let path = format!("/api/confessions/{}/list?limit=500&include_deleted=false", guild_id);
+    let path = format!(
+        "/api/confessions/{}/list?limit=500&include_deleted=false",
+        guild_id
+    );
     let list: Result<Vec<serde_json::Value>, String> = api.get_json(&path).await;
     let list = match list {
         Ok(l) => l,
@@ -250,7 +277,12 @@ async fn admin_delete(ctx: &Context, command: &CommandInteraction) {
                         .await;
                 }
             }
-            reply_ephemeral(ctx, command, &format!("✅ Confession #{} supprimee", number)).await;
+            reply_ephemeral(
+                ctx,
+                command,
+                &format!("✅ Confession #{} supprimee", number),
+            )
+            .await;
         }
         Err(e) => {
             reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
@@ -269,7 +301,10 @@ async fn admin_reveal(ctx: &Context, command: &CommandInteraction) {
         Some(a) => a,
         None => return,
     };
-    let path = format!("/api/confessions/{}/list?limit=500&include_deleted=true", guild_id);
+    let path = format!(
+        "/api/confessions/{}/list?limit=500&include_deleted=true",
+        guild_id
+    );
     let list: Result<Vec<serde_json::Value>, String> = api.get_json(&path).await;
     let list = match list {
         Ok(l) => l,
@@ -283,11 +318,17 @@ async fn admin_reveal(ctx: &Context, command: &CommandInteraction) {
         .find(|c| c.get("public_number").and_then(|v| v.as_i64()) == Some(number));
     match target {
         Some(t) => {
-            let author = t.get("author_user_id").and_then(|v| v.as_str()).unwrap_or("?");
+            let author = t
+                .get("author_user_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("?");
             reply_ephemeral(
                 ctx,
                 command,
-                &format!("Confession #{} → auteur : <@{}> (`{}`)", number, author, author),
+                &format!(
+                    "Confession #{} → auteur : <@{}> (`{}`)",
+                    number, author, author
+                ),
             )
             .await;
         }
@@ -330,13 +371,14 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn open_submit_modal_from_component(ctx: &Context, component: &ComponentInteraction) {
-    let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme")
-        .components(vec![CreateActionRow::InputText(
+    let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme").components(vec![
+        CreateActionRow::InputText(
             CreateInputText::new(InputTextStyle::Paragraph, "Ton message", "content")
                 .min_length(1)
                 .max_length(2000)
                 .required(true),
-        )]);
+        ),
+    ]);
     let resp = CreateInteractionResponse::Modal(modal);
     if let Err(e) = component.create_response(&ctx.http, resp).await {
         warn!(error = %e, "Echec ouverture modale submit");
@@ -421,7 +463,10 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
     let id = created.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let public_number = created.get("public_number").and_then(|v| v.as_i64()).unwrap_or(0);
+    let public_number = created
+        .get("public_number")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
     // 2. Recupere la config (gardee entiere pour pouvoir republier le panneau).
     let cfg_path = format!("/api/confessions/config/{}", guild_id);
@@ -500,7 +545,10 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
         "thread_id": thread_id,
     });
     let _: Result<serde_json::Value, String> = api
-        .post_json(&format!("/api/confessions/by-id/{}/message-refs", id), &refs_body)
+        .post_json(
+            &format!("/api/confessions/by-id/{}/message-refs", id),
+            &refs_body,
+        )
         .await;
 
     // 6. "Message collant" : on republie le panneau EN BAS du salon pour que le
@@ -532,7 +580,12 @@ async fn repost_panel(
         .map(|s| s.to_string());
 
     let posted = match channel
-        .send_message(&ctx.http, CreateMessage::new().embed(panel_embed()).components(panel_components()))
+        .send_message(
+            &ctx.http,
+            CreateMessage::new()
+                .embed(panel_embed())
+                .components(panel_components()),
+        )
         .await
     {
         Ok(m) => m,
@@ -585,15 +638,20 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
         }
     };
     let reply_id = created.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let public_number = created.get("public_number").and_then(|v| v.as_i64()).unwrap_or(0);
+    let public_number = created
+        .get("public_number")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
     // Recupere la confession pour avoir le thread_id
     let conf: Result<serde_json::Value, String> = api
         .get_json(&format!("/api/confessions/by-id/{}", conf_id))
         .await;
-    let thread_id_str = conf
-        .ok()
-        .and_then(|c| c.get("thread_id").and_then(|v| v.as_str()).map(|s| s.to_string()));
+    let thread_id_str = conf.ok().and_then(|c| {
+        c.get("thread_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+    });
     let Some(thread_id) = thread_id_str else {
         modal_reply_ephemeral(ctx, modal, "❌ Thread introuvable").await;
         return;
@@ -615,7 +673,10 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
     if let Ok(m) = posted {
         let body = serde_json::json!({ "message_id": m.id.to_string() });
         let _: Result<serde_json::Value, String> = api
-            .post_json(&format!("/api/confessions/replies/{}/message-id", reply_id), &body)
+            .post_json(
+                &format!("/api/confessions/replies/{}/message-id", reply_id),
+                &body,
+            )
             .await;
     }
     modal_reply_ephemeral(ctx, modal, "✅ Reponse anonyme postee").await;
@@ -635,7 +696,8 @@ async fn handle_report(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
         "reporter_user_id": modal.user.id.to_string(),
         "reason": reason,
     });
-    let resp: Result<serde_json::Value, String> = api.post_json("/api/confessions/reports", &body).await;
+    let resp: Result<serde_json::Value, String> =
+        api.post_json("/api/confessions/reports", &body).await;
     match resp {
         Ok(_) => modal_reply_ephemeral(ctx, modal, "✅ Signalement transmis aux moderateurs").await,
         Err(e) => modal_reply_ephemeral(ctx, modal, &format!("❌ {}", e)).await,
@@ -748,7 +810,11 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             let mid = MessageId::new(m);
             // Idempotent : si deja supprime, on ignore l'erreur 404.
             match ch.delete_message(&ctx.http, mid).await {
-                Ok(_) => info!(channel_id = c, message_id = m, "Confession message deleted (sync from web)"),
+                Ok(_) => info!(
+                    channel_id = c,
+                    message_id = m,
+                    "Confession message deleted (sync from web)"
+                ),
                 Err(e) => {
                     let s = e.to_string();
                     if !s.contains("404") {
@@ -797,7 +863,11 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             let ch = ChannelId::new(c);
             let mid = MessageId::new(m);
             match ch.delete_message(&ctx.http, mid).await {
-                Ok(_) => info!(thread_id = c, message_id = m, "Reply message deleted (sync web)"),
+                Ok(_) => info!(
+                    thread_id = c,
+                    message_id = m,
+                    "Reply message deleted (sync web)"
+                ),
                 Err(e) => {
                     let s = e.to_string();
                     if !s.contains("404") {

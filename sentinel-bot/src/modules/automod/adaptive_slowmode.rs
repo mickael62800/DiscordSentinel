@@ -189,7 +189,11 @@ mod tests {
             ts.push(Instant::now() - Duration::from_secs(10));
         });
         tracker.cleanup();
-        assert_eq!(tracker.tracked_channels(), 0, "Le channel inactif doit etre nettoye");
+        assert_eq!(
+            tracker.tracked_channels(),
+            0,
+            "Le channel inactif doit etre nettoye"
+        );
     }
 
     #[test]

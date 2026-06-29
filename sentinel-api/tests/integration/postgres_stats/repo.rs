@@ -5,23 +5,30 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::audit::stats_repository::PgStatsRepository;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_api::ports::outbound::audit::stats_repository::StatsRepository;
+use sentinel_core::domain::entities::audit::user_stats::UserStats;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 fn sample_stats(guild: &str, user: &str, msgs: u64, voice: u64) -> UserStats {
     UserStats {
-        id: Uuid::new_v4(), guild_id: guild.into(), user_id: user.into(),
+        id: Uuid::new_v4(),
+        guild_id: guild.into(),
+        user_id: user.into(),
         username: user.into(),
-        message_count: msgs, voice_seconds: voice,
+        message_count: msgs,
+        voice_seconds: voice,
         updated_at: Utc::now(),
     }
 }
@@ -29,13 +36,18 @@ fn sample_stats(guild: &str, user: &str, msgs: u64, voice: u64) -> UserStats {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn find_by_user_none_when_absent() {
     let repo = PgStatsRepository::new(pool().await);
-    assert!(repo.find_by_user(&fresh_id(), &fresh_id()).await.unwrap().is_none());
+    assert!(repo
+        .find_by_user(&fresh_id(), &fresh_id())
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn upsert_and_find_by_user() {
     let repo = PgStatsRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.upsert(&sample_stats(&g, &u, 10, 200)).await.unwrap();
     let got = repo.find_by_user(&g, &u).await.unwrap().unwrap();
     assert_eq!(got.message_count, 10);
@@ -45,7 +57,8 @@ async fn upsert_and_find_by_user() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn upsert_replaces_counts_not_accumulates() {
     let repo = PgStatsRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.upsert(&sample_stats(&g, &u, 100, 500)).await.unwrap();
     repo.upsert(&sample_stats(&g, &u, 42, 10)).await.unwrap();
     let got = repo.find_by_user(&g, &u).await.unwrap().unwrap();
@@ -57,7 +70,8 @@ async fn upsert_replaces_counts_not_accumulates() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn increment_messages_creates_then_accumulates() {
     let repo = PgStatsRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.increment_messages(&g, &u, "Alice", 5).await.unwrap();
     repo.increment_messages(&g, &u, "Alice", 3).await.unwrap();
     let got = repo.find_by_user(&g, &u).await.unwrap().unwrap();
@@ -68,7 +82,8 @@ async fn increment_messages_creates_then_accumulates() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_voice_seconds_creates_then_accumulates() {
     let repo = PgStatsRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.add_voice_seconds(&g, &u, "Alice", 60).await.unwrap();
     repo.add_voice_seconds(&g, &u, "Alice", 120).await.unwrap();
     let got = repo.find_by_user(&g, &u).await.unwrap().unwrap();
@@ -96,10 +111,17 @@ async fn find_by_guild_ordered_by_message_count_desc() {
 async fn count_distinct_guilds_and_users() {
     let repo = PgStatsRepository::new(pool().await);
     // Seed 2 guilds avec 2 users chacune
-    let g1 = fresh_id(); let g2 = fresh_id();
-    repo.upsert(&sample_stats(&g1, &fresh_id(), 1, 0)).await.unwrap();
-    repo.upsert(&sample_stats(&g1, &fresh_id(), 1, 0)).await.unwrap();
-    repo.upsert(&sample_stats(&g2, &fresh_id(), 1, 0)).await.unwrap();
+    let g1 = fresh_id();
+    let g2 = fresh_id();
+    repo.upsert(&sample_stats(&g1, &fresh_id(), 1, 0))
+        .await
+        .unwrap();
+    repo.upsert(&sample_stats(&g1, &fresh_id(), 1, 0))
+        .await
+        .unwrap();
+    repo.upsert(&sample_stats(&g2, &fresh_id(), 1, 0))
+        .await
+        .unwrap();
     // Les counts sont globaux (pas scope par test) — on verifie juste >= 2.
     assert!(repo.count_distinct_guilds().await.unwrap() >= 2);
     assert!(repo.count_distinct_users().await.unwrap() >= 3);
@@ -110,9 +132,14 @@ async fn save_voice_session_and_get_guild_voice_stats() {
     let repo = PgStatsRepository::new(pool().await);
     let g = fresh_id();
     let channel_id = fresh_id();
-    let u1 = fresh_id(); let u2 = fresh_id();
-    repo.save_voice_session(&g, &u1, "Alice", &channel_id, "general", 120).await.unwrap();
-    repo.save_voice_session(&g, &u2, "Bob", &channel_id, "general", 60).await.unwrap();
+    let u1 = fresh_id();
+    let u2 = fresh_id();
+    repo.save_voice_session(&g, &u1, "Alice", &channel_id, "general", 120)
+        .await
+        .unwrap();
+    repo.save_voice_session(&g, &u2, "Bob", &channel_id, "general", 60)
+        .await
+        .unwrap();
 
     let stats = repo.get_guild_voice_stats(&g, 7, 10).await.unwrap();
     assert_eq!(stats.len(), 1);
@@ -151,11 +178,19 @@ async fn count_unique_voice_users_scoped_and_windowed() {
     let repo = PgStatsRepository::new(pool().await);
     let g = fresh_id();
     let ch = fresh_id();
-    repo.save_voice_session(&g, &fresh_id(), "A", &ch, "g", 30).await.unwrap();
-    repo.save_voice_session(&g, &fresh_id(), "B", &ch, "g", 30).await.unwrap();
+    repo.save_voice_session(&g, &fresh_id(), "A", &ch, "g", 30)
+        .await
+        .unwrap();
+    repo.save_voice_session(&g, &fresh_id(), "B", &ch, "g", 30)
+        .await
+        .unwrap();
     // Meme user deux fois -> compte 1.
     let dup = fresh_id();
-    repo.save_voice_session(&g, &dup, "C", &ch, "g", 30).await.unwrap();
-    repo.save_voice_session(&g, &dup, "C", &ch, "g", 30).await.unwrap();
+    repo.save_voice_session(&g, &dup, "C", &ch, "g", 30)
+        .await
+        .unwrap();
+    repo.save_voice_session(&g, &dup, "C", &ch, "g", 30)
+        .await
+        .unwrap();
     assert_eq!(repo.count_unique_voice_users(&g, 7).await.unwrap(), 3);
 }

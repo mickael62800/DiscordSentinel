@@ -18,10 +18,10 @@
 //! Les "one-shot" passent par `build_taunt_event_single` qui court-circuite
 //! le check de palier.
 
-use rand::seq::SliceRandom;
-use rand::Rng;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use rand::seq::SliceRandom;
+use rand::Rng;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
@@ -74,11 +74,7 @@ impl StreakKind {
     pub fn is_threshold_based(self) -> bool {
         matches!(
             self,
-            Self::Win
-                | Self::Loss
-                | Self::StealVictim
-                | Self::BjBustStreak
-                | Self::BjWinStreak
+            Self::Win | Self::Loss | Self::StealVictim | Self::BjBustStreak | Self::BjWinStreak
         )
     }
 }
@@ -423,10 +419,7 @@ pub fn nickname_suffix_for(kind: StreakKind, threshold: i32) -> &'static str {
 
 /// Retourne le palier franchi si `new_streak` en est un, sinon None.
 pub fn crossed_threshold(new_streak: i32) -> Option<i32> {
-    TAUNT_THRESHOLDS
-        .iter()
-        .copied()
-        .find(|&t| t == new_streak)
+    TAUNT_THRESHOLDS.iter().copied().find(|&t| t == new_streak)
 }
 
 /// Construit un TauntEvent pret a etre poste par le bot. Renvoie None
@@ -553,7 +546,6 @@ pub fn build_taunt_event_deterministic(
 // Helper pour eviter `#[allow(dead_code)]` sur Rng — garde l'import used.
 #[inline]
 fn _keep_rng_used<R: Rng>(_: &mut R) {}
-
 
 #[cfg(test)]
 #[path = "tests/taunt.rs"]

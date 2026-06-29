@@ -3,13 +3,19 @@
 use sqlx::PgPool;
 
 async fn setup_pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
-    PgPool::connect(&url).await.expect("Impossible de se connecter a la base de test")
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
+    PgPool::connect(&url)
+        .await
+        .expect("Impossible de se connecter a la base de test")
 }
 
 fn unique_guild() -> String {
-    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -63,9 +69,13 @@ async fn different_guilds_isolated() {
            VALUES (gen_random_uuid(), $1, '555555555555555555', '333333333333333333', 'Mod', '444444444444444444', 'User', 'ban_permanent', 'Grave', NOW())"#,
     ).bind(&gid1).execute(&pool).await.unwrap();
 
-    let count = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM moderation_actions WHERE guild_id = $1",
-    ).bind(&gid2).fetch_one(&pool).await.unwrap().0;
+    let count =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM moderation_actions WHERE guild_id = $1")
+            .bind(&gid2)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(count, 0);
 }
@@ -126,7 +136,8 @@ async fn infraction_persists_with_flags() {
     let pool = setup_pool().await;
     let gid = unique_guild();
 
-    let flags = serde_json::json!({"spam": true, "insult": false, "link": false, "phishing": false});
+    let flags =
+        serde_json::json!({"spam": true, "insult": false, "link": false, "phishing": false});
 
     sqlx::query(
         r#"INSERT INTO infractions (id, guild_id, channel_id, user_id, username, message_id, content, flags, score, action, reason, created_at)
@@ -146,7 +157,8 @@ async fn infraction_persists_with_flags() {
 async fn infractions_count_by_action() {
     let pool = setup_pool().await;
     let gid = unique_guild();
-    let flags = serde_json::json!({"spam": true, "insult": false, "link": false, "phishing": false});
+    let flags =
+        serde_json::json!({"spam": true, "insult": false, "link": false, "phishing": false});
 
     for (action, count) in &[("warn", 3), ("delete", 2), ("mute", 1)] {
         for _ in 0..*count {
@@ -157,9 +169,12 @@ async fn infractions_count_by_action() {
         }
     }
 
-    let total = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM infractions WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    let total = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM infractions WHERE guild_id = $1")
+        .bind(&gid)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .0;
 
     assert_eq!(total, 6);
 }
@@ -181,15 +196,27 @@ async fn rules_crud() {
 
     let rule = sqlx::query_as::<_, (String, f64, bool)>(
         "SELECT flag_type, weight, enabled FROM rules WHERE id = $1",
-    ).bind(id.0).fetch_one(&pool).await.unwrap();
+    )
+    .bind(id.0)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(rule.0, "spam");
     assert!((rule.1 - 5.0).abs() < 0.01);
     assert!(rule.2);
 
-    sqlx::query("DELETE FROM rules WHERE id = $1").bind(id.0).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM rules WHERE id = $1")
+        .bind(id.0)
+        .execute(&pool)
+        .await
+        .unwrap();
     let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM rules WHERE id = $1")
-        .bind(id.0).fetch_one(&pool).await.unwrap().0;
+        .bind(id.0)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .0;
     assert_eq!(count, 0);
 }
 
@@ -211,7 +238,11 @@ async fn audit_log_persists() {
 
     let row = sqlx::query_as::<_, (String, serde_json::Value)>(
         "SELECT event_type, details FROM audit_logs WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "message_delete");
     assert_eq!(row.1["severity"], "info");
@@ -239,7 +270,11 @@ async fn notes_crud() {
     assert_eq!(note.0, "Suspect");
     assert_eq!(note.1, "warning");
 
-    sqlx::query("DELETE FROM user_notes WHERE id = $1").bind(id.0).execute(&pool).await.unwrap();
+    sqlx::query("DELETE FROM user_notes WHERE id = $1")
+        .bind(id.0)
+        .execute(&pool)
+        .await
+        .unwrap();
 }
 
 // ══════════════════════════════════════════════════════════
@@ -254,13 +289,20 @@ async fn security_event_persists() {
     sqlx::query(
         r#"INSERT INTO security_events (id, guild_id, event_type, severity, description, created_at)
            VALUES (gen_random_uuid(), $1, 'raid_detected', 'critical', '15 joins en 10s', NOW())"#,
-    ).bind(&gid).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let row = sqlx::query_as::<_, (String, String)>(
         "SELECT event_type, severity FROM security_events WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "raid_detected");
     assert_eq!(row.1, "critical");
 }
-

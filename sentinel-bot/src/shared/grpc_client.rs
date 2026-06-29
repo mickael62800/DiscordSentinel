@@ -41,6 +41,7 @@ use tracing::{error, info, warn};
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_client::AiDatasetServiceClient;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::blackjack::v1::blackjack_service_client::BlackjackServiceClient;
+use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::coude::v1::coude_bets_service_client::CoudeBetsServiceClient;
 use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
 use sentinel_proto::coude::v1::coude_economy_service_client::CoudeEconomyServiceClient;
@@ -55,7 +56,6 @@ use sentinel_proto::security::v1::security_service_client::SecurityServiceClient
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
 use sentinel_proto::tamagotchi::v1::tamagotchi_service_client::TamagotchiServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
-use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
 use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
@@ -146,8 +146,8 @@ impl SentinelGrpcClient {
     /// - `GRPC_API_URL` (defaut : `http://127.0.0.1:50051`)
     /// - `API_KEY` (optionnelle, injectee dans `authorization`)
     pub async fn from_env() -> Result<Self, tonic::transport::Error> {
-        let url = std::env::var("GRPC_API_URL")
-            .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
+        let url =
+            std::env::var("GRPC_API_URL").unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
         let api_key = std::env::var("API_KEY").unwrap_or_default();
         Self::connect(&url, &api_key).await
     }
@@ -236,18 +236,14 @@ impl SentinelGrpcClient {
     }
 
     /// Retourne un client `StatsService` pret a l'emploi.
-    pub fn stats(
-        &self,
-    ) -> StatsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn stats(&self) -> StatsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         StatsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }
 
     /// Retourne un client `TicketsService` pret a l'emploi.
-    pub fn tickets(
-        &self,
-    ) -> TicketsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn tickets(&self) -> TicketsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         TicketsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
@@ -311,9 +307,12 @@ impl SentinelGrpcClient {
     pub fn coude_inventory(
         &self,
     ) -> CoudeInventoryServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeInventoryServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
+        CoudeInventoryServiceClient::with_interceptor(
+            self.channel.clone(),
+            self.interceptor.clone(),
+        )
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
     }
 
     /// Phase 7A.opt F.1 — Retourne un client `CoudeSocialService`.
@@ -335,27 +334,21 @@ impl SentinelGrpcClient {
     }
 
     /// Retourne un client `MembersService` pret a l'emploi.
-    pub fn members(
-        &self,
-    ) -> MembersServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn members(&self) -> MembersServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         MembersServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }
 
     /// Retourne un client `SecurityService` pret a l'emploi.
-    pub fn security(
-        &self,
-    ) -> SecurityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn security(&self) -> SecurityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         SecurityServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }
 
     /// Retourne un client `AutomodService` pret a l'emploi.
-    pub fn automod(
-        &self,
-    ) -> AutomodServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn automod(&self) -> AutomodServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         AutomodServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
@@ -371,9 +364,7 @@ impl SentinelGrpcClient {
     }
 
     /// Phase 7A.opt F.4 — Retourne un client `WelcomeService`.
-    pub fn welcome(
-        &self,
-    ) -> WelcomeServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+    pub fn welcome(&self) -> WelcomeServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         WelcomeServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
@@ -509,7 +500,11 @@ mod tests {
         let mut clone = interceptor.clone();
         let req = clone.call(Request::new(())).unwrap();
         assert_eq!(
-            req.metadata().get("authorization").unwrap().to_str().unwrap(),
+            req.metadata()
+                .get("authorization")
+                .unwrap()
+                .to_str()
+                .unwrap(),
             "Bearer abc123"
         );
     }

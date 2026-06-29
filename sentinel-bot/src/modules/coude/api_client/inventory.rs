@@ -40,9 +40,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_inventory();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_inventory(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_inventory(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list

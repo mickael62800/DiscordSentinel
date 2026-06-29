@@ -1,11 +1,11 @@
 use super::*;
-use async_trait::async_trait;
-use std::sync::Arc;
-use std::sync::Mutex;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
 use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use async_trait::async_trait;
+use sentinel_core::domain::errors::DomainError;
+use std::sync::Arc;
+use std::sync::Mutex;
 
 /// Mock du use case (et non plus du repo) — l'adapter gRPC ne doit
 /// connaitre que le port inbound (cf. archi hexagonale).
@@ -15,10 +15,14 @@ struct MockWelcomeUc {
 
 impl MockWelcomeUc {
     fn with_config(cfg: WelcomeConfigData) -> Self {
-        Self { config: Mutex::new(Ok(cfg)) }
+        Self {
+            config: Mutex::new(Ok(cfg)),
+        }
     }
     fn with_err() -> Self {
-        Self { config: Mutex::new(Err(DomainError::Internal("pg down".into()))) }
+        Self {
+            config: Mutex::new(Err(DomainError::Internal("pg down".into()))),
+        }
     }
 }
 
@@ -83,9 +87,13 @@ fn sample_config() -> WelcomeConfigData {
 
 #[tokio::test]
 async fn get_config_maps_all_fields() {
-    let grpc = WelcomeGrpc { uc: Arc::new(MockWelcomeUc::with_config(sample_config())) };
+    let grpc = WelcomeGrpc {
+        uc: Arc::new(MockWelcomeUc::with_config(sample_config())),
+    };
     let resp = grpc
-        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g1".into() }))
+        .get_config(Request::new(proto::GetConfigRequest {
+            guild_id: "g1".into(),
+        }))
         .await
         .unwrap();
     let inner = resp.into_inner();
@@ -107,9 +115,13 @@ async fn get_config_maps_all_fields() {
 
 #[tokio::test]
 async fn get_config_repo_error_maps_to_internal() {
-    let grpc = WelcomeGrpc { uc: Arc::new(MockWelcomeUc::with_err()) };
+    let grpc = WelcomeGrpc {
+        uc: Arc::new(MockWelcomeUc::with_err()),
+    };
     let err = grpc
-        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g".into() }))
+        .get_config(Request::new(proto::GetConfigRequest {
+            guild_id: "g".into(),
+        }))
         .await
         .unwrap_err();
     assert_eq!(err.code(), tonic::Code::Internal);
@@ -125,9 +137,13 @@ async fn get_config_preserves_none_optionals() {
     cfg.rules_role_id = None;
     cfg.counter_channel_id = None;
     cfg.anniversary_channel_id = None;
-    let grpc = WelcomeGrpc { uc: Arc::new(MockWelcomeUc::with_config(cfg)) };
+    let grpc = WelcomeGrpc {
+        uc: Arc::new(MockWelcomeUc::with_config(cfg)),
+    };
     let inner = grpc
-        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g".into() }))
+        .get_config(Request::new(proto::GetConfigRequest {
+            guild_id: "g".into(),
+        }))
         .await
         .unwrap()
         .into_inner();

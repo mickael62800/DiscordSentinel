@@ -1,6 +1,6 @@
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
+use axum::extract::State;
 use axum::Extension;
 use axum::Json;
 use redis::AsyncCommands;
@@ -12,20 +12,20 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::entities::community::guild_member::MemberSummary;
-use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
-use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
-use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
-use sentinel_core::domain::errors::DomainError;
 use crate::adapters::outbound::discord_api::DiscordMember;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::entities::community::guild_member::MemberSummary;
+use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
+use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
+use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
 /// GET /api/guilds/{guild_id}/members â€” liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
@@ -42,12 +42,18 @@ pub async fn list_members(
         }
     }
 
-    let members = state.discord_api.list_members(&guild_id, DISCORD_LIST_MEMBERS_CAP).await?;
+    let members = state
+        .discord_api
+        .list_members(&guild_id, DISCORD_LIST_MEMBERS_CAP)
+        .await?;
 
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&members) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, MEMBERS_CACHE_TTL_SECS).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&cache_key, json, MEMBERS_CACHE_TTL_SECS)
+                .await
+            {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set members");
             }
         }
@@ -79,7 +85,10 @@ pub async fn get_member_summary(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MemberSummary>, ApiError> {
-    let summary = state.members_uc.get_member_summary(&guild_id, &user_id).await?;
+    let summary = state
+        .members_uc
+        .get_member_summary(&guild_id, &user_id)
+        .await?;
     Ok(Json(summary))
 }
 
@@ -88,10 +97,13 @@ pub async fn sync_members(
     State(state): State<AppState>,
     Json(payload): Json<SyncMembersPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let count = state.members_uc.sync_members(SyncMembersCommand {
-        guild_id: payload.guild_id,
-        members: payload.members,
-    }).await?;
+    let count = state
+        .members_uc
+        .sync_members(SyncMembersCommand {
+            guild_id: payload.guild_id,
+            members: payload.members,
+        })
+        .await?;
     Ok(Json(serde_json::json!({ "synced": count })))
 }
 
@@ -100,7 +112,10 @@ pub async fn register_member(
     State(state): State<AppState>,
     Json(member): Json<GuildMember>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state.members_uc.register_member(RegisterMemberCommand { member }).await?;
+    state
+        .members_uc
+        .register_member(RegisterMemberCommand { member })
+        .await?;
     Ok(ok_response())
 }
 
@@ -112,8 +127,11 @@ pub async fn remove_member(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B â€” Gate RBAC : moderator+ requis pour retirer un membre du cache local.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator)
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour retirer un membre".into())))?;
+        require_role(&ctx, Role::Moderator).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "moderator+ requis pour retirer un membre".into(),
+            ))
+        })?;
     }
     state.members_uc.remove_member(&guild_id, &user_id).await?;
     Ok(ok_response())
@@ -125,14 +143,17 @@ pub async fn update_member(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(payload): Json<UpdateMemberPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    state.members_uc.update_member(UpdateMemberCommand {
-        guild_id: guild_id.into(),
-        user_id: user_id.into(),
-        username: payload.username,
-        display_name: payload.display_name,
-        avatar: payload.avatar,
-        roles: payload.roles,
-    }).await?;
+    state
+        .members_uc
+        .update_member(UpdateMemberCommand {
+            guild_id: guild_id.into(),
+            user_id: user_id.into(),
+            username: payload.username,
+            display_name: payload.display_name,
+            avatar: payload.avatar,
+            roles: payload.roles,
+        })
+        .await?;
     Ok(ok_response())
 }
 
@@ -189,9 +210,12 @@ pub async fn reset_member(
             .bind(&user_id)
             .execute(&mut *tx)
             .await
-            .map_err(|e| ApiError(DomainError::Internal(format!(
-                "reset_member {}: {e}", entry.sql_table,
-            ))))?;
+            .map_err(|e| {
+                ApiError(DomainError::Internal(format!(
+                    "reset_member {}: {e}",
+                    entry.sql_table,
+                )))
+            })?;
         totals.insert(entry.response_key.into(), res.rows_affected().into());
     }
 
@@ -246,30 +270,36 @@ pub async fn leave_member(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let mut tx = state.pg_pool.begin().await
+    let mut tx = state
+        .pg_pool
+        .begin()
+        .await
         .map_err(sqlx_internal("leave_member begin"))?;
 
     // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
     let res = sqlx::query(
         "UPDATE guild_members SET left_at = COALESCE(left_at, NOW()) \
-         WHERE guild_id = $1 AND user_id = $2"
+         WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&guild_id)
     .bind(&user_id)
-    .execute(&mut *tx).await
+    .execute(&mut *tx)
+    .await
     .map_err(sqlx_internal("leave_member update"))?;
 
     // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
     let _ = sqlx::query(
         "UPDATE user_wallets SET coins = 0, total_spent = total_spent + coins, updated_at = NOW() \
-         WHERE guild_id = $1 AND user_id = $2 AND coins > 0"
+         WHERE guild_id = $1 AND user_id = $2 AND coins > 0",
     )
     .bind(&guild_id)
     .bind(&user_id)
-    .execute(&mut *tx).await
+    .execute(&mut *tx)
+    .await
     .map_err(sqlx_internal("leave_member wallet reset"))?;
 
-    tx.commit().await
+    tx.commit()
+        .await
         .map_err(sqlx_internal("leave_member commit"))?;
 
     Ok(Json(serde_json::json!({
@@ -295,11 +325,12 @@ pub async fn rejoin_member(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let res = sqlx::query(
         "UPDATE guild_members SET left_at = NULL, joined_at = NOW(), last_seen_at = NOW() \
-         WHERE guild_id = $1 AND user_id = $2"
+         WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&guild_id)
     .bind(&user_id)
-    .execute(&state.pg_pool).await
+    .execute(&state.pg_pool)
+    .await
     .map_err(sqlx_internal("rejoin_member update"))?;
 
     Ok(Json(serde_json::json!({

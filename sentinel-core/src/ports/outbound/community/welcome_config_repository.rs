@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 /// Config welcome brute (1 row par guild). Les defaults sont appliques
 /// par le repository si la row n'existe pas.
@@ -53,5 +53,9 @@ pub struct WelcomeConfigData {
 #[async_trait]
 pub trait WelcomeConfigRepository: Send + Sync {
     async fn get_config(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError>;
-    async fn save_config(&self, guild_id: &str, data: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError>;
+    async fn save_config(
+        &self,
+        guild_id: &str,
+        data: &WelcomeConfigData,
+    ) -> Result<WelcomeConfigData, DomainError>;
 }

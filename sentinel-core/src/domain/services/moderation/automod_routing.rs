@@ -57,7 +57,9 @@ pub fn is_severe_content(flags: &DetectionFlags, content: &str) -> bool {
     flags.phishing || contains_discord_invite(content)
 }
 
-const IMAGE_EXTS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "apng", "avif"];
+const IMAGE_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "apng", "avif",
+];
 
 /// `true` si le message contient au moins une URL http(s) qui n'est PAS une
 /// image (lien "hors image" a supprimer).
@@ -111,5 +113,9 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
         Routing::Auto
     };
 
-    RoutingDecision { route, severe, auto_delete_link }
+    RoutingDecision {
+        route,
+        severe,
+        auto_delete_link,
+    }
 }

@@ -52,32 +52,38 @@ pub async fn post_activity(
         Some(ch_id) => {
             // Poster dans le salon activites
             let channel = serenity::model::id::ChannelId::new(ch_id);
-            if let Err(e) = channel.send_message(
-                &ctx.http,
-                CreateMessage::new().embed(embed),
-            ).await {
+            if let Err(e) = channel
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                .await
+            {
                 tracing::warn!(error = %e, "Echec send_message salon activites");
             }
             // Repondre en ephemere pour confirmer
-            if let Err(e) = command.create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content(format!("Resultat poste dans <#{}>.", ch_id))
-                        .ephemeral(true),
-                ),
-            ).await {
+            if let Err(e) = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!("Resultat poste dans <#{}>.", ch_id))
+                            .ephemeral(true),
+                    ),
+                )
+                .await
+            {
                 tracing::warn!(error = %e, "Echec response Discord");
             }
         }
         None => {
             // Pas de salon configure → poster ici
-            if let Err(e) = command.create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(embed),
-                ),
-            ).await {
+            if let Err(e) = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new().embed(embed),
+                    ),
+                )
+                .await
+            {
                 tracing::warn!(error = %e, "Echec response Discord");
             }
         }
@@ -96,28 +102,34 @@ pub async fn post_activity_followup(
     match activity_channel.and_then(|id| id.parse::<u64>().ok()) {
         Some(ch_id) => {
             let channel = serenity::model::id::ChannelId::new(ch_id);
-            if let Err(e) = channel.send_message(
-                &ctx.http,
-                CreateMessage::new().embed(embed),
-            ).await {
+            if let Err(e) = channel
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                .await
+            {
                 tracing::warn!(error = %e, "Echec send_message salon activites (followup)");
             }
             // Followup ephemeral pour confirmer au joueur
-            if let Err(e) = command.create_followup(
-                &ctx.http,
-                CreateInteractionResponseFollowup::new()
-                    .content(format!("Resultat poste dans <#{}>.", ch_id))
-                    .ephemeral(true),
-            ).await {
+            if let Err(e) = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new()
+                        .content(format!("Resultat poste dans <#{}>.", ch_id))
+                        .ephemeral(true),
+                )
+                .await
+            {
                 tracing::warn!(error = %e, "Echec followup Discord");
             }
         }
         None => {
             // Pas de salon configure → followup ici avec l'embed public
-            if let Err(e) = command.create_followup(
-                &ctx.http,
-                CreateInteractionResponseFollowup::new().embed(embed),
-            ).await {
+            if let Err(e) = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new().embed(embed),
+                )
+                .await
+            {
                 tracing::warn!(error = %e, "Echec followup Discord");
             }
         }

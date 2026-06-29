@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
@@ -14,30 +15,39 @@ use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInvit
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
-use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 fn sample_channel(guild: &str, channel_id: &str, owner: &str) -> VoiceChannel {
     VoiceChannel {
         id: Uuid::new_v4(),
         guild_id: guild.into(),
-        owner_id: owner.into(), owner_name: "Owner".into(),
+        owner_id: owner.into(),
+        owner_name: "Owner".into(),
         channel_id: channel_id.into(),
-        text_channel_id: None, members_channel_id: None,
-        queue_channel_id: None, category_id: None,
+        text_channel_id: None,
+        members_channel_id: None,
+        queue_channel_id: None,
+        category_id: None,
         channel_name: "🎮-test".into(),
         kind: VoiceChannelKind::Public,
         visibility: "public".into(),
-        queue_enabled: false, locked: false, stage_enabled: false,
-        member_limit: None, status: None,
+        queue_enabled: false,
+        locked: false,
+        stage_enabled: false,
+        member_limit: None,
+        status: None,
         channel_status: "open".into(),
         closed_at: None,
         created_at: Utc::now(),
@@ -68,10 +78,16 @@ async fn find_by_id_absent_returns_none() {
 async fn find_all_by_guild_scope() {
     let repo = PgVoiceChannelRepository::new(pool().await);
     let g = fresh_id();
-    repo.save(&sample_channel(&g, &fresh_id(), &fresh_id())).await.unwrap();
-    repo.save(&sample_channel(&g, &fresh_id(), &fresh_id())).await.unwrap();
+    repo.save(&sample_channel(&g, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
+    repo.save(&sample_channel(&g, &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
     // Autre guild
-    repo.save(&sample_channel(&fresh_id(), &fresh_id(), &fresh_id())).await.unwrap();
+    repo.save(&sample_channel(&fresh_id(), &fresh_id(), &fresh_id()))
+        .await
+        .unwrap();
     let got = repo.find_all_by_guild(&g).await.unwrap();
     assert_eq!(got.len(), 2);
 }
@@ -136,7 +152,9 @@ async fn update_multiple_fields() {
     repo.update_name(vc.id, "new-name").await.unwrap();
     repo.update_status(vc.id, Some("brb")).await.unwrap();
     repo.update_member_limit(vc.id, Some(10)).await.unwrap();
-    repo.update_owner(vc.id, "new-owner", "NewName").await.unwrap();
+    repo.update_owner(vc.id, "new-owner", "NewName")
+        .await
+        .unwrap();
     repo.update_queue_channel(vc.id, Some("q1")).await.unwrap();
     repo.update_stage(vc.id, true).await.unwrap();
 
@@ -171,8 +189,10 @@ async fn add_find_and_remove_co_admin() {
     let vc = sample_channel(&fresh_id(), &fresh_id(), &fresh_id());
     repo.save(&vc).await.unwrap();
     let co = VoiceChannelCoAdmin {
-        id: Uuid::new_v4(), voice_channel_id: vc.id,
-        user_id: "user1".into(), user_name: "Alice".into(),
+        id: Uuid::new_v4(),
+        voice_channel_id: vc.id,
+        user_id: "user1".into(),
+        user_name: "Alice".into(),
         granted_at: Utc::now(),
     };
     repo.add_co_admin(&co).await.unwrap();
@@ -189,9 +209,12 @@ async fn whitelist_add_find_remove() {
     let g = fresh_id();
     let owner = fresh_id();
     let entry = VoiceChannelWhitelistEntry {
-        id: Uuid::new_v4(), guild_id: g.clone().into(),
-        owner_id: owner.clone(), target_id: "t1".into(),
-        target_name: "Target".into(), created_at: Utc::now(),
+        id: Uuid::new_v4(),
+        guild_id: g.clone().into(),
+        owner_id: owner.clone(),
+        target_id: "t1".into(),
+        target_name: "Target".into(),
+        created_at: Utc::now(),
     };
     repo.add_to_whitelist(&entry).await.unwrap();
     assert_eq!(repo.find_whitelist(&g, &owner).await.unwrap().len(), 1);
@@ -207,20 +230,31 @@ async fn ban_save_find_and_remove() {
     let vc = sample_channel(&fresh_id(), &fresh_id(), &fresh_id());
     repo.save(&vc).await.unwrap();
     let ban = VoiceChannelBan {
-        id: Uuid::new_v4(), voice_channel_id: vc.id,
-        user_id: "trouble".into(), user_name: "Trouble".into(),
-        banned_by: "mod".into(), reason: Some("spam".into()),
+        id: Uuid::new_v4(),
+        voice_channel_id: vc.id,
+        user_id: "trouble".into(),
+        user_name: "Trouble".into(),
+        banned_by: "mod".into(),
+        reason: Some("spam".into()),
         expires_at: Some(Utc::now() + Duration::hours(1)),
         created_at: Utc::now(),
     };
     repo.save_ban(&ban).await.unwrap();
-    let found = repo.find_active_ban(vc.id, "trouble").await.unwrap().unwrap();
+    let found = repo
+        .find_active_ban(vc.id, "trouble")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(found.user_id, "trouble");
     let all = repo.find_bans(vc.id).await.unwrap();
     assert_eq!(all.len(), 1);
 
     repo.remove_ban(vc.id, "trouble").await.unwrap();
-    assert!(repo.find_active_ban(vc.id, "trouble").await.unwrap().is_none());
+    assert!(repo
+        .find_active_ban(vc.id, "trouble")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -229,9 +263,12 @@ async fn find_active_ban_excludes_expired() {
     let vc = sample_channel(&fresh_id(), &fresh_id(), &fresh_id());
     repo.save(&vc).await.unwrap();
     let expired = VoiceChannelBan {
-        id: Uuid::new_v4(), voice_channel_id: vc.id,
-        user_id: "u1".into(), user_name: "U".into(),
-        banned_by: "mod".into(), reason: None,
+        id: Uuid::new_v4(),
+        voice_channel_id: vc.id,
+        user_id: "u1".into(),
+        user_name: "U".into(),
+        banned_by: "mod".into(),
+        reason: None,
         expires_at: Some(Utc::now() - Duration::hours(1)),
         created_at: Utc::now() - Duration::hours(2),
     };
@@ -254,13 +291,18 @@ async fn invite_save_find_increment_revoke() {
     repo.save(&vc).await.unwrap();
     let code = format!("code-{}", Uuid::new_v4().simple());
     let link = VoiceChannelInviteLink {
-        id: Uuid::new_v4(), voice_channel_id: vc.id,
-        guild_id: vc.guild_id.clone(), channel_id: vc.channel_id.clone(),
-        created_by: "u1".into(), created_by_name: "Alice".into(),
+        id: Uuid::new_v4(),
+        voice_channel_id: vc.id,
+        guild_id: vc.guild_id.clone(),
+        channel_id: vc.channel_id.clone(),
+        created_by: "u1".into(),
+        created_by_name: "Alice".into(),
         code: code.clone(),
-        max_uses: Some(5), current_uses: 0,
+        max_uses: Some(5),
+        current_uses: 0,
         expires_at: Utc::now() + Duration::hours(24),
-        revoked: false, created_at: Utc::now(),
+        revoked: false,
+        created_at: Utc::now(),
     };
     repo.save_invite_link(&link).await.unwrap();
 
@@ -283,13 +325,20 @@ async fn theme_save_find_update_delete() {
     let repo = PgVoiceChannelRepository::new(pool().await);
     let g = fresh_id();
     let theme = VoiceChannelTheme {
-        id: Uuid::new_v4(), guild_id: g.clone().into(),
-        name: "Gaming".into(), emoji: Some("game".into()),
+        id: Uuid::new_v4(),
+        guild_id: g.clone().into(),
+        name: "Gaming".into(),
+        emoji: Some("game".into()),
         channel_name_template: "🎮-{user}".into(),
-        member_limit: Some(5), visibility: "public".into(),
-        locked: false, queue_enabled: false,
-        bitrate: Some(64000), slowmode_secs: None,
-        stage_enabled: false, is_default: false, sort_order: 0,
+        member_limit: Some(5),
+        visibility: "public".into(),
+        locked: false,
+        queue_enabled: false,
+        bitrate: Some(64000),
+        slowmode_secs: None,
+        stage_enabled: false,
+        is_default: false,
+        sort_order: 0,
         created_at: Utc::now(),
     };
     repo.save_theme(&theme).await.unwrap();
@@ -302,7 +351,10 @@ async fn theme_save_find_update_delete() {
     let mut upd = theme.clone();
     upd.name = "GamingX".into();
     repo.update_theme(&upd).await.unwrap();
-    assert_eq!(repo.find_theme(theme.id).await.unwrap().unwrap().name, "GamingX");
+    assert_eq!(
+        repo.find_theme(theme.id).await.unwrap().unwrap().name,
+        "GamingX"
+    );
 
     repo.delete_theme(theme.id).await.unwrap();
     assert!(repo.find_theme(theme.id).await.unwrap().is_none());
@@ -313,13 +365,21 @@ async fn clear_default_themes_unsets_is_default() {
     let repo = PgVoiceChannelRepository::new(pool().await);
     let g = fresh_id();
     let mut t = VoiceChannelTheme {
-        id: Uuid::new_v4(), guild_id: g.clone().into(),
-        name: "Default".into(), emoji: None,
+        id: Uuid::new_v4(),
+        guild_id: g.clone().into(),
+        name: "Default".into(),
+        emoji: None,
         channel_name_template: "{user}".into(),
-        member_limit: None, visibility: "public".into(),
-        locked: false, queue_enabled: false,
-        bitrate: None, slowmode_secs: None, stage_enabled: false,
-        is_default: true, sort_order: 0, created_at: Utc::now(),
+        member_limit: None,
+        visibility: "public".into(),
+        locked: false,
+        queue_enabled: false,
+        bitrate: None,
+        slowmode_secs: None,
+        stage_enabled: false,
+        is_default: true,
+        sort_order: 0,
+        created_at: Utc::now(),
     };
     repo.save_theme(&t).await.unwrap();
     repo.clear_default_themes(&g).await.unwrap();

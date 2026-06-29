@@ -8,7 +8,7 @@ use redis::AsyncCommands;
 use serde::{Deserialize, Serialize};
 use tracing::{error, info, warn};
 
-use crate::common as common;
+use crate::common;
 
 const WORKER_NAME: &str = "announcements";
 const STREAM_KEY: &str = "sentinel:events";
@@ -135,7 +135,10 @@ async fn run_one_tick(
         return Ok(());
     }
 
-    info!(count = payloads.len(), "announcements: publishing via Redis stream");
+    info!(
+        count = payloads.len(),
+        "announcements: publishing via Redis stream"
+    );
 
     let mut conn = redis_client
         .get_multiplexed_async_connection()

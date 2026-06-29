@@ -2,7 +2,13 @@ use super::*;
 
 #[test]
 fn test_as_str_roundtrip() {
-    let actions = vec![Action::None, Action::Warn, Action::Delete, Action::Mute, Action::Ban];
+    let actions = vec![
+        Action::None,
+        Action::Warn,
+        Action::Delete,
+        Action::Mute,
+        Action::Ban,
+    ];
     for a in actions {
         let s = a.as_str();
         let back = Action::from_str_lossy(s);

@@ -14,7 +14,10 @@ use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::{ChannelManagerKey, GameApiKey, MODULE_BOT_NAME, BET_PREFIX, CLOSE_TABLE_ID, INVITE_BUTTON_ID, JOIN_BUTTON_ID};
+use super::{
+    ChannelManagerKey, GameApiKey, BET_PREFIX, CLOSE_TABLE_ID, INVITE_BUTTON_ID, JOIN_BUTTON_ID,
+    MODULE_BOT_NAME,
+};
 
 /// Handler Redis : `blackjack_table_closed` depuis web -> edit l'embed
 /// Discord pour signaler la fermeture (gris + retire boutons).
@@ -32,7 +35,10 @@ pub async fn handle_redis_event(ctx: &Context, payload: &str) {
         Some(d) => d,
         None => return,
     };
-    if data.get("actor").and_then(|a| a.get("source")).and_then(|s| s.as_str())
+    if data
+        .get("actor")
+        .and_then(|a| a.get("source"))
+        .and_then(|s| s.as_str())
         != Some("web")
     {
         return;
@@ -86,11 +92,9 @@ pub async fn handle_redis_event(ctx: &Context, payload: &str) {
     {
         if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
             if let Some(existing) = original.embeds.first() {
-                let new_embed = CreateEmbed::from(existing.clone())
-                    .color(0x95A5A6)
-                    .footer(CreateEmbedFooter::new(
-                        "\u{1f512} Table fermee depuis la web admin",
-                    ));
+                let new_embed = CreateEmbed::from(existing.clone()).color(0x95A5A6).footer(
+                    CreateEmbedFooter::new("\u{1f512} Table fermee depuis la web admin"),
+                );
                 if let Err(e) = channel_id
                     .edit_message(
                         &ctx.http,
@@ -126,11 +130,7 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
         if let Some(mgr) = data.get::<ChannelManagerKey>() {
             if let Some(table) = mgr.get(user_id) {
                 // Le channel existe-t-il toujours ?
-                let channel_still_exists = table
-                    .channel_id
-                    .to_channel(&ctx.http)
-                    .await
-                    .is_ok();
+                let channel_still_exists = table.channel_id.to_channel(&ctx.http).await.is_ok();
                 if channel_still_exists {
                     let resp = CreateInteractionResponse::Message(
                         CreateInteractionResponseMessage::new()
@@ -219,10 +219,7 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
         builder = builder.category(ChannelId::new(cat_id));
     }
 
-    let channel = match guild_id
-        .create_channel(&ctx.http, builder)
-        .await
-    {
+    let channel = match guild_id.create_channel(&ctx.http, builder).await {
         Ok(ch) => ch,
         Err(e) => {
             error!(error = %e, "Echec creation channel blackjack");
@@ -320,7 +317,9 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
         .id
         .send_message(
             &ctx.http,
-            CreateMessage::new().embed(embed).components(vec![row1, row2]),
+            CreateMessage::new()
+                .embed(embed)
+                .components(vec![row1, row2]),
         )
         .await
     {
@@ -397,7 +396,10 @@ pub(super) async fn handle_invite(ctx: &Context, component: &ComponentInteractio
 
             // Lire les derniers messages
             let messages = match channel_id
-                .messages(&ctx_clone.http, serenity::builder::GetMessages::new().limit(5))
+                .messages(
+                    &ctx_clone.http,
+                    serenity::builder::GetMessages::new().limit(5),
+                )
                 .await
             {
                 Ok(m) => m,
@@ -562,7 +564,10 @@ pub(super) async fn handle_close_table(ctx: &Context, component: &ComponentInter
 
     // Marquer la table comme fermee en DB (sinon la row reste 'open' orpheline).
     if let Some(api) = api {
-        match api.get_table_by_channel(&component.channel_id.to_string()).await {
+        match api
+            .get_table_by_channel(&component.channel_id.to_string())
+            .await
+        {
             Ok(Some(table)) => {
                 if let Err(e) = api.close_table(&table.id).await {
                     warn!(error = %e, table_id = %table.id, "Echec close_table API");

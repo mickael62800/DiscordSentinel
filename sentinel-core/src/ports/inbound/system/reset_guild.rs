@@ -21,5 +21,9 @@ pub trait ResetGuildUseCase: Send + Sync {
     /// le nom du serveur (garde-fou anti-clic accidentel), verifie ici.
     /// Renvoie `Forbidden` si la confirmation ne correspond pas, `NotFound` si
     /// le serveur est inconnu.
-    async fn reset(&self, guild_id: &str, confirmation: &str) -> Result<ResetGuildOutcome, DomainError>;
+    async fn reset(
+        &self,
+        guild_id: &str,
+        confirmation: &str,
+    ) -> Result<ResetGuildOutcome, DomainError>;
 }

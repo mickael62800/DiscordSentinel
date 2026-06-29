@@ -23,13 +23,19 @@ pub fn spawn(pg_pool: PgPool, container_state: Option<Arc<RwLock<ContainerMonito
         }
     };
     let interval_secs: u64 = std::env::var("SECURITY_ALERTS_INTERVAL_SECS")
-        .ok().and_then(|s| s.parse().ok()).unwrap_or(300);
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(300);
     tokio::spawn(async move {
         let client = match reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
-            .build() {
+            .build()
+        {
             Ok(c) => c,
-            Err(e) => { tracing::warn!("alerts client: {e}"); return; }
+            Err(e) => {
+                tracing::warn!("alerts client: {e}");
+                return;
+            }
         };
         let already_sent: Arc<Mutex<HashSet<String>>> = Arc::new(Mutex::new(HashSet::new()));
         loop {
@@ -49,15 +55,23 @@ pub fn spawn(pg_pool: PgPool, container_state: Option<Arc<RwLock<ContainerMonito
             // 2) Container changes recents (non-info)
             if let Some(ref cs) = container_state {
                 let s = cs.read().await;
-                let critical: Vec<_> = s.recent_changes.iter()
+                let critical: Vec<_> = s
+                    .recent_changes
+                    .iter()
                     .filter(|c| c.kind == "removed" || c.kind == "image_changed")
                     .collect();
                 if !critical.is_empty() {
                     let key = format!("container-{}", critical[0].timestamp);
-                    let names: Vec<String> = critical.iter().take(5)
+                    let names: Vec<String> = critical
+                        .iter()
+                        .take(5)
                         .map(|c| format!("`{}` ({})", c.container.name, c.kind))
                         .collect();
-                    alerts.push((key, format!("🐳 **Conteneurs modifies** : {}", names.join(", ")), 0xF39C12));
+                    alerts.push((
+                        key,
+                        format!("🐳 **Conteneurs modifies** : {}", names.join(", ")),
+                        0xF39C12,
+                    ));
                 }
             }
 
@@ -67,7 +81,11 @@ pub fn spawn(pg_pool: PgPool, container_state: Option<Arc<RwLock<ContainerMonito
                     if let Some(days) = v.get("days_until_expiry").and_then(|x| x.as_i64()) {
                         if days < 14 {
                             let key = format!("tls-expiry-{}", days);
-                            alerts.push((key, format!("🔐 **Cert TLS expire dans {} jours**", days), 0xF39C12));
+                            alerts.push((
+                                key,
+                                format!("🔐 **Cert TLS expire dans {} jours**", days),
+                                0xF39C12,
+                            ));
                         }
                     }
                 }
@@ -76,7 +94,9 @@ pub fn spawn(pg_pool: PgPool, container_state: Option<Arc<RwLock<ContainerMonito
             // Envoie Discord pour chaque alerte non encore envoyee
             let mut sent = already_sent.lock().await;
             for (key, content, color) in alerts {
-                if sent.contains(&key) { continue; }
+                if sent.contains(&key) {
+                    continue;
+                }
                 let body = serde_json::json!({
                     "username": "DiscordSentinel · Securite",
                     "embeds": [{
@@ -89,9 +109,13 @@ pub fn spawn(pg_pool: PgPool, container_state: Option<Arc<RwLock<ContainerMonito
                 match client.post(&webhook).json(&body).send().await {
                     Ok(r) if r.status().is_success() => {
                         sent.insert(key);
-                        if sent.len() > 500 { sent.clear(); }
+                        if sent.len() > 500 {
+                            sent.clear();
+                        }
                     }
-                    Ok(r) => tracing::warn!(status = %r.status(), "alerte webhook : status non-2xx"),
+                    Ok(r) => {
+                        tracing::warn!(status = %r.status(), "alerte webhook : status non-2xx")
+                    }
                     Err(e) => tracing::warn!(?e, "alerte webhook : erreur envoi"),
                 }
             }

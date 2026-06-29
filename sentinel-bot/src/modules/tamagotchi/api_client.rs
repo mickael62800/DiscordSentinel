@@ -300,7 +300,10 @@ impl TamaApi {
     /// pendant la consommation du stream sont remontees telles quelles.
     pub async fn list_cards(&self) -> Result<Vec<CardData>, String> {
         // limit = taille de batch cote serveur ; le client itere le stream.
-        let req = proto::ListCardsRequest { limit: 500, after_id: None };
+        let req = proto::ListCardsRequest {
+            limit: 500,
+            after_id: None,
+        };
         let g = &self.grpc;
         let mut c = g.tamagotchi();
         let mut stream = g

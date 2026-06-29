@@ -73,4 +73,3 @@ pub fn load_env_bool(key: &str, default: bool) -> bool {
         Err(_) => default,
     }
 }
-

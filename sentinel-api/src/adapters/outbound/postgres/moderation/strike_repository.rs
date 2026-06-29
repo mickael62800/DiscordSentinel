@@ -1,16 +1,16 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 pub struct PgStrikeRepository {
     pool: PgPool,
@@ -100,7 +100,12 @@ impl StrikeRepository for PgStrikeRepository {
         Ok(())
     }
 
-    async fn find_active_strikes(&self, guild_id: &str, user_id: &str, window_secs: i64) -> Result<Vec<UserStrike>, DomainError> {
+    async fn find_active_strikes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        window_secs: i64,
+    ) -> Result<Vec<UserStrike>, DomainError> {
         let cutoff = Utc::now() - Duration::seconds(window_secs);
         let rows = sqlx::query_as::<_, StrikeRow>(
             "SELECT id, guild_id, user_id, reason, source, infraction_id, expires_at, created_at
@@ -108,7 +113,7 @@ impl StrikeRepository for PgStrikeRepository {
              WHERE guild_id = $1 AND user_id = $2
                AND (expires_at IS NULL OR expires_at > NOW())
                AND created_at > $3
-             ORDER BY created_at DESC"
+             ORDER BY created_at DESC",
         )
         .bind(guild_id)
         .bind(user_id)
@@ -130,7 +135,10 @@ impl StrikeRepository for PgStrikeRepository {
         Ok(())
     }
 
-    async fn delete_strike_by_infraction_id(&self, infraction_id: Uuid) -> Result<u64, DomainError> {
+    async fn delete_strike_by_infraction_id(
+        &self,
+        infraction_id: Uuid,
+    ) -> Result<u64, DomainError> {
         let result = sqlx::query("DELETE FROM user_strikes WHERE infraction_id = $1")
             .bind(infraction_id)
             .execute(&self.pool)
@@ -142,7 +150,7 @@ impl StrikeRepository for PgStrikeRepository {
     async fn get_config(&self, guild_id: &str) -> Result<Option<StrikeConfig>, DomainError> {
         let row = sqlx::query_as::<_, StrikeConfigRow>(
             "SELECT guild_id, window_secs, thresholds, enabled, created_at, updated_at
-             FROM strike_config WHERE guild_id = $1"
+             FROM strike_config WHERE guild_id = $1",
         )
         .bind(guild_id)
         .fetch_optional(&self.pool)

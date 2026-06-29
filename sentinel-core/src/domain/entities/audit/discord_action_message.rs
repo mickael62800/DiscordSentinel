@@ -1,12 +1,12 @@
 //! Mapping entite metier <-> message Discord (cf. migration 175 +
 //! SYNC_DISCORD_WEB_DESIGN.md).
 
+use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::MessageId;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscordActionMessage {

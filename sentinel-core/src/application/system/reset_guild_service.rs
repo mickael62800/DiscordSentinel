@@ -18,7 +18,11 @@ impl ResetGuildService {
 
 #[async_trait]
 impl ResetGuildUseCase for ResetGuildService {
-    async fn reset(&self, guild_id: &str, confirmation: &str) -> Result<ResetGuildOutcome, DomainError> {
+    async fn reset(
+        &self,
+        guild_id: &str,
+        confirmation: &str,
+    ) -> Result<ResetGuildOutcome, DomainError> {
         crate::application::validation::validate_guild_id(guild_id)?;
         // Confirmation forte : le nom saisi doit correspondre EXACTEMENT au nom
         // du serveur (anti-clic accidentel sur une action irreversible).
@@ -37,6 +41,10 @@ impl ResetGuildUseCase for ResetGuildService {
         // 2. Efface toutes les donnees du serveur (transaction).
         let tables_wiped = self.repo.wipe_guild(guild_id).await?;
         let total_rows = tables_wiped.iter().map(|(_, n)| *n).sum();
-        Ok(ResetGuildOutcome { discord_context, tables_wiped, total_rows })
+        Ok(ResetGuildOutcome {
+            discord_context,
+            tables_wiped,
+            total_rows,
+        })
     }
 }

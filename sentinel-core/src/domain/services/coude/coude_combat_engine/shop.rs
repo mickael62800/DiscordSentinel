@@ -107,7 +107,8 @@ pub const SHOP_ITEMS: &[ShopItem] = &[
         name: "Explosion",
         emoji: "\u{1f4a3}",
         price: 200,
-        description: "Annule le combat : les 2 joueurs perdent 50% de la mise (defenseur uniquement)",
+        description:
+            "Annule le combat : les 2 joueurs perdent 50% de la mise (defenseur uniquement)",
         category: "defense",
     },
     ShopItem {

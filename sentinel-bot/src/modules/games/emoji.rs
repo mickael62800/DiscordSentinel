@@ -52,10 +52,7 @@ pub fn emoji_matches(stored: &str, reaction: &ReactionType) -> bool {
     };
     match (&parsed, reaction) {
         (ReactionType::Unicode(a), ReactionType::Unicode(b)) => a == b,
-        (
-            ReactionType::Custom { id: a, .. },
-            ReactionType::Custom { id: b, .. },
-        ) => a == b,
+        (ReactionType::Custom { id: a, .. }, ReactionType::Custom { id: b, .. }) => a == b,
         _ => false,
     }
 }

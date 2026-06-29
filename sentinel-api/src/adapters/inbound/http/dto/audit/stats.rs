@@ -1,14 +1,14 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::entities::audit::user_stats::VoiceSessionStats;
-use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -124,7 +124,11 @@ impl From<GuildVoiceStats> for GuildVoiceStatsDto {
             avg_session_secs: g.avg_session_secs,
             temp_channels: g.temp_channels,
             perm_channels: g.perm_channels,
-            channels: g.channels.into_iter().map(VoiceSessionStatsDto::from).collect(),
+            channels: g
+                .channels
+                .into_iter()
+                .map(VoiceSessionStatsDto::from)
+                .collect(),
         }
     }
 }

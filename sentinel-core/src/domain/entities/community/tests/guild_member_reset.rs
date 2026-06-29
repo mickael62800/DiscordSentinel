@@ -37,9 +37,15 @@ fn reset_tables_include_core_moderation() {
 fn reset_tables_use_target_id_for_moderation_actions_and_reminders() {
     // Regle : `moderation_actions` et `sanction_reminders` utilisent target_id
     // (la personne moderee), pas user_id (le moderateur).
-    let moderation = MEMBER_RESET_TABLES.iter().find(|t| t.sql_table == "moderation_actions").unwrap();
+    let moderation = MEMBER_RESET_TABLES
+        .iter()
+        .find(|t| t.sql_table == "moderation_actions")
+        .unwrap();
     assert_eq!(moderation.user_column, "target_id");
-    let reminders = MEMBER_RESET_TABLES.iter().find(|t| t.sql_table == "sanction_reminders").unwrap();
+    let reminders = MEMBER_RESET_TABLES
+        .iter()
+        .find(|t| t.sql_table == "sanction_reminders")
+        .unwrap();
     assert_eq!(reminders.user_column, "target_id");
 }
 
@@ -47,7 +53,11 @@ fn reset_tables_use_target_id_for_moderation_actions_and_reminders() {
 fn reset_tables_use_user_id_for_others() {
     for t in MEMBER_RESET_TABLES {
         if t.sql_table != "moderation_actions" && t.sql_table != "sanction_reminders" {
-            assert_eq!(t.user_column, "user_id", "table {} should use user_id", t.sql_table);
+            assert_eq!(
+                t.user_column, "user_id",
+                "table {} should use user_id",
+                t.sql_table
+            );
         }
     }
 }

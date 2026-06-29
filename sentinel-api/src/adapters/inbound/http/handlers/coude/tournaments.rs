@@ -9,8 +9,8 @@
 //! (resolution, distribution du prix) vit dans le coude-worker, pas ici.
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use axum::Json;
 use chrono::DateTime;
 use chrono::Utc;
@@ -54,8 +54,8 @@ pub struct PastTournamentDto {
 // `domain/entities/coude_tournament.rs` (purement testables).
 use sentinel_core::domain::entities::coude::tournament::current_week_bounds;
 use sentinel_core::domain::entities::coude::tournament::estimate_tournament_prize_pool;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,
@@ -106,14 +106,13 @@ pub async fn get_current_tournament(
 
     // Prize pool estime : 10% de la caisse communautaire par defaut.
     // Pragmatique : on ne lit pas la config ici, on utilise le default.
-    let cashbox: Option<i64> = sqlx::query_scalar(
-        "SELECT balance FROM coude_cashbox WHERE guild_id = $1",
-    )
-    .bind(&guild_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .ok()
-    .flatten();
+    let cashbox: Option<i64> =
+        sqlx::query_scalar("SELECT balance FROM coude_cashbox WHERE guild_id = $1")
+            .bind(&guild_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .ok()
+            .flatten();
 
     let prize_pool_estimated = estimate_tournament_prize_pool(cashbox);
 
@@ -131,18 +130,21 @@ pub async fn get_tournament_history(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<PastTournamentDto>>, ApiError> {
-    let rows = sqlx::query_as::<_, (
-        sqlx::types::Uuid,
-        String,
-        DateTime<Utc>,
-        DateTime<Utc>,
-        Option<String>,
-        Option<String>,
-        Option<i64>,
-        i64,
-        String,
-        Option<DateTime<Utc>>,
-    )>(
+    let rows = sqlx::query_as::<
+        _,
+        (
+            sqlx::types::Uuid,
+            String,
+            DateTime<Utc>,
+            DateTime<Utc>,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            i64,
+            String,
+            Option<DateTime<Utc>>,
+        ),
+    >(
         r#"
         SELECT id, guild_id, week_start, week_end, winner_user_id,
                winner_username, winner_net_gain, prize_amount, status, resolved_at
@@ -160,7 +162,18 @@ pub async fn get_tournament_history(
     let out = rows
         .into_iter()
         .map(
-            |(id, guild_id, week_start, week_end, winner_user_id, winner_username, winner_net_gain, prize_amount, status, resolved_at)| {
+            |(
+                id,
+                guild_id,
+                week_start,
+                week_end,
+                winner_user_id,
+                winner_username,
+                winner_net_gain,
+                prize_amount,
+                status,
+                resolved_at,
+            )| {
                 PastTournamentDto {
                     id: id.to_string(),
                     guild_id: guild_id.into(),

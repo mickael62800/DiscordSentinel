@@ -110,7 +110,10 @@ pub fn format_profile_section(level: i32) -> String {
             "{}\n\n\u{1f3af} Prochain : niveau **{}** -> {} {} ({})",
             unlocked_line, m.level, m.emoji, m.label, m.description
         ),
-        None => format!("{}\n\n\u{1f3c6} Tous les paliers debloques !", unlocked_line),
+        None => format!(
+            "{}\n\n\u{1f3c6} Tous les paliers debloques !",
+            unlocked_line
+        ),
     }
 }
 

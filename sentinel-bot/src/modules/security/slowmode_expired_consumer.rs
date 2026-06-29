@@ -50,7 +50,10 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
 
     let mut restored = 0usize;
     for entry in states {
-        let ch_str = entry.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
+        let ch_str = entry
+            .get("channel_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let rate = entry.get("rate").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
         let channel_id = match u64::from_str(ch_str) {
             Ok(c) => ChannelId::new(c),

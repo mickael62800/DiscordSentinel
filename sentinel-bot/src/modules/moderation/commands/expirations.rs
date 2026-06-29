@@ -90,14 +90,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let total = active.len();
-    let embed = info_embed(format!("\u{23f0} Sanctions temporaires actives ({})", total))
-        .description(description);
+    let embed = info_embed(format!(
+        "\u{23f0} Sanctions temporaires actives ({})",
+        total
+    ))
+    .description(description);
 
     if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await

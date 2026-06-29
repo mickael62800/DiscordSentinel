@@ -8,8 +8,8 @@ use crate::shared::api_client::BaseApiClient;
 use crate::shared::embeds::{info_embed, success_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
-use super::ModerationApiKey;
 use super::reason_templates::{self, ReasonTemplate};
+use super::ModerationApiKey;
 use crate::shared::discord_helpers::edit_response_text;
 
 const CONFIG_KEY: &str = "reason_templates";
@@ -25,27 +25,23 @@ pub fn register() -> CreateCommand {
             "Afficher les templates actuels",
         ))
         .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "add",
-                "Ajouter un template",
-            )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "label",
-                    "Libelle court du template (ex: Spam)",
+            CreateCommandOption::new(CommandOptionType::SubCommand, "add", "Ajouter un template")
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "label",
+                        "Libelle court du template (ex: Spam)",
+                    )
+                    .required(true),
                 )
-                .required(true),
-            )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "reason",
-                    "Raison a inserer (ex: Messages repetitifs)",
-                )
-                .required(true),
-            ),
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "reason",
+                        "Raison a inserer (ex: Messages repetitifs)",
+                    )
+                    .required(true),
+                ),
         )
         .add_option(
             CreateCommandOption::new(
@@ -65,14 +61,10 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let sub = command
-        .data
-        .options
-        .iter()
-        .find_map(|o| match &o.value {
-            CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
-            _ => None,
-        });
+    let sub = command.data.options.iter().find_map(|o| match &o.value {
+        CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
+        _ => None,
+    });
 
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
@@ -118,14 +110,19 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
             .join("\n")
     };
 
-    let embed = info_embed(format!("\u{1f4cb} Templates de raisons ({})", templates.len()))
-        .description(description);
+    let embed = info_embed(format!(
+        "\u{1f4cb} Templates de raisons ({})",
+        templates.len()
+    ))
+    .description(description);
 
     if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await
@@ -163,11 +160,21 @@ async fn handle_add(
         return;
     }
     if label.contains('|') || label.contains('\n') {
-        edit_response_text(ctx, command, "Le label ne peut pas contenir `|` ni de saut de ligne.").await;
+        edit_response_text(
+            ctx,
+            command,
+            "Le label ne peut pas contenir `|` ni de saut de ligne.",
+        )
+        .await;
         return;
     }
     if reason.contains('\n') {
-        edit_response_text(ctx, command, "La raison ne peut pas contenir de saut de ligne.").await;
+        edit_response_text(
+            ctx,
+            command,
+            "La raison ne peut pas contenir de saut de ligne.",
+        )
+        .await;
         return;
     }
 
@@ -187,8 +194,16 @@ async fn handle_add(
         }
     };
 
-    if templates.iter().any(|t| t.label.eq_ignore_ascii_case(label)) {
-        edit_response_text(ctx, command, "Un template avec ce label existe deja. Utilisez `/template remove` d'abord.").await;
+    if templates
+        .iter()
+        .any(|t| t.label.eq_ignore_ascii_case(label))
+    {
+        edit_response_text(
+            ctx,
+            command,
+            "Un template avec ce label existe deja. Utilisez `/template remove` d'abord.",
+        )
+        .await;
         return;
     }
 
@@ -211,7 +226,9 @@ async fn handle_add(
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await
@@ -261,7 +278,12 @@ async fn handle_remove(
     let removed = before - templates.len();
 
     if removed == 0 {
-        edit_response_text(ctx, command, &format!("Aucun template trouve avec le label `{label}`.")).await;
+        edit_response_text(
+            ctx,
+            command,
+            &format!("Aucun template trouve avec le label `{label}`."),
+        )
+        .await;
         return;
     }
 
@@ -279,7 +301,9 @@ async fn handle_remove(
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await
@@ -312,7 +336,8 @@ async fn save_templates(
     let api = data
         .get::<ModerationApiKey>()
         .ok_or_else(|| "ModerationApiKey manquant".to_string())?;
-    api.set_bot_config(guild_id, BOT_NAME, CONFIG_KEY, &serialized).await;
+    api.set_bot_config(guild_id, BOT_NAME, CONFIG_KEY, &serialized)
+        .await;
     Ok(())
 }
 
@@ -331,8 +356,14 @@ mod tests {
     #[test]
     fn serialize_roundtrip() {
         let templates = vec![
-            ReasonTemplate { label: "Spam".into(), reason: "Repetition".into() },
-            ReasonTemplate { label: "Insulte".into(), reason: "Propos inapproprie".into() },
+            ReasonTemplate {
+                label: "Spam".into(),
+                reason: "Repetition".into(),
+            },
+            ReasonTemplate {
+                label: "Insulte".into(),
+                reason: "Propos inapproprie".into(),
+            },
         ];
         let serialized = serialize_templates(&templates);
         let parsed = reason_templates::parse_templates(&serialized);
@@ -348,7 +379,10 @@ mod tests {
 
     #[test]
     fn serialize_single() {
-        let t = vec![ReasonTemplate { label: "A".into(), reason: "B".into() }];
+        let t = vec![ReasonTemplate {
+            label: "A".into(),
+            reason: "B".into(),
+        }];
         assert_eq!(serialize_templates(&t), "A|B");
     }
 }

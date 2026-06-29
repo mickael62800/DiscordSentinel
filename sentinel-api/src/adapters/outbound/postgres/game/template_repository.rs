@@ -1,12 +1,14 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::game::template::{ConfigField, GameTemplate, InitFile, PortProtocol};
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::game_template_repository::GameTemplateRepository;
+use sentinel_core::domain::entities::game::template::{
+    ConfigField, GameTemplate, InitFile, PortProtocol,
+};
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgGameTemplateRepository {
     pool: PgPool,
@@ -56,9 +58,10 @@ impl TryFrom<TemplateRow> for GameTemplate {
             .map_err(|e| DomainError::Internal(format!("init_files parse: {e}")))?;
         let command: Option<Vec<String>> = match r.command_template.as_deref() {
             None | Some("") => None,
-            Some(s) => Some(serde_json::from_str(s).map_err(|e| {
-                DomainError::Internal(format!("command_template parse: {e}"))
-            })?),
+            Some(s) => Some(
+                serde_json::from_str(s)
+                    .map_err(|e| DomainError::Internal(format!("command_template parse: {e}")))?,
+            ),
         };
         let port = u16::try_from(r.container_port)
             .map_err(|_| DomainError::Internal("container_port hors range u16".into()))?;

@@ -1,12 +1,12 @@
+use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use sqlx::PgPool;
-use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::wheel::WheelSpin;
 use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::casino::wheel_repository::WheelRepository;
+use sentinel_core::ports::uow::DbTx;
+use sqlx::PgPool;
 
 use super::super::pg_err;
 use super::super::uow::as_pg;
@@ -37,11 +37,7 @@ impl WheelRepository for PgWheelRepository {
         Ok(exists.is_some())
     }
 
-    async fn log_spin_in_tx(
-        &self,
-        tx: &mut dyn DbTx,
-        spin: &WheelSpin,
-    ) -> Result<(), DomainError> {
+    async fn log_spin_in_tx(&self, tx: &mut dyn DbTx, spin: &WheelSpin) -> Result<(), DomainError> {
         let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO wheel_spin_log
@@ -87,30 +83,41 @@ impl WheelRepository for PgWheelRepository {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<WheelSpin>, DomainError> {
-        let rows: Vec<(uuid::Uuid, String, String, String, String, String, i64, DateTime<Utc>)> =
-            sqlx::query_as(
-                "SELECT id, guild_id, user_id, username, case_key, case_label, payout, created_at
+        let rows: Vec<(
+            uuid::Uuid,
+            String,
+            String,
+            String,
+            String,
+            String,
+            i64,
+            DateTime<Utc>,
+        )> = sqlx::query_as(
+            "SELECT id, guild_id, user_id, username, case_key, case_label, payout, created_at
                  FROM wheel_spin_log
                  WHERE guild_id = $1
                  ORDER BY created_at DESC
                  LIMIT $2",
-            )
-            .bind(guild_id)
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        )
+        .bind(guild_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| WheelSpin {
-            id: r.0,
-            guild_id: r.1.into(),
-            user_id: r.2.into(),
-            username: r.3,
-            case_key: r.4,
-            case_label: r.5,
-            payout: r.6,
-            created_at: r.7,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| WheelSpin {
+                id: r.0,
+                guild_id: r.1.into(),
+                user_id: r.2.into(),
+                username: r.3,
+                case_key: r.4,
+                case_label: r.5,
+                payout: r.6,
+                created_at: r.7,
+            })
+            .collect())
     }
 
     async fn top_winners(
@@ -141,11 +148,14 @@ impl WheelRepository for PgWheelRepository {
         .await
         .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|(uid, name, total, count)| WheelTopWinner {
-            user_id: uid.into(),
-            username: name,
-            total_payout: total,
-            spin_count: count as u32,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|(uid, name, total, count)| WheelTopWinner {
+                user_id: uid.into(),
+                username: name,
+                total_payout: total,
+                spin_count: count as u32,
+            })
+            .collect())
     }
 }

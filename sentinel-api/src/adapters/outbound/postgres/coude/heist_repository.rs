@@ -6,14 +6,16 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
 use sentinel_core::domain::entities::coude::heist::HeistAttempt;
 use sentinel_core::domain::entities::coude::heist::PrisonState;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::heist_repository::HeistRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "heist";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgHeistRepository {
     pool: PgPool,

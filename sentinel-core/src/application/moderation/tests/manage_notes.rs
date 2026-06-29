@@ -1,6 +1,5 @@
 //! Tests unitaires du ManageNotesService.
 
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -23,7 +22,9 @@ struct InMemoryNotesRepo {
 
 impl InMemoryNotesRepo {
     fn new() -> Self {
-        Self { notes: Mutex::new(vec![]) }
+        Self {
+            notes: Mutex::new(vec![]),
+        }
     }
 }
 
@@ -34,9 +35,14 @@ impl NotesRepository for InMemoryNotesRepo {
         Ok(())
     }
 
-    async fn find_by_user(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserNote>, DomainError> {
+    async fn find_by_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<UserNote>, DomainError> {
         let notes = self.notes.lock().await;
-        Ok(notes.iter()
+        Ok(notes
+            .iter()
             .filter(|n| n.guild_id == guild_id && n.user_id == user_id)
             .cloned()
             .collect())
@@ -106,14 +112,17 @@ async fn add_note_invalid_category_rejected() {
 #[tokio::test]
 async fn add_note_preserves_all_fields() {
     let svc = build_service();
-    let note = svc.add_note(AddNoteCommand {
-        guild_id: "g1".into(),
-        user_id: "u1".into(),
-        author_id: "mod2".into(),
-        author_name: "Alice".into(),
-        content: "Comportement suspect".into(),
-        category: "warning".into(),
-    }).await.unwrap();
+    let note = svc
+        .add_note(AddNoteCommand {
+            guild_id: "g1".into(),
+            user_id: "u1".into(),
+            author_id: "mod2".into(),
+            author_name: "Alice".into(),
+            content: "Comportement suspect".into(),
+            category: "warning".into(),
+        })
+        .await
+        .unwrap();
     assert_eq!(note.author_id, "mod2");
     assert_eq!(note.author_name, "Alice");
     assert_eq!(note.content, "Comportement suspect");

@@ -1,6 +1,6 @@
 use super::*;
-use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use chrono::NaiveDate;
+use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use uuid::Uuid;
 
 fn sample(messages: i64, warns: i32) -> DailyActivity {

@@ -3,8 +3,8 @@
 //! ici : le sentinel-bot unifie utilise un seul token partage. On conserve
 //! juste les env vars de categorie et de salon de panel.
 
-use serenity::prelude::TypeMapKey;
 use crate::shared::config::load_env_optional;
+use serenity::prelude::TypeMapKey;
 
 #[derive(Clone, Default)]
 #[allow(dead_code)]

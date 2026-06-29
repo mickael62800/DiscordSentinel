@@ -50,10 +50,7 @@ impl ApiClient {
     pub async fn mark_steal_defended(&self, attempt_id: Uuid) {
         let body = serde_json::json!({});
         self.base
-            .patch_fire_and_forget(
-                &format!("/api/coude/steals/{attempt_id}/defend"),
-                &body,
-            )
+            .patch_fire_and_forget(&format!("/api/coude/steals/{attempt_id}/defend"), &body)
             .await;
     }
 
@@ -62,10 +59,7 @@ impl ApiClient {
     pub async fn mark_steal_resolved(&self, attempt_id: Uuid) {
         let body = serde_json::json!({});
         self.base
-            .patch_fire_and_forget(
-                &format!("/api/coude/steals/{attempt_id}/resolved"),
-                &body,
-            )
+            .patch_fire_and_forget(&format!("/api/coude/steals/{attempt_id}/resolved"), &body)
             .await;
     }
 }

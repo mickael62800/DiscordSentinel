@@ -35,42 +35,114 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         // Merge : on lit la config actuelle puis on applique les champs
         // presents (le `None` conserve l existant).
         let mut current = self.repo.get_config(guild_id).await?;
-        if let Some(v) = patch.welcome_enabled { current.welcome_enabled = v; }
-        if let Some(v) = patch.welcome_channel_id { current.welcome_channel_id = Some(v); }
-        if let Some(v) = patch.welcome_message { current.welcome_message = v; }
-        if let Some(v) = patch.welcome_embed_color { current.welcome_embed_color = v; }
-        if let Some(v) = patch.welcome_dm_enabled { current.welcome_dm_enabled = v; }
-        if let Some(v) = patch.welcome_dm_message { current.welcome_dm_message = v; }
-        if let Some(v) = patch.welcome_title { current.welcome_title = v; }
-        if let Some(v) = patch.welcome_image_url { current.welcome_image_url = v; }
-        if let Some(v) = patch.welcome_footer_text { current.welcome_footer_text = v; }
-        if let Some(v) = patch.leave_enabled { current.leave_enabled = v; }
-        if let Some(v) = patch.leave_channel_id { current.leave_channel_id = Some(v); }
-        if let Some(v) = patch.leave_message { current.leave_message = v; }
-        if let Some(v) = patch.leave_title { current.leave_title = v; }
-        if let Some(v) = patch.leave_image_url { current.leave_image_url = v; }
-        if let Some(v) = patch.leave_footer_text { current.leave_footer_text = v; }
-        if let Some(v) = patch.rules_enabled { current.rules_enabled = v; }
-        if let Some(v) = patch.rules_channel_id { current.rules_channel_id = Some(v); }
-        if let Some(v) = patch.rules_message { current.rules_message = v; }
-        if let Some(v) = patch.rules_role_id { current.rules_role_id = Some(v); }
-        if let Some(v) = patch.rules_button_label { current.rules_button_label = v; }
-        if let Some(v) = patch.counter_enabled { current.counter_enabled = v; }
-        if let Some(v) = patch.counter_channel_id { current.counter_channel_id = Some(v); }
-        if let Some(v) = patch.counter_format { current.counter_format = v; }
-        if let Some(v) = patch.voice_counter_enabled { current.voice_counter_enabled = v; }
-        if let Some(v) = patch.voice_counter_channel_id { current.voice_counter_channel_id = Some(v); }
-        if let Some(v) = patch.voice_counter_format { current.voice_counter_format = v; }
-        if let Some(v) = patch.anniversary_enabled { current.anniversary_enabled = v; }
-        if let Some(v) = patch.anniversary_channel_id { current.anniversary_channel_id = Some(v); }
-        if let Some(v) = patch.anniversary_message { current.anniversary_message = v; }
-        if let Some(v) = patch.anniversary_title { current.anniversary_title = v; }
-        if let Some(v) = patch.anniversary_image_url { current.anniversary_image_url = v; }
-        if let Some(v) = patch.anniversary_footer_text { current.anniversary_footer_text = v; }
-        if let Some(v) = patch.rejoin_message { current.rejoin_message = v; }
-        if let Some(v) = patch.rejoin_title { current.rejoin_title = v; }
-        if let Some(v) = patch.rejoin_image_url { current.rejoin_image_url = v; }
-        if let Some(v) = patch.rejoin_footer_text { current.rejoin_footer_text = v; }
+        if let Some(v) = patch.welcome_enabled {
+            current.welcome_enabled = v;
+        }
+        if let Some(v) = patch.welcome_channel_id {
+            current.welcome_channel_id = Some(v);
+        }
+        if let Some(v) = patch.welcome_message {
+            current.welcome_message = v;
+        }
+        if let Some(v) = patch.welcome_embed_color {
+            current.welcome_embed_color = v;
+        }
+        if let Some(v) = patch.welcome_dm_enabled {
+            current.welcome_dm_enabled = v;
+        }
+        if let Some(v) = patch.welcome_dm_message {
+            current.welcome_dm_message = v;
+        }
+        if let Some(v) = patch.welcome_title {
+            current.welcome_title = v;
+        }
+        if let Some(v) = patch.welcome_image_url {
+            current.welcome_image_url = v;
+        }
+        if let Some(v) = patch.welcome_footer_text {
+            current.welcome_footer_text = v;
+        }
+        if let Some(v) = patch.leave_enabled {
+            current.leave_enabled = v;
+        }
+        if let Some(v) = patch.leave_channel_id {
+            current.leave_channel_id = Some(v);
+        }
+        if let Some(v) = patch.leave_message {
+            current.leave_message = v;
+        }
+        if let Some(v) = patch.leave_title {
+            current.leave_title = v;
+        }
+        if let Some(v) = patch.leave_image_url {
+            current.leave_image_url = v;
+        }
+        if let Some(v) = patch.leave_footer_text {
+            current.leave_footer_text = v;
+        }
+        if let Some(v) = patch.rules_enabled {
+            current.rules_enabled = v;
+        }
+        if let Some(v) = patch.rules_channel_id {
+            current.rules_channel_id = Some(v);
+        }
+        if let Some(v) = patch.rules_message {
+            current.rules_message = v;
+        }
+        if let Some(v) = patch.rules_role_id {
+            current.rules_role_id = Some(v);
+        }
+        if let Some(v) = patch.rules_button_label {
+            current.rules_button_label = v;
+        }
+        if let Some(v) = patch.counter_enabled {
+            current.counter_enabled = v;
+        }
+        if let Some(v) = patch.counter_channel_id {
+            current.counter_channel_id = Some(v);
+        }
+        if let Some(v) = patch.counter_format {
+            current.counter_format = v;
+        }
+        if let Some(v) = patch.voice_counter_enabled {
+            current.voice_counter_enabled = v;
+        }
+        if let Some(v) = patch.voice_counter_channel_id {
+            current.voice_counter_channel_id = Some(v);
+        }
+        if let Some(v) = patch.voice_counter_format {
+            current.voice_counter_format = v;
+        }
+        if let Some(v) = patch.anniversary_enabled {
+            current.anniversary_enabled = v;
+        }
+        if let Some(v) = patch.anniversary_channel_id {
+            current.anniversary_channel_id = Some(v);
+        }
+        if let Some(v) = patch.anniversary_message {
+            current.anniversary_message = v;
+        }
+        if let Some(v) = patch.anniversary_title {
+            current.anniversary_title = v;
+        }
+        if let Some(v) = patch.anniversary_image_url {
+            current.anniversary_image_url = v;
+        }
+        if let Some(v) = patch.anniversary_footer_text {
+            current.anniversary_footer_text = v;
+        }
+        if let Some(v) = patch.rejoin_message {
+            current.rejoin_message = v;
+        }
+        if let Some(v) = patch.rejoin_title {
+            current.rejoin_title = v;
+        }
+        if let Some(v) = patch.rejoin_image_url {
+            current.rejoin_image_url = v;
+        }
+        if let Some(v) = patch.rejoin_footer_text {
+            current.rejoin_footer_text = v;
+        }
 
         self.repo.save_config(guild_id, &current).await
     }

@@ -93,9 +93,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
             } else {
                 1
             };
-            curr[j] = (prev[j] + 1)
-                .min(curr[j - 1] + 1)
-                .min(prev[j - 1] + cost);
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
         }
         std::mem::swap(&mut prev, &mut curr);
     }
@@ -111,7 +109,11 @@ pub fn has_similar_usernames(names: &[String], max_distance: usize) -> bool {
     }
 
     // Limiter pour eviter DoS sur gros raids
-    let capped = if names.len() > 50 { &names[..50] } else { names };
+    let capped = if names.len() > 50 {
+        &names[..50]
+    } else {
+        names
+    };
     let lowered: Vec<String> = capped.iter().map(|n| n.to_lowercase()).collect();
 
     for i in 0..lowered.len() {
@@ -328,9 +330,21 @@ mod tests {
     #[test]
     fn analyze_full_raid_pattern() {
         let joins = vec![
-            JoinInfo { username: "raider01".to_string(), has_avatar: false, account_created_timestamp: 1000 },
-            JoinInfo { username: "raider02".to_string(), has_avatar: false, account_created_timestamp: 1010 },
-            JoinInfo { username: "raider03".to_string(), has_avatar: false, account_created_timestamp: 1020 },
+            JoinInfo {
+                username: "raider01".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 1000,
+            },
+            JoinInfo {
+                username: "raider02".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 1010,
+            },
+            JoinInfo {
+                username: "raider03".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 1020,
+            },
         ];
         let result = analyze_joins(&joins, 2, 3600);
         assert!(result.similar_names);
@@ -342,8 +356,16 @@ mod tests {
     #[test]
     fn analyze_only_similar_names() {
         let joins = vec![
-            JoinInfo { username: "bot_abc".to_string(), has_avatar: true, account_created_timestamp: 1000 },
-            JoinInfo { username: "bot_abd".to_string(), has_avatar: true, account_created_timestamp: 500_000 },
+            JoinInfo {
+                username: "bot_abc".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 1000,
+            },
+            JoinInfo {
+                username: "bot_abd".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 500_000,
+            },
         ];
         let result = analyze_joins(&joins, 2, 3600);
         assert!(result.similar_names);
@@ -355,8 +377,16 @@ mod tests {
     #[test]
     fn analyze_only_default_avatars() {
         let joins = vec![
-            JoinInfo { username: "alice".to_string(), has_avatar: false, account_created_timestamp: 1000 },
-            JoinInfo { username: "bob".to_string(), has_avatar: false, account_created_timestamp: 500_000 },
+            JoinInfo {
+                username: "alice".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 1000,
+            },
+            JoinInfo {
+                username: "bob".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 500_000,
+            },
         ];
         let result = analyze_joins(&joins, 1, 3600);
         assert!(!result.similar_names);
@@ -368,8 +398,16 @@ mod tests {
     #[test]
     fn analyze_only_clustered_creation() {
         let joins = vec![
-            JoinInfo { username: "alice".to_string(), has_avatar: true, account_created_timestamp: 1000 },
-            JoinInfo { username: "bob".to_string(), has_avatar: true, account_created_timestamp: 1010 },
+            JoinInfo {
+                username: "alice".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 1000,
+            },
+            JoinInfo {
+                username: "bob".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 1010,
+            },
         ];
         let result = analyze_joins(&joins, 1, 3600);
         assert!(!result.similar_names);
@@ -381,9 +419,21 @@ mod tests {
     #[test]
     fn analyze_normal_joins() {
         let joins = vec![
-            JoinInfo { username: "alice".to_string(), has_avatar: true, account_created_timestamp: 1_000_000 },
-            JoinInfo { username: "bob".to_string(), has_avatar: true, account_created_timestamp: 2_000_000 },
-            JoinInfo { username: "charlie".to_string(), has_avatar: true, account_created_timestamp: 3_000_000 },
+            JoinInfo {
+                username: "alice".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 1_000_000,
+            },
+            JoinInfo {
+                username: "bob".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 2_000_000,
+            },
+            JoinInfo {
+                username: "charlie".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 3_000_000,
+            },
         ];
         let result = analyze_joins(&joins, 2, 3600);
         assert_eq!(result.score, 0);
@@ -395,16 +445,22 @@ mod tests {
     fn tracker_record_and_recent() {
         let tracker = RecentJoinsTracker::new(60);
         let guild = GuildId::new(1);
-        tracker.record(guild, JoinInfo {
-            username: "alice".to_string(),
-            has_avatar: true,
-            account_created_timestamp: 1000,
-        });
-        tracker.record(guild, JoinInfo {
-            username: "bob".to_string(),
-            has_avatar: false,
-            account_created_timestamp: 2000,
-        });
+        tracker.record(
+            guild,
+            JoinInfo {
+                username: "alice".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 1000,
+            },
+        );
+        tracker.record(
+            guild,
+            JoinInfo {
+                username: "bob".to_string(),
+                has_avatar: false,
+                account_created_timestamp: 2000,
+            },
+        );
         let recent = tracker.recent(guild);
         assert_eq!(recent.len(), 2);
     }
@@ -414,8 +470,22 @@ mod tests {
         let tracker = RecentJoinsTracker::new(60);
         let guild_a = GuildId::new(1);
         let guild_b = GuildId::new(2);
-        tracker.record(guild_a, JoinInfo { username: "a".to_string(), has_avatar: true, account_created_timestamp: 0 });
-        tracker.record(guild_b, JoinInfo { username: "b".to_string(), has_avatar: true, account_created_timestamp: 0 });
+        tracker.record(
+            guild_a,
+            JoinInfo {
+                username: "a".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 0,
+            },
+        );
+        tracker.record(
+            guild_b,
+            JoinInfo {
+                username: "b".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 0,
+            },
+        );
         assert_eq!(tracker.recent(guild_a).len(), 1);
         assert_eq!(tracker.recent(guild_b).len(), 1);
     }
@@ -424,7 +494,14 @@ mod tests {
     fn tracker_reset() {
         let tracker = RecentJoinsTracker::new(60);
         let guild = GuildId::new(1);
-        tracker.record(guild, JoinInfo { username: "a".to_string(), has_avatar: true, account_created_timestamp: 0 });
+        tracker.record(
+            guild,
+            JoinInfo {
+                username: "a".to_string(),
+                has_avatar: true,
+                account_created_timestamp: 0,
+            },
+        );
         tracker.reset(guild);
         assert_eq!(tracker.recent(guild).len(), 0);
     }

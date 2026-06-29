@@ -6,9 +6,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::system::security_log::{
-    AuthFailure, LogWindow, TopIp, TrafficTrend,
-};
+use crate::domain::entities::system::security_log::{AuthFailure, LogWindow, TopIp, TrafficTrend};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::system::read_security_logs::ReadSecurityLogsUseCase;
 use crate::ports::outbound::system::security_log_repository::SecurityLogRepository;

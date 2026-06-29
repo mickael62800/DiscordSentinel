@@ -3,19 +3,19 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::stats::v1 as proto;
+use sentinel_proto::stats::v1::stats_service_server::StatsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::stats::v1 as proto;
-use sentinel_proto::stats::v1::stats_service_server::StatsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_core::domain::entities::audit::user_stats::UserStats;
 pub struct StatsGrpc {
     pub stats_uc: Arc<dyn ManageStatsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
@@ -110,7 +110,11 @@ impl StatsService for StatsGrpc {
         request: Request<proto::GetLeaderboardRequest>,
     ) -> Result<Response<proto::UserStatsList>, Status> {
         let req = request.into_inner();
-        let limit = if req.limit == 0 { 10 } else { req.limit.min(50) };
+        let limit = if req.limit == 0 {
+            10
+        } else {
+            req.limit.min(50)
+        };
         let users = self
             .stats_uc
             .get_leaderboard(&req.guild_id, limit)
@@ -147,7 +151,6 @@ fn guild_overview_to_proto(o: GuildStatsOverview) -> proto::GuildOverview {
         top_members: o.top_members.into_iter().map(user_stats_to_proto).collect(),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/stats.rs"]

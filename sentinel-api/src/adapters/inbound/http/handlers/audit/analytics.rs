@@ -22,7 +22,11 @@ fn cache_key(endpoint: &str, guild_id: Option<&str>, days: i32, limit: Option<i6
 
 /// Tente de lire une valeur depuis le cache Redis.
 async fn try_cache_get<T: serde::de::DeserializeOwned>(state: &AppState, key: &str) -> Option<T> {
-    let mut conn = state.redis_client.get_multiplexed_async_connection().await.ok()?;
+    let mut conn = state
+        .redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .ok()?;
     let json: Option<String> = conn.get(key).await.ok()?;
     let json = json?;
     serde_json::from_str(&json).ok()
@@ -58,7 +62,9 @@ pub async fn get_full_analytics(
     let (heatmap, distribution, infractors, trend, peaks) = tokio::try_join!(
         state.analytics_repo.get_heatmap(guild_id, days),
         state.analytics_repo.get_action_distribution(guild_id, days),
-        state.analytics_repo.get_top_infractors(guild_id, days, limit, 0),
+        state
+            .analytics_repo
+            .get_top_infractors(guild_id, days, limit, 0),
         state.analytics_repo.get_moderation_trend(guild_id, days),
         state.analytics_repo.get_peak_hours(guild_id, days),
     )?;
@@ -157,18 +163,28 @@ pub async fn get_top_infractors(
     // 0 = pas de filtre (defaut). Permet aux admins de masquer les users avec
     // 1-2 infractions ponctuelles pour voir le "vrai" top.
     let min_total = if let Some(gid) = params.guild_id.as_deref() {
-        state.bot_config_repo.get_config(gid, "analytics").await
+        state
+            .bot_config_repo
+            .get_config(gid, "analytics")
+            .await
             .ok()
-            .and_then(|cfgs| cfgs.into_iter()
-                .find(|c| c.config_key == "low_activity_filter")
-                .and_then(|c| c.config_value.parse::<i64>().ok()))
+            .and_then(|cfgs| {
+                cfgs.into_iter()
+                    .find(|c| c.config_key == "low_activity_filter")
+                    .and_then(|c| c.config_value.parse::<i64>().ok())
+            })
             .unwrap_or(0)
             .max(0)
     } else {
         0
     };
 
-    let key = cache_key("infractors", params.guild_id.as_deref(), params.days(), Some(effective_limit));
+    let key = cache_key(
+        "infractors",
+        params.guild_id.as_deref(),
+        params.days(),
+        Some(effective_limit),
+    );
 
     if let Some(cached) = try_cache_get::<Vec<TopInfractorDto>>(&state, &key).await {
         return Ok(Json(cached));
@@ -176,7 +192,12 @@ pub async fn get_top_infractors(
 
     let data = state
         .analytics_repo
-        .get_top_infractors(params.guild_id.as_deref(), params.days(), effective_limit, min_total)
+        .get_top_infractors(
+            params.guild_id.as_deref(),
+            params.days(),
+            effective_limit,
+            min_total,
+        )
         .await?;
     let dtos: Vec<TopInfractorDto> = data.into_iter().map(Into::into).collect();
 
@@ -244,8 +265,11 @@ pub async fn reset_analytics(
     State(state): State<AppState>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<ResetAnalyticsResponse>, ApiError> {
-    let guild_id = params.guild_id.as_deref()
-        .ok_or_else(|| ApiError::from(sentinel_core::domain::errors::DomainError::ValidationError("guild_id requis".into())))?;
+    let guild_id = params.guild_id.as_deref().ok_or_else(|| {
+        ApiError::from(sentinel_core::domain::errors::DomainError::ValidationError(
+            "guild_id requis".into(),
+        ))
+    })?;
 
     let deleted_rows = state.analytics_repo.reset_activity(guild_id).await?;
 

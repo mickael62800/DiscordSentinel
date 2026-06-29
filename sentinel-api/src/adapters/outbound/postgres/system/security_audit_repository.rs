@@ -95,7 +95,17 @@ impl SecurityAuditRepository for PgSecurityAuditRepository {
         Ok(rows
             .into_iter()
             .map(
-                |(id, guild_id, event_type, actor_id, actor_name, target_id, target_name, details, created_at)| {
+                |(
+                    id,
+                    guild_id,
+                    event_type,
+                    actor_id,
+                    actor_name,
+                    target_id,
+                    target_name,
+                    details,
+                    created_at,
+                )| {
                     AuditLogEntry {
                         id,
                         guild_id,
@@ -115,7 +125,13 @@ impl SecurityAuditRepository for PgSecurityAuditRepository {
     async fn list_recent_logins(&self, limit: i64) -> Result<Vec<SuccessfulLogin>, DomainError> {
         let rows = sqlx::query_as::<
             _,
-            (DateTime<Utc>, String, Option<String>, Option<String>, Option<String>),
+            (
+                DateTime<Utc>,
+                String,
+                Option<String>,
+                Option<String>,
+                Option<String>,
+            ),
         >(
             "SELECT logged_at, discord_user_id, username, client_ip, user_agent \
              FROM successful_logins ORDER BY logged_at DESC LIMIT $1",
@@ -127,13 +143,15 @@ impl SecurityAuditRepository for PgSecurityAuditRepository {
 
         Ok(rows
             .into_iter()
-            .map(|(timestamp, discord_user_id, username, client_ip, user_agent)| SuccessfulLogin {
-                timestamp,
-                discord_user_id,
-                username,
-                client_ip,
-                user_agent,
-            })
+            .map(
+                |(timestamp, discord_user_id, username, client_ip, user_agent)| SuccessfulLogin {
+                    timestamp,
+                    discord_user_id,
+                    username,
+                    client_ip,
+                    user_agent,
+                },
+            )
             .collect())
     }
 
@@ -156,7 +174,8 @@ impl SecurityAuditRepository for PgSecurityAuditRepository {
                 .rows_affected();
         }
         if options.include_audit_logs {
-            report.deleted_audit_logs = purge_table(&self.pool, "audit_logs", "created_at", days).await;
+            report.deleted_audit_logs =
+                purge_table(&self.pool, "audit_logs", "created_at", days).await;
         }
         if options.include_server_events {
             report.deleted_server_events =

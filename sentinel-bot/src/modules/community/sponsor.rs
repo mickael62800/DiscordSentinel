@@ -41,16 +41,28 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let target_id = match command.data.options.iter().find(|o| o.name == "membre")
-        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-    {
+    let target_id = match command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "membre")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::User(id) => Some(*id),
+            _ => None,
+        }) {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Parametre membre requis.").await; return; }
+        None => {
+            reply_ephemeral(ctx, command, "Parametre membre requis.").await;
+            return;
+        }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     // Valider les gardes. Si OK, on envoie la demande de confirmation.
@@ -105,7 +117,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 let dm = target_id.create_dm_channel(&ctx.http).await?;
                 dm.send_message(
                     &ctx.http,
-                    CreateMessage::new().embed(embed.clone()).components(vec![row.clone()]),
+                    CreateMessage::new()
+                        .embed(embed.clone())
+                        .components(vec![row.clone()]),
                 )
                 .await
             }
@@ -142,11 +156,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         .embed(embed)
                         .components(vec![row]);
 
-                    if let Err(e2) = command
-                        .channel_id
-                        .send_message(&ctx.http, public_msg)
-                        .await
-                    {
+                    if let Err(e2) = command.channel_id.send_message(&ctx.http, public_msg).await {
                         warn!(error = %e2, "Failed to send public fallback sponsorship request");
                     }
 
@@ -244,16 +254,18 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
         if let Ok(dm) = parrain_uid.create_dm_channel(&ctx.http).await {
             let refuse_embed = CreateEmbed::new()
                 .title("\u{274c} Parrainage refuse")
-                .description(format!(
-                    "<@{target_id}> a refuse ta demande de parrainage."
-                ))
+                .description(format!("<@{target_id}> a refuse ta demande de parrainage."))
                 .color(0xED4245);
             let _ = dm
                 .send_message(&ctx.http, CreateMessage::new().embed(refuse_embed))
                 .await;
         }
 
-        info!(parrain = parrain_id, target = target_id, "Parrainage refuse par le filleul");
+        info!(
+            parrain = parrain_id,
+            target = target_id,
+            "Parrainage refuse par le filleul"
+        );
         return;
     }
 
@@ -297,7 +309,10 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
 
     let max_sponsorships: u32 = if let Some(base) = data.get::<ApiClientKey>() {
         let gc = base
-            .get_guild_config_for(&guild_id.to_string(), crate::modules::community::MODULE_BOT_NAME)
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::community::MODULE_BOT_NAME,
+            )
             .await
             .unwrap_or_default();
         BaseApiClient::config_u64(&gc, "max_sponsorships", 3) as u32
@@ -386,11 +401,10 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
     // Notifier le parrain en DM
     let parrain_uid = serenity::model::id::UserId::new(parrain_id);
     if let Ok(dm) = parrain_uid.create_dm_channel(&ctx.http).await {
-        let notif = success_embed("\u{2705} Parrainage accepte")
-            .description(format!(
-                "<@{target_id}> a accepte ta demande de parrainage. \
+        let notif = success_embed("\u{2705} Parrainage accepte").description(format!(
+            "<@{target_id}> a accepte ta demande de parrainage. \
                  Tu es maintenant officiellement son parrain !"
-            ));
+        ));
         let _ = dm
             .send_message(&ctx.http, CreateMessage::new().embed(notif))
             .await;
@@ -461,7 +475,10 @@ async fn validate_sponsorship(
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
             let gc = base
-                .get_guild_config_for(&guild_id.to_string(), crate::modules::community::MODULE_BOT_NAME)
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::community::MODULE_BOT_NAME,
+                )
                 .await
                 .unwrap_or_default();
             (

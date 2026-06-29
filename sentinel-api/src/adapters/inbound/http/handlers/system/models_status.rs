@@ -21,9 +21,7 @@ pub struct ModelsStatusResponse {
 }
 
 /// GET /api/models/status — retourne l'etat des modeles IA charges
-pub async fn get_models_status(
-    State(state): State<AppState>,
-) -> Json<ModelsStatusResponse> {
+pub async fn get_models_status(State(state): State<AppState>) -> Json<ModelsStatusResponse> {
     let vision_path = std::env::var("VISION_MODEL_PATH").unwrap_or_default();
     let text_path = std::env::var("TEXT_MODEL_PATH").unwrap_or_default();
 
@@ -63,11 +61,21 @@ pub async fn reload_model(
     match state.inference.reload(&req.model_type) {
         Ok(msg) => {
             info!("{}", msg);
-            (StatusCode::OK, Json(ReloadResponse { success: true, message: msg }))
+            (
+                StatusCode::OK,
+                Json(ReloadResponse {
+                    success: true,
+                    message: msg,
+                }),
+            )
         }
-        Err(msg) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, Json(ReloadResponse { success: false, message: msg }))
-        }
+        Err(msg) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ReloadResponse {
+                success: false,
+                message: msg,
+            }),
+        ),
     }
 }
 

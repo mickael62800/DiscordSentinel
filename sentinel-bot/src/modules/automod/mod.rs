@@ -3,8 +3,8 @@
 
 pub const MODULE_BOT_NAME: &str = "automod-bot";
 
-mod api_client;
 pub mod adaptive_slowmode;
+mod api_client;
 pub mod automod_cmd;
 mod backend;
 mod config;
@@ -185,7 +185,10 @@ pub fn handles_component(custom_id: &str) -> bool {
 }
 
 /// Handle a component interaction (review/vote button click).
-pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+pub async fn on_component(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+) {
     if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
         return;
     }
@@ -268,7 +271,11 @@ pub fn spawn_background_tasks(ctx: &Context) {
                 processed.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
                 let removed = before.saturating_sub(processed.len());
                 if removed > 0 {
-                    info!(removed, remaining = processed.len(), "Purge background processed cache");
+                    info!(
+                        removed,
+                        remaining = processed.len(),
+                        "Purge background processed cache"
+                    );
                 }
             }
 
@@ -281,7 +288,11 @@ pub fn spawn_background_tasks(ctx: &Context) {
                 });
                 let removed = before.saturating_sub(tracker.len());
                 if removed > 0 {
-                    info!(removed, remaining = tracker.len(), "Purge background flood tracker");
+                    info!(
+                        removed,
+                        remaining = tracker.len(),
+                        "Purge background flood tracker"
+                    );
                 }
             }
 

@@ -3,18 +3,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::validation::check_min_hp_pct;
 use crate::domain::entities::coude::combat::validation::check_surprise_hp_pct;
 use crate::domain::entities::coude::combat::validation::validate_new_combat;
-use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeCombatsService {
     repo: Arc<dyn CombatRepository>,
     /// Optionnel : requis pour appliquer le gate `surprise_min_hp_percent`.
@@ -79,7 +79,9 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         guild_id: &str,
         attacker_id: &str,
     ) -> Result<Option<Combat>, DomainError> {
-        self.repo.get_pending_for_attacker(guild_id, attacker_id).await
+        self.repo
+            .get_pending_for_attacker(guild_id, attacker_id)
+            .await
     }
 
     async fn get_pending_for_defender(
@@ -87,7 +89,9 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         guild_id: &str,
         defender_id: &str,
     ) -> Result<Option<Combat>, DomainError> {
-        self.repo.get_pending_for_defender(guild_id, defender_id).await
+        self.repo
+            .get_pending_for_defender(guild_id, defender_id)
+            .await
     }
 
     async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
@@ -134,9 +138,7 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
             }
 
             // Gate 2 : attaque surprise -> seuil HP attaquant specifique.
-            if new.special_attack.as_deref() == Some("surprise")
-                && params.surprise_min_hp_pct > 0
-            {
+            if new.special_attack.as_deref() == Some("surprise") && params.surprise_min_hp_pct > 0 {
                 let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
                 check_surprise_hp_pct(
                     attacker.hp_current,
@@ -172,11 +174,7 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         Ok(())
     }
 
-    async fn resolve(
-        &self,
-        id: Uuid,
-        resolution: CombatResolution,
-    ) -> Result<(), DomainError> {
+    async fn resolve(&self, id: Uuid, resolution: CombatResolution) -> Result<(), DomainError> {
         let resolved = self.repo.resolve(id, resolution).await?;
         if !resolved {
             return Err(DomainError::Conflict(
@@ -188,9 +186,7 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
 
     async fn set_betting(&self, id: Uuid, message_id: &str) -> Result<bool, DomainError> {
         if message_id.is_empty() {
-            return Err(DomainError::ValidationError(
-                "message_id requis".into(),
-            ));
+            return Err(DomainError::ValidationError("message_id requis".into()));
         }
         self.repo.set_betting(id, message_id).await
     }
@@ -203,11 +199,7 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         Ok(())
     }
 
-    async fn set_defender_special(
-        &self,
-        id: Uuid,
-        item_key: &str,
-    ) -> Result<(), DomainError> {
+    async fn set_defender_special(&self, id: Uuid, item_key: &str) -> Result<(), DomainError> {
         if item_key.is_empty() {
             return Err(DomainError::ValidationError("item_key requis".into()));
         }

@@ -40,9 +40,14 @@ impl QuarantineManager {
         };
 
         // Ajouter le role quarantaine sans supprimer les autres
-        match ctx.http.add_member_role(guild_id, user_id, role_id, Some("Quarantaine Sentinel")).await {
+        match ctx
+            .http
+            .add_member_role(guild_id, user_id, role_id, Some("Quarantaine Sentinel"))
+            .await
+        {
             Ok(_) => {
-                self.quarantined.insert((guild_id, user_id), (Instant::now(), original_roles));
+                self.quarantined
+                    .insert((guild_id, user_id), (Instant::now(), original_roles));
                 info!(
                     guild_id = %guild_id,
                     user_id = %user_id,
@@ -70,7 +75,11 @@ impl QuarantineManager {
         user_id: UserId,
         role_id: RoleId,
     ) -> bool {
-        if let Err(e) = ctx.http.remove_member_role(guild_id, user_id, role_id, Some("Captcha verifie")).await {
+        if let Err(e) = ctx
+            .http
+            .remove_member_role(guild_id, user_id, role_id, Some("Captcha verifie"))
+            .await
+        {
             warn!(error = %e, "Impossible de retirer le role quarantaine");
             return false;
         }
@@ -112,7 +121,9 @@ mod tests {
 
         assert!(!manager.is_quarantined(guild, user));
 
-        manager.quarantined.insert((guild, user), (Instant::now(), Vec::new()));
+        manager
+            .quarantined
+            .insert((guild, user), (Instant::now(), Vec::new()));
         assert!(manager.is_quarantined(guild, user));
 
         manager.remove_tracking(guild, user);

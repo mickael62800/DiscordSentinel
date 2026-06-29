@@ -12,9 +12,9 @@ use sqlx::Transaction;
 use uuid::Uuid;
 
 use crate::application::casino::manage_wheel_service::ManageWheelService;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
@@ -36,16 +36,28 @@ impl WheelRepository for MockWheelRepo {
         Ok(*self.has_claimed.lock().unwrap())
     }
     async fn log_spin_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &WheelSpin,
-    ) -> Result<(), DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &WheelSpin,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn mark_claimed_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str,
-    ) -> Result<(), DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn recent_spins(&self, _g: &str, _l: i64) -> Result<Vec<WheelSpin>, DomainError> {
         Ok(self.recent_returns.lock().unwrap().clone())
     }
     async fn top_winners(
-        &self, _g: &str, _d: i64, _l: i64,
+        &self,
+        _g: &str,
+        _d: i64,
+        _l: i64,
     ) -> Result<Vec<WheelTopWinner>, DomainError> {
         Ok(self.top_returns.lock().unwrap().clone())
     }
@@ -55,13 +67,65 @@ struct MockWalletUc;
 
 #[async_trait]
 impl ManageWalletUseCase for MockWalletUc {
-    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
-    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    async fn credit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn transfer(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
+        unimplemented!()
+    }
+    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn credit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> {
+        vec![]
+    }
 }
 
 fn lazy_pool() -> sqlx::PgPool {

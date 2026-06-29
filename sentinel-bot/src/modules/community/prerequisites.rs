@@ -14,10 +14,14 @@ pub fn parse_prerequisites(raw: &str) -> Vec<(u64, Vec<Prerequisite>)> {
 
     for line in raw.lines() {
         let line = line.trim();
-        if line.is_empty() { continue; }
+        if line.is_empty() {
+            continue;
+        }
 
         let parts: Vec<&str> = line.splitn(3, ':').collect();
-        if parts.len() < 3 { continue; }
+        if parts.len() < 3 {
+            continue;
+        }
 
         let role_id: u64 = match parts[0].trim().parse() {
             Ok(id) => id,
@@ -25,18 +29,14 @@ pub fn parse_prerequisites(raw: &str) -> Vec<(u64, Vec<Prerequisite>)> {
         };
 
         let prereq = match parts[1].trim() {
-            "requires_role" => {
-                match parts[2].trim().parse::<u64>() {
-                    Ok(rid) => Prerequisite::RequiresRole(rid),
-                    Err(_) => continue,
-                }
-            }
-            "min_days" => {
-                match parts[2].trim().parse::<u64>() {
-                    Ok(d) => Prerequisite::MinDays(d),
-                    Err(_) => continue,
-                }
-            }
+            "requires_role" => match parts[2].trim().parse::<u64>() {
+                Ok(rid) => Prerequisite::RequiresRole(rid),
+                Err(_) => continue,
+            },
+            "min_days" => match parts[2].trim().parse::<u64>() {
+                Ok(d) => Prerequisite::MinDays(d),
+                Err(_) => continue,
+            },
             _ => continue,
         };
 
@@ -67,7 +67,10 @@ pub fn check_prerequisites(
         match prereq {
             Prerequisite::RequiresRole(required_role) => {
                 if !user_roles.contains(required_role) {
-                    return Err(format!("Vous devez avoir le role <@&{}> pour obtenir ce role.", required_role));
+                    return Err(format!(
+                        "Vous devez avoir le role <@&{}> pour obtenir ce role.",
+                        required_role
+                    ));
                 }
             }
             Prerequisite::MinDays(min) => {
@@ -167,19 +170,19 @@ mod tests {
 
     #[test]
     fn check_multiple_prereqs_all_pass() {
-        let prereqs = vec![(100, vec![
-            Prerequisite::RequiresRole(200),
-            Prerequisite::MinDays(7),
-        ])];
+        let prereqs = vec![(
+            100,
+            vec![Prerequisite::RequiresRole(200), Prerequisite::MinDays(7)],
+        )];
         assert!(check_prerequisites(&prereqs, 100, &[200], 10).is_ok());
     }
 
     #[test]
     fn check_multiple_prereqs_one_fails() {
-        let prereqs = vec![(100, vec![
-            Prerequisite::RequiresRole(200),
-            Prerequisite::MinDays(30),
-        ])];
+        let prereqs = vec![(
+            100,
+            vec![Prerequisite::RequiresRole(200), Prerequisite::MinDays(30)],
+        )];
         let result = check_prerequisites(&prereqs, 100, &[200], 10);
         assert!(result.is_err());
     }

@@ -27,30 +27,20 @@ pub trait GameServerRepository: Send + Sync {
         last_error: Option<&str>,
     ) -> Result<(), DomainError>;
 
-    async fn update_player_activity(
-        &self,
-        id: Uuid,
-        player_count: i32,
-    ) -> Result<(), DomainError>;
+    async fn update_player_activity(&self, id: Uuid, player_count: i32) -> Result<(), DomainError>;
 
     /// Soft-delete (status = deleted, deleted_at = NOW()).
     async fn soft_delete(&self, id: Uuid) -> Result<(), DomainError>;
 
     /// Compte les serveurs actifs (non-deleted) d'une guild + leur memoire totale.
     /// Pour le calcul de quota.
-    async fn count_active_for_guild(
-        &self,
-        guild_id: &str,
-    ) -> Result<(i32, i32), DomainError>;
+    async fn count_active_for_guild(&self, guild_id: &str) -> Result<(i32, i32), DomainError>;
 
     /// Pour un template donne, retourne (nb_servers_actifs, derniere_activite).
     /// derniere_activite = MAX(updated_at) sur tous les serveurs (incluant
     /// soft-deleted) qui ont utilise ce template. Utilise par le job
     /// image-cleanup pour decider si l'image Docker peut etre supprimee.
-    async fn template_usage(
-        &self,
-        template_id: uuid::Uuid,
-    ) -> Result<TemplateUsage, DomainError>;
+    async fn template_usage(&self, template_id: uuid::Uuid) -> Result<TemplateUsage, DomainError>;
 }
 
 #[derive(Debug, Clone)]

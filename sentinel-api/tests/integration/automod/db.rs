@@ -1,37 +1,46 @@
 //! Tests d'integration REELS pour le pipeline automod (avec PostgreSQL).
 //! Verifie le flow complet : config guild → rules → scoring → infractions.
 
-use std::sync::Arc;
 use sqlx::PgPool;
+use std::sync::Arc;
 
-use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
-use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
-use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
-use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
 use sentinel_api::adapters::outbound::inference_service::InferenceService;
+use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use sentinel_api::adapters::outbound::text_tokenizer::TextTokenizer;
-use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use sentinel_api::ports::inbound::ai::analyze_message::ContextMessageEntry;
 use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
 async fn setup_pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
-    PgPool::connect(&url).await.expect("Impossible de se connecter a la base de test")
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
+    PgPool::connect(&url)
+        .await
+        .expect("Impossible de se connecter a la base de test")
 }
 
 fn unique_guild() -> String {
-    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 /// Guild ID court pour les tables avec varchar(20) comme bot_guild_config.
 fn short_guild_id() -> String {
     use rand::Rng;
     let mut rng = rand::thread_rng();
-    format!("{}", rng.gen_range(10000000000000000u64..99999999999999999u64))
+    format!(
+        "{}",
+        rng.gen_range(10000000000000000u64..99999999999999999u64)
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -76,16 +85,31 @@ async fn bot_config_multiple_keys_per_guild() {
     let pool = setup_pool().await;
     let gid = short_guild_id();
 
-    for (key, val) in &[("enabled", "true"), ("flood_max_messages", "5"), ("mute_duration_secs", "600")] {
+    for (key, val) in &[
+        ("enabled", "true"),
+        ("flood_max_messages", "5"),
+        ("mute_duration_secs", "600"),
+    ] {
         sqlx::query(
             r#"INSERT INTO bot_guild_config (guild_id, bot_name, config_key, config_value)
                VALUES ($1, 'automod-bot', $2, $3)"#,
-        ).bind(&gid).bind(key).bind(val).execute(&pool).await.unwrap();
+        )
+        .bind(&gid)
+        .bind(key)
+        .bind(val)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
 
     let count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM bot_guild_config WHERE guild_id = $1 AND bot_name = 'automod-bot'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(count, 3);
 }
@@ -99,11 +123,20 @@ async fn bot_config_isolated_per_guild() {
     sqlx::query(
         r#"INSERT INTO bot_guild_config (guild_id, bot_name, config_key, config_value)
            VALUES ($1, 'automod-bot', 'enabled', 'false')"#,
-    ).bind(&gid1).execute(&pool).await.unwrap();
+    )
+    .bind(&gid1)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let exists = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM bot_guild_config WHERE guild_id = $1 AND config_key = 'enabled'",
-    ).bind(&gid2).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid2)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(exists, 0, "Guild 2 ne doit pas heriter de guild 1");
 }
@@ -131,7 +164,10 @@ async fn rules_per_guild_with_weights() {
     let rules = repo.find_by_guild(&gid).await.unwrap();
     assert_eq!(rules.len(), 2);
 
-    let spam_rule = rules.iter().find(|r| r.flag_type.as_str() == "spam").unwrap();
+    let spam_rule = rules
+        .iter()
+        .find(|r| r.flag_type.as_str() == "spam")
+        .unwrap();
     assert!((spam_rule.weight - 3.0).abs() < 0.01);
     assert!(spam_rule.enabled);
 }
@@ -177,9 +213,9 @@ async fn full_analyze_spam_creates_infraction() {
     let tokenizer = Arc::new(TextTokenizer::new(None, 512));
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
-    let service = AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, bot_config_repo, limiter,
-    ).with_text_inference(inference, tokenizer);
+    let service =
+        AnalyzeMessageService::new(rule_repo, infraction_repo, cache, bot_config_repo, limiter)
+            .with_text_inference(inference, tokenizer);
 
     // Analyze a spam message
     let cmd = AnalyzeMessageCommand {
@@ -188,19 +224,33 @@ async fn full_analyze_spam_creates_infraction() {
         user_id: "444444444444444444".into(),
         username: "Spammer".into(),
         content: "buy buy buy buy buy".into(),
-        flags: DetectionFlags { spam: true, insult: false, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: true,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
         message_id: "msg_test_1".into(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         context_messages: vec![],
     };
 
     let result = service.analyze(cmd).await.unwrap();
-    assert_eq!(result.action.as_str(), "warn", "Spam seul devrait trigger warn (score=3.0, threshold_warn=2.0)");
+    assert_eq!(
+        result.action.as_str(),
+        "warn",
+        "Spam seul devrait trigger warn (score=3.0, threshold_warn=2.0)"
+    );
 
     // Verifier que l'infraction est persistee en DB
     let count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND action = 'warn'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(count, 1);
 }
@@ -227,7 +277,12 @@ async fn full_analyze_spam_plus_insult_escalates() {
         user_id: "444444444444444444".into(),
         username: "BadUser".into(),
         content: "connard connard connard".into(),
-        flags: DetectionFlags { spam: true, insult: true, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: true,
+            insult: true,
+            link: false,
+            phishing: false,
+        },
         message_id: "msg_test_2".into(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         context_messages: vec![],
@@ -235,7 +290,11 @@ async fn full_analyze_spam_plus_insult_escalates() {
 
     let result = service.analyze(cmd).await.unwrap();
     // spam(3.0) + insult(5.0) = 8.0 → mute (threshold 6.0)
-    assert_eq!(result.action.as_str(), "mute", "Spam+Insult (score=8.0) devrait trigger mute");
+    assert_eq!(
+        result.action.as_str(),
+        "mute",
+        "Spam+Insult (score=8.0) devrait trigger mute"
+    );
 }
 
 #[tokio::test]
@@ -258,7 +317,12 @@ async fn full_analyze_no_flags_returns_none() {
         user_id: "444444444444444444".into(),
         username: "NormalUser".into(),
         content: "Salut tout le monde".into(),
-        flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
         message_id: "msg_test_3".into(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         context_messages: vec![],
@@ -286,12 +350,23 @@ async fn full_analyze_with_context_messages() {
         user_id: "444444444444444444".into(),
         username: "User".into(),
         content: "spam spam spam".into(),
-        flags: DetectionFlags { spam: true, insult: false, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: true,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
         message_id: "msg_test_4".into(),
         timestamp: chrono::Utc::now().to_rfc3339(),
         context_messages: vec![
-            ContextMessageEntry { username: "Alice".into(), content: "Salut".into() },
-            ContextMessageEntry { username: "Bob".into(), content: "Ca va ?".into() },
+            ContextMessageEntry {
+                username: "Alice".into(),
+                content: "Salut".into(),
+            },
+            ContextMessageEntry {
+                username: "Bob".into(),
+                content: "Ca va ?".into(),
+            },
         ],
     };
 
@@ -340,9 +415,8 @@ fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
     let tokenizer = Arc::new(TextTokenizer::new(None, 512));
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
-    AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, bot_config_repo, limiter,
-    ).with_text_inference(inference, tokenizer)
+    AnalyzeMessageService::new(rule_repo, infraction_repo, cache, bot_config_repo, limiter)
+        .with_text_inference(inference, tokenizer)
 }
 
 // Stub cache qui ne cache rien (force la lecture DB a chaque fois)
@@ -350,25 +424,49 @@ struct NoCache;
 
 #[async_trait::async_trait]
 impl sentinel_api::ports::outbound::system::cache::CachePort for NoCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<sentinel_core::domain::entities::system::rule::Rule>>, sentinel_core::domain::errors::DomainError> {
+    async fn get_rules(
+        &self,
+        _: &str,
+    ) -> Result<
+        Option<Vec<sentinel_core::domain::entities::system::rule::Rule>>,
+        sentinel_core::domain::errors::DomainError,
+    > {
         Ok(None) // Force lecture DB a chaque fois
     }
-    async fn set_rules(&self, _: &str, _: &[sentinel_core::domain::entities::system::rule::Rule]) -> Result<(), sentinel_core::domain::errors::DomainError> {
+    async fn set_rules(
+        &self,
+        _: &str,
+        _: &[sentinel_core::domain::entities::system::rule::Rule],
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
         Ok(())
     }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), sentinel_core::domain::errors::DomainError> {
+    async fn invalidate_rules(
+        &self,
+        _: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
         Ok(())
     }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+    async fn get_json(
+        &self,
+        _: &str,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
         Ok(None)
     }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), sentinel_core::domain::errors::DomainError> {
+    async fn set_json(
+        &self,
+        _: &str,
+        _: &str,
+        _: u64,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
         Ok(())
     }
     async fn invalidate(&self, _: &str) -> Result<(), sentinel_core::domain::errors::DomainError> {
         Ok(())
     }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), sentinel_core::domain::errors::DomainError> {
+    async fn invalidate_pattern(
+        &self,
+        _: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
         Ok(())
     }
 }

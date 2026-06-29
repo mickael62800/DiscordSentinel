@@ -45,7 +45,8 @@ pub const CLASS_AGILE: ClassStats = ClassStats {
     description: "Esquive souvent mais frappe faible",
     passif_key: "esquive",
     passif_description: "Esquive : 15% de chance d'esquiver par round",
-    passif_reveal: "{joueur} fait un pas de cote et esquive completement le coup ! C'est un AGILE !",
+    passif_reveal:
+        "{joueur} fait un pas de cote et esquive completement le coup ! C'est un AGILE !",
 };
 
 pub const CLASS_FOURBE: ClassStats = ClassStats {

@@ -4,12 +4,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
+use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 use sentinel_core::domain::entities::tamagotchi::pet::{Health, NewPet, Pet, PetEvent};
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 
 const TBL: &str = "pets";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 #[derive(sqlx::FromRow)]
 struct Row {
@@ -81,7 +83,9 @@ pub struct PgPetRepository {
 }
 
 impl PgPetRepository {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[async_trait]
@@ -113,7 +117,11 @@ impl PetRepository for PgPetRepository {
         Ok(row.map(Into::into))
     }
 
-    async fn get_by_owner(&self, guild_id: &str, owner_id: &str) -> Result<Option<Pet>, DomainError> {
+    async fn get_by_owner(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<Pet>, DomainError> {
         let row: Option<Row> =
             sqlx::query_as("SELECT * FROM pets WHERE guild_id = $1 AND owner_id = $2")
                 .bind(guild_id)
@@ -125,13 +133,12 @@ impl PetRepository for PgPetRepository {
     }
 
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError> {
-        let rows: Vec<Row> = sqlx::query_as(
-            "SELECT * FROM pets WHERE guild_id = $1 ORDER BY level DESC, xp DESC",
-        )
-        .bind(guild_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let rows: Vec<Row> =
+            sqlx::query_as("SELECT * FROM pets WHERE guild_id = $1 ORDER BY level DESC, xp DESC")
+                .bind(guild_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
@@ -179,7 +186,11 @@ impl PetRepository for PgPetRepository {
         Ok(row.into())
     }
 
-    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+    async fn list_alive(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
         // Tri par `id` (et non `last_decay_at`) : stable pour la pagination par
         // curseur meme si le tick met a jour `last_decay_at` ou tue des pets.
         let rows: Vec<Row> = sqlx::query_as(
@@ -216,7 +227,11 @@ impl PetRepository for PgPetRepository {
         Ok(())
     }
 
-    async fn list_with_card(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+    async fn list_with_card(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
         // Compagnons vivants ayant une carte postee (a rafraichir), pagine par
         // curseur `id` croissant.
         let rows: Vec<Row> = sqlx::query_as(
@@ -246,7 +261,11 @@ impl PetRepository for PgPetRepository {
 
     async fn recent_events(&self, pet_id: Uuid, limit: i64) -> Result<Vec<PetEvent>, DomainError> {
         #[derive(sqlx::FromRow)]
-        struct EvRow { kind: String, detail: String, created_at: DateTime<Utc> }
+        struct EvRow {
+            kind: String,
+            detail: String,
+            created_at: DateTime<Utc>,
+        }
         let rows: Vec<EvRow> = sqlx::query_as(
             "SELECT kind, detail, created_at FROM pet_events \
              WHERE pet_id = $1 ORDER BY created_at DESC LIMIT $2",
@@ -258,7 +277,11 @@ impl PetRepository for PgPetRepository {
         .map_err(pg_err)?;
         Ok(rows
             .into_iter()
-            .map(|e| PetEvent { kind: e.kind, detail: e.detail, created_at: e.created_at })
+            .map(|e| PetEvent {
+                kind: e.kind,
+                detail: e.detail,
+                created_at: e.created_at,
+            })
             .collect())
     }
 }

@@ -17,36 +17,69 @@ pub fn register() -> CreateCommand {
                 .add_string_choice("JSON", "json")
                 .add_string_choice("CSV", "csv"),
         )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur dont exporter l'historique (ou user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur dont exporter l'historique (ou user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (ex. membre parti / banni)",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            crate::shared::discord_helpers::reply_ephemeral(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
-    let format = command.data.options.iter().find(|o| o.name == "format")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let format = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "format")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
         .unwrap_or("json");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            crate::shared::discord_helpers::reply_ephemeral(
+                ctx,
+                command,
+                "Commande serveur uniquement.",
+            )
+            .await;
+            return;
+        }
     };
 
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
 
-    match api.get_history(&guild_id.to_string(), &target_id.to_string()).await {
+    match api
+        .get_history(&guild_id.to_string(), &target_id.to_string())
+        .await
+    {
         Ok(history) => {
             let (content, filename) = match format {
                 "csv" => (
@@ -59,14 +92,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
             };
 
-            if let Err(e) = command.create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content(format!("Historique de <@{}> ({} actions) — fichier en cours d'envoi...", target_id, history.actions.len()))
-                        .ephemeral(true),
-                ),
-            ).await {
+            if let Err(e) = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!(
+                                "Historique de <@{}> ({} actions) — fichier en cours d'envoi...",
+                                target_id,
+                                history.actions.len()
+                            ))
+                            .ephemeral(true),
+                    ),
+                )
+                .await
+            {
                 warn!(error = %e, "Failed to send export initial response");
             }
 
@@ -81,7 +121,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur export historique");
-            crate::shared::discord_helpers::reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
+            crate::shared::discord_helpers::reply_ephemeral(ctx, command, &format!("Erreur : {e}"))
+                .await;
         }
     }
 }
@@ -124,7 +165,6 @@ fn csv_escape(s: &str) -> String {
         s.to_string()
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -179,9 +219,9 @@ mod tests {
         let actions = vec![ModerationActionResponse {
             id: "1".to_string(),
             action_type: "warn".to_string(),
-                moderator_name: "Mod1".to_string(),
-                gravity: None,
-                created_at: "2026-01-01T00:00:00Z".to_string(),
+            moderator_name: "Mod1".to_string(),
+            gravity: None,
+            created_at: "2026-01-01T00:00:00Z".to_string(),
             target_name: "Bob".to_string(),
             reason: "Raison avec, virgule".to_string(),
             escalation_action: None,

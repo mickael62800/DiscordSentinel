@@ -24,12 +24,7 @@ impl InteractionCooldown {
     /// Verifie le cooldown. Retourne `Some(remaining_secs)` si le user doit
     /// encore attendre, `None` si l'action est autorisee (et alors enregistre
     /// le nouveau timestamp).
-    pub fn check_and_set(
-        &self,
-        user_id: u64,
-        key: &str,
-        cooldown_secs: u64,
-    ) -> Option<u64> {
+    pub fn check_and_set(&self, user_id: u64, key: &str, cooldown_secs: u64) -> Option<u64> {
         let k = (user_id, key.to_string());
         let now = Instant::now();
 

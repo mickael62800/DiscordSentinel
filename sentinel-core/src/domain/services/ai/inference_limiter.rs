@@ -3,9 +3,9 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
+use crate::domain::errors::DomainError;
 use tokio::sync::Semaphore;
 use tokio::sync::SemaphorePermit;
-use crate::domain::errors::DomainError;
 
 /// Rate limiter pour les appels d'inference ONNX.
 /// Combine un semaphore (concurrence max) et un token bucket (debit max/s).
@@ -62,7 +62,8 @@ impl InferenceRateLimiter {
                 {
                     Ok(Ok(permit)) => Ok(permit),
                     _ => Err(DomainError::RateLimited(
-                        "Inference rate limit exceeded — max concurrent inferences reached".to_string(),
+                        "Inference rate limit exceeded — max concurrent inferences reached"
+                            .to_string(),
                     )),
                 }
             }
@@ -83,7 +84,6 @@ impl InferenceRateLimiter {
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/inference_limiter.rs"]

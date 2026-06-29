@@ -15,14 +15,14 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
-use sentinel_core::domain::entities::coude::bet::Bet;
-use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
-use sentinel_core::domain::entities::coude::bet::RefundSummary;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use sentinel_api::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use sentinel_api::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
+use sentinel_core::domain::entities::coude::bet::Bet;
+use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
+use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
+use sentinel_core::domain::entities::coude::bet::RefundSummary;
+use sentinel_core::domain::errors::DomainError;
 #[derive(Default)]
 struct MockBets {
     placed: Mutex<Vec<NewCoudeBet>>,
@@ -38,7 +38,9 @@ impl ManageCoudeBetsUseCase for MockBets {
             return Err(DomainError::ValidationError("combat pas en betting".into()));
         }
         self.placed.lock().unwrap().push(n);
-        Ok(PlaceBetOutcome { taunt_events: vec![] })
+        Ok(PlaceBetOutcome {
+            taunt_events: vec![],
+        })
     }
     async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> {
         Ok(vec![])
@@ -50,13 +52,19 @@ impl ManageCoudeBetsUseCase for MockBets {
     ) -> Result<ResolveBetsOutcome, DomainError> {
         self.resolved.lock().unwrap().push((combat_id, winner_id));
         Ok(ResolveBetsOutcome {
-            plan: BetResolutionPlan { payouts: vec![], fighter_bonus: None },
+            plan: BetResolutionPlan {
+                payouts: vec![],
+                fighter_bonus: None,
+            },
             taunt_events: vec![],
         })
     }
     async fn refund(&self, combat_id: Uuid) -> Result<RefundSummary, DomainError> {
         self.refunded.lock().unwrap().push(combat_id);
-        Ok(RefundSummary { refunded_count: 3, refunded_total: 600 })
+        Ok(RefundSummary {
+            refunded_count: 3,
+            refunded_total: 600,
+        })
     }
 }
 
@@ -66,9 +74,12 @@ fn state_with(bets: Arc<MockBets>) -> sentinel_api::adapters::inbound::http::sta
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
         Some(v) => {
@@ -81,7 +92,10 @@ async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── place_bet ──
@@ -142,8 +156,13 @@ async fn get_combat_bets_returns_empty_array() {
     let bets = Arc::new(MockBets::default());
     let app = router::build_for_test(state_with(bets));
     let combat_id = Uuid::new_v4();
-    let (status, json) = req_json(app, "GET",
-        &format!("/api/coude/combats/{combat_id}/bets"), None).await;
+    let (status, json) = req_json(
+        app,
+        "GET",
+        &format!("/api/coude/combats/{combat_id}/bets"),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(json.as_array().unwrap().is_empty());
 }
@@ -152,8 +171,7 @@ async fn get_combat_bets_returns_empty_array() {
 async fn get_combat_bets_invalid_uuid_422() {
     let bets = Arc::new(MockBets::default());
     let app = router::build_for_test(state_with(bets));
-    let (status, _) = req_json(app, "GET",
-        "/api/coude/combats/bad-uuid/bets", None).await;
+    let (status, _) = req_json(app, "GET", "/api/coude/combats/bad-uuid/bets", None).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -165,8 +183,13 @@ async fn resolve_bets_with_winner_forwards_to_uc() {
     let app = router::build_for_test(state_with(bets.clone()));
     let combat_id = Uuid::new_v4();
     let body = serde_json::json!({ "winner_id": "111" });
-    let (status, json) = req_json(app, "POST",
-        &format!("/api/coude/combats/{combat_id}/resolve-bets"), Some(body)).await;
+    let (status, json) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{combat_id}/resolve-bets"),
+        Some(body),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert!(json["results"].as_array().unwrap().is_empty());
     assert!(json["fighter_bonus"].is_null());
@@ -180,8 +203,13 @@ async fn resolve_bets_without_winner_treats_as_draw() {
     let app = router::build_for_test(state_with(bets.clone()));
     let combat_id = Uuid::new_v4();
     let body = serde_json::json!({ "winner_id": null });
-    let (status, _) = req_json(app, "POST",
-        &format!("/api/coude/combats/{combat_id}/resolve-bets"), Some(body)).await;
+    let (status, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{combat_id}/resolve-bets"),
+        Some(body),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(bets.resolved.lock().unwrap()[0].1, None);
 }
@@ -193,8 +221,13 @@ async fn refund_bets_returns_summary() {
     let bets = Arc::new(MockBets::default());
     let app = router::build_for_test(state_with(bets.clone()));
     let combat_id = Uuid::new_v4();
-    let (status, json) = req_json(app, "POST",
-        &format!("/api/coude/combats/{combat_id}/refund-bets"), None).await;
+    let (status, json) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{combat_id}/refund-bets"),
+        None,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["refunded_count"], 3);
     assert_eq!(json["refunded_total"], 600);

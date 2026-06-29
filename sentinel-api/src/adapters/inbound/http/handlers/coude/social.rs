@@ -1,10 +1,10 @@
 //! Handlers sociaux : cooldowns, leaderboard, événements, daily chaos, saisons.
 //! Délèguent à `state.coude_social_uc`.
 
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -66,7 +66,9 @@ pub async fn leaderboard(
         .coude_social_uc
         .leaderboard(&guild_id, cat, params.limit.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
         .await?;
-    Ok(Json(entries.into_iter().map(LeaderboardEntryDto::from).collect()))
+    Ok(Json(
+        entries.into_iter().map(LeaderboardEntryDto::from).collect(),
+    ))
 }
 
 // ── Daily chaos ──

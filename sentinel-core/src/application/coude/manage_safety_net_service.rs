@@ -8,8 +8,8 @@ use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeSafetyNetService {
     repo: Arc<dyn SafetyNetRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
@@ -17,7 +17,10 @@ pub struct ManageCoudeSafetyNetService {
 
 impl ManageCoudeSafetyNetService {
     pub fn new(repo: Arc<dyn SafetyNetRepository>) -> Self {
-        Self { repo, bot_config_repo: None }
+        Self {
+            repo,
+            bot_config_repo: None,
+        }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
@@ -64,10 +67,7 @@ impl ManageCoudeSafetyNetUseCase for ManageCoudeSafetyNetService {
         self.repo.get_active(guild_id, user_id).await
     }
 
-    async fn list_active(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<ActiveSafetyNet>, DomainError> {
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<ActiveSafetyNet>, DomainError> {
         self.repo.list_active(guild_id).await
     }
 }

@@ -52,7 +52,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await

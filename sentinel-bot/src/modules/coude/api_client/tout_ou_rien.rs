@@ -43,10 +43,7 @@ impl ApiClient {
             delta,
         };
         self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/tout-ou-rien/record"),
-                &body,
-            )
+            .post_fire_and_forget(&format!("/api/coude/{guild_id}/tout-ou-rien/record"), &body)
             .await;
     }
 
@@ -115,10 +112,7 @@ impl ApiClient {
     ) -> Result<PlayToutOuRienResp, String> {
         let body = PlayToutOuRienBody { user_id, username };
         self.base
-            .post_json(
-                &format!("/api/coude/{guild_id}/tout-ou-rien/play"),
-                &body,
-            )
+            .post_json(&format!("/api/coude/{guild_id}/tout-ou-rien/play"), &body)
             .await
     }
 }

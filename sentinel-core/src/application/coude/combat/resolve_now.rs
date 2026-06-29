@@ -19,30 +19,30 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
-use crate::domain::entities::coude::combat::resolution_rules::compute_combat_xp;
 use crate::domain::entities::coude::combat::outcome_flags::detect_outcome_flags;
-use crate::domain::entities::coude::combat::resolution_rules::format_bet_payout_lines;
 use crate::domain::entities::coude::combat::outcome_flags::CombatOutcomeFlags;
 use crate::domain::entities::coude::combat::outcome_flags::COMEBACK_HP_PCT_MAX;
+use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
+use crate::domain::entities::coude::combat::resolution_rules::compute_combat_xp;
+use crate::domain::entities::coude::combat::resolution_rules::format_bet_payout_lines;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine as engine;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
 use crate::domain::services::coude::coude_combat_engine::ServerEventLite;
-use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowOutput;
-use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
-use crate::ports::inbound::coude::resolve_combat_now::ResolvedCombatEmbedField;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowOutput;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
+use crate::ports::inbound::coude::resolve_combat_now::ResolvedCombatEmbedField;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ResolveCombatNowService {
     combat_repo: Arc<dyn CombatRepository>,
     combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
@@ -100,12 +100,16 @@ impl ResolveCombatNowService {
     }
 
     async fn loser_has_safety_net(&self, guild_id: &str, user_id: &str) -> bool {
-        let Some(repo) = &self.safety_net_repo else { return false; };
+        let Some(repo) = &self.safety_net_repo else {
+            return false;
+        };
         matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_)))
     }
 
     async fn try_activate_safety_net_after(&self, guild_id: &str, user_id: &str) {
-        let Some(repo) = &self.safety_net_repo else { return; };
+        let Some(repo) = &self.safety_net_repo else {
+            return;
+        };
         let balance = match self.wallet_repo.get(guild_id, user_id).await {
             Ok(Some(w)) => w.coins,
             _ => return,
@@ -130,7 +134,9 @@ impl ResolveCombatNowService {
     }
 
     async fn fetch_banana(&self, guild_id: &str, user_id: &str) -> bool {
-        let Some(repo) = &self.curses_repo else { return false; };
+        let Some(repo) = &self.curses_repo else {
+            return false;
+        };
         use crate::domain::entities::coude::curse::CurseKind;
         matches!(
             repo.get_active_for_target(guild_id, user_id).await,
@@ -142,7 +148,9 @@ impl ResolveCombatNowService {
     /// Retourne `true` si la malediction a ete trouvee + levee, ce qui doit
     /// faire foirer la prochaine attaque speciale.
     async fn consume_graisser_if_active(&self, guild_id: &str, user_id: &str) -> bool {
-        let Some(repo) = &self.curses_repo else { return false; };
+        let Some(repo) = &self.curses_repo else {
+            return false;
+        };
         use crate::domain::entities::coude::curse::CurseKind;
         match repo.get_active_for_target(guild_id, user_id).await {
             Ok(Some(c)) if c.kind == CurseKind::Graisser => {
@@ -160,10 +168,7 @@ impl ResolveCombatNowService {
 
 #[async_trait]
 impl ResolveCombatNowUseCase for ResolveCombatNowService {
-    async fn resolve_now(
-        &self,
-        combat_id: Uuid,
-    ) -> Result<ResolveCombatNowOutput, DomainError> {
+    async fn resolve_now(&self, combat_id: Uuid) -> Result<ResolveCombatNowOutput, DomainError> {
         // 1. Charger le combat
         let combat = self.combats_uc.get(combat_id).await?;
 
@@ -185,7 +190,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             .unwrap_or_default();
         let engine_events: Vec<ServerEventLite> = events
             .into_iter()
-            .map(|e| ServerEventLite { event_type: e.event_type })
+            .map(|e| ServerEventLite {
+                event_type: e.event_type,
+            })
             .collect();
 
         // 4. Moteur de combat (pur domain).
@@ -284,8 +291,12 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let defender_riposte_first_round = defender.level >= 20 && defender.level > attacker.level;
 
         let curses = engine::combat::CombatCurses {
-            attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
-            defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
+            attacker_has_banana: self
+                .fetch_banana(&combat.guild_id, &combat.attacker_id)
+                .await,
+            defender_has_banana: self
+                .fetch_banana(&combat.guild_id, &combat.defender_id)
+                .await,
             chaos_multiplier: season_chaos_multiplier,
             tank_def_bonus_pct: season_tank_def_bonus,
             defender_riposte_first_round,
@@ -299,7 +310,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let defender_special_raw = combat.defender_special.as_deref();
         let mut graisser_msgs: Vec<String> = Vec::new();
         let attacker_special_effective = if attacker_special_raw.is_some()
-            && self.consume_graisser_if_active(&combat.guild_id, &combat.attacker_id).await
+            && self
+                .consume_graisser_if_active(&combat.guild_id, &combat.attacker_id)
+                .await
         {
             graisser_msgs.push(format!(
                 "\u{1f6e2}\u{fe0f} **{}** : son arme etait graissee, l attaque speciale foire !",
@@ -310,7 +323,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             attacker_special_raw
         };
         let defender_special_effective = if defender_special_raw.is_some()
-            && self.consume_graisser_if_active(&combat.guild_id, &combat.defender_id).await
+            && self
+                .consume_graisser_if_active(&combat.guild_id, &combat.defender_id)
+                .await
         {
             graisser_msgs.push(format!(
                 "\u{1f6e2}\u{fe0f} **{}** : son arme etait graissee, la riposte foire !",
@@ -638,13 +653,16 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // Migration #7 : taunts declenches par les mutations wallet des paris
         // (jackpots cote parieurs gagnants + bonus combattants). Fusionnes en
         // fin de fonction avec les taunts streaks win/loss.
-        let mut bets_draw_taunts: Vec<crate::domain::entities::coude::taunt::TauntEvent> = Vec::new();
+        let mut bets_draw_taunts: Vec<crate::domain::entities::coude::taunt::TauntEvent> =
+            Vec::new();
         if result.chaos_events_count > 0 {
             title_color = 0x9B59B6;
         }
 
         let vendetta_msg: Option<String> = None;
-        let vendetta_humiliation: Option<crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation> = None;
+        let vendetta_humiliation: Option<
+            crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation,
+        > = None;
         // Bouclier malchance (4.1) : true si la 1ere defaite du jour a
         // ete adoucie. Visible aux deux match blocks (payout + streaks).
         let mut shield_active = false;
@@ -808,7 +826,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 let shield_mult = settings.get_percent_ratio("lucky_shield_loss_percent", 50);
                 let actual_loss = if shield_enabled {
                     crate::domain::entities::coude::lucky_shield::apply_lucky_shield_with_multiplier(
-                        adj.actual_loss, is_first_defeat_today, shield_mult,
+                        adj.actual_loss,
+                        is_first_defeat_today,
+                        shield_mult,
                     )
                 } else {
                     adj.actual_loss
@@ -831,7 +851,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 let actual_loss = if has_safety_net {
                     use crate::domain::entities::coude::safety_net::reduce_loss_with_multiplier as safety_net_reduce_loss_with_multiplier;
                     let net_mult = settings.get_percent_ratio("safety_net_loss_percent", 50);
-                    let reduced = safety_net_reduce_loss_with_multiplier(actual_loss, true, net_mult);
+                    let reduced =
+                        safety_net_reduce_loss_with_multiplier(actual_loss, true, net_mult);
                     if reduced < actual_loss {
                         let net_msg = format!(
                             "\u{1f49a} Filet de securite : perte reduite de {} a {}.",
@@ -882,13 +903,19 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) : apres
                 // le payout, si le solde du perdant tombe sous 50c et qu il
                 // n a pas deja un filet actif, on l active. Best-effort.
-                self.try_activate_safety_net_after(&combat.guild_id, loser_id).await;
+                self.try_activate_safety_net_after(&combat.guild_id, loser_id)
+                    .await;
 
                 // Stats : seulement si le payout a reussi (eviter desync).
                 if payout_ok {
                     if let Err(e) = self
                         .players_uc
-                        .record_win(&combat.guild_id, winner_id, coins_transferred, result.stolen_bonus)
+                        .record_win(
+                            &combat.guild_id,
+                            winner_id,
+                            coins_transferred,
+                            result.stolen_bonus,
+                        )
                         .await
                     {
                         tracing::error!(error = %e, "Echec record_win");
@@ -953,9 +980,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 }
 
                 // XP (regles pures → domain::compute_combat_xp)
-                let awards = compute_combat_xp(
-                    attacker.level, defender.level, result.is_giant_killer,
-                );
+                let awards =
+                    compute_combat_xp(attacker.level, defender.level, result.is_giant_killer);
                 let winner_is_underdog = awards.winner_is_underdog;
                 let winner_xp = awards.winner_xp;
                 let loser_xp = awards.loser_xp;
@@ -969,7 +995,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         "\u{2b06}\u{fe0f} <@{}> gagne **+{} XP**{}",
                         winner_id,
                         winner_xp,
-                        if winner_is_underdog { " (Giant Killer x2 !)" } else { "" }
+                        if winner_is_underdog {
+                            " (Giant Killer x2 !)"
+                        } else {
+                            ""
+                        }
                     ));
                     if xp.leveled_up {
                         let title = title_for_level(xp.new_level);
@@ -1010,9 +1040,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     } else {
                         &combat.attacker_id
                     };
-                    if let Some(lines) = format_bet_payout_lines(
-                        &outcome.plan, Some(winner_id), Some(loser_display),
-                    ) {
+                    if let Some(lines) =
+                        format_bet_payout_lines(&outcome.plan, Some(winner_id), Some(loser_display))
+                    {
                         fields.push(ResolvedCombatEmbedField {
                             name: "\u{1f3b2} Paris".into(),
                             value: lines,
@@ -1040,14 +1070,26 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     let loss = result.coins_lost_by_loser;
                     if let Err(e) = self
                         .wallet_repo
-                        .debit(&combat.guild_id, &combat.attacker_id, loss, "coude_combat_explosion", &desc)
+                        .debit(
+                            &combat.guild_id,
+                            &combat.attacker_id,
+                            loss,
+                            "coude_combat_explosion",
+                            &desc,
+                        )
                         .await
                     {
                         tracing::error!(error = %e, attacker = %combat.attacker_id, %loss, "Echec debit explosion attaquant — desync embed/wallet");
                     }
                     if let Err(e) = self
                         .wallet_repo
-                        .debit(&combat.guild_id, &combat.defender_id, loss, "coude_combat_explosion", &desc)
+                        .debit(
+                            &combat.guild_id,
+                            &combat.defender_id,
+                            loss,
+                            "coude_combat_explosion",
+                            &desc,
+                        )
                         .await
                     {
                         tracing::error!(error = %e, defender = %combat.defender_id, %loss, "Echec debit explosion defenseur — desync embed/wallet");
@@ -1077,14 +1119,26 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     if combat.mise > 0 {
                         if let Err(e) = self
                             .wallet_repo
-                            .debit(&combat.guild_id, &combat.attacker_id, combat.mise, "coude_combat_draw", &desc)
+                            .debit(
+                                &combat.guild_id,
+                                &combat.attacker_id,
+                                combat.mise,
+                                "coude_combat_draw",
+                                &desc,
+                            )
                             .await
                         {
                             tracing::error!(error = %e, "Echec debit accident attaquant — desync embed/wallet");
                         }
                         if let Err(e) = self
                             .wallet_repo
-                            .debit(&combat.guild_id, &combat.defender_id, combat.mise, "coude_combat_draw", &desc)
+                            .debit(
+                                &combat.guild_id,
+                                &combat.defender_id,
+                                combat.mise,
+                                "coude_combat_draw",
+                                &desc,
+                            )
                             .await
                         {
                             tracing::error!(error = %e, "Echec debit accident defenseur — desync embed/wallet");
@@ -1142,7 +1196,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             if let Some(winner_id) = &result.winner_id {
                 fields.push(ResolvedCombatEmbedField {
                     name: "\u{1f4b0} Primes recuperees !".into(),
-                    value: format!("<@{}> empoche {} coins de primes !", winner_id, prime_amount),
+                    value: format!(
+                        "<@{}> empoche {} coins de primes !",
+                        winner_id, prime_amount
+                    ),
                     inline: false,
                 });
             }
@@ -1223,14 +1280,22 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let mythic_announce: Option<String> = mythic_event.map(|ev| {
             use crate::domain::entities::coude::mythic_events::format_mythic_announce;
             let winner_name = result.winner_id.as_deref().and_then(|id| {
-                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                else { None }
+                if id == combat.attacker_id {
+                    Some(combat.attacker_name.as_str())
+                } else if id == combat.defender_id {
+                    Some(combat.defender_name.as_str())
+                } else {
+                    None
+                }
             });
             let loser_name = result.loser_id.as_deref().and_then(|id| {
-                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                else { None }
+                if id == combat.attacker_id {
+                    Some(combat.attacker_name.as_str())
+                } else if id == combat.defender_id {
+                    Some(combat.defender_name.as_str())
+                } else {
+                    None
+                }
             });
             format_mythic_announce(
                 &ev,
@@ -1251,14 +1316,22 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             use rand::SeedableRng;
             let mut chat_rng = StdRng::from_entropy();
             let winner_name = result.winner_id.as_deref().and_then(|id| {
-                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                else { None }
+                if id == combat.attacker_id {
+                    Some(combat.attacker_name.as_str())
+                } else if id == combat.defender_id {
+                    Some(combat.defender_name.as_str())
+                } else {
+                    None
+                }
             });
             let loser_name = result.loser_id.as_deref().and_then(|id| {
-                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                else { None }
+                if id == combat.attacker_id {
+                    Some(combat.attacker_name.as_str())
+                } else if id == combat.defender_id {
+                    Some(combat.defender_name.as_str())
+                } else {
+                    None
+                }
             });
             let chat = pick_spectator_chat(
                 &mut chat_rng,
@@ -1336,7 +1409,11 @@ fn compute_outcome_flags_from_result(
         .rounds
         .iter()
         .filter(|r| {
-            let hp = if winner_is_attacker { r.attacker_hp_after } else { r.defender_hp_after };
+            let hp = if winner_is_attacker {
+                r.attacker_hp_after
+            } else {
+                r.defender_hp_after
+            };
             hp <= low_hp_threshold && hp > 0
         })
         .count();
@@ -1355,4 +1432,4 @@ fn compute_outcome_flags_from_result(
 // (cf. API P0 #3 audit). Le wrapper local conserve l'usage existant.
 use crate::application::coude::guild_settings::load_balance_params;
 
-use crate::domain::entities::coude::player::title_for_level as title_for_level;
+use crate::domain::entities::coude::player::title_for_level;

@@ -1,7 +1,10 @@
 use super::*;
 
 fn card(rank: &str, suit: &str) -> Card {
-    Card { rank: rank.into(), suit: suit.into() }
+    Card {
+        rank: rank.into(),
+        suit: suit.into(),
+    }
 }
 
 #[test]
@@ -70,13 +73,19 @@ fn score_two_aces_reduces_one_to_avoid_bust() {
 #[test]
 fn score_three_aces_reduces_as_many_as_needed() {
     // As+As+As = 33 → 23 → 13 (on garde un As a 11)
-    assert_eq!(calculate_score(&[card("As", "h"), card("As", "d"), card("As", "c")]), 13);
+    assert_eq!(
+        calculate_score(&[card("As", "h"), card("As", "d"), card("As", "c")]),
+        13
+    );
 }
 
 #[test]
 fn score_as_reduces_when_bust_with_face() {
     // As + King + 5 = 11+10+5 = 26 → As devient 1 → 16
-    assert_eq!(calculate_score(&[card("As", "h"), card("King", "d"), card("5", "c")]), 16);
+    assert_eq!(
+        calculate_score(&[card("As", "h"), card("King", "d"), card("5", "c")]),
+        16
+    );
 }
 
 #[test]
@@ -88,15 +97,24 @@ fn score_keeps_as_at_11_when_safe() {
 #[test]
 fn score_bust_hand_above_21() {
     // 10 + 10 + 5 = 25 (pas d'As pour reduire)
-    assert_eq!(calculate_score(&[card("10", "h"), card("King", "d"), card("5", "c")]), 25);
+    assert_eq!(
+        calculate_score(&[card("10", "h"), card("King", "d"), card("5", "c")]),
+        25
+    );
 }
 
 #[test]
 fn score_four_aces() {
     // 4 As = 44 → -10 = 34 → -10 = 24 → -10 = 14
-    assert_eq!(calculate_score(&[
-        card("As", "h"), card("As", "d"), card("As", "c"), card("As", "s"),
-    ]), 14);
+    assert_eq!(
+        calculate_score(&[
+            card("As", "h"),
+            card("As", "d"),
+            card("As", "c"),
+            card("As", "s"),
+        ]),
+        14
+    );
 }
 
 // ── create_deck ──
@@ -119,7 +137,9 @@ fn deck_has_13_ranks_per_suit() {
 #[test]
 fn deck_has_4_of_each_rank() {
     let deck = create_deck();
-    for rank in ["2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "As"] {
+    for rank in [
+        "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "As",
+    ] {
         let count = deck.iter().filter(|c| c.rank == rank).count();
         assert_eq!(count, 4, "rank {} should have 4 cards", rank);
     }
@@ -130,7 +150,10 @@ fn deck_shuffled_across_multiple_calls() {
     // Deux decks de suite doivent difficilement etre identiques (proba ~1/52!).
     let d1 = create_deck();
     let d2 = create_deck();
-    let same: bool = d1.iter().zip(d2.iter()).all(|(a, b)| a.rank == b.rank && a.suit == b.suit);
+    let same: bool = d1
+        .iter()
+        .zip(d2.iter())
+        .all(|(a, b)| a.rank == b.rank && a.suit == b.suit);
     assert!(!same, "two shuffled decks should not be identical");
 }
 
@@ -191,9 +214,7 @@ fn config_rejects_non_positive_bets() {
 
 #[test]
 fn config_rejects_non_positive_payout() {
-    let pairs = vec![
-        ("blackjack_payout".into(), "0".into()),
-    ];
+    let pairs = vec![("blackjack_payout".into(), "0".into())];
     let c = BlackjackConfig::from_kv_pairs(&pairs);
     assert_eq!(c.blackjack_payout, 1.5); // default
 }

@@ -2,12 +2,12 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::enums::moderation::action::Action;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;
-use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::enums::moderation::action::Action;
 #[derive(Debug, Clone)]
 pub struct Infraction {
     pub id: Uuid,

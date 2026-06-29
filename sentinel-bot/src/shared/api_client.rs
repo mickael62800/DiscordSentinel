@@ -279,14 +279,17 @@ impl BaseApiClient {
         };
 
         // Publier aussi via Redis pour le temps reel desktop
-        self.publish_event("bot_log", serde_json::json!({
-            "level": log_data.level,
-            "bot": log_data.bot,
-            "server": log_data.server,
-            "message": log_data.message,
-            "category": log_data.category,
-            "details": details,
-        }));
+        self.publish_event(
+            "bot_log",
+            serde_json::json!({
+                "level": log_data.level,
+                "bot": log_data.bot,
+                "server": log_data.server,
+                "message": log_data.message,
+                "category": log_data.category,
+                "details": details,
+            }),
+        );
 
         let req = self
             .client
@@ -301,13 +304,7 @@ impl BaseApiClient {
         });
     }
 
-    fn send_log_with_category(
-        &self,
-        level: &str,
-        server: &str,
-        message: &str,
-        category: &str,
-    ) {
+    fn send_log_with_category(&self, level: &str, server: &str, message: &str, category: &str) {
         #[derive(Serialize)]
         struct LogPayload {
             level: String,
@@ -326,13 +323,16 @@ impl BaseApiClient {
         };
 
         // Publier aussi via Redis pour le temps reel desktop
-        self.publish_event("bot_log", serde_json::json!({
-            "level": log_data.level,
-            "bot": log_data.bot,
-            "server": log_data.server,
-            "message": log_data.message,
-            "category": log_data.category,
-        }));
+        self.publish_event(
+            "bot_log",
+            serde_json::json!({
+                "level": log_data.level,
+                "bot": log_data.bot,
+                "server": log_data.server,
+                "message": log_data.message,
+                "category": log_data.category,
+            }),
+        );
 
         // Persister via HTTP (fire-and-forget)
         let req = self
@@ -393,7 +393,8 @@ impl BaseApiClient {
     /// GET JSON vers l'API. Retourne le body deserialise.
     pub async fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
         let req = self.client.get(format!("{}{}", self.base_url, path));
-        let resp = self.auth(req)
+        let resp = self
+            .auth(req)
             .send()
             .await
             .map_err(|e| network_error_message("GET", path, &e.to_string()))?;
@@ -408,9 +409,17 @@ impl BaseApiClient {
     }
 
     /// POST JSON vers l'API. Retourne le body deserialise.
-    pub async fn post_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, String> {
-        let req = self.client.post(format!("{}{}", self.base_url, path)).json(body);
-        let resp = self.auth(req)
+    pub async fn post_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, String> {
+        let req = self
+            .client
+            .post(format!("{}{}", self.base_url, path))
+            .json(body);
+        let resp = self
+            .auth(req)
             .send()
             .await
             .map_err(|e| network_error_message("POST", path, &e.to_string()))?;
@@ -426,7 +435,10 @@ impl BaseApiClient {
 
     /// POST fire-and-forget vers l'API. Log l'erreur mais ne la propage pas.
     pub async fn post_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
-        let req = self.client.post(format!("{}{}", self.base_url, path)).json(body);
+        let req = self
+            .client
+            .post(format!("{}{}", self.base_url, path))
+            .json(body);
         if let Err(e) = self.auth(req).send().await {
             tracing::warn!(error = %e, path, "Echec POST fire-and-forget");
         }
@@ -434,16 +446,23 @@ impl BaseApiClient {
 
     /// PATCH JSON vers l'API. Fire-and-forget avec log d'erreur.
     pub async fn patch_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
-        let req = self.client.patch(format!("{}{}", self.base_url, path)).json(body);
+        let req = self
+            .client
+            .patch(format!("{}{}", self.base_url, path))
+            .json(body);
         if let Err(e) = self.auth(req).send().await {
             tracing::warn!(error = %e, path, "Echec PATCH fire-and-forget");
         }
     }
 
     /// DELETE JSON vers l'API. Retourne le body deserialise.
-    pub async fn delete_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+    pub async fn delete_json<T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+    ) -> Result<T, String> {
         let req = self.client.delete(format!("{}{}", self.base_url, path));
-        let resp = self.auth(req)
+        let resp = self
+            .auth(req)
             .send()
             .await
             .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
@@ -458,9 +477,17 @@ impl BaseApiClient {
     }
 
     /// DELETE JSON avec body vers l'API. Retourne le body deserialise.
-    pub async fn delete_with_body<B: serde::Serialize, T: serde::de::DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, String> {
-        let req = self.client.delete(format!("{}{}", self.base_url, path)).json(body);
-        let resp = self.auth(req)
+    pub async fn delete_with_body<B: serde::Serialize, T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, String> {
+        let req = self
+            .client
+            .delete(format!("{}{}", self.base_url, path))
+            .json(body);
+        let resp = self
+            .auth(req)
             .send()
             .await
             .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
@@ -476,33 +503,21 @@ impl BaseApiClient {
 
     // ── Config Helpers ──
 
-    pub fn config_or(
-        config: &HashMap<String, String>,
-        key: &str,
-        default: &str,
-    ) -> String {
+    pub fn config_or(config: &HashMap<String, String>, key: &str, default: &str) -> String {
         config
             .get(key)
             .cloned()
             .unwrap_or_else(|| default.to_string())
     }
 
-    pub fn config_u64(
-        config: &HashMap<String, String>,
-        key: &str,
-        default: u64,
-    ) -> u64 {
+    pub fn config_u64(config: &HashMap<String, String>, key: &str, default: u64) -> u64 {
         config
             .get(key)
             .and_then(|v| v.parse().ok())
             .unwrap_or(default)
     }
 
-    pub fn config_bool(
-        config: &HashMap<String, String>,
-        key: &str,
-        default: bool,
-    ) -> bool {
+    pub fn config_bool(config: &HashMap<String, String>, key: &str, default: bool) -> bool {
         config
             .get(key)
             .map(|v| v == "true" || v == "1")

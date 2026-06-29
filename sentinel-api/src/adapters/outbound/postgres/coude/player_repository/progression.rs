@@ -22,7 +22,7 @@ pub(super) async fn update_class(
     guild_id: &str,
     user_id: &str,
     class: &str,
-    ) -> Result<bool, DomainError> {
+) -> Result<bool, DomainError> {
     // Phase 2 A.3 — la colonne est maintenant un enum Postgres `coude_class`,
     // on cast explicitement le bind string vers l'enum.
     let result = sqlx::query(
@@ -36,14 +36,14 @@ pub(super) async fn update_class(
     .await
     .map_err(pg_err)?;
     Ok(result.rows_affected() > 0)
-    }
+}
 
 pub(super) async fn add_xp(
     repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     amount: i64,
-    ) -> Result<Option<XpProgress>, DomainError> {
+) -> Result<Option<XpProgress>, DomainError> {
     let mut tx = repo.pool.begin().await.map_err(pg_err)?;
 
     let row: Option<(i64, i32, i32)> = sqlx::query_as(
@@ -66,9 +66,7 @@ pub(super) async fn add_xp(
     current_xp += amount;
 
     // Application déterministe du barème de niveaux du domaine.
-    while current_level < COUDE_MAX_LEVEL
-        && current_xp >= coude_xp_for_level(current_level + 1)
-    {
+    while current_level < COUDE_MAX_LEVEL && current_xp >= coude_xp_for_level(current_level + 1) {
         current_level += 1;
         current_stat_points += 3;
     }
@@ -100,14 +98,14 @@ pub(super) async fn add_xp(
         leveled_up,
         stat_points_gained,
     }))
-    }
+}
 
 pub(super) async fn spend_stat_point(
     repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     stat: CombatStat,
-    ) -> Result<Option<Player>, DomainError> {
+) -> Result<Option<Player>, DomainError> {
     // `stat.column()` retourne uniquement "atk" ou "def" — sûr à interpoler.
     // L'UPDATE a besoin de l'alias `cp` parce que PLAYER_COLUMNS reference
     // `cp.guild_id` / `cp.user_id` dans la sous-requete wallet — sans
@@ -118,7 +116,11 @@ pub(super) async fn spend_stat_point(
     // correspondre a `100 + effective_def * 2` pour que /repos restaure au
     // bon max et que le moteur de combat ne cape pas les HP a tort.
     let col = stat.column();
-    let hp_delta = if col == "def" { ", hp_max = hp_max + 2, hp_current = hp_current + 2" } else { "" };
+    let hp_delta = if col == "def" {
+        ", hp_max = hp_max + 2, hp_current = hp_current + 2"
+    } else {
+        ""
+    };
     let sql = format!(
         r#"UPDATE coude_players AS cp
            SET {col} = {col} + 1, stat_points = stat_points - 1{hp_delta}, updated_at = NOW()
@@ -135,22 +137,25 @@ pub(super) async fn spend_stat_point(
         .await
         .map_err(pg_err)?;
     Ok(row.map(Into::into))
-    }
+}
 
 pub(super) async fn reset_stats(
     repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     cost: i64,
-    ) -> Result<Option<Player>, DomainError> {
+) -> Result<Option<Player>, DomainError> {
     let mut tx = repo.pool.begin().await.map_err(pg_err)?;
 
     // Verifier que le wallet a assez de coins pour payer le reset (lock).
     let wallet_coins: Option<i64> = sqlx::query_scalar(
         "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
     )
-    .bind(guild_id).bind(user_id)
-    .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(pg_err)?;
 
     let balance = wallet_coins.unwrap_or(0);
     if balance < cost {
@@ -170,8 +175,11 @@ pub(super) async fn reset_stats(
                atk = 0, def = 0, updated_at = NOW()
            WHERE guild_id = $1 AND user_id = $2 AND (atk > 0 OR def > 0)"#,
     )
-    .bind(guild_id).bind(user_id)
-    .execute(&mut *tx).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(pg_err)?;
 
     // Debiter le cout du reset sur le wallet partage.
     let balance_after: i64 = sqlx::query_scalar(
@@ -182,7 +190,16 @@ pub(super) async fn reset_stats(
     .bind(guild_id).bind(user_id).bind(cost)
     .fetch_one(&mut *tx).await.map_err(pg_err)?;
 
-    log_wallet_tx(&mut tx, guild_id, user_id, -cost, balance_after, "coude_reset_stats", "Reset des stats").await?;
+    log_wallet_tx(
+        &mut tx,
+        guild_id,
+        user_id,
+        -cost,
+        balance_after,
+        "coude_reset_stats",
+        "Reset des stats",
+    )
+    .await?;
 
     // Re-fetch le joueur avec les coins a jour.
     let sql = format!(
@@ -190,10 +207,12 @@ pub(super) async fn reset_stats(
         cols = PLAYER_COLUMNS
     );
     let row: Option<PlayerRow> = sqlx::query_as(&sql)
-        .bind(guild_id).bind(user_id)
-        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
 
     tx.commit().await.map_err(pg_err)?;
     Ok(row.map(Into::into))
-    }
-
+}

@@ -5,11 +5,11 @@
 //! blocage, et une tentative de vol fait rouler tous les items actifs
 //! de la cible dans l'ordre d'efficacite.
 
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct StealProtection {

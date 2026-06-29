@@ -26,7 +26,11 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     }
 
     if refreshed > 0 {
-        info!(refreshed, total = VIEWS.len(), "Leaderboards materialized views refreshed");
+        info!(
+            refreshed,
+            total = VIEWS.len(),
+            "Leaderboards materialized views refreshed"
+        );
     }
 
     Ok(())

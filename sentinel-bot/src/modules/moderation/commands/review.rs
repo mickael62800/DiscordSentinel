@@ -27,13 +27,11 @@ pub fn register() -> CreateCommand {
                 )
                 .required(true),
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "reason",
-                    "Raison de la demande (optionnel)",
-                ),
-            ),
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::String,
+                "reason",
+                "Raison de la demande (optionnel)",
+            )),
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
@@ -70,14 +68,10 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let sub = command
-        .data
-        .options
-        .iter()
-        .find_map(|o| match &o.value {
-            CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
-            _ => None,
-        });
+    let sub = command.data.options.iter().find_map(|o| match &o.value {
+        CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
+        _ => None,
+    });
 
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
@@ -158,7 +152,9 @@ async fn handle_add(
                 .create_response(
                     &ctx.http,
                     CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                        CreateInteractionResponseMessage::new()
+                            .embed(embed)
+                            .ephemeral(true),
                     ),
                 )
                 .await
@@ -221,17 +217,16 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
             .join("\n\n")
     };
 
-    let embed = info_embed(format!(
-        "\u{1f4cb} Reviews en attente ({})",
-        reviews.len()
-    ))
-    .description(description);
+    let embed = info_embed(format!("\u{1f4cb} Reviews en attente ({})", reviews.len()))
+        .description(description);
 
     if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await
@@ -308,7 +303,9 @@ async fn handle_resolve(
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .ephemeral(true),
             ),
         )
         .await

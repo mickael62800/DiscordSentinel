@@ -41,7 +41,11 @@ impl ManageAuditLogsUseCase for ManageAuditLogsService {
         Ok(log)
     }
 
-    async fn list(&self, guild_id: Option<&str>, filters: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> {
+    async fn list(
+        &self,
+        guild_id: Option<&str>,
+        filters: AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
         self.repo.find_all(guild_id, &filters).await
     }
 

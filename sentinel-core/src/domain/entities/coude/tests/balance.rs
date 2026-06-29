@@ -22,7 +22,10 @@ fn from_config_parses_overrides() {
     let mut cfg = HashMap::new();
     cfg.insert("rage_atk_bonus_pct".to_string(), "60".to_string());
     cfg.insert("double_coup_mode".to_string(), "max".to_string());
-    cfg.insert("surprise_allow_defender_counter".to_string(), "false".to_string());
+    cfg.insert(
+        "surprise_allow_defender_counter".to_string(),
+        "false".to_string(),
+    );
     let p = BalanceParams::from_config(&cfg);
     assert_eq!(p.rage_atk_bonus_pct, 60);
     assert_eq!(p.double_coup_mode, DoubleCoupMode::Max);
@@ -66,7 +69,11 @@ fn from_config_parse_bool_all_truthy_values() {
         let mut cfg = HashMap::new();
         cfg.insert("surprise_allow_defender_counter".into(), v.into());
         let p = BalanceParams::from_config(&cfg);
-        assert!(p.surprise_allow_defender_counter, "'{}' doit etre truthy", v);
+        assert!(
+            p.surprise_allow_defender_counter,
+            "'{}' doit etre truthy",
+            v
+        );
     }
 }
 
@@ -76,6 +83,10 @@ fn from_config_parse_bool_falsy_and_invalid() {
         let mut cfg = HashMap::new();
         cfg.insert("surprise_allow_defender_counter".into(), v.into());
         let p = BalanceParams::from_config(&cfg);
-        assert!(!p.surprise_allow_defender_counter, "'{}' doit etre falsy", v);
+        assert!(
+            !p.surprise_allow_defender_counter,
+            "'{}' doit etre falsy",
+            v
+        );
     }
 }

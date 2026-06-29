@@ -1,6 +1,6 @@
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, warn};
 
@@ -14,42 +14,74 @@ pub fn register() -> CreateCommand {
     CreateCommand::new("compare")
         .description("Comparer l'historique de sanctions de deux utilisateurs")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user1", "Premier utilisateur (ou user1_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user2", "Second utilisateur (ou user2_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user1_id", "ID du premier utilisateur (ex. parti / banni)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user2_id", "ID du second utilisateur (ex. parti / banni)"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user1",
+            "Premier utilisateur (ou user1_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user2",
+            "Second utilisateur (ou user2_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user1_id",
+            "ID du premier utilisateur (ex. parti / banni)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user2_id",
+            "ID du second utilisateur (ex. parti / banni)",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "compare", "Echec defer interaction Discord");
         return;
     }
 
     let user1_id = match super::resolve_target_user_id_named(command, "user1", "user1_id") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Indique le 1er utilisateur (`user1`) ou son ID (`user1_id`).").await; return; }
+        None => {
+            edit_response_text(
+                ctx,
+                command,
+                "Indique le 1er utilisateur (`user1`) ou son ID (`user1_id`).",
+            )
+            .await;
+            return;
+        }
     };
     let user2_id = match super::resolve_target_user_id_named(command, "user2", "user2_id") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Indique le 2e utilisateur (`user2`) ou son ID (`user2_id`).").await; return; }
+        None => {
+            edit_response_text(
+                ctx,
+                command,
+                "Indique le 2e utilisateur (`user2`) ou son ID (`user2_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
     if user1_id == user2_id {
-        edit_response_text(ctx, command, "Les deux utilisateurs doivent etre differents.").await;
+        edit_response_text(
+            ctx,
+            command,
+            "Les deux utilisateurs doivent etre differents.",
+        )
+        .await;
         return;
     }
 
@@ -63,8 +95,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let user1 = user1_id.to_user(&ctx.http).await.ok();
     let user2 = user2_id.to_user(&ctx.http).await.ok();
-    let name1 = user1.as_ref().map(|u| u.name.clone()).unwrap_or_else(|| "?".into());
-    let name2 = user2.as_ref().map(|u| u.name.clone()).unwrap_or_else(|| "?".into());
+    let name1 = user1
+        .as_ref()
+        .map(|u| u.name.clone())
+        .unwrap_or_else(|| "?".into());
+    let name2 = user2
+        .as_ref()
+        .map(|u| u.name.clone())
+        .unwrap_or_else(|| "?".into());
 
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
@@ -102,18 +140,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let summary = build_comparison_line(&h1, &h2);
 
-    let embed = info_embed(format!("\u{2696}\u{fe0f} Comparaison — @{name1} vs @{name2}"))
-        .description(summary)
-        .field(
-            format!("\u{1f464} @{name1}"),
-            format_history_block(&h1),
-            true,
-        )
-        .field(
-            format!("\u{1f464} @{name2}"),
-            format_history_block(&h2),
-            true,
-        );
+    let embed = info_embed(format!(
+        "\u{2696}\u{fe0f} Comparaison — @{name1} vs @{name2}"
+    ))
+    .description(summary)
+    .field(
+        format!("\u{1f464} @{name1}"),
+        format_history_block(&h1),
+        true,
+    )
+    .field(
+        format!("\u{1f464} @{name2}"),
+        format_history_block(&h2),
+        true,
+    );
 
     if let Err(e) = command
         .edit_response(

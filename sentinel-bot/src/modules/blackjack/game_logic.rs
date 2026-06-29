@@ -97,11 +97,7 @@ pub(super) async fn dispatch_blackjack_taunt_pub(
 
 /// Post + rename pour un TauntEvent (mini copie de coude::taunts_dispatch,
 /// pour eviter un couplage cross-module). Fire-and-forget.
-async fn dispatch_blackjack_taunt(
-    ctx: &Context,
-    guild_id: serenity::all::GuildId,
-    ev: TauntEvent,
-) {
+async fn dispatch_blackjack_taunt(ctx: &Context, guild_id: serenity::all::GuildId, ev: TauntEvent) {
     use serenity::all::{
         ChannelId, CreateEmbed, CreateEmbedFooter, CreateMessage, EditMember, UserId,
     };
@@ -158,7 +154,9 @@ pub fn register() -> CreateCommand {
 
 #[allow(dead_code)]
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let user_id = command.user.id.to_string();
     let username = command.user.name.clone();
@@ -212,18 +210,23 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Nouvelle partie
-    let (game, wallet_taunts, wallet_balance) = match api.start_game(&guild_id, &user_id, &username, mise).await {
-        Ok(g) => g,
-        Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
-            return;
-        }
-    };
+    let (game, wallet_taunts, wallet_balance) =
+        match api.start_game(&guild_id, &user_id, &username, mise).await {
+            Ok(g) => g,
+            Err(e) => {
+                reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
+                return;
+            }
+        };
 
     let flavor = fetch_flavor_for_status(api, &game.status).await;
     let (embed, attachment) = build_game_message(&game, wallet_balance, flavor.as_deref());
     let game_over = is_game_over(&game.status);
-    let components = if game_over { vec![] } else { build_buttons(&game) };
+    let components = if game_over {
+        vec![]
+    } else {
+        build_buttons(&game)
+    };
 
     let mut msg = CreateInteractionResponseMessage::new()
         .embed(embed)
@@ -344,7 +347,11 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     let flavor = fetch_flavor_for_status(api, &game.status).await;
     let (embed, attachment) = build_game_message(&game, wallet_balance, flavor.as_deref());
     let game_over = is_game_over(&game.status);
-    let components = if game_over { vec![] } else { build_buttons(&game) };
+    let components = if game_over {
+        vec![]
+    } else {
+        build_buttons(&game)
+    };
 
     let mut edit = serenity::all::EditInteractionResponse::new()
         .embed(embed)
@@ -376,4 +383,3 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
     }
 }
-

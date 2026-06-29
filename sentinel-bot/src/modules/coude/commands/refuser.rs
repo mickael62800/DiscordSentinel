@@ -1,12 +1,12 @@
 use serenity::all::{
-    ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 
 use crate::shared::discord_helpers::component_reply_ephemeral as reply_ephemeral;
 
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub const REFUSE_PREFIX: &str = "coude_refuse:";
 
@@ -74,12 +74,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     let shame_msg = match api.random_flavor("combat_refused", "fr").await {
         Ok(Some(s)) => s,
         Ok(None) | Err(_) => {
-            reply_ephemeral(
-                ctx,
-                component,
-                "API indispo, veuillez reessayer plus tard.",
-            )
-            .await;
+            reply_ephemeral(ctx, component, "API indispo, veuillez reessayer plus tard.").await;
             return;
         }
     };
@@ -108,7 +103,11 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     // Retirer les coins et incrementer la lachete
     if let Err(e) = api
-        .update_player_coins(&combat_record.guild_id, &combat_record.defender_id, -penalty)
+        .update_player_coins(
+            &combat_record.guild_id,
+            &combat_record.defender_id,
+            -penalty,
+        )
         .await
     {
         tracing::warn!(error = %e, "Echec API update_player_coins refus");
@@ -142,7 +141,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .title("\u{1f414} Defi refuse !")
         .description(description)
         .color(0xED4245)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     // Remplacer la card de defi par la card de refus (supprime les boutons)
@@ -160,4 +161,3 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         tracing::warn!(error = %e, "Echec response Discord");
     }
 }
-

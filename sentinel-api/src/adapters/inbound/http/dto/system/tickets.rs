@@ -1,9 +1,9 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketDetail;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;
-use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct ListTicketsQuery {
@@ -166,7 +166,6 @@ impl From<TicketDetail> for TicketDetailDto {
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/tickets.rs"]

@@ -5,9 +5,9 @@ use crate::domain::entities::moderation::action::strikes::StrikeConfig;
 use crate::domain::entities::moderation::action::strikes::StrikeResult;
 use crate::domain::entities::moderation::action::strikes::StrikeThreshold;
 use crate::domain::entities::moderation::action::strikes::UserStrike;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 pub struct AddStrikeCommand {
     pub guild_id: GuildId,
@@ -27,7 +27,11 @@ pub struct SaveStrikeConfigCommand {
 #[async_trait]
 pub trait ManageStrikesUseCase: Send + Sync {
     async fn add_strike(&self, cmd: AddStrikeCommand) -> Result<StrikeResult, DomainError>;
-    async fn get_active_strikes(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserStrike>, DomainError>;
+    async fn get_active_strikes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<UserStrike>, DomainError>;
     async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
     async fn get_config(&self, guild_id: &str) -> Result<StrikeConfig, DomainError>;
     async fn save_config(&self, cmd: SaveStrikeConfigCommand) -> Result<StrikeConfig, DomainError>;

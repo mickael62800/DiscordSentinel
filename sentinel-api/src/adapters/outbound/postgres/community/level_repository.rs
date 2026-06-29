@@ -1,13 +1,13 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::level_repository::LevelRepository;
 use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::level_repository::LevelRepository;
 
 pub struct PgLevelRepository {
     pool: PgPool,
@@ -90,13 +90,12 @@ impl From<UserLevelRow> for UserLevel {
 #[async_trait]
 impl LevelRepository for PgLevelRepository {
     async fn get_config(&self, guild_id: &str) -> Result<Option<LevelConfig>, DomainError> {
-        let row = sqlx::query_as::<_, LevelConfigRow>(
-            "SELECT * FROM level_config WHERE guild_id = $1",
-        )
-        .bind(guild_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row =
+            sqlx::query_as::<_, LevelConfigRow>("SELECT * FROM level_config WHERE guild_id = $1")
+                .bind(guild_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
 
         Ok(row.map(LevelConfig::from))
     }
@@ -125,7 +124,11 @@ impl LevelRepository for PgLevelRepository {
         Ok(())
     }
 
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<Option<UserLevel>, DomainError> {
+    async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserLevel>, DomainError> {
         let row = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 AND user_id = $2",
         )
@@ -164,7 +167,14 @@ impl LevelRepository for PgLevelRepository {
         Ok(())
     }
 
-    async fn add_xp_atomic(&self, guild_id: &str, user_id: &str, username: &str, amount: i64, source: XpSource) -> Result<UserLevel, DomainError> {
+    async fn add_xp_atomic(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        amount: i64,
+        source: XpSource,
+    ) -> Result<UserLevel, DomainError> {
         // Determine quelles colonnes incrementer selon la source.
         // SECURITE : xp_col est strictement controle par le match (jamais d'input utilisateur).
         let xp_col = match source {
@@ -201,7 +211,11 @@ impl LevelRepository for PgLevelRepository {
         Ok(UserLevel::from(row))
     }
 
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
         // Phase 2 A.2 â€” Lit depuis `mv_level_leaderboard` (5 min staleness max).
         let rows = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM mv_level_leaderboard WHERE guild_id = $1 ORDER BY rank LIMIT $2",
@@ -215,7 +229,12 @@ impl LevelRepository for PgLevelRepository {
         Ok(rows.into_iter().map(UserLevel::from).collect())
     }
 
-    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+    async fn get_leaderboard_by_source(
+        &self,
+        guild_id: &str,
+        source: XpSource,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError> {
         let order_col = match source {
             XpSource::Text => "xp_text",
             XpSource::Voice => "xp_voice",

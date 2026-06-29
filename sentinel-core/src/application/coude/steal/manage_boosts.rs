@@ -2,18 +2,18 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::steal::boost::find_boost_item;
 use crate::domain::entities::coude::steal::boost::sum_roll_bonus_for_active_keys;
-use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::steal::boost::StealBoost;
 use crate::domain::entities::coude::steal::boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 pub struct ManageCoudeStealBoostsService {
     repo: Arc<dyn StealBoostRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
@@ -30,10 +30,7 @@ impl ManageCoudeStealBoostsService {
     /// Branche la lecture de `bot_guild_config` pour appliquer le gate
     /// `steal_max_active_boosts`. Optionnel : sans config_repo, le cap
     /// n'est pas applique (comportement historique).
-    pub fn with_bot_config_repo(
-        mut self,
-        bot_config_repo: Arc<dyn BotConfigRepository>,
-    ) -> Self {
+    pub fn with_bot_config_repo(mut self, bot_config_repo: Arc<dyn BotConfigRepository>) -> Self {
         self.bot_config_repo = Some(bot_config_repo);
         self
     }
@@ -87,10 +84,7 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
         let cap = params.steal_max_active_boosts;
         if cap > 0 {
             let actives = self.repo.list_active(guild_id, user_id).await?;
-            let other_active = actives
-                .iter()
-                .filter(|b| b.item_key != item_key)
-                .count() as u64;
+            let other_active = actives.iter().filter(|b| b.item_key != item_key).count() as u64;
             if other_active >= cap {
                 return Err(DomainError::ValidationError(format!(
                     "Trop de boosts actifs ({other_active}/{cap}). Attends qu'un boost expire avant d'en souscrire un nouveau."
@@ -103,11 +97,7 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
             .await
     }
 
-    async fn total_bonus(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i32, DomainError> {
+    async fn total_bonus(&self, guild_id: &str, user_id: &str) -> Result<i32, DomainError> {
         let actives = self.repo.list_active(guild_id, user_id).await?;
         let keys: Vec<&str> = actives.iter().map(|b| b.item_key.as_str()).collect();
         Ok(sum_roll_bonus_for_active_keys(keys))

@@ -21,13 +21,11 @@ pub fn routes() -> Router<AppState> {
         // Serveurs CRUD + lifecycle
         .route(
             "/api/games/{guild_id}/servers",
-            get(handlers::game::servers::list_servers)
-                .post(handlers::game::servers::create_server),
+            get(handlers::game::servers::list_servers).post(handlers::game::servers::create_server),
         )
         .route(
             "/api/games/servers/{server_id}",
-            get(handlers::game::servers::get_server)
-                .delete(handlers::game::servers::delete_server),
+            get(handlers::game::servers::get_server).delete(handlers::game::servers::delete_server),
         )
         .route(
             "/api/games/servers/{server_id}/start",
@@ -82,4 +80,3 @@ pub fn routes() -> Router<AppState> {
             post(handlers::game::jobs::job_image_cleanup),
         )
 }
-

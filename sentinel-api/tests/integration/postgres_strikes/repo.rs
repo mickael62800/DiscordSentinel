@@ -7,19 +7,23 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::moderation::strike_repository::PgStrikeRepository;
+use sentinel_api::ports::outbound::moderation::strike_repository::StrikeRepository;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
-use sentinel_api::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 fn sample_strike(guild: &str, user: &str) -> UserStrike {
@@ -68,7 +72,10 @@ async fn find_active_strikes_excludes_expired() {
     repo.save_strike(&expired).await.unwrap();
     repo.save_strike(&active).await.unwrap();
 
-    let found = repo.find_active_strikes(&guild, &user, 86_400).await.unwrap();
+    let found = repo
+        .find_active_strikes(&guild, &user, 86_400)
+        .await
+        .unwrap();
     assert_eq!(found.len(), 1);
     assert_eq!(found[0].id, active.id);
 }
@@ -89,7 +96,10 @@ async fn find_active_strikes_respects_window_secs() {
     assert_eq!(found.len(), 0);
 
     // Fenetre 24h : inclut old.
-    let found = repo.find_active_strikes(&guild, &user, 86_400).await.unwrap();
+    let found = repo
+        .find_active_strikes(&guild, &user, 86_400)
+        .await
+        .unwrap();
     assert_eq!(found.len(), 1);
 }
 
@@ -101,10 +111,17 @@ async fn find_active_strikes_scoped_to_user() {
     let user_a = fresh_id();
     let user_b = fresh_id();
 
-    repo.save_strike(&sample_strike(&guild, &user_a)).await.unwrap();
-    repo.save_strike(&sample_strike(&guild, &user_b)).await.unwrap();
+    repo.save_strike(&sample_strike(&guild, &user_a))
+        .await
+        .unwrap();
+    repo.save_strike(&sample_strike(&guild, &user_b))
+        .await
+        .unwrap();
 
-    let found_a = repo.find_active_strikes(&guild, &user_a, 3600).await.unwrap();
+    let found_a = repo
+        .find_active_strikes(&guild, &user_a, 3600)
+        .await
+        .unwrap();
     assert_eq!(found_a.len(), 1);
     assert_eq!(found_a[0].user_id, user_a);
 }
@@ -116,8 +133,12 @@ async fn delete_strikes_removes_all_for_user() {
     let guild = fresh_id();
     let user = fresh_id();
 
-    repo.save_strike(&sample_strike(&guild, &user)).await.unwrap();
-    repo.save_strike(&sample_strike(&guild, &user)).await.unwrap();
+    repo.save_strike(&sample_strike(&guild, &user))
+        .await
+        .unwrap();
+    repo.save_strike(&sample_strike(&guild, &user))
+        .await
+        .unwrap();
     repo.delete_strikes(&guild, &user).await.unwrap();
 
     let found = repo.find_active_strikes(&guild, &user, 3600).await.unwrap();
@@ -136,11 +157,17 @@ async fn delete_strike_by_infraction_id_returns_count() {
     s.infraction_id = Some(infraction_id);
     repo.save_strike(&s).await.unwrap();
 
-    let n = repo.delete_strike_by_infraction_id(infraction_id).await.unwrap();
+    let n = repo
+        .delete_strike_by_infraction_id(infraction_id)
+        .await
+        .unwrap();
     assert_eq!(n, 1);
 
     // Deuxieme delete = 0 lignes.
-    let n = repo.delete_strike_by_infraction_id(infraction_id).await.unwrap();
+    let n = repo
+        .delete_strike_by_infraction_id(infraction_id)
+        .await
+        .unwrap();
     assert_eq!(n, 0);
 }
 
@@ -162,8 +189,16 @@ async fn save_and_get_config_roundtrip() {
         guild_id: guild.clone().into(),
         window_secs: 3600,
         thresholds: vec![
-            StrikeThreshold { strikes: 3, action: "warn".into(), duration: None },
-            StrikeThreshold { strikes: 5, action: "mute".into(), duration: Some(600) },
+            StrikeThreshold {
+                strikes: 3,
+                action: "warn".into(),
+                duration: None,
+            },
+            StrikeThreshold {
+                strikes: 5,
+                action: "mute".into(),
+                duration: Some(600),
+            },
         ],
         enabled: true,
         created_at: Utc::now(),

@@ -16,8 +16,8 @@ use crate::adapters::inbound::http::middleware::rbac::{require_role, RoleContext
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use axum::http::StatusCode;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::tamagotchi::pet::{xp_progress, Pet};
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]
@@ -135,7 +135,12 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
     const BATCH: i64 = 500;
 
     let mut cfg_cache: HashMap<String, TickConfig> = HashMap::new();
-    let mut summary = TickSummary { processed: 0, sick: 0, died: 0, recovered: 0 };
+    let mut summary = TickSummary {
+        processed: 0,
+        sick: 0,
+        died: 0,
+        recovered: 0,
+    };
     // Pagination par curseur `id` : couvre TOUS les compagnons vivants, sans
     // troncature silencieuse.
     let mut after_id: Option<Uuid> = None;
@@ -157,7 +162,9 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
                 c
             };
             match state.pets_uc.tick(pet.id, cfg).await {
-                Ok(outcome @ (TickOutcome::FellSick | TickOutcome::Died | TickOutcome::Recovered)) => {
+                Ok(
+                    outcome @ (TickOutcome::FellSick | TickOutcome::Died | TickOutcome::Recovered),
+                ) => {
                     match outcome {
                         TickOutcome::FellSick => summary.sick += 1,
                         TickOutcome::Died => summary.died += 1,

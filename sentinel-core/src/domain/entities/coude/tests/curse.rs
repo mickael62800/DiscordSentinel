@@ -134,7 +134,10 @@ fn classic_curses_use_default_cost_and_duration() {
 #[test]
 fn graisser_round_trips_db_string() {
     assert_eq!(CurseKind::Graisser.as_db_str(), "graisser");
-    assert_eq!(CurseKind::from_db_str("graisser"), Some(CurseKind::Graisser));
+    assert_eq!(
+        CurseKind::from_db_str("graisser"),
+        Some(CurseKind::Graisser)
+    );
 }
 
 #[test]

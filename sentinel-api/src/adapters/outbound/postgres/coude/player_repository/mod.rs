@@ -107,7 +107,6 @@ impl From<PlayerRow> for Player {
     }
 }
 
-
 mod coins;
 mod combat_stats;
 mod hp;
@@ -126,11 +125,7 @@ impl PlayerRepository for PgPlayerRepository {
         read::get_or_create(self, guild_id, user_id, username).await
     }
 
-    async fn get(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<Option<Player>, DomainError> {
+    async fn get(&self, guild_id: &str, user_id: &str) -> Result<Option<Player>, DomainError> {
         read::get(self, guild_id, user_id).await
     }
 
@@ -259,11 +254,7 @@ impl PlayerRepository for PgPlayerRepository {
         streaks::touch_loss_streak(self, guild_id, user_id).await
     }
 
-    async fn reset_combat_streaks(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn reset_combat_streaks(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         streaks::reset_combat_streaks(self, guild_id, user_id).await
     }
 
@@ -369,19 +360,11 @@ impl PlayerRepository for PgPlayerRepository {
         streaks::touch_bj_bust_streak(self, guild_id, user_id).await
     }
 
-    async fn reset_bj_bust_streak(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn reset_bj_bust_streak(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         streaks::reset_bj_bust_streak(self, guild_id, user_id).await
     }
 
-    async fn increment_chaos(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<bool, DomainError> {
+    async fn increment_chaos(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
         combat_stats::increment_chaos(self, guild_id, user_id).await
     }
 
@@ -395,11 +378,7 @@ impl PlayerRepository for PgPlayerRepository {
         hp::update_hp(self, guild_id, user_id, hp_current, hp_max).await
     }
 
-    async fn full_heal(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         hp::full_heal(self, guild_id, user_id).await
     }
 

@@ -8,7 +8,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
-use crate::shared::embeds::{warn_embed, moderate_embed};
+use crate::shared::embeds::{moderate_embed, warn_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::Action;
@@ -43,15 +43,24 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
     // Charger la config depuis l'API pour ce guild
     let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
-    let config = crate::shared::discord_helpers::guild_config_or_default(ctx, &guild_id, crate::modules::automod::MODULE_BOT_NAME).await;
+    let config = crate::shared::discord_helpers::guild_config_or_default(
+        ctx,
+        &guild_id,
+        crate::modules::automod::MODULE_BOT_NAME,
+    )
+    .await;
 
     if !BaseApiClient::config_bool(&config, "enabled", true) {
         return;
     }
 
-    let flood_max_messages = BaseApiClient::config_u64(&config, "flood_max_messages", DEFAULT_FLOOD_MAX_MESSAGES) as usize;
-    let flood_window_secs = BaseApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
-    let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+    let flood_max_messages =
+        BaseApiClient::config_u64(&config, "flood_max_messages", DEFAULT_FLOOD_MAX_MESSAGES)
+            as usize;
+    let flood_window_secs =
+        BaseApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
+    let mute_duration_secs =
+        BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
 
     let mut detector_config = build_detector_config(&config);
 
@@ -73,11 +82,14 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     // poste toujours la carte. `severe_flood_max_messages` = seuil "gros flood".
     let auto_protect = BaseApiClient::config_bool(&config, "auto_protect_enabled", true);
     let severe_flood_max = BaseApiClient::config_u64(
-        &config, "severe_flood_max_messages", (flood_max_messages as u64) * 2,
+        &config,
+        "severe_flood_max_messages",
+        (flood_max_messages as u64) * 2,
     )
     .max(flood_max_messages as u64) as usize;
     // Notification DSA au membre (DM motif + droit d'appel) lors d'une action auto.
-    let auto_notify_member = BaseApiClient::config_bool(&config, "auto_protect_notify_member", true);
+    let auto_notify_member =
+        BaseApiClient::config_bool(&config, "auto_protect_notify_member", true);
     // Mention systematique du droit d'appel sur les messages de sanction (membre).
     let sanction_appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
 
@@ -112,15 +124,18 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     let files_review = BaseApiClient::config_bool(&config, "files_review_mode", true);
     if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
         const DANGEROUS_EXTENSIONS: &[&str] = &[
-            "exe", "bat", "cmd", "scr", "ps1", "vbs", "js",
-            "jar", "com", "pif", "msi", "dll", "reg", "hta",
+            "exe", "bat", "cmd", "scr", "ps1", "vbs", "js", "jar", "com", "pif", "msi", "dll",
+            "reg", "hta",
         ];
 
         let suspicious = msg.attachments.iter().find(|a| {
             let name_lower = a.filename.to_lowercase();
             let ext = name_lower.rsplit('.').next().unwrap_or("");
             DANGEROUS_EXTENSIONS.contains(&ext)
-                || detector_config.suspicious_file_extensions.iter().any(|e| e == ext)
+                || detector_config
+                    .suspicious_file_extensions
+                    .iter()
+                    .any(|e| e == ext)
         });
 
         if let Some(attachment) = suspicious {
@@ -128,8 +143,24 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             let reason = format!("Piece jointe suspecte : {}", attachment.filename);
 
             if (files_review || human_only) && log_channel_id != 0 {
-                let flags = detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false };
-                send_review_card(ctx, msg, &Action::Delete, &reason, 1.0, &flags, log_channel_id, &colors, None).await;
+                let flags = detectors::DetectionFlags {
+                    spam: false,
+                    insult: false,
+                    link: false,
+                    phishing: false,
+                };
+                send_review_card(
+                    ctx,
+                    msg,
+                    &Action::Delete,
+                    &reason,
+                    1.0,
+                    &flags,
+                    log_channel_id,
+                    &colors,
+                    None,
+                )
+                .await;
             } else if human_only {
                 // Modération humaine sans salon de review : on ne supprime pas.
                 warn!(user = %msg.author.name, "Fichier suspect + human_only sans salon review : suppression bloquee");
@@ -148,7 +179,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 }
             }
 
-            let log_msg = format!("Fichier suspect -- {} : {}", msg.author.name, attachment.filename);
+            let log_msg = format!(
+                "Fichier suspect -- {} : {}",
+                msg.author.name, attachment.filename
+            );
             let data = ctx.data.read().await;
             if let Some(base) = data.get::<ApiClientKey>() {
                 base.send_log("warn", &guild_id, &log_msg);
@@ -200,8 +234,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let (base, grpc) = {
                     let data = ctx.data.read().await;
                     (
-                        data.get::<crate::shared::heartbeat::ApiClientKey>().cloned(),
-                        data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned(),
+                        data.get::<crate::shared::heartbeat::ApiClientKey>()
+                            .cloned(),
+                        data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                            .cloned(),
                     )
                 };
                 match (base, grpc) {
@@ -234,16 +270,25 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
             let auto_note = if severe {
                 super::backend::apply_auto_protect(
-                    ctx, msg, mute_duration_secs,
-                    "Gros flood / raid probable", auto_notify_member,
-                ).await
+                    ctx,
+                    msg,
+                    mute_duration_secs,
+                    "Gros flood / raid probable",
+                    auto_notify_member,
+                )
+                .await
             } else {
                 None
             };
 
             let flood_review = BaseApiClient::config_bool(&config, "flood_review_mode", true);
             if (flood_review || severe) && log_channel_id != 0 {
-                let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+                let flags = detectors::DetectionFlags {
+                    spam: true,
+                    insult: false,
+                    link: false,
+                    phishing: false,
+                };
                 // Cas severe : on suggere Mute (deja applique), sinon Warn.
                 let suggested = if severe { Action::Mute } else { Action::Warn };
                 let reason = if severe {
@@ -251,34 +296,74 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 } else {
                     "Flood detecte -- messages envoyes trop rapidement."
                 };
-                send_review_card(ctx, msg, &suggested, reason, if severe { 0.99 } else { 0.9 }, &flags, log_channel_id, &colors, auto_note).await;
+                send_review_card(
+                    ctx,
+                    msg,
+                    &suggested,
+                    reason,
+                    if severe { 0.99 } else { 0.9 },
+                    &flags,
+                    log_channel_id,
+                    &colors,
+                    auto_note,
+                )
+                .await;
             } else if severe {
                 // Severe sans salon de review : protection auto deja appliquee.
                 // On poste une card pour que l'admin voie qui/pourquoi.
                 info!(user = %msg.author.name, "Gros flood protege automatiquement (pas de salon de review)");
                 if auto_note.is_some() {
                     super::backend::post_auto_mute_notice(
-                        ctx, msg, "Gros flood / raid probable", mute_duration_secs, log_channel_id,
-                    ).await;
+                        ctx,
+                        msg,
+                        "Gros flood / raid probable",
+                        mute_duration_secs,
+                        log_channel_id,
+                    )
+                    .await;
                 }
             } else {
                 let embed = warn_embed("Avertissement AutoMod")
                     .color(colors.warn)
-                    .field("Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
+                    .field(
+                        "Raison",
+                        "Merci de ne pas envoyer autant de messages aussi rapidement.",
+                        false,
+                    )
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
                 if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
                     warn!(error = %e, "Echec envoi avertissement flood");
                 }
 
-                let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-                let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
-                let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
+                let flags = detectors::DetectionFlags {
+                    spam: true,
+                    insult: false,
+                    link: false,
+                    phishing: false,
+                };
+                let ctx_max_msgs =
+                    BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
+                let ctx_max_chars =
+                    BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
                 let ctx_clone = ctx.clone();
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
                     // Routage decide cote serveur.
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars, human_only, auto_notify_member, sanction_appeal).await;
+                    send_to_backend(
+                        &ctx_clone,
+                        &msg_clone,
+                        flags,
+                        mute_duration_secs,
+                        log_channel_id,
+                        &colors,
+                        ctx_max_msgs,
+                        ctx_max_chars,
+                        human_only,
+                        auto_notify_member,
+                        sanction_appeal,
+                    )
+                    .await;
                 });
             }
             return;
@@ -292,12 +377,32 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         info!(user = %msg.author.name, "Caps detecte");
         let caps_review = BaseApiClient::config_bool(&config, "caps_review_mode", true);
         if caps_review && log_channel_id != 0 {
-            let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-            send_review_card(ctx, msg, &Action::Warn, "Abus de majuscules detecte.", 0.8, &flags, log_channel_id, &colors, None).await;
+            let flags = detectors::DetectionFlags {
+                spam: true,
+                insult: false,
+                link: false,
+                phishing: false,
+            };
+            send_review_card(
+                ctx,
+                msg,
+                &Action::Warn,
+                "Abus de majuscules detecte.",
+                0.8,
+                &flags,
+                log_channel_id,
+                &colors,
+                None,
+            )
+            .await;
         } else {
             let embed = warn_embed("Avertissement AutoMod")
                 .color(colors.warn)
-                .field("Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
+                .field(
+                    "Raison",
+                    "Merci d'ecrire normalement sans tout mettre en majuscules.",
+                    false,
+                )
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
             if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
@@ -308,10 +413,13 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
     // Slowmode adaptatif
     {
-        let adaptive_enabled = BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
+        let adaptive_enabled =
+            BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
         if adaptive_enabled {
-            let threshold = BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
-            let slowmode_secs = BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5) as u16;
+            let threshold =
+                BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
+            let slowmode_secs =
+                BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5) as u16;
 
             let data = ctx.data.read().await;
             if let Some(tracker) = data.get::<SlowmodeTrackerKey>() {
@@ -319,7 +427,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 if tracker.should_activate(msg.channel_id, threshold)
                     && tracker.try_start_activation(msg.channel_id)
                 {
-                    let edit = serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
+                    let edit =
+                        serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
                     if let Err(e) = msg.channel_id.edit(&ctx.http, edit).await {
                         warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
                     } else {
@@ -347,7 +456,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     }
 
     let ia_text_enabled = BaseApiClient::config_bool(&config, "text_enabled", true);
-    let should_analyze = flags.spam || flags.insult || flags.link || flags.phishing || ia_text_enabled;
+    let should_analyze =
+        flags.spam || flags.insult || flags.link || flags.phishing || ia_text_enabled;
 
     if !should_analyze {
         return;
@@ -363,11 +473,31 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         // Analyse texte : le ROUTAGE (carte/auto/rien + severe + suppression
         // de lien) est decide cote serveur. Le bot execute la decision.
         // `human_only` n'est conserve que pour le fallback "backend injoignable".
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars, human_only, auto_notify_member, sanction_appeal).await;
+        send_to_backend(
+            &ctx_clone,
+            &msg_clone,
+            flags,
+            mute_duration_secs,
+            log_channel_id,
+            &colors,
+            context_max_messages,
+            context_max_chars,
+            human_only,
+            auto_notify_member,
+            sanction_appeal,
+        )
+        .await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {
-            analyze_message_images(&ctx_clone, &msg_clone, mute_duration_secs, log_channel_id, &colors).await;
+            analyze_message_images(
+                &ctx_clone,
+                &msg_clone,
+                mute_duration_secs,
+                log_channel_id,
+                &colors,
+            )
+            .await;
         }
     });
 }

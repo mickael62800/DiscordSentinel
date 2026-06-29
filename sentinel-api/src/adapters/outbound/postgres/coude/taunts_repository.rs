@@ -3,13 +3,15 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
+use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
 use sentinel_core::domain::entities::coude::taunt::TauntsConfig;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "taunts";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgTauntsRepository {
     pool: PgPool,
@@ -23,10 +25,7 @@ impl PgTauntsRepository {
 
 #[async_trait]
 impl TauntsRepository for PgTauntsRepository {
-    async fn get_or_init_config(
-        &self,
-        guild_id: &str,
-    ) -> Result<TauntsConfig, DomainError> {
+    async fn get_or_init_config(&self, guild_id: &str) -> Result<TauntsConfig, DomainError> {
         let row: (String, Option<String>, bool, bool, bool) = sqlx::query_as(
             r#"INSERT INTO coude_taunts_config (guild_id)
                VALUES ($1)
@@ -82,7 +81,11 @@ impl TauntsRepository for PgTauntsRepository {
         Ok(())
     }
 
-    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError> {
+    async fn set_rename_enabled(
+        &self,
+        guild_id: &str,
+        rename_enabled: bool,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"INSERT INTO coude_taunts_config (guild_id, rename_enabled)
                VALUES ($1, $2)
@@ -98,7 +101,11 @@ impl TauntsRepository for PgTauntsRepository {
         Ok(())
     }
 
-    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError> {
+    async fn set_messages_enabled(
+        &self,
+        guild_id: &str,
+        messages_enabled: bool,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"INSERT INTO coude_taunts_config (guild_id, messages_enabled)
                VALUES ($1, $2)
@@ -158,14 +165,12 @@ impl TauntsRepository for PgTauntsRepository {
             .await
             .map_err(pg_err)?;
         } else {
-            sqlx::query(
-                "DELETE FROM coude_taunts_opt_outs WHERE guild_id = $1 AND user_id = $2",
-            )
-            .bind(guild_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+            sqlx::query("DELETE FROM coude_taunts_opt_outs WHERE guild_id = $1 AND user_id = $2")
+                .bind(guild_id)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await
+                .map_err(pg_err)?;
         }
         Ok(())
     }

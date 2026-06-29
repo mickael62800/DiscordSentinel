@@ -3,8 +3,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::inventory::Insurance;
 use crate::domain::entities::coude::inventory::InventoryItem;
-use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 
 /// Use case "gérer l'inventaire/primes/assurances Coup de Coude".
@@ -78,7 +78,8 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         duration_seconds: i64,
         _level: i32,
     ) -> Result<bool, DomainError> {
-        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds).await
+        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds)
+            .await
     }
 
     /// Phase 2 #3 audit : decide cote API si l'assurance est un scam

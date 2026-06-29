@@ -1,18 +1,18 @@
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::audit::security::ReportEventDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityQueryParams;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
@@ -50,20 +50,22 @@ pub async fn purge_events(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.purge.security_events",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.purge.security_events",
         "role insuffisant pour purger les evenements de securite",
     )
     .await?;
 
     // Phase 4 : on supprime depuis audit_logs (la table security_events est
     // deprecated, plus de writes). On vire aussi les anciennes lignes legacy.
-    let events_audit = sqlx::query(
-        "DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'",
-    )
-    .bind(&guild_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("purge audit security"))?;
+    let events_audit =
+        sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'")
+            .bind(&guild_id)
+            .execute(&state.pg_pool)
+            .await
+            .map_err(sqlx_internal("purge audit security"))?;
 
     let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
         .bind(&guild_id)

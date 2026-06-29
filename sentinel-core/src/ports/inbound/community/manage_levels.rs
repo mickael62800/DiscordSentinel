@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use crate::domain::entities::community::level::LevelConfig;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 pub struct SaveLevelConfigCommand {
     pub guild_id: GuildId,
@@ -61,11 +61,26 @@ pub trait ManageLevelsUseCase: Send + Sync {
     async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError>;
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError>;
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError>;
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError>;
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
-    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
+    async fn get_user_level(&self, guild_id: &str, user_id: &str)
+        -> Result<UserLevel, DomainError>;
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError>;
+    async fn get_leaderboard_by_source(
+        &self,
+        guild_id: &str,
+        source: XpSource,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError>;
     /// Set valeur exacte XP texte/voix (admin override). Recalcule les niveaux.
     async fn set_user_xp(&self, cmd: SetUserXpCommand) -> Result<UserLevel, DomainError>;
     /// Reset XP a 0 sur la cible (text / voice / all). Recalcule les niveaux.
-    async fn reset_user_xp(&self, guild_id: &str, user_id: &str, target: ResetTarget) -> Result<UserLevel, DomainError>;
+    async fn reset_user_xp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        target: ResetTarget,
+    ) -> Result<UserLevel, DomainError>;
 }

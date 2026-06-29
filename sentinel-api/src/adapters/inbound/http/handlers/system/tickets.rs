@@ -19,15 +19,15 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
 use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
+use sentinel_core::domain::errors::DomainError;
 pub async fn list_tickets(
     State(state): State<AppState>,
     Query(params): Query<ListTicketsQuery>,
@@ -38,7 +38,17 @@ pub async fn list_tickets(
 
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
-    let tickets = state.tickets_uc.list_tickets(params.status, params.priority, params.search, params.author_id, limit, offset).await?;
+    let tickets = state
+        .tickets_uc
+        .list_tickets(
+            params.status,
+            params.priority,
+            params.search,
+            params.author_id,
+            limit,
+            offset,
+        )
+        .await?;
     Ok(map_to_dtos(tickets))
 }
 
@@ -155,10 +165,14 @@ pub async fn update_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let status = match TicketStatus::from_str(&dto.status) {
         Some(s) => s,
-        None => return Err(DomainError::ValidationError(format!(
-            "Statut invalide : {}. Valeurs acceptees : {:?}",
-            dto.status, TicketStatus::VALID_VALUES
-        )).into()),
+        None => {
+            return Err(DomainError::ValidationError(format!(
+                "Statut invalide : {}. Valeurs acceptees : {:?}",
+                dto.status,
+                TicketStatus::VALID_VALUES
+            ))
+            .into())
+        }
     };
 
     if status == TicketStatus::Closed {

@@ -5,35 +5,35 @@
 //! - attempt_heist success path (withdraw + credit + record)
 //! - attempt_heist failure path (prison 24h)
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Duration as ChronoDuration;
 use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::coude::manage_heist_service::ManageCoudeHeistService;
-use crate::domain::entities::system::bot_config::BotDefinition;
-use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::heist::HeistAttempt;
+use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::inventory::Insurance;
 use crate::domain::entities::coude::inventory::InventoryItem;
-use crate::domain::entities::coude::inventory::Prime;
-use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
-use crate::domain::entities::casino::wallet::Wallet;
-use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::inventory::Prime;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::coude::heist_repository::HeistRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 // ── MockHeistRepo ──
 
 #[derive(Default)]
@@ -50,13 +50,28 @@ impl HeistRepository for MockHeistRepo {
         Ok(self.last_attempt.lock().unwrap().clone())
     }
     async fn record_attempt(
-        &self, g: &str, u: &str, success: bool, amount_stolen: i64, chance: i32, _: &[String],
+        &self,
+        g: &str,
+        u: &str,
+        success: bool,
+        amount_stolen: i64,
+        chance: i32,
+        _: &[String],
     ) -> Result<HeistAttempt, DomainError> {
-        self.record_calls.lock().unwrap().push((g.into(), u.into(), success, amount_stolen, chance));
+        self.record_calls.lock().unwrap().push((
+            g.into(),
+            u.into(),
+            success,
+            amount_stolen,
+            chance,
+        ));
         Ok(HeistAttempt {
             id: Uuid::new_v4(),
-            guild_id: g.into(), user_id: u.into(),
-            success, amount_stolen, chance_percent: chance,
+            guild_id: g.into(),
+            user_id: u.into(),
+            success,
+            amount_stolen,
+            chance_percent: chance,
             tools_used: vec![],
             attempted_at: Utc::now(),
         })
@@ -65,9 +80,16 @@ impl HeistRepository for MockHeistRepo {
         Ok(self.prison.lock().unwrap().clone())
     }
     async fn send_to_prison(
-        &self, g: &str, u: &str, _released: chrono::DateTime<Utc>, reason: &str,
+        &self,
+        g: &str,
+        u: &str,
+        _released: chrono::DateTime<Utc>,
+        reason: &str,
     ) -> Result<(), DomainError> {
-        self.prison_calls.lock().unwrap().push((g.into(), u.into(), reason.into()));
+        self.prison_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), reason.into()));
         Ok(())
     }
 }
@@ -81,7 +103,10 @@ struct MockCashboxRepo {
 
 impl Default for MockCashboxRepo {
     fn default() -> Self {
-        Self { balance: Mutex::new(1_000_000), withdraw_calls: Mutex::new(vec![]) }
+        Self {
+            balance: Mutex::new(1_000_000),
+            withdraw_calls: Mutex::new(vec![]),
+        }
     }
 }
 
@@ -91,13 +116,19 @@ impl CashboxRepository for MockCashboxRepo {
         Ok(Cashbox {
             guild_id: g.into(),
             balance: *self.balance.lock().unwrap(),
-            total_collected: 0, total_redistributed: 0,
+            total_collected: 0,
+            total_redistributed: 0,
             last_redistribution_at: None,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         })
     }
-    async fn deposit(&self, _: &str, _: i64, _: CashboxSource) -> Result<(), DomainError> { Ok(()) }
-    async fn claim_all_for_redistribution(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
+    async fn deposit(&self, _: &str, _: i64, _: CashboxSource) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn claim_all_for_redistribution(&self, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
     async fn withdraw(&self, g: &str, amount: i64) -> Result<i64, DomainError> {
         self.withdraw_calls.lock().unwrap().push((g.into(), amount));
         let mut b = self.balance.lock().unwrap();
@@ -105,11 +136,34 @@ impl CashboxRepository for MockCashboxRepo {
         *b -= taken;
         Ok(taken)
     }
-    async fn record_redistribution(&self, _: &str, _: i64, _: Vec<(String, String, i64)>) -> Result<Uuid, DomainError> { Ok(Uuid::new_v4()) }
-    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<CashboxRedistribution>, DomainError> { Ok(vec![]) }
-    async fn list_entries(&self, _: Uuid) -> Result<Vec<CashboxRedistributionEntry>, DomainError> { Ok(vec![]) }
-    async fn list_active_players(&self, _: &str, _: i64) -> Result<Vec<(String, String)>, DomainError> { Ok(vec![]) }
-    async fn list_guilds_due_for_redistribution(&self, _: i64) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn record_redistribution(
+        &self,
+        _: &str,
+        _: i64,
+        _: Vec<(String, String, i64)>,
+    ) -> Result<Uuid, DomainError> {
+        Ok(Uuid::new_v4())
+    }
+    async fn list_redistributions(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<CashboxRedistribution>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_entries(&self, _: Uuid) -> Result<Vec<CashboxRedistributionEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_active_players(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<(String, String)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_guilds_due_for_redistribution(&self, _: i64) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 // ── MockInventoryUc ──
@@ -125,18 +179,41 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(self.inventory.lock().unwrap().clone())
     }
-    async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn use_item(&self, g: &str, u: &str, key: &str) -> Result<bool, DomainError> {
-        self.use_calls.lock().unwrap().push((g.into(), u.into(), key.into()));
+        self.use_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), key.into()));
         Ok(true)
     }
-    async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { Ok(vec![]) }
-    async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { Ok(None) }
-    async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> {
+        unimplemented!()
+    }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn get_active_insurance(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Insurance>, DomainError> {
+        Ok(None)
+    }
+    async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ── MockWalletRepo ──
@@ -148,24 +225,95 @@ struct MockWalletRepo {
 
 #[async_trait]
 impl WalletRepository for MockWalletRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> { Ok(None) }
-    async fn credit(&self, g: &str, u: &str, amount: i64, source: &str, _: &str) -> Result<Wallet, DomainError> {
-        self.credit_calls.lock().unwrap().push((g.into(), u.into(), amount, source.into()));
+    async fn get_or_create(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> {
+        Ok(None)
+    }
+    async fn credit(
+        &self,
+        g: &str,
+        u: &str,
+        amount: i64,
+        source: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
+        self.credit_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), amount, source.into()));
         Ok(Wallet {
-            id: Uuid::new_v4(), guild_id: g.into(), user_id: u.into(), username: "x".into(),
-            coins: amount, total_earned: amount, total_spent: 0,
-            created_at: Utc::now(), updated_at: Utc::now(),
+            id: Uuid::new_v4(),
+            guild_id: g.into(),
+            user_id: u.into(),
+            username: "x".into(),
+            coins: amount,
+            total_earned: amount,
+            total_spent: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
         })
     }
-    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
-    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> { Ok(0) }
+    async fn debit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn transfer(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn pay_combat_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_transactions(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── MockBotConfig (pour load_balance) ──
@@ -177,13 +325,21 @@ struct MockBotConfig {
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfig {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.rows.lock().unwrap().clone())
     }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ── Helper builder ──
@@ -199,8 +355,11 @@ fn build_service(
 }
 
 fn default_service_parts() -> (
-    Arc<MockHeistRepo>, Arc<MockCashboxRepo>, Arc<MockInventoryUc>,
-    Arc<MockWalletRepo>, Arc<MockBotConfig>,
+    Arc<MockHeistRepo>,
+    Arc<MockCashboxRepo>,
+    Arc<MockInventoryUc>,
+    Arc<MockWalletRepo>,
+    Arc<MockBotConfig>,
 ) {
     (
         Arc::new(MockHeistRepo::default()),
@@ -230,8 +389,11 @@ async fn cooldown_not_ready_when_recent_attempt() {
     let (h, c, i, w, b) = default_service_parts();
     *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
-        guild_id: "g".into(), user_id: "u".into(),
-        success: true, amount_stolen: 1000, chance_percent: 50,
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        success: true,
+        amount_stolen: 1000,
+        chance_percent: 50,
         tools_used: vec![],
         attempted_at: Utc::now(), // tout recent
     });
@@ -247,8 +409,11 @@ async fn cooldown_ready_when_old_attempt() {
     let (h, c, i, w, b) = default_service_parts();
     *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
-        guild_id: "g".into(), user_id: "u".into(),
-        success: false, amount_stolen: 0, chance_percent: 30,
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        success: false,
+        amount_stolen: 0,
+        chance_percent: 30,
         tools_used: vec![],
         attempted_at: Utc::now() - ChronoDuration::days(30), // tres vieux
     });
@@ -276,7 +441,8 @@ async fn prison_status_not_in_prison_by_default() {
 async fn prison_status_active_when_released_at_in_future() {
     let (h, c, i, w, b) = default_service_parts();
     *h.prison.lock().unwrap() = Some(PrisonState {
-        guild_id: "g".into(), user_id: "u".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
         released_at: Utc::now() + ChronoDuration::hours(10),
         reason: "heist_failed".into(),
         created_at: Utc::now(),
@@ -291,7 +457,8 @@ async fn prison_status_active_when_released_at_in_future() {
 async fn prison_status_released_when_released_at_past() {
     let (h, c, i, w, b) = default_service_parts();
     *h.prison.lock().unwrap() = Some(PrisonState {
-        guild_id: "g".into(), user_id: "u".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
         released_at: Utc::now() - ChronoDuration::hours(1), // passe
         reason: "heist_failed".into(),
         created_at: Utc::now() - ChronoDuration::days(2),
@@ -310,7 +477,8 @@ async fn prison_status_released_when_released_at_past() {
 async fn attempt_heist_forbidden_when_in_prison() {
     let (h, c, i, w, b) = default_service_parts();
     *h.prison.lock().unwrap() = Some(PrisonState {
-        guild_id: "g".into(), user_id: "u".into(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
         released_at: Utc::now() + ChronoDuration::hours(10),
         reason: "heist_failed".into(),
         created_at: Utc::now(),
@@ -326,8 +494,11 @@ async fn attempt_heist_forbidden_when_cooldown_active() {
     let (h, c, i, w, b) = default_service_parts();
     *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
-        guild_id: "g".into(), user_id: "u".into(),
-        success: true, amount_stolen: 500, chance_percent: 50,
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        success: true,
+        amount_stolen: 500,
+        chance_percent: 50,
         tools_used: vec![],
         attempted_at: Utc::now(),
     });
@@ -387,7 +558,10 @@ async fn attempt_heist_failure_sends_to_prison() {
             break;
         }
     }
-    assert!(saw_failure, "devrait voir au moins un echec en 50 iterations");
+    assert!(
+        saw_failure,
+        "devrait voir au moins un echec en 50 iterations"
+    );
 }
 
 #[tokio::test]
@@ -398,8 +572,10 @@ async fn attempt_heist_success_withdraws_and_credits() {
     use crate::domain::entities::coude::heist::HEIST_TOOLS;
     for tool in HEIST_TOOLS {
         i.inventory.lock().unwrap().push(InventoryItem {
-            guild_id: "g".into(), user_id: "u".into(),
-            item_key: tool.key.to_string(), quantity: 10,
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            item_key: tool.key.to_string(),
+            quantity: 10,
         });
     }
     let svc = build_service(h.clone(), c.clone(), i, w.clone(), b);
@@ -426,7 +602,10 @@ async fn attempt_heist_success_withdraws_and_credits() {
             break;
         }
     }
-    assert!(saw_success, "devrait voir au moins un succes en 50 iterations avec tous les outils");
+    assert!(
+        saw_success,
+        "devrait voir au moins un succes en 50 iterations avec tous les outils"
+    );
 }
 
 #[tokio::test]
@@ -436,12 +615,16 @@ async fn attempt_heist_filters_unknown_items_from_tools() {
     let (h, c, i, w, b) = default_service_parts();
     i.inventory.lock().unwrap().extend(vec![
         InventoryItem {
-            guild_id: "g".into(), user_id: "u".into(),
-            item_key: "potion".into(), quantity: 5, // pas un outil braquage
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            item_key: "potion".into(),
+            quantity: 5, // pas un outil braquage
         },
         InventoryItem {
-            guild_id: "g".into(), user_id: "u".into(),
-            item_key: "not_an_item".into(), quantity: 1,
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            item_key: "not_an_item".into(),
+            quantity: 1,
         },
     ]);
     let svc = build_service(h, c, i.clone(), w, b);
@@ -453,8 +636,10 @@ async fn attempt_heist_filters_unknown_items_from_tools() {
 async fn attempt_heist_skips_zero_quantity_items() {
     let (h, c, i, w, b) = default_service_parts();
     i.inventory.lock().unwrap().push(InventoryItem {
-        guild_id: "g".into(), user_id: "u".into(),
-        item_key: "potion".into(), quantity: 0,
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        item_key: "potion".into(),
+        quantity: 0,
     });
     let svc = build_service(h, c, i.clone(), w, b);
     let _ = svc.attempt_heist("g", "u").await.unwrap();

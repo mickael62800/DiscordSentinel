@@ -2,30 +2,50 @@
 //! request du module Coup de Coude.
 
 use super::*;
+use chrono::Utc;
+use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::BetPayout;
 use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
-use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
 use sentinel_core::domain::entities::coude::combat::*;
 use sentinel_core::domain::entities::coude::inventory::*;
 use sentinel_core::domain::entities::coude::player::*;
 use sentinel_core::domain::entities::coude::social::*;
 use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
-use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_player() -> Player {
     let now = Utc::now();
     Player {
-        guild_id: "g".into(), user_id: "u1".into(), username: "alice".into(),
+        guild_id: "g".into(),
+        user_id: "u1".into(),
+        username: "alice".into(),
         coins: 500,
-        total_wins: 5, total_losses: 2, total_draws: 1,
-        total_earned: 2000, total_lost: 500, total_stolen: 100,
-        cowardice_count: 1, chaos_events: 3, casino_wins: 10, casino_losses: 5,
-        level: 8, xp: 1500, stat_points: 2, atk: 5, def: 3,
-        class: Some(PlayerClass::Tank), title: Some("Guerrier".into()), class_changed_at: None,
-        hp_current: 80, hp_max: 100, hp_last_regen: None, repos_last_used: None,
-        season: 2, created_at: now, updated_at: now,
+        total_wins: 5,
+        total_losses: 2,
+        total_draws: 1,
+        total_earned: 2000,
+        total_lost: 500,
+        total_stolen: 100,
+        cowardice_count: 1,
+        chaos_events: 3,
+        casino_wins: 10,
+        casino_losses: 5,
+        level: 8,
+        xp: 1500,
+        stat_points: 2,
+        atk: 5,
+        def: 3,
+        class: Some(PlayerClass::Tank),
+        title: Some("Guerrier".into()),
+        class_changed_at: None,
+        hp_current: 80,
+        hp_max: 100,
+        hp_last_regen: None,
+        repos_last_used: None,
+        season: 2,
+        created_at: now,
+        updated_at: now,
     }
 }
 
@@ -148,17 +168,27 @@ fn combat_dto_from_domain() {
     let id = Uuid::new_v4();
     let now = Utc::now();
     let c = Combat {
-        id, guild_id: "g".into(),
+        id,
+        guild_id: "g".into(),
         channel_id: Some("c1".into()),
-        attacker_id: "a".into(), attacker_name: "A".into(),
-        defender_id: "d".into(), defender_name: "D".into(),
+        attacker_id: "a".into(),
+        attacker_name: "A".into(),
+        defender_id: "d".into(),
+        defender_name: "D".into(),
         mise: 100,
         status: "pending".into(),
         winner_id: None,
-        attacker_roll: None, defender_roll: None,
-        chaos_event: None, special_attack: None, defender_special: None,
-        coins_transferred: None, result_message: None, message_id: None,
-        created_at: now, accepted_at: None, resolved_at: None,
+        attacker_roll: None,
+        defender_roll: None,
+        chaos_event: None,
+        special_attack: None,
+        defender_special: None,
+        coins_transferred: None,
+        result_message: None,
+        message_id: None,
+        created_at: now,
+        accepted_at: None,
+        resolved_at: None,
     };
     let dto = CombatDto::from(&c);
     assert_eq!(dto.id, id.to_string());
@@ -261,10 +291,12 @@ fn event_dto_from_domain() {
     let id = Uuid::new_v4();
     let now = Utc::now();
     let e = Event {
-        id, guild_id: "g".into(),
+        id,
+        guild_id: "g".into(),
         event_type: "happy_hour".into(),
         active: true,
-        expires_at: now, created_at: now,
+        expires_at: now,
+        created_at: now,
     };
     let dto = EventDto::from(e);
     assert_eq!(dto.id, id.to_string());
@@ -279,7 +311,8 @@ fn current_season_dto_from_domain() {
     let now = Utc::now();
     let s = Season {
         season_number: 3,
-        started_at: now, ends_at: now,
+        started_at: now,
+        ends_at: now,
         days_remaining: 15,
     };
     let dto = CurrentSeasonDto::from(s);
@@ -319,14 +352,24 @@ fn sample_combat() -> Combat {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         channel_id: Some("c1".into()),
-        attacker_id: "a".into(), attacker_name: "A".into(),
-        defender_id: "d".into(), defender_name: "D".into(),
-        mise: 100, status: "betting".into(),
-        winner_id: None, attacker_roll: None, defender_roll: None,
-        chaos_event: None, special_attack: None, defender_special: None,
-        coins_transferred: None, result_message: None,
+        attacker_id: "a".into(),
+        attacker_name: "A".into(),
+        defender_id: "d".into(),
+        defender_name: "D".into(),
+        mise: 100,
+        status: "betting".into(),
+        winner_id: None,
+        attacker_roll: None,
+        defender_roll: None,
+        chaos_event: None,
+        special_attack: None,
+        defender_special: None,
+        coins_transferred: None,
+        result_message: None,
         message_id: Some("msg".into()),
-        created_at: now, accepted_at: None, resolved_at: None,
+        created_at: now,
+        accepted_at: None,
+        resolved_at: None,
     }
 }
 
@@ -348,11 +391,17 @@ fn full_combat_dto_from_domain_maps_all_fields() {
 fn prime_dto_from_domain_maps_all_fields() {
     let now = Utc::now();
     let p = Prime {
-        id: Uuid::new_v4(), guild_id: "g".into(),
-        target_id: "t".into(), target_name: "T".into(),
-        placed_by_id: "p".into(), placed_by_name: "P".into(),
-        amount: 500, claimed: false,
-        claimed_by_id: None, claimed_by_name: None, claimed_at: None,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        target_id: "t".into(),
+        target_name: "T".into(),
+        placed_by_id: "p".into(),
+        placed_by_name: "P".into(),
+        amount: 500,
+        claimed: false,
+        claimed_by_id: None,
+        claimed_by_name: None,
+        claimed_at: None,
         created_at: now,
     };
     let dto = PrimeDto::from(p);
@@ -366,10 +415,14 @@ fn prime_dto_from_domain_maps_all_fields() {
 fn prime_dto_claimed_carries_metadata() {
     let now = Utc::now();
     let p = Prime {
-        id: Uuid::new_v4(), guild_id: "g".into(),
-        target_id: "t".into(), target_name: "T".into(),
-        placed_by_id: "p".into(), placed_by_name: "P".into(),
-        amount: 500, claimed: true,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        target_id: "t".into(),
+        target_name: "T".into(),
+        placed_by_id: "p".into(),
+        placed_by_name: "P".into(),
+        amount: 500,
+        claimed: true,
         claimed_by_id: Some("c".into()),
         claimed_by_name: Some("C".into()),
         claimed_at: Some(now),
@@ -404,7 +457,10 @@ fn insurance_dto_from_domain() {
 #[test]
 fn add_xp_response_from_xp_progress() {
     let p = XpProgress {
-        new_xp: 1500, new_level: 9, leveled_up: true, stat_points_gained: 2,
+        new_xp: 1500,
+        new_level: 9,
+        leveled_up: true,
+        stat_points_gained: 2,
     };
     let r: AddXpResponse = p.into();
     assert_eq!(r.new_xp, 1500);
@@ -418,7 +474,9 @@ fn add_xp_response_from_xp_progress() {
 #[test]
 fn leaderboard_entry_from_domain() {
     let e = LeaderboardEntry {
-        user_id: "u".into(), username: "Alice".into(), value: 12345,
+        user_id: "u".into(),
+        username: "Alice".into(),
+        value: 12345,
     };
     let dto: LeaderboardEntry = e.into();
     assert_eq!(dto.user_id, "u".into());
@@ -430,8 +488,10 @@ fn leaderboard_entry_from_domain() {
 #[test]
 fn fighter_bet_bonus_from_domain() {
     let b = CoudeFighterBetBonus {
-        winner_id: "w".into(), winner_bonus: 100,
-        loser_id: "l".into(), loser_bonus: 50,
+        winner_id: "w".into(),
+        winner_bonus: 100,
+        loser_id: "l".into(),
+        loser_bonus: 50,
         total_pot: 200,
     };
     let dto: FighterBetBonus = b.into();
@@ -447,13 +507,18 @@ fn resolve_bets_response_maps_payouts_and_bonus() {
     let plan = BetResolutionPlan {
         payouts: vec![BetPayout {
             bet_id: Uuid::new_v4(),
-            bettor_id: "u1".into(), bettor_name: "U1".into(),
-            backed_id: "att".into(), amount_bet: 100,
-            payout: 200, won: true,
+            bettor_id: "u1".into(),
+            bettor_name: "U1".into(),
+            backed_id: "att".into(),
+            amount_bet: 100,
+            payout: 200,
+            won: true,
         }],
         fighter_bonus: Some(CoudeFighterBetBonus {
-            winner_id: "att".into(), winner_bonus: 50,
-            loser_id: "def".into(), loser_bonus: 0,
+            winner_id: "att".into(),
+            winner_bonus: 50,
+            loser_id: "def".into(),
+            loser_bonus: 0,
             total_pot: 100,
         }),
     };
@@ -467,7 +532,10 @@ fn resolve_bets_response_maps_payouts_and_bonus() {
 
 #[test]
 fn resolve_bets_response_empty_plan() {
-    let plan = BetResolutionPlan { payouts: vec![], fighter_bonus: None };
+    let plan = BetResolutionPlan {
+        payouts: vec![],
+        fighter_bonus: None,
+    };
     let resp: ResolveBetsResponse = plan.into();
     assert!(resp.results.is_empty());
     assert!(resp.fighter_bonus.is_none());
@@ -477,9 +545,8 @@ fn resolve_bets_response_empty_plan() {
 
 #[test]
 fn combat_query_params_deserializes() {
-    let q: CombatQueryParams = serde_json::from_value(
-        serde_json::json!({"status": "resolved", "limit": 25})
-    ).unwrap();
+    let q: CombatQueryParams =
+        serde_json::from_value(serde_json::json!({"status": "resolved", "limit": 25})).unwrap();
     assert_eq!(q.status.as_deref(), Some("resolved"));
     assert_eq!(q.limit, Some(25));
 
@@ -490,9 +557,8 @@ fn combat_query_params_deserializes() {
 
 #[test]
 fn leaderboard_query_params_deserializes() {
-    let q: LeaderboardQueryParams = serde_json::from_value(
-        serde_json::json!({"limit": 50})
-    ).unwrap();
+    let q: LeaderboardQueryParams =
+        serde_json::from_value(serde_json::json!({"limit": 50})).unwrap();
     assert_eq!(q.limit, Some(50));
     let empty: LeaderboardQueryParams = serde_json::from_str("{}").unwrap();
     assert!(empty.limit.is_none());
@@ -502,9 +568,8 @@ fn leaderboard_query_params_deserializes() {
 
 #[test]
 fn buy_insurance_dto_default_duration_zero() {
-    let dto: BuyInsuranceDto = serde_json::from_value(
-        serde_json::json!({"user_id": "u", "is_scam": true})
-    ).unwrap();
+    let dto: BuyInsuranceDto =
+        serde_json::from_value(serde_json::json!({"user_id": "u", "is_scam": true})).unwrap();
     assert_eq!(dto.user_id, "u".into());
     assert!(dto.is_scam);
     // Default est 0 avec #[serde(default)] (i64::default()).
@@ -514,8 +579,9 @@ fn buy_insurance_dto_default_duration_zero() {
 #[test]
 fn buy_insurance_dto_with_duration() {
     let dto: BuyInsuranceDto = serde_json::from_value(
-        serde_json::json!({"user_id": "u", "is_scam": false, "duration_seconds": 7200})
-    ).unwrap();
+        serde_json::json!({"user_id": "u", "is_scam": false, "duration_seconds": 7200}),
+    )
+    .unwrap();
     assert_eq!(dto.duration_seconds, 7200);
 }
 
@@ -523,57 +589,51 @@ fn buy_insurance_dto_with_duration() {
 
 #[test]
 fn create_prime_dto_deserializes() {
-    let dto: CreatePrimeDto = serde_json::from_value(
-        serde_json::json!({
-            "target_id": "t", "target_name": "T",
-            "placed_by_id": "p", "placed_by_name": "P",
-            "amount": 500
-        })
-    ).unwrap();
+    let dto: CreatePrimeDto = serde_json::from_value(serde_json::json!({
+        "target_id": "t", "target_name": "T",
+        "placed_by_id": "p", "placed_by_name": "P",
+        "amount": 500
+    }))
+    .unwrap();
     assert_eq!(dto.amount, 500);
     assert_eq!(dto.target_id, "t");
 }
 
 #[test]
 fn claim_primes_dto_deserializes() {
-    let dto: ClaimPrimesDto = serde_json::from_value(
-        serde_json::json!({
-            "target_id": "t", "claimer_id": "c", "claimer_name": "C"
-        })
-    ).unwrap();
+    let dto: ClaimPrimesDto = serde_json::from_value(serde_json::json!({
+        "target_id": "t", "claimer_id": "c", "claimer_name": "C"
+    }))
+    .unwrap();
     assert_eq!(dto.target_id, "t");
     assert_eq!(dto.claimer_name, "C");
 }
 
 #[test]
 fn use_item_dto_deserializes() {
-    let dto: UseItemDto = serde_json::from_value(
-        serde_json::json!({"item_key": "potion"})
-    ).unwrap();
+    let dto: UseItemDto =
+        serde_json::from_value(serde_json::json!({"item_key": "potion"})).unwrap();
     assert_eq!(dto.item_key, "potion");
 }
 
 #[test]
 fn defender_special_dto_deserializes() {
-    let dto: DefenderSpecialDto = serde_json::from_value(
-        serde_json::json!({"item_key": "fake_plaque"})
-    ).unwrap();
+    let dto: DefenderSpecialDto =
+        serde_json::from_value(serde_json::json!({"item_key": "fake_plaque"})).unwrap();
     assert_eq!(dto.item_key, "fake_plaque");
 }
 
 #[test]
 fn set_betting_dto_deserializes() {
-    let dto: SetBettingDto = serde_json::from_value(
-        serde_json::json!({"message_id": "123"})
-    ).unwrap();
+    let dto: SetBettingDto =
+        serde_json::from_value(serde_json::json!({"message_id": "123"})).unwrap();
     assert_eq!(dto.message_id, "123".into());
 }
 
 #[test]
 fn resolve_combat_dto_all_optional_except_status() {
-    let dto: ResolveCombatDto = serde_json::from_value(
-        serde_json::json!({"status": "resolved"})
-    ).unwrap();
+    let dto: ResolveCombatDto =
+        serde_json::from_value(serde_json::json!({"status": "resolved"})).unwrap();
     assert_eq!(dto.status, "resolved");
     assert!(dto.winner_id.is_none());
     assert!(dto.coins_transferred.is_none());
@@ -593,13 +653,15 @@ fn daily_chaos_dto_deserializes() {
         "loser_id": "l", "loser_name": "L",
         "winner_id": "w", "winner_name": "W",
         "amount": 500,
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.amount, 500);
 }
 
 #[test]
 fn duration_dto_deserializes() {
-    let d: DurationDto = serde_json::from_value(serde_json::json!({"duration_secs": 3600})).unwrap();
+    let d: DurationDto =
+        serde_json::from_value(serde_json::json!({"duration_secs": 3600})).unwrap();
     assert_eq!(d.duration_secs, 3600);
 }
 

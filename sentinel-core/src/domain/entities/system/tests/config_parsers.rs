@@ -1,7 +1,10 @@
 use super::*;
 
 fn make_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
-    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect()
 }
 
 // ── parse_bool_config ──
@@ -25,7 +28,10 @@ fn parse_bool_accepts_true_1_yes_case_insensitive() {
 fn parse_bool_rejects_other_strings() {
     for v in ["false", "0", "no", "nope", "", "2"] {
         let m = make_map(&[("f", v)]);
-        assert!(!parse_bool_config(&m, "f", true), "should be false for '{v}'");
+        assert!(
+            !parse_bool_config(&m, "f", true),
+            "should be false for '{v}'"
+        );
     }
 }
 

@@ -14,12 +14,12 @@ use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine::combat::resolve_combat;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelInput;
 use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelOutput;
-use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 const DEFAULT_FRIENDLY_WINNER_XP: i64 = 20;
 const DEFAULT_FRIENDLY_LOSER_XP: i64 = 5;
 
@@ -35,7 +35,11 @@ impl ResolveFriendlyDuelService {
         players_uc: Arc<dyn ManageCoudePlayersUseCase>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { player_repo, players_uc, bot_config_repo }
+        Self {
+            player_repo,
+            players_uc,
+            bot_config_repo,
+        }
     }
 }
 

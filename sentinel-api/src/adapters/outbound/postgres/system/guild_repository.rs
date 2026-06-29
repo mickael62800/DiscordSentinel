@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 
+use crate::ports::outbound::system::guild_repository::GuildRepository;
 use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::guild_repository::GuildRepository;
 
 pub struct PgGuildRepository {
     pool: PgPool,
@@ -65,24 +65,20 @@ impl GuildRepository for PgGuildRepository {
     }
 
     async fn find_all(&self) -> Result<Vec<Guild>, DomainError> {
-        let rows = sqlx::query_as::<_, GuildRow>(
-            "SELECT * FROM guilds ORDER BY name",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let rows = sqlx::query_as::<_, GuildRow>("SELECT * FROM guilds ORDER BY name")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Guild::from).collect())
     }
 
     async fn find_by_id(&self, guild_id: &str) -> Result<Option<Guild>, DomainError> {
-        let row = sqlx::query_as::<_, GuildRow>(
-            "SELECT * FROM guilds WHERE guild_id = $1",
-        )
-        .bind(guild_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row = sqlx::query_as::<_, GuildRow>("SELECT * FROM guilds WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(row.map(Guild::from))
     }

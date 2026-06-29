@@ -13,7 +13,9 @@ use tracing::warn;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("signalement")
-        .description("Signaler un message : cree une carte de vote moderateurs (avec contexte avant/apres)")
+        .description(
+            "Signaler un message : cree une carte de vote moderateurs (avec contexte avant/apres)",
+        )
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(
@@ -109,8 +111,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             let _ = command
                 .edit_response(
                     &ctx.http,
-                    EditInteractionResponse::new()
-                        .content("Ce lien pointe vers un autre serveur."),
+                    EditInteractionResponse::new().content("Ce lien pointe vers un autre serveur."),
                 )
                 .await;
             return;
@@ -118,15 +119,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
     let channel_id = channel_id.0;
 
-    let target = match channel_id.message(&ctx.http, MessageId::new(message_id)).await {
+    let target = match channel_id
+        .message(&ctx.http, MessageId::new(message_id))
+        .await
+    {
         Ok(m) => m,
         Err(_) => {
             let _ = command
                 .edit_response(
                     &ctx.http,
-                    EditInteractionResponse::new().content(
-                        "Message introuvable (lien errone ou message supprime ?).",
-                    ),
+                    EditInteractionResponse::new()
+                        .content("Message introuvable (lien errone ou message supprime ?)."),
                 )
                 .await;
             return;

@@ -1,9 +1,9 @@
+use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Daily chaos : regles metier ──
@@ -26,7 +26,11 @@ pub const LEADERBOARD_MAX_LIMIT: i64 = 100;
 /// si le montant calcule est < 1 (chaos invisible -> skip).
 pub fn daily_chaos_amount(victim_coins: i64, chaos_percent: f64) -> Option<i64> {
     let amount = ((victim_coins as f64) * chaos_percent).floor() as i64;
-    if amount >= 1 { Some(amount) } else { None }
+    if amount >= 1 {
+        Some(amount)
+    } else {
+        None
+    }
 }
 
 /// Clamp d'un parametre `limit` de leaderboard dans [1, 100].

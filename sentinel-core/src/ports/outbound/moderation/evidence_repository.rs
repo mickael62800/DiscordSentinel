@@ -18,6 +18,13 @@ pub struct EvidenceEntry {
 
 #[async_trait]
 pub trait EvidenceRepository: Send + Sync {
-    async fn add(&self, action_id: Uuid, url: &str, description: Option<&str>, uploaded_by: &str, uploaded_by_name: &str) -> Result<EvidenceEntry, DomainError>;
+    async fn add(
+        &self,
+        action_id: Uuid,
+        url: &str,
+        description: Option<&str>,
+        uploaded_by: &str,
+        uploaded_by_name: &str,
+    ) -> Result<EvidenceEntry, DomainError>;
     async fn list(&self, action_id: Uuid) -> Result<Vec<EvidenceEntry>, DomainError>;
 }

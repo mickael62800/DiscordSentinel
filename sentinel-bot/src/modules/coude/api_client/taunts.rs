@@ -54,20 +54,14 @@ impl ApiClient {
         let mut client = self.grpc.coude_social();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.track_steal_victim(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.track_steal_victim(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.event.map(taunt_event_from_proto))
     }
 
     /// Reset le steal_victim_streak (protection a bloque).
-    pub async fn track_steal_defended(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), String> {
+    pub async fn track_steal_defended(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
         let req = proto_coude::UserInGuildRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -106,7 +100,8 @@ impl ApiClient {
         user_id: &str,
     ) -> Result<Option<TauntEvent>, String> {
         let path = format!("/api/coude/{guild_id}/taunts/bj/natural/{user_id}");
-        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        let resp: MaybeTauntEventHttpDto =
+            self.base.post_json(&path, &serde_json::json!({})).await?;
         Ok(resp.event.map(dto_to_taunt))
     }
 
@@ -117,7 +112,8 @@ impl ApiClient {
         user_id: &str,
     ) -> Result<Option<TauntEvent>, String> {
         let path = format!("/api/coude/{guild_id}/taunts/bj/won/{user_id}");
-        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        let resp: MaybeTauntEventHttpDto =
+            self.base.post_json(&path, &serde_json::json!({})).await?;
         Ok(resp.event.map(dto_to_taunt))
     }
 
@@ -128,7 +124,8 @@ impl ApiClient {
         user_id: &str,
     ) -> Result<Option<TauntEvent>, String> {
         let path = format!("/api/coude/{guild_id}/taunts/bj/bust/{user_id}");
-        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        let resp: MaybeTauntEventHttpDto =
+            self.base.post_json(&path, &serde_json::json!({})).await?;
         Ok(resp.event.map(dto_to_taunt))
     }
 
@@ -139,7 +136,8 @@ impl ApiClient {
         user_id: &str,
     ) -> Result<Option<TauntEvent>, String> {
         let path = format!("/api/coude/{guild_id}/taunts/eco/bankruptcy/{user_id}");
-        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        let resp: MaybeTauntEventHttpDto =
+            self.base.post_json(&path, &serde_json::json!({})).await?;
         Ok(resp.event.map(dto_to_taunt))
     }
 

@@ -1,8 +1,8 @@
 use serenity::all::{
-    Context, CreateActionRow, CreateButton, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption, ComponentInteraction, PermissionOverwrite, PermissionOverwriteType,
-    EditChannel, CreateModal, CreateInputText, InputTextStyle, ModalInteraction, ChannelId,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    ChannelId, ComponentInteraction, Context, CreateActionRow, CreateButton, CreateInputText,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateModal, CreateSelectMenu,
+    CreateSelectMenuKind, CreateSelectMenuOption, EditChannel, InputTextStyle, ModalInteraction,
+    PermissionOverwrite, PermissionOverwriteType,
 };
 use serenity::builder::{CreateChannel, CreateEmbed, CreateMessage};
 use serenity::model::channel::ChannelType;
@@ -45,16 +45,11 @@ pub fn build_panel_message() -> CreateMessage {
 pub async fn handle_panel_click(ctx: &Context, component: &ComponentInteraction) {
     let options: Vec<CreateSelectMenuOption> = TICKET_TYPES
         .iter()
-        .map(|(value, label, desc)| {
-            CreateSelectMenuOption::new(*label, *value).description(*desc)
-        })
+        .map(|(value, label, desc)| CreateSelectMenuOption::new(*label, *value).description(*desc))
         .collect();
 
-    let select = CreateSelectMenu::new(
-        TYPE_SELECT_ID,
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez le type de ticket...");
+    let select = CreateSelectMenu::new(TYPE_SELECT_ID, CreateSelectMenuKind::String { options })
+        .placeholder("Choisissez le type de ticket...");
 
     let row = CreateActionRow::SelectMenu(select);
 
@@ -101,18 +96,23 @@ pub async fn handle_type_select(ctx: &Context, component: &ComponentInteraction)
         "Description",
         "ticket_description",
     )
-    .placeholder("Decrivez votre probleme en detail : que s'est-il passe, quand, qui est concerne...")
+    .placeholder(
+        "Decrivez votre probleme en detail : que s'est-il passe, quand, qui est concerne...",
+    )
     .required(true)
     .min_length(10)
     .max_length(2000);
 
-    let modal = CreateModal::new(&modal_id, format!("Nouveau ticket — {}", type_label))
-        .components(vec![
+    let modal =
+        CreateModal::new(&modal_id, format!("Nouveau ticket — {}", type_label)).components(vec![
             CreateActionRow::InputText(subject_input),
             CreateActionRow::InputText(description_input),
         ]);
 
-    if let Err(e) = component.create_response(&ctx.http, CreateInteractionResponse::Modal(modal)).await {
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Modal(modal))
+        .await
+    {
         error!(error = %e, "Erreur ouverture modal ticket");
     }
 
@@ -155,13 +155,15 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     }
 
-    if let Err(e) = modal.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new()
-                .ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = modal
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to defer modal response");
     }
 
@@ -169,14 +171,24 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
+            let guild_config = match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::tickets::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
                     std::collections::HashMap::new()
                 }
             };
-            let max_open: u64 = crate::shared::api_client::BaseApiClient::config_u64(&guild_config, "max_open_per_user", 0);
+            let max_open: u64 = crate::shared::api_client::BaseApiClient::config_u64(
+                &guild_config,
+                "max_open_per_user",
+                0,
+            );
 
             if max_open > 0 {
                 let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
@@ -185,9 +197,10 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                 };
                 let api = ApiClient::new(base.clone(), grpc);
                 if let Ok(tickets) = api.list_tickets().await {
-                    let open_count = tickets.iter().filter(|t| {
-                        t.author_id == author.id.to_string() && t.status != "closed"
-                    }).count() as u64;
+                    let open_count = tickets
+                        .iter()
+                        .filter(|t| t.author_id == author.id.to_string() && t.status != "closed")
+                        .count() as u64;
 
                     if open_count >= max_open {
                         if let Err(e) = modal.edit_response(
@@ -232,12 +245,18 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
             kind: PermissionOverwriteType::Role(everyone_role),
         },
         PermissionOverwrite {
-            allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY | Permissions::ATTACH_FILES,
+            allow: Permissions::VIEW_CHANNEL
+                | Permissions::SEND_MESSAGES
+                | Permissions::READ_MESSAGE_HISTORY
+                | Permissions::ATTACH_FILES,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(author.id),
         },
         PermissionOverwrite {
-            allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY | Permissions::MANAGE_CHANNELS,
+            allow: Permissions::VIEW_CHANNEL
+                | Permissions::SEND_MESSAGES
+                | Permissions::READ_MESSAGE_HISTORY
+                | Permissions::MANAGE_CHANNELS,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(ctx.cache.current_user().id),
         },
@@ -259,7 +278,13 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
     let api = ApiClient::new(base.clone(), grpc);
-    let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
+    let guild_config = match base
+        .get_guild_config_for(
+            &guild_id.to_string(),
+            crate::modules::tickets::MODULE_BOT_NAME,
+        )
+        .await
+    {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -273,7 +298,10 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     if let Some(admin_role_str) = guild_config.get("admin_role_id") {
         if let Ok(role_id) = admin_role_str.parse::<u64>() {
             all_overwrites.push(PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY | Permissions::MANAGE_CHANNELS,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY
+                    | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
             });
@@ -284,7 +312,9 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
             if let Ok(role_id) = mod_role_str.parse::<u64>() {
                 all_overwrites.push(PermissionOverwrite {
-                    allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                    allow: Permissions::VIEW_CHANNEL
+                        | Permissions::SEND_MESSAGES
+                        | Permissions::READ_MESSAGE_HISTORY,
                     deny: Permissions::empty(),
                     kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
                 });
@@ -303,7 +333,11 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     let category_id = guild_config
         .get("ticket_category_id")
         .and_then(|v| v.parse::<u64>().ok())
-        .or_else(|| std::env::var("TICKET_CATEGORY_ID").ok().and_then(|v| v.parse().ok()));
+        .or_else(|| {
+            std::env::var("TICKET_CATEGORY_ID")
+                .ok()
+                .and_then(|v| v.parse().ok())
+        });
 
     let mut create_channel = CreateChannel::new(&channel_name)
         .kind(ChannelType::Text)
@@ -370,7 +404,10 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
 
     if ticket_id != "???" {
         let new_topic = format!("[ticket:{}] {} — {}", ticket_id, type_label, author.name);
-        if let Err(e) = channel.edit(&ctx.http, EditChannel::new().topic(&new_topic)).await {
+        if let Err(e) = channel
+            .edit(&ctx.http, EditChannel::new().topic(&new_topic))
+            .await
+        {
             warn!(error = %e, "Impossible de mettre a jour le topic du salon ticket");
         }
     }
@@ -396,11 +433,13 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         description = description.replace('\n', "\n> "),
     );
 
-    let parse_color = |config: &std::collections::HashMap<String, String>, key: &str, default: u32| -> u32 {
-        config.get(key)
-            .and_then(|v| u32::from_str_radix(v.trim_start_matches('#'), 16).ok())
-            .unwrap_or(default)
-    };
+    let parse_color =
+        |config: &std::collections::HashMap<String, String>, key: &str, default: u32| -> u32 {
+            config
+                .get(key)
+                .and_then(|v| u32::from_str_radix(v.trim_start_matches('#'), 16).ok())
+                .unwrap_or(default)
+        };
 
     let color_normal = parse_color(&guild_config, "color_normal", 0x2ecc71);
     let color_urgent = parse_color(&guild_config, "color_urgent", 0xff6600);
@@ -416,7 +455,8 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         color_normal
     };
 
-    let custom_welcome = guild_config.get("welcome_message")
+    let custom_welcome = guild_config
+        .get("welcome_message")
         .filter(|v| !v.is_empty())
         .cloned();
 
@@ -438,7 +478,11 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     };
 
     let welcome_embed = CreateEmbed::new()
-        .title(format!("Ticket #{} — {}", &ticket_id[..8.min(ticket_id.len())], type_label))
+        .title(format!(
+            "Ticket #{} — {}",
+            &ticket_id[..8.min(ticket_id.len())],
+            type_label
+        ))
         .description(welcome_text)
         .color(embed_color);
 
@@ -471,7 +515,8 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                     &guild_str,
                     &ch_str,
                     &msg_str,
-                ).await;
+                )
+                .await;
             }
         }
     }
@@ -533,11 +578,17 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
 
 /// Gere le clic sur le bouton "Creer un ticket" — avec FAQ intercalee si configuree.
 pub async fn handle_panel_click_with_faq(ctx: &Context, component: &ComponentInteraction) {
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
     let faq_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config_for(&guild_id, crate::modules::tickets::MODULE_BOT_NAME).await {
+            let gc = match base
+                .get_guild_config_for(&guild_id, crate::modules::tickets::MODULE_BOT_NAME)
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

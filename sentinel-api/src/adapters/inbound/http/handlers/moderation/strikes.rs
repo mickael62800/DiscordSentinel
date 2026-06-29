@@ -1,21 +1,21 @@
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::strikes::AddStrikeDto;
 use crate::adapters::inbound::http::dto::moderation::strikes::SaveStrikeConfigDto;
 use crate::adapters::inbound::http::dto::moderation::strikes::StrikeConfigDto;
 use crate::adapters::inbound::http::dto::moderation::strikes::StrikeResultDto;
 use crate::adapters::inbound::http::dto::moderation::strikes::UserStrikeDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 /// GET /api/strikes/config/{guild_id}
@@ -36,8 +36,11 @@ pub async fn save_config(
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
     // Config des seuils d'escalation = admin (pas moderator).
     if let Some(Extension(ctx)) = &rbac {
-        require_role(ctx, Role::Admin)
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour editer la config des strikes".into())))?;
+        require_role(ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour editer la config des strikes".into(),
+            ))
+        })?;
     }
     let command = dto.into_command(guild_id.into());
     let config = state.strikes_uc.save_config(command).await?;
@@ -49,7 +52,10 @@ pub async fn get_active_strikes(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserStrikeDto>>, ApiError> {
-    let strikes = state.strikes_uc.get_active_strikes(&guild_id, &user_id).await?;
+    let strikes = state
+        .strikes_uc
+        .get_active_strikes(&guild_id, &user_id)
+        .await?;
     Ok(map_to_dtos(strikes))
 }
 
@@ -97,8 +103,11 @@ pub async fn reset_strikes(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate RBAC : moderator+ requis pour reset les strikes d'un user.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator)
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour reset les strikes".into())))?;
+        require_role(&ctx, Role::Moderator).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "moderator+ requis pour reset les strikes".into(),
+            ))
+        })?;
     }
     state.strikes_uc.reset_strikes(&guild_id, &user_id).await?;
     Ok(ok_response())

@@ -1,3 +1,4 @@
+use crate::shared::discord_helpers::edit_response_text;
 use chrono::Utc;
 use serenity::all::{
     ChannelId, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
@@ -5,7 +6,6 @@ use serenity::all::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GetMessages,
 };
 use tracing::{error, warn};
-use crate::shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("transcript")
@@ -40,9 +40,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let defer = CreateInteractionResponse::Defer(
-        CreateInteractionResponseMessage::new().ephemeral(true),
-    );
+    let defer =
+        CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true));
     if let Err(e) = command.create_response(&ctx.http, defer).await {
         warn!(error = %e, "Failed to defer transcript response");
         return;
@@ -92,10 +91,7 @@ async fn build_transcript(
     }
 
     let mut lines: Vec<String> = Vec::with_capacity(messages.len() + 4);
-    lines.push(format!(
-        "=== Transcript du salon {} ===",
-        channel_id
-    ));
+    lines.push(format!("=== Transcript du salon {} ===", channel_id));
     lines.push(format!(
         "Genere le {} UTC",
         Utc::now().format("%Y-%m-%d %H:%M:%S")
@@ -135,10 +131,7 @@ fn format_message(msg: &serenity::model::channel::Message) -> String {
     };
 
     if !msg.attachments.is_empty() {
-        body.push_str(&format!(
-            " [+{} piece(s) jointe(s)]",
-            msg.attachments.len()
-        ));
+        body.push_str(&format!(" [+{} piece(s) jointe(s)]", msg.attachments.len()));
     }
     if !msg.embeds.is_empty() {
         body.push_str(&format!(" [+{} embed(s)]", msg.embeds.len()));

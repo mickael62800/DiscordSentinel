@@ -25,20 +25,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
              \u{1f3b0} Clique sur le bouton ci-dessous pour ouvrir une table privee.\n\
              \u{1f4b0} Tu choisis ta mise, puis tu joues avec les boutons.\n\
              \u{23f1}\u{fe0f} La table se ferme automatiquement apres 30 minutes d'inactivite.\n\n\
-             *Bonne chance !*"
+             *Bonne chance !*",
         )
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::BLACKJACK_TAGLINE));
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::BLACKJACK_TAGLINE,
+        ));
 
     let button = CreateButton::new(PANEL_BUTTON_ID)
         .label("Jouer au Blackjack")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f0cf}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f0cf}".into(),
+        ))
         .style(ButtonStyle::Success);
 
     let row = CreateActionRow::Buttons(vec![button]);
 
     if let Err(e) = channel_id
-        .send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row]))
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embed).components(vec![row]),
+        )
         .await
     {
         warn!(error = %e, "Echec envoi panel blackjack");

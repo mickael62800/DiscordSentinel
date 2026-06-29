@@ -97,7 +97,10 @@ fn spin_distribution_respects_weights_statistically() {
     }
     let licorne_count = licorne_count.max(1); // eviter div par 0
     let ratio = blanche_count as f64 / licorne_count as f64;
-    assert!(ratio > 10.0 && ratio < 80.0, "ratio blanche/licorne = {ratio}, attendu ~25");
+    assert!(
+        ratio > 10.0 && ratio < 80.0,
+        "ratio blanche/licorne = {ratio}, attendu ~25"
+    );
 }
 
 #[test]
@@ -110,7 +113,10 @@ fn spin_can_produce_different_results_with_different_seeds() {
             diff_count += 1;
         }
     }
-    assert!(diff_count > 5, "deux seeds differents -> spins differents (au moins 5)");
+    assert!(
+        diff_count > 5,
+        "deux seeds differents -> spins differents (au moins 5)"
+    );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -155,15 +161,29 @@ fn unknown_key_is_not_memorable() {
 fn no_payout_above_jackpot_threshold() {
     // Sanity : eviter qu une modif rajoute par erreur une case +1M coins.
     for c in WHEEL_CASES {
-        assert!(c.payout <= 10000, "case {} payout {} > seuil 10000", c.key, c.payout);
-        assert!(c.payout >= -2000, "case {} payout {} < seuil -2000", c.key, c.payout);
+        assert!(
+            c.payout <= 10000,
+            "case {} payout {} > seuil 10000",
+            c.key,
+            c.payout
+        );
+        assert!(
+            c.payout >= -2000,
+            "case {} payout {} < seuil -2000",
+            c.key,
+            c.payout
+        );
     }
 }
 
 #[test]
 fn all_weights_positive() {
     for c in WHEEL_CASES {
-        assert!(c.weight > 0, "case {} a un poids 0 -> ne sortira jamais", c.key);
+        assert!(
+            c.weight > 0,
+            "case {} a un poids 0 -> ne sortira jamais",
+            c.key
+        );
     }
 }
 
@@ -176,7 +196,10 @@ fn heartbreak_blocks_licorne_in_10000_spins() {
     let mut rng = StdRng::seed_from_u64(42);
     for _ in 0..10_000 {
         let outcome = spin_with_rng_curses(&mut rng, true);
-        assert_ne!(outcome.case.key, "licorne", "Heartbreak doit bloquer la licorne");
+        assert_ne!(
+            outcome.case.key, "licorne",
+            "Heartbreak doit bloquer la licorne"
+        );
     }
 }
 
@@ -191,7 +214,10 @@ fn no_heartbreak_can_yield_licorne() {
             break;
         }
     }
-    assert!(saw_licorne, "sans Heartbreak la licorne doit pouvoir tomber sur 50k spins");
+    assert!(
+        saw_licorne,
+        "sans Heartbreak la licorne doit pouvoir tomber sur 50k spins"
+    );
 }
 
 #[test]
@@ -207,6 +233,9 @@ fn heartbreak_keeps_other_cases_distribution() {
             _ => {}
         }
     }
-    assert!(blanche > 2_000, "blanche (poids 25/99) doit sortir frequemment");
+    assert!(
+        blanche > 2_000,
+        "blanche (poids 25/99) doit sortir frequemment"
+    );
     assert!(bombe > 100, "bombe (poids 2/99) doit sortir parfois");
 }

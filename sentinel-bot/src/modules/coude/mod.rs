@@ -8,14 +8,14 @@ pub const MODULE_BOT_NAME: &str = "coude-bot";
 pub mod achievements;
 pub mod api_client;
 pub mod catalog;
-pub mod milestones;
 pub mod channel_check;
 pub mod commands;
 pub mod daily_chaos_events;
-pub mod steal_expired_events;
 pub mod guild_config;
 pub mod interaction_helper;
+pub mod milestones;
 pub mod prison_check;
+pub mod steal_expired_events;
 pub mod taunts_dispatch;
 pub mod tournament_events;
 
@@ -55,7 +55,9 @@ pub use prison_check::{check_and_reply_if_in_prison, check_component_in_prison};
 /// Charge la config guild Coude depuis l'API (avec cache Redis cote API, TTL 15min).
 pub async fn load_guild_config(ctx: &Context, guild_id: &str) -> Config {
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().expect("ApiClientKey non initialise");
+    let api = data
+        .get::<ApiClientKey>()
+        .expect("ApiClientKey non initialise");
     Config::load(api, guild_id).await
 }
 
@@ -269,7 +271,12 @@ async fn handle_combat_redis_event(ctx: &Context, payload: &str) {
         Some(d) => d,
         None => return,
     };
-    if data.get("actor").and_then(|a| a.get("source")).and_then(|s| s.as_str()) != Some("web") {
+    if data
+        .get("actor")
+        .and_then(|a| a.get("source"))
+        .and_then(|s| s.as_str())
+        != Some("web")
+    {
         return;
     }
     let action_id = match data.get("action_id").and_then(|v| v.as_str()) {
@@ -320,11 +327,9 @@ async fn handle_combat_redis_event(ctx: &Context, payload: &str) {
     {
         if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
             if let Some(existing) = original.embeds.first() {
-                let new_embed = CreateEmbed::from(existing.clone())
-                    .color(0x95A5A6)
-                    .footer(CreateEmbedFooter::new(
-                        "\u{1f512} Combat annule depuis la web admin",
-                    ));
+                let new_embed = CreateEmbed::from(existing.clone()).color(0x95A5A6).footer(
+                    CreateEmbedFooter::new("\u{1f512} Combat annule depuis la web admin"),
+                );
                 let _ = channel_id
                     .edit_message(
                         &ctx.http,

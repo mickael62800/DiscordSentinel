@@ -1,19 +1,19 @@
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use crate::adapters::inbound::http::handlers::coude::taunts::TauntEventDto;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::adapters::inbound::http::handlers::coude::taunts::TauntEventDto;
-use sentinel_core::domain::entities::casino::slot::SlotSpin;
-use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
 use crate::ports::inbound::casino::manage_slot::SpinCommand;
 use crate::ports::inbound::casino::manage_slot::SpinResult;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Json;
+use sentinel_core::domain::entities::casino::slot::SlotSpin;
+use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -57,7 +57,11 @@ impl From<SpinResult> for SpinResponseDto {
             is_free: r.spin.is_free,
             jackpot_pool_after: r.jackpot_pool_after,
             balance_after: r.balance_after,
-            triggered_taunts: r.triggered_taunts.into_iter().map(TauntEventDto::from).collect(),
+            triggered_taunts: r
+                .triggered_taunts
+                .into_iter()
+                .map(TauntEventDto::from)
+                .collect(),
         }
     }
 }
@@ -228,7 +232,9 @@ pub async fn leaderboard(
     let days = params.days.unwrap_or(7).clamp(1, 365);
     let limit = normalize_limit(params.limit, 10, 100);
     let winners = state.slot_uc.top_winners(&guild_id, days, limit).await?;
-    Ok(Json(winners.into_iter().map(SlotTopWinnerDto::from).collect()))
+    Ok(Json(
+        winners.into_iter().map(SlotTopWinnerDto::from).collect(),
+    ))
 }
 
 #[cfg(test)]

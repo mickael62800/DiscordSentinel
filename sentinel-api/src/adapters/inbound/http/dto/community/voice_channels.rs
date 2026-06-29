@@ -1,5 +1,6 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
@@ -7,12 +8,11 @@ use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetai
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
-use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -168,7 +168,6 @@ pub struct WhitelistEntryResponseDto {
     pub target_name: String,
     pub created_at: String,
 }
-
 
 #[derive(Debug, Serialize)]
 pub struct BanResponseDto {
@@ -385,13 +384,20 @@ impl From<VoiceChannelDetail> for VoiceChannelDetailDto {
     fn from(d: VoiceChannelDetail) -> Self {
         Self {
             channel: VoiceChannelResponseDto::from(d.channel),
-            co_admins: d.co_admins.into_iter().map(CoAdminResponseDto::from).collect(),
+            co_admins: d
+                .co_admins
+                .into_iter()
+                .map(CoAdminResponseDto::from)
+                .collect(),
             bans: d.bans.into_iter().map(BanResponseDto::from).collect(),
-            invite_links: d.invite_links.into_iter().map(InviteLinkResponseDto::from).collect(),
+            invite_links: d
+                .invite_links
+                .into_iter()
+                .map(InviteLinkResponseDto::from)
+                .collect(),
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/voice_channels.rs"]

@@ -1,10 +1,10 @@
+use crate::adapters::inbound::http::state::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
 use serde_json::json;
 use serde_json::Value;
-use crate::adapters::inbound::http::state::AppState;
 
 /// Health check complet : vérifie API + PostgreSQL + Redis.
 /// Retourne 200 si tout est OK, 503 si un composant est down.
@@ -20,7 +20,10 @@ pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
 
     // ── Redis check ──
     let redis_ok = match state.redis_client.get_multiplexed_async_connection().await {
-        Ok(mut conn) => conn.set_ex::<_, _, ()>("health:ping", "pong", 10).await.is_ok(),
+        Ok(mut conn) => conn
+            .set_ex::<_, _, ()>("health:ping", "pong", 10)
+            .await
+            .is_ok(),
         Err(_) => false,
     };
 

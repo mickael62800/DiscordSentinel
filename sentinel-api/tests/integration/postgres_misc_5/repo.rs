@@ -8,18 +8,22 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
-use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
 use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
+use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
 use sentinel_api::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
-use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;
+use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -51,7 +55,8 @@ async fn sponsorship_conflict_on_duplicate_sponsored() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sponsorship_list_scoped_to_guild() {
     let repo = PgSponsorshipRepository::new(pool().await);
-    let g1 = fresh_id(); let g2 = fresh_id();
+    let g1 = fresh_id();
+    let g2 = fresh_id();
     repo.create(&g1, "s", "u").await.unwrap();
     repo.create(&g2, "s", "u").await.unwrap();
     assert_eq!(repo.list(&g1).await.unwrap().len(), 1);
@@ -65,7 +70,8 @@ async fn sponsorship_list_scoped_to_guild() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn temp_role_create_and_list() {
     let repo = PgTempRoleRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let future = (Utc::now() + Duration::hours(1)).to_rfc3339();
     repo.create(&g, &u, "role1", &future).await.unwrap();
     let list = repo.list_active(&g).await.unwrap();
@@ -77,7 +83,8 @@ async fn temp_role_create_and_list() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn temp_role_create_is_upsert() {
     let repo = PgTempRoleRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let t1 = (Utc::now() + Duration::hours(1)).to_rfc3339();
     let t2 = (Utc::now() + Duration::hours(5)).to_rfc3339();
     repo.create(&g, &u, "role1", &t1).await.unwrap();
@@ -89,7 +96,8 @@ async fn temp_role_create_is_upsert() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn temp_role_list_excludes_expired() {
     let repo = PgTempRoleRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let past = (Utc::now() - Duration::hours(1)).to_rfc3339();
     repo.create(&g, &u, "expired", &past).await.unwrap();
     let list = repo.list_active(&g).await.unwrap();
@@ -99,7 +107,8 @@ async fn temp_role_list_excludes_expired() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn temp_role_delete_removes() {
     let repo = PgTempRoleRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let future = (Utc::now() + Duration::hours(1)).to_rfc3339();
     repo.create(&g, &u, "role1", &future).await.unwrap();
     repo.delete(&g, &u, "role1").await.unwrap();

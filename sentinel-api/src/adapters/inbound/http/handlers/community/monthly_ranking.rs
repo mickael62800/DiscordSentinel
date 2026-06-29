@@ -63,8 +63,18 @@ fn period_string(year: i32, month: u32) -> String {
 
 fn month_label_fr(period: &str) -> String {
     const MOIS: [&str; 12] = [
-        "Janvier", "Fevrier", "Mars", "Avril", "Mai", "Juin", "Juillet", "Aout",
-        "Septembre", "Octobre", "Novembre", "Decembre",
+        "Janvier",
+        "Fevrier",
+        "Mars",
+        "Avril",
+        "Mai",
+        "Juin",
+        "Juillet",
+        "Aout",
+        "Septembre",
+        "Octobre",
+        "Novembre",
+        "Decembre",
     ];
     let parts: Vec<&str> = period.split('-').collect();
     if parts.len() == 2 {
@@ -125,7 +135,10 @@ pub async fn publish_monthly_ranking_all(
             skipped += 1;
             continue;
         }
-        if !parse_bool(read_cfg(&state, guild_id, "monthly_ranking_enabled").await, false) {
+        if !parse_bool(
+            read_cfg(&state, guild_id, "monthly_ranking_enabled").await,
+            false,
+        ) {
             skipped += 1;
             continue;
         }
@@ -160,8 +173,11 @@ pub async fn publish_monthly_ranking_all(
                 .await
                 .filter(|s| !s.is_empty())
             {
-                let top = parse_i64(read_cfg(&state, guild_id, "monthly_ranking_top_count").await, 10)
-                    .clamp(1, 25) as usize;
+                let top = parse_i64(
+                    read_cfg(&state, guild_id, "monthly_ranking_top_count").await,
+                    10,
+                )
+                .clamp(1, 25) as usize;
 
                 let rows: Vec<(String, i64, i64)> = sqlx::query_as(
                     r#"SELECT ul.user_id,
@@ -218,7 +234,12 @@ pub async fn publish_monthly_ranking_all(
                             published += 1;
                             let _ = state
                                 .bot_config_repo
-                                .set_config(guild_id, PROGRESSION_BOT, LAST_PERIOD_KEY, &prev_period)
+                                .set_config(
+                                    guild_id,
+                                    PROGRESSION_BOT,
+                                    LAST_PERIOD_KEY,
+                                    &prev_period,
+                                )
                                 .await;
                         }
                         Ok(r) => {

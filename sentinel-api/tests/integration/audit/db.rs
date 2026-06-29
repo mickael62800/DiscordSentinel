@@ -4,18 +4,27 @@
 use sqlx::PgPool;
 
 async fn setup_pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
-    PgPool::connect(&url).await.expect("Impossible de se connecter a la base de test")
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
+    PgPool::connect(&url)
+        .await
+        .expect("Impossible de se connecter a la base de test")
 }
 
 fn unique_guild() -> String {
-    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 fn short_guild_id() -> String {
     use rand::Rng;
-    format!("{}", rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64))
+    format!(
+        "{}",
+        rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64)
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -36,7 +45,11 @@ async fn audit_log_insert_and_read() {
 
     let row = sqlx::query_as::<_, (String, serde_json::Value)>(
         "SELECT event_type, details FROM audit_logs WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "channel_update");
     assert_eq!(row.1["old_name"], "general");
@@ -48,15 +61,28 @@ async fn audit_logs_filter_by_event_type() {
     let pool = setup_pool().await;
     let gid = unique_guild();
 
-    for event in &["message_delete", "message_delete", "role_create", "member_ban"] {
-        sqlx::query(
-            "INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, $2, '{}')",
-        ).bind(&gid).bind(event).execute(&pool).await.unwrap();
+    for event in &[
+        "message_delete",
+        "message_delete",
+        "role_create",
+        "member_ban",
+    ] {
+        sqlx::query("INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, $2, '{}')")
+            .bind(&gid)
+            .bind(event)
+            .execute(&pool)
+            .await
+            .unwrap();
     }
 
     let deletes = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'message_delete'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(deletes, 2);
 }
@@ -75,7 +101,12 @@ async fn audit_logs_filter_by_actor() {
 
     let mod1_count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND actor_id = '111'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(mod1_count, 1);
 }
@@ -94,7 +125,12 @@ async fn audit_logs_filter_by_target() {
 
     let target_events = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND target_id = '444'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(target_events, 2);
 }
@@ -105,16 +141,23 @@ async fn audit_logs_ordered_desc() {
     let gid = unique_guild();
 
     for event in &["first", "second", "third"] {
-        sqlx::query(
-            "INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, $2, '{}')",
-        ).bind(&gid).bind(event).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, $2, '{}')")
+            .bind(&gid)
+            .bind(event)
+            .execute(&pool)
+            .await
+            .unwrap();
         // Petit delai pour ordre garanti
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
     }
 
     let events = sqlx::query_as::<_, (String,)>(
         "SELECT event_type FROM audit_logs WHERE guild_id = $1 ORDER BY created_at DESC",
-    ).bind(&gid).fetch_all(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(events[0].0, "third");
     assert_eq!(events[2].0, "first");
@@ -127,11 +170,17 @@ async fn audit_logs_guild_isolation() {
     let gid2 = unique_guild();
 
     sqlx::query("INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, 'test', '{}')")
-        .bind(&gid1).execute(&pool).await.unwrap();
+        .bind(&gid1)
+        .execute(&pool)
+        .await
+        .unwrap();
 
-    let count = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1",
-    ).bind(&gid2).fetch_one(&pool).await.unwrap().0;
+    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1")
+        .bind(&gid2)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .0;
 
     assert_eq!(count, 0);
 }
@@ -150,11 +199,20 @@ async fn security_event_with_user_ids() {
     sqlx::query(
         r#"INSERT INTO security_events (id, guild_id, event_type, severity, description, user_ids)
            VALUES (gen_random_uuid(), $1, 'raid_detected', 'critical', '3 joins en 2s', $2)"#,
-    ).bind(&gid).bind(&user_ids).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .bind(&user_ids)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let row = sqlx::query_as::<_, (String, String, serde_json::Value)>(
         "SELECT event_type, severity, user_ids FROM security_events WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "raid_detected");
     assert_eq!(row.1, "critical");
@@ -166,7 +224,11 @@ async fn security_events_filter_by_severity() {
     let pool = setup_pool().await;
     let gid = unique_guild();
 
-    for (event, sev) in &[("alt_detected", "warning"), ("raid_detected", "critical"), ("lockdown", "critical")] {
+    for (event, sev) in &[
+        ("alt_detected", "warning"),
+        ("raid_detected", "critical"),
+        ("lockdown", "critical"),
+    ] {
         sqlx::query(
             "INSERT INTO security_events (id, guild_id, event_type, severity, description) VALUES (gen_random_uuid(), $1, $2, $3, 'test')",
         ).bind(&gid).bind(event).bind(sev).execute(&pool).await.unwrap();
@@ -174,7 +236,12 @@ async fn security_events_filter_by_severity() {
 
     let critical = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM security_events WHERE guild_id = $1 AND severity = 'critical'",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(critical, 2);
 }
@@ -186,17 +253,39 @@ async fn security_events_filter_by_severity() {
 #[tokio::test]
 async fn log_insert_and_filter_by_level() {
     let pool = setup_pool().await;
-    let bot_name = format!("test-bot-{}", uuid::Uuid::new_v4().simple().to_string().chars().take(8).collect::<String>());
+    let bot_name = format!(
+        "test-bot-{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
 
-    for (level, msg) in &[("info", "Bot demarre"), ("warn", "Config manquante"), ("error", "API timeout")] {
+    for (level, msg) in &[
+        ("info", "Bot demarre"),
+        ("warn", "Config manquante"),
+        ("error", "API timeout"),
+    ] {
         sqlx::query(
             "INSERT INTO logs (level, bot, server, message) VALUES ($1, $2, 'test-server', $3)",
-        ).bind(level).bind(&bot_name).bind(msg).execute(&pool).await.unwrap();
+        )
+        .bind(level)
+        .bind(&bot_name)
+        .bind(msg)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
 
-    let warns = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM logs WHERE bot = $1 AND level = 'warn'",
-    ).bind(&bot_name).fetch_one(&pool).await.unwrap().0;
+    let warns =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM logs WHERE bot = $1 AND level = 'warn'")
+            .bind(&bot_name)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(warns, 1);
 }
@@ -204,7 +293,15 @@ async fn log_insert_and_filter_by_level() {
 #[tokio::test]
 async fn log_filter_by_category() {
     let pool = setup_pool().await;
-    let bot_name = format!("cat-test-{}", uuid::Uuid::new_v4().simple().to_string().chars().take(8).collect::<String>());
+    let bot_name = format!(
+        "cat-test-{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
 
     sqlx::query("INSERT INTO logs (level, bot, server, message, category) VALUES ('info', $1, 's', 'msg', 'discord')")
         .bind(&bot_name).execute(&pool).await.unwrap();
@@ -213,7 +310,12 @@ async fn log_filter_by_category() {
 
     let discord_logs = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM logs WHERE bot = $1 AND category = 'discord'",
-    ).bind(&bot_name).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&bot_name)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(discord_logs, 1);
 }
@@ -244,7 +346,13 @@ async fn daily_activity_upsert() {
 
     let messages = sqlx::query_as::<_, (i64,)>(
         "SELECT messages FROM daily_activity WHERE guild_id = $1 AND day = $2",
-    ).bind(&gid).bind(today).fetch_one(&pool).await.unwrap().0;
+    )
+    .bind(&gid)
+    .bind(today)
+    .fetch_one(&pool)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(messages, 150, "Messages doivent etre cumules");
 }
@@ -266,11 +374,15 @@ async fn daily_activity_multi_day_trend() {
 
     let rows = sqlx::query_as::<_, (chrono::NaiveDate, i64)>(
         "SELECT day, messages FROM daily_activity WHERE guild_id = $1 ORDER BY day DESC",
-    ).bind(&gid).fetch_all(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_all(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(rows.len(), 7);
     assert_eq!(rows[0].1, 100); // aujourd'hui = le plus actif
-    assert_eq!(rows[6].1, 40);  // il y a 6 jours
+    assert_eq!(rows[6].1, 40); // il y a 6 jours
 }
 
 #[tokio::test]
@@ -285,9 +397,13 @@ async fn daily_activity_guild_isolation() {
            VALUES ($1, $2, 999, 0, 0, 0, 0, 0, 0, 0, 0)"#,
     ).bind(&gid1).bind(today).execute(&pool).await.unwrap();
 
-    let count = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM daily_activity WHERE guild_id = $1",
-    ).bind(&gid2).fetch_one(&pool).await.unwrap().0;
+    let count =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM daily_activity WHERE guild_id = $1")
+            .bind(&gid2)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(count, 0);
 }
@@ -305,11 +421,19 @@ async fn guild_register_and_read() {
         r#"INSERT INTO guilds (guild_id, name, member_count)
            VALUES ($1, 'TestServer', 42)
            ON CONFLICT (guild_id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()"#,
-    ).bind(&gid).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let row = sqlx::query_as::<_, (String, i32)>(
         "SELECT name, member_count FROM guilds WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(row.0, "TestServer");
     assert_eq!(row.1, 42);
@@ -320,16 +444,24 @@ async fn guild_update_name_on_conflict() {
     let pool = setup_pool().await;
     let gid = short_guild_id();
 
-    sqlx::query("INSERT INTO guilds (guild_id, name) VALUES ($1, 'OldName') ON CONFLICT DO NOTHING")
-        .bind(&gid).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO guilds (guild_id, name) VALUES ($1, 'OldName') ON CONFLICT DO NOTHING",
+    )
+    .bind(&gid)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     sqlx::query(
         "INSERT INTO guilds (guild_id, name) VALUES ($1, 'NewName') ON CONFLICT (guild_id) DO UPDATE SET name = EXCLUDED.name, updated_at = NOW()",
     ).bind(&gid).execute(&pool).await.unwrap();
 
-    let name = sqlx::query_as::<_, (String,)>(
-        "SELECT name FROM guilds WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    let name = sqlx::query_as::<_, (String,)>("SELECT name FROM guilds WHERE guild_id = $1")
+        .bind(&gid)
+        .fetch_one(&pool)
+        .await
+        .unwrap()
+        .0;
 
     assert_eq!(name, "NewName");
 }
@@ -351,18 +483,30 @@ async fn purge_old_audit_logs() {
     // Log recent
     sqlx::query(
         "INSERT INTO audit_logs (guild_id, event_type, details) VALUES ($1, 'recent_event', '{}')",
-    ).bind(&gid).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     // Purge > 30 jours
     let deleted = sqlx::query(
         "DELETE FROM audit_logs WHERE guild_id = $1 AND created_at < NOW() - INTERVAL '30 days'",
-    ).bind(&gid).execute(&pool).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     assert_eq!(deleted.rows_affected(), 1);
 
-    let remaining = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    let remaining =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1")
+            .bind(&gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(remaining, 1);
 }
@@ -386,9 +530,13 @@ async fn purge_old_security_events() {
 
     assert_eq!(deleted.rows_affected(), 1);
 
-    let remaining = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM security_events WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    let remaining =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM security_events WHERE guild_id = $1")
+            .bind(&gid)
+            .fetch_one(&pool)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(remaining, 1);
 }

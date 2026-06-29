@@ -2,9 +2,9 @@
 
 use chrono::Utc;
 use sentinel_api::adapters::outbound::redis_cache::RedisCache;
+use sentinel_api::ports::outbound::system::cache::CachePort;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
-use sentinel_api::ports::outbound::system::cache::CachePort;
 use uuid::Uuid;
 
 async fn cache() -> RedisCache {
@@ -23,10 +23,13 @@ fn sample_rule(g: &str, flag: FlagType) -> Rule {
         guild_id: g.into(),
         flag_type: flag,
         weight: 1.5,
-        threshold_warn: 0.3, threshold_delete: 0.5,
-        threshold_mute: 0.7, threshold_ban: 0.9,
+        threshold_warn: 0.3,
+        threshold_delete: 0.5,
+        threshold_mute: 0.7,
+        threshold_ban: 0.9,
         enabled: true,
-        created_at: now, updated_at: now,
+        created_at: now,
+        updated_at: now,
     }
 }
 
@@ -58,7 +61,10 @@ async fn rules_set_and_get_roundtrip() {
 async fn rules_invalidate_removes() {
     let cache = cache().await;
     let g = fresh_guild();
-    cache.set_rules(&g, &[sample_rule(&g, FlagType::Spam)]).await.unwrap();
+    cache
+        .set_rules(&g, &[sample_rule(&g, FlagType::Spam)])
+        .await
+        .unwrap();
     cache.invalidate_rules(&g).await.unwrap();
     assert!(cache.get_rules(&g).await.unwrap().is_none());
 }
@@ -68,7 +74,11 @@ async fn rules_invalidate_removes() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn json_get_none_when_absent() {
     let cache = cache().await;
-    assert!(cache.get_json(&format!("nokey-{}", Uuid::new_v4())).await.unwrap().is_none());
+    assert!(cache
+        .get_json(&format!("nokey-{}", Uuid::new_v4()))
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -93,13 +103,37 @@ async fn json_invalidate() {
 async fn invalidate_pattern_wipes_multiple_keys() {
     let cache = cache().await;
     let prefix = format!("testpat-{}-", Uuid::new_v4().simple());
-    cache.set_json(&format!("{prefix}1"), "a", 60).await.unwrap();
-    cache.set_json(&format!("{prefix}2"), "b", 60).await.unwrap();
-    cache.set_json(&format!("{prefix}3"), "c", 60).await.unwrap();
-    cache.invalidate_pattern(&format!("{prefix}*")).await.unwrap();
-    assert!(cache.get_json(&format!("{prefix}1")).await.unwrap().is_none());
-    assert!(cache.get_json(&format!("{prefix}2")).await.unwrap().is_none());
-    assert!(cache.get_json(&format!("{prefix}3")).await.unwrap().is_none());
+    cache
+        .set_json(&format!("{prefix}1"), "a", 60)
+        .await
+        .unwrap();
+    cache
+        .set_json(&format!("{prefix}2"), "b", 60)
+        .await
+        .unwrap();
+    cache
+        .set_json(&format!("{prefix}3"), "c", 60)
+        .await
+        .unwrap();
+    cache
+        .invalidate_pattern(&format!("{prefix}*"))
+        .await
+        .unwrap();
+    assert!(cache
+        .get_json(&format!("{prefix}1"))
+        .await
+        .unwrap()
+        .is_none());
+    assert!(cache
+        .get_json(&format!("{prefix}2"))
+        .await
+        .unwrap()
+        .is_none());
+    assert!(cache
+        .get_json(&format!("{prefix}3"))
+        .await
+        .unwrap()
+        .is_none());
 }
 
 // ── Stats ──
@@ -110,9 +144,15 @@ async fn stats_track_hits_and_misses() {
     let g = fresh_guild();
     // 2 misses (get_rules + get_json)
     let _ = cache.get_rules(&g).await.unwrap();
-    let _ = cache.get_json(&format!("missingkey-{}", Uuid::new_v4())).await.unwrap();
+    let _ = cache
+        .get_json(&format!("missingkey-{}", Uuid::new_v4()))
+        .await
+        .unwrap();
     // 1 hit
-    cache.set_rules(&g, &[sample_rule(&g, FlagType::Spam)]).await.unwrap();
+    cache
+        .set_rules(&g, &[sample_rule(&g, FlagType::Spam)])
+        .await
+        .unwrap();
     let _ = cache.get_rules(&g).await.unwrap();
 
     let s = cache.stats();

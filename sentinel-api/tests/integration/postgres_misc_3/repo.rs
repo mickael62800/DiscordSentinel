@@ -5,23 +5,27 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::taunts_repository::PgTauntsRepository;
 use sentinel_api::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
 use sentinel_api::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
-use sentinel_core::domain::entities::community::role_panel::AutoRole;
-use sentinel_core::domain::entities::community::role_panel::RolePanel;
-use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
-use sentinel_api::ports::outbound::coude::taunts_repository::TauntsRepository;
+use sentinel_api::adapters::outbound::postgres::coude::taunts_repository::PgTauntsRepository;
 use sentinel_api::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use sentinel_api::ports::outbound::coude::taunts_repository::TauntsRepository;
+use sentinel_core::domain::entities::community::role_panel::AutoRole;
+use sentinel_core::domain::entities::community::role_panel::RolePanel;
+use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -40,7 +44,8 @@ fn sample_panel(guild: &str) -> RolePanel {
         mode: "unique".into(),
         max_roles: Some(3),
         enabled: true,
-        created_at: now, updated_at: now,
+        created_at: now,
+        updated_at: now,
     }
 }
 
@@ -70,16 +75,24 @@ async fn role_panel_save_entries_and_retrieve() {
     repo.save_panel(&p).await.unwrap();
     let entries = vec![
         RolePanelEntry {
-            id: Uuid::new_v4(), panel_id: p.id,
-            role_id: "r1".into(), role_name: "Dev".into(),
-            emoji: None, label: "Developer".into(),
-            style: "primary".into(), position: 0,
+            id: Uuid::new_v4(),
+            panel_id: p.id,
+            role_id: "r1".into(),
+            role_name: "Dev".into(),
+            emoji: None,
+            label: "Developer".into(),
+            style: "primary".into(),
+            position: 0,
         },
         RolePanelEntry {
-            id: Uuid::new_v4(), panel_id: p.id,
-            role_id: "r2".into(), role_name: "Gamer".into(),
-            emoji: Some("game".into()), label: "Gaming".into(),
-            style: "secondary".into(), position: 1,
+            id: Uuid::new_v4(),
+            panel_id: p.id,
+            role_id: "r2".into(),
+            role_name: "Gamer".into(),
+            emoji: Some("game".into()),
+            label: "Gaming".into(),
+            style: "secondary".into(),
+            position: 1,
         },
     ];
     repo.save_entries(&entries).await.unwrap();
@@ -103,7 +116,9 @@ async fn role_panel_update_message_id() {
     let g = fresh_id();
     let p = sample_panel(&g);
     repo.save_panel(&p).await.unwrap();
-    repo.update_message_id(&p.id.to_string(), "msg-123").await.unwrap();
+    repo.update_message_id(&p.id.to_string(), "msg-123")
+        .await
+        .unwrap();
     let detail = repo.find_panel(&p.id.to_string()).await.unwrap().unwrap();
     assert_eq!(detail.panel.message_id.as_deref(), Some("msg-123"));
 }
@@ -126,7 +141,9 @@ async fn role_panel_find_by_message() {
     repo.save_panel(&p).await.unwrap();
     // message_id est VARCHAR(20) — 8 chars suffisent.
     let msg = format!("m-{:08x}", Uuid::new_v4().as_u128() as u32);
-    repo.update_message_id(&p.id.to_string(), &msg).await.unwrap();
+    repo.update_message_id(&p.id.to_string(), &msg)
+        .await
+        .unwrap();
     let found = repo.find_panel_by_message(&msg).await.unwrap().unwrap();
     assert_eq!(found.panel.id, p.id);
 }
@@ -138,9 +155,12 @@ async fn auto_role_save_find_delete() {
     let repo = PgRolePanelRepository::new(pool().await);
     let g = fresh_id();
     let ar = AutoRole {
-        id: Uuid::new_v4(), guild_id: g.clone().into(),
-        role_id: "role1".into(), role_name: "Welcome".into(),
-        delay_secs: 60, enabled: true,
+        id: Uuid::new_v4(),
+        guild_id: g.clone().into(),
+        role_id: "role1".into(),
+        role_name: "Welcome".into(),
+        delay_secs: 60,
+        enabled: true,
     };
     repo.save_auto_role(&ar).await.unwrap();
     assert_eq!(repo.find_auto_roles(&g).await.unwrap().len(), 1);

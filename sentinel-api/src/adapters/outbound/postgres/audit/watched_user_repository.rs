@@ -1,11 +1,11 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 use sentinel_core::domain::entities::audit::watched_user::classify_risk_level;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,
@@ -35,7 +35,8 @@ impl From<WatchedUserRow> for WatchedUser {
     fn from(row: WatchedUserRow) -> Self {
         // La regle de classification de risque est en `domain/entities/watched_user.rs`.
         // Cet adapter se contente de mapper row â†’ entity + appel de la fn pure.
-        let risk_level = classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
+        let risk_level =
+            classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
 
         Self {
             user_id: row.user_id.into(),
@@ -144,19 +145,13 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         Ok(())
     }
 
-    async fn remove_manual_watch(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
-        sqlx::query(
-            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+    async fn remove_manual_watch(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2")
+            .bind(guild_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(())
     }

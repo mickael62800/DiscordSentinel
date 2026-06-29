@@ -24,13 +24,17 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
          WHERE bot_name = 'cleanup' AND config_key = 'vacuum_enabled' \
            AND config_value IN ('true','1') LIMIT 1",
     )
-    .fetch_optional(pool).await.unwrap_or(None);
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
     let any_explicit_false: Option<i64> = sqlx::query_scalar(
         "SELECT 1 FROM bot_guild_config \
          WHERE bot_name = 'cleanup' AND config_key = 'vacuum_enabled' \
            AND config_value IN ('false','0') LIMIT 1",
     )
-    .fetch_optional(pool).await.unwrap_or(None);
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
     // Si quelqu'un a actif -> run. Sinon si quelqu'un a explicit false et
     // personne actif -> skip. Sinon (aucune row) -> default true.
     if any_disabled.is_none() && any_explicit_false.is_some() {
@@ -46,7 +50,11 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         match sqlx::query(&query).execute(pool).await {
             Ok(_) => {
                 let elapsed = start.elapsed();
-                info!(table, duration_ms = elapsed.as_millis() as u64, "VACUUM ANALYZE termine");
+                info!(
+                    table,
+                    duration_ms = elapsed.as_millis() as u64,
+                    "VACUUM ANALYZE termine"
+                );
             }
             Err(e) => {
                 warn!(table, error = %e, "Erreur VACUUM ANALYZE");

@@ -35,10 +35,14 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
     async fn create(&self, cmd: CreateConfessionCommand) -> Result<Confession, DomainError> {
         let cfg = self.config_or_default(&cmd.guild_id).await?;
         if !cfg.enabled {
-            return Err(DomainError::ValidationError("Systeme confessions desactive".into()));
+            return Err(DomainError::ValidationError(
+                "Systeme confessions desactive".into(),
+            ));
         }
         if cfg.is_user_banned(&cmd.author_user_id) {
-            return Err(DomainError::Forbidden("Tu n'es plus autorise a poster".into()));
+            return Err(DomainError::Forbidden(
+                "Tu n'es plus autorise a poster".into(),
+            ));
         }
         cfg.validate_content(&cmd.content)
             .map_err(DomainError::ValidationError)?;
@@ -112,10 +116,14 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
             .await?
             .ok_or_else(|| DomainError::NotFound(format!("Confession {} introuvable", id)))?;
         if c.author_user_id != author_user_id {
-            return Err(DomainError::Forbidden("Cette confession n'est pas la tienne".into()));
+            return Err(DomainError::Forbidden(
+                "Cette confession n'est pas la tienne".into(),
+            ));
         }
         if c.deleted_at.is_some() {
-            return Err(DomainError::ValidationError("Confession supprimee, edit impossible".into()));
+            return Err(DomainError::ValidationError(
+                "Confession supprimee, edit impossible".into(),
+            ));
         }
         let cfg = self.config_or_default(&c.guild_id).await?;
         cfg.validate_content(&new_content)
@@ -169,7 +177,9 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         self.repo
             .get_by_public_number(guild_id, public_number)
             .await?
-            .ok_or_else(|| DomainError::NotFound(format!("Confession #{} introuvable", public_number)))
+            .ok_or_else(|| {
+                DomainError::NotFound(format!("Confession #{} introuvable", public_number))
+            })
     }
 
     async fn list(
@@ -178,13 +188,12 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         limit: i64,
         include_deleted: bool,
     ) -> Result<Vec<Confession>, DomainError> {
-        self.repo.list_by_guild(guild_id, limit, include_deleted).await
+        self.repo
+            .list_by_guild(guild_id, limit, include_deleted)
+            .await
     }
 
-    async fn create_reply(
-        &self,
-        cmd: CreateReplyCommand,
-    ) -> Result<ConfessionReply, DomainError> {
+    async fn create_reply(&self, cmd: CreateReplyCommand) -> Result<ConfessionReply, DomainError> {
         // Verifier que la confession existe et n'est pas supprimee
         let conf = self
             .repo
@@ -192,16 +201,23 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
             .await?
             .ok_or_else(|| DomainError::NotFound("Confession introuvable".into()))?;
         if conf.deleted_at.is_some() {
-            return Err(DomainError::ValidationError("Confession supprimee, replies fermees".into()));
+            return Err(DomainError::ValidationError(
+                "Confession supprimee, replies fermees".into(),
+            ));
         }
         let cfg = self.config_or_default(&conf.guild_id).await?;
         cfg.validate_content(&cmd.content)
             .map_err(DomainError::ValidationError)?;
         if cfg.is_user_banned(&cmd.author_user_id) {
-            return Err(DomainError::Forbidden("Tu n'es plus autorise a poster".into()));
+            return Err(DomainError::Forbidden(
+                "Tu n'es plus autorise a poster".into(),
+            ));
         }
 
-        let public_number = self.repo.next_reply_public_number(cmd.confession_id).await?;
+        let public_number = self
+            .repo
+            .next_reply_public_number(cmd.confession_id)
+            .await?;
         let reply = ConfessionReply {
             id: Uuid::new_v4(),
             confession_id: cmd.confession_id,
@@ -219,11 +235,19 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         Ok(reply)
     }
 
-    async fn update_reply_message_id(&self, id: Uuid, message_id: String) -> Result<(), DomainError> {
+    async fn update_reply_message_id(
+        &self,
+        id: Uuid,
+        message_id: String,
+    ) -> Result<(), DomainError> {
         self.repo.update_reply_message_id(id, &message_id).await
     }
 
-    async fn delete_reply(&self, id: Uuid, deleted_by: String) -> Result<ConfessionReply, DomainError> {
+    async fn delete_reply(
+        &self,
+        id: Uuid,
+        deleted_by: String,
+    ) -> Result<ConfessionReply, DomainError> {
         let mut r = self
             .repo
             .get_reply(id)
@@ -242,7 +266,10 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         self.repo.list_replies(confession_id).await
     }
 
-    async fn create_report(&self, cmd: CreateReportCommand) -> Result<ConfessionReport, DomainError> {
+    async fn create_report(
+        &self,
+        cmd: CreateReportCommand,
+    ) -> Result<ConfessionReport, DomainError> {
         if cmd.confession_id.is_none() && cmd.reply_id.is_none() {
             return Err(DomainError::ValidationError(
                 "Il faut une cible (confession ou reply)".into(),
@@ -289,17 +316,16 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         self.config_or_default(guild_id).await
     }
 
-    async fn save_config(
-        &self,
-        cfg: ConfessionConfig,
-    ) -> Result<ConfessionConfig, DomainError> {
+    async fn save_config(&self, cfg: ConfessionConfig) -> Result<ConfessionConfig, DomainError> {
         if cfg.cooldown_secs < 0 || cfg.cooldown_secs > 3600 {
             return Err(DomainError::ValidationError(
                 "cooldown_secs doit etre 0..3600".into(),
             ));
         }
         if cfg.max_per_day < 1 || cfg.max_per_day > 1000 {
-            return Err(DomainError::ValidationError("max_per_day doit etre 1..1000".into()));
+            return Err(DomainError::ValidationError(
+                "max_per_day doit etre 1..1000".into(),
+            ));
         }
         if cfg.min_chars < 1 || cfg.min_chars > cfg.max_chars {
             return Err(DomainError::ValidationError(
@@ -307,7 +333,9 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
             ));
         }
         if cfg.max_chars < 1 || cfg.max_chars > 4000 {
-            return Err(DomainError::ValidationError("max_chars doit etre 1..4000".into()));
+            return Err(DomainError::ValidationError(
+                "max_chars doit etre 1..4000".into(),
+            ));
         }
         self.repo.upsert_config(&cfg).await?;
         Ok(cfg)

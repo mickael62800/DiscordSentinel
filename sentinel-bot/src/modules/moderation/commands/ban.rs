@@ -1,6 +1,6 @@
 use serenity::all::{
-    ButtonStyle, CommandInteraction, CommandOptionType, Context,
-    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    ButtonStyle, CommandInteraction, CommandOptionType, Context, CreateActionRow, CreateButton,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
 use serenity::builder::CreateEmbedFooter;
@@ -10,11 +10,11 @@ use crate::shared::api_client::BaseApiClient;
 use crate::shared::embeds::{critical_embed, success_embed};
 
 use super::api_client::ModerationAction;
-use super::ModerationApiKey;
-use crate::shared::discord_helpers::edit_response_text;
 use super::risk_check::{
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
+use super::ModerationApiKey;
+use crate::shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ban")
@@ -24,19 +24,21 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du ban")
                 .required(true),
         )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a bannir (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. deja parti du serveur)"),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Integer,
-                "duration",
-                "Duree en heures (vide = permanent)",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur a bannir (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (ex. deja parti du serveur)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::Integer,
+            "duration",
+            "Duree en heures (vide = permanent)",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::Integer,
@@ -55,31 +57,40 @@ pub fn register_unban() -> CreateCommand {
         .description("Debannir un utilisateur")
         .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur a debannir")
-                .required(true),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "user_id",
+                "ID de l'utilisateur a debannir",
+            )
+            .required(true),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
-        let _ = command.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("❌ Permission BAN_MEMBERS requise pour /ban.")
-                    .ephemeral(true),
-            ),
-        ).await;
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission BAN_MEMBERS requise pour /ban.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
         warn!(user = %command.user.name, "Tentative /ban sans permission");
         return;
     }
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "ban", "Echec defer interaction Discord");
         return;
     }
@@ -88,23 +99,37 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            edit_response_text(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
-    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
-        .unwrap_or("Aucune raison");
+    let reason_raw =
+        crate::shared::discord_helpers::option_str(options, "reason").unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
     let duration_hours = crate::shared::discord_helpers::option_i64(options, "duration");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "Utilisateur introuvable.").await;
+            return;
+        }
     };
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
@@ -346,8 +371,10 @@ pub async fn execute_ban(
         if let Err(e) = cmd
             .edit_response(
                 &ctx.http,
-                serenity::builder::EditInteractionResponse::new()
-                    .content(format!("✅ Ban applique sur <@{}> ({}).", target.id, duration_label)),
+                serenity::builder::EditInteractionResponse::new().content(format!(
+                    "✅ Ban applique sur <@{}> ({}).",
+                    target.id, duration_label
+                )),
             )
             .await
         {
@@ -359,17 +386,23 @@ pub async fn execute_ban(
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
-    let user_id_str = crate::shared::discord_helpers::option_str(&command.data.options, "user_id")
-        .unwrap_or("0");
+    let user_id_str =
+        crate::shared::discord_helpers::option_str(&command.data.options, "user_id").unwrap_or("0");
 
     let user_id: u64 = match user_id_str.parse() {
         Ok(id) => id,
-        Err(_) => { edit_response_text(ctx, command, "ID utilisateur invalide.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "ID utilisateur invalide.").await;
+            return;
+        }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target_uid = serenity::model::id::UserId::new(user_id);
@@ -383,7 +416,10 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
 
     let action = ModerationAction {
@@ -411,14 +447,17 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now())
         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!("✅ Unban applique sur `{user_id_str}`."))
-                .ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!("✅ Unban applique sur `{user_id_str}`."))
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send unban response");
     }
 

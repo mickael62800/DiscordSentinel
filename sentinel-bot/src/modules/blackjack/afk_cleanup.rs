@@ -49,13 +49,22 @@ async fn handle_cleanup_event(ctx: &Context, payload_json: &str) {
     }
 
     let data = event.get("data").cloned().unwrap_or_default();
-    let channel_id_str = data.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
-    let idle_minutes = data.get("idle_minutes").and_then(|v| v.as_i64()).unwrap_or(0);
+    let channel_id_str = data
+        .get("channel_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let idle_minutes = data
+        .get("idle_minutes")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
 
     let channel_id = match channel_id_str.parse::<u64>() {
         Ok(id) => ChannelId::new(id),
         Err(_) => {
-            warn!(channel_id = channel_id_str, "blackjack_table_afk: channel_id invalide");
+            warn!(
+                channel_id = channel_id_str,
+                "blackjack_table_afk: channel_id invalide"
+            );
             return;
         }
     };

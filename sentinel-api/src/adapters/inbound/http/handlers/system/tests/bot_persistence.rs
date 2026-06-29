@@ -14,7 +14,8 @@ fn create_name_history_dto_deserializes() {
 
 #[test]
 fn update_streak_dto_deserializes() {
-    let raw = r#"{"streak_current":5,"streak_best":10,"streak_last_day":15,"streak_last_year":2026}"#;
+    let raw =
+        r#"{"streak_current":5,"streak_best":10,"streak_last_day":15,"streak_last_year":2026}"#;
     let dto: UpdateStreakDto = serde_json::from_str(raw).unwrap();
     assert_eq!(dto.streak_current, 5);
     assert_eq!(dto.streak_best, 10);
@@ -36,7 +37,10 @@ fn update_ticket_sla_dto_all_optional() {
 fn update_ticket_sla_dto_partial() {
     let raw = r#"{"first_response_at":"2026-01-01T00:00:00Z","satisfaction_rating":5}"#;
     let dto: UpdateTicketSlaDto = serde_json::from_str(raw).unwrap();
-    assert_eq!(dto.first_response_at.as_deref(), Some("2026-01-01T00:00:00Z"));
+    assert_eq!(
+        dto.first_response_at.as_deref(),
+        Some("2026-01-01T00:00:00Z")
+    );
     assert_eq!(dto.satisfaction_rating, Some(5));
     assert!(dto.resolved_at.is_none());
 }

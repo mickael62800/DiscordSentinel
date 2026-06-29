@@ -40,22 +40,41 @@ pub(super) async fn send_review_card(
     {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
-            let cfg = api.get_guild_config_for(&guild_id, super::MODULE_BOT_NAME).await.unwrap_or_default();
-            discussion_enabled = BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
+            let cfg = api
+                .get_guild_config_for(&guild_id, super::MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default();
+            discussion_enabled =
+                BaseApiClient::config_bool(&cfg, "discussion_channel_enabled", false);
             detail_url = super::vote::build_detail_url(&cfg, &guild_id);
             // Modération humaine : human_only force le mode vote (1 carte/personne
             // agregee + decision humaine), au lieu des cartes 1-clic non agregees.
             let force_vote = BaseApiClient::config_bool(&cfg, "human_only_enabled", false);
             if force_vote || BaseApiClient::config_bool(&cfg, "vote_enabled", false) {
-                let deadline_hours = BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
-                let context_before = BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8;
+                let deadline_hours =
+                    BaseApiClient::config_u64(&cfg, "vote_deadline_hours", 72) as i64;
+                let context_before =
+                    BaseApiClient::config_u64(&cfg, "vote_context_before", 10) as u8;
                 let thread_enabled = BaseApiClient::config_bool(&cfg, "vote_thread_enabled", true);
                 let aggregate = BaseApiClient::config_bool(&cfg, "vote_aggregate_enabled", false);
-                let aggregate_window = BaseApiClient::config_u64(&cfg, "vote_aggregate_window_minutes", 60) as i64;
+                let aggregate_window =
+                    BaseApiClient::config_u64(&cfg, "vote_aggregate_window_minutes", 60) as i64;
                 drop(data);
                 super::vote::post_vote_card(
-                    ctx, msg, suggested_action, reason, score, flags, review_channel_id,
-                    deadline_hours, context_before, thread_enabled, aggregate, aggregate_window, discussion_enabled, detail_url,
+                    ctx,
+                    msg,
+                    suggested_action,
+                    reason,
+                    score,
+                    flags,
+                    review_channel_id,
+                    deadline_hours,
+                    context_before,
+                    thread_enabled,
+                    aggregate,
+                    aggregate_window,
+                    discussion_enabled,
+                    detail_url,
                     auto_note,
                 )
                 .await;
@@ -86,19 +105,39 @@ pub(super) async fn send_review_card(
     };
 
     let mut flag_parts = Vec::new();
-    if flags.spam { flag_parts.push("Spam"); }
-    if flags.insult { flag_parts.push("Insulte"); }
-    if flags.link { flag_parts.push("Lien"); }
-    if flags.phishing { flag_parts.push("Phishing"); }
-    let flags_str = if flag_parts.is_empty() { "Aucun".to_string() } else { flag_parts.join(", ") };
+    if flags.spam {
+        flag_parts.push("Spam");
+    }
+    if flags.insult {
+        flag_parts.push("Insulte");
+    }
+    if flags.link {
+        flag_parts.push("Lien");
+    }
+    if flags.phishing {
+        flag_parts.push("Phishing");
+    }
+    let flags_str = if flag_parts.is_empty() {
+        "Aucun".to_string()
+    } else {
+        flag_parts.join(", ")
+    };
 
     let mut embed = serenity::builder::CreateEmbed::new()
         .title(format!("AutoMod -- Action suggeree : {}", action_label))
         .color(action_color)
-        .field("Utilisateur", format!("<@{}> (`{}`)", user_id, msg.author.name), true)
+        .field(
+            "Utilisateur",
+            format!("<@{}> (`{}`)", user_id, msg.author.name),
+            true,
+        )
         .field("Salon", format!("<#{}>", channel_id), true)
         .field("Score IA", format!("{:.2}", score), true)
-        .field("Message original", format!("```{}```", content_preview), false)
+        .field(
+            "Message original",
+            format!("```{}```", content_preview),
+            false,
+        )
         .field("Raison IA", reason, false)
         .field("Flags detectes", &flags_str, true)
         .thumbnail(msg.author.face())
@@ -121,9 +160,10 @@ pub(super) async fn send_review_card(
     // Bouton principal (action suggeree) + ajustements + ignorer.
     let suggested_char = action_char(suggested_action);
 
-    let btn_apply = serenity::builder::CreateButton::new(format!("am_{}:{}", suggested_char, id_suffix))
-        .label(format!("Appliquer ({})", action_label))
-        .style(serenity::all::ButtonStyle::Success);
+    let btn_apply =
+        serenity::builder::CreateButton::new(format!("am_{}:{}", suggested_char, id_suffix))
+            .label(format!("Appliquer ({})", action_label))
+            .style(serenity::all::ButtonStyle::Success);
 
     let btn_ignore = serenity::builder::CreateButton::new(format!("am_i:{}", id_suffix))
         .label("Ignorer")
@@ -157,8 +197,17 @@ pub(super) async fn send_review_card(
     // ce qui permet d'ajouter le bouton « Ouvrir une discussion » (amdisc:<id>)
     // — meme bouton/handler que les cartes de vote (full hexa).
     let review_id = create_review_in_api(
-        ctx, &guild_id, &channel_id, &message_id, &user_id, &msg.author.name,
-        &content_preview, suggested_action, score, reason, flags,
+        ctx,
+        &guild_id,
+        &channel_id,
+        &message_id,
+        &user_id,
+        &msg.author.name,
+        &content_preview,
+        suggested_action,
+        score,
+        reason,
+        flags,
     )
     .await;
 
@@ -173,9 +222,13 @@ pub(super) async fn send_review_card(
     if discussion_enabled {
         if let Some(id) = &review_id {
             extra.push(
-                serenity::builder::CreateButton::new(format!("{}{}", super::vote::DISCUSSION_PREFIX, id))
-                    .label("Ouvrir une discussion")
-                    .style(serenity::all::ButtonStyle::Secondary),
+                serenity::builder::CreateButton::new(format!(
+                    "{}{}",
+                    super::vote::DISCUSSION_PREFIX,
+                    id
+                ))
+                .label("Ouvrir une discussion")
+                .style(serenity::all::ButtonStyle::Secondary),
             );
         }
     }
@@ -299,11 +352,22 @@ async fn create_review_in_api(
 /// Enregistre le mapping `(review_id, carte Discord)` dans
 /// `discord_action_messages` pour que le web retrouve la carte lors d'une
 /// resolution. Appele apres l'envoi de la carte (on a alors le message poste).
-async fn register_review_mapping(ctx: &Context, review_id: &str, guild_id: &str, card_channel_id: &str, card_message_id: &str) {
-    let Ok(uuid) = uuid::Uuid::parse_str(review_id) else { return };
+async fn register_review_mapping(
+    ctx: &Context,
+    review_id: &str,
+    guild_id: &str,
+    card_channel_id: &str,
+    card_message_id: &str,
+) {
+    let Ok(uuid) = uuid::Uuid::parse_str(review_id) else {
+        return;
+    };
     let api = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
     };
     crate::sync::register_action_message(
         &api,
@@ -338,7 +402,10 @@ fn char_to_action(c: char) -> Action {
 
 /// Handler des boutons de review. Parse le custom_id, execute l'action
 /// choisie par le moderateur, et met a jour la carte.
-pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+pub(super) async fn handle_review_button(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+) {
     let has_perm = component
         .member
         .as_ref()
@@ -418,16 +485,22 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
     let moderator_name = &component.user.name;
 
     // Charger la config guild pour mute_duration
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
     let data = ctx.data.read().await;
     let config = if let Some(api) = data.get::<ApiClientKey>() {
-        api.get_guild_config_for(&guild_id, crate::modules::automod::MODULE_BOT_NAME).await.unwrap_or_default()
+        api.get_guild_config_for(&guild_id, crate::modules::automod::MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default()
     } else {
         std::collections::HashMap::new()
     };
     drop(data);
 
-    let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+    let mute_duration_secs =
+        BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
     let colors = build_embed_colors(&config);
     let appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
 
@@ -436,7 +509,10 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         info!(target = %user_id_str, moderator = %moderator_name, "Detection ignoree via review");
         let ignored_embed = serenity::builder::CreateEmbed::new()
             .title("AutoMod -- Ignore par un moderateur")
-            .description(format!("Moderateur : **{}**\nAucune action appliquee.", moderator_name))
+            .description(format!(
+                "Moderateur : **{}**\nAucune action appliquee.",
+                moderator_name
+            ))
             .color(0x95a5a6)
             .timestamp(serenity::model::Timestamp::now());
 
@@ -475,9 +551,19 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         Action::Warn => {
             info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Warn valide via review");
             let embed = crate::shared::embeds::sanction_notice(
-                "warn", "Contenu inapproprie detecte par l'IA", None, Some(moderator_name), appeal,
+                "warn",
+                "Contenu inapproprie detecte par l'IA",
+                None,
+                Some(moderator_name),
+                appeal,
             );
-            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+            if let Err(e) = channel_id
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
                 error!(error = %e, "Echec envoi embed warn dans le salon");
             }
         }
@@ -488,20 +574,36 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
                     .await
                 {
                     Ok(_) => info!(message_id = %msg_id, "Message supprime via review"),
-                    Err(e) => warn!(error = %e, message_id = %msg_id, "Echec suppression message (peut-etre deja supprime)"),
+                    Err(e) => {
+                        warn!(error = %e, message_id = %msg_id, "Echec suppression message (peut-etre deja supprime)")
+                    }
                 }
             }
             let embed = crate::shared::embeds::sanction_notice(
-                "delete", "Contenu inapproprie", None, Some(moderator_name), appeal,
+                "delete",
+                "Contenu inapproprie",
+                None,
+                Some(moderator_name),
+                appeal,
             );
-            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+            if let Err(e) = channel_id
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
                 error!(error = %e, "Echec envoi embed delete dans le salon");
             }
         }
         Action::Mute => {
             let mut mute_applied = false;
-            if let (Some(guild_id_val), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
-                match guild_id_val.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
+            if let (Some(guild_id_val), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>())
+            {
+                match guild_id_val
+                    .member(&ctx.http, serenity::model::id::UserId::new(uid))
+                    .await
+                {
                     Ok(mut member) => {
                         let secs = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
@@ -510,12 +612,17 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
                         match time::OffsetDateTime::from_unix_timestamp(secs) {
                             Ok(dt) => {
                                 let timeout = serenity::model::Timestamp::from(dt);
-                                match member.disable_communication_until_datetime(&ctx.http, timeout).await {
+                                match member
+                                    .disable_communication_until_datetime(&ctx.http, timeout)
+                                    .await
+                                {
                                     Ok(_) => {
                                         info!(user_id = %uid, duration = mute_duration_secs, "Mute applique via review");
                                         mute_applied = true;
                                     }
-                                    Err(e) => error!(error = %e, user_id = %uid, "Echec Discord disable_communication -- le bot a-t-il la permission MODERATE_MEMBERS ?"),
+                                    Err(e) => {
+                                        error!(error = %e, user_id = %uid, "Echec Discord disable_communication -- le bot a-t-il la permission MODERATE_MEMBERS ?")
+                                    }
                                 }
                             }
                             Err(e) => error!(error = %e, "Timestamp invalide pour mute"),
@@ -539,7 +646,11 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             let mute_min = mute_duration_secs / 60;
             let embed = if mute_applied {
                 crate::shared::embeds::sanction_notice(
-                    "mute", "Contenu inapproprie", Some(mute_min), Some(moderator_name), appeal,
+                    "mute",
+                    "Contenu inapproprie",
+                    Some(mute_min),
+                    Some(moderator_name),
+                    appeal,
                 )
             } else {
                 // Echec du mute : on reste factuel (pas un gabarit de sanction).
@@ -548,19 +659,40 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
                     .field("Duree", format!("{} minutes", mute_min), true)
                     .field("Valide par", moderator_name.as_str(), true)
             };
-            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+            let _ = channel_id
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await;
         }
         Action::Ban => {
             // Decision humaine -> ban reel (coherent avec la finalisation de vote).
             super::vote::apply_member_sanction(
-                ctx, component.guild_id, channel_id_str, message_id_str, user_id_str, "ban", mute_duration_secs,
+                ctx,
+                component.guild_id,
+                channel_id_str,
+                message_id_str,
+                user_id_str,
+                "ban",
+                mute_duration_secs,
             )
             .await;
             info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Ban applique via review");
             let embed = crate::shared::embeds::sanction_notice(
-                "ban", "Contenu inapproprie", None, Some(moderator_name), appeal,
+                "ban",
+                "Contenu inapproprie",
+                None,
+                Some(moderator_name),
+                appeal,
             );
-            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+            if let Err(e) = channel_id
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
                 error!(error = %e, "Echec envoi embed ban dans le salon");
             }
         }
@@ -577,11 +709,20 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
     };
     if !action_type.is_empty() {
         super::vote::log_sanction_to_moderation(
-            ctx, &guild_id, &component.channel_id.to_string(),
-            &component.user.id.to_string(), &component.user.name,
-            user_id_str, user_id_str,
-            action_type, "Sanction validee par un moderateur (AutoMod review)",
-            if action == Action::Mute { Some(mute_duration_secs) } else { None },
+            ctx,
+            &guild_id,
+            &component.channel_id.to_string(),
+            &component.user.id.to_string(),
+            &component.user.name,
+            user_id_str,
+            user_id_str,
+            action_type,
+            "Sanction validee par un moderateur (AutoMod review)",
+            if action == Action::Mute {
+                Some(mute_duration_secs)
+            } else {
+                None
+            },
         )
         .await;
     }
@@ -597,9 +738,14 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         };
         if let Some(api) = api {
             #[derive(serde::Deserialize)]
-            struct R { id: String, user_id: String }
+            struct R {
+                id: String,
+                user_id: String,
+            }
             if let Ok(Some(r)) = api
-                .get_json::<Option<R>>(&format!("/api/automod/{guild_id}/reviews/by-message/{message_id_str}"))
+                .get_json::<Option<R>>(&format!(
+                    "/api/automod/{guild_id}/reviews/by-message/{message_id_str}"
+                ))
                 .await
             {
                 super::vote::archive_discussion_channel(ctx, &api, &r.id, &r.user_id).await;
@@ -621,7 +767,9 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             Action::Ban => colors.ban,
             Action::None => 0x95a5a6,
         })
-        .footer(serenity::builder::CreateEmbedFooter::new("AutoMod Review | Action executee"))
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "AutoMod Review | Action executee",
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     let _ = component
@@ -694,11 +842,19 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
     {
         let api = {
             let data = ctx.data.read().await;
-            match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+            match data.get::<ApiClientKey>() {
+                Some(a) => a.clone(),
+                None => return,
+            }
         };
         #[derive(serde::Deserialize)]
-        struct U { user_id: String }
-        if let Ok(r) = api.get_json::<U>(&format!("/api/automod/reviews/{action_id}")).await {
+        struct U {
+            user_id: String,
+        }
+        if let Ok(r) = api
+            .get_json::<U>(&format!("/api/automod/reviews/{action_id}"))
+            .await
+        {
             super::vote::archive_discussion_channel(ctx, &api, action_id, &r.user_id).await;
         }
     }
@@ -707,23 +863,28 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
 /// Applique sur Discord la sanction resolue depuis le web (delete/mute/ban).
 /// La tracabilite (historique moderation) est faite cote API. Reutilise les
 /// helpers partages du mode vote.
-async fn apply_web_resolution(
-    ctx: &Context,
-    action_id: &str,
-    applied_action: &str,
-) {
-    if !matches!(applied_action, "prevention" | "warn" | "delete" | "mute" | "ban") {
+async fn apply_web_resolution(ctx: &Context, action_id: &str, applied_action: &str) {
+    if !matches!(
+        applied_action,
+        "prevention" | "warn" | "delete" | "mute" | "ban"
+    ) {
         return; // "ignore" ou inconnu : rien a appliquer.
     }
     // Idempotence : le consumer Redis (stream group + ack) peut redelivrer
     // l'event. On ne (re)applique la sanction qu'une fois par review.
     if !super::claim_once(ctx, &format!("webres:{action_id}")).await {
-        info!(action_id, "Event web-resolve deja applique (redelivrance ignoree)");
+        info!(
+            action_id,
+            "Event web-resolve deja applique (redelivrance ignoree)"
+        );
         return;
     }
     let api = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
     };
 
     #[derive(serde::Deserialize)]
@@ -733,7 +894,10 @@ async fn apply_web_resolution(
         message_id: String,
         user_id: String,
     }
-    let review: ReviewDto = match api.get_json(&format!("/api/automod/reviews/{action_id}")).await {
+    let review: ReviewDto = match api
+        .get_json(&format!("/api/automod/reviews/{action_id}"))
+        .await
+    {
         Ok(r) => r,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch review (resolution web) : sanction non appliquee");
@@ -745,15 +909,26 @@ async fn apply_web_resolution(
         .get_guild_config_for(&review.guild_id, crate::modules::automod::MODULE_BOT_NAME)
         .await
         .unwrap_or_default();
-    let mute_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+    let mute_secs =
+        BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
 
-    let gid = review.guild_id.parse::<u64>().ok().map(serenity::model::id::GuildId::new);
+    let gid = review
+        .guild_id
+        .parse::<u64>()
+        .ok()
+        .map(serenity::model::id::GuildId::new);
 
     // Action Discord (delete/mute/ban ; warn = pas d'action destructive).
     // La sanction est tracee cote API dans la requete /resolve (source web) ;
     // le bot n'applique ici que l'action Discord (pas de log redondant).
     super::vote::apply_member_sanction(
-        ctx, gid, &review.channel_id, &review.message_id, &review.user_id, applied_action, mute_secs,
+        ctx,
+        gid,
+        &review.channel_id,
+        &review.message_id,
+        &review.user_id,
+        applied_action,
+        mute_secs,
     )
     .await;
 }
@@ -845,9 +1020,7 @@ async fn edit_review_card_from_web(
 
     info!(
         action_id,
-        applied_action,
-        actor_name,
-        "Carte automod review editee suite resolution web"
+        applied_action, actor_name, "Carte automod review editee suite resolution web"
     );
 }
 

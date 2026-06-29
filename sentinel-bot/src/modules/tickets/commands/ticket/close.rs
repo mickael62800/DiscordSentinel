@@ -1,6 +1,6 @@
 use serenity::all::{
-    Context, CreateActionRow, CreateButton, ComponentInteraction,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    ComponentInteraction, Context, CreateActionRow, CreateButton, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 use serenity::model::channel::ChannelType;
 use tracing::{error, info, warn};
@@ -138,23 +138,25 @@ pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction
             warn!(error = %e, "Failed to send close confirmation prompt");
         }
     } else {
-        if let Err(e) = component.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("Votre demande de fermeture a ete envoyee au staff.")
-                    .ephemeral(true),
-            ),
-        ).await {
+        if let Err(e) = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Votre demande de fermeture a ete envoyee au staff.")
+                        .ephemeral(true),
+                ),
+            )
+            .await
+        {
             warn!(error = %e, "Failed to send close request acknowledgement");
         }
 
-        let msg = serenity::builder::CreateMessage::new()
-            .content(format!(
-                "**<@{}> souhaite fermer ce ticket.**\n\
+        let msg = serenity::builder::CreateMessage::new().content(format!(
+            "**<@{}> souhaite fermer ce ticket.**\n\
                  En attente de validation d'un administrateur ou moderateur.",
-                component.user.id
-            ));
+            component.user.id
+        ));
 
         if let Err(e) = component.channel_id.send_message(&ctx.http, msg).await {
             warn!(error = %e, "Failed to send close request message");
@@ -206,16 +208,18 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
 
     let ticket_id = get_ticket_id_from_channel(ctx, channel_id).await;
 
-    if let Err(e) = component.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!(
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(
+                format!(
                     "Ticket ferme par <@{}>. Ce salon sera supprime dans 5 secondes.",
                     component.user.id
-                ))
-        ),
-    ).await {
+                ),
+            )),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send ticket close confirmation");
     }
 
@@ -234,7 +238,10 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
 
         base.send_log(
             "info",
-            &component.guild_id.map(|g| g.to_string()).unwrap_or_default(),
+            &component
+                .guild_id
+                .map(|g| g.to_string())
+                .unwrap_or_default(),
             &format!(
                 "Ticket ferme : {} (id: {}) par {}",
                 channel_name,
@@ -267,14 +274,24 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let transcript_enabled = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
+            let gc = match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::tickets::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
                     std::collections::HashMap::new()
                 }
             };
-            crate::shared::api_client::BaseApiClient::config_bool(&gc, "transcript_dm_enabled", true)
+            crate::shared::api_client::BaseApiClient::config_bool(
+                &gc,
+                "transcript_dm_enabled",
+                true,
+            )
         } else {
             true
         }
@@ -283,7 +300,13 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let close_delay = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
+            let gc = match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::tickets::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -300,7 +323,10 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
             let gc = base
-                .get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME)
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::tickets::MODULE_BOT_NAME,
+                )
                 .await
                 .unwrap_or_default();
             crate::shared::api_client::BaseApiClient::config_bool(&gc, "satisfaction_enabled", true)
@@ -313,91 +339,102 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
             let gc = base
-                .get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME)
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::tickets::MODULE_BOT_NAME,
+                )
                 .await
                 .unwrap_or_default();
-            crate::shared::api_client::BaseApiClient::config_or(&gc, "transcript_format", "markdown")
-                .to_string()
+            crate::shared::api_client::BaseApiClient::config_or(
+                &gc,
+                "transcript_format",
+                "markdown",
+            )
+            .to_string()
         } else {
             "markdown".to_string()
         }
     };
 
     if transcript_enabled {
-    if let Some(ref id) = ticket_id {
-        let data2 = ctx.data.read().await;
-        if let (Some(base), Some(grpc)) = (
-            data2.get::<ApiClientKey>(),
-            data2.get::<crate::shared::grpc_client::GrpcClientKey>(),
-        ) {
-            let api = ApiClient::new(base.clone(), grpc.clone());
-            if let Ok(detail) = api.get_ticket(id).await {
-                if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
-                    let user_id = serenity::model::id::UserId::new(author_id);
-                    if let Ok(dm_channel) = user_id.create_dm_channel(&ctx.http).await {
-                        // On retient le ChannelId pour les sends post-transcript
-                        // (send_files consomme dm_channel donc on stocke l'id avant).
-                        let dm_channel_id = dm_channel.id;
-                        let short_id = &id[..8.min(id.len())];
-                        let transcript = build_transcript(
-                            &transcript_format,
-                            short_id,
-                            &detail.ticket.title,
-                            &detail.ticket.category,
-                            &detail.messages,
-                        );
-
-                        if transcript_format == "html" {
-                            // HTML : envoye comme fichier attache (.html).
-                            let attachment = serenity::builder::CreateAttachment::bytes(
-                                transcript.into_bytes(),
-                                format!("ticket-{}.html", short_id),
+        if let Some(ref id) = ticket_id {
+            let data2 = ctx.data.read().await;
+            if let (Some(base), Some(grpc)) = (
+                data2.get::<ApiClientKey>(),
+                data2.get::<crate::shared::grpc_client::GrpcClientKey>(),
+            ) {
+                let api = ApiClient::new(base.clone(), grpc.clone());
+                if let Ok(detail) = api.get_ticket(id).await {
+                    if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
+                        let user_id = serenity::model::id::UserId::new(author_id);
+                        if let Ok(dm_channel) = user_id.create_dm_channel(&ctx.http).await {
+                            // On retient le ChannelId pour les sends post-transcript
+                            // (send_files consomme dm_channel donc on stocke l'id avant).
+                            let dm_channel_id = dm_channel.id;
+                            let short_id = &id[..8.min(id.len())];
+                            let transcript = build_transcript(
+                                &transcript_format,
+                                short_id,
+                                &detail.ticket.title,
+                                &detail.ticket.category,
+                                &detail.messages,
                             );
-                            if let Err(e) = dm_channel
-                                .send_files(
-                                    &ctx.http,
-                                    [attachment],
-                                    serenity::builder::CreateMessage::new()
-                                        .content(format!("Transcript du ticket #{} (HTML).", short_id)),
-                                )
-                                .await
-                            {
-                                warn!(error = %e, "Failed to send HTML transcript attachment");
-                            }
-                        } else {
-                            // text / markdown : message inline en chunks de 1900 chars.
-                            let mut buf = String::new();
-                            let mut char_count = 0usize;
-                            for ch in transcript.chars() {
-                                if char_count + 1 > 1900 {
+
+                            if transcript_format == "html" {
+                                // HTML : envoye comme fichier attache (.html).
+                                let attachment = serenity::builder::CreateAttachment::bytes(
+                                    transcript.into_bytes(),
+                                    format!("ticket-{}.html", short_id),
+                                );
+                                if let Err(e) = dm_channel
+                                    .send_files(
+                                        &ctx.http,
+                                        [attachment],
+                                        serenity::builder::CreateMessage::new().content(format!(
+                                            "Transcript du ticket #{} (HTML).",
+                                            short_id
+                                        )),
+                                    )
+                                    .await
+                                {
+                                    warn!(error = %e, "Failed to send HTML transcript attachment");
+                                }
+                            } else {
+                                // text / markdown : message inline en chunks de 1900 chars.
+                                let mut buf = String::new();
+                                let mut char_count = 0usize;
+                                for ch in transcript.chars() {
+                                    if char_count + 1 > 1900 {
+                                        if let Err(e) = dm_channel_id.say(&ctx.http, &buf).await {
+                                            warn!(error = %e, "Failed to send transcript DM chunk");
+                                        }
+                                        buf.clear();
+                                        char_count = 0;
+                                    }
+                                    buf.push(ch);
+                                    char_count += 1;
+                                }
+                                if !buf.is_empty() {
                                     if let Err(e) = dm_channel_id.say(&ctx.http, &buf).await {
                                         warn!(error = %e, "Failed to send transcript DM chunk");
                                     }
-                                    buf.clear();
-                                    char_count = 0;
-                                }
-                                buf.push(ch);
-                                char_count += 1;
-                            }
-                            if !buf.is_empty() {
-                                if let Err(e) = dm_channel_id.say(&ctx.http, &buf).await {
-                                    warn!(error = %e, "Failed to send transcript DM chunk");
                                 }
                             }
-                        }
 
-                        // Survey satisfaction (1-5 etoiles) si enable.
-                        if satisfaction_enabled {
-                            let survey = crate::modules::tickets::satisfaction::build_survey_message(id);
-                            if let Err(e) = dm_channel_id.send_message(&ctx.http, survey).await {
-                                warn!(error = %e, "Failed to send satisfaction survey DM");
+                            // Survey satisfaction (1-5 etoiles) si enable.
+                            if satisfaction_enabled {
+                                let survey =
+                                    crate::modules::tickets::satisfaction::build_survey_message(id);
+                                if let Err(e) = dm_channel_id.send_message(&ctx.http, survey).await
+                                {
+                                    warn!(error = %e, "Failed to send satisfaction survey DM");
+                                }
                             }
                         }
                     }
                 }
             }
         }
-    }
     }
 
     tokio::time::sleep(tokio::time::Duration::from_secs(close_delay)).await;
@@ -426,42 +463,54 @@ pub async fn handle_close_cancel(ctx: &Context, component: &ComponentInteraction
     };
 
     if !is_staff {
-        if let Err(e) = component.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("Seuls les administrateurs et moderateurs peuvent gerer la fermeture.")
-                    .ephemeral(true),
-            ),
-        ).await {
+        if let Err(e) = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(
+                            "Seuls les administrateurs et moderateurs peuvent gerer la fermeture.",
+                        )
+                        .ephemeral(true),
+                ),
+            )
+            .await
+        {
             warn!(error = %e, "Failed to send staff-only cancel rejection");
         }
         return;
     }
 
-    if let Err(e) = component.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!(
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(
+                format!(
                     "<@{}> a decide de garder ce ticket ouvert. La discussion continue.",
                     component.user.id
-                ))
-        ),
-    ).await {
+                ),
+            )),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send cancel close response");
     }
 }
 
 /// Gere le clic sur un bouton de satisfaction (1-5 etoiles).
 pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInteraction) {
-    let rating = match crate::modules::tickets::satisfaction::extract_rating(&component.data.custom_id) {
-        Some(r) => r,
-        None => return,
-    };
+    let rating =
+        match crate::modules::tickets::satisfaction::extract_rating(&component.data.custom_id) {
+            Some(r) => r,
+            None => return,
+        };
 
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let ticket_id = crate::modules::tickets::satisfaction::extract_ticket_id(&component.data.custom_id);
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let ticket_id =
+        crate::modules::tickets::satisfaction::extract_ticket_id(&component.data.custom_id);
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -474,14 +523,20 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
                 ),
             );
         }
-        if let (Some(tid), Some(api)) = (ticket_id, crate::modules::tickets::api_client::ApiClient::from_data(&data)) {
+        if let (Some(tid), Some(api)) = (
+            ticket_id,
+            crate::modules::tickets::api_client::ApiClient::from_data(&data),
+        ) {
             api.update_ticket_sla(tid, None, None, Some(rating)).await;
         }
     }
 
     let response = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content(format!("Merci pour votre retour ! Vous avez donne **{}/5** etoiles.", rating))
+            .content(format!(
+                "Merci pour votre retour ! Vous avez donne **{}/5** etoiles.",
+                rating
+            ))
             .ephemeral(true),
     );
 

@@ -4,21 +4,21 @@
 
 use std::sync::Arc;
 
-use tonic::Request;
-use tonic::Response;
-use tonic::Status;
 use sentinel_proto::common::v1 as proto_common;
 use sentinel_proto::progression::v1 as proto;
 use sentinel_proto::progression::v1::progression_service_server::ProgressionService;
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_core::domain::entities::community::level::xp_progress;
-use sentinel_core::domain::entities::community::level::UserLevel;
-use sentinel_core::domain::entities::community::level::XpSource;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_core::domain::entities::community::level::xp_progress;
+use sentinel_core::domain::entities::community::level::UserLevel;
+use sentinel_core::domain::entities::community::level::XpSource;
 pub struct ProgressionGrpc {
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
@@ -79,7 +79,11 @@ impl ProgressionService for ProgressionGrpc {
         request: Request<proto::GetLeaderboardRequest>,
     ) -> Result<Response<proto::Leaderboard>, Status> {
         let req = request.into_inner();
-        let limit = if req.limit <= 0 { 25 } else { req.limit.min(100) };
+        let limit = if req.limit <= 0 {
+            25
+        } else {
+            req.limit.min(100)
+        };
         let users = match xp_source_opt_from_proto(req.source) {
             Some(src) => self
                 .levels_uc
@@ -157,7 +161,6 @@ fn add_xp_result_to_proto(r: AddXpResult) -> proto::AddXpResponse {
         source: xp_source_to_proto(r.source),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/progression.rs"]

@@ -5,10 +5,10 @@
 //! `/automod` cote web consomme ce endpoint pour la timeline des
 //! detections automod.
 
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
@@ -20,16 +20,16 @@ use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::SuggestedAction;
-use sentinel_core::domain::errors::DomainError;
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
-use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::MessageId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::errors::DomainError;
 #[derive(Debug, Deserialize)]
 pub struct DetectionQuery {
     /// Defaut 50, max 200.
@@ -45,7 +45,6 @@ pub async fn list_detections(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<DetectionQuery>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
-
     // Filtre `action = "detection"` : seules les detections automod, pas
     // les actions de moderation (warn/mute/ban...).
     let filters = InfractionFilters {
@@ -138,9 +137,15 @@ pub struct ReviewVoteDto {
     pub vote_action: String,
 }
 
-impl From<sentinel_core::domain::entities::moderation::review::automod::ReviewVote> for ReviewVoteDto {
+impl From<sentinel_core::domain::entities::moderation::review::automod::ReviewVote>
+    for ReviewVoteDto
+{
     fn from(v: sentinel_core::domain::entities::moderation::review::automod::ReviewVote) -> Self {
-        Self { voter_id: v.voter_id, voter_name: v.voter_name, vote_action: v.vote_action }
+        Self {
+            voter_id: v.voter_id,
+            voter_name: v.voter_name,
+            vote_action: v.vote_action,
+        }
     }
 }
 
@@ -159,9 +164,15 @@ pub async fn list_reviews(
 ) -> Result<Json<Vec<AutomodReviewDto>>, ApiError> {
     let limit = params.limit.unwrap_or(100).clamp(1, 500);
     let reviews = if params.include_resolved.unwrap_or(false) {
-        state.automod_reviews_uc.list_recent(&guild_id, limit).await?
+        state
+            .automod_reviews_uc
+            .list_recent(&guild_id, limit)
+            .await?
     } else {
-        state.automod_reviews_uc.list_pending(&guild_id, limit).await?
+        state
+            .automod_reviews_uc
+            .list_pending(&guild_id, limit)
+            .await?
     };
     // Enrichit chaque carte avec son salon de discussion (si ouvert) pour le web.
     let mut dtos: Vec<AutomodReviewDto> = Vec::with_capacity(reviews.len());
@@ -241,7 +252,11 @@ pub async fn create_review(
 
     // Notification web : creation OU mise a jour (agregation) d'une review.
     state.broadcaster.broadcast(
-        if merged { "automod_review_updated" } else { "automod_review_created" },
+        if merged {
+            "automod_review_updated"
+        } else {
+            "automod_review_created"
+        },
         serde_json::json!({
             "review_id": review.id.to_string(),
             "guild_id": &review.guild_id,
@@ -318,7 +333,11 @@ async fn log_review_sanction(
         target_name: review.user_name.clone(),
         action_type: applied_action.to_string(),
         reason: "Sanction validee via carte AutoMod".to_string(),
-        gravity: if applied_action == "warn" { Some("medium".to_string()) } else { None },
+        gravity: if applied_action == "warn" {
+            Some("medium".to_string())
+        } else {
+            None
+        },
         duration,
     };
     let logged = match state.moderation_uc.log_action_with_strike(cmd).await {
@@ -382,13 +401,15 @@ pub async fn resolve_review(
     // Faits du demandeur seulement pour la finalisation Discord (la source
     // "web" est autorisee par guild_auth en amont -> requester None).
     let requester = if source == "discord" {
-        Some(sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
-            is_admin: body.is_admin,
-            has_moderate_members: body.has_moderate_members,
-            has_manage_messages: body.has_manage_messages,
-            has_mod_role: body.has_mod_role,
-            has_admin_role: body.has_admin_role,
-        })
+        Some(
+            sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+                is_admin: body.is_admin,
+                has_moderate_members: body.has_moderate_members,
+                has_manage_messages: body.has_manage_messages,
+                has_mod_role: body.has_mod_role,
+                has_admin_role: body.has_admin_role,
+            },
+        )
     } else {
         None
     };
@@ -408,7 +429,11 @@ pub async fn resolve_review(
     // meme requete que la resolution (le bot n'a plus a faire un 2e appel
     // HTTP -> plus de fenetre "resolu mais non logge" cote bot).
     log_review_sanction(
-        &state, &review, &body.applied_action, &body.resolved_by_id, &body.resolved_by_name,
+        &state,
+        &review,
+        &body.applied_action,
+        &body.resolved_by_id,
+        &body.resolved_by_name,
     )
     .await;
 
@@ -460,13 +485,15 @@ fn discord_facts_or_none(
     has_admin_role: bool,
 ) -> Option<sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts> {
     if source == "discord" {
-        Some(sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
-            is_admin,
-            has_moderate_members,
-            has_manage_messages,
-            has_mod_role,
-            has_admin_role,
-        })
+        Some(
+            sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+                is_admin,
+                has_moderate_members,
+                has_manage_messages,
+                has_mod_role,
+                has_admin_role,
+            },
+        )
     } else {
         None
     }
@@ -486,8 +513,12 @@ pub async fn ignore_review(
         _ => "web",
     };
     let requester = discord_facts_or_none(
-        source, body.is_admin, body.has_moderate_members, body.has_manage_messages,
-        body.has_mod_role, body.has_admin_role,
+        source,
+        body.is_admin,
+        body.has_moderate_members,
+        body.has_manage_messages,
+        body.has_mod_role,
+        body.has_admin_role,
     );
     let review = state
         .automod_reviews_uc
@@ -548,8 +579,12 @@ pub async fn reopen_review(
         _ => "web",
     };
     let requester = discord_facts_or_none(
-        source, body.is_admin, body.has_moderate_members, body.has_manage_messages,
-        body.has_mod_role, body.has_admin_role,
+        source,
+        body.is_admin,
+        body.has_moderate_members,
+        body.has_manage_messages,
+        body.has_mod_role,
+        body.has_admin_role,
     );
     let review = state
         .automod_reviews_uc
@@ -602,19 +637,22 @@ pub async fn vote_review(
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let votes = state
         .automod_reviews_uc
-        .cast_vote(crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
-            review_id: id,
-            voter_id: body.voter_id.clone(),
-            voter_name: body.voter_name.clone(),
-            vote_action: body.vote_action.clone(),
-            requester: sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
-                is_admin: body.is_admin,
-                has_moderate_members: body.has_moderate_members,
-                has_manage_messages: body.has_manage_messages,
-                has_mod_role: body.has_mod_role,
-                has_admin_role: false,
+        .cast_vote(
+            crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
+                review_id: id,
+                voter_id: body.voter_id.clone(),
+                voter_name: body.voter_name.clone(),
+                vote_action: body.vote_action.clone(),
+                requester:
+                    sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
+                        is_admin: body.is_admin,
+                        has_moderate_members: body.has_moderate_members,
+                        has_manage_messages: body.has_manage_messages,
+                        has_mod_role: body.has_mod_role,
+                        has_admin_role: false,
+                    },
             },
-        })
+        )
         .await?;
     state.broadcaster.broadcast(
         "automod_review_voted",
@@ -638,7 +676,9 @@ pub async fn get_review(
             }
             Ok(Json(dto))
         }
-        None => Err(ApiError::from(DomainError::NotFound(format!("review {review_id} introuvable")))),
+        None => Err(ApiError::from(DomainError::NotFound(format!(
+            "review {review_id} introuvable"
+        )))),
     }
 }
 
@@ -671,7 +711,10 @@ pub async fn decide_review(
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let quorum = body.quorum.clamp(1, 100) as usize;
-    let (review, tally) = state.automod_reviews_uc.decide(id, quorum, &body.tie_action).await?;
+    let (review, tally) = state
+        .automod_reviews_uc
+        .decide(id, quorum, &body.tie_action)
+        .await?;
     state.broadcaster.broadcast(
         "automod_review_decided",
         serde_json::json!({
@@ -726,7 +769,9 @@ pub async fn get_discussion(
 ) -> Result<Json<Option<DiscussionChannelDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let existing = state.automod_reviews_uc.get_discussion(id).await?;
-    Ok(Json(existing.map(|d| DiscussionChannelDto::build(d, false))))
+    Ok(Json(
+        existing.map(|d| DiscussionChannelDto::build(d, false)),
+    ))
 }
 
 /// DELETE /api/automod/reviews/{review_id}/discussion
@@ -766,8 +811,8 @@ pub async fn open_discussion(
     Path(review_id): Path<String>,
     Json(body): Json<OpenDiscussionBody>,
 ) -> Result<Json<DiscussionChannelDto>, ApiError> {
-    use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
     use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
+    use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
 
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
 
@@ -864,7 +909,10 @@ pub async fn append_discussion_messages(
         })
         .collect();
 
-    let inserted = state.automod_reviews_uc.append_discussion_messages(messages).await?;
+    let inserted = state
+        .automod_reviews_uc
+        .append_discussion_messages(messages)
+        .await?;
     Ok(Json(serde_json::json!({ "inserted": inserted })))
 }
 
@@ -926,7 +974,10 @@ pub async fn list_discussion_messages(
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<DiscussionMessageDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-    let msgs = state.automod_reviews_uc.list_discussion_messages(id).await?;
+    let msgs = state
+        .automod_reviews_uc
+        .list_discussion_messages(id)
+        .await?;
     let dtos = msgs
         .into_iter()
         .map(|m| DiscussionMessageDto {

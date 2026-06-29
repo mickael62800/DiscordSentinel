@@ -7,9 +7,7 @@
 //!
 //! Plus le `build_notification_embed` pour le ping dans le salon notifications.
 
-use serenity::all::{
-    ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter,
-};
+use serenity::all::{ButtonStyle, CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter};
 use serenity::model::id::UserId;
 
 const FOOTER: &str = crate::shared::branding::COUDE_TAGLINE_SHORT;

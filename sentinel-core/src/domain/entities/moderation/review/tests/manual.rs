@@ -9,7 +9,10 @@ fn evidence_url_accepts_valid() {
 
 #[test]
 fn evidence_url_rejects_empty() {
-    assert_eq!(validate_evidence_url("").unwrap_err(), "url vide ou trop longue (max 2000)");
+    assert_eq!(
+        validate_evidence_url("").unwrap_err(),
+        "url vide ou trop longue (max 2000)"
+    );
 }
 
 #[test]

@@ -6,8 +6,8 @@
 //!   combat de 50 % (ou les double si c'est une arnaque, configure
 //!   par guild).
 
-use serde::Deserialize;
 use sentinel_proto::coude::v1 as proto_coude;
+use serde::Deserialize;
 
 use super::{grpc_err_to_string, proto_prime_to_dto, ApiClient, Insurance, Prime};
 
@@ -38,9 +38,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_inventory();
         let p = self
             .grpc
-            .guarded(|| async move {
-                client.create_prime(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.create_prime(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(proto_prime_to_dto(p))
@@ -58,9 +56,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_inventory();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_active_primes(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_active_primes(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list.primes.into_iter().map(proto_prime_to_dto).collect())
@@ -82,9 +78,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_inventory();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.claim_primes(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.claim_primes(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.value)
@@ -129,7 +123,12 @@ impl ApiClient {
             duration_seconds: i64,
             level: i32,
         }
-        let body = Body { user_id, scam_rate_pct, duration_seconds, level };
+        let body = Body {
+            user_id,
+            scam_rate_pct,
+            duration_seconds,
+            level,
+        };
         self.base
             .post_json(
                 &format!("/api/coude/{guild_id}/insurance/buy-with-roll"),
@@ -151,7 +150,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.get_active_insurance(req).await.map(|r| r.into_inner())
+                client
+                    .get_active_insurance(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;

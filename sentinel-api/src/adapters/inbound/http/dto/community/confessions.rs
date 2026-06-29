@@ -41,7 +41,9 @@ pub struct CreateReplyDto {
     #[serde(default = "default_true")]
     pub is_anonymous: bool,
 }
-fn default_true() -> bool { true }
+fn default_true() -> bool {
+    true
+}
 
 #[derive(Debug, Deserialize)]
 pub struct UpdateReplyMessageDto {

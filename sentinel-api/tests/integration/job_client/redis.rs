@@ -32,9 +32,15 @@ async fn enqueue_pushes_job_to_redis_queue() {
     let queue = fresh_queue();
     let jc = JobClient::new(c.clone(), queue.clone());
 
-    jc.enqueue("analyze_message", json!({"content": "hello", "guild_id": "g1"})).await;
+    jc.enqueue(
+        "analyze_message",
+        json!({"content": "hello", "guild_id": "g1"}),
+    )
+    .await;
 
-    let raw = wait_and_pop(&c, &queue).await.expect("queue doit contenir 1 job");
+    let raw = wait_and_pop(&c, &queue)
+        .await
+        .expect("queue doit contenir 1 job");
     let parsed: serde_json::Value = serde_json::from_str(&raw).unwrap();
     assert_eq!(parsed["type"], "analyze_message");
     assert_eq!(parsed["payload"]["content"], "hello");

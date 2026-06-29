@@ -14,8 +14,8 @@
 //! increment_cowardice/chaos, record_coins_earned/lost, spend_stat_point,
 //! reset_stats, repos.
 
-use sentinel_proto::coude::v1 as proto_coude;
 use crate::shared::grpc_client::GrpcCallError;
+use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, proto_player_to_dto, ApiClient, CowardiceResponse, Player};
 
@@ -35,7 +35,10 @@ impl ApiClient {
         let p = self
             .grpc
             .guarded(|| async move {
-                client.get_or_create_player(req).await.map(|r| r.into_inner())
+                client
+                    .get_or_create_player(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -76,9 +79,7 @@ impl ApiClient {
         };
         let mut client = self.grpc.coude_players();
         self.grpc
-            .guarded(|| async move {
-                client.update_player_class(req).await.map(|_| ())
-            })
+            .guarded(|| async move { client.update_player_class(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
     }
@@ -182,11 +183,7 @@ impl ApiClient {
         Ok(())
     }
 
-    pub async fn increment_cowardice(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i32, String> {
+    pub async fn increment_cowardice(&self, guild_id: &str, user_id: &str) -> Result<i32, String> {
         let resp: CowardiceResponse = self
             .base
             .post_json(

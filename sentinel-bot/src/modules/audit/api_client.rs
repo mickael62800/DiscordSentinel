@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
-use serde::Serialize;
 use crate::shared::api_client::BaseApiClient;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct AuditEvent {
@@ -32,10 +32,7 @@ impl ApiClient {
         event_type: Option<&str>,
         limit: u32,
     ) -> Result<Vec<serde_json::Value>, String> {
-        let mut path = format!(
-            "/api/audit-logs?guild_id={}&limit={}",
-            guild_id, limit
-        );
+        let mut path = format!("/api/audit-logs?guild_id={}&limit={}", guild_id, limit);
         if let Some(tid) = target_id {
             path.push_str(&format!("&target_id={}", tid));
         }
@@ -49,14 +46,16 @@ impl ApiClient {
     /// Recupere les IDs de tous les utilisateurs surveilles (batch, tous les serveurs).
     /// Un seul appel API au lieu de N appels par guild.
     pub async fn get_all_watched_user_ids(&self) -> Result<Vec<String>, String> {
-        let users: Vec<serde_json::Value> = self
-            .base
-            .get_json("/api/watched-users?limit=1000")
-            .await?;
+        let users: Vec<serde_json::Value> =
+            self.base.get_json("/api/watched-users?limit=1000").await?;
 
         Ok(users
             .iter()
-            .filter_map(|u| u.get("user_id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+            .filter_map(|u| {
+                u.get("user_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+            })
             .collect())
     }
 
@@ -81,7 +80,9 @@ impl ApiClient {
             "metadata": metadata,
         });
 
-        self.base.post_fire_and_forget("/api/user-activity", &payload).await;
+        self.base
+            .post_fire_and_forget("/api/user-activity", &payload)
+            .await;
         Ok(())
     }
 

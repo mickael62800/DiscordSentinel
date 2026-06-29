@@ -51,7 +51,9 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         window_minutes: i64,
     ) -> Result<(AutomodReview, bool), DomainError> {
         crate::application::validation::validate_guild_id(&review.guild_id)?;
-        self.repo.create_or_merge(review, aggregate, window_minutes).await
+        self.repo
+            .create_or_merge(review, aggregate, window_minutes)
+            .await
     }
 
     async fn get(&self, id: Uuid) -> Result<Option<AutomodReview>, DomainError> {
@@ -125,10 +127,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             .await
     }
 
-    async fn close_ignored(
-        &self,
-        cmd: CloseIgnoredCommand,
-    ) -> Result<AutomodReview, DomainError> {
+    async fn close_ignored(&self, cmd: CloseIgnoredCommand) -> Result<AutomodReview, DomainError> {
         if !matches!(cmd.source.as_str(), "web" | "discord") {
             return Err(DomainError::ValidationError(
                 "source doit etre 'web' ou 'discord'".into(),
@@ -169,7 +168,9 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     async fn cast_vote(&self, cmd: CastVoteCommand) -> Result<Vec<ReviewVote>, DomainError> {
         // Regle d'acces (domaine) : seul un moderateur peut voter.
         if !crate::domain::entities::moderation::review::automod::is_moderator(&cmd.requester) {
-            return Err(DomainError::Forbidden("Tu n'es pas autorise a voter.".into()));
+            return Err(DomainError::Forbidden(
+                "Tu n'es pas autorise a voter.".into(),
+            ));
         }
         if AppliedAction::from_str(&cmd.vote_action).is_none() {
             return Err(DomainError::ValidationError(format!(
@@ -181,7 +182,12 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             return Err(DomainError::ValidationError("voter_id requis".into()));
         }
         self.repo
-            .upsert_vote(cmd.review_id, &cmd.voter_id, &cmd.voter_name, &cmd.vote_action)
+            .upsert_vote(
+                cmd.review_id,
+                &cmd.voter_id,
+                &cmd.voter_name,
+                &cmd.vote_action,
+            )
             .await?;
         self.repo.list_votes(cmd.review_id).await
     }
@@ -226,15 +232,26 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     async fn get_discussion(
         &self,
         review_id: Uuid,
-    ) -> Result<Option<crate::domain::entities::moderation::review::automod::DiscussionChannel>, DomainError> {
+    ) -> Result<
+        Option<crate::domain::entities::moderation::review::automod::DiscussionChannel>,
+        DomainError,
+    > {
         self.repo.find_discussion(review_id).await
     }
 
     async fn open_discussion(
         &self,
         cmd: crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand,
-    ) -> Result<(crate::domain::entities::moderation::review::automod::DiscussionChannel, bool), DomainError> {
-        use crate::domain::entities::moderation::review::automod::{can_open_discussion, NewDiscussionChannel};
+    ) -> Result<
+        (
+            crate::domain::entities::moderation::review::automod::DiscussionChannel,
+            bool,
+        ),
+        DomainError,
+    > {
+        use crate::domain::entities::moderation::review::automod::{
+            can_open_discussion, NewDiscussionChannel,
+        };
 
         // Regle d'acces (domaine) : le demandeur doit etre moderateur.
         if !can_open_discussion(&cmd.requester) {
@@ -286,7 +303,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     async fn list_discussion_messages(
         &self,
         review_id: Uuid,
-    ) -> Result<Vec<crate::domain::entities::moderation::review::automod::DiscussionMessage>, DomainError> {
+    ) -> Result<
+        Vec<crate::domain::entities::moderation::review::automod::DiscussionMessage>,
+        DomainError,
+    > {
         self.repo.list_discussion_messages(review_id).await
     }
 }

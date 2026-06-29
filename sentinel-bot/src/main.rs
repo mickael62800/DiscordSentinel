@@ -17,11 +17,14 @@ use tracing::info;
 
 use crate::shared::config::BotConfig;
 use crate::shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
-use crate::shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+use crate::shared::heartbeat::{spawn_heartbeat, ApiClientKey};
 
 use crate::config::Config;
 use crate::handler::Handler;
-use crate::modules::{audit, automod, blackjack, community, coude, moderation, progression, security, slot, tickets, voice};
+use crate::modules::{
+    audit, automod, blackjack, community, coude, moderation, progression, security, slot, tickets,
+    voice,
+};
 
 #[tokio::main]
 async fn main() {
@@ -34,7 +37,10 @@ async fn main() {
     let config = Config::from_env();
     info!("Demarrage de Sentinel Bot (unifie)");
 
-    let api = Arc::new(crate::shared::api_client::BaseApiClient::new(&config, "sentinel-bot"));
+    let api = Arc::new(crate::shared::api_client::BaseApiClient::new(
+        &config,
+        "sentinel-bot",
+    ));
 
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),

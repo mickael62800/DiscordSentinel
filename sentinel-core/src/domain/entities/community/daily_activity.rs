@@ -1,6 +1,6 @@
+use crate::domain::entities::system::discord_ids::GuildId;
 use chrono::NaiveDate;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]

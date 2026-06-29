@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 
+use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 pub struct PgDiscordRoleRepository {
     pool: PgPool,
@@ -53,7 +53,10 @@ impl From<DiscordRoleRow> for DiscordRole {
 impl DiscordRoleRepository for PgDiscordRoleRepository {
     async fn sync_roles(&self, guild_id: &str, roles: Vec<DiscordRole>) -> Result<(), DomainError> {
         // Supprimer les anciens roles du guild puis inserer les nouveaux
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("Transaction error", e))?;
 
         sqlx::query("DELETE FROM discord_roles WHERE guild_id = $1")
@@ -82,7 +85,8 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
             .map_err(|e| pg_err_ctx("Insert role error", e))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("Commit error", e))?;
 
         Ok(())
@@ -100,7 +104,11 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
         Ok(rows.into_iter().map(DiscordRole::from).collect())
     }
 
-    async fn find_by_id(&self, guild_id: &str, role_id: &str) -> Result<Option<DiscordRole>, DomainError> {
+    async fn find_by_id(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+    ) -> Result<Option<DiscordRole>, DomainError> {
         let row = sqlx::query_as::<_, DiscordRoleRow>(
             "SELECT id, guild_id, name, color, position, permissions, mentionable, managed, icon, member_count, synced_at \
              FROM discord_roles WHERE guild_id = $1 AND id = $2"

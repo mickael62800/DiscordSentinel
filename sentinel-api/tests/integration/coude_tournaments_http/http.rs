@@ -17,11 +17,18 @@ use sentinel_api::adapters::inbound::http::router;
 use sentinel_core::domain::entities::coude::tournament::current_week_bounds;
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn state() -> sentinel_api::adapters::inbound::http::state::AppState {
@@ -29,14 +36,18 @@ fn state() -> sentinel_api::adapters::inbound::http::state::AppState {
 }
 
 async fn pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     sqlx::PgPool::connect(&url).await.unwrap()
 }
 
 // Guild isole par test — max 20 chars (VARCHAR(20) sur les Discord IDs).
 fn fresh_guild_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ── current ──
@@ -62,16 +73,30 @@ async fn current_tournament_standings_ranked_by_net_gain() {
 
     // Seed user_wallets pour avoir des usernames.
     for (uid, name) in [("u1", "Alice"), ("u2", "Bob"), ("u3", "Carol")] {
-        sqlx::query("INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, $3, 0)")
-            .bind(&g).bind(uid).bind(name).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, $3, 0)",
+        )
+        .bind(&g)
+        .bind(uid)
+        .bind(name)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
     // u1: +500, u2: +200, u3: -100 -> ordre attendu u1, u2, u3.
     for (uid, amt) in [("u1", 500i64), ("u1", -100), ("u2", 200), ("u3", -100)] {
-        sqlx::query("INSERT INTO wallet_transactions \
+        sqlx::query(
+            "INSERT INTO wallet_transactions \
             (guild_id, user_id, amount, balance_after, source, created_at) \
-            VALUES ($1, $2, $3, 0, 'test', $4)")
-            .bind(&g).bind(uid).bind(amt).bind(mid_week)
-            .execute(&pool).await.unwrap();
+            VALUES ($1, $2, $3, 0, 'test', $4)",
+        )
+        .bind(&g)
+        .bind(uid)
+        .bind(amt)
+        .bind(mid_week)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
     // Cashbox : prize_pool = 10% * 10000 = 1000.
     sqlx::query("INSERT INTO coude_cashbox (guild_id, balance) VALUES ($1, 10000) ON CONFLICT (guild_id) DO UPDATE SET balance = EXCLUDED.balance")
@@ -97,11 +122,16 @@ async fn current_tournament_falls_back_to_question_mark_when_no_wallet() {
     let pool = pool().await;
     let g = fresh_guild_id();
     let (ws, _we) = current_week_bounds();
-    sqlx::query("INSERT INTO wallet_transactions \
+    sqlx::query(
+        "INSERT INTO wallet_transactions \
         (guild_id, user_id, amount, balance_after, source, created_at) \
-        VALUES ($1, 'stranger', 100, 0, 'test', $2)")
-        .bind(&g).bind(ws + chrono::Duration::hours(1))
-        .execute(&pool).await.unwrap();
+        VALUES ($1, 'stranger', 100, 0, 'test', $2)",
+    )
+    .bind(&g)
+    .bind(ws + chrono::Duration::hours(1))
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let app = router::build_for_test(state());
     let (_, j) = get(app, &format!("/api/coude/{g}/tournaments/current")).await;
@@ -114,7 +144,11 @@ async fn current_tournament_falls_back_to_question_mark_when_no_wallet() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn tournament_history_empty_guild_returns_empty_array() {
     let app = router::build_for_test(state());
-    let (s, j) = get(app, &format!("/api/coude/{}/tournaments/history", fresh_guild_id())).await;
+    let (s, j) = get(
+        app,
+        &format!("/api/coude/{}/tournaments/history", fresh_guild_id()),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert!(j.as_array().unwrap().is_empty());
 }
@@ -124,7 +158,11 @@ async fn tournament_history_returns_seeded_rows_ordered_desc() {
     let pool = pool().await;
     let g = fresh_guild_id();
     let now = chrono::Utc::now();
-    for (offset_weeks, status, prize) in [(4i64, "resolved", 500i64), (2, "resolved", 800), (1, "ongoing", 0)] {
+    for (offset_weeks, status, prize) in [
+        (4i64, "resolved", 500i64),
+        (2, "resolved", 800),
+        (1, "ongoing", 0),
+    ] {
         let ws = now - chrono::Duration::weeks(offset_weeks);
         sqlx::query(
             "INSERT INTO coude_weekly_tournaments \

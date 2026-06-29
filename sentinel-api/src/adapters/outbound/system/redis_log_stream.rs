@@ -84,8 +84,7 @@ pub async fn xrevrange_logs(
     limit: usize,
 ) -> Vec<LogEntry> {
     let key = stream_key(category);
-    let read_count = (limit.saturating_mul(if level.is_some() { 4 } else { 1 }))
-        .min(STREAM_MAXLEN);
+    let read_count = (limit.saturating_mul(if level.is_some() { 4 } else { 1 })).min(STREAM_MAXLEN);
 
     let mut conn = match client.get_multiplexed_async_connection().await {
         Ok(c) => c,
@@ -115,9 +114,13 @@ pub async fn xrevrange_logs(
 
     let mut out = Vec::with_capacity(raw.len().min(limit));
     for (_id, fields) in raw {
-        let json = fields.iter().find_map(|(k, v)| (k == FIELD).then_some(v.as_str()));
+        let json = fields
+            .iter()
+            .find_map(|(k, v)| (k == FIELD).then_some(v.as_str()));
         let Some(json) = json else { continue };
-        let Ok(entry) = serde_json::from_str::<LogEntry>(json) else { continue };
+        let Ok(entry) = serde_json::from_str::<LogEntry>(json) else {
+            continue;
+        };
         if let Some(lv) = level {
             if entry.level != lv {
                 continue;

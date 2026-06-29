@@ -7,10 +7,10 @@
 mod challenge_ui;
 
 use serenity::all::{
-    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction,
-    Context, CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
-    CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
-    EditInteractionResponse, UserId,
+    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType,
+    ComponentInteraction, Context, CreateActionRow, CreateButton, CreateCommand,
+    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage, EditInteractionResponse, UserId,
 };
 
 use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
@@ -54,29 +54,42 @@ pub fn register() -> CreateCommand {
             .min_int_value(1),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "special", "Attaque speciale (item)")
-                .required(false)
-                .add_string_choice("Attaque surprise", "surprise")
-                .add_string_choice("Double coup", "double_coup")
-                .add_string_choice("Coup traitre", "coup_traitre")
-                .add_string_choice("Rage", "rage")
-                .add_string_choice("Poison", "poison")
-                .add_string_choice("Mindgame", "mindgame")
-                .add_string_choice("Bouclier", "bouclier")
-                .add_string_choice("Antidote", "antidote")
-                .add_string_choice("Explosion", "explosion"),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "special",
+                "Attaque speciale (item)",
+            )
+            .required(false)
+            .add_string_choice("Attaque surprise", "surprise")
+            .add_string_choice("Double coup", "double_coup")
+            .add_string_choice("Coup traitre", "coup_traitre")
+            .add_string_choice("Rage", "rage")
+            .add_string_choice("Poison", "poison")
+            .add_string_choice("Mindgame", "mindgame")
+            .add_string_choice("Bouclier", "bouclier")
+            .add_string_choice("Antidote", "antidote")
+            .add_string_choice("Explosion", "explosion"),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_combats()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_combats())
+        .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -167,7 +180,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // cliquer l'attaquant pour ensuite lui dire qu'il est en KO.
     let hp_current_now = attacker.hp_current.unwrap_or(100);
     let hp_max_now = attacker.hp_max.unwrap_or(100);
-    let hp_pct_now = if hp_max_now > 0 { (hp_current_now * 100) / hp_max_now } else { 0 };
+    let hp_pct_now = if hp_max_now > 0 {
+        (hp_current_now * 100) / hp_max_now
+    } else {
+        0
+    };
     if hp_pct_now < 10 {
         crate::modules::coude::interaction_helper::followup_text(
             ctx,
@@ -215,8 +232,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Matchmaking check (handicap sera recalcule apres la confirmation)
     let level_gap = (attacker.level - defender_player.level).abs();
-    let (_handicap, blocked) =
-        catalog.matchmaking_handicap(attacker.level, defender_player.level);
+    let (_handicap, blocked) = catalog.matchmaking_handicap(attacker.level, defender_player.level);
 
     if blocked {
         crate::modules::coude::interaction_helper::followup_text(
@@ -280,16 +296,21 @@ async fn build_preconfirm_payload(
     let api = data.get::<GameApiKey>().unwrap();
 
     if mise < config.min_bet() {
-        return Err(format!("La mise minimum est de {} coins.", config.min_bet()));
+        return Err(format!(
+            "La mise minimum est de {} coins.",
+            config.min_bet()
+        ));
     }
     if mise > config.max_bet() {
-        return Err(format!("La mise maximum est de {} coins.", config.max_bet()));
+        return Err(format!(
+            "La mise maximum est de {} coins.",
+            config.max_bet()
+        ));
     }
 
     let attacker = api
         .get_or_create_player(guild_id, &attacker_user.id.to_string(), &attacker_user.name)
-        .await
-        ?;
+        .await?;
 
     if attacker.coins < mise {
         return Err(format!(
@@ -308,16 +329,22 @@ async fn build_preconfirm_payload(
     if let Some(item_key) = special {
         let has = api
             .has_item(guild_id, &attacker_user.id.to_string(), item_key)
-            .await
-            ?;
+            .await?;
         if !has {
-            return Err(format!("Tu n'as pas l'objet **{}** dans ton inventaire !", item_key));
+            return Err(format!(
+                "Tu n'as pas l'objet **{}** dans ton inventaire !",
+                item_key
+            ));
         }
     }
 
     let hp_current = attacker.hp_current.unwrap_or(100);
     let hp_max = attacker.hp_max.unwrap_or(100);
-    let hp_pct = if hp_max > 0 { (hp_current * 100) / hp_max } else { 0 };
+    let hp_pct = if hp_max > 0 {
+        (hp_current * 100) / hp_max
+    } else {
+        0
+    };
     let hp_warn = if hp_pct <= 25 {
         "\n\n\u{26a0}\u{fe0f} **Tu es tres bas en PV !** Si tu lances ce combat tu risques une faillite HP rapide."
     } else if hp_pct <= 50 {
@@ -416,7 +443,11 @@ fn build_mise_pick_ui(
     let mut buttons: Vec<CreateButton> = Vec::new();
     let mut seen_amounts: Vec<i64> = Vec::new();
 
-    let add_btn = |amount: i64, label: String, style: ButtonStyle, seen: &mut Vec<i64>, btns: &mut Vec<CreateButton>| {
+    let add_btn = |amount: i64,
+                   label: String,
+                   style: ButtonStyle,
+                   seen: &mut Vec<i64>,
+                   btns: &mut Vec<CreateButton>| {
         if amount < min_bet || amount > max_bet || amount > attacker_coins {
             return;
         }
@@ -424,7 +455,10 @@ fn build_mise_pick_ui(
             return;
         }
         seen.push(amount);
-        let cid = format!("{}{}|{}|{}", MISE_PICK_PREFIX, target_id, amount, special_for_id);
+        let cid = format!(
+            "{}{}|{}|{}",
+            MISE_PICK_PREFIX, target_id, amount, special_for_id
+        );
         btns.push(CreateButton::new(cid).label(label).style(style));
     };
 
@@ -435,8 +469,20 @@ fn build_mise_pick_ui(
         &mut seen_amounts,
         &mut buttons,
     );
-    add_btn(50, "50c".into(), ButtonStyle::Secondary, &mut seen_amounts, &mut buttons);
-    add_btn(100, "100c".into(), ButtonStyle::Secondary, &mut seen_amounts, &mut buttons);
+    add_btn(
+        50,
+        "50c".into(),
+        ButtonStyle::Secondary,
+        &mut seen_amounts,
+        &mut buttons,
+    );
+    add_btn(
+        100,
+        "100c".into(),
+        ButtonStyle::Secondary,
+        &mut seen_amounts,
+        &mut buttons,
+    );
     if all_in > 0 && all_in != suggested {
         add_btn(
             all_in,
@@ -458,7 +504,10 @@ fn build_mise_pick_ui(
         );
     }
 
-    let cancel_cid = format!("{}{}|0|{}", MISE_PICK_CANCEL_PREFIX, target_id, special_for_id);
+    let cancel_cid = format!(
+        "{}{}|0|{}",
+        MISE_PICK_CANCEL_PREFIX, target_id, special_for_id
+    );
     buttons.push(
         CreateButton::new(cancel_cid)
             .label("Annuler")
@@ -489,13 +538,14 @@ fn build_mise_pick_ui(
 /// Handler du clic sur un bouton de mise rapide (1.2). Re-fait toutes les
 /// validations puis emet le preconfirm habituel en remplacement de l UI pick.
 pub async fn handle_pick_mise(ctx: &Context, component: &ComponentInteraction) {
-    let (target_id_str, mise, special) = match parse_preconfirm_id(&component.data.custom_id, MISE_PICK_PREFIX) {
-        Some(x) => x,
-        None => {
-            edit_component_message(ctx, component, "Custom id invalide.").await;
-            return;
-        }
-    };
+    let (target_id_str, mise, special) =
+        match parse_preconfirm_id(&component.data.custom_id, MISE_PICK_PREFIX) {
+            Some(x) => x,
+            None => {
+                edit_component_message(ctx, component, "Custom id invalide.").await;
+                return;
+            }
+        };
 
     let guild_id = match component.guild_id {
         Some(id) => id.to_string(),
@@ -521,7 +571,11 @@ pub async fn handle_pick_mise(ctx: &Context, component: &ComponentInteraction) {
     };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    let special_opt = if special == "-" { None } else { Some(special.as_str()) };
+    let special_opt = if special == "-" {
+        None
+    } else {
+        Some(special.as_str())
+    };
 
     match build_preconfirm_payload(
         ctx,
@@ -565,13 +619,14 @@ pub async fn handle_pick_cancel(ctx: &Context, component: &ComponentInteraction)
 /// combat. Parse le custom_id, rejoue les validations minimales, consomme
 /// l'item eventuel puis cree le combat et poste le defi normal.
 pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteraction) {
-    let (target_id_str, mise, special) = match parse_preconfirm_id(&component.data.custom_id, PRECONFIRM_OK_PREFIX) {
-        Some(x) => x,
-        None => {
-            edit_component_message(ctx, component, "Custom id invalide.").await;
-            return;
-        }
-    };
+    let (target_id_str, mise, special) =
+        match parse_preconfirm_id(&component.data.custom_id, PRECONFIRM_OK_PREFIX) {
+            Some(x) => x,
+            None => {
+                edit_component_message(ctx, component, "Custom id invalide.").await;
+                return;
+            }
+        };
 
     let guild_id = match component.guild_id {
         Some(id) => id.to_string(),
@@ -630,7 +685,11 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     // Re-fetch attacker pour check coins a jour (un vol/combat a pu passer
     // entre le /coude et le clic sur Confirmer).
     let attacker = match api
-        .get_or_create_player(&guild_id, &attacker_user.id.to_string(), &attacker_user.name)
+        .get_or_create_player(
+            &guild_id,
+            &attacker_user.id.to_string(),
+            &attacker_user.name,
+        )
         .await
     {
         Ok(p) => p,
@@ -725,7 +784,11 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
         }
     };
 
-    let special_opt = if special == "-" { None } else { Some(special.as_str()) };
+    let special_opt = if special == "-" {
+        None
+    } else {
+        Some(special.as_str())
+    };
 
     let combat = match api
         .create_combat(
@@ -884,7 +947,10 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                 let data = ctx.data.read().await;
                 if let Some(api) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
                     let api = std::sync::Arc::clone(api);
-                    let g = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+                    let g = component
+                        .guild_id
+                        .map(|g| g.to_string())
+                        .unwrap_or_default();
                     let c = component.channel_id.to_string();
                     let m = msg.id.to_string();
                     drop(data);
@@ -906,24 +972,30 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     // Notifier dans le salon notifications
     if let Some(notif_ch) = config.channel_notifications() {
         if let Ok(ch_id) = notif_ch.parse::<u64>() {
-            let notif_embed = build_notification_embed(
-                target.id,
-                &attacker_user.name,
-                mise,
-                &combat_channel,
-            );
+            let notif_embed =
+                build_notification_embed(target.id, &attacker_user.name, mise, &combat_channel);
             let _ = serenity::model::id::ChannelId::new(ch_id)
                 .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
                 .await;
         }
     }
 
-    edit_component_message(ctx, component, "\u{2705} Defi envoye dans le salon combats !").await;
+    edit_component_message(
+        ctx,
+        component,
+        "\u{2705} Defi envoye dans le salon combats !",
+    )
+    .await;
 }
 
 /// Handler du bouton "Annuler" du preconfirm.
 pub async fn handle_preconfirm_no(ctx: &Context, component: &ComponentInteraction) {
-    edit_component_message(ctx, component, "\u{274c} Defi annule avant envoi. Aucune mise prelevee.").await;
+    edit_component_message(
+        ctx,
+        component,
+        "\u{274c} Defi annule avant envoi. Aucune mise prelevee.",
+    )
+    .await;
 }
 
 fn parse_preconfirm_id(id: &str, prefix: &str) -> Option<(String, i64, String)> {
@@ -955,9 +1027,10 @@ async fn edit_component_message(ctx: &Context, component: &ComponentInteraction,
         let _ = component
             .edit_response(
                 &ctx.http,
-                EditInteractionResponse::new().content(content).components(vec![]),
+                EditInteractionResponse::new()
+                    .content(content)
+                    .components(vec![]),
             )
             .await;
     }
 }
-

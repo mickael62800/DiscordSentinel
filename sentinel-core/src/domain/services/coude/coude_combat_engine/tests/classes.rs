@@ -80,7 +80,8 @@ fn all_classes_have_unique_names_and_passifs() {
     let names: std::collections::HashSet<&str> = ALL_CLASSES.iter().map(|c| c.name).collect();
     assert_eq!(names.len(), ALL_CLASSES.len(), "duplicate class names");
 
-    let passifs: std::collections::HashSet<&str> = ALL_CLASSES.iter().map(|c| c.passif_key).collect();
+    let passifs: std::collections::HashSet<&str> =
+        ALL_CLASSES.iter().map(|c| c.passif_key).collect();
     assert_eq!(passifs.len(), ALL_CLASSES.len(), "duplicate passif_key");
 }
 
@@ -98,6 +99,10 @@ fn all_classes_have_positive_base_stats() {
 fn passif_reveal_contains_player_placeholder() {
     // Les messages de révélation doivent inclure {joueur} pour substitution.
     for c in ALL_CLASSES {
-        assert!(c.passif_reveal.contains("{joueur}"), "{} passif_reveal missing {{joueur}}", c.name);
+        assert!(
+            c.passif_reveal.contains("{joueur}"),
+            "{} passif_reveal missing {{joueur}}",
+            c.name
+        );
     }
 }

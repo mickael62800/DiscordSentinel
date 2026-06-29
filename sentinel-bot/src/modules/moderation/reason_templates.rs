@@ -14,7 +14,10 @@ pub fn parse_templates(raw: &str) -> Vec<ReasonTemplate> {
 }
 
 /// Filtre les templates par un terme de recherche (pour l'autocomplete).
-pub fn filter_templates<'a>(templates: &'a [ReasonTemplate], query: &str) -> Vec<&'a ReasonTemplate> {
+pub fn filter_templates<'a>(
+    templates: &'a [ReasonTemplate],
+    query: &str,
+) -> Vec<&'a ReasonTemplate> {
     let query_lower = query.to_lowercase();
     templates
         .iter()
@@ -74,9 +77,18 @@ mod tests {
     #[test]
     fn filter_by_label() {
         let templates = vec![
-            ReasonTemplate { label: "Spam".into(), reason: "Messages repetitifs".into() },
-            ReasonTemplate { label: "Insulte".into(), reason: "Propos insultants".into() },
-            ReasonTemplate { label: "Pub".into(), reason: "Publicite non autorisee".into() },
+            ReasonTemplate {
+                label: "Spam".into(),
+                reason: "Messages repetitifs".into(),
+            },
+            ReasonTemplate {
+                label: "Insulte".into(),
+                reason: "Propos insultants".into(),
+            },
+            ReasonTemplate {
+                label: "Pub".into(),
+                reason: "Publicite non autorisee".into(),
+            },
         ];
         let results = filter_templates(&templates, "ins");
         assert_eq!(results.len(), 1);
@@ -86,8 +98,14 @@ mod tests {
     #[test]
     fn filter_by_reason() {
         let templates = vec![
-            ReasonTemplate { label: "Spam".into(), reason: "Messages repetitifs".into() },
-            ReasonTemplate { label: "Pub".into(), reason: "Publicite non autorisee".into() },
+            ReasonTemplate {
+                label: "Spam".into(),
+                reason: "Messages repetitifs".into(),
+            },
+            ReasonTemplate {
+                label: "Pub".into(),
+                reason: "Publicite non autorisee".into(),
+            },
         ];
         let results = filter_templates(&templates, "repet");
         assert_eq!(results.len(), 1);
@@ -97,8 +115,14 @@ mod tests {
     #[test]
     fn filter_empty_query_returns_all() {
         let templates = vec![
-            ReasonTemplate { label: "A".into(), reason: "a".into() },
-            ReasonTemplate { label: "B".into(), reason: "b".into() },
+            ReasonTemplate {
+                label: "A".into(),
+                reason: "a".into(),
+            },
+            ReasonTemplate {
+                label: "B".into(),
+                reason: "b".into(),
+            },
         ];
         assert_eq!(filter_templates(&templates, "").len(), 2);
     }
@@ -106,7 +130,10 @@ mod tests {
     #[test]
     fn filter_max_25() {
         let templates: Vec<ReasonTemplate> = (0..30)
-            .map(|i| ReasonTemplate { label: format!("T{}", i), reason: "r".into() })
+            .map(|i| ReasonTemplate {
+                label: format!("T{}", i),
+                reason: "r".into(),
+            })
             .collect();
         assert_eq!(filter_templates(&templates, "").len(), 25);
     }

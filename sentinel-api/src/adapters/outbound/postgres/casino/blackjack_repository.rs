@@ -1,13 +1,13 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 
 pub struct PgBlackjackRepository {
     pool: PgPool,
@@ -96,7 +96,11 @@ impl BlackjackRepository for PgBlackjackRepository {
         Ok(())
     }
 
-    async fn get_active(&self, guild_id: &str, user_id: &str) -> Result<Option<BlackjackGame>, DomainError> {
+    async fn get_active(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<BlackjackGame>, DomainError> {
         // Une partie est reellement "active" uniquement si :
         //  - status = 'playing' ET finished_at IS NULL (pas un blackjack naturel)
         //  - created_at dans les 30 dernieres minutes (au-dela, on considere
@@ -135,7 +139,7 @@ impl BlackjackRepository for PgBlackjackRepository {
                 player_hand = $1, dealer_hand = $2, deck = $3,
                 status = $4, player_score = $5, dealer_score = $6,
                 doubled = $7, payout = $8, bet = $9, finished_at = $10
-             WHERE id = $11 AND status = 'playing'"
+             WHERE id = $11 AND status = 'playing'",
         )
         .bind(player_hand)
         .bind(dealer_hand)
@@ -153,7 +157,9 @@ impl BlackjackRepository for PgBlackjackRepository {
         .map_err(|e| pg_err_ctx("blackjack update ", e))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::Conflict("Partie deja terminee ou action concurrente".into()));
+            return Err(DomainError::Conflict(
+                "Partie deja terminee ou action concurrente".into(),
+            ));
         }
 
         Ok(())
@@ -173,7 +179,11 @@ impl BlackjackRepository for PgBlackjackRepository {
         Ok(row.map(BlackjackGame::from))
     }
 
-    async fn list_by_guild(&self, guild_id: &str, status: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> {
+    async fn list_by_guild(
+        &self,
+        guild_id: &str,
+        status: Option<&str>,
+    ) -> Result<Vec<BlackjackGame>, DomainError> {
         let rows = if let Some(s) = status {
             sqlx::query_as::<_, BlackjackRow>(
                 "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
@@ -202,7 +212,10 @@ impl BlackjackRepository for PgBlackjackRepository {
     }
 
     async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("cancel_game begin ", e))?;
 
         // Recupere la partie pour obtenir la mise et valider le status.
@@ -220,7 +233,8 @@ impl BlackjackRepository for PgBlackjackRepository {
         // peuvent etre "waiting" quand le dealer est en train de distribuer.
         if !matches!(row.status.as_str(), "playing" | "waiting") {
             return Err(DomainError::Conflict(format!(
-                "Partie deja terminee (status = {})", row.status
+                "Partie deja terminee (status = {})",
+                row.status
             )));
         }
 
@@ -228,10 +242,11 @@ impl BlackjackRepository for PgBlackjackRepository {
         sqlx::query(
             "UPDATE blackjack_games
              SET status = 'cancelled', finished_at = NOW()
-             WHERE id = $1"
+             WHERE id = $1",
         )
         .bind(id)
-        .execute(&mut *tx).await
+        .execute(&mut *tx)
+        .await
         .map_err(|e| pg_err_ctx("cancel_game update ", e))?;
 
         // Rembourse la mise sur le wallet du joueur.
@@ -239,12 +254,13 @@ impl BlackjackRepository for PgBlackjackRepository {
         sqlx::query(
             "UPDATE user_wallets
              SET coins = coins + $1, total_spent = GREATEST(0, total_spent - $1), updated_at = NOW()
-             WHERE guild_id = $2 AND user_id = $3"
+             WHERE guild_id = $2 AND user_id = $3",
         )
         .bind(refund)
         .bind(row.guild_id.as_str())
         .bind(row.user_id.as_str())
-        .execute(&mut *tx).await
+        .execute(&mut *tx)
+        .await
         .map_err(|e| pg_err_ctx("cancel_game refund ", e))?;
 
         sqlx::query(
@@ -260,7 +276,8 @@ impl BlackjackRepository for PgBlackjackRepository {
         .execute(&mut *tx).await
         .map_err(|e| pg_err_ctx("cancel_game audit ", e))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("cancel_game commit ", e))?;
 
         tracing::info!(

@@ -10,10 +10,22 @@ fn as_str_all_variants() {
 
 #[test]
 fn from_str_lossy_valid() {
-    assert_eq!(ModerationGravity::from_str_lossy("low"), Some(ModerationGravity::Low));
-    assert_eq!(ModerationGravity::from_str_lossy("medium"), Some(ModerationGravity::Medium));
-    assert_eq!(ModerationGravity::from_str_lossy("high"), Some(ModerationGravity::High));
-    assert_eq!(ModerationGravity::from_str_lossy("critical"), Some(ModerationGravity::Critical));
+    assert_eq!(
+        ModerationGravity::from_str_lossy("low"),
+        Some(ModerationGravity::Low)
+    );
+    assert_eq!(
+        ModerationGravity::from_str_lossy("medium"),
+        Some(ModerationGravity::Medium)
+    );
+    assert_eq!(
+        ModerationGravity::from_str_lossy("high"),
+        Some(ModerationGravity::High)
+    );
+    assert_eq!(
+        ModerationGravity::from_str_lossy("critical"),
+        Some(ModerationGravity::Critical)
+    );
 }
 
 #[test]

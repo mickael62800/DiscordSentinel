@@ -3,9 +3,16 @@ use super::*;
 #[test]
 fn test_as_str_roundtrip_all_variants() {
     let variants = vec![
-        FlagType::Spam, FlagType::Insult, FlagType::Link, FlagType::Phishing,
-        FlagType::Nsfw, FlagType::Illicit,
-        FlagType::Anger, FlagType::Rage, FlagType::Threat, FlagType::Harassment,
+        FlagType::Spam,
+        FlagType::Insult,
+        FlagType::Link,
+        FlagType::Phishing,
+        FlagType::Nsfw,
+        FlagType::Illicit,
+        FlagType::Anger,
+        FlagType::Rage,
+        FlagType::Threat,
+        FlagType::Harassment,
     ];
     for v in variants {
         let s = v.as_str();

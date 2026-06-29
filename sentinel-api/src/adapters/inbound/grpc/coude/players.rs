@@ -6,18 +6,18 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use sentinel_core::domain::entities::coude::player::Player;
 use sentinel_core::domain::entities::coude::player::XpProgress;
 use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
 pub struct PlayerGrpc {
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
@@ -93,12 +93,24 @@ impl CoudePlayerService for PlayerGrpc {
         // (ajustement admin, pas d'update stats total_earned/total_lost).
         if req.delta > 0 {
             self.wallet_uc
-                .credit(&req.guild_id, &req.user_id, req.delta, "coude_adjust", "Ajustement manuel")
+                .credit(
+                    &req.guild_id,
+                    &req.user_id,
+                    req.delta,
+                    "coude_adjust",
+                    "Ajustement manuel",
+                )
                 .await
                 .map_err(domain_to_status)?;
         } else if req.delta < 0 {
             self.wallet_uc
-                .debit(&req.guild_id, &req.user_id, -req.delta, "coude_adjust", "Ajustement manuel")
+                .debit(
+                    &req.guild_id,
+                    &req.user_id,
+                    -req.delta,
+                    "coude_adjust",
+                    "Ajustement manuel",
+                )
                 .await
                 .map_err(domain_to_status)?;
         }
@@ -124,7 +136,12 @@ impl CoudePlayerService for PlayerGrpc {
         let req = request.into_inner();
         let updated = self
             .players_uc
-            .regen_hp_tick(req.rate_0_25, req.rate_25_50, req.rate_50_75, req.rate_75_100)
+            .regen_hp_tick(
+                req.rate_0_25,
+                req.rate_25_50,
+                req.rate_50_75,
+                req.rate_75_100,
+            )
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::HpRegenTickResponse { updated }))

@@ -41,8 +41,8 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     debug!(count, "watched users snapshot");
 
-    let serialized = serde_json::to_string(&user_ids)
-        .map_err(|e| format!("serialize user_ids: {e}"))?;
+    let serialized =
+        serde_json::to_string(&user_ids).map_err(|e| format!("serialize user_ids: {e}"))?;
 
     // 2. Push dans Redis (SET avec TTL)
     let mut conn = crate::common::redis_helpers::get_conn(redis).await?;

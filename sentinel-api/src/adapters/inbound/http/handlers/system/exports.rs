@@ -20,12 +20,12 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateExportJobDto {
@@ -74,13 +74,16 @@ pub async fn create_export_job(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("requested_by", &dto.requested_by).map_err(ApiError)?;
 
-    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_export_job_type(&dto.job_type) {
+    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_export_job_type(
+        &dto.job_type,
+    ) {
         return Err(ApiError(DomainError::ValidationError(format!(
             "job_type invalide : '{}'",
             dto.job_type
         ))));
     }
-    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_export_format(&dto.format) {
+    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_export_format(&dto.format)
+    {
         return Err(ApiError(DomainError::ValidationError(format!(
             "format invalide : '{}' (attendu csv|json)",
             dto.format

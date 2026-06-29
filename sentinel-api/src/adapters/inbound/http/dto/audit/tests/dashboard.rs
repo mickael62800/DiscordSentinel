@@ -1,20 +1,25 @@
 use super::*;
-use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::system::guild::Guild;
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
-use sentinel_core::domain::entities::system::log_entry::LogEntry;
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
-use sentinel_core::domain::enums::moderation::flag_type::FlagType;
-use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use chrono::TimeZone;
 use chrono::Utc;
+use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::entities::system::guild::Guild;
+use sentinel_core::domain::entities::system::log_entry::LogEntry;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use uuid::Uuid;
 
 fn flags() -> DetectionFlags {
-    DetectionFlags { spam: false, insult: false, link: false, phishing: false }
+    DetectionFlags {
+        spam: false,
+        insult: false,
+        link: false,
+        phishing: false,
+    }
 }
 
 fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
@@ -74,9 +79,16 @@ fn sample_rule(flag_type: FlagType, warn: f64, delete: f64, mute: f64, ban: f64)
 #[test]
 fn dashboard_stats_dto_preserves_all_fields() {
     let s = DashboardStats {
-        total_servers: 10, total_users: 200, messages_today: 3000, infractions_today: 5,
-        bots_online: 2, bots_total: 3, workers_online: 1, workers_total: 1,
-        postgres_online: true, redis_online: false,
+        total_servers: 10,
+        total_users: 200,
+        messages_today: 3000,
+        infractions_today: 5,
+        bots_online: 2,
+        bots_total: 3,
+        workers_online: 1,
+        workers_total: 1,
+        postgres_online: true,
+        redis_online: false,
     };
     let dto = DashboardStatsDto::from(s);
     assert_eq!(dto.total_servers, 10);
@@ -202,8 +214,12 @@ fn dashboard_rule_description_includes_guild_and_weight() {
 #[test]
 fn guild_dto_preserves_fields() {
     let g = Guild {
-        guild_id: "g".into(), name: "Guild".into(), icon: Some("i".into()), member_count: 42,
-        registered_at: Utc::now(), updated_at: Utc::now(),
+        guild_id: "g".into(),
+        name: "Guild".into(),
+        icon: Some("i".into()),
+        member_count: 42,
+        registered_at: Utc::now(),
+        updated_at: Utc::now(),
     };
     let dto = GuildDto::from(g);
     assert_eq!(dto.guild_id, "g".into());
@@ -215,7 +231,8 @@ fn guild_dto_preserves_fields() {
 fn register_guild_dto_optional_fields() {
     let dto: RegisterGuildDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "name": "Guild"
-    })).unwrap();
+    }))
+    .unwrap();
     assert!(dto.icon.is_none());
     assert!(dto.member_count.is_none());
     assert!(dto.owner_id.is_none());

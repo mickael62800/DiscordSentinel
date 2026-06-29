@@ -3,24 +3,24 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use tracing::debug;
-use tracing::warn;
+use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::build_taunt_event;
 use crate::domain::entities::coude::taunt::build_taunt_event_single;
 use crate::domain::entities::coude::taunt::crossed_threshold;
-use crate::domain::entities::system::config_parsers::parse_bool_config;
-use crate::domain::entities::system::config_parsers::parse_i64_config;
-use crate::domain::entities::coude::taunt::TauntsConfig;
-use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntsConfig;
+use crate::domain::entities::system::config_parsers::parse_bool_config;
+use crate::domain::entities::system::config_parsers::parse_i64_config;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use async_trait::async_trait;
+use tracing::debug;
+use tracing::warn;
 const ECO_BOT_NAME: &str = "coude-bot";
 const CFG_BANKRUPTCY_ENABLED: &str = "bankruptcy_taunt_enabled";
 const CFG_JACKPOT_THRESHOLD: &str = "jackpot_threshold";
@@ -78,22 +78,32 @@ impl ManageCoudeTauntsService {
         new_streak: Option<i32>,
     ) -> Result<Option<TauntEvent>, DomainError> {
         let Some(new_streak) = new_streak else {
-            debug!(guild_id, user_id, kind = kind.as_str(), "taunt: joueur introuvable (streak None)");
+            debug!(
+                guild_id,
+                user_id,
+                kind = kind.as_str(),
+                "taunt: joueur introuvable (streak None)"
+            );
             return Ok(None);
         };
 
-        debug!(guild_id, user_id, kind = kind.as_str(), new_streak, "taunt: streak updated");
+        debug!(
+            guild_id,
+            user_id,
+            kind = kind.as_str(),
+            new_streak,
+            "taunt: streak updated"
+        );
 
         // Insomnia (cf. COUPE_AMELIORATIONS 5.1) — multiplie les streaks
         // de defaite par 1.5 avant de checker les paliers, pour que les
         // taunts tombent +50% plus vite sur la cible maudite.
-        let effective_streak = if matches!(kind, StreakKind::Loss)
-            && self.has_insomnia(guild_id, user_id).await
-        {
-            ((new_streak as f64) * 1.5).floor() as i32
-        } else {
-            new_streak
-        };
+        let effective_streak =
+            if matches!(kind, StreakKind::Loss) && self.has_insomnia(guild_id, user_id).await {
+                ((new_streak as f64) * 1.5).floor() as i32
+            } else {
+                new_streak
+            };
 
         if crossed_threshold(effective_streak).is_none() {
             return Ok(None);
@@ -106,7 +116,13 @@ impl ManageCoudeTauntsService {
         };
         let event = build_taunt_event(&config, user_id, kind, new_streak, opted_out);
         if event.is_some() {
-            debug!(guild_id, user_id, kind = kind.as_str(), new_streak, "taunt: event emis !");
+            debug!(
+                guild_id,
+                user_id,
+                kind = kind.as_str(),
+                new_streak,
+                "taunt: event emis !"
+            );
         }
         Ok(event)
     }
@@ -140,7 +156,11 @@ impl ManageCoudeTauntsService {
     }
 
     async fn load_eco_config(&self, guild_id: &str) -> HashMap<String, String> {
-        match self.bot_config_repo.get_config(guild_id, ECO_BOT_NAME).await {
+        match self
+            .bot_config_repo
+            .get_config(guild_id, ECO_BOT_NAME)
+            .await
+        {
             Ok(entries) => entries
                 .into_iter()
                 .map(|e| (e.config_key, e.config_value))
@@ -173,17 +193,18 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<TauntEvent>, DomainError> {
-        let new_streak = self.player_repo.touch_loss_streak(guild_id, user_id).await?;
+        let new_streak = self
+            .player_repo
+            .touch_loss_streak(guild_id, user_id)
+            .await?;
         self.handle_streak_touch(guild_id, user_id, StreakKind::Loss, new_streak)
             .await
     }
 
-    async fn on_player_drew(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
-        self.player_repo.reset_combat_streaks(guild_id, user_id).await
+    async fn on_player_drew(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
+        self.player_repo
+            .reset_combat_streaks(guild_id, user_id)
+            .await
     }
 
     async fn on_player_stolen_from(
@@ -204,7 +225,9 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError> {
-        self.player_repo.reset_steal_victim_streak(guild_id, user_id).await
+        self.player_repo
+            .reset_steal_victim_streak(guild_id, user_id)
+            .await
     }
 
     // ── Blackjack (migration 139) ──
@@ -217,7 +240,10 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         // Naturel = egalement une victoire → utilise touch_bj_win_streak
         // pour incrementer la win streak et reset la bust streak. Le
         // taunt Natural21 est one-shot, independant du palier.
-        let _ = self.player_repo.touch_bj_win_streak(guild_id, user_id).await?;
+        let _ = self
+            .player_repo
+            .touch_bj_win_streak(guild_id, user_id)
+            .await?;
         self.handle_one_shot(guild_id, user_id, StreakKind::BjNatural21)
             .await
     }
@@ -227,7 +253,10 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<TauntEvent>, DomainError> {
-        let new_streak = self.player_repo.touch_bj_win_streak(guild_id, user_id).await?;
+        let new_streak = self
+            .player_repo
+            .touch_bj_win_streak(guild_id, user_id)
+            .await?;
         self.handle_streak_touch(guild_id, user_id, StreakKind::BjWinStreak, new_streak)
             .await
     }
@@ -237,7 +266,10 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<TauntEvent>, DomainError> {
-        let new_streak = self.player_repo.touch_bj_bust_streak(guild_id, user_id).await?;
+        let new_streak = self
+            .player_repo
+            .touch_bj_bust_streak(guild_id, user_id)
+            .await?;
         self.handle_streak_touch(guild_id, user_id, StreakKind::BjBustStreak, new_streak)
             .await
     }
@@ -304,12 +336,24 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         self.taunts_repo.set_enabled(guild_id, enabled).await
     }
 
-    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError> {
-        self.taunts_repo.set_rename_enabled(guild_id, rename_enabled).await
+    async fn set_rename_enabled(
+        &self,
+        guild_id: &str,
+        rename_enabled: bool,
+    ) -> Result<(), DomainError> {
+        self.taunts_repo
+            .set_rename_enabled(guild_id, rename_enabled)
+            .await
     }
 
-    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError> {
-        self.taunts_repo.set_messages_enabled(guild_id, messages_enabled).await
+    async fn set_messages_enabled(
+        &self,
+        guild_id: &str,
+        messages_enabled: bool,
+    ) -> Result<(), DomainError> {
+        self.taunts_repo
+            .set_messages_enabled(guild_id, messages_enabled)
+            .await
     }
 
     async fn set_opt_out(

@@ -1,17 +1,17 @@
-use serde::Deserialize;
-use serde::Serialize;
-use sentinel_core::domain::entities::system::discord_ids::MessageId;
-use sentinel_core::domain::entities::community::role_panel::AutoRole;
-use sentinel_core::domain::entities::community::role_panel::RolePanel;
-use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
-use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 use crate::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
 use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
 use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCommand;
 use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
-use sentinel_core::domain::entities::system::discord_ids::RoleId;
+use sentinel_core::domain::entities::community::role_panel::AutoRole;
+use sentinel_core::domain::entities::community::role_panel::RolePanel;
+use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::MessageId;
+use sentinel_core::domain::entities::system::discord_ids::RoleId;
+use serde::Deserialize;
+use serde::Serialize;
 #[derive(Debug, Deserialize)]
 pub struct CreateRolePanelDto {
     pub guild_id: GuildId,
@@ -25,7 +25,9 @@ pub struct CreateRolePanelDto {
     pub entries: Vec<CreateEntryDto>,
 }
 
-fn default_mode() -> String { "button".to_string() }
+fn default_mode() -> String {
+    "button".to_string()
+}
 
 #[derive(Debug, Deserialize)]
 pub struct CreateEntryDto {
@@ -40,7 +42,9 @@ pub struct CreateEntryDto {
     pub position: i32,
 }
 
-fn default_style() -> String { "primary".to_string() }
+fn default_style() -> String {
+    "primary".to_string()
+}
 
 #[derive(Debug, Deserialize)]
 pub struct SetMessageIdDto {
@@ -100,40 +104,99 @@ pub struct AutoRoleDto {
 
 impl From<CreateRolePanelDto> for CreateRolePanelCommand {
     fn from(d: CreateRolePanelDto) -> Self {
-        Self { guild_id: d.guild_id, channel_id: d.channel_id, title: d.title, description: d.description, mode: d.mode, max_roles: d.max_roles,
-            entries: d.entries.into_iter().map(|e| CreateRolePanelEntryCommand { role_id: e.role_id, role_name: e.role_name, emoji: e.emoji, label: e.label, style: e.style, position: e.position }).collect() }
+        Self {
+            guild_id: d.guild_id,
+            channel_id: d.channel_id,
+            title: d.title,
+            description: d.description,
+            mode: d.mode,
+            max_roles: d.max_roles,
+            entries: d
+                .entries
+                .into_iter()
+                .map(|e| CreateRolePanelEntryCommand {
+                    role_id: e.role_id,
+                    role_name: e.role_name,
+                    emoji: e.emoji,
+                    label: e.label,
+                    style: e.style,
+                    position: e.position,
+                })
+                .collect(),
+        }
     }
 }
 
 impl From<SetMessageIdDto> for SetMessageIdCommand {
-    fn from(d: SetMessageIdDto) -> Self { Self { panel_id: d.panel_id, message_id: d.message_id } }
+    fn from(d: SetMessageIdDto) -> Self {
+        Self {
+            panel_id: d.panel_id,
+            message_id: d.message_id,
+        }
+    }
 }
 
 impl From<CreateAutoRoleDto> for CreateAutoRoleCommand {
-    fn from(d: CreateAutoRoleDto) -> Self { Self { guild_id: d.guild_id, role_id: d.role_id, role_name: d.role_name, delay_secs: d.delay_secs } }
+    fn from(d: CreateAutoRoleDto) -> Self {
+        Self {
+            guild_id: d.guild_id,
+            role_id: d.role_id,
+            role_name: d.role_name,
+            delay_secs: d.delay_secs,
+        }
+    }
 }
 
 impl From<RolePanel> for RolePanelDto {
     fn from(p: RolePanel) -> Self {
-        Self { id: p.id.to_string(), guild_id: p.guild_id, channel_id: p.channel_id, message_id: p.message_id, title: p.title, description: p.description, mode: p.mode, max_roles: p.max_roles, enabled: p.enabled, created_at: p.created_at.to_rfc3339() }
+        Self {
+            id: p.id.to_string(),
+            guild_id: p.guild_id,
+            channel_id: p.channel_id,
+            message_id: p.message_id,
+            title: p.title,
+            description: p.description,
+            mode: p.mode,
+            max_roles: p.max_roles,
+            enabled: p.enabled,
+            created_at: p.created_at.to_rfc3339(),
+        }
     }
 }
 
 impl From<RolePanelEntry> for RolePanelEntryDto {
     fn from(e: RolePanelEntry) -> Self {
-        Self { id: e.id.to_string(), role_id: e.role_id, role_name: e.role_name, emoji: e.emoji, label: e.label, style: e.style, position: e.position }
+        Self {
+            id: e.id.to_string(),
+            role_id: e.role_id,
+            role_name: e.role_name,
+            emoji: e.emoji,
+            label: e.label,
+            style: e.style,
+            position: e.position,
+        }
     }
 }
 
 impl From<RolePanelDetail> for RolePanelDetailDto {
     fn from(d: RolePanelDetail) -> Self {
-        Self { panel: d.panel.into(), entries: d.entries.into_iter().map(RolePanelEntryDto::from).collect() }
+        Self {
+            panel: d.panel.into(),
+            entries: d.entries.into_iter().map(RolePanelEntryDto::from).collect(),
+        }
     }
 }
 
 impl From<AutoRole> for AutoRoleDto {
     fn from(a: AutoRole) -> Self {
-        Self { id: a.id.to_string(), guild_id: a.guild_id, role_id: a.role_id, role_name: a.role_name, delay_secs: a.delay_secs, enabled: a.enabled }
+        Self {
+            id: a.id.to_string(),
+            guild_id: a.guild_id,
+            role_id: a.role_id,
+            role_name: a.role_name,
+            delay_secs: a.delay_secs,
+            enabled: a.enabled,
+        }
     }
 }
 

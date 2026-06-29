@@ -18,7 +18,9 @@ use tracing::{error, info, warn};
 
 use crate::shared::heartbeat::ApiClientKey;
 
-use crate::modules::voice::api_client::{ApiClient, CreateVoiceChannelRequest, UpdateVoiceChannelRequest};
+use crate::modules::voice::api_client::{
+    ApiClient, CreateVoiceChannelRequest, UpdateVoiceChannelRequest,
+};
 use crate::modules::voice::embeds;
 use crate::modules::voice::{CooldownTrackerKey, VoiceOwnerMapKey};
 
@@ -55,7 +57,8 @@ pub(super) async fn create_temp_channel(
     let preset = {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
-            api.get_preset(&guild_id.to_string(), &user_id.get().to_string()).await
+            api.get_preset(&guild_id.to_string(), &user_id.get().to_string())
+                .await
         } else {
             None
         }
@@ -73,7 +76,10 @@ pub(super) async fn create_temp_channel(
         let data = ctx.data.read().await;
         data.get::<crate::modules::voice::ThemeCacheKey>()
             .and_then(|themes| {
-                themes.iter().find(|t| t.name == kind).and_then(|t| t.member_limit)
+                themes
+                    .iter()
+                    .find(|t| t.name == kind)
+                    .and_then(|t| t.member_limit)
             })
             .unwrap_or(0) as u32
     };
@@ -87,14 +93,17 @@ pub(super) async fn create_temp_channel(
     let anchor_category_id: Option<u64> = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME)
-                .await
-                .ok()
-                .and_then(|cfg| {
-                    cfg.get("voice_anchor_category_id")
-                        .and_then(|v| v.parse::<u64>().ok())
-                        .filter(|id| *id > 0)
-                })
+            base.get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::voice::MODULE_BOT_NAME,
+            )
+            .await
+            .ok()
+            .and_then(|cfg| {
+                cfg.get("voice_anchor_category_id")
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .filter(|id| *id > 0)
+            })
         } else {
             None
         }
@@ -110,10 +119,7 @@ pub(super) async fn create_temp_channel(
     if let Some(cat_id) = anchor_category_id {
         voice_builder = voice_builder.category(ChannelId::new(cat_id));
     }
-    let voice_channel = match guild_id
-        .create_channel(&ctx.http, voice_builder)
-        .await
-    {
+    let voice_channel = match guild_id.create_channel(&ctx.http, voice_builder).await {
         Ok(ch) => ch,
         Err(why) => {
             error!(error = %why, "Erreur creation salon vocal");
@@ -135,14 +141,20 @@ pub(super) async fn create_temp_channel(
         deny: Permissions::empty(),
         kind: PermissionOverwriteType::Member(user_id),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_perm).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, owner_perm)
+        .await
+    {
         tracing::warn!(error = %e, "failed to set owner permission on voice channel");
     }
 
     // ── Application du preset (visibilite/verrou) + whitelist ──
     // Pour les salons `game`, la file d'attente gere deja les overwrites
     // @everyone (verrou derriere la queue) : on ne superpose pas le preset.
-    let preset_hidden = preset.as_ref().map(|p| p.visibility == "hidden").unwrap_or(false);
+    let preset_hidden = preset
+        .as_ref()
+        .map(|p| p.visibility == "hidden")
+        .unwrap_or(false);
     let preset_locked = preset.as_ref().map(|p| p.locked).unwrap_or(false);
 
     if kind != "game" && (preset_hidden || preset_locked) {
@@ -158,7 +170,10 @@ pub(super) async fn create_temp_channel(
             deny,
             kind: PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, everyone_overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, everyone_overwrite)
+            .await
+        {
             warn!(error = %e, "failed to apply preset @everyone overwrite");
         }
     }
@@ -169,19 +184,25 @@ pub(super) async fn create_temp_channel(
     let whitelist = {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
-            api.get_whitelist(&guild_id.to_string(), &user_id.get().to_string()).await
+            api.get_whitelist(&guild_id.to_string(), &user_id.get().to_string())
+                .await
         } else {
             Vec::new()
         }
     };
     for entry in &whitelist {
-        let Ok(target) = entry.target_id.parse::<u64>() else { continue };
+        let Ok(target) = entry.target_id.parse::<u64>() else {
+            continue;
+        };
         let overwrite = PermissionOverwrite {
             allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(UserId::new(target)),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
             warn!(error = %e, target = %target, "failed to apply whitelist overwrite");
         }
     }
@@ -197,7 +218,10 @@ pub(super) async fn create_temp_channel(
     }
 
     // Deplacer l'utilisateur dans le vocal.
-    if let Err(why) = guild_id.move_member(&ctx.http, user_id, voice_channel_id).await {
+    if let Err(why) = guild_id
+        .move_member(&ctx.http, user_id, voice_channel_id)
+        .await
+    {
         warn!(error = %why, "Erreur deplacement membre");
     }
 
@@ -223,7 +247,10 @@ pub(super) async fn create_temp_channel(
                     deny: Permissions::CONNECT,
                     kind: PermissionOverwriteType::Role(everyone_role),
                 };
-                if let Err(e) = voice_channel_id.create_permission(&ctx.http, voice_overwrite).await {
+                if let Err(e) = voice_channel_id
+                    .create_permission(&ctx.http, voice_overwrite)
+                    .await
+                {
                     warn!(error = %e, "failed to lock game voice channel behind queue");
                 }
                 place_queue_above_voice(ctx, guild_id, qch.id, voice_channel_id).await;
@@ -245,7 +272,9 @@ pub(super) async fn create_temp_channel(
     let panel_post_enabled = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-            let cfg = api.get_guild_config_for(&guild_id.to_string(), "voice-bot").await
+            let cfg = api
+                .get_guild_config_for(&guild_id.to_string(), "voice-bot")
+                .await
                 .unwrap_or_default();
             cfg.get("panel_post_enabled")
                 .map(|v| v == "true" || v == "1")
@@ -256,7 +285,15 @@ pub(super) async fn create_temp_channel(
     };
     let panel_msg_id = if panel_post_enabled && (kind == "private" || kind == "game") {
         let queue_enabled_init = queue_channel_id.is_some();
-        send_control_panel(ctx, voice_channel_id, preset_hidden, queue_enabled_init, preset_locked, user_id.get()).await
+        send_control_panel(
+            ctx,
+            voice_channel_id,
+            preset_hidden,
+            queue_enabled_init,
+            preset_locked,
+            user_id.get(),
+        )
+        .await
     } else {
         None
     };
@@ -277,7 +314,11 @@ pub(super) async fn create_temp_channel(
                 category_id: None,
                 channel_name: voice_name.clone(),
                 kind: kind.to_string(),
-                visibility: if preset_hidden { "hidden".to_string() } else { "visible".to_string() },
+                visibility: if preset_hidden {
+                    "hidden".to_string()
+                } else {
+                    "visible".to_string()
+                },
                 queue_enabled: queue_channel_id.is_some(),
             };
 
@@ -308,7 +349,10 @@ pub(super) async fn create_temp_channel(
                 member_limit: None,
                 queue_channel_id: None,
             };
-            if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &upd).await {
+            if let Err(e) = api
+                .update_channel(&voice_channel_id.get().to_string(), &upd)
+                .await
+            {
                 warn!(error = %e, "Erreur API update_channel (verrou preset)");
             }
         }
@@ -649,7 +693,10 @@ pub async fn handle_voice_redis_event(ctx: &Context, payload: &str) {
     }
 
     // event = voice_channel_updated. Re-render le panel.
-    let locked = data.get("locked").and_then(|v| v.as_bool()).unwrap_or(false);
+    let locked = data
+        .get("locked")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
     let queue_enabled = data
         .get("queue_enabled")
         .and_then(|v| v.as_bool())
@@ -688,7 +735,11 @@ async fn rerender_control_panel(
     owner_id: u64,
 ) {
     let visibility = if is_hidden { "Cache" } else { "Visible" };
-    let queue_status = if queue_enabled { "Activee" } else { "Desactivee" };
+    let queue_status = if queue_enabled {
+        "Activee"
+    } else {
+        "Desactivee"
+    };
     let lock_status = if locked { "Verrouille" } else { "Ouvert" };
 
     let embed = CreateEmbed::new()
@@ -732,7 +783,11 @@ async fn send_control_panel(
     owner_id: u64,
 ) -> Option<serenity::model::id::MessageId> {
     let visibility = if is_hidden { "Cache" } else { "Visible" };
-    let queue_status = if queue_enabled { "Activee" } else { "Desactivee" };
+    let queue_status = if queue_enabled {
+        "Activee"
+    } else {
+        "Desactivee"
+    };
     let lock_status = if locked { "Verrouille" } else { "Ouvert" };
 
     let embed = CreateEmbed::new()
@@ -753,7 +808,11 @@ async fn send_control_panel(
             0x2ecc71
         });
 
-    let hide_label = if is_hidden { "Rendre visible" } else { "Cacher" };
+    let hide_label = if is_hidden {
+        "Rendre visible"
+    } else {
+        "Cacher"
+    };
     let queue_label = if queue_enabled {
         "Desactiver attente"
     } else {
@@ -780,7 +839,11 @@ async fn send_control_panel(
         );
     }
 
-    let lock_label = if locked { "Deverrouiller" } else { "Verrouiller" };
+    let lock_label = if locked {
+        "Deverrouiller"
+    } else {
+        "Verrouiller"
+    };
 
     let row2 = vec![
         CreateButton::new("btn_kick")

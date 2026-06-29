@@ -55,7 +55,9 @@ impl CooldownTracker {
 mod tests {
     use super::*;
 
-    fn uid(id: u64) -> UserId { UserId::new(id) }
+    fn uid(id: u64) -> UserId {
+        UserId::new(id)
+    }
 
     #[test]
     fn test_no_cooldown_initially() {

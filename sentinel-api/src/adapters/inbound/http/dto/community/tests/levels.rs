@@ -1,8 +1,8 @@
 use super::*;
+use chrono::Utc;
 use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
-use chrono::Utc;
 use uuid::Uuid;
 
 #[test]
@@ -102,7 +102,8 @@ use crate::ports::inbound::community::manage_levels::AddXpResult;
 fn save_config_dto_deserializes_with_defaults() {
     let dto: SaveLevelConfigDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.xp_per_message, 15);
     assert_eq!(dto.xp_per_voice_minute, 5);
     assert_eq!(dto.xp_cooldown_secs, 60);
@@ -121,7 +122,8 @@ fn save_config_dto_deserializes_with_overrides() {
         "level_up_channel_id": "c1",
         "excluded_channels": ["ex1", "ex2"],
         "enabled": false
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.xp_per_message, 25);
     assert_eq!(dto.level_up_channel_id.as_deref(), Some("c1"));
     assert_eq!(dto.excluded_channels.len(), 2);
@@ -132,7 +134,8 @@ fn save_config_dto_deserializes_with_overrides() {
 fn add_xp_dto_default_source_is_text() {
     let dto: AddXpDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "user_id": "u", "username": "alice", "amount": 100
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.source, "text");
 }
 
@@ -141,7 +144,8 @@ fn add_xp_dto_with_voice_source() {
     let dto: AddXpDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "user_id": "u", "username": "alice",
         "amount": 50, "source": "voice"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.source, "voice");
     assert_eq!(dto.amount, 50);
 }
@@ -157,7 +161,8 @@ fn level_leaderboard_params_all_optional() {
 fn level_leaderboard_params_with_source() {
     let p: LevelLeaderboardParams = serde_json::from_value(serde_json::json!({
         "limit": 20, "source": "voice"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(p.limit, Some(20));
     assert_eq!(p.source.as_deref(), Some("voice"));
 }
@@ -167,12 +172,19 @@ fn add_xp_response_dto_from_result_with_level_up() {
     let now = Utc::now();
     let result = AddXpResult {
         user_level: UserLevel {
-            id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            user_id: "u".into(),
             username: "alice".into(),
-            xp: 500, level: 3,
-            xp_text: 400, level_text: 2,
-            xp_voice: 100, level_voice: 1,
-            last_xp_at: now, created_at: now, updated_at: now,
+            xp: 500,
+            level: 3,
+            xp_text: 400,
+            level_text: 2,
+            xp_voice: 100,
+            level_voice: 1,
+            last_xp_at: now,
+            created_at: now,
+            updated_at: now,
         },
         leveled_up: true,
         old_level: 2,
@@ -191,11 +203,19 @@ fn add_xp_response_dto_no_level_up() {
     let now = Utc::now();
     let result = AddXpResult {
         user_level: UserLevel {
-            id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            user_id: "u".into(),
             username: "alice".into(),
-            xp: 50, level: 0, xp_text: 50, level_text: 0,
-            xp_voice: 0, level_voice: 0,
-            last_xp_at: now, created_at: now, updated_at: now,
+            xp: 50,
+            level: 0,
+            xp_text: 50,
+            level_text: 0,
+            xp_voice: 0,
+            level_voice: 0,
+            last_xp_at: now,
+            created_at: now,
+            updated_at: now,
         },
         leveled_up: false,
         old_level: 0,

@@ -10,7 +10,13 @@ fn xp_for_level_is_monotonic() {
     let mut prev = 0;
     for lv in 1..=COUDE_MAX_LEVEL {
         let x = xp_for_level(lv);
-        assert!(x > prev, "xp_for_level({}) = {} should be > {}", lv, x, prev);
+        assert!(
+            x > prev,
+            "xp_for_level({}) = {} should be > {}",
+            lv,
+            x,
+            prev
+        );
         prev = x;
     }
 }

@@ -123,10 +123,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     let mut top5_lines = String::new();
     for (i, entry) in top5.iter().enumerate() {
         let user_id = entry.get("user_id").and_then(|v| v.as_str()).unwrap_or("");
-        let username = entry
-            .get("username")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let username = entry.get("username").and_then(|v| v.as_str()).unwrap_or("");
         let net_gain = entry.get("net_gain").and_then(|v| v.as_i64()).unwrap_or(0);
         let mention = if !user_id.is_empty() {
             format!("<@{}>", user_id)

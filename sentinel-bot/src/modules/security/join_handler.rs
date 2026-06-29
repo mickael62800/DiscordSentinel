@@ -145,7 +145,13 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
     };
 
     // Charger la config per-guild depuis l'API (fallback sur env vars)
-    let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::security::MODULE_BOT_NAME).await {
+    let guild_config = match base
+        .get_guild_config_for(
+            &guild_id.to_string(),
+            crate::modules::security::MODULE_BOT_NAME,
+        )
+        .await
+    {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -157,8 +163,11 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         return;
     }
 
-    let _min_account_age =
-        BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
+    let _min_account_age = BaseApiClient::config_u64(
+        &guild_config,
+        "min_account_age_secs",
+        env_config.min_account_age_secs,
+    );
 
     // Config quarantaine per-guild
     let _quarantine_enabled = guild_config
@@ -294,7 +303,8 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
                     "user_id": user.id.to_string(),
                     "timeout_secs": captcha_timeout as i64,
                 });
-                base.post_fire_and_forget("/api/security/quarantine", &body).await;
+                base.post_fire_and_forget("/api/security/quarantine", &body)
+                    .await;
             }
 
             if decision.send_captcha {

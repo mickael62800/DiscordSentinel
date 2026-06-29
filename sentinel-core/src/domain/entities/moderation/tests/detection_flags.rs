@@ -2,20 +2,35 @@ use super::*;
 
 #[test]
 fn test_no_active_flags() {
-    let flags = DetectionFlags { spam: false, insult: false, link: false, phishing: false };
+    let flags = DetectionFlags {
+        spam: false,
+        insult: false,
+        link: false,
+        phishing: false,
+    };
     assert!(flags.active_flags().is_empty());
 }
 
 #[test]
 fn test_all_active_flags() {
-    let flags = DetectionFlags { spam: true, insult: true, link: true, phishing: true };
+    let flags = DetectionFlags {
+        spam: true,
+        insult: true,
+        link: true,
+        phishing: true,
+    };
     let active = flags.active_flags();
     assert_eq!(active.len(), 4);
 }
 
 #[test]
 fn test_single_flag_spam() {
-    let flags = DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+    let flags = DetectionFlags {
+        spam: true,
+        insult: false,
+        link: false,
+        phishing: false,
+    };
     let active = flags.active_flags();
     assert_eq!(active.len(), 1);
     assert_eq!(active[0], FlagType::Spam);

@@ -14,7 +14,9 @@ fn steal_fail_penalty_dto_deserializes() {
 
 #[test]
 fn transfer_coins_response_serializes() {
-    let r = TransferCoinsResponse { taunt_events: vec![] };
+    let r = TransferCoinsResponse {
+        taunt_events: vec![],
+    };
     let json = serde_json::to_string(&r).unwrap();
     assert!(json.contains("\"taunt_events\":[]"));
 }

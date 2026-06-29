@@ -49,10 +49,7 @@ impl StatsTracker {
     /// Incrémente le compteur de messages d'un utilisateur.
     pub async fn record_message(&self, guild_id: u64, user_id: u64) {
         let mut stats = self.stats.write().await;
-        stats
-            .entry((guild_id, user_id))
-            .or_default()
-            .message_count += 1;
+        stats.entry((guild_id, user_id)).or_default().message_count += 1;
     }
 
     /// Enregistre l'entrée d'un utilisateur dans un salon vocal.
@@ -61,7 +58,11 @@ impl StatsTracker {
     /// tant qu'il n'est pas sorti de l'AFK.
     pub async fn voice_join(&self, guild_id: u64, user_id: u64, channel_id: u64, is_afk: bool) {
         let mut sessions = self.voice_sessions.write().await;
-        let active_since = if is_afk { None } else { Some(Utc::now().timestamp()) };
+        let active_since = if is_afk {
+            None
+        } else {
+            Some(Utc::now().timestamp())
+        };
         sessions.insert(
             (guild_id, user_id),
             VoiceSession {
@@ -147,7 +148,11 @@ impl StatsTracker {
     pub async fn hydrate(&self, guild_id: u64, user_id: u64, channel_id: u64, is_afk: bool) {
         let mut sessions = self.voice_sessions.write().await;
         sessions.entry((guild_id, user_id)).or_insert_with(|| {
-            let active_since = if is_afk { None } else { Some(Utc::now().timestamp()) };
+            let active_since = if is_afk {
+                None
+            } else {
+                Some(Utc::now().timestamp())
+            };
             VoiceSession {
                 active_since,
                 credited_seconds: 0,
@@ -155,7 +160,6 @@ impl StatsTracker {
             }
         });
     }
-
 
     /// Enregistre la sortie d'un utilisateur du salon vocal, cumule le temps
     /// actif (hors AFK) et retourne les secondes comptabilisees pour l'XP.
@@ -168,10 +172,7 @@ impl StatsTracker {
             };
             let duration = session.credited_seconds.saturating_add(tail);
             let mut stats = self.stats.write().await;
-            stats
-                .entry((guild_id, user_id))
-                .or_default()
-                .voice_seconds += duration;
+            stats.entry((guild_id, user_id)).or_default().voice_seconds += duration;
             duration
         } else {
             0
@@ -182,10 +183,7 @@ impl StatsTracker {
     #[allow(dead_code)]
     pub async fn get_user_stats(&self, guild_id: u64, user_id: u64) -> UserStats {
         let stats = self.stats.read().await;
-        let mut result = stats
-            .get(&(guild_id, user_id))
-            .cloned()
-            .unwrap_or_default();
+        let mut result = stats.get(&(guild_id, user_id)).cloned().unwrap_or_default();
 
         // Ajouter le temps de la session vocale en cours (hors AFK)
         let sessions = self.voice_sessions.read().await;
@@ -286,7 +284,10 @@ mod tests {
         tracker.voice_join(1, 100, 0, true).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         let duration = tracker.voice_leave(1, 100).await;
-        assert_eq!(duration, 0, "une session entierement AFK ne doit pas crediter de temps");
+        assert_eq!(
+            duration, 0,
+            "une session entierement AFK ne doit pas crediter de temps"
+        );
     }
 
     #[tokio::test]

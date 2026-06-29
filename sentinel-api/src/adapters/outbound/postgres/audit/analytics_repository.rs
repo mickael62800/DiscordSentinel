@@ -1,11 +1,11 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 
+use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 use sentinel_core::domain::entities::system::analytics::*;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 pub struct PgAnalyticsRepository {
     pool: PgPool,
@@ -280,26 +280,33 @@ impl AnalyticsRepository for PgAnalyticsRepository {
     }
 
     async fn reset_activity(&self, guild_id: &str) -> Result<u64, DomainError> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("reset_activity begin", e))?;
         let h = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1")
             .bind(guild_id)
-            .execute(&mut *tx).await
+            .execute(&mut *tx)
+            .await
             .map_err(|e| pg_err_ctx("reset hourly_activity", e))?
             .rows_affected();
         let d = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1")
             .bind(guild_id)
-            .execute(&mut *tx).await
+            .execute(&mut *tx)
+            .await
             .map_err(|e| pg_err_ctx("reset daily_activity", e))?
             .rows_affected();
         // Vide aussi la baseline : sans Ã§a, le prochain snapshot calculerait un
         // delta basÃ© sur l'ancienne baseline et reproduirait des chiffres faux.
         let b = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1")
             .bind(guild_id)
-            .execute(&mut *tx).await
+            .execute(&mut *tx)
+            .await
             .map_err(|e| pg_err_ctx("reset analytics_daily_baseline", e))?
             .rows_affected();
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("reset_activity commit", e))?;
         Ok(h + d + b)
     }

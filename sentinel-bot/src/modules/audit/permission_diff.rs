@@ -39,7 +39,10 @@ const PERMISSION_FLAGS: &[(Permissions, &str)] = &[
     (Permissions::MANAGE_ROLES, "MANAGE_ROLES"),
     (Permissions::MANAGE_WEBHOOKS, "MANAGE_WEBHOOKS"),
     (Permissions::MANAGE_EVENTS, "MANAGE_EVENTS"),
-    (Permissions::USE_APPLICATION_COMMANDS, "USE_APPLICATION_COMMANDS"),
+    (
+        Permissions::USE_APPLICATION_COMMANDS,
+        "USE_APPLICATION_COMMANDS",
+    ),
     (Permissions::MODERATE_MEMBERS, "MODERATE_MEMBERS"),
 ];
 
@@ -114,12 +117,17 @@ mod tests {
     #[test]
     fn multiple_changes() {
         let old = Permissions::SEND_MESSAGES | Permissions::BAN_MEMBERS;
-        let new = Permissions::SEND_MESSAGES | Permissions::KICK_MEMBERS | Permissions::MANAGE_MESSAGES;
+        let new =
+            Permissions::SEND_MESSAGES | Permissions::KICK_MEMBERS | Permissions::MANAGE_MESSAGES;
         let changes = diff_permissions(old, new);
         assert_eq!(changes.len(), 3);
 
         let added: Vec<_> = changes.iter().filter(|c| c.added).map(|c| c.name).collect();
-        let removed: Vec<_> = changes.iter().filter(|c| !c.added).map(|c| c.name).collect();
+        let removed: Vec<_> = changes
+            .iter()
+            .filter(|c| !c.added)
+            .map(|c| c.name)
+            .collect();
 
         assert!(added.contains(&"KICK_MEMBERS"));
         assert!(added.contains(&"MANAGE_MESSAGES"));
@@ -144,8 +152,14 @@ mod tests {
     #[test]
     fn format_diff_mixed() {
         let changes = vec![
-            PermissionChange { name: "BAN_MEMBERS", added: true },
-            PermissionChange { name: "KICK_MEMBERS", added: false },
+            PermissionChange {
+                name: "BAN_MEMBERS",
+                added: true,
+            },
+            PermissionChange {
+                name: "KICK_MEMBERS",
+                added: false,
+            },
         ];
         let result = format_diff(&changes);
         assert!(result.contains("+ BAN_MEMBERS"));

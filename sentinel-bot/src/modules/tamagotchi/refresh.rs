@@ -69,7 +69,10 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
     };
     let mut by_guild: HashMap<String, Vec<CardData>> = HashMap::new();
     for item in cards {
-        by_guild.entry(item.guild_id.clone()).or_default().push(item);
+        by_guild
+            .entry(item.guild_id.clone())
+            .or_default()
+            .push(item);
     }
 
     // 2. Pour chaque serveur, refresh seulement si son intervalle est ecoule.
@@ -99,7 +102,10 @@ async fn refresh_due(ctx: &Context, last_refresh: &mut HashMap<String, Instant>)
 
 /// Lit `card_refresh_interval_minutes` depuis la config guild (defaut 60, min 1).
 async fn guild_interval_minutes(base: &BaseApiClient, guild_id: &str) -> u64 {
-    let cfg = base.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let cfg = base
+        .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     cfg.get("card_refresh_interval_minutes")
         .and_then(|v| v.parse::<u64>().ok())
         .unwrap_or(DEFAULT_REFRESH_MINUTES)
@@ -119,7 +125,11 @@ async fn edit_card(ctx: &Context, base: &BaseApiClient, item: &CardData) -> bool
 
     let edit = match render_card(base, &item.guild_id, &item.owner_id, &item.pet).await {
         Some(png) => EditMessage::new()
-            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .embed(
+                CreateEmbed::new()
+                    .image("attachment://card.png")
+                    .color(0x232838),
+            )
             .attachments(EditAttachments::new().add(CreateAttachment::bytes(png, "card.png")))
             .components(care_buttons()),
         None => EditMessage::new()

@@ -38,9 +38,7 @@ impl IntoResponse for ApiError {
             ),
 
             // 501
-            DomainError::NotImplemented(_) => {
-                (StatusCode::NOT_IMPLEMENTED, self.0.to_string())
-            }
+            DomainError::NotImplemented(_) => (StatusCode::NOT_IMPLEMENTED, self.0.to_string()),
         };
 
         tracing::error!(status = %status, error = %self.0, "Erreur API");

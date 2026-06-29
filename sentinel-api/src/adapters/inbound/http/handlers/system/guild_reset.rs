@@ -46,7 +46,6 @@ pub async fn reset_guild(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ResetGuildBody>,
 ) -> Result<Json<ResetGuildResponse>, ApiError> {
-
     // ── Garde-fou 1 : OWNER uniquement ──
     let ctx = ctx
         .map(|e| e.0)

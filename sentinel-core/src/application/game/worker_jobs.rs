@@ -28,7 +28,8 @@ const RCON_HOST: &str = "127.0.0.1";
 /// Bag d'adapters pour les jobs (evite des signatures kilometriques).
 pub struct JobContext {
     pub server_repo: Arc<dyn GameServerRepository>,
-    pub template_repo: Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository>,
+    pub template_repo:
+        Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository>,
     pub audit_repo: Arc<dyn GameAuditRepository>,
     pub session_repo: Arc<dyn PlayerSessionRepository>,
     pub container_runtime: Arc<dyn ContainerRuntime>,

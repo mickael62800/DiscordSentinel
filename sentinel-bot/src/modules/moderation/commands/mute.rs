@@ -1,6 +1,6 @@
 use serenity::all::{
-    ButtonStyle, CommandInteraction, CommandOptionType, Context,
-    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    ButtonStyle, CommandInteraction, CommandOptionType, Context, CreateActionRow, CreateButton,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
 use serenity::builder::CreateEmbedFooter;
@@ -10,11 +10,11 @@ use crate::shared::api_client::BaseApiClient;
 use crate::shared::embeds::{critical_embed, moderate_embed, success_embed};
 
 use super::api_client::ModerationAction;
-use super::ModerationApiKey;
-use crate::shared::discord_helpers::edit_response_text;
 use super::risk_check::{
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
+use super::ModerationApiKey;
+use crate::shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("mute")
@@ -24,53 +24,64 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du mute")
                 .required(true),
         )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a mute (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (alternative au selecteur)"),
-        )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::Integer,
-                "duration",
-                "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur a mute (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (alternative au selecteur)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::Integer,
+            "duration",
+            "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
+        ))
 }
 
 pub fn register_unmute() -> CreateCommand {
     CreateCommand::new("unmute")
         .description("Retirer le mute d'un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a unmute (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (alternative au selecteur)"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur a unmute (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (alternative au selecteur)",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
-        let _ = command.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("❌ Permission MODERATE_MEMBERS requise pour /mute.")
-                    .ephemeral(true),
-            ),
-        ).await;
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MODERATE_MEMBERS requise pour /mute.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
         warn!(user = %command.user.name, "Tentative /mute sans permission");
         return;
     }
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "mute", "Echec defer interaction Discord");
         return;
     }
@@ -79,23 +90,32 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Parametre 'user' manquant.").await;
+            return;
+        }
     };
 
-    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
-        .unwrap_or("Aucune raison");
+    let reason_raw =
+        crate::shared::discord_helpers::option_str(options, "reason").unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
     let duration_minutes = crate::shared::discord_helpers::option_i64(options, "duration");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "Utilisateur introuvable.").await;
+            return;
+        }
     };
 
     if guild_id.member(&ctx.http, target.id).await.is_err() {
@@ -114,8 +134,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         crate::modules::moderation::MODULE_BOT_NAME,
     )
     .await;
-    let default_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
-    let max_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
+    let default_mute_duration_secs =
+        BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
+    let max_mute_duration_secs =
+        BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
 
     let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
     let timeout_secs = duration_secs.unwrap_or(default_mute_duration_secs);
@@ -179,9 +201,7 @@ async fn defer_with_confirmation(
     let pending_id = uuid::Uuid::new_v4().to_string();
 
     let pending = RiskyPending {
-        kind: PendingKind::Mute {
-            timeout_secs,
-        },
+        kind: PendingKind::Mute { timeout_secs },
         guild_id: guild_id.to_string(),
         channel_id: command.channel_id.to_string(),
         target_id: target.id.to_string(),
@@ -274,7 +294,8 @@ pub async fn execute_mute(
         .as_secs() as i64
         + timeout_secs as i64;
 
-    let datetime = time::OffsetDateTime::from_unix_timestamp(ts).unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+    let datetime = time::OffsetDateTime::from_unix_timestamp(ts)
+        .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
     let timeout = serenity::model::Timestamp::from(datetime);
 
     if let Err(e) = member
@@ -357,8 +378,10 @@ pub async fn execute_mute(
         if let Err(e) = cmd
             .edit_response(
                 &ctx.http,
-                serenity::builder::EditInteractionResponse::new()
-                    .content(format!("✅ Mute applique sur <@{}> ({}).", target.id, duration_label)),
+                serenity::builder::EditInteractionResponse::new().content(format!(
+                    "✅ Mute applique sur <@{}> ({}).",
+                    target.id, duration_label
+                )),
             )
             .await
         {
@@ -372,17 +395,31 @@ pub async fn execute_mute(
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            edit_response_text(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let mut member = match guild_id.member(&ctx.http, target_id).await {
         Ok(m) => m,
-        Err(_) => { edit_response_text(ctx, command, "Membre introuvable.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "Membre introuvable.").await;
+            return;
+        }
     };
 
     if let Err(e) = member.enable_communication(&ctx.http).await {
@@ -394,10 +431,16 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
     let target = target_id.to_user(&ctx.http).await.ok();
-    let target_name = target.as_ref().map(|u| u.name.as_str()).unwrap_or("inconnu");
+    let target_name = target
+        .as_ref()
+        .map(|u| u.name.as_str())
+        .unwrap_or("inconnu");
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -424,14 +467,17 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now())
         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!("✅ <@{target_id}> a ete unmute."))
-                .ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!("✅ <@{target_id}> a ete unmute."))
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send unmute response");
     }
 

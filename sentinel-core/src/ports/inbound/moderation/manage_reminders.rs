@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 pub struct CreateReminderCommand {
     pub guild_id: GuildId,
@@ -20,7 +20,10 @@ pub struct CreateReminderCommand {
 
 #[async_trait]
 pub trait ManageRemindersUseCase: Send + Sync {
-    async fn create_reminder(&self, cmd: CreateReminderCommand) -> Result<SanctionReminder, DomainError>;
+    async fn create_reminder(
+        &self,
+        cmd: CreateReminderCommand,
+    ) -> Result<SanctionReminder, DomainError>;
     async fn get_pending_reminders(&self) -> Result<Vec<SanctionReminder>, DomainError>;
     async fn mark_sent(&self, reminder_id: Uuid) -> Result<(), DomainError>;
     async fn cancel_for_action(&self, action_id: Uuid) -> Result<(), DomainError>;

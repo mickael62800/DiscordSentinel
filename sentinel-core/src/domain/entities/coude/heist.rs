@@ -8,11 +8,11 @@
 //! **Choix d'architecture** : constantes hardcodees ici avec notes.
 //! Modifier ici puis redeployer.
 
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Cooldown entre deux tentatives de braquage (par joueur).
 pub const HEIST_COOLDOWN_DAYS: i64 = 7;

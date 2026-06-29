@@ -105,9 +105,7 @@ pub async fn run(pool: &PgPool, bot_token: &str) -> Result<(), String> {
 
     info!(
         guilds_synced,
-        guilds_errored,
-        total_imported,
-        "Discord audit sync tick termine"
+        guilds_errored, total_imported, "Discord audit sync tick termine"
     );
     Ok(())
 }
@@ -119,18 +117,18 @@ async fn sync_guild(
     guild_id: &str,
 ) -> Result<u32, String> {
     // 1. Recuperer le curseur
-    let last_entry_id: Option<String> =
-        sqlx::query_scalar("SELECT last_entry_id FROM discord_audit_sync_state WHERE guild_id = $1")
-            .bind(guild_id)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| format!("query sync state: {e}"))?
-            .flatten();
+    let last_entry_id: Option<String> = sqlx::query_scalar(
+        "SELECT last_entry_id FROM discord_audit_sync_state WHERE guild_id = $1",
+    )
+    .bind(guild_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(|e| format!("query sync state: {e}"))?
+    .flatten();
 
     // 2. Appel Discord
-    let mut url = format!(
-        "{DISCORD_API_BASE}/guilds/{guild_id}/audit-logs?limit={ENTRIES_PER_CALL}"
-    );
+    let mut url =
+        format!("{DISCORD_API_BASE}/guilds/{guild_id}/audit-logs?limit={ENTRIES_PER_CALL}");
     if let Some(ref id) = last_entry_id {
         url.push_str(&format!("&after={id}"));
     }
@@ -157,7 +155,9 @@ async fn sync_guild(
             .unwrap_or(5.0);
         warn!(guild_id = %guild_id, retry_after, "Discord rate limit — attente");
         tokio::time::sleep(std::time::Duration::from_secs_f64(retry_after)).await;
-        return Err(format!("rate limited ({retry_after}s), retry au prochain tick"));
+        return Err(format!(
+            "rate limited ({retry_after}s), retry au prochain tick"
+        ));
     }
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
@@ -360,7 +360,10 @@ mod tests {
 
     #[test]
     fn map_action_type_member_ban() {
-        assert_eq!(map_action_type(22), Some("discord_audit:member_ban".to_string()));
+        assert_eq!(
+            map_action_type(22),
+            Some("discord_audit:member_ban".to_string())
+        );
     }
 
     #[test]

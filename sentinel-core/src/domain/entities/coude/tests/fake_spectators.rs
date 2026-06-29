@@ -21,7 +21,11 @@ fn pseudos_are_distinct_in_a_single_chat() {
         users.sort();
         let before = users.len();
         users.dedup();
-        assert_eq!(users.len(), before, "spectateurs doublons dans un meme chat");
+        assert_eq!(
+            users.len(),
+            before,
+            "spectateurs doublons dans un meme chat"
+        );
     }
 }
 
@@ -51,7 +55,11 @@ fn handles_draw_with_none_winner_loser() {
 
 #[test]
 fn at_least_100_usernames_in_catalog() {
-    assert!(SPECTATOR_USERNAMES.len() >= 100, "got {}", SPECTATOR_USERNAMES.len());
+    assert!(
+        SPECTATOR_USERNAMES.len() >= 100,
+        "got {}",
+        SPECTATOR_USERNAMES.len()
+    );
 }
 
 #[test]
@@ -67,8 +75,14 @@ fn no_template_has_unbalanced_placeholders() {
             .replace("{def}", "")
             .replace("{winner}", "")
             .replace("{loser}", "");
-        assert!(!cleaned.contains('{'), "template avec placeholder inconnu : {tmpl}");
-        assert!(!cleaned.contains('}'), "template avec placeholder inconnu : {tmpl}");
+        assert!(
+            !cleaned.contains('{'),
+            "template avec placeholder inconnu : {tmpl}"
+        );
+        assert!(
+            !cleaned.contains('}'),
+            "template avec placeholder inconnu : {tmpl}"
+        );
     }
 }
 
@@ -94,5 +108,9 @@ fn distribution_uses_many_different_pseudos() {
             seen.insert(u);
         }
     }
-    assert!(seen.len() >= 50, "doit varier sur 200 chats (got {})", seen.len());
+    assert!(
+        seen.len() >= 50,
+        "doit varier sur 200 chats (got {})",
+        seen.len()
+    );
 }

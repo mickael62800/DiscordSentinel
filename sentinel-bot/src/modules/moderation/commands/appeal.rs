@@ -1,6 +1,6 @@
 use serenity::all::{
-    CommandInteraction, ComponentInteraction, Context, CreateCommand,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, ComponentInteraction, Context, CreateCommand, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 use tracing::{error, info, warn};
 
@@ -17,13 +17,19 @@ pub fn register() -> CreateCommand {
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let data = ctx.data.read().await;
     let base = match data.get::<ApiClientKey>() {
         Some(b) => b,
-        None => { reply_ephemeral(ctx, command, "Erreur interne.").await; return; }
+        None => {
+            reply_ephemeral(ctx, command, "Erreur interne.").await;
+            return;
+        }
     };
 
     let req = base
@@ -51,7 +57,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Ok(resp) => {
             let status = resp.status();
             error!(status = %status, "Erreur creation ticket appel");
-            reply_ephemeral(ctx, command, "Erreur lors de la creation de l'appel. Reessayez plus tard.").await;
+            reply_ephemeral(
+                ctx,
+                command,
+                "Erreur lors de la creation de l'appel. Reessayez plus tard.",
+            )
+            .await;
         }
         Err(e) => {
             error!(error = %e, "Erreur reseau creation ticket appel");
@@ -128,7 +139,8 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
                     &action_id[..16.min(action_id.len())],
                 ))
                 .timestamp(serenity::model::Timestamp::now());
-            crate::modules::moderation::post_to_appeal_channel(ctx, &found_guild, notif_embed).await;
+            crate::modules::moderation::post_to_appeal_channel(ctx, &found_guild, notif_embed)
+                .await;
         }
         _ => {
             let response = CreateInteractionResponse::Message(

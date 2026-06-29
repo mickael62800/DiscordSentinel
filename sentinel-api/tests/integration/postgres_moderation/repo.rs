@@ -9,17 +9,25 @@ use sentinel_api::adapters::outbound::postgres::moderation::moderation_repositor
 use sentinel_api::ports::outbound::moderation::moderation_repository::ModerationRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 async fn seed_audit(
-    pool: &PgPool, guild: &str, event_type: &str,
-    target_id: &str, action_id: Option<Uuid>, reason: &str,
+    pool: &PgPool,
+    guild: &str,
+    event_type: &str,
+    target_id: &str,
+    action_id: Option<Uuid>,
+    reason: &str,
 ) -> Uuid {
     let id = Uuid::new_v4();
     let details = if let Some(aid) = action_id {
@@ -41,11 +49,17 @@ async fn save_is_noop_phase4() {
     // save() est un no-op (Phase 4).
     let repo = PgModerationRepository::new(pool().await);
     let action = sentinel_core::domain::entities::moderation::action::applied::ModerationAction {
-        id: Uuid::new_v4(), guild_id: "g".into(), channel_id: "c".into(),
-        moderator_id: "m".into(), moderator_name: "M".into(),
-        target_id: "t".into(), target_name: "T".into(),
-        action_type: "warn".into(), reason: "test".into(),
-        gravity: None, duration: None,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        channel_id: "c".into(),
+        moderator_id: "m".into(),
+        moderator_name: "M".into(),
+        target_id: "t".into(),
+        target_name: "T".into(),
+        action_type: "warn".into(),
+        reason: "test".into(),
+        gravity: None,
+        duration: None,
         created_at: chrono::Utc::now(),
     };
     repo.save(&action).await.unwrap(); // should not error
@@ -290,7 +304,15 @@ async fn find_all_for_guild_respects_limit() {
     let repo = PgModerationRepository::new(pool.clone());
     let guild = fresh_id();
     for i in 0..5 {
-        seed_audit(&pool, &guild, "mod_warn", &fresh_id(), None, &format!("r{i}")).await;
+        seed_audit(
+            &pool,
+            &guild,
+            "mod_warn",
+            &fresh_id(),
+            None,
+            &format!("r{i}"),
+        )
+        .await;
     }
     let got = repo.find_all_for_guild(Some(&guild), 3).await.unwrap();
     assert_eq!(got.len(), 3);
@@ -308,6 +330,9 @@ async fn delete_bans_for_user_no_bans_is_noop() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn find_by_target_empty_returns_empty() {
     let repo = PgModerationRepository::new(pool().await);
-    let res = repo.find_by_target(&fresh_id(), &fresh_id(), 10).await.unwrap();
+    let res = repo
+        .find_by_target(&fresh_id(), &fresh_id(), 10)
+        .await
+        .unwrap();
     assert!(res.is_empty());
 }

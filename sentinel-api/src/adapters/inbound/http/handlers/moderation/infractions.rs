@@ -1,21 +1,21 @@
-use axum::extract::Path;
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionQueryParams;
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use sentinel_core::domain::enums::system::role::Role;
 
 pub async fn list_infractions(
     State(state): State<AppState>,
@@ -31,7 +31,10 @@ pub async fn list_infractions(
         offset: normalize_offset(params.offset),
     };
 
-    let infractions = state.infractions_uc.list_infractions(&guild_id, filters).await?;
+    let infractions = state
+        .infractions_uc
+        .list_infractions(&guild_id, filters)
+        .await?;
     Ok(map_to_dtos(infractions))
 }
 
@@ -59,7 +62,10 @@ pub async fn delete_infraction(
 
     let deleted = state.infractions_uc.delete_infraction(&id).await?;
     if !deleted {
-        return Err(sentinel_core::domain::errors::DomainError::NotFound("Infraction introuvable".into()).into());
+        return Err(sentinel_core::domain::errors::DomainError::NotFound(
+            "Infraction introuvable".into(),
+        )
+        .into());
     }
 
     // Envoyer un DM a l'utilisateur pour l'informer de la grace

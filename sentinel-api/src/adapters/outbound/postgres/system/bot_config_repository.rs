@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sentinel_core::domain::entities::system::bot_config::BotDefinition;
 use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 pub struct PgBotConfigRepository {
     pool: PgPool,
@@ -73,7 +73,11 @@ impl BotConfigRepository for PgBotConfigRepository {
         Ok(rows.into_iter().map(BotDefinition::from).collect())
     }
 
-    async fn get_config(&self, guild_id: &str, bot_name: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+    async fn get_config(
+        &self,
+        guild_id: &str,
+        bot_name: &str,
+    ) -> Result<Vec<BotGuildConfig>, DomainError> {
         let rows = sqlx::query_as::<_, ConfigRow>(
             "SELECT * FROM bot_guild_config WHERE guild_id = $1 AND bot_name = $2 ORDER BY config_key",
         )
@@ -98,7 +102,13 @@ impl BotConfigRepository for PgBotConfigRepository {
         Ok(rows.into_iter().map(BotGuildConfig::from).collect())
     }
 
-    async fn set_config(&self, guild_id: &str, bot_name: &str, key: &str, value: &str) -> Result<(), DomainError> {
+    async fn set_config(
+        &self,
+        guild_id: &str,
+        bot_name: &str,
+        key: &str,
+        value: &str,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO bot_guild_config (id, guild_id, bot_name, config_key, config_value, updated_at)
@@ -120,7 +130,12 @@ impl BotConfigRepository for PgBotConfigRepository {
         Ok(())
     }
 
-    async fn delete_config(&self, guild_id: &str, bot_name: &str, key: &str) -> Result<(), DomainError> {
+    async fn delete_config(
+        &self,
+        guild_id: &str,
+        bot_name: &str,
+        key: &str,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             "DELETE FROM bot_guild_config WHERE guild_id = $1 AND bot_name = $2 AND config_key = $3",
         )

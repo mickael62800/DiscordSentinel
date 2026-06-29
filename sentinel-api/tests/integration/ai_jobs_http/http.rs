@@ -13,9 +13,12 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 
-async fn json_req(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn json_req(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body = match body {
         Some(v) => {
@@ -28,7 +31,10 @@ async fn json_req(app: axum::Router, method: &str, uri: &str, body: Option<serde
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn state() -> sentinel_api::adapters::inbound::http::state::AppState {

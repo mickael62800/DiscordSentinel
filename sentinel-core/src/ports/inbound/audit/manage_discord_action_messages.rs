@@ -13,10 +13,7 @@ use crate::domain::errors::DomainError;
 #[async_trait]
 pub trait ManageDiscordActionMessagesUseCase: Send + Sync {
     /// Enregistre un mapping (idempotent). Le `kind` doit etre non vide.
-    async fn register(
-        &self,
-        msg: NewDiscordActionMessage,
-    ) -> Result<(), DomainError>;
+    async fn register(&self, msg: NewDiscordActionMessage) -> Result<(), DomainError>;
 
     /// Liste tous les mappings d'une action (toutes les representations
     /// Discord d'une meme entite metier).

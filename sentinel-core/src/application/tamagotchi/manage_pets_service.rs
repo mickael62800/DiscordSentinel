@@ -37,7 +37,9 @@ fn clamp_gauge(v: i32) -> i32 {
 impl ManagePetsUseCase for ManagePetsService {
     async fn create(&self, cmd: CreatePetCommand) -> Result<Pet, DomainError> {
         if cmd.guild_id.trim().is_empty() || cmd.owner_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id et owner_id requis".into()));
+            return Err(DomainError::ValidationError(
+                "guild_id et owner_id requis".into(),
+            ));
         }
         let name = cmd.name.trim();
         if name.is_empty() || name.chars().count() > 32 {
@@ -45,8 +47,9 @@ impl ManagePetsUseCase for ManagePetsService {
                 "nom requis (1-32 caracteres)".into(),
             ));
         }
-        let species = Species::from_str(&cmd.species)
-            .ok_or_else(|| DomainError::ValidationError(format!("espece inconnue : {}", cmd.species)))?;
+        let species = Species::from_str(&cmd.species).ok_or_else(|| {
+            DomainError::ValidationError(format!("espece inconnue : {}", cmd.species))
+        })?;
         // Un seul compagnon vivant par joueur. La contrainte UNIQUE
         // (guild_id, owner_id) empeche de recreer tant que l'ancien existe :
         // si le compagnon precedent est mort, on le supprime d'abord pour
@@ -72,12 +75,20 @@ impl ManagePetsUseCase for ManagePetsService {
             .await?;
         let _ = self
             .repo
-            .add_event(pet.id, "born", &format!("{} ({}) est ne !", pet.name, species.display()))
+            .add_event(
+                pet.id,
+                "born",
+                &format!("{} ({}) est ne !", pet.name, species.display()),
+            )
             .await;
         Ok(pet)
     }
 
-    async fn get_by_owner(&self, guild_id: &str, owner_id: &str) -> Result<Option<Pet>, DomainError> {
+    async fn get_by_owner(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<Pet>, DomainError> {
         self.repo.get_by_owner(guild_id, owner_id).await
     }
 
@@ -175,7 +186,13 @@ impl ManagePetsUseCase for ManagePetsService {
         }
         if cmd.coin_cost > 0 {
             self.wallet
-                .debit(&pet.guild_id, &pet.owner_id, cmd.coin_cost, "tamagotchi", "Tamagotchi : entrainement")
+                .debit(
+                    &pet.guild_id,
+                    &pet.owner_id,
+                    cmd.coin_cost,
+                    "tamagotchi",
+                    "Tamagotchi : entrainement",
+                )
                 .await?;
         }
         pet.energy = clamp_gauge(pet.energy - cmd.energy_cost);
@@ -183,20 +200,30 @@ impl ManagePetsUseCase for ManagePetsService {
             "str" => pet.str_ += cmd.stat_gain,
             "vit" => pet.vit += cmd.stat_gain,
             "agi" => pet.agi += cmd.stat_gain,
-            _ => return Err(DomainError::ValidationError("stat invalide (str|vit|agi)".into())),
+            _ => {
+                return Err(DomainError::ValidationError(
+                    "stat invalide (str|vit|agi)".into(),
+                ))
+            }
         }
         pet.set_cooldown("train", now);
         let saved = self.repo.save(&pet).await?;
         let _ = self
             .repo
-            .add_event(saved.id, "train", &format!("Entrainement : +{} {}", cmd.stat_gain, cmd.stat))
+            .add_event(
+                saved.id,
+                "train",
+                &format!("Entrainement : +{} {}", cmd.stat_gain, cmd.stat),
+            )
             .await;
         Ok(saved)
     }
 
     async fn visit(&self, cmd: VisitCommand) -> Result<VisitResult, DomainError> {
         if cmd.visitor_id == cmd.target_id {
-            return Err(DomainError::ValidationError("tu ne peux pas te visiter toi-meme".into()));
+            return Err(DomainError::ValidationError(
+                "tu ne peux pas te visiter toi-meme".into(),
+            ));
         }
         // Compagnon du visiteur (pour cooldown + limite/jour).
         let mut visitor = self
@@ -227,13 +254,21 @@ impl ManagePetsUseCase for ManagePetsService {
             .await?
             .ok_or_else(|| DomainError::NotFound("ce joueur n'a pas de compagnon".into()))?;
         if target.status == Health::Dead {
-            return Err(DomainError::Conflict("le compagnon de ce joueur est mort".into()));
+            return Err(DomainError::Conflict(
+                "le compagnon de ce joueur est mort".into(),
+            ));
         }
 
         // Recompense le visite : coins (wallet) + XP.
         if cmd.coins_reward > 0 {
             self.wallet
-                .credit(&cmd.guild_id, &cmd.target_id, cmd.coins_reward, "tamagotchi", "Visite recue")
+                .credit(
+                    &cmd.guild_id,
+                    &cmd.target_id,
+                    cmd.coins_reward,
+                    "tamagotchi",
+                    "Visite recue",
+                )
                 .await?;
         }
         if cmd.xp_reward > 0 {
@@ -267,7 +302,9 @@ impl ManagePetsUseCase for ManagePetsService {
 
     async fn combat(&self, cmd: CombatCommand) -> Result<CombatResult, DomainError> {
         if cmd.attacker_id == cmd.target_id {
-            return Err(DomainError::ValidationError("tu ne peux pas te combattre toi-meme".into()));
+            return Err(DomainError::ValidationError(
+                "tu ne peux pas te combattre toi-meme".into(),
+            ));
         }
         let mut att = self
             .repo
@@ -280,7 +317,9 @@ impl ManagePetsUseCase for ManagePetsService {
         let now = Utc::now();
         let remaining = att.cooldown_remaining_secs("combat", now, cmd.cooldown_secs);
         if remaining > 0 {
-            return Err(DomainError::Conflict(format!("combat en cooldown ({remaining}s restantes)")));
+            return Err(DomainError::Conflict(format!(
+                "combat en cooldown ({remaining}s restantes)"
+            )));
         }
         if att.energy < cmd.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
@@ -291,7 +330,9 @@ impl ManagePetsUseCase for ManagePetsService {
             .await?
             .ok_or_else(|| DomainError::NotFound("ce joueur n'a pas de compagnon".into()))?;
         if def.status == Health::Dead {
-            return Err(DomainError::Conflict("le compagnon de ce joueur est mort".into()));
+            return Err(DomainError::Conflict(
+                "le compagnon de ce joueur est mort".into(),
+            ));
         }
 
         // Rolls (RNG genere avant tout await, non maintenu a travers).
@@ -303,8 +344,12 @@ impl ManagePetsUseCase for ManagePetsService {
             let lo = if max == 0 { 0 } else { rng.gen_range(0..=max) };
             (hi, lo)
         };
-        let power_a = combat_power(att.str_, att.vit, att.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_a);
-        let power_d = combat_power(def.str_, def.vit, def.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_d);
+        let power_a = combat_power(
+            att.str_, att.vit, att.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_a,
+        );
+        let power_d = combat_power(
+            def.str_, def.vit, def.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_d,
+        );
         let attacker_won = power_a >= power_d;
 
         att.energy = clamp_gauge(att.energy - cmd.energy_cost);
@@ -333,11 +378,26 @@ impl ManagePetsUseCase for ManagePetsService {
 
         self.repo.save(&att).await?;
         self.repo.save(&def).await?;
-        let verb = if attacker_won { "a battu" } else { "a perdu contre" };
-        let _ = self.repo.add_event(att.id, "combat", &format!("{} {} {}", att.name, verb, def.name)).await;
+        let verb = if attacker_won {
+            "a battu"
+        } else {
+            "a perdu contre"
+        };
         let _ = self
             .repo
-            .add_event(def.id, "combat", &format!("{} a affronte {}", def.name, cmd.attacker_name))
+            .add_event(
+                att.id,
+                "combat",
+                &format!("{} {} {}", att.name, verb, def.name),
+            )
+            .await;
+        let _ = self
+            .repo
+            .add_event(
+                def.id,
+                "combat",
+                &format!("{} a affronte {}", def.name, cmd.attacker_name),
+            )
             .await;
 
         Ok(CombatResult {
@@ -350,7 +410,11 @@ impl ManagePetsUseCase for ManagePetsService {
         })
     }
 
-    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
+    async fn list_alive(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
         // Borne par batch (anti-OOM) ; la pagination par curseur permet de
         // couvrir l'integralite des compagnons sur plusieurs appels.
         self.repo.list_alive(limit.clamp(1, 1000), after_id).await
@@ -363,11 +427,19 @@ impl ManagePetsUseCase for ManagePetsService {
         channel_id: &str,
         message_id: &str,
     ) -> Result<(), DomainError> {
-        self.repo.set_card_location(guild_id, owner_id, channel_id, message_id).await
+        self.repo
+            .set_card_location(guild_id, owner_id, channel_id, message_id)
+            .await
     }
 
-    async fn list_cards(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError> {
-        self.repo.list_with_card(limit.clamp(1, 1000), after_id).await
+    async fn list_cards(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
+        self.repo
+            .list_with_card(limit.clamp(1, 1000), after_id)
+            .await
     }
 
     async fn tick(&self, pet_id: Uuid, cfg: TickConfig) -> Result<TickOutcome, DomainError> {

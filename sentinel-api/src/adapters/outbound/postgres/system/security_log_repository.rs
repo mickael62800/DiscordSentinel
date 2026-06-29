@@ -93,21 +93,22 @@ impl SecurityLogRepository for PgSecurityLogRepository {
              ORDER BY timestamp DESC \
              LIMIT {limit}"
         );
-        let rows =
-            sqlx::query_as::<_, (DateTime<Utc>, i64, String, String, String, String)>(&sql)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(pg_err)?;
+        let rows = sqlx::query_as::<_, (DateTime<Utc>, i64, String, String, String, String)>(&sql)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(rows
             .into_iter()
-            .map(|(timestamp, status_code, method, route, client_ip, user_agent)| AuthFailure {
-                timestamp,
-                status_code,
-                method,
-                route,
-                client_ip,
-                user_agent,
-            })
+            .map(
+                |(timestamp, status_code, method, route, client_ip, user_agent)| AuthFailure {
+                    timestamp,
+                    status_code,
+                    method,
+                    route,
+                    client_ip,
+                    user_agent,
+                },
+            )
             .collect())
     }
 

@@ -14,8 +14,8 @@ use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use tracing::warn;
 
-use crate::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::cache_helpers::cached_json;
 use crate::ports::outbound::system::ticket_repository::TicketRepository;
 const TICKETS_LIST_TTL: u64 = 60; // 1 minute
 const TICKET_DETAIL_TTL: u64 = 120; // 2 minutes
@@ -42,8 +42,17 @@ impl ManageTicketsService {
 
 #[async_trait]
 impl ManageTicketsUseCase for ManageTicketsService {
-    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, search: Option<String>, author_id: Option<String>, limit: i64, offset: i64) -> Result<Vec<Ticket>, DomainError> {
-        let has_filters = status.is_some() || priority.is_some() || search.is_some() || author_id.is_some();
+    async fn list_tickets(
+        &self,
+        status: Option<String>,
+        priority: Option<String>,
+        search: Option<String>,
+        author_id: Option<String>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Ticket>, DomainError> {
+        let has_filters =
+            status.is_some() || priority.is_some() || search.is_some() || author_id.is_some();
 
         // Cache-first uniquement si pas de filtres et premiere page
         if !has_filters && offset == 0 {
@@ -54,19 +63,26 @@ impl ManageTicketsUseCase for ManageTicketsService {
             }
         }
 
-        let tickets = self.ticket_repo.find_all(
-            status.as_deref(),
-            priority.as_deref(),
-            search.as_deref(),
-            author_id.as_deref(),
-            limit,
-            offset,
-        ).await?;
+        let tickets = self
+            .ticket_repo
+            .find_all(
+                status.as_deref(),
+                priority.as_deref(),
+                search.as_deref(),
+                author_id.as_deref(),
+                limit,
+                offset,
+            )
+            .await?;
 
         // Populate cache uniquement si pas de filtres
         if !has_filters {
             if let Ok(json) = serde_json::to_string(&tickets) {
-                if let Err(e) = self.cache.set_json("tickets:all", &json, TICKETS_LIST_TTL).await {
+                if let Err(e) = self
+                    .cache
+                    .set_json("tickets:all", &json, TICKETS_LIST_TTL)
+                    .await
+                {
                     warn!(error = %e, "Echec cache set tickets:all");
                 }
             }
@@ -122,10 +138,9 @@ impl ManageTicketsUseCase for ManageTicketsService {
     }
 
     async fn reply_ticket(&self, cmd: ReplyTicketCommand) -> Result<(), DomainError> {
-        let ticket_id = cmd
-            .ticket_id
-            .parse::<Uuid>()
-            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+        let ticket_id = cmd.ticket_id.parse::<Uuid>().map_err(|_| {
+            DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id))
+        })?;
 
         let message = TicketMessage {
             id: Uuid::new_v4(),
@@ -168,28 +183,35 @@ impl ManageTicketsUseCase for ManageTicketsService {
     }
 
     async fn assign_ticket(&self, cmd: AssignTicketCommand) -> Result<(), DomainError> {
-        let uuid = cmd
-            .ticket_id
-            .parse::<Uuid>()
-            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+        let uuid = cmd.ticket_id.parse::<Uuid>().map_err(|_| {
+            DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id))
+        })?;
 
-        self.ticket_repo.update_assignee(uuid, &cmd.assignee).await?;
+        self.ticket_repo
+            .update_assignee(uuid, &cmd.assignee)
+            .await?;
         self.invalidate_tickets_cache().await;
 
         Ok(())
     }
 
-    async fn update_ticket_channel(&self, cmd: UpdateTicketChannelCommand) -> Result<(), DomainError> {
-        let uuid = cmd
-            .ticket_id
-            .parse::<Uuid>()
-            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+    async fn update_ticket_channel(
+        &self,
+        cmd: UpdateTicketChannelCommand,
+    ) -> Result<(), DomainError> {
+        let uuid = cmd.ticket_id.parse::<Uuid>().map_err(|_| {
+            DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id))
+        })?;
 
         if let Some(ref vc_id) = cmd.voice_channel_id {
-            self.ticket_repo.update_voice_channel(uuid, Some(vc_id)).await?;
+            self.ticket_repo
+                .update_voice_channel(uuid, Some(vc_id))
+                .await?;
         }
         if let Some(ref inv_id) = cmd.invited_user_id {
-            self.ticket_repo.update_invited_user(uuid, Some(inv_id)).await?;
+            self.ticket_repo
+                .update_invited_user(uuid, Some(inv_id))
+                .await?;
         }
         self.invalidate_tickets_cache().await;
 
@@ -209,11 +231,12 @@ impl ManageTicketsUseCase for ManageTicketsService {
         resolved_at: Option<&str>,
         satisfaction_rating: Option<i32>,
     ) -> Result<(), DomainError> {
-        self.ticket_repo.update_sla(id, first_response_at, resolved_at, satisfaction_rating).await?;
+        self.ticket_repo
+            .update_sla(id, first_response_at, resolved_at, satisfaction_rating)
+            .await?;
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/manage_tickets.rs"]

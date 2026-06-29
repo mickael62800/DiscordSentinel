@@ -98,7 +98,8 @@ pub fn spawn_background(ctx: Context) {
                                 .await
                                 .ok()
                                 .and_then(|cfg| {
-                                    cfg.get("afk_timeout_secs").and_then(|v| v.parse::<u64>().ok())
+                                    cfg.get("afk_timeout_secs")
+                                        .and_then(|v| v.parse::<u64>().ok())
                                 })
                                 .filter(|v| *v > 0)
                                 .unwrap_or(DEFAULT_AFK_TIMEOUT_SECS),

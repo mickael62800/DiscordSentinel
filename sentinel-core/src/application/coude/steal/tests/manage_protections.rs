@@ -45,16 +45,25 @@ fn mk_protection(item_key: &str) -> StealProtection {
 #[tokio::test]
 async fn price_for_known_item_returns_grid() {
     let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let price = svc.price_for("chien_garde", StealProtectionDuration::OneDay).await.unwrap();
+    let price = svc
+        .price_for("chien_garde", StealProtectionDuration::OneDay)
+        .await
+        .unwrap();
     assert_eq!(price, 50);
-    let price = svc.price_for("chien_garde", StealProtectionDuration::SevenDays).await.unwrap();
+    let price = svc
+        .price_for("chien_garde", StealProtectionDuration::SevenDays)
+        .await
+        .unwrap();
     assert_eq!(price, 280);
 }
 
 #[tokio::test]
 async fn price_for_unknown_item_errors() {
     let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let err = svc.price_for("unknown", StealProtectionDuration::OneDay).await.unwrap_err();
+    let err = svc
+        .price_for("unknown", StealProtectionDuration::OneDay)
+        .await
+        .unwrap_err();
     matches!(err, DomainError::ValidationError(_));
 }
 
@@ -77,7 +86,10 @@ async fn try_trigger_with_forteresse_high_probability() {
             break;
         }
     }
-    assert!(any_blocked, "forteresse n'a jamais bloque sur 50 essais (tres improbable)");
+    assert!(
+        any_blocked,
+        "forteresse n'a jamais bloque sur 50 essais (tres improbable)"
+    );
 }
 
 #[tokio::test]
@@ -92,14 +104,20 @@ async fn list_active_passes_through() {
 #[tokio::test]
 async fn subscribe_known_item_returns_future_date() {
     let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let expires = svc.subscribe("g", "u", "chien_garde", StealProtectionDuration::SevenDays).await.unwrap();
+    let expires = svc
+        .subscribe("g", "u", "chien_garde", StealProtectionDuration::SevenDays)
+        .await
+        .unwrap();
     assert!(expires > Utc::now());
 }
 
 #[tokio::test]
 async fn subscribe_unknown_item_returns_validation_error() {
     let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let err = svc.subscribe("g", "u", "wibble", StealProtectionDuration::OneDay).await.unwrap_err();
+    let err = svc
+        .subscribe("g", "u", "wibble", StealProtectionDuration::OneDay)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
@@ -132,5 +150,8 @@ async fn try_trigger_skips_non_active_items() {
         }
     }
     // chien_garde a une block_chance < 100%, donc quelques miss attendus.
-    assert!(misses > 0, "chien_garde devrait louper au moins une fois sur 200");
+    assert!(
+        misses > 0,
+        "chien_garde devrait louper au moins une fois sur 200"
+    );
 }

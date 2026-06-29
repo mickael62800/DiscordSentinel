@@ -31,13 +31,11 @@ pub fn register() -> CreateCommand {
                 CreateCommandOption::new(CommandOptionType::String, "url", "URL de la preuve")
                     .required(true),
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "description",
-                    "Description optionnelle (max 500 chars)",
-                ),
-            ),
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::String,
+                "description",
+                "Description optionnelle (max 500 chars)",
+            )),
         )
         .add_option(
             CreateCommandOption::new(
@@ -57,24 +55,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "evidence", "Echec defer interaction Discord");
         return;
     }
 
-    let sub = command
-        .data
-        .options
-        .iter()
-        .find_map(|o| match &o.value {
-            CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
-            _ => None,
-        });
+    let sub = command.data.options.iter().find_map(|o| match &o.value {
+        CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
+        _ => None,
+    });
 
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
@@ -207,10 +204,7 @@ async fn handle_list(
             .take(10)
             .enumerate()
             .map(|(i, e)| {
-                let desc = e
-                    .description
-                    .as_deref()
-                    .unwrap_or("_pas de description_");
+                let desc = e.description.as_deref().unwrap_or("_pas de description_");
                 format!(
                     "{}. [Lien]({}) — par <@{}>\n   _{}_",
                     i + 1,
@@ -244,17 +238,13 @@ fn short_id(full: &str) -> String {
     full.chars().take(8).collect()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn short_id_truncates_to_8() {
-        assert_eq!(
-            short_id("12345678-abcd-ef00-1234-567890abcdef"),
-            "12345678"
-        );
+        assert_eq!(short_id("12345678-abcd-ef00-1234-567890abcdef"), "12345678");
     }
 
     #[test]

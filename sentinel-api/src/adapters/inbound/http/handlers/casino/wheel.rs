@@ -1,19 +1,19 @@
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::coude::taunts::TauntEventDto;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::entities::casino::wheel::WheelSpin;
-use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Json;
+use sentinel_core::domain::entities::casino::wheel::WheelSpin;
+use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -42,7 +42,11 @@ impl From<WheelSpinResult> for WheelSpinResponseDto {
             payout: r.case.payout,
             balance_after: r.balance_after,
             is_memorable: r.is_memorable,
-            triggered_taunts: r.triggered_taunts.into_iter().map(TauntEventDto::from).collect(),
+            triggered_taunts: r
+                .triggered_taunts
+                .into_iter()
+                .map(TauntEventDto::from)
+                .collect(),
         }
     }
 }
@@ -154,7 +158,9 @@ pub async fn leaderboard(
     let days = params.days.unwrap_or(7).clamp(1, 365);
     let limit = normalize_limit(params.limit, 10, 100);
     let winners = state.wheel_uc.top_winners(&guild_id, days, limit).await?;
-    Ok(Json(winners.into_iter().map(WheelTopWinnerDto::from).collect()))
+    Ok(Json(
+        winners.into_iter().map(WheelTopWinnerDto::from).collect(),
+    ))
 }
 
 #[cfg(test)]

@@ -134,9 +134,7 @@ pub(super) async fn random_active(
     Ok(rows.into_iter().map(Into::into).collect())
 }
 
-pub(super) async fn list_guild_ids(
-    repo: &PgPlayerRepository,
-) -> Result<Vec<String>, DomainError> {
+pub(super) async fn list_guild_ids(repo: &PgPlayerRepository) -> Result<Vec<String>, DomainError> {
     let rows: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT guild_id FROM coude_players")
         .fetch_all(&repo.pool)
         .await

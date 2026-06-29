@@ -1,7 +1,7 @@
 use serenity::all::{
-    ButtonStyle, CommandInteraction, CommandOptionType,
-    ComponentInteraction, Context, CreateActionRow, CreateButton, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    ButtonStyle, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
+    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 use tracing::{info, warn};
 
@@ -13,12 +13,16 @@ pub fn register() -> CreateCommand {
     CreateCommand::new("unwarn")
         .description("Retirer un avertissement d'un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "L'utilisateur concerne (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "L'utilisateur concerne (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (ex. membre parti / banni)",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::Boolean,
@@ -31,14 +35,16 @@ pub fn register() -> CreateCommand {
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
-        let _ = command.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("❌ Permission MODERATE_MEMBERS requise pour /unwarn.")
-                    .ephemeral(true),
-            ),
-        ).await;
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MODERATE_MEMBERS requise pour /unwarn.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
         warn!(user = %command.user.name, "Tentative /unwarn sans permission");
         return;
     }
@@ -55,7 +61,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => {
-            edit_response(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await;
+            edit_response(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
             return;
         }
     };
@@ -283,7 +294,9 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
                     ))
                     .color(0x2ecc71)
                     .timestamp(serenity::model::Timestamp::now())
-                    .footer(serenity::builder::CreateEmbedFooter::new("Moderation | Sentinel"));
+                    .footer(serenity::builder::CreateEmbedFooter::new(
+                        "Moderation | Sentinel",
+                    ));
                 super::log_to_channel(ctx, &guild_id.to_string(), log_embed).await;
             }
         }

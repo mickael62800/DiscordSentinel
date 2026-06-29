@@ -6,19 +6,19 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
-use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use tracing::warn;
 
-use crate::ports::outbound::system::cache_helpers::cached_json;
-use crate::ports::outbound::system::cache::CachePort;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::cache_helpers::cached_json;
 const HISTORY_TTL: u64 = 180; // 3 minutes
 
 pub struct ManageModerationService {
@@ -35,7 +35,13 @@ impl ManageModerationService {
         strike_repo: Arc<dyn StrikeRepository>,
         cache: Arc<dyn CachePort>,
     ) -> Self {
-        Self { repo, strike_repo, cache, strikes_uc: None, audit_logs_uc: None }
+        Self {
+            repo,
+            strike_repo,
+            cache,
+            strikes_uc: None,
+            audit_logs_uc: None,
+        }
     }
 
     /// Injecte le use case strikes (optionnel — active `log_action_with_strike`).
@@ -84,9 +90,7 @@ impl ManageModerationUseCase for ManageModerationService {
         self.repo.save(&action).await?;
 
         let uc = self.audit_logs_uc.as_ref().ok_or_else(|| {
-            DomainError::Internal(
-                "audit_logs_uc non injecte dans ManageModerationService".into(),
-            )
+            DomainError::Internal("audit_logs_uc non injecte dans ManageModerationService".into())
         })?;
         let event_type = format!("mod_{}", action.action_type);
         let details = serde_json::json!({
@@ -117,7 +121,10 @@ impl ManageModerationUseCase for ManageModerationService {
         Ok(action)
     }
 
-    async fn log_action_with_strike(&self, cmd: LogModerationCommand) -> Result<LoggedModerationAction, DomainError> {
+    async fn log_action_with_strike(
+        &self,
+        cmd: LogModerationCommand,
+    ) -> Result<LoggedModerationAction, DomainError> {
         // Capture les champs necessaires pour la commande strike AVANT le move.
         let guild_id = cmd.guild_id.clone();
         let target_id = cmd.target_id.clone();
@@ -129,7 +136,10 @@ impl ManageModerationUseCase for ManageModerationService {
         // La "prevention" est tracee dans l'historique mais NE compte PAS dans
         // l'escalade : on n'ajoute pas de strike (cran sous le warn).
         if action_type == "prevention" {
-            return Ok(LoggedModerationAction { action, strike: None });
+            return Ok(LoggedModerationAction {
+                action,
+                strike: None,
+            });
         }
 
         // Si le strikes_uc n'a pas ete injecte, on retourne sans strike
@@ -167,15 +177,28 @@ impl ManageModerationUseCase for ManageModerationService {
         Ok(LoggedModerationAction { action, strike })
     }
 
-    async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError> {
+    async fn get_history(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+    ) -> Result<UserModerationHistory, DomainError> {
         let cache_key = format!("modhistory:{guild_id}:{target_id}");
         cached_json(&self.cache, &cache_key, HISTORY_TTL, || async {
             let actions = self.repo.find_by_target(guild_id, target_id, 500).await?;
-            let target_name = actions.first().map(|a| a.target_name.clone()).unwrap_or_default();
+            let target_name = actions
+                .first()
+                .map(|a| a.target_name.clone())
+                .unwrap_or_default();
 
             let total_warns = actions.iter().filter(|a| a.action_type == "warn").count() as u32;
-            let total_mutes = actions.iter().filter(|a| a.action_type.starts_with("mute")).count() as u32;
-            let total_bans = actions.iter().filter(|a| a.action_type.starts_with("ban")).count() as u32;
+            let total_mutes = actions
+                .iter()
+                .filter(|a| a.action_type.starts_with("mute"))
+                .count() as u32;
+            let total_bans = actions
+                .iter()
+                .filter(|a| a.action_type.starts_with("ban"))
+                .count() as u32;
 
             Ok(UserModerationHistory {
                 target_id: target_id.to_string(),
@@ -189,15 +212,28 @@ impl ManageModerationUseCase for ManageModerationService {
         .await
     }
 
-    async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn list_bans(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         self.repo.find_bans(guild_id, limit, offset).await
     }
 
-    async fn list_actions(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn list_actions(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         self.repo.find_all_for_guild(guild_id, limit).await
     }
 
-    async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
+    async fn delete_bans_for_user(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError> {
         self.repo.delete_bans_for_user(guild_id, target_id).await?;
         let cache_key = format!("modhistory:{guild_id}:{target_id}");
         if let Err(e) = self.cache.invalidate(&cache_key).await {
@@ -245,8 +281,12 @@ impl ManageModerationUseCase for ManageModerationService {
     }
 
     async fn find_action_for_reversal(
-        &self, action_id: uuid::Uuid,
-    ) -> Result<Option<crate::domain::entities::moderation::action::reversal::ActionReversalInfo>, DomainError> {
+        &self,
+        action_id: uuid::Uuid,
+    ) -> Result<
+        Option<crate::domain::entities::moderation::action::reversal::ActionReversalInfo>,
+        DomainError,
+    > {
         self.repo.find_action_for_reversal(action_id).await
     }
 }

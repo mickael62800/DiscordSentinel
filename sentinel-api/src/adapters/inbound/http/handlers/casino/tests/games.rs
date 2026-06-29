@@ -13,7 +13,8 @@ fn create_game_dto_minimal() {
 
 #[test]
 fn create_game_dto_with_emoji_and_category() {
-    let raw = r#"{"guild_id":"g","game_name":"LoL","created_by":"u","emoji":"🎮","category":"MOBA"}"#;
+    let raw =
+        r#"{"guild_id":"g","game_name":"LoL","created_by":"u","emoji":"🎮","category":"MOBA"}"#;
     let dto: CreateGameDto = serde_json::from_str(raw).unwrap();
     assert_eq!(dto.emoji.as_deref(), Some("🎮"));
     assert_eq!(dto.category.as_deref(), Some("MOBA"));

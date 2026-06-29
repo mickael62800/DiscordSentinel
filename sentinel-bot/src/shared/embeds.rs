@@ -117,12 +117,19 @@ pub fn sanction_notice(
         "ban" => "Bannissement",
         _ => "Décision de modération",
     };
-    let mut e = sentinel_embed(format!("{} {}", action_emoji(action), title), action_color(action))
-        .field(
-            "Raison",
-            if reason.trim().is_empty() { "Non précisée" } else { reason },
-            false,
-        );
+    let mut e = sentinel_embed(
+        format!("{} {}", action_emoji(action), title),
+        action_color(action),
+    )
+    .field(
+        "Raison",
+        if reason.trim().is_empty() {
+            "Non précisée"
+        } else {
+            reason
+        },
+        false,
+    );
     if let Some(m) = mute_minutes {
         e = e.field("Durée", format!("{m} minute(s)"), true);
     }

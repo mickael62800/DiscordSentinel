@@ -16,16 +16,16 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::entities::system::log_entry::LogEntry;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::entities::system::log_entry::LogEntry;
+use sentinel_core::domain::errors::DomainError;
 
 #[derive(Default)]
 struct MockInfUC {
@@ -33,11 +33,25 @@ struct MockInfUC {
 }
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfUC {
-    async fn list_infractions(&self, _: &str, _: InfractionFilters) -> Result<Vec<Infraction>, DomainError> { Ok(vec![]) }
-    async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> { Ok(vec![]) }
-    async fn count_today(&self) -> Result<u64, DomainError> { Ok(0) }
-    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> { Ok(None) }
-    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn list_infractions(
+        &self,
+        _: &str,
+        _: InfractionFilters,
+    ) -> Result<Vec<Infraction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn count_today(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> {
+        Ok(None)
+    }
+    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
         self.purged.lock().unwrap().push((guild_id.into(), days));
         Ok(42)
@@ -50,8 +64,16 @@ struct MockAuditUC {
 }
 #[async_trait]
 impl ManageAuditLogsUseCase for MockAuditUC {
-    async fn create(&self, _: CreateAuditLogCommand) -> Result<AuditLog, DomainError> { unimplemented!() }
-    async fn list(&self, _: Option<&str>, _: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { Ok(vec![]) }
+    async fn create(&self, _: CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
+        unimplemented!()
+    }
+    async fn list(
+        &self,
+        _: Option<&str>,
+        _: AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        Ok(vec![])
+    }
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
         self.purged.lock().unwrap().push((guild_id.into(), days));
         Ok(7)
@@ -64,9 +86,15 @@ struct MockLogRepo {
 }
 #[async_trait]
 impl LogRepository for MockLogRepo {
-    async fn save(&self, _: &LogEntry) -> Result<(), DomainError> { Ok(()) }
-    async fn find_all(&self, _: i64) -> Result<Vec<LogEntry>, DomainError> { Ok(vec![]) }
-    async fn delete_by_category(&self, _: &str) -> Result<u64, DomainError> { Ok(0) }
+    async fn save(&self, _: &LogEntry) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn find_all(&self, _: i64) -> Result<Vec<LogEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_by_category(&self, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn delete_older_than_days(&self, days: i32) -> Result<u64, DomainError> {
         self.purged.lock().unwrap().push(days);
         Ok(99)
@@ -84,21 +112,34 @@ fn build_state() -> (AppState, Arc<MockInfUC>, Arc<MockAuditUC>, Arc<MockLogRepo
     (state, inf, audit, log)
 }
 
-async fn delete_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri)
+async fn delete_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -113,7 +154,10 @@ async fn purge_infractions_success_positive_days() {
     let (status, json) = delete_json(app, "/api/purge/infractions", body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["deleted"], 42);
-    assert_eq!(inf.purged.lock().unwrap()[0], ("111111111111111111".into(), 30));
+    assert_eq!(
+        inf.purged.lock().unwrap()[0],
+        ("111111111111111111".into(), 30)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -151,8 +195,10 @@ async fn purge_infractions_with_rbac_moderator_forbidden() {
     let (state, _, _, _) = build_state();
     let app = router::build_for_test(state);
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/purge/infractions",
-        "444444444444444444", Some(Role::Moderator),
+        "DELETE",
+        "/api/purge/infractions",
+        "444444444444444444",
+        Some(Role::Moderator),
         Some("111111111111111111".into()),
         Some(serde_json::json!({"guild_id": "111111111111111111", "days": 30})),
     );
@@ -164,22 +210,38 @@ async fn purge_infractions_with_rbac_moderator_forbidden() {
 async fn purge_infractions_with_rbac_owner_allowed() {
     use sentinel_core::domain::enums::system::role::Role;
     // Seed api_user_guilds pour que check_role_for_guild valide owner en DB
-    let pool = sqlx::PgPool::connect(
-        &std::env::var("DATABASE_URL").unwrap_or_else(|_|
-            "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into())
-    ).await.unwrap();
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    }))
+    .await
+    .unwrap();
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let user_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'O') ON CONFLICT DO NOTHING")
         .bind(&user_id).execute(&pool).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'owner')")
-        .bind(&user_id).bind(&guild_id).execute(&pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'owner')",
+    )
+    .bind(&user_id)
+    .bind(&guild_id)
+    .execute(&pool)
+    .await
+    .unwrap();
 
     let (state, _, _, _) = build_state();
     let app = router::build_for_test(state);
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/purge/infractions",
-        &user_id, Some(Role::Owner), Some(guild_id.clone()),
+        "DELETE",
+        "/api/purge/infractions",
+        &user_id,
+        Some(Role::Owner),
+        Some(guild_id.clone()),
         Some(serde_json::json!({"guild_id": guild_id, "days": 30})),
     );
     let (status, _) = send_request(app, req).await;
@@ -198,7 +260,10 @@ async fn purge_audit_logs_success() {
     let (status, json) = delete_json(app, "/api/purge/audit-logs", body).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["deleted"], 7);
-    assert_eq!(audit.purged.lock().unwrap()[0], ("111111111111111111".into(), 7));
+    assert_eq!(
+        audit.purged.lock().unwrap()[0],
+        ("111111111111111111".into(), 7)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -253,8 +318,11 @@ async fn purge_logs_with_rbac_non_superadmin_forbidden() {
     let (state, _, _, _) = build_state();
     let app = router::build_for_test(state);
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/purge/logs",
-        "444444444444444444", Some(Role::Owner), None,
+        "DELETE",
+        "/api/purge/logs",
+        "444444444444444444",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"days": 30})),
     );
     let (status, json) = send_request(app, req).await;

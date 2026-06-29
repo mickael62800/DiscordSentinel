@@ -69,7 +69,11 @@ const TOKENIZER_PATH: &str = "../../sentinel-ml/text/exports/tokenizer.json";
 
 fn load_real_tokenizer() -> Option<TextTokenizer> {
     let tok = TextTokenizer::new(Some(TOKENIZER_PATH), 256);
-    if tok.available() { Some(tok) } else { None }
+    if tok.available() {
+        Some(tok)
+    } else {
+        None
+    }
 }
 
 #[test]
@@ -81,7 +85,9 @@ fn real_tokenizer_loads_successfully() {
 
 #[test]
 fn real_tokenizer_simple_text() {
-    let Some(tok) = load_real_tokenizer() else { return };
+    let Some(tok) = load_real_tokenizer() else {
+        return;
+    };
     let (ids, mask) = tok.tokenize("Bonjour tout le monde").unwrap();
     assert_eq!(ids.shape(), &[1, 256]);
     assert_eq!(mask.shape(), &[1, 256]);
@@ -92,7 +98,9 @@ fn real_tokenizer_simple_text() {
 
 #[test]
 fn real_tokenizer_empty_text() {
-    let Some(tok) = load_real_tokenizer() else { return };
+    let Some(tok) = load_real_tokenizer() else {
+        return;
+    };
     let (ids, mask) = tok.tokenize("").unwrap();
     assert_eq!(ids.shape(), &[1, 256]);
     assert_eq!(mask[[0, 0]], 1);
@@ -101,7 +109,9 @@ fn real_tokenizer_empty_text() {
 
 #[test]
 fn real_tokenizer_long_text_truncated() {
-    let Some(tok) = load_real_tokenizer() else { return };
+    let Some(tok) = load_real_tokenizer() else {
+        return;
+    };
     let long_text = "mot ".repeat(1000);
     let (ids, mask) = tok.tokenize(&long_text).unwrap();
     assert_eq!(ids.shape(), &[1, 256]);
@@ -110,14 +120,18 @@ fn real_tokenizer_long_text_truncated() {
 
 #[test]
 fn real_tokenizer_special_chars() {
-    let Some(tok) = load_real_tokenizer() else { return };
+    let Some(tok) = load_real_tokenizer() else {
+        return;
+    };
     let result = tok.tokenize("😡🤬💀 je vais te 💩 espèce de $#@!");
     assert!(result.is_ok());
 }
 
 #[test]
 fn real_tokenizer_french_insults() {
-    let Some(tok) = load_real_tokenizer() else { return };
+    let Some(tok) = load_real_tokenizer() else {
+        return;
+    };
     let result = tok.tokenize("t'es qu'un connard, ferme ta gueule");
     assert!(result.is_ok());
     let (ids, _) = result.unwrap();
@@ -135,7 +149,11 @@ fn write_minimal_tokenizer_json(pad_token: &str, pad_id: u32) -> std::path::Path
     let dir = std::env::temp_dir();
     let path = dir.join(format!(
         "sentinel_test_tokenizer_{}_{}.json",
-        pad_token.replace('<', "a").replace('>', "b").replace('[', "c").replace(']', "d"),
+        pad_token
+            .replace('<', "a")
+            .replace('>', "b")
+            .replace('[', "c")
+            .replace(']', "d"),
         uuid::Uuid::new_v4().as_u128() % 1_000_000
     ));
     // WordLevel minimal qui se decode avec le crate `tokenizers`.
@@ -164,8 +182,7 @@ fn write_minimal_tokenizer_json(pad_token: &str, pad_id: u32) -> std::path::Path
             "unk_token": "[UNK]"
         }
     });
-    std::fs::write(&path, serde_json::to_string(&json).unwrap())
-        .expect("ecriture tokenizer temp");
+    std::fs::write(&path, serde_json::to_string(&json).unwrap()).expect("ecriture tokenizer temp");
     path
 }
 
@@ -217,7 +234,10 @@ fn minimal_tokenizer_handles_unknown_words() {
 fn malformed_tokenizer_file_falls_back_to_unavailable() {
     // Ecrit du JSON invalide pour un tokenizer
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("sentinel_malformed_{}.json", uuid::Uuid::new_v4().as_u128() % 1_000_000));
+    let path = dir.join(format!(
+        "sentinel_malformed_{}.json",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000
+    ));
     std::fs::write(&path, "{not: valid: json}").unwrap();
     let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
     // Erreur de parsing → tokenizer = None
@@ -229,7 +249,10 @@ fn malformed_tokenizer_file_falls_back_to_unavailable() {
 fn tokenizer_without_pad_token_uses_default_fallback() {
     // Tokenizer valide mais sans <pad> ni [PAD] → fallback (0, "[PAD]")
     let dir = std::env::temp_dir();
-    let path = dir.join(format!("sentinel_no_pad_{}.json", uuid::Uuid::new_v4().as_u128() % 1_000_000));
+    let path = dir.join(format!(
+        "sentinel_no_pad_{}.json",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000
+    ));
     let json = serde_json::json!({
         "version": "1.0",
         "truncation": null,

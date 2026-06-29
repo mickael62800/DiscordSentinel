@@ -6,13 +6,18 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::handlers::casino::wheel::WheelSpinLogDto;
 use crate::adapters::inbound::http::handlers::casino::wheel::WheelSpinResponseDto;
 use crate::adapters::inbound::http::handlers::casino::wheel::WheelTopWinnerDto;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 use sentinel_core::domain::entities::casino::wheel::WheelCase;
 use sentinel_core::domain::entities::casino::wheel::WheelSpin;
 use sentinel_core::domain::entities::casino::wheel::WheelTopWinner;
-use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 
 fn sample_jackpot_case() -> WheelCase {
-    WheelCase { key: "jackpot", label: "🎰 Jackpot", payout: 5000, weight: 3 }
+    WheelCase {
+        key: "jackpot",
+        label: "🎰 Jackpot",
+        payout: 5000,
+        weight: 3,
+    }
 }
 
 fn sample_spin() -> WheelSpin {
@@ -64,7 +69,12 @@ fn spin_response_dto_negative_payout() {
             case_label: "💀 Ruine".into(),
             ..sample_spin()
         },
-        case: WheelCase { key: "ruine", label: "💀 Ruine", payout: -500, weight: 5 },
+        case: WheelCase {
+            key: "ruine",
+            label: "💀 Ruine",
+            payout: -500,
+            weight: 5,
+        },
         balance_after: 100,
         is_memorable: false,
         triggered_taunts: vec![],

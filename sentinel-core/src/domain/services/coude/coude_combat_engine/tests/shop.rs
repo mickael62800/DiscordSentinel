@@ -69,7 +69,9 @@ fn all_shop_items_have_known_category() {
     for item in SHOP_ITEMS {
         assert!(
             matches!(item.category, "attaque" | "defense" | "braquage"),
-            "{} has unknown category: {}", item.key, item.category
+            "{} has unknown category: {}",
+            item.key,
+            item.category
         );
     }
 }
@@ -80,7 +82,11 @@ fn all_shop_items_have_non_empty_metadata() {
         assert!(!item.key.is_empty());
         assert!(!item.name.is_empty(), "{} name empty", item.key);
         assert!(!item.emoji.is_empty(), "{} emoji empty", item.key);
-        assert!(!item.description.is_empty(), "{} description empty", item.key);
+        assert!(
+            !item.description.is_empty(),
+            "{} description empty",
+            item.key
+        );
     }
 }
 
@@ -97,7 +103,10 @@ fn shop_has_at_least_one_item_per_category() {
 #[test]
 fn anti_theft_items_deprecated_empty() {
     // Phase 9 Part B : ANTI_THEFT_ITEMS doit rester vide.
-    assert!(ANTI_THEFT_ITEMS.is_empty(), "ANTI_THEFT_ITEMS should be empty (deprecated)");
+    assert!(
+        ANTI_THEFT_ITEMS.is_empty(),
+        "ANTI_THEFT_ITEMS should be empty (deprecated)"
+    );
 }
 
 #[test]

@@ -1,6 +1,5 @@
 //! Tests unitaires du ManageRemindersService.
 
-
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -24,7 +23,9 @@ struct InMemoryReminderRepo {
 
 impl InMemoryReminderRepo {
     fn new() -> Self {
-        Self { reminders: Mutex::new(vec![]) }
+        Self {
+            reminders: Mutex::new(vec![]),
+        }
     }
 }
 
@@ -38,7 +39,8 @@ impl ReminderRepository for InMemoryReminderRepo {
     async fn find_pending(&self) -> Result<Vec<SanctionReminder>, DomainError> {
         let now = Utc::now();
         let reminders = self.reminders.lock().await;
-        Ok(reminders.iter()
+        Ok(reminders
+            .iter()
             .filter(|r| r.status == "pending" && r.remind_at <= now)
             .cloned()
             .collect())
@@ -64,7 +66,11 @@ impl ReminderRepository for InMemoryReminderRepo {
 
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, DomainError> {
         let reminders = self.reminders.lock().await;
-        Ok(reminders.iter().filter(|r| r.guild_id == guild_id).cloned().collect())
+        Ok(reminders
+            .iter()
+            .filter(|r| r.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
 }
 

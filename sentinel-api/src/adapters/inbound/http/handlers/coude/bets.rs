@@ -1,9 +1,9 @@
 //! Handlers paris : place/list/resolve/refund. Le handler `get_betting_combat`
 //! est ici parce que c'est une lookup combat utilisée par le flow paris.
 
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Path;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 
@@ -13,14 +13,14 @@ use super::dto::PlaceBetDto;
 use super::dto::PlaceBetResponse;
 use super::dto::ResolveBetsDto;
 use super::dto::ResolveBetsResponse;
-use super::taunts::TauntEventDto;
 use super::parse_combat_id;
+use super::taunts::TauntEventDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
+use sentinel_core::domain::enums::system::role::Role;
 
 /// POST /api/coude/{guild_id}/bets
 ///
@@ -33,7 +33,14 @@ pub async fn place_bet(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<PlaceBetDto>,
 ) -> Result<Json<PlaceBetResponse>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour place_bet").await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour place_bet",
+    )
+    .await?;
     let combat_id = parse_combat_id(&dto.combat_id)?;
     let outcome = state
         .coude_bets_uc
@@ -93,7 +100,14 @@ pub async fn resolve_bets(
     let id = parse_combat_id(&combat_id)?;
     // Gate Moderator+: lookup guild_id du combat puis check role.
     if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
-        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour resolve_bets").await?;
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour resolve_bets",
+        )
+        .await?;
     }
     let outcome = state.coude_bets_uc.resolve(id, dto.winner_id).await?;
     let mut resp: ResolveBetsResponse = outcome.plan.into();
@@ -113,7 +127,14 @@ pub async fn refund_bets(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
     if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
-        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour refund_bets").await?;
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour refund_bets",
+        )
+        .await?;
     }
     let summary = state.coude_bets_uc.refund(id).await?;
     Ok(Json(serde_json::json!({

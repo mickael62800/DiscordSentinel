@@ -1,15 +1,16 @@
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption,
+    CreateActionRow, CreateButton, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
 };
-use serenity::model::application::{ButtonStyle, ComponentInteraction, ComponentInteractionDataKind};
+use serenity::model::application::{
+    ButtonStyle, ComponentInteraction, ComponentInteractionDataKind,
+};
 use serenity::model::id::{ChannelId, UserId};
 use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::api_client::{ApiClient, AddWhitelistRequest, BanFromChannelRequest};
+use super::api_client::{AddWhitelistRequest, ApiClient, BanFromChannelRequest};
 
 /// Handle access control interactions: invite, kick, ban.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -41,7 +42,12 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     let selected_users = match &component.data.kind {
         ComponentInteractionDataKind::UserSelect { values } => values.clone(),
         _ => {
-            super::respond_followup_ephemeral(ctx, component, "❌ Interaction invalide, relance l'action depuis le panneau du salon.").await;
+            super::respond_followup_ephemeral(
+                ctx,
+                component,
+                "❌ Interaction invalide, relance l'action depuis le panneau du salon.",
+            )
+            .await;
             return;
         }
     };
@@ -58,7 +64,10 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await
+    {
         error!(error = %e, "Erreur permission invite");
         super::respond_followup_ephemeral(ctx, component, "❌ Impossible d'inviter ce membre (le bot manque peut-etre la permission de gerer ce salon).").await;
         return;
@@ -67,11 +76,16 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     if let Some(ref text_id_str) = ch.text_channel_id {
         if let Ok(text_id) = text_id_str.parse::<u64>() {
             let text_overwrite = serenity::model::channel::PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
             };
-            if let Err(e) = ChannelId::new(text_id).create_permission(&ctx.http, text_overwrite).await {
+            if let Err(e) = ChannelId::new(text_id)
+                .create_permission(&ctx.http, text_overwrite)
+                .await
+            {
                 tracing::warn!(error = %e, "failed to grant invite permission on text channel");
             }
         }
@@ -80,11 +94,16 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     if let Some(ref members_id_str) = ch.members_channel_id {
         if let Ok(members_id) = members_id_str.parse::<u64>() {
             let members_overwrite = serenity::model::channel::PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
             };
-            if let Err(e) = ChannelId::new(members_id).create_permission(&ctx.http, members_overwrite).await {
+            if let Err(e) = ChannelId::new(members_id)
+                .create_permission(&ctx.http, members_overwrite)
+                .await
+            {
                 tracing::warn!(error = %e, "failed to grant invite permission on members channel");
             }
         }
@@ -137,7 +156,12 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
     let members = get_voice_members(ctx, guild_id, voice_channel_id, Some(owner_id)).await;
 
     if members.is_empty() {
-        super::respond_ephemeral(ctx, component, "Aucun membre a expulser dans le salon vocal.").await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Aucun membre a expulser dans le salon vocal.",
+        )
+        .await;
         return;
     }
 
@@ -146,11 +170,8 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
         .map(|(id, name)| CreateSelectMenuOption::new(name, id.get().to_string()))
         .collect();
 
-    let select = CreateSelectMenu::new(
-        "select_kick",
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez un membre a expulser");
+    let select = CreateSelectMenu::new("select_kick", CreateSelectMenuKind::String { options })
+        .placeholder("Choisissez un membre a expulser");
 
     let row = CreateActionRow::SelectMenu(select);
 
@@ -167,16 +188,23 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
 
 async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
     super::defer_ephemeral(ctx, component).await;
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await else {
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await
+    else {
         return;
     };
 
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Impossible de trouver le salon vocal associe.",
+        )
+        .await;
         return;
     };
 
@@ -187,7 +215,8 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
             match values.first() {
                 Some(v) => v.clone(),
                 None => {
-                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.").await;
+                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.")
+                        .await;
                     return;
                 }
             }
@@ -208,10 +237,7 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
 
     let target_user_id = UserId::new(target_id);
 
-    match guild_id
-        .disconnect_member(&ctx.http, target_user_id)
-        .await
-    {
+    match guild_id.disconnect_member(&ctx.http, target_user_id).await {
         Ok(_) => {
             info!(voice = %voice_channel_id, target = %target_user_id, "Membre expulse");
         }
@@ -243,7 +269,8 @@ async fn handle_ban_menu(ctx: &Context, component: &ComponentInteraction) {
     let members = get_voice_members(ctx, guild_id, voice_channel_id, Some(owner_id)).await;
 
     if members.is_empty() {
-        super::respond_ephemeral(ctx, component, "Aucun membre a bannir dans le salon vocal.").await;
+        super::respond_ephemeral(ctx, component, "Aucun membre a bannir dans le salon vocal.")
+            .await;
         return;
     }
 
@@ -252,11 +279,8 @@ async fn handle_ban_menu(ctx: &Context, component: &ComponentInteraction) {
         .map(|(id, name)| CreateSelectMenuOption::new(name, id.get().to_string()))
         .collect();
 
-    let select = CreateSelectMenu::new(
-        "select_ban",
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez un membre a bannir");
+    let select = CreateSelectMenu::new("select_ban", CreateSelectMenuKind::String { options })
+        .placeholder("Choisissez un membre a bannir");
 
     let row = CreateActionRow::SelectMenu(select);
 
@@ -316,13 +340,18 @@ async fn handle_ban_select(ctx: &Context, component: &ComponentInteraction) {
 
 async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     super::defer_ephemeral(ctx, component).await;
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await else {
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await
+    else {
         return;
     };
 
     let custom_id = component.data.custom_id.as_str();
 
-    let parts: Vec<&str> = custom_id.strip_prefix("ban_duration_").unwrap_or("").rsplitn(2, '_').collect();
+    let parts: Vec<&str> = custom_id
+        .strip_prefix("ban_duration_")
+        .unwrap_or("")
+        .rsplitn(2, '_')
+        .collect();
     if parts.len() < 2 {
         super::respond_followup_ephemeral(ctx, component, "Format invalide.").await;
         return;
@@ -341,10 +370,16 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     let target_user_id = UserId::new(target_id);
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Impossible de trouver le salon vocal associe.",
+        )
+        .await;
         return;
     };
 
@@ -359,7 +394,10 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await
+    {
         tracing::warn!(error = %e, "failed to set ban permission on voice channel");
     }
 
@@ -406,9 +444,7 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     super::respond_followup_ephemeral(
         ctx,
         component,
-        &format!(
-            "<@{target_id}> a ete banni du salon ({duration_text})."
-        ),
+        &format!("<@{target_id}> a ete banni du salon ({duration_text})."),
     )
     .await;
 

@@ -62,18 +62,17 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.record_casino_faillite(req).await.map(|r| r.into_inner())
+                client
+                    .record_casino_faillite(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.cleared_coins)
     }
 
-    pub async fn count_casino_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<u64, String> {
+    pub async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<u64, String> {
         let req = proto_coude::UserInGuildRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -81,9 +80,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_economy();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.count_casino_today(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.count_casino_today(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.value.max(0) as u64)
@@ -102,18 +99,17 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.sum_casino_gains_today(req).await.map(|r| r.into_inner())
+                client
+                    .sum_casino_gains_today(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.value)
     }
 
-    pub async fn count_steal_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<u64, String> {
+    pub async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<u64, String> {
         let req = proto_coude::UserInGuildRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -121,9 +117,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_economy();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.count_steal_today(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.count_steal_today(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.value.max(0) as u64)
@@ -249,9 +243,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_economy();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.steal_fail_penalty(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.steal_fail_penalty(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         let taunts = r

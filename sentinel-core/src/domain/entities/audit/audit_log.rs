@@ -1,7 +1,7 @@
+use crate::domain::entities::system::discord_ids::GuildId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct AuditLog {

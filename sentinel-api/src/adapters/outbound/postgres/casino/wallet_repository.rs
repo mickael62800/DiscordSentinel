@@ -1,17 +1,17 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
-use uuid::Uuid;
 use tracing::info;
+use uuid::Uuid;
 
+use super::super::uow::as_pg;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use sentinel_core::ports::uow::DbTx;
-use super::super::uow::as_pg;
 
 pub struct PgWalletRepository {
     pool: PgPool,
@@ -81,7 +81,13 @@ impl From<WalletTransactionRow> for WalletTransaction {
 
 #[async_trait]
 impl WalletRepository for PgWalletRepository {
-    async fn get_or_create(&self, guild_id: &str, user_id: &str, username: &str, starting_coins: i64) -> Result<Wallet, DomainError> {
+    async fn get_or_create(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        starting_coins: i64,
+    ) -> Result<Wallet, DomainError> {
         let row = sqlx::query_as::<_, WalletRow>(
             r#"INSERT INTO user_wallets (id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at)
                VALUES ($1, $2, $3, $4, $5, 0, 0, NOW(), NOW())
@@ -114,8 +120,18 @@ impl WalletRepository for PgWalletRepository {
         Ok(row.map(Wallet::from))
     }
 
-    async fn credit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError> {
-        let mut tx = self.pool.begin().await
+    async fn credit(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<Wallet, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("credit begin tx", e))?;
 
         let row = sqlx::query_as::<_, WalletRow>(
@@ -149,15 +165,33 @@ impl WalletRepository for PgWalletRepository {
         .await
         .map_err(|e| pg_err_ctx("credit insert tx", e))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("credit commit", e))?;
 
-        info!(guild_id, user_id, amount, balance = wallet.coins, source, "Wallet credit");
+        info!(
+            guild_id,
+            user_id,
+            amount,
+            balance = wallet.coins,
+            source,
+            "Wallet credit"
+        );
         Ok(wallet)
     }
 
-    async fn debit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError> {
-        let mut tx = self.pool.begin().await
+    async fn debit(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<Wallet, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("debit begin tx", e))?;
 
         // Verifier le solde avant debit
@@ -211,15 +245,34 @@ impl WalletRepository for PgWalletRepository {
         .await
         .map_err(|e| pg_err_ctx("debit insert tx", e))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("debit commit", e))?;
 
-        info!(guild_id, user_id, amount, balance = wallet.coins, source, "Wallet debit");
+        info!(
+            guild_id,
+            user_id,
+            amount,
+            balance = wallet.coins,
+            source,
+            "Wallet debit"
+        );
         Ok(wallet)
     }
 
-    async fn transfer(&self, guild_id: &str, from_user: &str, to_user: &str, amount: i64, source: &str, description: &str) -> Result<(), DomainError> {
-        let mut tx = self.pool.begin().await
+    async fn transfer(
+        &self,
+        guild_id: &str,
+        from_user: &str,
+        to_user: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(), DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("transfer begin tx", e))?;
 
         // Verifier le solde de l'expediteur
@@ -300,10 +353,14 @@ impl WalletRepository for PgWalletRepository {
         .await
         .map_err(|e| pg_err_ctx("transfer insert tx receiver", e))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("transfer commit", e))?;
 
-        info!(guild_id, from_user, to_user, amount, source, "Wallet transfer");
+        info!(
+            guild_id,
+            from_user, to_user, amount, source, "Wallet transfer"
+        );
         Ok(())
     }
 
@@ -317,7 +374,10 @@ impl WalletRepository for PgWalletRepository {
         source: &str,
         description: &str,
     ) -> Result<(), DomainError> {
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("pay_combat begin tx", e))?;
 
         // Debit perdant (si loser_amount > 0). On ne fail pas si le wallet
@@ -384,10 +444,14 @@ impl WalletRepository for PgWalletRepository {
             }
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("pay_combat commit", e))?;
 
-        info!(guild_id, winner_id, winner_amount, loser_id, loser_amount, source, "Combat payout atomic");
+        info!(
+            guild_id,
+            winner_id, winner_amount, loser_id, loser_amount, source, "Combat payout atomic"
+        );
         Ok(())
     }
 
@@ -418,7 +482,12 @@ impl WalletRepository for PgWalletRepository {
         Ok(rows.into_iter().map(Wallet::from).collect())
     }
 
-    async fn get_transactions(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<WalletTransaction>, DomainError> {
+    async fn get_transactions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
         let rows = sqlx::query_as::<_, WalletTransactionRow>(
             "SELECT id, guild_id, user_id, amount, balance_after, source, description, created_at
              FROM wallet_transactions WHERE guild_id = $1 AND user_id = $2
@@ -452,14 +521,24 @@ impl WalletRepository for PgWalletRepository {
         Ok(rows.into_iter().map(Wallet::from).collect())
     }
 
-    async fn reset_wallet(&self, guild_id: &str, user_id: &str, new_balance: i64) -> Result<Wallet, DomainError> {
-        let mut tx = self.pool.begin().await
+    async fn reset_wallet(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        new_balance: i64,
+    ) -> Result<Wallet, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("reset begin tx", e))?;
 
         // Efface l'historique de transactions du joueur.
         sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1 AND user_id = $2")
-            .bind(guild_id).bind(user_id)
-            .execute(&mut *tx).await
+            .bind(guild_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
             .map_err(|e| pg_err_ctx("reset wipe tx", e))?;
 
         // Reset le solde + total_earned/total_spent.
@@ -491,21 +570,30 @@ impl WalletRepository for PgWalletRepository {
         .await
         .map_err(|e| pg_err_ctx("reset audit", e))?;
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("reset commit", e))?;
 
         info!(guild_id, user_id, new_balance, "Wallet reset");
         Ok(Wallet::from(row))
     }
 
-    async fn reset_all_wallets(&self, guild_id: &str, new_balance: i64) -> Result<u64, DomainError> {
-        let mut tx = self.pool.begin().await
+    async fn reset_all_wallets(
+        &self,
+        guild_id: &str,
+        new_balance: i64,
+    ) -> Result<u64, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("reset_all begin tx", e))?;
 
         // Efface toutes les transactions de la guild.
         sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1")
             .bind(guild_id)
-            .execute(&mut *tx).await
+            .execute(&mut *tx)
+            .await
             .map_err(|e| pg_err_ctx("reset_all wipe tx", e))?;
 
         // Reset tous les wallets.
@@ -521,7 +609,8 @@ impl WalletRepository for PgWalletRepository {
         .map_err(|e| pg_err_ctx("reset_all update", e))?
         .rows_affected();
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("reset_all commit", e))?;
 
         info!(guild_id, affected, new_balance, "Wallets bulk reset");
@@ -538,16 +627,21 @@ impl WalletRepository for PgWalletRepository {
         description: &str,
     ) -> Result<(i64, i64), DomainError> {
         if amount <= 0 {
-            return Err(DomainError::ValidationError("Montant credit doit etre positif".into()));
+            return Err(DomainError::ValidationError(
+                "Montant credit doit etre positif".into(),
+            ));
         }
         let tx = as_pg(tx);
         let previous: Option<i64> = sqlx::query_scalar(
             "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
-        .bind(guild_id).bind(user_id)
-        .fetch_optional(&mut **tx).await
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&mut **tx)
+        .await
         .map_err(|e| pg_err_ctx("credit_in_tx select", e))?;
-        let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
+        let previous =
+            previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
         let after: i64 = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins + $1, total_earned = total_earned + $1, updated_at = NOW() \
              WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
@@ -575,20 +669,27 @@ impl WalletRepository for PgWalletRepository {
         description: &str,
     ) -> Result<(i64, i64), DomainError> {
         if amount <= 0 {
-            return Err(DomainError::ValidationError("Montant debit doit etre positif".into()));
+            return Err(DomainError::ValidationError(
+                "Montant debit doit etre positif".into(),
+            ));
         }
         let tx = as_pg(tx);
         let previous: Option<i64> = sqlx::query_scalar(
             "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
-        .bind(guild_id).bind(user_id)
-        .fetch_optional(&mut **tx).await
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&mut **tx)
+        .await
         .map_err(|e| pg_err_ctx("debit_in_tx select", e))?;
-        let previous = previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
+        let previous =
+            previous.ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
         if previous < amount {
             return Err(DomainError::ValidationError(format!(
                 "Solde insuffisant : tu as {} coins, il en faut {} (manque {}).",
-                previous, amount, amount - previous
+                previous,
+                amount,
+                amount - previous
             )));
         }
         let after: i64 = sqlx::query_scalar(

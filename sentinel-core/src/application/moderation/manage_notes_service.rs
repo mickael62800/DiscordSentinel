@@ -25,9 +25,10 @@ impl ManageNotesUseCase for ManageNotesService {
     async fn add_note(&self, cmd: AddNoteCommand) -> Result<UserNote, DomainError> {
         let valid_categories = ["general", "warning", "positive", "context"];
         if !valid_categories.contains(&cmd.category.as_str()) {
-            return Err(DomainError::ValidationError(
-                format!("Categorie invalide '{}'. Valeurs acceptees : general, warning, positive, context", cmd.category)
-            ));
+            return Err(DomainError::ValidationError(format!(
+                "Categorie invalide '{}'. Valeurs acceptees : general, warning, positive, context",
+                cmd.category
+            )));
         }
 
         let now = Utc::now();

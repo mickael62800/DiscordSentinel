@@ -1,12 +1,12 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::community::manage_levels::AddXpResult;
+use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use sentinel_core::domain::entities::community::level::xp_progress;
 use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
-use crate::ports::inbound::community::manage_levels::AddXpResult;
-use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -27,11 +27,21 @@ pub struct SaveLevelConfigDto {
     pub enabled: bool,
 }
 
-fn default_xp_per_message() -> i32 { 15 }
-fn default_xp_per_voice_minute() -> i32 { 5 }
-fn default_xp_cooldown() -> i32 { 60 }
-fn default_level_up_message() -> String { "GG {user}, tu es maintenant niveau **{level}** !".to_string() }
-fn default_enabled() -> bool { true }
+fn default_xp_per_message() -> i32 {
+    15
+}
+fn default_xp_per_voice_minute() -> i32 {
+    5
+}
+fn default_xp_cooldown() -> i32 {
+    60
+}
+fn default_level_up_message() -> String {
+    "GG {user}, tu es maintenant niveau **{level}** !".to_string()
+}
+fn default_enabled() -> bool {
+    true
+}
 
 #[derive(Debug, Deserialize)]
 pub struct AddXpDto {
@@ -44,7 +54,9 @@ pub struct AddXpDto {
     pub source: String,
 }
 
-fn default_source() -> String { "text".to_string() }
+fn default_source() -> String {
+    "text".to_string()
+}
 
 /// Set la valeur exacte XP texte/voix d'un user (admin override).
 /// Champs Option : non envoye = on ne touche pas a ce champ.

@@ -5,13 +5,15 @@ use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
 
+use crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository;
 use sentinel_core::domain::entities::coude::refusal_count::RefusalCount;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_refusal_counts";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgRefusalCountRepository {
     pool: PgPool,

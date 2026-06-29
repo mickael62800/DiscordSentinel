@@ -5,8 +5,8 @@ use serenity::all::{
 use serenity::model::id::ChannelId;
 
 use crate::modules::coude::api_client::Combat;
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub const ACCEPT_PREFIX: &str = "coude_accept:";
 
@@ -83,8 +83,17 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         if let Err(e) = api.expire_combat(&combat_id).await {
             tracing::warn!(error = %e, "Echec API expire_combat");
         }
-        let expire_label = if expire_secs >= 3600 { format!("{}h", expire_secs / 3600) } else { format!("{}min", expire_secs / 60) };
-        followup_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
+        let expire_label = if expire_secs >= 3600 {
+            format!("{}h", expire_secs / 3600)
+        } else {
+            format!("{}min", expire_secs / 60)
+        };
+        followup_ephemeral(
+            ctx,
+            component,
+            &format!("Ce defi a expire ! ({})", expire_label),
+        )
+        .await;
         return;
     }
 
@@ -115,13 +124,13 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             \u{1f3b2} **Les paris sont ouverts pendant {} minute(s) !**\n\
             Utilisez `/pari` pour miser sur le vainqueur.\n\n\
             \u{23f3} Le combat sera resolu automatiquement par le serveur...",
-            combat_record.defender_id,
-            combat_record.attacker_id,
-            delay_min,
+            combat_record.defender_id, combat_record.attacker_id, delay_min,
         ))
         .field("Mise", format!("{} coins", combat_record.mise), true)
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     // Edit du message original : on enleve les boutons et on met le nouveau
@@ -148,11 +157,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
                     "**{}** vs **{}** pour **{} coins** !\n\n\
                     \u{23f3} Paris ouverts pendant **{} minute(s)** !\n\
                     Utilisez `/pari` dans <#{}> pour miser.",
-                    combat_record.attacker_name, combat_record.defender_name,
-                    combat_record.mise, delay_min, combat_channel,
+                    combat_record.attacker_name,
+                    combat_record.defender_name,
+                    combat_record.mise,
+                    delay_min,
+                    combat_channel,
                 ))
                 .color(0x57F287)
-                .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+                .footer(CreateEmbedFooter::new(
+                    crate::shared::branding::COUDE_TAGLINE_SHORT,
+                ))
                 .timestamp(serenity::model::Timestamp::now());
 
             if let Err(e) = serenity::model::id::ChannelId::new(ch_id)
@@ -223,7 +237,9 @@ pub async fn resolve_combat_internal_ex(
         .title(&resp.title)
         .description(&resp.description)
         .color(resp.color)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     for f in resp.fields {
@@ -249,7 +265,8 @@ pub async fn resolve_combat_internal_ex(
     if !resp.taunt_events.is_empty() {
         if let Ok(guild_id) = combat_record.guild_id.parse::<u64>() {
             let gid = serenity::all::GuildId::new(guild_id);
-            crate::modules::coude::taunts_dispatch::dispatch_all(ctx, gid, &resp.taunt_events).await;
+            crate::modules::coude::taunts_dispatch::dispatch_all(ctx, gid, &resp.taunt_events)
+                .await;
         }
     }
 
@@ -270,10 +287,8 @@ pub async fn resolve_combat_internal_ex(
                 .map(|u| u.name)
                 .unwrap_or_else(|_| "challenger".into());
             let suffix = format!(" le Bourreau de {}", challenger_name);
-            crate::modules::coude::taunts_dispatch::apply_suffix_to_user(
-                ctx, gid, target, &suffix,
-            )
-            .await;
+            crate::modules::coude::taunts_dispatch::apply_suffix_to_user(ctx, gid, target, &suffix)
+                .await;
         }
     }
 
@@ -310,7 +325,9 @@ pub async fn post_combat_embed_animated(
     // Phase 1 : placeholder "le combat commence".
     let phase1 = CreateEmbed::new()
         .title("\u{1f941} Le combat commence...")
-        .description("Les deux combattants entrent dans l arene. Les paris sont fermes. Le silence se fait.")
+        .description(
+            "Les deux combattants entrent dans l arene. Les paris sont fermes. Le silence se fait.",
+        )
         .color(0xF1C40F);
     let msg = match channel
         .send_message(&ctx.http, CreateMessage::new().embed(phase1))

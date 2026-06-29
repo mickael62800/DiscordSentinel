@@ -8,14 +8,14 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 use std::time::Duration;
 
-use sqlx::PgPool;
-use tokio::signal;
-use tracing::info;
-use tracing::warn;
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
 use sentinel_api::bootstrap;
 use sentinel_api::config::AppConfig;
+use sqlx::PgPool;
+use tokio::signal;
+use tracing::info;
+use tracing::warn;
 
 #[tokio::main]
 async fn main() {
@@ -159,7 +159,10 @@ async fn serve_http(state: AppState, config: &AppConfig, pg_pool: PgPool) {
     .expect("Erreur serveur");
 
     // Attendre que les connexions en cours se terminent
-    info!(timeout_secs = config.shutdown_timeout_secs, "Arrêt en cours, attente des requêtes en vol...");
+    info!(
+        timeout_secs = config.shutdown_timeout_secs,
+        "Arrêt en cours, attente des requêtes en vol..."
+    );
     tokio::time::sleep(shutdown_timeout).await;
 
     // Log arret en BDD
@@ -186,9 +189,7 @@ async fn serve_http(state: AppState, config: &AppConfig, pg_pool: PgPool) {
 /// Écoute SIGTERM (Docker/K8s) et Ctrl+C (dev local)
 async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Impossible d'écouter Ctrl+C");
+        signal::ctrl_c().await.expect("Impossible d'écouter Ctrl+C");
     };
 
     #[cfg(unix)]

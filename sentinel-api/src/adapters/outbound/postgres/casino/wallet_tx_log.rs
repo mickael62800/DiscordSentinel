@@ -1,5 +1,5 @@
-use sqlx::Postgres;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use sqlx::Postgres;
 use sqlx::Transaction;
 use uuid::Uuid;
 

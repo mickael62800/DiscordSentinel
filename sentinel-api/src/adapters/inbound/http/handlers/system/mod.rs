@@ -5,19 +5,19 @@ pub mod cache_stats;
 pub mod component_min_role;
 pub mod component_visibility;
 pub mod docker;
-pub mod guild_reset;
-pub mod invitations;
-pub mod lockdown;
-pub mod quarantine;
-pub mod security;
-pub mod slowmode;
-pub mod server_events;
 pub mod exports;
+pub mod guild_reset;
 pub mod health;
 pub mod info;
+pub mod invitations;
+pub mod lockdown;
 pub mod models_status;
 pub mod oauth;
+pub mod quarantine;
 pub mod rbac;
+pub mod security;
+pub mod server_events;
+pub mod slowmode;
 pub mod tickets;
 
 // Glob re-export du fichier `info.rs` (l'ancien `system.rs` au root)

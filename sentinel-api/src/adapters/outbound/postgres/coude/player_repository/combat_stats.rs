@@ -28,8 +28,13 @@ pub(super) async fn record_win(
                updated_at = NOW()
            WHERE guild_id = $1 AND user_id = $2"#,
     )
-    .bind(guild_id).bind(user_id).bind(earned).bind(stolen)
-    .execute(&repo.pool).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(earned)
+    .bind(stolen)
+    .execute(&repo.pool)
+    .await
+    .map_err(pg_err)?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -46,8 +51,12 @@ pub(super) async fn record_loss(
                updated_at = NOW()
            WHERE guild_id = $1 AND user_id = $2"#,
     )
-    .bind(guild_id).bind(user_id).bind(lost)
-    .execute(&repo.pool).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(lost)
+    .execute(&repo.pool)
+    .await
+    .map_err(pg_err)?;
     Ok(result.rows_affected() > 0)
 }
 

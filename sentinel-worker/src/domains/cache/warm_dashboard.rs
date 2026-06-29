@@ -71,21 +71,19 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 }
 
 async fn compute_dashboard(pool: &PgPool, guild_id: &str) -> Result<DashboardOverview, String> {
-    let total_infractions: (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM infractions WHERE guild_id = $1",
-    )
-    .bind(guild_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| format!("total_infractions: {e}"))?;
+    let total_infractions: (i64,) =
+        sqlx::query_as("SELECT COUNT(*) FROM infractions WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| format!("total_infractions: {e}"))?;
 
-    let unique_users: (i64,) = sqlx::query_as(
-        "SELECT COUNT(DISTINCT user_id) FROM user_stats WHERE guild_id = $1",
-    )
-    .bind(guild_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| format!("unique_users: {e}"))?;
+    let unique_users: (i64,) =
+        sqlx::query_as("SELECT COUNT(DISTINCT user_id) FROM user_stats WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_one(pool)
+            .await
+            .map_err(|e| format!("unique_users: {e}"))?;
 
     let recent_infractions: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM infractions WHERE guild_id = $1 AND created_at >= NOW() - INTERVAL '7 days'",

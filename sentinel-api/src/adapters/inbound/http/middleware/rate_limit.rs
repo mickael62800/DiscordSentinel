@@ -46,7 +46,9 @@ impl RateLimiter {
         // Cap: refuse les nouvelles IPs au-dela de 50 000 entrees pour eviter l'OOM
         if !inner.buckets.contains_key(&ip) && inner.buckets.len() >= 50_000 {
             // Nettoyage d'urgence des entrees expirees
-            inner.buckets.retain(|_, b| now.duration_since(b.last_refill).as_secs() < 120);
+            inner
+                .buckets
+                .retain(|_, b| now.duration_since(b.last_refill).as_secs() < 120);
             if inner.buckets.len() >= 50_000 {
                 return false;
             }
@@ -78,7 +80,9 @@ impl RateLimiter {
     pub async fn cleanup(&self) {
         let mut inner = self.inner.lock().await;
         let now = Instant::now();
-        inner.buckets.retain(|_, b| now.duration_since(b.last_refill).as_secs() < 120);
+        inner
+            .buckets
+            .retain(|_, b| now.duration_since(b.last_refill).as_secs() < 120);
     }
 }
 

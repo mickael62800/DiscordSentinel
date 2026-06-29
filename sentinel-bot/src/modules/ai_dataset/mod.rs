@@ -63,12 +63,12 @@ pub async fn spawn_collector(ctx: Context) {
     tokio::spawn(async move {
         loop {
             // Canal interne propre a CETTE connexion : alimente la stream gRPC.
-            let (inner_tx, inner_rx) = mpsc::channel::<proto::CollectMessageRequest>(CHANNEL_BUFFER);
+            let (inner_tx, inner_rx) =
+                mpsc::channel::<proto::CollectMessageRequest>(CHANNEL_BUFFER);
             let mut client = grpc.ai_dataset();
-            let call =
-                tokio::spawn(
-                    async move { client.collect_messages(ReceiverStream::new(inner_rx)).await },
-                );
+            let call = tokio::spawn(async move {
+                client.collect_messages(ReceiverStream::new(inner_rx)).await
+            });
 
             // Relaie le canal stable vers la stream courante jusqu'a rupture.
             loop {

@@ -6,20 +6,26 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
-use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
-use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
 use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
+use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
 use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
-use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
-use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;
+use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
+use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
 
 // ══════════════════════════════════════════════════════════
 // GameRepository
@@ -31,8 +37,12 @@ async fn game_repo_create_and_list() {
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    repo.create(&gid, "Fortnite", "user1", None, None, None).await.unwrap();
-    repo.create(&gid, "Valorant", "user1", None, None, None).await.unwrap();
+    repo.create(&gid, "Fortnite", "user1", None, None, None)
+        .await
+        .unwrap();
+    repo.create(&gid, "Valorant", "user1", None, None, None)
+        .await
+        .unwrap();
 
     let games = repo.list(&gid).await.unwrap();
     assert_eq!(games.len(), 2);
@@ -44,7 +54,9 @@ async fn game_repo_find_by_name() {
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    repo.create(&gid, "Rocket League", "user1", None, None, None).await.unwrap();
+    repo.create(&gid, "Rocket League", "user1", None, None, None)
+        .await
+        .unwrap();
     let found = repo.find_by_name(&gid, "rocket league").await.unwrap();
     assert!(found.is_some());
     assert_eq!(found.unwrap().game_name, "Rocket League");
@@ -56,9 +68,16 @@ async fn game_repo_delete_removes_entry() {
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    let game = repo.create(&gid, "Minecraft", "user1", None, None, None).await.unwrap();
+    let game = repo
+        .create(&gid, "Minecraft", "user1", None, None, None)
+        .await
+        .unwrap();
     assert!(repo.delete(&gid, &game.id).await.unwrap());
-    assert!(repo.find_by_name(&gid, "Minecraft").await.unwrap().is_none());
+    assert!(repo
+        .find_by_name(&gid, "Minecraft")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 // ══════════════════════════════════════════════════════════
@@ -120,7 +139,12 @@ async fn pending_action_repo_create_list_resolve() {
     let repo = PgPendingActionRepository::new(p);
     let gid = ugid();
 
-    let id = repo.create(&gid, "mod1", "Mod", "target1", "Target", "warn", "spam", None, None).await.unwrap();
+    let id = repo
+        .create(
+            &gid, "mod1", "Mod", "target1", "Target", "warn", "spam", None, None,
+        )
+        .await
+        .unwrap();
 
     let list = repo.list_pending(&gid).await.unwrap();
     assert_eq!(list.len(), 1);
@@ -137,7 +161,20 @@ async fn pending_action_repo_get_guild_id() {
     let repo = PgPendingActionRepository::new(p);
     let gid = ugid();
 
-    let id = repo.create(&gid, "mod1", "Mod", "t1", "T", "mute", "toxic", None, Some(600)).await.unwrap();
+    let id = repo
+        .create(
+            &gid,
+            "mod1",
+            "Mod",
+            "t1",
+            "T",
+            "mute",
+            "toxic",
+            None,
+            Some(600),
+        )
+        .await
+        .unwrap();
     let found = repo.get_guild_id(id).await.unwrap();
     assert_eq!(found, Some(gid));
 }

@@ -18,11 +18,7 @@ pub struct FlavorTemplateResp {
 impl ApiClient {
     /// Tire un template aleatoire depuis l'API. `Ok(None)` si la cle est
     /// inconnue (404), `Err` sur autre erreur reseau/serveur.
-    pub async fn random_flavor(
-        &self,
-        key: &str,
-        locale: &str,
-    ) -> Result<Option<String>, String> {
+    pub async fn random_flavor(&self, key: &str, locale: &str) -> Result<Option<String>, String> {
         // Les keys sont des identifiants ASCII (steal_success_afk, etc.) et
         // locale est "fr"/"en" — pas besoin de url-encoder.
         let path = format!("/api/coude/flavor/{}/random?locale={}", key, locale);

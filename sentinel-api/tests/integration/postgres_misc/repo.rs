@@ -7,27 +7,31 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::audit::audit_log_repository::PgAuditLogRepository;
-use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::notes_repository::PgNotesRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::reminder_repository::PgReminderRepository;
-use sentinel_api::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
-use sentinel_core::domain::entities::moderation::user_note::UserNote;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use sentinel_api::ports::outbound::audit::audit_log_repository::AuditLogRepository;
-use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_api::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use sentinel_api::ports::outbound::moderation::notes_repository::NotesRepository;
 use sentinel_api::ports::outbound::moderation::reminder_repository::ReminderRepository;
-use sentinel_api::ports::outbound::audit::security_event_repository::SecurityEventRepository;
+use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
+use sentinel_core::domain::entities::moderation::user_note::UserNote;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -57,9 +61,19 @@ async fn audit_log_save_and_find_all() {
     repo.save(&audit_log(&g, "mod_warn")).await.unwrap();
     repo.save(&audit_log(&g, "mod_ban")).await.unwrap();
 
-    let logs = repo.find_all(Some(&g), &AuditLogFilters {
-        event_type: None, actor_id: None, target_id: None, limit: 50, offset: 0,
-    }).await.unwrap();
+    let logs = repo
+        .find_all(
+            Some(&g),
+            &AuditLogFilters {
+                event_type: None,
+                actor_id: None,
+                target_id: None,
+                limit: 50,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(logs.len(), 2);
 }
 
@@ -70,10 +84,19 @@ async fn audit_log_filter_by_event_type() {
     repo.save(&audit_log(&g, "mod_warn")).await.unwrap();
     repo.save(&audit_log(&g, "mod_ban")).await.unwrap();
 
-    let warns = repo.find_all(Some(&g), &AuditLogFilters {
-        event_type: Some("mod_warn".into()),
-        actor_id: None, target_id: None, limit: 50, offset: 0,
-    }).await.unwrap();
+    let warns = repo
+        .find_all(
+            Some(&g),
+            &AuditLogFilters {
+                event_type: Some("mod_warn".into()),
+                actor_id: None,
+                target_id: None,
+                limit: 50,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(warns.len(), 1);
     assert_eq!(warns[0].event_type, "mod_warn");
 }
@@ -82,14 +105,27 @@ async fn audit_log_filter_by_event_type() {
 async fn audit_log_filter_combinations() {
     let repo = PgAuditLogRepository::new(pool().await);
     let g = fresh_id();
-    let mut a = audit_log(&g, "mod_ban"); a.actor_id = Some("admin1".into()); a.target_id = Some("victim1".into());
-    let mut b = audit_log(&g, "mod_ban"); b.actor_id = Some("admin2".into()); b.target_id = Some("victim2".into());
+    let mut a = audit_log(&g, "mod_ban");
+    a.actor_id = Some("admin1".into());
+    a.target_id = Some("victim1".into());
+    let mut b = audit_log(&g, "mod_ban");
+    b.actor_id = Some("admin2".into());
+    b.target_id = Some("victim2".into());
     repo.save(&a).await.unwrap();
     repo.save(&b).await.unwrap();
-    let filtered = repo.find_all(Some(&g), &AuditLogFilters {
-        event_type: None, actor_id: Some("admin1".into()),
-        target_id: Some("victim1".into()), limit: 50, offset: 0,
-    }).await.unwrap();
+    let filtered = repo
+        .find_all(
+            Some(&g),
+            &AuditLogFilters {
+                event_type: None,
+                actor_id: Some("admin1".into()),
+                target_id: Some("victim1".into()),
+                limit: 50,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(filtered.len(), 1);
 }
 
@@ -115,9 +151,19 @@ async fn audit_log_delete_older_than_days() {
 
     let n = repo.delete_older_than_days(&g, 1).await.unwrap();
     assert_eq!(n, 1);
-    let remaining = repo.find_all(Some(&g), &AuditLogFilters {
-        event_type: None, actor_id: None, target_id: None, limit: 50, offset: 0,
-    }).await.unwrap();
+    let remaining = repo
+        .find_all(
+            Some(&g),
+            &AuditLogFilters {
+                event_type: None,
+                actor_id: None,
+                target_id: None,
+                limit: 50,
+                offset: 0,
+            },
+        )
+        .await
+        .unwrap();
     assert_eq!(remaining.len(), 1);
 }
 
@@ -134,8 +180,14 @@ async fn seed_security_audit(p: &PgPool, guild: &str, severity: &str, user_ids: 
     });
     sqlx::query(
         "INSERT INTO audit_logs (id, guild_id, event_type, details) \
-         VALUES ($1, $2, 'security_raid', $3)"
-    ).bind(id).bind(guild).bind(details).execute(p).await.unwrap();
+         VALUES ($1, $2, 'security_raid', $3)",
+    )
+    .bind(id)
+    .bind(guild)
+    .bind(details)
+    .execute(p)
+    .await
+    .unwrap();
     id
 }
 
@@ -143,11 +195,16 @@ async fn seed_security_audit(p: &PgPool, guild: &str, severity: &str, user_ids: 
 async fn security_save_is_noop() {
     let repo = PgSecurityEventRepository::new(pool().await);
     repo.save(&SecurityEvent {
-        id: Uuid::new_v4(), guild_id: "g".into(),
-        event_type: "raid".into(), severity: "high".into(),
-        description: "x".into(), user_ids: vec![],
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        event_type: "raid".into(),
+        severity: "high".into(),
+        description: "x".into(),
+        user_ids: vec![],
         created_at: Utc::now(),
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -181,17 +238,22 @@ async fn security_find_all_returns_recent() {
 fn note(guild: &str, user: &str, content: &str) -> UserNote {
     UserNote {
         id: Uuid::new_v4(),
-        guild_id: guild.into(), user_id: user.into(),
-        author_id: "admin".into(), author_name: "Admin".into(),
-        content: content.into(), category: "general".into(),
-        created_at: Utc::now(), updated_at: Utc::now(),
+        guild_id: guild.into(),
+        user_id: user.into(),
+        author_id: "admin".into(),
+        author_name: "Admin".into(),
+        content: content.into(),
+        category: "general".into(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn notes_save_and_find() {
     let repo = PgNotesRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.save(&note(&g, &u, "Note 1")).await.unwrap();
     repo.save(&note(&g, &u, "Note 2")).await.unwrap();
     let notes = repo.find_by_user(&g, &u).await.unwrap();
@@ -201,7 +263,8 @@ async fn notes_save_and_find() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn notes_delete_valid_uuid() {
     let repo = PgNotesRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let n = note(&g, &u, "Note");
     repo.save(&n).await.unwrap();
     repo.delete(&n.id.to_string()).await.unwrap();
@@ -212,7 +275,10 @@ async fn notes_delete_valid_uuid() {
 async fn notes_delete_invalid_uuid_returns_not_found() {
     let repo = PgNotesRepository::new(pool().await);
     let err = repo.delete("not-a-uuid").await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::NotFound(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::NotFound(_)
+    ));
 }
 
 // ══════════════════════════════════════════════════════════
@@ -222,10 +288,14 @@ async fn notes_delete_invalid_uuid_returns_not_found() {
 fn reminder(guild: &str, remind_in_seconds: i64) -> SanctionReminder {
     let now = Utc::now();
     SanctionReminder {
-        id: Uuid::new_v4(), guild_id: guild.into(),
-        moderator_id: "mod".into(), moderator_name: "Mod".into(),
-        target_id: "target".into(), target_name: "Target".into(),
-        action_type: "mute".into(), reason: "test".into(),
+        id: Uuid::new_v4(),
+        guild_id: guild.into(),
+        moderator_id: "mod".into(),
+        moderator_name: "Mod".into(),
+        target_id: "target".into(),
+        target_name: "Target".into(),
+        action_type: "mute".into(),
+        reason: "test".into(),
         action_id: Uuid::new_v4(),
         remind_at: now + chrono::Duration::seconds(remind_in_seconds),
         expires_at: now + chrono::Duration::seconds(remind_in_seconds + 3600),
@@ -287,18 +357,29 @@ async fn reminder_find_by_guild_returns_all() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bot_config_get_config_empty_when_none() {
     let repo = PgBotConfigRepository::new(pool().await);
-    assert!(repo.get_config(&fresh_id(), "coude-bot").await.unwrap().is_empty());
+    assert!(repo
+        .get_config(&fresh_id(), "coude-bot")
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bot_config_set_and_get() {
     let repo = PgBotConfigRepository::new(pool().await);
     let g = fresh_id();
-    repo.set_config(&g, "coude-bot", "jackpot_threshold", "5000").await.unwrap();
-    repo.set_config(&g, "coude-bot", "chaos_enabled", "true").await.unwrap();
+    repo.set_config(&g, "coude-bot", "jackpot_threshold", "5000")
+        .await
+        .unwrap();
+    repo.set_config(&g, "coude-bot", "chaos_enabled", "true")
+        .await
+        .unwrap();
     let entries = repo.get_config(&g, "coude-bot").await.unwrap();
     assert_eq!(entries.len(), 2);
-    let jackpot = entries.iter().find(|e| e.config_key == "jackpot_threshold").unwrap();
+    let jackpot = entries
+        .iter()
+        .find(|e| e.config_key == "jackpot_threshold")
+        .unwrap();
     assert_eq!(jackpot.config_value, "5000");
 }
 

@@ -1,7 +1,7 @@
-pub mod spam;
 pub mod insult;
 pub mod link;
 pub mod phishing;
+pub mod spam;
 pub mod unicode;
 
 /// Configuration des détecteurs, construite depuis la guild config.
@@ -73,12 +73,11 @@ pub fn analyze(content: &str, config: &DetectorConfig) -> DetectionFlags {
     DetectionFlags {
         spam: config.spam_enabled
             && (spam::detect(
-                    content,
-                    config.spam_repeat_char_threshold,
-                    config.spam_repeat_word_threshold,
-                )
-                || (config.emoji_spam_enabled
-                    && spam::detect_emoji_spam(content, config.emoji_spam_max))
+                content,
+                config.spam_repeat_char_threshold,
+                config.spam_repeat_word_threshold,
+            ) || (config.emoji_spam_enabled
+                && spam::detect_emoji_spam(content, config.emoji_spam_max))
                 || (config.mentions_enabled
                     && spam::detect_mentions(content, config.mentions_max))
                 || (config.unicode_enabled
@@ -87,10 +86,13 @@ pub fn analyze(content: &str, config: &DetectorConfig) -> DetectionFlags {
                         config.unicode_max_combining,
                         config.unicode_max_invisible,
                     ))),
-        insult: config.insult_enabled
-            && insult::detect(content, &config.insult_custom_words),
+        insult: config.insult_enabled && insult::detect(content, &config.insult_custom_words),
         link: config.link_enabled
-            && link::detect(content, config.allow_discord_invites, &config.allowed_domains),
+            && link::detect(
+                content,
+                config.allow_discord_invites,
+                &config.allowed_domains,
+            ),
         phishing: config.phishing_enabled
             && phishing::detect(content, &config.phishing_extra_whitelist),
     }
@@ -163,28 +165,40 @@ mod tests {
 
     #[test]
     fn spam_disabled_skips_detection() {
-        let config = DetectorConfig { spam_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            spam_enabled: false,
+            ..DetectorConfig::default()
+        };
         let f = analyze("aaaaaaa", &config);
         assert!(!f.spam);
     }
 
     #[test]
     fn insult_disabled_skips_detection() {
-        let config = DetectorConfig { insult_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            insult_enabled: false,
+            ..DetectorConfig::default()
+        };
         let f = analyze("t'es un connard", &config);
         assert!(!f.insult);
     }
 
     #[test]
     fn link_disabled_skips_detection() {
-        let config = DetectorConfig { link_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            link_enabled: false,
+            ..DetectorConfig::default()
+        };
         let f = analyze("https://example.com", &config);
         assert!(!f.link);
     }
 
     #[test]
     fn phishing_disabled_skips_detection() {
-        let config = DetectorConfig { phishing_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            phishing_enabled: false,
+            ..DetectorConfig::default()
+        };
         let f = analyze("Free Discord Nitro click here", &config);
         assert!(!f.phishing);
     }
@@ -217,7 +231,10 @@ mod tests {
 
     #[test]
     fn emoji_spam_disabled_skips() {
-        let config = DetectorConfig { emoji_spam_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            emoji_spam_enabled: false,
+            ..DetectorConfig::default()
+        };
         // Utilise des custom emojis Discord variés pour éviter le trigger char-repeat
         let msg = "<:a:1> <:b:2> <:c:3> <:d:4> <:e:5> <:f:6> <:g:7> <:h:8> <:i:9> <:j:10>";
         let f = analyze(msg, &config);
@@ -232,7 +249,10 @@ mod tests {
 
     #[test]
     fn mentions_disabled_skips() {
-        let config = DetectorConfig { mentions_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            mentions_enabled: false,
+            ..DetectorConfig::default()
+        };
         let f = analyze("<@1> <@2> <@3> <@4> <@5>", &config);
         assert!(!f.spam);
     }
@@ -247,7 +267,10 @@ mod tests {
 
     #[test]
     fn unicode_disabled_skips() {
-        let config = DetectorConfig { unicode_enabled: false, ..DetectorConfig::default() };
+        let config = DetectorConfig {
+            unicode_enabled: false,
+            ..DetectorConfig::default()
+        };
         let zalgo = format!("a{}", "\u{0300}".repeat(5));
         let f = analyze(&zalgo, &config);
         assert!(!f.spam);

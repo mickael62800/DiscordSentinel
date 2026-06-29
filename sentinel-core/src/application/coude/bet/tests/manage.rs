@@ -1,13 +1,13 @@
 use super::*;
-use crate::domain::entities::coude::bet::BetResolutionPlan;
 use crate::domain::entities::coude::bet::Bet;
-use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
 use crate::ports::outbound::coude::bet_repository::BetRepository;
+use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
@@ -25,7 +25,10 @@ impl MockBetRepo {
             placed: StdMutex::new(vec![]),
             bets: StdMutex::new(vec![]),
             apply_calls: StdMutex::new(vec![]),
-            refund_summary: StdMutex::new(RefundSummary { refunded_count: 0, refunded_total: 0 }),
+            refund_summary: StdMutex::new(RefundSummary {
+                refunded_count: 0,
+                refunded_total: 0,
+            }),
             refund_calls: StdMutex::new(vec![]),
         }
     }
@@ -40,7 +43,11 @@ impl BetRepository for MockBetRepo {
         self.placed.lock().unwrap().push(new);
         Ok(vec![])
     }
-    async fn apply_resolution(&self, g: &str, p: BetResolutionPlan) -> Result<Vec<TauntEvent>, DomainError> {
+    async fn apply_resolution(
+        &self,
+        g: &str,
+        p: BetResolutionPlan,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
         self.apply_calls.lock().unwrap().push((g.into(), p));
         Ok(vec![])
     }
@@ -59,10 +66,20 @@ struct MockCombatQuery {
 
 impl MockCombatQuery {
     fn new(status: &str) -> Self {
-        Self { status: status.into(), attacker_id: "att".into(), defender_id: "def".into(), should_fail: false }
+        Self {
+            status: status.into(),
+            attacker_id: "att".into(),
+            defender_id: "def".into(),
+            should_fail: false,
+        }
     }
     fn failing() -> Self {
-        Self { status: "betting".into(), attacker_id: "att".into(), defender_id: "def".into(), should_fail: true }
+        Self {
+            status: "betting".into(),
+            attacker_id: "att".into(),
+            defender_id: "def".into(),
+            should_fail: true,
+        }
     }
 }
 
@@ -141,7 +158,10 @@ async fn place_rejects_combat_not_betting() {
 #[tokio::test]
 async fn place_rejects_combat_resolved() {
     let (svc, _) = make_svc("resolved");
-    assert!(matches!(svc.place(new_bet("u1", 100)).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.place(new_bet("u1", 100)).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -158,7 +178,10 @@ async fn place_rejects_attacker_betting_on_own_combat() {
 #[tokio::test]
 async fn place_rejects_defender_betting_on_own_combat() {
     let (svc, _) = make_svc("betting");
-    assert!(matches!(svc.place(new_bet("def", 100)).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.place(new_bet("def", 100)).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -183,7 +206,10 @@ async fn place_maps_combat_not_found_to_not_found() {
 #[tokio::test]
 async fn resolve_empty_bets_returns_empty_plan() {
     let (svc, _) = make_svc("betting");
-    let outcome = svc.resolve(Uuid::new_v4(), Some("att".into())).await.unwrap();
+    let outcome = svc
+        .resolve(Uuid::new_v4(), Some("att".into()))
+        .await
+        .unwrap();
     assert!(outcome.plan.payouts.is_empty());
     assert!(outcome.taunt_events.is_empty());
 }
@@ -194,10 +220,15 @@ async fn resolve_empty_bets_returns_empty_plan() {
 async fn list_for_combat_delegates_repo() {
     let (svc, repo) = make_svc("betting");
     repo.bets.lock().unwrap().push(Bet {
-        id: Uuid::new_v4(), guild_id: "g".into(), combat_id: Uuid::new_v4(),
-        bettor_id: "u1".into(), bettor_name: "U1".into(),
-        backed_id: "att".into(), amount: 100,
-        won: None, payout: None,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        combat_id: Uuid::new_v4(),
+        bettor_id: "u1".into(),
+        bettor_name: "U1".into(),
+        backed_id: "att".into(),
+        amount: 100,
+        won: None,
+        payout: None,
     });
     let bets = svc.list_for_combat(Uuid::new_v4()).await.unwrap();
     assert_eq!(bets.len(), 1);
@@ -207,7 +238,10 @@ async fn list_for_combat_delegates_repo() {
 #[tokio::test]
 async fn refund_delegates_to_repo_with_guild_id() {
     let (svc, repo) = make_svc("betting");
-    *repo.refund_summary.lock().unwrap() = RefundSummary { refunded_count: 3, refunded_total: 900 };
+    *repo.refund_summary.lock().unwrap() = RefundSummary {
+        refunded_count: 3,
+        refunded_total: 900,
+    };
     let combat_id = Uuid::new_v4();
     let summary = svc.refund(combat_id).await.unwrap();
     assert_eq!(summary.refunded_count, 3);
@@ -223,10 +257,15 @@ async fn resolve_with_bets_invokes_apply_resolution() {
     let combat_id = Uuid::new_v4();
     // Un pari sur l'attaquant pour qu'un payout soit calcule.
     repo.bets.lock().unwrap().push(Bet {
-        id: Uuid::new_v4(), guild_id: "g".into(), combat_id,
-        bettor_id: "u1".into(), bettor_name: "U1".into(),
-        backed_id: "att".into(), amount: 100,
-        won: None, payout: None,
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        combat_id,
+        bettor_id: "u1".into(),
+        bettor_name: "U1".into(),
+        backed_id: "att".into(),
+        amount: 100,
+        won: None,
+        payout: None,
     });
     let _outcome = svc.resolve(combat_id, Some("att".into())).await.unwrap();
     assert_eq!(repo.apply_calls.lock().unwrap().len(), 1);
@@ -238,5 +277,8 @@ async fn refund_propagates_combat_not_found() {
     let repo = Arc::new(MockBetRepo::new());
     let combats = Arc::new(MockCombatQuery::failing());
     let svc = ManageCoudeBetsService::new(repo, combats);
-    assert!(matches!(svc.refund(Uuid::new_v4()).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.refund(Uuid::new_v4()).await,
+        Err(DomainError::NotFound(_))
+    ));
 }

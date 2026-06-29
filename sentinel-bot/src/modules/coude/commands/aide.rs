@@ -14,12 +14,13 @@ use crate::shared::discord_helpers::{reply_api_err, require_guild_id};
 use crate::modules::coude::GameApiKey;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("aide")
-        .description("Suggestions contextuelles selon l etat de ton compte")
+    CreateCommand::new("aide").description("Suggestions contextuelles selon l etat de ton compte")
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let user_id = command.user.id.to_string();
     let data = ctx.data.read().await;
@@ -74,7 +75,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if player.total_wins + player.total_losses + player.total_draws == 0 {
         tips.push((
             "\u{1f44a} Premier combat",
-            "Tu n as jamais combattu ! Tente un `/coude @qqun 20` (mise basse pour t echauffer).".into(),
+            "Tu n as jamais combattu ! Tente un `/coude @qqun 20` (mise basse pour t echauffer)."
+                .into(),
         ));
     }
 
@@ -108,9 +110,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     ));
 
     // 9. Theme de saison (cf. COUPE_AMELIORATIONS 6.3).
-    let theme = crate::shared::season_theme::theme_for_season(
-        player.season.unwrap_or(1),
-    );
+    let theme = crate::shared::season_theme::theme_for_season(player.season.unwrap_or(1));
     tips.push((
         "\u{1f3ad} Saison en cours",
         format!("{} **{}** — {}", theme.emoji, theme.label, theme.tagline),

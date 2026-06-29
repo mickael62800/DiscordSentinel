@@ -24,15 +24,20 @@ pub(super) use super::reason_templates;
 pub(super) use super::risk_check;
 pub(super) use super::ModerationApiKey;
 
+use crate::shared::heartbeat::ApiClientKey;
 use serenity::all::{
     CommandInteraction, Context, CreateEmbed, CreateMessage, GuildId, Permissions, UserId,
 };
 use serenity::builder::CreateCommand;
-use crate::shared::heartbeat::ApiClientKey;
 
 /// Envoie un embed de log dans le salon de logs configure pour la guild.
 pub async fn log_to_channel(ctx: &Context, guild_id: &str, embed: CreateEmbed) {
-    let Some(channel) = crate::shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
+    let Some(channel) = crate::shared::discord_helpers::get_log_channel(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await
     else {
         return;
     };
@@ -54,7 +59,13 @@ pub async fn find_immune_role(
     let ignored_roles_raw = {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>()?;
-        let config = base.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await.ok()?;
+        let config = base
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::moderation::MODULE_BOT_NAME,
+            )
+            .await
+            .ok()?;
         config.get("ignored_roles").cloned()
     };
 
@@ -115,10 +126,7 @@ pub fn has_mod_permission(command: &CommandInteraction, required: Permissions) -
 /// `picker_name` (selecteur de membre) OU une option String `user_id` (ID
 /// brut). Permet de cibler un membre **parti / banni** que le selecteur
 /// Discord ne propose pas. Retourne `None` si aucun des deux n'est fourni.
-pub fn resolve_target_user_id(
-    command: &CommandInteraction,
-    picker_name: &str,
-) -> Option<UserId> {
+pub fn resolve_target_user_id(command: &CommandInteraction, picker_name: &str) -> Option<UserId> {
     resolve_target_user_id_named(command, picker_name, "user_id")
 }
 
@@ -145,7 +153,12 @@ pub fn resolve_target_user_id_named(
             CommandDataOptionValue::String(s) => Some(s.as_str()),
             _ => None,
         })
-        .map(|s| s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>'))
+        .map(|s| {
+            s.trim()
+                .trim_start_matches("<@")
+                .trim_start_matches('!')
+                .trim_end_matches('>')
+        })
         .and_then(|s| s.parse::<u64>().ok())
         .map(UserId::new);
     from_picker.or(from_id)

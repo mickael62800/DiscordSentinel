@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 
 pub struct PgDailyActivityRepository {
     pool: PgPool,
@@ -55,7 +55,11 @@ impl From<DailyActivityRow> for DailyActivity {
 
 #[async_trait]
 impl DailyActivityRepository for PgDailyActivityRepository {
-    async fn get_activity(&self, guild_id: Option<&str>, days: i32) -> Result<Vec<DailyActivity>, DomainError> {
+    async fn get_activity(
+        &self,
+        guild_id: Option<&str>,
+        days: i32,
+    ) -> Result<Vec<DailyActivity>, DomainError> {
         let query = if guild_id.is_some() {
             r#"SELECT * FROM daily_activity
                WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer

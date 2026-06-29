@@ -3,21 +3,21 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::roles::v1 as proto;
+use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::roles::v1 as proto;
-use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
-use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
-use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
-use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 
 pub struct RolePanelsGrpc {
     pub uc: Arc<dyn ManageRolePanelsUseCase>,
@@ -135,7 +135,9 @@ impl RolePanelsService for RolePanelsGrpc {
             .sync_roles(&req.guild_id, roles)
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::SyncDiscordRolesResponse { synced: count }))
+        Ok(Response::new(proto::SyncDiscordRolesResponse {
+            synced: count,
+        }))
     }
 }
 
@@ -168,7 +170,11 @@ fn role_panel_entry_to_proto(e: RolePanelEntry) -> proto::RolePanelEntry {
 fn role_panel_detail_to_proto(d: RolePanelDetail) -> proto::RolePanelDetail {
     proto::RolePanelDetail {
         panel: Some(role_panel_to_proto(d.panel)),
-        entries: d.entries.into_iter().map(role_panel_entry_to_proto).collect(),
+        entries: d
+            .entries
+            .into_iter()
+            .map(role_panel_entry_to_proto)
+            .collect(),
     }
 }
 
@@ -180,7 +186,6 @@ fn auto_role_to_proto(r: AutoRole) -> proto::AutoRole {
         enabled: r.enabled,
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/roles.rs"]

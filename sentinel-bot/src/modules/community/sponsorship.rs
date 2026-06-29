@@ -32,7 +32,11 @@ impl SponsorshipTracker {
             return Err("Ce membre a deja un parrain.");
         }
 
-        let count = self.counts.get(&(guild_id, parrain_id)).map(|c| *c).unwrap_or(0);
+        let count = self
+            .counts
+            .get(&(guild_id, parrain_id))
+            .map(|c| *c)
+            .unwrap_or(0);
         if count >= max_active {
             return Err("Vous avez atteint le nombre maximum de filleuls actifs.");
         }
@@ -58,7 +62,10 @@ impl SponsorshipTracker {
     /// Nombre de filleuls actifs d'un parrain.
     #[allow(dead_code)]
     pub fn active_count(&self, guild_id: u64, parrain_id: u64) -> u32 {
-        self.counts.get(&(guild_id, parrain_id)).map(|c| *c).unwrap_or(0)
+        self.counts
+            .get(&(guild_id, parrain_id))
+            .map(|c| *c)
+            .unwrap_or(0)
     }
 
     /// Retire un parrainage (utilise pour le rollback si l'API echoue).

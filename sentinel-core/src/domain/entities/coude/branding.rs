@@ -15,7 +15,12 @@ pub const SENTINEL_TAGLINE: &str = "Sentinel — Combats. Paris. Vols. Surtout :
 
 /// Footer formate pour un embed de combat coude.
 pub fn coude_combat_footer(round_count: usize) -> String {
-    format!("{} | {} round{}", COUDE_TAGLINE_SHORT, round_count, if round_count > 1 { "s" } else { "" })
+    format!(
+        "{} | {} round{}",
+        COUDE_TAGLINE_SHORT,
+        round_count,
+        if round_count > 1 { "s" } else { "" }
+    )
 }
 
 /// Footer formate pour un embed de paris.

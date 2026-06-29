@@ -7,10 +7,10 @@ use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
 use crate::domain::entities::community::voice_channel::VoiceChannelPreset;
 use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 pub struct CreateVoiceChannelCommand {
     pub guild_id: GuildId,
@@ -113,9 +113,17 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError>;
     /// Historique : salons fermes d'une guild, limites a `limit`.
-    async fn list_history_channels(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError>;
-    async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError>;
-    async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError>;
+    async fn list_history_channels(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<VoiceChannel>, DomainError>;
+    async fn get_channel_detail(&self, channel_id: &str)
+        -> Result<VoiceChannelDetail, DomainError>;
+    async fn create_channel(
+        &self,
+        cmd: CreateVoiceChannelCommand,
+    ) -> Result<VoiceChannel, DomainError>;
     async fn close_channel(&self, channel_id: &str) -> Result<(), DomainError>;
     async fn delete_channel(&self, channel_id: &str) -> Result<(), DomainError>;
     async fn update_channel(&self, cmd: UpdateVoiceChannelCommand) -> Result<(), DomainError>;
@@ -126,12 +134,25 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn remove_co_admin(&self, channel_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     // Whitelist
-    async fn get_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError>;
+    async fn get_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError>;
     async fn add_to_whitelist(&self, cmd: ManageWhitelistCommand) -> Result<(), DomainError>;
-    async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError>;
+    async fn remove_from_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError>;
 
     // Presets par proprietaire
-    async fn get_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError>;
+    async fn get_preset(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<VoiceChannelPreset>, DomainError>;
     async fn save_preset(&self, cmd: SavePresetCommand) -> Result<(), DomainError>;
 
     // Bans
@@ -140,9 +161,18 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn is_banned(&self, channel_id: &str, user_id: &str) -> Result<bool, DomainError>;
 
     // Invite Links
-    async fn create_invite_link(&self, cmd: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError>;
-    async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError>;
-    async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError>;
+    async fn create_invite_link(
+        &self,
+        cmd: CreateInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError>;
+    async fn list_invite_links(
+        &self,
+        channel_id: &str,
+    ) -> Result<Vec<VoiceChannelInviteLink>, DomainError>;
+    async fn use_invite_link(
+        &self,
+        cmd: UseInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError>;
     async fn revoke_invite_link(&self, channel_id: &str, link_id: &str) -> Result<(), DomainError>;
 
     // Config voice-bot par guild
@@ -150,7 +180,12 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
 
     // Themes
     async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError>;
-    async fn create_theme(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError>;
-    async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError>;
+    async fn create_theme(&self, cmd: CreateThemeCommand)
+        -> Result<VoiceChannelTheme, DomainError>;
+    async fn update_theme(
+        &self,
+        theme_id: &str,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError>;
     async fn delete_theme(&self, guild_id: &str, theme_id: &str) -> Result<(), DomainError>;
 }

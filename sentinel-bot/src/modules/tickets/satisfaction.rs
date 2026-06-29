@@ -43,5 +43,9 @@ pub fn extract_rating(custom_id: &str) -> Option<u8> {
 pub fn extract_ticket_id(custom_id: &str) -> Option<&str> {
     let suffix = custom_id.strip_prefix(SATISFACTION_PREFIX)?;
     let (ticket_id, _rating) = suffix.rsplit_once('_')?;
-    if ticket_id.is_empty() { None } else { Some(ticket_id) }
+    if ticket_id.is_empty() {
+        None
+    } else {
+        Some(ticket_id)
+    }
 }

@@ -8,26 +8,26 @@
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
-use sqlx::Postgres;
-use sqlx::Transaction;
 use crate::application::casino::manage_slot_service::ManageSlotService;
-use crate::domain::entities::system::bot_config::BotDefinition;
-use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::casino::slot::SlotJackpotPool;
 use crate::domain::entities::casino::slot::SlotSpin;
 use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_slot::ManageSlotUseCase;
 use crate::ports::inbound::casino::manage_slot::SpinCommand;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::casino::slot_repository::SlotRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::Postgres;
+use sqlx::Transaction;
 // ── Mocks ──
 
 #[derive(Default)]
@@ -48,14 +48,31 @@ impl SlotRepository for MockSlotRepo {
         Ok(())
     }
     async fn add_to_jackpot_pool_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: i64, _: i64,
-    ) -> Result<i64, DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: i64,
+        _: i64,
+    ) -> Result<i64, DomainError> {
+        unimplemented!()
+    }
     async fn claim_jackpot_pool_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: i64,
-    ) -> Result<(), DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: i64,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn log_spin_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &SlotSpin,
-    ) -> Result<(), DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &SlotSpin,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn last_spin_at(&self, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> {
         Ok(*self.last_spin.lock().unwrap())
     }
@@ -63,13 +80,21 @@ impl SlotRepository for MockSlotRepo {
         Ok(*self.has_claimed.lock().unwrap())
     }
     async fn mark_daily_claimed_in_tx(
-        &self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str,
-    ) -> Result<(), DomainError> { unimplemented!() }
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn recent_spins(&self, _: &str, _: i64) -> Result<Vec<SlotSpin>, DomainError> {
         Ok(self.recent_returns.lock().unwrap().clone())
     }
     async fn top_winners(
-        &self, _: &str, _: i64, _: i64,
+        &self,
+        _: &str,
+        _: i64,
+        _: i64,
     ) -> Result<Vec<SlotTopWinner>, DomainError> {
         Ok(self.top_returns.lock().unwrap().clone())
     }
@@ -82,28 +107,86 @@ struct MockBotConfigRepo {
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfigRepo {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_config(&self, _g: &str, _b: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.entries.lock().unwrap().clone())
     }
     async fn get_all_config(&self, _g: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.entries.lock().unwrap().clone())
     }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 struct MockWalletUc;
 
 #[async_trait]
 impl ManageWalletUseCase for MockWalletUc {
-    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
-    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    async fn credit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn transfer(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
+        unimplemented!()
+    }
+    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn credit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> {
+        vec![]
+    }
 }
 
 // Pool postgres factice : le service en a besoin pour begin(). Comme nos
@@ -150,14 +233,20 @@ fn cmd(mise: i64) -> SpinCommand {
 
 #[tokio::test]
 async fn spin_rejects_mise_below_min() {
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     let err = svc.spin(cmd(5)).await.unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(m) if m.contains("hors borne")));
 }
 
 #[tokio::test]
 async fn spin_rejects_mise_above_max() {
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     let err = svc.spin(cmd(99_999_999)).await.unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(m) if m.contains("hors borne")));
 }
@@ -166,7 +255,10 @@ async fn spin_rejects_mise_above_max() {
 async fn spin_accepts_mise_exactly_at_min() {
     // mise = 10 (min defaut), on s arrete au moment de begin tx (lazy pool fail).
     // L erreur de validation NE doit pas etre levee.
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     let err = svc.spin(cmd(10)).await.unwrap_err();
     // L erreur doit etre une erreur Internal (begin tx lazy fail), pas validation.
     assert!(!matches!(err, DomainError::ValidationError(m) if m.contains("hors borne")));
@@ -174,7 +266,10 @@ async fn spin_accepts_mise_exactly_at_min() {
 
 #[tokio::test]
 async fn spin_accepts_mise_exactly_at_max() {
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     let err = svc.spin(cmd(1000)).await.unwrap_err();
     assert!(!matches!(err, DomainError::ValidationError(m) if m.contains("hors borne")));
 }
@@ -238,10 +333,15 @@ async fn daily_rejects_when_already_claimed_today() {
 
 #[tokio::test]
 async fn daily_passes_when_enabled_and_not_claimed() {
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     let err = svc.claim_daily_bonus(cmd(0)).await.unwrap_err();
     // pas une erreur de validation business : echoue plus tard sur la tx
-    assert!(!matches!(err, DomainError::ValidationError(m) if m.contains("desactive") || m.contains("deja")));
+    assert!(
+        !matches!(err, DomainError::ValidationError(m) if m.contains("desactive") || m.contains("deja"))
+    );
 }
 
 // ══════════════════════════════════════════════════════════
@@ -251,15 +351,14 @@ async fn daily_passes_when_enabled_and_not_claimed() {
 #[tokio::test]
 async fn config_parses_custom_min_max_bet() {
     let bot_cfg = MockBotConfigRepo::default();
-    *bot_cfg.entries.lock().unwrap() = vec![
-        entry("min_bet", "100"),
-        entry("max_bet", "10000"),
-    ];
+    *bot_cfg.entries.lock().unwrap() = vec![entry("min_bet", "100"), entry("max_bet", "10000")];
     let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(bot_cfg));
 
     // mise = 50 => en dessous du min custom 100 => rejet
     let err = svc.spin(cmd(50)).await.unwrap_err();
-    assert!(matches!(err, DomainError::ValidationError(m) if m.contains("hors borne") && m.contains("100")));
+    assert!(
+        matches!(err, DomainError::ValidationError(m) if m.contains("hors borne") && m.contains("100"))
+    );
 
     // mise = 5000 => OK (pas de validation error)
     let err2 = svc.spin(cmd(5000)).await.unwrap_err();
@@ -285,7 +384,7 @@ async fn config_lengths_mismatch_returns_validation_error() {
     let bot_cfg = MockBotConfigRepo::default();
     *bot_cfg.entries.lock().unwrap() = vec![
         entry("symbols", "🍒,🍋,🍊"),
-        entry("weights", "1,1"),                // mauvaise longueur
+        entry("weights", "1,1"), // mauvaise longueur
         entry("payout_3x_multipliers", "2,3,5"),
     ];
     let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(bot_cfg));
@@ -299,7 +398,10 @@ async fn config_lengths_mismatch_returns_validation_error() {
 
 #[tokio::test]
 async fn get_jackpot_pool_zero_when_no_row() {
-    let svc = make_service(Arc::new(MockSlotRepo::default()), Arc::new(MockBotConfigRepo::default()));
+    let svc = make_service(
+        Arc::new(MockSlotRepo::default()),
+        Arc::new(MockBotConfigRepo::default()),
+    );
     assert_eq!(svc.get_jackpot_pool("g").await.unwrap(), 0);
 }
 

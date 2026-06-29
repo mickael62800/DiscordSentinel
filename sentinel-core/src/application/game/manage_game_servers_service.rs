@@ -15,9 +15,7 @@ use std::sync::Arc;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
-use crate::application::game::config_loader::{
-    load_game_portal_config, GamePortalConfig,
-};
+use crate::application::game::config_loader::{load_game_portal_config, GamePortalConfig};
 use crate::application::game::password_gen::generate_rcon_password;
 use crate::domain::entities::game::audit::GameAuditAction;
 use crate::domain::entities::game::quota::GuildQuotaState;
@@ -99,7 +97,11 @@ impl ManageGameServersService {
         validate_server_name(&cmd.name).map_err(DomainError::ValidationError)?;
 
         // Whitelist template
-        if !cfg.allowed_templates.iter().any(|s| s == &cmd.template_slug) {
+        if !cfg
+            .allowed_templates
+            .iter()
+            .any(|s| s == &cmd.template_slug)
+        {
             return Err(DomainError::Forbidden(format!(
                 "template '{}' non autorise pour cette guild",
                 cmd.template_slug
@@ -114,7 +116,9 @@ impl ManageGameServersService {
             })?;
 
         // Memoire
-        let memory = cmd.allocated_memory_mb.unwrap_or(template.default_memory_mb);
+        let memory = cmd
+            .allocated_memory_mb
+            .unwrap_or(template.default_memory_mb);
         template
             .validate_memory(memory)
             .map_err(DomainError::ValidationError)?;
@@ -220,17 +224,16 @@ impl ManageGameServersService {
         let mut labels = HashMap::new();
         labels.insert("sentinel.server_id".to_string(), server.id.to_string());
         labels.insert("sentinel.guild_id".to_string(), server.guild_id.clone());
-        labels.insert(
-            "sentinel.template_slug".to_string(),
-            template.slug.clone(),
-        );
+        labels.insert("sentinel.template_slug".to_string(), template.slug.clone());
         labels.insert("sentinel.owner".to_string(), server.owner_user_id.clone());
 
         // Command (templated) : si le template definit un override CMD, on
         // substitue les {{KEY}} par les env effectives (defaults + overrides
         // utilisateur), puis on passe au runtime. Sinon None.
         let command = template.command.as_ref().map(|tmpl| {
-            tmpl.iter().map(|arg| render_template(arg, &env)).collect::<Vec<_>>()
+            tmpl.iter()
+                .map(|arg| render_template(arg, &env))
+                .collect::<Vec<_>>()
         });
 
         ContainerSpec {
@@ -306,7 +309,9 @@ impl ManageGameServersUseCase for ManageGameServersService {
         let cfg = load_game_portal_config(&self.bot_config, &cmd.guild_id).await?;
         let template = self.validate_create(&cmd, &cfg).await?;
 
-        let memory = cmd.allocated_memory_mb.unwrap_or(template.default_memory_mb);
+        let memory = cmd
+            .allocated_memory_mb
+            .unwrap_or(template.default_memory_mb);
 
         // 1. Creation DB en statut `created` (pas encore de container).
         let new = NewGameServer {
@@ -324,7 +329,11 @@ impl ManageGameServersUseCase for ManageGameServersService {
         // 2. Configs initiales (overrides eventuels).
         if !cmd.initial_config.is_empty() {
             self.config_repo
-                .replace_all(server_id, cmd.initial_config.clone(), Some(&cmd.owner_user_id))
+                .replace_all(
+                    server_id,
+                    cmd.initial_config.clone(),
+                    Some(&cmd.owner_user_id),
+                )
                 .await?;
         }
 
@@ -426,9 +435,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
             .template_repo
             .find_by_id(server.template_id)
             .await?
-            .ok_or_else(|| {
-                DomainError::Internal("template du serveur introuvable".into())
-            })?;
+            .ok_or_else(|| DomainError::Internal("template du serveur introuvable".into()))?;
 
         // Marque starting tout de suite (etat transient).
         self.server_repo
@@ -536,9 +543,10 @@ impl ManageGameServersUseCase for ManageGameServersService {
         }
 
         // Start
-        let cid = server.container_id.as_ref().ok_or_else(|| {
-            DomainError::Internal("container_id absent apres create".into())
-        })?;
+        let cid = server
+            .container_id
+            .as_ref()
+            .ok_or_else(|| DomainError::Internal("container_id absent apres create".into()))?;
 
         // Init files : pour les jeux dont l'image ne genere pas elle-meme
         // ses fichiers de config (ex Terraria/ryshe + /tshock/config.json).
@@ -572,11 +580,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
 
         if let Err(e) = self.container_runtime.start_container(cid).await {
             self.server_repo
-                .update_status(
-                    id,
-                    GameServerStatus::Error,
-                    Some(&format!("start: {e}")),
-                )
+                .update_status(id, GameServerStatus::Error, Some(&format!("start: {e}")))
                 .await?;
             return Err(e);
         }
@@ -628,11 +632,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
             {
                 error!(error = %e, "stop_container failed");
                 self.server_repo
-                    .update_status(
-                        id,
-                        GameServerStatus::Error,
-                        Some(&format!("stop: {e}")),
-                    )
+                    .update_status(id, GameServerStatus::Error, Some(&format!("stop: {e}")))
                     .await?;
                 return Err(e);
             }
@@ -695,9 +695,9 @@ impl ManageGameServersUseCase for ManageGameServersService {
             .find_by_id(id)
             .await?
             .ok_or_else(|| DomainError::NotFound(format!("game_server {id} introuvable")))?;
-        let cid = server.container_id.ok_or_else(|| {
-            DomainError::Conflict("container_id non defini".into())
-        })?;
+        let cid = server
+            .container_id
+            .ok_or_else(|| DomainError::Conflict("container_id non defini".into()))?;
         self.container_runtime.stats(&cid).await
     }
 

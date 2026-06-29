@@ -17,25 +17,35 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::coude::combat::CombatResolution;
+use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 use sentinel_core::domain::entities::coude::combat::Combat;
+use sentinel_core::domain::entities::coude::combat::CombatResolution;
 use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 
 fn sample_combat(id: Uuid, guild: &str, status: &str) -> Combat {
     Combat {
-        id, guild_id: guild.into(),
+        id,
+        guild_id: guild.into(),
         channel_id: Some("chan".into()),
-        attacker_id: "a1".into(), attacker_name: "Att".into(),
-        defender_id: "d1".into(), defender_name: "Def".into(),
-        mise: 100, status: status.into(),
+        attacker_id: "a1".into(),
+        attacker_name: "Att".into(),
+        defender_id: "d1".into(),
+        defender_name: "Def".into(),
+        mise: 100,
+        status: status.into(),
         winner_id: None,
-        attacker_roll: None, defender_roll: None,
-        chaos_event: None, special_attack: None, defender_special: None,
-        coins_transferred: None, result_message: None, message_id: None,
+        attacker_roll: None,
+        defender_roll: None,
+        chaos_event: None,
+        special_attack: None,
+        defender_special: None,
+        coins_transferred: None,
+        result_message: None,
+        message_id: None,
         created_at: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
-        accepted_at: None, resolved_at: None,
+        accepted_at: None,
+        resolved_at: None,
     }
 }
 
@@ -54,22 +64,48 @@ struct MockCombats {
 
 #[async_trait]
 impl ManageCoudeCombatsUseCase for MockCombats {
-    async fn list(&self, g: &str, status: Option<&str>, limit: i64) -> Result<Vec<Combat>, DomainError> {
-        self.list_calls.lock().unwrap().push((g.into(), status.map(String::from), limit));
+    async fn list(
+        &self,
+        g: &str,
+        status: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<Combat>, DomainError> {
+        self.list_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), status.map(String::from), limit));
         Ok(vec![sample_combat(Uuid::new_v4(), g, "pending")])
     }
     async fn get(&self, id: Uuid) -> Result<Combat, DomainError> {
-        Ok(self.canned_get.lock().unwrap().clone()
+        Ok(self
+            .canned_get
+            .lock()
+            .unwrap()
+            .clone()
             .unwrap_or_else(|| sample_combat(id, "999", "resolved")))
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
+    async fn get_pending_for_attacker(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
         Ok(None)
     }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
+    async fn get_pending_for_defender(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
         Ok(Some(sample_combat(Uuid::new_v4(), "999", "pending")))
     }
-    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_betting_for_participant(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
         Ok(None)
     }
     async fn create(&self, n: NewCoudeCombat) -> Result<Combat, DomainError> {
@@ -113,19 +149,28 @@ fn state_with(m: Arc<MockCombats>) -> sentinel_api::adapters::inbound::http::sta
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
-        Some(v) => { b = b.header("content-type", "application/json"); Body::from(serde_json::to_string(&v).unwrap()) }
+        Some(v) => {
+            b = b.header("content-type", "application/json");
+            Body::from(serde_json::to_string(&v).unwrap())
+        }
         None => Body::empty(),
     };
     let req = b.body(body_payload).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Lecture ──
@@ -146,7 +191,13 @@ async fn list_combats_default_limit_is_50() {
 async fn list_combats_with_status_and_limit_filters() {
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m.clone()));
-    let (s, _) = req_json(app, "GET", "/api/coude/999/combats?status=pending&limit=5", None).await;
+    let (s, _) = req_json(
+        app,
+        "GET",
+        "/api/coude/999/combats?status=pending&limit=5",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     let calls = m.list_calls.lock().unwrap();
     assert_eq!(calls[0].1.as_deref(), Some("pending"));
@@ -176,7 +227,13 @@ async fn get_combat_valid_uuid_returns_dto() {
 async fn get_pending_attacker_none_returns_null() {
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m));
-    let (s, j) = req_json(app, "GET", "/api/coude/999/combats/pending/attacker/111", None).await;
+    let (s, j) = req_json(
+        app,
+        "GET",
+        "/api/coude/999/combats/pending/attacker/111",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert!(j.is_null());
 }
@@ -185,7 +242,13 @@ async fn get_pending_attacker_none_returns_null() {
 async fn get_pending_defender_some_returns_full_dto() {
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m));
-    let (s, j) = req_json(app, "GET", "/api/coude/999/combats/pending/defender/111", None).await;
+    let (s, j) = req_json(
+        app,
+        "GET",
+        "/api/coude/999/combats/pending/defender/111",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["status"], "pending");
     assert_eq!(j["attacker_name"], "Att");
@@ -252,7 +315,13 @@ async fn resolve_combat_defaults_coins_transferred_to_zero() {
         "chaos_event": null,
         "result_message": null
     });
-    let (s, _) = req_json(app, "POST", &format!("/api/coude/combats/{id}/resolve"), Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{id}/resolve"),
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let resolved = m.resolved.lock().unwrap();
     assert_eq!(resolved[0].0, id);
@@ -271,7 +340,13 @@ async fn resolve_combat_propagates_coins_when_present() {
         "chaos_event": null, "result_message": null,
         "coins_transferred": 500
     });
-    let (_, _) = req_json(app, "POST", &format!("/api/coude/combats/{id}/resolve"), Some(body)).await;
+    let (_, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{id}/resolve"),
+        Some(body),
+    )
+    .await;
     assert_eq!(m.resolved.lock().unwrap()[0].1.coins_transferred, 500);
 }
 
@@ -281,7 +356,13 @@ async fn set_combat_betting_returns_success_flag() {
     let app = router::build_for_test(state_with(m.clone()));
     let id = Uuid::new_v4();
     let body = serde_json::json!({ "message_id": "msg-123" });
-    let (s, j) = req_json(app, "POST", &format!("/api/coude/combats/{id}/betting"), Some(body)).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{id}/betting"),
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["success"], true);
     assert_eq!(m.betting_set.lock().unwrap()[0], (id, "msg-123".into()));
@@ -292,7 +373,13 @@ async fn expire_combat_success() {
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m.clone()));
     let id = Uuid::new_v4();
-    let (s, _) = req_json(app, "POST", &format!("/api/coude/combats/{id}/expire"), None).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{id}/expire"),
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(m.expired.lock().unwrap()[0], id);
 }
@@ -303,9 +390,18 @@ async fn set_defender_special_forwards_key() {
     let app = router::build_for_test(state_with(m.clone()));
     let id = Uuid::new_v4();
     let body = serde_json::json!({ "item_key": "shield" });
-    let (s, _) = req_json(app, "POST", &format!("/api/coude/combats/{id}/defender-special"), Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/combats/{id}/defender-special"),
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(m.defender_specials.lock().unwrap()[0], (id, "shield".into()));
+    assert_eq!(
+        m.defender_specials.lock().unwrap()[0],
+        (id, "shield".into())
+    );
 }
 
 // ── Purge ──
@@ -315,15 +411,25 @@ async fn purge_all_without_rbac_returns_7_table_totals() {
     // Sans rbac -> check_role_for_guild laisse passer (bot/internal).
     let m = Arc::new(MockCombats::new());
     // Guild isole (VARCHAR(20)) pour eviter d'impacter d'autres tests.
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let app = router::build_for_test(state_with(m));
     let (s, j) = req_json(app, "DELETE", &format!("/api/coude/{guild_id}/purge"), None).await;
     assert_eq!(s, StatusCode::OK);
     let obj = j.as_object().unwrap();
     // Les 7 tables du COUDE_PURGE_TABLES doivent etre presentes.
     assert_eq!(obj.len(), 7);
-    for t in ["coude_insurances", "coude_bets", "coude_combats", "coude_primes",
-              "coude_inventory", "coude_events", "coude_players"] {
+    for t in [
+        "coude_insurances",
+        "coude_bets",
+        "coude_combats",
+        "coude_primes",
+        "coude_inventory",
+        "coude_events",
+        "coude_players",
+    ] {
         assert!(obj.contains_key(t), "table manquante: {t}");
         assert_eq!(obj[t], 0); // guild fraiche -> 0 rows affected
     }
@@ -335,8 +441,12 @@ async fn purge_all_viewer_forbidden() {
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m));
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/coude/999/purge",
-        "u1", Some(Role::Viewer), Some("999".into()), None,
+        "DELETE",
+        "/api/coude/999/purge",
+        "u1",
+        Some(Role::Viewer),
+        Some("999".into()),
+        None,
     );
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);

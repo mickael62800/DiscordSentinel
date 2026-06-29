@@ -4,7 +4,8 @@ use super::*;
 
 #[test]
 fn humanizes_cooldown_error() {
-    let raw = r#"Erreur API 400 POST /api/slot/g/spin: {"error":"Cooldown actif : encore 3 secondes"}"#;
+    let raw =
+        r#"Erreur API 400 POST /api/slot/g/spin: {"error":"Cooldown actif : encore 3 secondes"}"#;
     let msg = humanize_api_error(raw);
     assert!(msg.contains("Cooldown"));
     assert!(msg.contains("3 secondes"));
@@ -21,7 +22,8 @@ fn humanizes_mise_out_of_range() {
 
 #[test]
 fn humanizes_insufficient_balance() {
-    let raw = r#"Erreur API 400: {"error":"ValidationError(\"Solde insuffisant: tu as 50 coins\")"}"#;
+    let raw =
+        r#"Erreur API 400: {"error":"ValidationError(\"Solde insuffisant: tu as 50 coins\")"}"#;
     let msg = humanize_api_error(raw);
     assert!(msg.contains("Solde insuffisant"));
 }

@@ -12,8 +12,8 @@ use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_curses::CastedCurse;
 use crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase;
-use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 const CAST_SOURCE: &str = "curse_cast";
 const LIFT_SOURCE: &str = "curse_lift";
 

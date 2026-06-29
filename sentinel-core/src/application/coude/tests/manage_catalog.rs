@@ -17,8 +17,16 @@ async fn catalog_contains_four_classes() {
 async fn catalog_shop_items_heal_amounts() {
     let svc = ManageCoudeCatalogService::new();
     let cat = svc.get_catalog().await.unwrap();
-    let soin = cat.shop_items.iter().find(|i| i.key == "potion_soin").unwrap();
-    let majeure = cat.shop_items.iter().find(|i| i.key == "potion_majeure").unwrap();
+    let soin = cat
+        .shop_items
+        .iter()
+        .find(|i| i.key == "potion_soin")
+        .unwrap();
+    let majeure = cat
+        .shop_items
+        .iter()
+        .find(|i| i.key == "potion_majeure")
+        .unwrap();
     let rage = cat.shop_items.iter().find(|i| i.key == "rage").unwrap();
     assert_eq!(soin.heal_amount, 30);
     assert_eq!(majeure.heal_amount, 80);

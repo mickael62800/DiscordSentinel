@@ -3,35 +3,35 @@
 //! wallet_uc.transfer sont testes via l'integration wallet et ne sont pas
 //! duplique ici.
 
-use std::sync::Arc;
-use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::social::Season;
-use crate::domain::entities::coude::social::Event;
-use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::player::Player;
-use crate::domain::entities::coude::social::LeaderboardCategory;
-use crate::domain::entities::coude::social::NewDailyChaos;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::player::XpProgress;
-use crate::domain::errors::DomainError;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::Season;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::enums::coude::coude_class::PlayerClass;
-use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
-use crate::domain::entities::system::bot_config::BotDefinition;
-use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sqlx::Postgres;
 use sqlx::Transaction;
 // ── Mock SocialRepository ──
@@ -58,13 +58,7 @@ impl SocialRepository for MockSocialRepo {
     ) -> Result<Option<DateTime<Utc>>, DomainError> {
         Ok(*self.cooldown_returns.lock().unwrap())
     }
-    async fn set_cooldown(
-        &self,
-        g: &str,
-        u: &str,
-        a: &str,
-        d: i64,
-    ) -> Result<(), DomainError> {
+    async fn set_cooldown(&self, g: &str, u: &str, a: &str, d: i64) -> Result<(), DomainError> {
         self.set_cooldown_calls
             .lock()
             .unwrap()
@@ -112,35 +106,96 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> {
+        unimplemented!()
+    }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> {
+        Ok(vec![])
+    }
     async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> {
         Ok(self.random_returns.lock().unwrap().clone())
     }
-    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_steal_victim_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
+    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> {
+        Ok(None)
+    }
+    async fn spend_stat_point(
+        &self,
+        _: &str,
+        _: &str,
+        _: CombatStat,
+    ) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_steal_victim_streak(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── Mock EconomyRepository ──
@@ -152,18 +207,48 @@ struct MockEconomyRepo {
 
 #[async_trait]
 impl EconomyRepository for MockEconomyRepo {
-    async fn record_steal_stats(&self, g: &str, thief: &str, victim: &str, amount: i64) -> Result<(), DomainError> {
-        self.steal_calls.lock().unwrap().push((g.into(), thief.into(), victim.into(), amount));
+    async fn record_steal_stats(
+        &self,
+        g: &str,
+        thief: &str,
+        victim: &str,
+        amount: i64,
+    ) -> Result<(), DomainError> {
+        self.steal_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), thief.into(), victim.into(), amount));
         Ok(())
     }
-    async fn record_steal_fail_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn get_coins(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn record_casino_win_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn record_casino_loss_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn record_casino_faillite_stats(&self, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { Ok(0) }
-    async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn sum_casino_gains_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
+    async fn record_steal_fail_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_coins(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn record_casino_win_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_casino_loss_stats(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_casino_faillite_stats(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn sum_casino_gains_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn count_steal_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── Mock BotConfigRepository ──
@@ -189,13 +274,21 @@ impl MockBotConfig {
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfig {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.config_rows.lock().unwrap().clone())
     }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ── Mock ManageWalletUseCase ──
@@ -207,16 +300,69 @@ struct MockWalletUc {
 
 #[async_trait]
 impl ManageWalletUseCase for MockWalletUc {
-    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> { unimplemented!() }
-    async fn transfer(&self, g: &str, from: &str, to: &str, amount: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> {
-        self.transfer_calls.lock().unwrap().push((g.into(), from.into(), to.into(), amount));
+    async fn credit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn transfer(
+        &self,
+        g: &str,
+        from: &str,
+        to: &str,
+        amount: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
+        self.transfer_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), from.into(), to.into(), amount));
         Ok(vec![])
     }
-    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn credit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut dyn crate::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn credit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit_tx(
+        &self,
+        _: &mut dyn crate::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> {
+        vec![]
+    }
 }
 
 // ── Helpers ──
@@ -228,13 +374,31 @@ fn make_player(user_id: &str, coins: i64) -> Player {
         user_id: user_id.into(),
         username: format!("user_{user_id}"),
         coins,
-        total_wins: 0, total_losses: 0, total_draws: 0,
-        total_earned: 0, total_lost: 0, total_stolen: 0,
-        cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
-        level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-        class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
-        hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
-        season: 1, created_at: now, updated_at: now,
+        total_wins: 0,
+        total_losses: 0,
+        total_draws: 0,
+        total_earned: 0,
+        total_lost: 0,
+        total_stolen: 0,
+        cowardice_count: 0,
+        chaos_events: 0,
+        casino_wins: 0,
+        casino_losses: 0,
+        level: 1,
+        xp: 0,
+        stat_points: 0,
+        atk: 0,
+        def: 0,
+        class: Some(PlayerClass::Tank),
+        title: None,
+        class_changed_at: None,
+        hp_current: 100,
+        hp_max: 100,
+        hp_last_regen: None,
+        repos_last_used: None,
+        season: 1,
+        created_at: now,
+        updated_at: now,
     }
 }
 
@@ -331,7 +495,9 @@ async fn leaderboard_clamps_oversized_limit() {
         Arc::new(MockBotConfig::default()),
         Arc::new(MockWalletUc::default()),
     );
-    svc.leaderboard("g", LeaderboardCategory::Richest, 9999).await.unwrap();
+    svc.leaderboard("g", LeaderboardCategory::Richest, 9999)
+        .await
+        .unwrap();
     let calls = social.leaderboard_limit_calls.lock().unwrap();
     assert_eq!(calls.len(), 1);
     // clamp_leaderboard_limit ramène 9999 vers LEADERBOARD_MAX_LIMIT
@@ -349,7 +515,9 @@ async fn leaderboard_clamps_negative_limit() {
         Arc::new(MockBotConfig::default()),
         Arc::new(MockWalletUc::default()),
     );
-    svc.leaderboard("g", LeaderboardCategory::Richest, -5).await.unwrap();
+    svc.leaderboard("g", LeaderboardCategory::Richest, -5)
+        .await
+        .unwrap();
     let calls = social.leaderboard_limit_calls.lock().unwrap();
     assert!(calls[0] >= 1);
 }
@@ -425,10 +593,8 @@ async fn trigger_daily_chaos_returns_none_when_not_enough_players() {
 async fn trigger_daily_chaos_success_path_transfers_and_logs() {
     let social = Arc::new(MockSocialRepo::default());
     let player = Arc::new(MockPlayerRepo::default());
-    *player.random_returns.lock().unwrap() = vec![
-        make_player("victim", 10_000),
-        make_player("winner", 0),
-    ];
+    *player.random_returns.lock().unwrap() =
+        vec![make_player("victim", 10_000), make_player("winner", 0)];
     let cfg = MockBotConfig::default().with_kv("channel_announcements", "channel-1");
     let economy = Arc::new(MockEconomyRepo::default());
     let wallet = Arc::new(MockWalletUc::default());
@@ -465,10 +631,7 @@ async fn trigger_daily_chaos_success_path_transfers_and_logs() {
 async fn trigger_daily_chaos_custom_percent_config() {
     let social = Arc::new(MockSocialRepo::default());
     let player = Arc::new(MockPlayerRepo::default());
-    *player.random_returns.lock().unwrap() = vec![
-        make_player("v", 10_000),
-        make_player("w", 0),
-    ];
+    *player.random_returns.lock().unwrap() = vec![make_player("v", 10_000), make_player("w", 0)];
     // 50% au lieu du default 20%
     let cfg = MockBotConfig::default()
         .with_kv("channel_announcements", "c")
@@ -525,10 +688,14 @@ async fn log_daily_chaos_delegates_to_repo() {
     );
     svc.log_daily_chaos(NewDailyChaos {
         guild_id: "g".into(),
-        loser_id: "v".into(), loser_name: "V".into(),
-        winner_id: "w".into(), winner_name: "W".into(),
+        loser_id: "v".into(),
+        loser_name: "V".into(),
+        winner_id: "w".into(),
+        winner_name: "W".into(),
         amount: 500,
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
     let logs = social.daily_chaos_logs.lock().unwrap();
     assert_eq!(logs.len(), 1);
     assert_eq!(logs[0].amount, 500);

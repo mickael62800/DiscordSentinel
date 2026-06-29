@@ -3,8 +3,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::inventory::Insurance;
 use crate::domain::entities::coude::inventory::InventoryItem;
-use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 
 /// Repository consolidé pour les 3 "stocks" persistants d'un joueur Coup de Coude :
@@ -87,7 +87,8 @@ pub trait InventoryRepository: Send + Sync {
         duration_seconds: i64,
         _max_slots: i32,
     ) -> Result<bool, DomainError> {
-        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds).await
+        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds)
+            .await
     }
 
     async fn get_active_insurance(

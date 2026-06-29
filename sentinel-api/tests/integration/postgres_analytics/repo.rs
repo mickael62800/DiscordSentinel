@@ -7,12 +7,16 @@ use sentinel_api::adapters::outbound::postgres::audit::analytics_repository::PgA
 use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -36,7 +40,9 @@ async fn record_hourly_and_heatmap_shows_data() {
     repo.record_hourly(&g, 14, 100, 5).await.unwrap();
     let heatmap = repo.get_heatmap(Some(&g), 1).await.unwrap();
     assert!(!heatmap.is_empty());
-    assert!(heatmap.iter().any(|h| h.hour == 14 && h.messages == 100 && h.infractions == 5));
+    assert!(heatmap
+        .iter()
+        .any(|h| h.hour == 14 && h.messages == 100 && h.infractions == 5));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -55,7 +61,10 @@ async fn record_hourly_is_upsert_on_same_day_hour() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn action_distribution_empty_for_fresh_guild() {
     let repo = PgAnalyticsRepository::new(pool().await);
-    let got = repo.get_action_distribution(Some(&fresh_id()), 30).await.unwrap();
+    let got = repo
+        .get_action_distribution(Some(&fresh_id()), 30)
+        .await
+        .unwrap();
     assert!(got.is_empty());
 }
 
@@ -69,14 +78,24 @@ async fn action_distribution_groups_with_percentage() {
         sqlx::query(
             "INSERT INTO infractions (id, guild_id, channel_id, user_id, username, message_id, \
               content, flags, score, action, reason, duration, created_at) \
-             VALUES ($1, $2, 'c', 'u', 'u', 'm', 'x', '{}'::jsonb, 0.5, 'warn', 'r', NULL, NOW())"
-        ).bind(Uuid::new_v4()).bind(&g).execute(&p).await.unwrap();
+             VALUES ($1, $2, 'c', 'u', 'u', 'm', 'x', '{}'::jsonb, 0.5, 'warn', 'r', NULL, NOW())",
+        )
+        .bind(Uuid::new_v4())
+        .bind(&g)
+        .execute(&p)
+        .await
+        .unwrap();
     }
     sqlx::query(
         "INSERT INTO infractions (id, guild_id, channel_id, user_id, username, message_id, \
           content, flags, score, action, reason, duration, created_at) \
-         VALUES ($1, $2, 'c', 'u', 'u', 'm', 'x', '{}'::jsonb, 0.8, 'mute', 'r', 300, NOW())"
-    ).bind(Uuid::new_v4()).bind(&g).execute(&p).await.unwrap();
+         VALUES ($1, $2, 'c', 'u', 'u', 'm', 'x', '{}'::jsonb, 0.8, 'mute', 'r', 300, NOW())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(&g)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let got = repo.get_action_distribution(Some(&g), 7).await.unwrap();
     assert_eq!(got.len(), 2);
@@ -91,7 +110,10 @@ async fn action_distribution_groups_with_percentage() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn top_infractors_empty() {
     let repo = PgAnalyticsRepository::new(pool().await);
-    let got = repo.get_top_infractors(Some(&fresh_id()), 30, 10).await.unwrap();
+    let got = repo
+        .get_top_infractors(Some(&fresh_id()), 30, 10)
+        .await
+        .unwrap();
     assert!(got.is_empty());
 }
 
@@ -113,8 +135,14 @@ async fn top_infractors_ranks_by_count() {
     sqlx::query(
         "INSERT INTO infractions (id, guild_id, channel_id, user_id, username, message_id, \
           content, flags, score, action, reason, duration, created_at) \
-         VALUES ($1, $2, 'c', $3, 'Bob', 'm', 'x', '{}'::jsonb, 0.5, 'warn', 'r', NULL, NOW())"
-    ).bind(Uuid::new_v4()).bind(&g).bind(&u2).execute(&p).await.unwrap();
+         VALUES ($1, $2, 'c', $3, 'Bob', 'm', 'x', '{}'::jsonb, 0.5, 'warn', 'r', NULL, NOW())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(&g)
+    .bind(&u2)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let top = repo.get_top_infractors(Some(&g), 7, 10).await.unwrap();
     assert_eq!(top.len(), 2);
@@ -126,7 +154,10 @@ async fn top_infractors_ranks_by_count() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn moderation_trend_empty_ok() {
     let repo = PgAnalyticsRepository::new(pool().await);
-    let _ = repo.get_moderation_trend(Some(&fresh_id()), 30).await.unwrap();
+    let _ = repo
+        .get_moderation_trend(Some(&fresh_id()), 30)
+        .await
+        .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

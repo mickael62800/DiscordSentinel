@@ -1,13 +1,6 @@
 //! Handlers combats : cycle de vie complet (création, transitions, résolution,
 //! expiration, annulation) + lectures associées. Délèguent à `state.coude_combats_uc`.
 
-use axum::extract::Path;
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use axum::http::StatusCode;
-use axum::Extension;
-use axum::Json;
 use super::dto::CombatDto;
 use super::dto::CombatQueryParams;
 use super::dto::CreateCombatDto;
@@ -17,13 +10,20 @@ use super::dto::ResolveCombatDto;
 use super::dto::SetBettingDto;
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Extension;
+use axum::Json;
 use sentinel_core::domain::entities::coude::combat::CombatResolution;
 use sentinel_core::domain::entities::coude::combat::NewCoudeCombat;
+use sentinel_core::domain::enums::system::role::Role;
 // ── Lecture ──
 
 /// GET /api/coude/{guild_id}/combats — liste des combats
@@ -32,7 +32,9 @@ pub async fn list_combats(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<CombatQueryParams>,
 ) -> Result<Json<Vec<CombatDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_COMBATS_LIMIT);
+    let limit = params
+        .limit
+        .unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_COMBATS_LIMIT);
     let combats = state
         .coude_combats_uc
         .list(&guild_id, params.status.as_deref(), limit)
@@ -91,7 +93,14 @@ pub async fn create_combat(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateCombatDto>,
 ) -> Result<Json<FullCombatDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour create_combat").await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour create_combat",
+    )
+    .await?;
     let combat = state
         .coude_combats_uc
         .create(NewCoudeCombat {
@@ -157,7 +166,14 @@ pub async fn resolve_combat(
 ) -> Result<StatusCode, ApiError> {
     let id = parse_combat_id(&combat_id)?;
     if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
-        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour resolve_combat").await?;
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour resolve_combat",
+        )
+        .await?;
     }
     state
         .coude_combats_uc
@@ -186,7 +202,14 @@ pub async fn set_combat_betting(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
     if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
-        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour set_combat_betting").await?;
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour set_combat_betting",
+        )
+        .await?;
     }
     let success = state
         .coude_combats_uc
@@ -203,7 +226,14 @@ pub async fn expire_combat(
 ) -> Result<StatusCode, ApiError> {
     let id = parse_combat_id(&combat_id)?;
     if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
-        check_role_for_guild(&state, &rbac, &gid, Role::Moderator, "moderator+ requis pour expire_combat").await?;
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour expire_combat",
+        )
+        .await?;
     }
     state.coude_combats_uc.expire(id).await?;
     Ok(StatusCode::NO_CONTENT)
@@ -228,7 +258,10 @@ pub async fn purge_all(
 
     // Le repo possede l'atomicite (tx + ordre des DELETE selon
     // COUDE_PURGE_TABLES). Handler convertit juste le resultat en JSON.
-    let counts = state.coude_combats_uc.purge_guild_subsystem(&guild_id).await?;
+    let counts = state
+        .coude_combats_uc
+        .purge_guild_subsystem(&guild_id)
+        .await?;
     let totals: serde_json::Map<String, serde_json::Value> = counts
         .into_iter()
         .map(|(table, rows)| (table, serde_json::Value::from(rows)))

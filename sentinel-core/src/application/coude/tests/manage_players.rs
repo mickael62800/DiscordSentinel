@@ -72,17 +72,33 @@ impl PlayerRepository for MockRepo {
         *self.list_limit.lock().unwrap() = Some(limit);
         Ok(vec![])
     }
-    async fn random_active(&self, _: &str, count: i64, min_coins: i64) -> Result<Vec<Player>, DomainError> {
+    async fn random_active(
+        &self,
+        _: &str,
+        count: i64,
+        min_coins: i64,
+    ) -> Result<Vec<Player>, DomainError> {
         *self.random_count.lock().unwrap() = Some(count);
         *self.random_min_coins.lock().unwrap() = Some(min_coins);
         Ok(vec![])
     }
-    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(*self.update_class_returns.lock().unwrap())
     }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> {
+        Ok(None)
+    }
+    async fn spend_stat_point(
+        &self,
+        _: &str,
+        _: &str,
+        _: CombatStat,
+    ) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
     async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> {
         if *self.reset_stats_returns_some.lock().unwrap() {
             Ok(Some(sample_player()))
@@ -90,24 +106,64 @@ impl PlayerRepository for MockRepo {
             Ok(None)
         }
     }
-    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_steal_victim_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_steal_victim_streak(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── update_class ──
@@ -115,14 +171,23 @@ impl PlayerRepository for MockRepo {
 #[tokio::test]
 async fn update_class_rejects_empty() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.update_class("g", "u", "").await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.update_class("g", "u", "").await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
 async fn update_class_rejects_whitespace_only() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.update_class("g", "u", "   ").await, Err(DomainError::ValidationError(_))));
-    assert!(matches!(svc.update_class("g", "u", "\t\n").await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.update_class("g", "u", "   ").await,
+        Err(DomainError::ValidationError(_))
+    ));
+    assert!(matches!(
+        svc.update_class("g", "u", "\t\n").await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -134,7 +199,10 @@ async fn update_class_accepts_valid_and_returns_ok() {
 #[tokio::test]
 async fn update_class_maps_not_found_when_repo_returns_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::with_update_class(false)));
-    assert!(matches!(svc.update_class("g", "u", "bourrin").await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.update_class("g", "u", "bourrin").await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 // ── random_active clamping ──
@@ -180,8 +248,14 @@ async fn list_uses_limit_200() {
 #[tokio::test]
 async fn reset_stats_rejects_negative_cost() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.reset_stats("g", "u", -1).await, Err(DomainError::ValidationError(_))));
-    assert!(matches!(svc.reset_stats("g", "u", -999).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.reset_stats("g", "u", -1).await,
+        Err(DomainError::ValidationError(_))
+    ));
+    assert!(matches!(
+        svc.reset_stats("g", "u", -999).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -197,7 +271,10 @@ async fn reset_stats_accepts_zero_cost() {
 #[tokio::test]
 async fn spend_stat_point_none_returns_validation_error() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    let err = svc.spend_stat_point("g", "u", CombatStat::Atk).await.unwrap_err();
+    let err = svc
+        .spend_stat_point("g", "u", CombatStat::Atk)
+        .await
+        .unwrap_err();
     match err {
         DomainError::ValidationError(msg) => {
             assert!(msg.contains("introuvable") || msg.contains("stat_points"));
@@ -211,7 +288,10 @@ async fn spend_stat_point_none_returns_validation_error() {
 #[tokio::test]
 async fn add_xp_none_returns_not_found() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.add_xp("g", "u", 100).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.add_xp("g", "u", 100).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 // ── get player not found ──
@@ -219,7 +299,10 @@ async fn add_xp_none_returns_not_found() {
 #[tokio::test]
 async fn get_not_found_returns_not_found_error() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.get("g", "u").await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.get("g", "u").await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 // ── Validation negative amounts ──
@@ -227,8 +310,14 @@ async fn get_not_found_returns_not_found_error() {
 #[tokio::test]
 async fn record_win_rejects_negative_amounts() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.record_win("g", "u", -1, 0).await, Err(DomainError::ValidationError(_))));
-    assert!(matches!(svc.record_win("g", "u", 0, -5).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.record_win("g", "u", -1, 0).await,
+        Err(DomainError::ValidationError(_))
+    ));
+    assert!(matches!(
+        svc.record_win("g", "u", 0, -5).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -240,8 +329,14 @@ async fn record_win_ok_with_zero_amounts() {
 #[tokio::test]
 async fn record_coins_earned_rejects_zero_and_negative() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.record_coins_earned("g", "u", 0).await, Err(DomainError::ValidationError(_))));
-    assert!(matches!(svc.record_coins_earned("g", "u", -10).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.record_coins_earned("g", "u", 0).await,
+        Err(DomainError::ValidationError(_))
+    ));
+    assert!(matches!(
+        svc.record_coins_earned("g", "u", -10).await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -256,75 +351,159 @@ async fn record_coins_earned_ok_with_positive() {
 struct FalseRepo;
 #[async_trait]
 impl PlayerRepository for FalseRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> { Ok(sample_player()) }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
-    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { Ok(None) }
-    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
-    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
-    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(false) }
-    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
-    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
-    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_steal_victim_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
-    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> {
+        Ok(sample_player())
+    }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
+    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> {
+        Ok(None)
+    }
+    async fn spend_stat_point(
+        &self,
+        _: &str,
+        _: &str,
+        _: CombatStat,
+    ) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> {
+        Ok(None)
+    }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_steal_victim_streak(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[tokio::test]
 async fn record_win_not_found_when_repo_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.record_win("g", "u", 10, 5).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.record_win("g", "u", 10, 5).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn record_loss_not_found_when_repo_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.record_loss("g", "u", 10).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.record_loss("g", "u", 10).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn record_draw_not_found_when_repo_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.record_draw("g", "u", 10).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.record_draw("g", "u", 10).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn record_coins_lost_not_found_when_repo_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.record_coins_lost("g", "u", 10).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.record_coins_lost("g", "u", 10).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn record_coins_earned_not_found_when_repo_false() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.record_coins_earned("g", "u", 10).await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.record_coins_earned("g", "u", 10).await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn increment_cowardice_none_returns_not_found() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.increment_cowardice("g", "u").await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.increment_cowardice("g", "u").await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn increment_chaos_false_returns_not_found() {
     let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
-    assert!(matches!(svc.increment_chaos("g", "u").await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.increment_chaos("g", "u").await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
@@ -346,7 +525,10 @@ async fn update_hp_full_heal_regen_delegate() {
 #[tokio::test]
 async fn get_or_create_delegates() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    let p = svc.get_or_create("g".into(), "u".into(), "Alice".into()).await.unwrap();
+    let p = svc
+        .get_or_create("g".into(), "u".into(), "Alice".into())
+        .await
+        .unwrap();
     assert_eq!(p.username, "alice"); // sample_player renvoie "alice"
 }
 

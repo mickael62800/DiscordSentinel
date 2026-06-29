@@ -126,9 +126,7 @@ impl ApiClient {
         let mut client = self.grpc.automod();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.analyze_message(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.analyze_message(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(AnalyzeResponse {

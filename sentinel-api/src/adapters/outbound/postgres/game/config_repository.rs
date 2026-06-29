@@ -1,11 +1,11 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::game_server_config_repository::GameServerConfigRepository;
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgGameServerConfigRepository {
     pool: PgPool,
@@ -56,14 +56,12 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
     }
 
     async fn delete(&self, server_id: Uuid, key: &str) -> Result<(), DomainError> {
-        sqlx::query(
-            "DELETE FROM game_server_configs WHERE server_id = $1 AND config_key = $2",
-        )
-        .bind(server_id)
-        .bind(key)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| pg_err_ctx("delete config", e))?;
+        sqlx::query("DELETE FROM game_server_configs WHERE server_id = $1 AND config_key = $2")
+            .bind(server_id)
+            .bind(key)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| pg_err_ctx("delete config", e))?;
         Ok(())
     }
 
@@ -96,9 +94,7 @@ impl GameServerConfigRepository for PgGameServerConfigRepository {
             .await
             .map_err(|e| pg_err_ctx("replace_all insert", e))?;
         }
-        tx.commit()
-            .await
-            .map_err(|e| pg_err_ctx("tx commit", e))?;
+        tx.commit().await.map_err(|e| pg_err_ctx("tx commit", e))?;
         Ok(())
     }
 }

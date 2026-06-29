@@ -1,12 +1,12 @@
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::Season;
+use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::social::Season;
-use crate::domain::entities::coude::social::Event;
-use crate::domain::entities::coude::social::LeaderboardEntry;
-use crate::domain::entities::coude::social::LeaderboardCategory;
-use crate::domain::entities::coude::social::NewDailyChaos;
-use crate::domain::errors::DomainError;
 
 /// Repository pour les fonctionnalités "sociales" Coup de Coude :
 /// cooldowns, classements, événements serveur, daily chaos, saisons.
@@ -56,8 +56,5 @@ pub trait SocialRepository: Send + Sync {
 
     /// Renvoie la saison active du guild. Bootstrap automatique si aucune
     /// saison n'existe : insertion de la saison suivante (numéro incrémenté).
-    async fn get_or_bootstrap_current_season(
-        &self,
-        guild_id: &str,
-    ) -> Result<Season, DomainError>;
+    async fn get_or_bootstrap_current_season(&self, guild_id: &str) -> Result<Season, DomainError>;
 }

@@ -1,16 +1,20 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use sentinel_core::domain::entities::moderation::modstats::ModeratorBreakdown;
-use sentinel_core::domain::entities::moderation::modstats::ModstatsTrendDay;
+use super::super::pg_err;
 use crate::ports::outbound::audit::modstats_repository::ModeratorStat;
 use crate::ports::outbound::audit::modstats_repository::ModstatsRepository;
-use super::super::pg_err;
+use sentinel_core::domain::entities::moderation::modstats::ModeratorBreakdown;
+use sentinel_core::domain::entities::moderation::modstats::ModstatsTrendDay;
 
-pub struct PgModstatsRepository { pool: PgPool }
+pub struct PgModstatsRepository {
+    pool: PgPool,
+}
 
 impl PgModstatsRepository {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -23,7 +27,10 @@ struct Row {
 #[async_trait]
 impl ModstatsRepository for PgModstatsRepository {
     async fn top_moderators(
-        &self, guild_id: &str, days: i32, limit: i64,
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
     ) -> Result<Vec<ModeratorStat>, sentinel_core::domain::errors::DomainError> {
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT moderator_id, moderator_name, COUNT(*) AS action_count \
@@ -33,18 +40,28 @@ impl ModstatsRepository for PgModstatsRepository {
              ORDER BY action_count DESC \
              LIMIT $3",
         )
-        .bind(guild_id).bind(days).bind(limit)
-        .fetch_all(&self.pool).await.map_err(pg_err)?;
+        .bind(guild_id)
+        .bind(days)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| ModeratorStat {
-            moderator_id: r.moderator_id.into(),
-            moderator_name: r.moderator_name,
-            action_count: r.action_count,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| ModeratorStat {
+                moderator_id: r.moderator_id.into(),
+                moderator_name: r.moderator_name,
+                action_count: r.action_count,
+            })
+            .collect())
     }
 
     async fn breakdown(
-        &self, guild_id: &str, days: i32, limit: i64,
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
     ) -> Result<Vec<ModeratorBreakdown>, sentinel_core::domain::errors::DomainError> {
         #[derive(sqlx::FromRow)]
         struct BreakdownRow {
@@ -85,19 +102,24 @@ impl ModstatsRepository for PgModstatsRepository {
             .await
             .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| ModeratorBreakdown {
-            moderator_id: r.moderator_id,
-            moderator_name: r.moderator_name,
-            total: r.total,
-            warns: r.warns,
-            mutes: r.mutes,
-            bans: r.bans,
-            kicks: r.kicks,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| ModeratorBreakdown {
+                moderator_id: r.moderator_id,
+                moderator_name: r.moderator_name,
+                total: r.total,
+                warns: r.warns,
+                mutes: r.mutes,
+                bans: r.bans,
+                kicks: r.kicks,
+            })
+            .collect())
     }
 
     async fn daily_trend(
-        &self, guild_id: &str, days: i32,
+        &self,
+        guild_id: &str,
+        days: i32,
     ) -> Result<Vec<ModstatsTrendDay>, sentinel_core::domain::errors::DomainError> {
         #[derive(sqlx::FromRow)]
         struct TrendRow {
@@ -137,12 +159,15 @@ impl ModstatsRepository for PgModstatsRepository {
             .await
             .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| ModstatsTrendDay {
-            day: r.day,
-            warns: r.warns,
-            mutes: r.mutes,
-            bans: r.bans,
-            kicks: r.kicks,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| ModstatsTrendDay {
+                day: r.day,
+                warns: r.warns,
+                mutes: r.mutes,
+                bans: r.bans,
+                kicks: r.kicks,
+            })
+            .collect())
     }
 }

@@ -9,20 +9,20 @@
 //! Pattern : direct sqlx (comme `bot_persistence.rs`, `rbac` simple, pas de
 //! logique metier complexe, pas besoin de use-case).
 
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use axum::http::StatusCode;
-use axum::Extension;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Extension;
+use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Deserialize)]
 pub struct GrantRoleDto {
@@ -122,11 +122,11 @@ pub async fn grant_role(
             granted_at: row.granted_at.to_rfc3339(),
             granted_by: Some(ctx.discord_user_id),
         })),
-        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => {
-            Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
+        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(ApiError(
+            sentinel_core::domain::errors::DomainError::ValidationError(
                 "user a deja un role sur cette guild, utiliser PATCH pour modifier".into(),
-            )))
-        }
+            ),
+        )),
         Err(e) => Err(internal(format!("insert api_user_guilds: {e}"))),
     }
 }
@@ -145,10 +145,16 @@ pub async fn update_role(
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     // Regle metier : anti-lockout du dernier owner-caller.
-    if sentinel_core::domain::entities::system::rbac::is_owner_self_demotion(&ctx.discord_user_id, &user_id, &dto.role) {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "un owner ne peut pas se retrograder (lockout risk)".into(),
-        )));
+    if sentinel_core::domain::entities::system::rbac::is_owner_self_demotion(
+        &ctx.discord_user_id,
+        &user_id,
+        &dto.role,
+    ) {
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "un owner ne peut pas se retrograder (lockout risk)".into(),
+            ),
+        ));
     }
 
     let role = parse_role(&dto.role)?;
@@ -165,12 +171,16 @@ pub async fn update_role(
     .map_err(|e| internal(format!("update role: {e}")))?;
 
     if res.rows_affected() == 0 {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound(
-            "user n'a pas de role sur cette guild".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound(
+                "user n'a pas de role sur cette guild".into(),
+            ),
+        ));
     }
 
-    Ok(Json(serde_json::json!({ "ok": true, "role": role.as_str() })))
+    Ok(Json(
+        serde_json::json!({ "ok": true, "role": role.as_str() }),
+    ))
 }
 
 /// DELETE /api/rbac/guilds/{guild_id}/users/{user_id}
@@ -207,25 +217,31 @@ pub async fn revoke_role(
     .await
     .map_err(|e| internal(format!("check target owner: {e}")))?;
 
-    if sentinel_core::domain::entities::system::rbac::would_revoke_last_owner(is_target_owner, total_owners) {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "impossible de revoquer le dernier owner de la guild".into(),
-        )));
+    if sentinel_core::domain::entities::system::rbac::would_revoke_last_owner(
+        is_target_owner,
+        total_owners,
+    ) {
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "impossible de revoquer le dernier owner de la guild".into(),
+            ),
+        ));
     }
 
-    let res = sqlx::query(
-        "DELETE FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2",
-    )
-    .bind(&user_id)
-    .bind(&guild_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("delete role: {e}")))?;
+    let res =
+        sqlx::query("DELETE FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2")
+            .bind(&user_id)
+            .bind(&guild_id)
+            .execute(&state.pg_pool)
+            .await
+            .map_err(|e| internal(format!("delete role: {e}")))?;
 
     if res.rows_affected() == 0 {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound(
-            "user n'a pas de role sur cette guild".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound(
+                "user n'a pas de role sur cette guild".into(),
+            ),
+        ));
     }
 
     Ok(Json(serde_json::json!({ "ok": true })))
@@ -300,9 +316,9 @@ pub async fn get_my_role(
 
     // Si pas de RoleContext (middleware n'a pas pu resoudre = pas auth), 401.
     let Some(axum::Extension(ctx)) = rbac else {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::Forbidden(
-            "auth Discord requise".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::Forbidden("auth Discord requise".into()),
+        ));
     };
 
     let is_super = state
@@ -314,9 +330,11 @@ pub async fn get_my_role(
         Some(r) => r,
         None if is_super => Role::Owner,
         None => {
-            return Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound(
-                "pas de role pour ce guild (endpoint necessite X-Discord-Token)".into(),
-            )));
+            return Err(ApiError(
+                sentinel_core::domain::errors::DomainError::NotFound(
+                    "pas de role pour ce guild (endpoint necessite X-Discord-Token)".into(),
+                ),
+            ));
         }
     };
 
@@ -332,9 +350,9 @@ pub async fn get_my_role(
 
 fn parse_role(s: &str) -> Result<Role, ApiError> {
     Role::from_str(s).ok_or_else(|| {
-        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(format!(
-            "role invalide: {s} (attendu: owner|admin|moderator|viewer)"
-        )))
+        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
+            format!("role invalide: {s} (attendu: owner|admin|moderator|viewer)"),
+        ))
     })
 }
 
@@ -347,13 +365,12 @@ fn status_to_err(status: StatusCode, context: &str) -> ApiError {
         StatusCode::FORBIDDEN => ApiError(sentinel_core::domain::errors::DomainError::Forbidden(
             context.to_string(),
         )),
-        _ => ApiError(sentinel_core::domain::errors::DomainError::Internal(format!(
-            "rbac gate failed: {status}"
-        ))),
+        _ => ApiError(sentinel_core::domain::errors::DomainError::Internal(
+            format!("rbac gate failed: {status}"),
+        )),
     }
 }
 
 #[cfg(test)]
 #[path = "tests/rbac.rs"]
 mod tests;
-

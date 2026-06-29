@@ -3,7 +3,10 @@ use super::*;
 #[test]
 fn nickname_history_event_name_is_stable() {
     // Regle metier : l'identifiant est stable, consomme par desktop/exports.
-    assert_eq!(AUDIT_EVENT_MEMBER_NICKNAME_HISTORY, "member_nickname_history");
+    assert_eq!(
+        AUDIT_EVENT_MEMBER_NICKNAME_HISTORY,
+        "member_nickname_history"
+    );
 }
 
 #[test]

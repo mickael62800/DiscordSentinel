@@ -1,8 +1,8 @@
 use super::*;
+use chrono::Utc;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
-use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
@@ -15,7 +15,12 @@ fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
         display_name: None,
         message_id: "m".into(),
         content: "hello".into(),
-        flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
+        flags: DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
         score: 0.75,
         action,
         reason: "bad".into(),

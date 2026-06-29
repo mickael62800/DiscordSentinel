@@ -1,6 +1,6 @@
 use super::*;
-use sentinel_core::domain::entities::system::rule::Rule;
 use chrono::Utc;
+use sentinel_core::domain::entities::system::rule::Rule;
 use uuid::Uuid;
 
 fn make_dto(flag: &str) -> CreateRuleDto {
@@ -36,7 +36,17 @@ fn create_rule_dto_unknown_flag_defaults_to_spam() {
 
 #[test]
 fn create_rule_dto_maps_all_variants() {
-    for flag in ["insult", "link", "phishing", "nsfw", "illicit", "anger", "rage", "threat", "harassment"] {
+    for flag in [
+        "insult",
+        "link",
+        "phishing",
+        "nsfw",
+        "illicit",
+        "anger",
+        "rage",
+        "threat",
+        "harassment",
+    ] {
         let cmd: CreateRuleCommand = make_dto(flag).into();
         assert_eq!(cmd.flag_type.as_str(), flag);
     }

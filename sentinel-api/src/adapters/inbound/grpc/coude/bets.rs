@@ -6,20 +6,20 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::BetPayout;
 use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
-use sentinel_core::domain::entities::coude::bet::Bet;
 use sentinel_core::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
 use sentinel_core::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_core::domain::entities::coude::bet::RefundSummary;
-use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 
 use super::parse_uuid;
 use super::taunt_event_to_proto;
@@ -147,11 +147,7 @@ impl CoudeBetsService for BetsGrpc {
         request: Request<proto::RefundBetsRequest>,
     ) -> Result<Response<proto::RefundSummary>, Status> {
         let combat_id = parse_uuid(&request.into_inner().combat_id)?;
-        let s = self
-            .uc
-            .refund(combat_id)
-            .await
-            .map_err(domain_to_status)?;
+        let s = self.uc.refund(combat_id).await.map_err(domain_to_status)?;
         Ok(Response::new(refund_summary_to_proto(s)))
     }
 }
@@ -159,4 +155,3 @@ impl CoudeBetsService for BetsGrpc {
 #[cfg(test)]
 #[path = "tests/bets.rs"]
 mod tests;
-

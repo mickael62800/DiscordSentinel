@@ -4,8 +4,8 @@
 //! (config railleries, config salons d'activite, etc.). Cache Redis 10min
 //! pour eviter de taper Discord a chaque ouverture de page.
 
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::State;
 use axum::Json;
 use redis::AsyncCommands;
 use tracing::warn;
@@ -35,7 +35,10 @@ pub async fn list_text_channels(
 
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&channels) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, CHANNELS_CACHE_TTL_SECS).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&cache_key, json, CHANNELS_CACHE_TTL_SECS)
+                .await
+            {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set channels");
             }
         }
@@ -65,7 +68,10 @@ pub async fn list_all_channels(
 
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&channels) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, CHANNELS_CACHE_TTL_SECS).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&cache_key, json, CHANNELS_CACHE_TTL_SECS)
+                .await
+            {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set channels (all)");
             }
         }

@@ -82,7 +82,11 @@ fn invariant_no_coin_creation() {
             })
             .collect();
         let total_pot: i64 = bets.iter().map(|b| b.amount).sum();
-        let winner = if rng.gen_bool(0.5) { Some("A") } else { Some("B") };
+        let winner = if rng.gen_bool(0.5) {
+            Some("A")
+        } else {
+            Some("B")
+        };
         let plan = calculate_bet_resolution(&bets, winner, "A", "B");
 
         let distributed: i64 = plan.payouts.iter().map(|p| p.payout).sum();
@@ -111,14 +115,24 @@ fn draw_always_refunds_exact_amount() {
     for _ in 0..100 {
         let n: usize = rng.gen_range(1..=20);
         let bets: Vec<Bet> = (0..n)
-            .map(|i| bet(i as i64, &format!("u{i}"), "A", rng.gen_range(1..=1_000_000)))
+            .map(|i| {
+                bet(
+                    i as i64,
+                    &format!("u{i}"),
+                    "A",
+                    rng.gen_range(1..=1_000_000),
+                )
+            })
             .collect();
         let plan = calculate_bet_resolution(&bets, None, "A", "B");
         for (b, p) in bets.iter().zip(plan.payouts.iter()) {
             assert_eq!(p.payout, b.amount, "egalite doit rembourser la mise exacte");
             assert!(!p.won, "egalite : won = false par convention");
         }
-        assert!(plan.fighter_bonus.is_none(), "egalite : pas de bonus combattants");
+        assert!(
+            plan.fighter_bonus.is_none(),
+            "egalite : pas de bonus combattants"
+        );
     }
 }
 
@@ -127,10 +141,7 @@ fn draw_always_refunds_exact_amount() {
 /// leur bonus (commission). Verifier que c'est coherent.
 #[test]
 fn no_winning_bettors_zero_payout_but_fighter_bonus_still_paid() {
-    let bets = vec![
-        bet(1, "u1", "B", 500),
-        bet(2, "u2", "B", 500),
-    ];
+    let bets = vec![bet(1, "u1", "B", 500), bet(2, "u2", "B", 500)];
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
     for p in &plan.payouts {
         assert_eq!(p.payout, 0, "pas de gagnants → payout 0");
@@ -146,7 +157,10 @@ fn no_winning_bettors_zero_payout_but_fighter_bonus_still_paid() {
     let distributed: i64 = plan.payouts.iter().map(|p| p.payout).sum();
     let fighter_total = bonus.winner_bonus + bonus.loser_bonus;
     let total_pot: i64 = bets.iter().map(|b| b.amount).sum();
-    assert!(distributed + fighter_total < total_pot, "coins non redistribues");
+    assert!(
+        distributed + fighter_total < total_pot,
+        "coins non redistribues"
+    );
 }
 
 /// Un seul parieur qui backe le gagnant recupere 85% du pot (distributable).
@@ -177,9 +191,7 @@ fn rounding_loss_bounded_by_winner_count() {
     // Cas avec rounding : 3 parts de 100 sur pot de 100 ne divise pas exactement.
     // 100*0.85 = 85, part = 100/100 * 85 = 85. OK.
     // Cas plus interessant : 7 parieurs
-    let bets: Vec<Bet> = (0..7)
-        .map(|i| bet(i, &format!("u{i}"), "A", 100))
-        .collect();
+    let bets: Vec<Bet> = (0..7).map(|i| bet(i, &format!("u{i}"), "A", 100)).collect();
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
     // total_pot = 700, commission = round(700*0.15) = 105, distributable = 595.
     // Chaque parieur : 100/700 * 595 = 85 pile.
@@ -227,7 +239,7 @@ fn winner_pool_zero_with_matching_backs_gives_zero_share() {
     // Couvre la branche defensive line 131 : si backed_id == winner_id mais
     // winner_pool == 0 (tous les montants gagnants a 0), share = 0.
     let bets = vec![
-        bet(1, "u1", "A", 0),    // mise 0 sur A (winner), mais pot zero
+        bet(1, "u1", "A", 0), // mise 0 sur A (winner), mais pot zero
         bet(2, "u2", "B", 100),
     ];
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
@@ -270,12 +282,18 @@ fn payout(won: bool, payout: i64) -> BetPayout {
 
 #[test]
 fn outcome_win_when_won_and_payout_positive() {
-    assert_eq!(payout(true, 250).outcome(), BetPayoutOutcome::Win { amount: 250 });
+    assert_eq!(
+        payout(true, 250).outcome(),
+        BetPayoutOutcome::Win { amount: 250 }
+    );
 }
 
 #[test]
 fn outcome_refund_when_not_won_but_payout_positive() {
-    assert_eq!(payout(false, 100).outcome(), BetPayoutOutcome::Refund { amount: 100 });
+    assert_eq!(
+        payout(false, 100).outcome(),
+        BetPayoutOutcome::Refund { amount: 100 }
+    );
 }
 
 #[test]

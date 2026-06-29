@@ -12,12 +12,12 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use crate::ports::outbound::system::cache_helpers::cached_json;
-use crate::ports::outbound::system::cache::CachePort;
-use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use crate::ports::outbound::audit::stats_repository::StatsRepository;
-use crate::ports::outbound::system::service_registry::ServiceRegistry;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::cache_helpers::cached_json;
+use crate::ports::outbound::system::service_registry::ServiceRegistry;
 
 const OVERVIEW_TTL: u64 = 60; // 1 minute
 
@@ -35,12 +35,22 @@ impl ManageStatsService {
         cache: Arc<dyn CachePort>,
         service_registry: Arc<dyn ServiceRegistry>,
     ) -> Self {
-        Self { stats_repo, infraction_repo, cache, service_registry }
+        Self {
+            stats_repo,
+            infraction_repo,
+            cache,
+            service_registry,
+        }
     }
 
     async fn count_services(&self) -> (u32, u32, u32, u32) {
         let c = self.service_registry.count_services().await;
-        (c.bots_online, c.bots_total, c.workers_online, c.workers_total)
+        (
+            c.bots_online,
+            c.bots_total,
+            c.workers_online,
+            c.workers_total,
+        )
     }
 }
 
@@ -97,7 +107,11 @@ impl ManageStatsUseCase for ManageStatsService {
         Ok(())
     }
 
-    async fn get_user_stats(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError> {
+    async fn get_user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserStats>, DomainError> {
         self.stats_repo.find_by_user(guild_id, user_id).await
     }
 
@@ -118,14 +132,27 @@ impl ManageStatsUseCase for ManageStatsService {
                 limit: 10000,
                 offset: 0,
             };
-            let infractions = self.infraction_repo.find_by_guild(guild_id, &filters).await.unwrap_or_else(|e| {
-                warn!(error = %e, guild_id, "Echec chargement infractions pour stats overview");
-                vec![]
-            });
+            let infractions = self
+                .infraction_repo
+                .find_by_guild(guild_id, &filters)
+                .await
+                .unwrap_or_else(|e| {
+                    warn!(error = %e, guild_id, "Echec chargement infractions pour stats overview");
+                    vec![]
+                });
 
-            let total_warns = infractions.iter().filter(|i| i.action.as_str() == "warn").count() as u64;
-            let total_mutes = infractions.iter().filter(|i| i.action.as_str() == "mute").count() as u64;
-            let total_bans = infractions.iter().filter(|i| i.action.as_str() == "ban").count() as u64;
+            let total_warns = infractions
+                .iter()
+                .filter(|i| i.action.as_str() == "warn")
+                .count() as u64;
+            let total_mutes = infractions
+                .iter()
+                .filter(|i| i.action.as_str() == "mute")
+                .count() as u64;
+            let total_bans = infractions
+                .iter()
+                .filter(|i| i.action.as_str() == "ban")
+                .count() as u64;
 
             let top_members: Vec<UserStats> = members.into_iter().take(10).collect();
 
@@ -144,7 +171,11 @@ impl ManageStatsUseCase for ManageStatsService {
         .await
     }
 
-    async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError> {
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<UserStats>, DomainError> {
         self.stats_repo.find_by_guild(guild_id, limit).await
     }
 
@@ -175,16 +206,31 @@ impl ManageStatsUseCase for ManageStatsService {
         })
     }
 
-    async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<GuildVoiceStats, DomainError> {
+    async fn get_guild_voice_stats(
+        &self,
+        guild_id: &str,
+        days: u32,
+        limit: u32,
+    ) -> Result<GuildVoiceStats, DomainError> {
         let cache_key = format!("voice_stats:{guild_id}:{days}:{limit}");
         cached_json(&self.cache, &cache_key, OVERVIEW_TTL, || async {
-            let channels = self.stats_repo.get_guild_voice_stats(guild_id, days, limit).await?;
-            let unique_users = self.stats_repo.count_unique_voice_users(guild_id, days).await?;
+            let channels = self
+                .stats_repo
+                .get_guild_voice_stats(guild_id, days, limit)
+                .await?;
+            let unique_users = self
+                .stats_repo
+                .count_unique_voice_users(guild_id, days)
+                .await?;
 
             let total_channels = channels.len() as i64;
             let total_sessions: i64 = channels.iter().map(|c| c.total_sessions).sum();
             let total_duration_secs: i64 = channels.iter().map(|c| c.total_duration_secs).sum();
-            let avg_session_secs = if total_sessions > 0 { total_duration_secs / total_sessions } else { 0 };
+            let avg_session_secs = if total_sessions > 0 {
+                total_duration_secs / total_sessions
+            } else {
+                0
+            };
             let temp_channels = channels.iter().filter(|c| c.is_temporary).count() as i64;
             let perm_channels = channels.iter().filter(|c| !c.is_temporary).count() as i64;
 
@@ -206,4 +252,3 @@ impl ManageStatsUseCase for ManageStatsService {
 #[cfg(test)]
 #[path = "tests/manage_stats.rs"]
 mod tests;
-

@@ -1,6 +1,6 @@
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, info, warn};
 
@@ -17,24 +17,37 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::String, "content", "Contenu de la note")
                 .required(true),
         )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur concerne (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (ex. membre parti / banni)",
+        ))
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur concerne (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "category", "Categorie de la note")
-                .add_string_choice("General", "general")
-                .add_string_choice("Avertissement", "warning")
-                .add_string_choice("Positif", "positive")
-                .add_string_choice("Contexte", "context"),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "category",
+                "Categorie de la note",
+            )
+            .add_string_choice("General", "general")
+            .add_string_choice("Avertissement", "warning")
+            .add_string_choice("Positif", "positive")
+            .add_string_choice("Contexte", "context"),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
-        crate::shared::discord_helpers::reply_ephemeral(ctx, command, "❌ Permission MODERATE_MEMBERS requise pour /note.").await;
+        crate::shared::discord_helpers::reply_ephemeral(
+            ctx,
+            command,
+            "❌ Permission MODERATE_MEMBERS requise pour /note.",
+        )
+        .await;
         tracing::warn!(user = %command.user.name, "Tentative /note sans permission");
         return;
     }
@@ -43,39 +56,58 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { crate::shared::discord_helpers::reply_ephemeral(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            crate::shared::discord_helpers::reply_ephemeral(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
-    let content = crate::shared::discord_helpers::option_str(options, "content")
-        .unwrap_or("");
+    let content = crate::shared::discord_helpers::option_str(options, "content").unwrap_or("");
 
-    let category = crate::shared::discord_helpers::option_str(options, "category")
-        .unwrap_or("general");
+    let category =
+        crate::shared::discord_helpers::option_str(options, "category").unwrap_or("general");
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "Utilisateur introuvable.").await;
+            return;
+        }
     };
 
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
 
-    match api.add_note(
-        &guild_id.to_string(),
-        &target.id.to_string(),
-        &command.user.id.to_string(),
-        &command.user.name,
-        content,
-        category,
-    ).await {
+    match api
+        .add_note(
+            &guild_id.to_string(),
+            &target.id.to_string(),
+            &command.user.id.to_string(),
+            &command.user.name,
+            content,
+            category,
+        )
+        .await
+    {
         Ok(_) => {
             info!(target = %target.name, category = category, "Note ajoutee");
 
@@ -91,12 +123,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Categorie", category, true)
                 .field("Contenu", content, false);
 
-            if let Err(e) = command.create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
-                ),
-            ).await {
+            if let Err(e) = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .embed(embed)
+                            .ephemeral(true),
+                    ),
+                )
+                .await
+            {
                 warn!(error = %e, "Failed to send note response");
             }
         }

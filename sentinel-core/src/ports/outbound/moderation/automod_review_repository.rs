@@ -35,8 +35,16 @@ pub trait AutomodReviewRepository: Send + Sync {
         guild_id: &str,
         message_id: &str,
     ) -> Result<Option<AutomodReview>, DomainError>;
-    async fn list_pending(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
-    async fn list_recent(&self, guild_id: &str, limit: i64) -> Result<Vec<AutomodReview>, DomainError>;
+    async fn list_pending(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<AutomodReview>, DomainError>;
+    async fn list_recent(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<AutomodReview>, DomainError>;
     /// Resolve une review (statut pending OU decided -> applied|ignored).
     /// Retourne la review mise a jour ou `Conflict` si deja resolue.
     async fn resolve(
@@ -61,11 +69,7 @@ pub trait AutomodReviewRepository: Send + Sync {
     /// Rouvrir un dossier (applied|ignored -> voting) : efface les votes,
     /// remet les champs de resolution a NULL et fixe une nouvelle echeance
     /// (NOW + `deadline_hours`). `Conflict` si la review n'est pas close.
-    async fn reopen(
-        &self,
-        id: Uuid,
-        deadline_hours: i64,
-    ) -> Result<AutomodReview, DomainError>;
+    async fn reopen(&self, id: Uuid, deadline_hours: i64) -> Result<AutomodReview, DomainError>;
 
     // ── Vote ──
     /// Enregistre/met a jour le vote d'un moderateur (un seul par review et
@@ -104,7 +108,10 @@ pub trait AutomodReviewRepository: Send + Sync {
 
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.
-    async fn find_discussion(&self, review_id: Uuid) -> Result<Option<DiscussionChannel>, DomainError>;
+    async fn find_discussion(
+        &self,
+        review_id: Uuid,
+    ) -> Result<Option<DiscussionChannel>, DomainError>;
 
     /// Enregistre un salon de discussion (idempotent : un seul par review).
     /// Retourne `(salon, created)` — `created = false` si un salon existait

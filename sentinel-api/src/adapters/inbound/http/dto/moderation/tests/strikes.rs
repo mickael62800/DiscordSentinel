@@ -63,9 +63,21 @@ fn save_config_dto_into_command_preserves_thresholds() {
     let dto = SaveStrikeConfigDto {
         window_secs: 3600,
         thresholds: vec![
-            StrikeThresholdDto { strikes: 1, action: "warn".into(), duration: None },
-            StrikeThresholdDto { strikes: 3, action: "mute".into(), duration: Some(600) },
-            StrikeThresholdDto { strikes: 5, action: "ban".into(), duration: None },
+            StrikeThresholdDto {
+                strikes: 1,
+                action: "warn".into(),
+                duration: None,
+            },
+            StrikeThresholdDto {
+                strikes: 3,
+                action: "mute".into(),
+                duration: Some(600),
+            },
+            StrikeThresholdDto {
+                strikes: 5,
+                action: "ban".into(),
+                duration: None,
+            },
         ],
         enabled: true,
     };
@@ -95,7 +107,11 @@ fn strike_config_dto_from_domain() {
     let config = StrikeConfig {
         guild_id: "g".into(),
         window_secs: 7200,
-        thresholds: vec![StrikeThreshold { strikes: 5, action: "ban".into(), duration: None }],
+        thresholds: vec![StrikeThreshold {
+            strikes: 5,
+            action: "ban".into(),
+            duration: None,
+        }],
         enabled: true,
         created_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),

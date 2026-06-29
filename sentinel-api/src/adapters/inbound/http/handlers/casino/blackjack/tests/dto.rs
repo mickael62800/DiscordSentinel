@@ -15,12 +15,24 @@ fn sample_game(status: &str) -> BlackjackGame {
         username: "alice".into(),
         bet: 100,
         player_hand: vec![
-            Card { rank: "10".into(), suit: "hearts".into() },
-            Card { rank: "As".into(), suit: "spades".into() },
+            Card {
+                rank: "10".into(),
+                suit: "hearts".into(),
+            },
+            Card {
+                rank: "As".into(),
+                suit: "spades".into(),
+            },
         ],
         dealer_hand: vec![
-            Card { rank: "King".into(), suit: "clubs".into() },
-            Card { rank: "7".into(), suit: "diamonds".into() },
+            Card {
+                rank: "King".into(),
+                suit: "clubs".into(),
+            },
+            Card {
+                rank: "7".into(),
+                suit: "diamonds".into(),
+            },
         ],
         deck: vec![],
         status: status.into(),
@@ -37,7 +49,10 @@ fn sample_game(status: &str) -> BlackjackGame {
 
 #[test]
 fn card_dto_from_includes_filename() {
-    let card = Card { rank: "As".into(), suit: "hearts".into() };
+    let card = Card {
+        rank: "As".into(),
+        suit: "hearts".into(),
+    };
     let dto = CardDto::from(&card);
     assert_eq!(dto.rank, "As");
     assert_eq!(dto.suit, "hearts");
@@ -48,8 +63,14 @@ fn card_dto_from_includes_filename() {
 
 #[test]
 fn game_is_over_terminal_states() {
-    for s in &["player_blackjack", "player_bust", "dealer_bust",
-               "player_win", "dealer_win", "push"] {
+    for s in &[
+        "player_blackjack",
+        "player_bust",
+        "dealer_bust",
+        "player_win",
+        "dealer_win",
+        "push",
+    ] {
         assert!(game_is_over(s), "{s} doit etre terminal");
     }
 }
@@ -94,7 +115,10 @@ fn to_dto_in_progress_dealer_score_is_only_visible_card() {
 fn to_dto_in_progress_single_dealer_card_no_back() {
     // Edge case : dealer a une seule carte (distribution partielle).
     let mut g = sample_game("playing");
-    g.dealer_hand = vec![Card { rank: "7".into(), suit: "diamonds".into() }];
+    g.dealer_hand = vec![Card {
+        rank: "7".into(),
+        suit: "diamonds".into(),
+    }];
     let dto = to_dto(&g);
     assert_eq!(dto.dealer_hand.len(), 1);
     assert_eq!(dto.dealer_hand[0].rank, "7");

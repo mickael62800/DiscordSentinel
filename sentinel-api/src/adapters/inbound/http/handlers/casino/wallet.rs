@@ -1,6 +1,6 @@
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -16,8 +16,8 @@ use sentinel_core::domain::entities::casino::wallet::validate_positive_amount;
 use sentinel_core::domain::entities::casino::wallet::validate_transfer_distinct_users;
 use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::errors::DomainError;
 
 // ── DTOs ──
 
@@ -50,7 +50,6 @@ pub async fn get_wallet(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Wallet>, ApiError> {
-
     let wallet = state.wallet_uc.get_or_create(&guild_id, &user_id).await?;
     Ok(Json(wallet))
 }
@@ -66,7 +65,13 @@ pub async fn credit(
 
     let mutation = state
         .wallet_uc
-        .credit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description)
+        .credit(
+            &guild_id,
+            &user_id,
+            dto.amount,
+            &dto.source,
+            &dto.description,
+        )
         .await?;
 
     state.broadcaster.broadcast(
@@ -95,7 +100,13 @@ pub async fn debit(
 
     let mutation = state
         .wallet_uc
-        .debit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description)
+        .debit(
+            &guild_id,
+            &user_id,
+            dto.amount,
+            &dto.source,
+            &dto.description,
+        )
         .await?;
 
     state.broadcaster.broadcast(
@@ -166,7 +177,6 @@ pub async fn leaderboard(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<Wallet>>, ApiError> {
-
     let limit = normalize_limit(params.limit, 20, 100);
     let wallets = state.wallet_uc.leaderboard(&guild_id, limit).await?;
     Ok(Json(wallets))
@@ -178,9 +188,11 @@ pub async fn transactions(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<WalletTransaction>>, ApiError> {
-
     let limit = normalize_limit(params.limit, 20, 100);
-    let txs = state.wallet_uc.get_transactions(&guild_id, &user_id, limit).await?;
+    let txs = state
+        .wallet_uc
+        .get_transactions(&guild_id, &user_id, limit)
+        .await?;
     Ok(Json(txs))
 }
 
@@ -206,7 +218,6 @@ pub async fn reset_wallet(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<Wallet>, ApiError> {
-
     let (wallet, new_balance) = state
         .wallet_uc
         .reset_wallet(&guild_id, &user_id, dto.new_balance)
@@ -232,7 +243,10 @@ pub async fn reset_all_wallets(
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.reset.wallets",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.reset.wallets",
         "role insuffisant pour reset bulk des wallets",
     )
     .await?;
@@ -252,7 +266,9 @@ pub async fn reset_all_wallets(
     );
 
     info!(guild_id = %guild_id, affected, new_balance, "Bulk wallet reset");
-    Ok(Json(serde_json::json!({ "affected": affected, "new_balance": new_balance })))
+    Ok(Json(
+        serde_json::json!({ "affected": affected, "new_balance": new_balance }),
+    ))
 }
 
 #[cfg(test)]

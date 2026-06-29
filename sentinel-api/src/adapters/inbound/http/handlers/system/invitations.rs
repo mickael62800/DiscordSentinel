@@ -6,10 +6,10 @@
 //!   DELETE /api/invitations/{code}     (owner+) â€” revoque un code non utilise
 //!   POST /api/auth/redeem-invitation   (auth Discord token requis) â€” consomme code
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -101,8 +101,15 @@ pub async fn create_invitation(
         .map_err(sqlx_internal("query role"))?;
         let role_str = row.map(|r| r.0).unwrap_or_default();
         let role = Role::from_str(&role_str).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
-            .map_err(|s| forbid(s, "owner+ requis pour generer une invitation"))?;
+        require_role(
+            &RoleContext {
+                discord_user_id: ctx.discord_user_id.clone(),
+                role: Some(role),
+                guild_id: None,
+            },
+            Role::Owner,
+        )
+        .map_err(|s| forbid(s, "owner+ requis pour generer une invitation"))?;
     }
 
     if !VALID_ROLES.contains(&dto.role.as_str()) {
@@ -187,8 +194,15 @@ pub async fn list_invitations(
         .await
         .map_err(sqlx_internal("query role"))?;
         let role = Role::from_str(&row.map(|r| r.0).unwrap_or_default()).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
-            .map_err(|s| forbid(s, "owner+ requis"))?;
+        require_role(
+            &RoleContext {
+                discord_user_id: ctx.discord_user_id.clone(),
+                role: Some(role),
+                guild_id: None,
+            },
+            Role::Owner,
+        )
+        .map_err(|s| forbid(s, "owner+ requis"))?;
     }
 
     let rows = sqlx::query_as::<
@@ -218,27 +232,39 @@ pub async fn list_invitations(
     let now = chrono::Utc::now();
     let out: Vec<InvitationDto> = rows
         .into_iter()
-        .map(|(code, guild_id, role, created_by, created_at, expires_at, used_at, used_by, notes)| {
-            let status = if used_at.is_some() {
-                "used".to_string()
-            } else if expires_at.map(|e| e < now).unwrap_or(false) {
-                "expired".to_string()
-            } else {
-                "active".to_string()
-            };
-            InvitationDto {
+        .map(
+            |(
                 code,
                 guild_id,
                 role,
                 created_by,
-                created_at: created_at.to_rfc3339(),
-                expires_at: expires_at.map(|t| t.to_rfc3339()),
-                used_at: used_at.map(|t| t.to_rfc3339()),
-                used_by_discord_id: used_by,
+                created_at,
+                expires_at,
+                used_at,
+                used_by,
                 notes,
-                status,
-            }
-        })
+            )| {
+                let status = if used_at.is_some() {
+                    "used".to_string()
+                } else if expires_at.map(|e| e < now).unwrap_or(false) {
+                    "expired".to_string()
+                } else {
+                    "active".to_string()
+                };
+                InvitationDto {
+                    code,
+                    guild_id,
+                    role,
+                    created_by,
+                    created_at: created_at.to_rfc3339(),
+                    expires_at: expires_at.map(|t| t.to_rfc3339()),
+                    used_at: used_at.map(|t| t.to_rfc3339()),
+                    used_by_discord_id: used_by,
+                    notes,
+                    status,
+                }
+            },
+        )
         .collect();
     Ok(Json(out))
 }
@@ -281,8 +307,15 @@ pub async fn revoke_invitation(
         .ok()
         .flatten();
         let role = Role::from_str(&r.map(|x| x.0).unwrap_or_default()).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
-            .map_err(|s| forbid(s, "owner+ requis"))?;
+        require_role(
+            &RoleContext {
+                discord_user_id: ctx.discord_user_id.clone(),
+                role: Some(role),
+                guild_id: None,
+            },
+            Role::Owner,
+        )
+        .map_err(|s| forbid(s, "owner+ requis"))?;
     }
 
     sqlx::query("DELETE FROM invitation_codes WHERE code = $1 AND used_at IS NULL")
@@ -381,14 +414,18 @@ pub async fn redeem_invitation(
     }
 
     // Recupere le code
-    let row: Option<(String, String, Option<chrono::DateTime<chrono::Utc>>, Option<chrono::DateTime<chrono::Utc>>)> =
-        sqlx::query_as(
-            "SELECT guild_id, role, expires_at, used_at FROM invitation_codes WHERE code = $1",
-        )
-        .bind(&code)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("query"))?;
+    let row: Option<(
+        String,
+        String,
+        Option<chrono::DateTime<chrono::Utc>>,
+        Option<chrono::DateTime<chrono::Utc>>,
+    )> = sqlx::query_as(
+        "SELECT guild_id, role, expires_at, used_at FROM invitation_codes WHERE code = $1",
+    )
+    .bind(&code)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(sqlx_internal("query"))?;
 
     let Some((guild_id, role, expires_at, used_at)) = row else {
         return Err(ApiError(DomainError::NotFound(
@@ -403,18 +440,12 @@ pub async fn redeem_invitation(
     }
     if let Some(exp) = expires_at {
         if exp < chrono::Utc::now() {
-            return Err(ApiError(DomainError::Conflict(
-                "code expire".into(),
-            )));
+            return Err(ApiError(DomainError::Conflict("code expire".into())));
         }
     }
 
     // Transaction : ajouter au RBAC + marquer code consomme atomique
-    let mut tx = state
-        .pg_pool
-        .begin()
-        .await
-        .map_err(sqlx_internal("tx"))?;
+    let mut tx = state.pg_pool.begin().await.map_err(sqlx_internal("tx"))?;
 
     // Insert ou update api_user_guilds
     sqlx::query(
@@ -450,9 +481,7 @@ pub async fn redeem_invitation(
         )));
     }
 
-    tx.commit()
-        .await
-        .map_err(sqlx_internal("commit"))?;
+    tx.commit().await.map_err(sqlx_internal("commit"))?;
 
     tracing::info!(
         target: "audit::invitation",

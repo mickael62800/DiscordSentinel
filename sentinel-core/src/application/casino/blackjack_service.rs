@@ -3,16 +3,16 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::casino::blackjack::BlackjackGame;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::blackjack::calculate_score;
 use crate::domain::entities::casino::blackjack::create_deck;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 /// Resultat d'une action de jeu : la partie mise a jour + la liste des
 /// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
 /// La couche transport (gRPC / HTTP) est responsable de propager ces
@@ -56,7 +56,11 @@ impl BlackjackService {
         wallet_repo: Arc<dyn WalletRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
     ) -> Self {
-        Self { repo, wallet_repo, wallet_uc }
+        Self {
+            repo,
+            wallet_repo,
+            wallet_uc,
+        }
     }
 
     /// Démarre une nouvelle partie de blackjack.
@@ -74,14 +78,16 @@ impl BlackjackService {
     ) -> Result<BlackjackActionResult, DomainError> {
         // Validation de la mise
         if bet < min_bet {
-            return Err(DomainError::ValidationError(
-                format!("La mise minimum est de {} coins.", min_bet),
-            ));
+            return Err(DomainError::ValidationError(format!(
+                "La mise minimum est de {} coins.",
+                min_bet
+            )));
         }
         if bet > max_bet {
-            return Err(DomainError::ValidationError(
-                format!("La mise maximum est de {} coins.", max_bet),
-            ));
+            return Err(DomainError::ValidationError(format!(
+                "La mise maximum est de {} coins.",
+                max_bet
+            )));
         }
 
         // Vérifier qu'il n'y a pas de partie active
@@ -129,7 +135,13 @@ impl BlackjackService {
         if status == "player_blackjack" && payout > 0 {
             let credit_mut = self
                 .wallet_uc
-                .credit(&guild_id, &user_id, payout, "blackjack", "Blackjack ! Gain x2.5")
+                .credit(
+                    &guild_id,
+                    &user_id,
+                    payout,
+                    "blackjack",
+                    "Blackjack ! Gain x2.5",
+                )
                 .await?;
             taunt_events.extend(credit_mut.triggered_taunts);
         }
@@ -153,8 +165,15 @@ impl BlackjackService {
         };
 
         self.repo.create(&game).await?;
-        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
-        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
+        let wallet_balance = self
+            .wallet_uc
+            .get_balance(&game.guild_id, &game.user_id)
+            .await?;
+        Ok(BlackjackActionResult {
+            game,
+            taunt_events,
+            wallet_balance,
+        })
     }
 
     /// Le joueur tire une carte supplémentaire.
@@ -163,9 +182,10 @@ impl BlackjackService {
         self.ensure_playing(&game)?;
 
         // Tirer une carte
-        let card = game.deck.pop().ok_or_else(|| {
-            DomainError::Internal("Le deck est vide.".into())
-        })?;
+        let card = game
+            .deck
+            .pop()
+            .ok_or_else(|| DomainError::Internal("Le deck est vide.".into()))?;
         game.player_hand.push(card);
         game.player_score = calculate_score(&game.player_hand);
 
@@ -180,8 +200,15 @@ impl BlackjackService {
         self.repo.update(&game).await?;
         // Hit ne touche pas le wallet (sauf si bust — pas de credit). Aucun
         // taunt wallet a propager ici.
-        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
-        Ok(BlackjackActionResult { game, taunt_events: vec![], wallet_balance })
+        let wallet_balance = self
+            .wallet_uc
+            .get_balance(&game.guild_id, &game.user_id)
+            .await?;
+        Ok(BlackjackActionResult {
+            game,
+            taunt_events: vec![],
+            wallet_balance,
+        })
     }
 
     /// Le joueur reste avec sa main actuelle. Le dealer joue.
@@ -193,8 +220,15 @@ impl BlackjackService {
         let taunt_events = self.resolve_game(&mut game).await?;
 
         self.repo.update(&game).await?;
-        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
-        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
+        let wallet_balance = self
+            .wallet_uc
+            .get_balance(&game.guild_id, &game.user_id)
+            .await?;
+        Ok(BlackjackActionResult {
+            game,
+            taunt_events,
+            wallet_balance,
+        })
     }
 
     /// Double down : doubler la mise, tirer une carte, puis le dealer joue.
@@ -228,9 +262,10 @@ impl BlackjackService {
         game.doubled = true;
 
         // Tirer exactement une carte
-        let card = game.deck.pop().ok_or_else(|| {
-            DomainError::Internal("Le deck est vide.".into())
-        })?;
+        let card = game
+            .deck
+            .pop()
+            .ok_or_else(|| DomainError::Internal("Le deck est vide.".into()))?;
         game.player_hand.push(card);
         game.player_score = calculate_score(&game.player_hand);
 
@@ -247,8 +282,15 @@ impl BlackjackService {
         }
 
         self.repo.update(&game).await?;
-        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
-        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
+        let wallet_balance = self
+            .wallet_uc
+            .get_balance(&game.guild_id, &game.user_id)
+            .await?;
+        Ok(BlackjackActionResult {
+            game,
+            taunt_events,
+            wallet_balance,
+        })
     }
 
     /// Récupère la partie active d'un joueur.
@@ -356,7 +398,6 @@ impl BlackjackService {
         Ok(vec![])
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/blackjack.rs"]

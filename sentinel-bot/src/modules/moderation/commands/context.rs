@@ -1,7 +1,7 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    GetMessages, MessageId,
+    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage, GetMessages,
+    MessageId,
 };
 use serenity::builder::CreateEmbed;
 use tracing::warn;
@@ -10,40 +10,70 @@ pub fn register() -> CreateCommand {
         .description("Afficher les messages autour d'un message specifique")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "message_id", "ID du message cible")
-                .required(true),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "message_id",
+                "ID du message cible",
+            )
+            .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::Integer, "count", "Nombre de messages avant et apres (defaut: 5)")
-                .min_int_value(1)
-                .max_int_value(15),
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "count",
+                "Nombre de messages avant et apres (defaut: 5)",
+            )
+            .min_int_value(1)
+            .max_int_value(15),
         )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "context", "Echec defer interaction Discord");
         return;
     }
 
-    let message_id_str = command.data.options.iter().find(|o| o.name == "message_id")
-        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+    let message_id_str = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "message_id")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
         .unwrap_or("");
 
-    let count = command.data.options.iter().find(|o| o.name == "count")
-        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(i) => Some(*i as u8), _ => None })
+    let count = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "count")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::Integer(i) => Some(*i as u8),
+            _ => None,
+        })
         .unwrap_or(5);
 
     let message_id: u64 = match message_id_str.parse() {
         Ok(id) => id,
         Err(_) => {
-            let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
-                .content("ID de message invalide. Clic droit > Copier l'ID du message.")).await;
+            let _ = command
+                .edit_response(
+                    &ctx.http,
+                    serenity::builder::EditInteractionResponse::new()
+                        .content("ID de message invalide. Clic droit > Copier l'ID du message."),
+                )
+                .await;
             return;
         }
     };
@@ -68,13 +98,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     for msg in before.iter().rev() {
         let time = format_timestamp(&msg.timestamp);
         let preview = truncate(&msg.content, 100);
-        context_lines.push(format!("`[{}]` **@{}**: {}", time, msg.author.name, preview));
+        context_lines.push(format!(
+            "`[{}]` **@{}**: {}",
+            time, msg.author.name, preview
+        ));
     }
 
     if let Some(ref msg) = target_msg {
         let time = format_timestamp(&msg.timestamp);
         let preview = truncate(&msg.content, 100);
-        context_lines.push(format!("> **`[{}]` @{}: {}** ← cible", time, msg.author.name, preview));
+        context_lines.push(format!(
+            "> **`[{}]` @{}: {}** ← cible",
+            time, msg.author.name, preview
+        ));
     } else {
         context_lines.push("> *(message introuvable ou supprime)* ← cible".to_string());
     }
@@ -82,12 +118,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     for msg in after.iter().rev() {
         let time = format_timestamp(&msg.timestamp);
         let preview = truncate(&msg.content, 100);
-        context_lines.push(format!("`[{}]` **@{}**: {}", time, msg.author.name, preview));
+        context_lines.push(format!(
+            "`[{}]` **@{}**: {}",
+            time, msg.author.name, preview
+        ));
     }
 
     if context_lines.is_empty() {
-        let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
-            .content("Aucun message trouve autour de cet ID.")).await;
+        let _ = command
+            .edit_response(
+                &ctx.http,
+                serenity::builder::EditInteractionResponse::new()
+                    .content("Aucun message trouve autour de cet ID."),
+            )
+            .await;
         return;
     }
 
@@ -102,14 +146,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             description
         })
         .color(0x3498db)
-        .footer(serenity::builder::CreateEmbedFooter::new(
-            format!("{} messages avant + cible + {} messages apres", count, count),
-        ));
+        .footer(serenity::builder::CreateEmbedFooter::new(format!(
+            "{} messages avant + cible + {} messages apres",
+            count, count
+        )));
 
-    if let Err(e) = command.edit_response(
-        &ctx.http,
-        serenity::builder::EditInteractionResponse::new().embed(embed),
-    ).await {
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().embed(embed),
+        )
+        .await
+    {
         warn!(error = %e, "Failed to send context response");
     }
 }

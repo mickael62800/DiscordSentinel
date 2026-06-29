@@ -41,17 +41,8 @@ impl SafetyNetRepository for MockRepo {
         Ok(self.active.lock().unwrap().clone())
     }
 
-    async fn list_active(
-        &self,
-        _guild_id: &str,
-    ) -> Result<Vec<ActiveSafetyNet>, DomainError> {
-        Ok(self
-            .active
-            .lock()
-            .unwrap()
-            .clone()
-            .into_iter()
-            .collect())
+    async fn list_active(&self, _guild_id: &str) -> Result<Vec<ActiveSafetyNet>, DomainError> {
+        Ok(self.active.lock().unwrap().clone().into_iter().collect())
     }
 }
 

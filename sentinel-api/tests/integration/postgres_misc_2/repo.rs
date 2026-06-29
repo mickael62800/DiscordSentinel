@@ -5,26 +5,30 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
-use sentinel_api::adapters::outbound::postgres::system::log_repository::PgLogRepository;
-use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
 use sentinel_api::adapters::outbound::postgres::audit::user_activity_repository::PgUserActivityRepository;
+use sentinel_api::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::system::log_repository::PgLogRepository;
+use sentinel_api::ports::outbound::audit::user_activity_repository::UserActivityRepository;
+use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
-use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
-use sentinel_api::ports::outbound::system::log_repository::LogRepository;
-use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
-use sentinel_api::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -51,14 +55,21 @@ fn role(guild: &str, role_id: &str, name: &str, pos: i32) -> DiscordRole {
 async fn discord_role_sync_replaces_all() {
     let repo = PgDiscordRoleRepository::new(pool().await);
     let g = fresh_id();
-    repo.sync_roles(&g, vec![
-        role(&g, &fresh_id(), "Admin", 10),
-        role(&g, &fresh_id(), "Member", 1),
-    ]).await.unwrap();
+    repo.sync_roles(
+        &g,
+        vec![
+            role(&g, &fresh_id(), "Admin", 10),
+            role(&g, &fresh_id(), "Member", 1),
+        ],
+    )
+    .await
+    .unwrap();
     assert_eq!(repo.find_by_guild(&g).await.unwrap().len(), 2);
     // Resync remplace totalement.
     let new_id = fresh_id();
-    repo.sync_roles(&g, vec![role(&g, &new_id, "Only", 5)]).await.unwrap();
+    repo.sync_roles(&g, vec![role(&g, &new_id, "Only", 5)])
+        .await
+        .unwrap();
     let roles = repo.find_by_guild(&g).await.unwrap();
     assert_eq!(roles.len(), 1);
     assert_eq!(roles[0].id, new_id);
@@ -68,11 +79,16 @@ async fn discord_role_sync_replaces_all() {
 async fn discord_role_find_by_guild_ordered_desc() {
     let repo = PgDiscordRoleRepository::new(pool().await);
     let g = fresh_id();
-    repo.sync_roles(&g, vec![
-        role(&g, &fresh_id(), "Low", 1),
-        role(&g, &fresh_id(), "High", 100),
-        role(&g, &fresh_id(), "Mid", 50),
-    ]).await.unwrap();
+    repo.sync_roles(
+        &g,
+        vec![
+            role(&g, &fresh_id(), "Low", 1),
+            role(&g, &fresh_id(), "High", 100),
+            role(&g, &fresh_id(), "Mid", 50),
+        ],
+    )
+    .await
+    .unwrap();
     let roles = repo.find_by_guild(&g).await.unwrap();
     assert_eq!(roles[0].position, 100);
     assert_eq!(roles[2].position, 1);
@@ -83,7 +99,9 @@ async fn discord_role_find_by_id() {
     let repo = PgDiscordRoleRepository::new(pool().await);
     let g = fresh_id();
     let rid = fresh_id();
-    repo.sync_roles(&g, vec![role(&g, &rid, "X", 0)]).await.unwrap();
+    repo.sync_roles(&g, vec![role(&g, &rid, "X", 0)])
+        .await
+        .unwrap();
     assert!(repo.find_by_id(&g, &rid).await.unwrap().is_some());
     assert!(repo.find_by_id(&g, "nonexistent").await.unwrap().is_none());
 }
@@ -92,7 +110,9 @@ async fn discord_role_find_by_id() {
 async fn discord_role_sync_empty_list_clears_guild() {
     let repo = PgDiscordRoleRepository::new(pool().await);
     let g = fresh_id();
-    repo.sync_roles(&g, vec![role(&g, &fresh_id(), "A", 1)]).await.unwrap();
+    repo.sync_roles(&g, vec![role(&g, &fresh_id(), "A", 1)])
+        .await
+        .unwrap();
     repo.sync_roles(&g, vec![]).await.unwrap();
     assert!(repo.find_by_guild(&g).await.unwrap().is_empty());
 }
@@ -109,11 +129,17 @@ async fn discord_role_preserves_all_fields() {
     let g = fresh_id();
     let rid = fresh_id();
     let r = DiscordRole {
-        id: rid.clone(), guild_id: g.clone().into(), name: "Special".into(),
-        color: 0xFF0000, position: 42, permissions: 0x8, // ADMINISTRATOR
-        mentionable: false, managed: true,
+        id: rid.clone(),
+        guild_id: g.clone().into(),
+        name: "Special".into(),
+        color: 0xFF0000,
+        position: 42,
+        permissions: 0x8, // ADMINISTRATOR
+        mentionable: false,
+        managed: true,
         icon: Some("icon_hash".into()),
-        member_count: 99, synced_at: Utc::now(),
+        member_count: 99,
+        synced_at: Utc::now(),
     };
     repo.sync_roles(&g, vec![r]).await.unwrap();
     let got = repo.find_by_id(&g, &rid).await.unwrap().unwrap();
@@ -132,8 +158,12 @@ async fn discord_role_sync_isolates_per_guild() {
     let repo = PgDiscordRoleRepository::new(pool().await);
     let g1 = fresh_id();
     let g2 = fresh_id();
-    repo.sync_roles(&g1, vec![role(&g1, &fresh_id(), "G1-Role", 1)]).await.unwrap();
-    repo.sync_roles(&g2, vec![role(&g2, &fresh_id(), "G2-Role", 1)]).await.unwrap();
+    repo.sync_roles(&g1, vec![role(&g1, &fresh_id(), "G1-Role", 1)])
+        .await
+        .unwrap();
+    repo.sync_roles(&g2, vec![role(&g2, &fresh_id(), "G2-Role", 1)])
+        .await
+        .unwrap();
     assert_eq!(repo.find_by_guild(&g1).await.unwrap().len(), 1);
     assert_eq!(repo.find_by_guild(&g2).await.unwrap().len(), 1);
     // Resync g1 doesn't affect g2
@@ -189,8 +219,13 @@ async fn log_delete_older_than_days() {
     // Insert direct avec timestamp ancien.
     sqlx::query(
         "INSERT INTO logs (id, timestamp, level, bot, server, message, category, details) \
-         VALUES ($1, NOW() - INTERVAL '10 days', 'info', 'b', 's', 'old', $2, '{}')"
-    ).bind(Uuid::new_v4()).bind(&cat).execute(&p).await.unwrap();
+         VALUES ($1, NOW() - INTERVAL '10 days', 'info', 'b', 's', 'old', $2, '{}')",
+    )
+    .bind(Uuid::new_v4())
+    .bind(&cat)
+    .execute(&p)
+    .await
+    .unwrap();
     // Un autre recent.
     repo.save(&log_entry(&cat, "recent")).await.unwrap();
 
@@ -231,7 +266,8 @@ async fn activity_create_and_list_scoped() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn activity_filter_by_event_type() {
     let repo = PgUserActivityRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.create(&activity(&g, &u, "message")).await.unwrap();
     repo.create(&activity(&g, &u, "voice_join")).await.unwrap();
     let msgs = repo.list(&g, &u, Some("message"), 50, 0).await.unwrap();
@@ -242,7 +278,8 @@ async fn activity_filter_by_event_type() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn activity_list_pagination() {
     let repo = PgUserActivityRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     for _ in 0..5 {
         repo.create(&activity(&g, &u, "message")).await.unwrap();
     }
@@ -263,10 +300,13 @@ fn sample_rule(guild: &str, flag: FlagType) -> Rule {
         guild_id: guild.into(),
         flag_type: flag,
         weight: 1.0,
-        threshold_warn: 0.3, threshold_delete: 0.5,
-        threshold_mute: 0.7, threshold_ban: 0.9,
+        threshold_warn: 0.3,
+        threshold_delete: 0.5,
+        threshold_mute: 0.7,
+        threshold_ban: 0.9,
         enabled: true,
-        created_at: now, updated_at: now,
+        created_at: now,
+        updated_at: now,
     }
 }
 
@@ -309,14 +349,20 @@ async fn rule_toggle_updates_enabled() {
 async fn rule_toggle_unknown_returns_not_found() {
     let repo = PgRuleRepository::new(pool().await);
     let err = repo.toggle(Uuid::new_v4(), true).await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::NotFound(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::NotFound(_)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rule_delete_returns_not_found_on_unknown() {
     let repo = PgRuleRepository::new(pool().await);
     let err = repo.delete(Uuid::new_v4()).await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::NotFound(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::NotFound(_)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

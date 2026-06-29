@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::system::rule::Rule;
-use crate::domain::errors::DomainError;
-use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::errors::DomainError;
 
 pub struct CreateRuleCommand {
     pub guild_id: GuildId,

@@ -7,11 +7,15 @@ pub fn parse_pipe_lines(raw: &str) -> Vec<(String, String)> {
     raw.lines()
         .filter_map(|line| {
             let line = line.trim();
-            if line.is_empty() { return None; }
+            if line.is_empty() {
+                return None;
+            }
             let (left, right) = line.split_once('|')?;
             let left = left.trim();
             let right = right.trim();
-            if left.is_empty() || right.is_empty() { return None; }
+            if left.is_empty() || right.is_empty() {
+                return None;
+            }
             Some((left.to_string(), right.to_string()))
         })
         .collect()
@@ -23,7 +27,9 @@ pub fn parse_id_f64_lines(raw: &str) -> Vec<(u64, f64)> {
     raw.lines()
         .filter_map(|line| {
             let line = line.trim();
-            if line.is_empty() { return None; }
+            if line.is_empty() {
+                return None;
+            }
             let (id_str, val_str) = line.split_once(':')?;
             let id: u64 = id_str.trim().parse().ok()?;
             let val: f64 = val_str.trim().parse().ok()?;
@@ -37,7 +43,9 @@ pub fn parse_id_u64_lines(raw: &str) -> Vec<(u64, u64)> {
     raw.lines()
         .filter_map(|line| {
             let line = line.trim();
-            if line.is_empty() { return None; }
+            if line.is_empty() {
+                return None;
+            }
             let (id_str, val_str) = line.split_once(':')?;
             let id: u64 = id_str.trim().parse().ok()?;
             let val: u64 = val_str.trim().parse().ok()?;
@@ -56,7 +64,11 @@ pub fn split_csv(s: &str) -> Vec<String> {
 
 /// Lookup dans un Vec<(u64, f64)> par id, retourne le defaut si non trouve.
 pub fn lookup_f64(entries: &[(u64, f64)], id: u64, default: f64) -> f64 {
-    entries.iter().find(|(k, _)| *k == id).map(|(_, v)| *v).unwrap_or(default)
+    entries
+        .iter()
+        .find(|(k, _)| *k == id)
+        .map(|(_, v)| *v)
+        .unwrap_or(default)
 }
 
 /// Lookup dans un Vec<(u64, u64)> par id.

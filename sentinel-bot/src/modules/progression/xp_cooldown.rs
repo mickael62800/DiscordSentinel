@@ -43,7 +43,8 @@ impl XpCooldown {
     pub fn cleanup(&self, max_age_secs: u64) {
         let cutoff = Duration::from_secs(max_age_secs);
         let now = Instant::now();
-        self.last_xp.retain(|_, last| now.duration_since(*last) < cutoff);
+        self.last_xp
+            .retain(|_, last| now.duration_since(*last) < cutoff);
     }
 }
 

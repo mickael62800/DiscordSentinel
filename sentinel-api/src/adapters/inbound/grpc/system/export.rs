@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::export::v1 as proto;
+use sentinel_proto::export::v1::export_service_server::ExportService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::export::v1 as proto;
-use sentinel_proto::export::v1::export_service_server::ExportService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::application::system::export_service::ExecuteExportUseCase;

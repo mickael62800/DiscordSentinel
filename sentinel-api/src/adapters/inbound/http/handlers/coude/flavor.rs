@@ -3,14 +3,14 @@
 //! Endpoint read-only : le bot tire un template au hasard pour une cle
 //! donnee (`steal_success_afk`, `heist_fail`, etc.) et `locale` (default `fr`).
 
+use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::state::AppState;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
-use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct FlavorQuery {
@@ -43,9 +43,11 @@ pub async fn get_random_flavor(
         .await?
     {
         Some(content) => Ok(Json(FlavorTemplateDto { content })),
-        None => Err(ApiError(sentinel_core::domain::errors::DomainError::NotFound(
-            format!("Aucun template pour key={key}, locale={}", q.locale),
-        ))),
+        None => Err(ApiError(
+            sentinel_core::domain::errors::DomainError::NotFound(format!(
+                "Aucun template pour key={key}, locale={}",
+                q.locale
+            )),
+        )),
     }
 }
-

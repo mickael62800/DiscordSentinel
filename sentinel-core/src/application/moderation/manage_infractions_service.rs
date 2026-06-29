@@ -49,7 +49,9 @@ impl ManageInfractionsUseCase for ManageInfractionsService {
     }
 
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
-        self.infraction_repo.delete_older_than_days(guild_id, days).await
+        self.infraction_repo
+            .delete_older_than_days(guild_id, days)
+            .await
     }
 }
 

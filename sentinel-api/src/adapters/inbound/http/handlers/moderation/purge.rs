@@ -7,12 +7,12 @@ use tracing::info;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct PurgeByDaysDto {
@@ -46,15 +46,21 @@ pub async fn purge_infractions(
     )
     .await?;
 
-    let count = state.infractions_uc.delete_older_than_days(&dto.guild_id, dto.days).await?;
+    let count = state
+        .infractions_uc
+        .delete_older_than_days(&dto.guild_id, dto.days)
+        .await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge infractions");
 
-    state.broadcaster.broadcast("purge_completed", serde_json::json!({
-        "type": "infractions",
-        "guild_id": &dto.guild_id,
-        "days": dto.days,
-        "deleted": count,
-    }));
+    state.broadcaster.broadcast(
+        "purge_completed",
+        serde_json::json!({
+            "type": "infractions",
+            "guild_id": &dto.guild_id,
+            "days": dto.days,
+            "deleted": count,
+        }),
+    );
 
     Ok(Json(serde_json::json!({
         "deleted": count,
@@ -68,8 +74,10 @@ pub async fn purge_audit_logs(
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    sentinel_core::domain::entities::moderation::purge::validate_purge_days_strictly_positive(dto.days)
-        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
+    sentinel_core::domain::entities::moderation::purge::validate_purge_days_strictly_positive(
+        dto.days,
+    )
+    .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
     check_role_for_guild(
@@ -81,15 +89,21 @@ pub async fn purge_audit_logs(
     )
     .await?;
 
-    let count = state.audit_logs_uc.delete_older_than_days(&dto.guild_id, dto.days).await?;
+    let count = state
+        .audit_logs_uc
+        .delete_older_than_days(&dto.guild_id, dto.days)
+        .await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge audit logs");
 
-    state.broadcaster.broadcast("purge_completed", serde_json::json!({
-        "type": "audit_logs",
-        "guild_id": &dto.guild_id,
-        "days": dto.days,
-        "deleted": count,
-    }));
+    state.broadcaster.broadcast(
+        "purge_completed",
+        serde_json::json!({
+            "type": "audit_logs",
+            "guild_id": &dto.guild_id,
+            "days": dto.days,
+            "deleted": count,
+        }),
+    );
 
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
@@ -106,23 +120,31 @@ pub async fn purge_logs(
     rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeLogsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    sentinel_core::domain::entities::moderation::purge::validate_purge_days_strictly_positive(dto.days)
-        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
+    sentinel_core::domain::entities::moderation::purge::validate_purge_days_strictly_positive(
+        dto.days,
+    )
+    .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate superadmin pour les appels desktop.
     if let Some(Extension(ctx)) = rbac {
-        require_superadmin(&state, &ctx)
-            .map_err(|_| ApiError(DomainError::Forbidden("superadmin requis pour purger les logs systeme".into())))?;
+        require_superadmin(&state, &ctx).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "superadmin requis pour purger les logs systeme".into(),
+            ))
+        })?;
     }
 
     let count = state.log_repo.delete_older_than_days(dto.days).await?;
     info!(days = dto.days, deleted = count, "Purge logs systeme");
 
-    state.broadcaster.broadcast("purge_completed", serde_json::json!({
-        "type": "logs",
-        "days": dto.days,
-        "deleted": count,
-    }));
+    state.broadcaster.broadcast(
+        "purge_completed",
+        serde_json::json!({
+            "type": "logs",
+            "days": dto.days,
+            "deleted": count,
+        }),
+    );
 
     Ok(Json(serde_json::json!({ "deleted": count })))
 }

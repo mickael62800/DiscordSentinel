@@ -40,17 +40,19 @@ pub fn detect_emoji_spam(content: &str, threshold: usize) -> bool {
     use regex::Regex;
     use std::sync::LazyLock;
 
-    static CUSTOM_EMOJI: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"<a?:[a-zA-Z0-9_]+:\d+>").expect("regex emoji invalide")
-    });
+    static CUSTOM_EMOJI: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"<a?:[a-zA-Z0-9_]+:\d+>").expect("regex emoji invalide"));
 
-    let unicode_count = content.chars().filter(|&c| {
-        matches!(c,
-            '\u{1F300}'..='\u{1FAFF}'
-            | '\u{2600}'..='\u{27BF}'
-            | '\u{FE00}'..='\u{FE0F}'
-        )
-    }).count();
+    let unicode_count = content
+        .chars()
+        .filter(|&c| {
+            matches!(c,
+                '\u{1F300}'..='\u{1FAFF}'
+                | '\u{2600}'..='\u{27BF}'
+                | '\u{FE00}'..='\u{FE0F}'
+            )
+        })
+        .count();
 
     let custom_count = CUSTOM_EMOJI.find_iter(content).count();
 
@@ -62,9 +64,8 @@ pub fn detect_mentions(content: &str, threshold: usize) -> bool {
     use regex::Regex;
     use std::sync::LazyLock;
 
-    static USER_MENTION: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"<@!?\d+>").expect("regex mention invalide")
-    });
+    static USER_MENTION: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"<@!?\d+>").expect("regex mention invalide"));
 
     let user_count = USER_MENTION.find_iter(content).count();
     let everyone = if content.contains("@everyone") { 1 } else { 0 };

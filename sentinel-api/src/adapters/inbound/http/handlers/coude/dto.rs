@@ -3,23 +3,23 @@
 //! Chaque DTO de réponse dérive `Serialize` et fournit une conversion
 //! `From<domain_entity>` pour que les handlers restent des mappers triviaux.
 
-use serde::Deserialize;
-use serde::Serialize;
-use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
 use sentinel_core::domain::entities::coude::bet::Bet;
-use sentinel_core::domain::entities::coude::combat::Combat;
-use sentinel_core::domain::entities::coude::social::Season;
-use sentinel_core::domain::entities::coude::social::Event;
+use sentinel_core::domain::entities::coude::bet::BetResolutionPlan;
 use sentinel_core::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
+use sentinel_core::domain::entities::coude::combat::Combat;
 use sentinel_core::domain::entities::coude::inventory::Insurance;
 use sentinel_core::domain::entities::coude::inventory::InventoryItem;
-use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
-use sentinel_core::domain::entities::coude::player::Player;
 use sentinel_core::domain::entities::coude::inventory::Prime;
+use sentinel_core::domain::entities::coude::player::Player;
 use sentinel_core::domain::entities::coude::player::XpProgress;
+use sentinel_core::domain::entities::coude::social::Event;
+use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
+use sentinel_core::domain::entities::coude::social::Season;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use serde::Deserialize;
+use serde::Serialize;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
 // ══════════════════════════════════════════════════════════════════════

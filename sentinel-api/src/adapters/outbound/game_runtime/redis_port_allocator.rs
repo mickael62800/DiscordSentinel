@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use redis::AsyncCommands;
 use redis::Client;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
+use sentinel_core::domain::errors::DomainError;
 
 const KEY_TTL_SECS: u64 = 60 * 60 * 24 * 7; // 7j (refresh sur usage)
 

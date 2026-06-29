@@ -206,9 +206,14 @@ impl ApiClient {
 
     /// Supprime une action de moderation par son ID (unwarn).
     pub async fn delete_action(&self, action_id: &str) -> Result<bool, String> {
-        let req = self.base.client()
-            .delete(format!("{}/api/moderation/actions/{}", self.base.base_url(), action_id));
-        let resp = self.base.auth(req)
+        let req = self.base.client().delete(format!(
+            "{}/api/moderation/actions/{}",
+            self.base.base_url(),
+            action_id
+        ));
+        let resp = self
+            .base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur HTTP delete_action: {e}"))?;
@@ -237,7 +242,10 @@ impl ApiClient {
     }
 
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
-    pub async fn get_active_reminders(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, String> {
+    pub async fn get_active_reminders(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<SanctionReminder>, String> {
         self.base
             .get_json(&format!("/api/reminders/{}", guild_id))
             .await

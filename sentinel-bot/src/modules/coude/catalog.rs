@@ -81,11 +81,7 @@ impl CatalogCache {
         self.classes
             .iter()
             .find(|c| c.name == name)
-            .unwrap_or_else(|| {
-                self.classes
-                    .first()
-                    .expect("catalog.classes vide — fatal")
-            })
+            .unwrap_or_else(|| self.classes.first().expect("catalog.classes vide — fatal"))
     }
 
     /// Lookup item par clef.
@@ -95,7 +91,9 @@ impl CatalogCache {
 
     /// Verifie si un item est une potion consommable (a heal_amount > 0).
     pub fn is_potion(&self, key: &str) -> bool {
-        self.get_item(key).map(|i| i.heal_amount > 0).unwrap_or(false)
+        self.get_item(key)
+            .map(|i| i.heal_amount > 0)
+            .unwrap_or(false)
     }
 
     /// Quantite de HP restauree par une potion (0 si pas une potion).

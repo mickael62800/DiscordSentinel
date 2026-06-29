@@ -80,9 +80,7 @@ pub fn start(
         shutdown.clone(),
         api_url.clone(),
         "automod-bot",
-        move |pool| {
-            Box::pin(async move { domains::automod::close_votes::run(&pool).await })
-        },
+        move |pool| Box::pin(async move { domains::automod::close_votes::run(&pool).await }),
     );
 
     // Domaine : automod — suppression des cartes closes vieilles de > 1 mois
@@ -95,9 +93,7 @@ pub fn start(
         shutdown.clone(),
         api_url.clone(),
         "automod-bot",
-        move |pool| {
-            Box::pin(async move { domains::automod::cleanup_cards::run(&pool).await })
-        },
+        move |pool| Box::pin(async move { domains::automod::cleanup_cards::run(&pool).await }),
     );
 
     // ─────────────────────────────────────────────────────────────
@@ -163,11 +159,7 @@ pub fn start(
             shutdown.clone(),
             api_url.clone(),
             "cache",
-            |pool| {
-                Box::pin(async move {
-                    domains::cache::refresh_leaderboards::run(&pool).await
-                })
-            },
+            |pool| Box::pin(async move { domains::cache::refresh_leaderboards::run(&pool).await }),
         );
 
         spawn_periodic(
@@ -187,9 +179,7 @@ pub fn start(
             shutdown.clone(),
             api_url.clone(),
             "cache",
-            |pool| {
-                Box::pin(async move { domains::cache::manage_partitions::run(&pool).await })
-            },
+            |pool| Box::pin(async move { domains::cache::manage_partitions::run(&pool).await }),
         );
     }
 
@@ -230,9 +220,9 @@ pub fn start(
             "blackjack-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::blackjack::cleanup_afk_tables::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::blackjack::cleanup_afk_tables::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -302,7 +292,9 @@ pub fn start(
         shutdown.clone(),
         api_url.clone(),
         "analytics",
-        |pool| Box::pin(async move { domains::analytics::publish_monthly_ranking::run(&pool).await }),
+        |pool| {
+            Box::pin(async move { domains::analytics::publish_monthly_ranking::run(&pool).await })
+        },
     );
 
     // ─────────────────────────────────────────────────────────────
@@ -320,9 +312,9 @@ pub fn start(
             "temp_roles",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::temp_roles::expire_temp_roles::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::temp_roles::expire_temp_roles::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -456,9 +448,9 @@ pub fn start(
             "moderation-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::moderation::send_reminders::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::moderation::send_reminders::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -489,9 +481,9 @@ pub fn start(
             move |pool| {
                 let api = api.clone();
                 let token = token.clone();
-                Box::pin(async move {
-                    domains::coude::resolve_betting::run(&pool, &api, &token).await
-                })
+                Box::pin(
+                    async move { domains::coude::resolve_betting::run(&pool, &api, &token).await },
+                )
             },
         );
     }
@@ -515,9 +507,9 @@ pub fn start(
             "coude-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::coude::resolve_tournament::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::coude::resolve_tournament::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -531,9 +523,9 @@ pub fn start(
             api_url.clone(),
             "coude-bot",
             move |pool| {
-                Box::pin(async move {
-                    domains::coude::redistribute_cashbox::run(&pool, min_days).await
-                })
+                Box::pin(
+                    async move { domains::coude::redistribute_cashbox::run(&pool, min_days).await },
+                )
             },
         );
     }
@@ -551,9 +543,7 @@ pub fn start(
             "coude-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::coude::expire_steals::run(&pool, &redis).await
-                })
+                Box::pin(async move { domains::coude::expire_steals::run(&pool, &redis).await })
             },
         );
     }
@@ -605,9 +595,7 @@ pub fn start(
             "ticket-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::tickets::escalate_sla::run(&pool, &redis).await
-                })
+                Box::pin(async move { domains::tickets::escalate_sla::run(&pool, &redis).await })
             },
         );
     }
@@ -629,9 +617,7 @@ pub fn start(
             "ticket-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::tickets::close_inactive::run(&pool, &redis).await
-                })
+                Box::pin(async move { domains::tickets::close_inactive::run(&pool, &redis).await })
             },
         );
     }
@@ -673,9 +659,9 @@ pub fn start(
             "security-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::security::expire_lockdown::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::security::expire_lockdown::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -692,9 +678,9 @@ pub fn start(
             "security-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move {
-                    domains::security::expire_slowmode::run(&pool, &redis).await
-                })
+                Box::pin(
+                    async move { domains::security::expire_slowmode::run(&pool, &redis).await },
+                )
             },
         );
     }
@@ -706,4 +692,3 @@ pub fn start(
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);
 }
-

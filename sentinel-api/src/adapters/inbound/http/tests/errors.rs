@@ -20,13 +20,21 @@ async fn not_found_maps_to_404() {
 
 #[tokio::test]
 async fn rule_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Regle {}", uuid::Uuid::nil())))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!(
+        "Regle {}",
+        uuid::Uuid::nil()
+    ))))
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn infraction_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Infraction {}", uuid::Uuid::nil())))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!(
+        "Infraction {}",
+        uuid::Uuid::nil()
+    ))))
+    .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
@@ -46,7 +54,8 @@ async fn invalid_rule_maps_to_422() {
 
 #[tokio::test]
 async fn validation_error_maps_to_422() {
-    let (status, body) = response_parts(ApiError(DomainError::ValidationError("champ vide".into()))).await;
+    let (status, body) =
+        response_parts(ApiError(DomainError::ValidationError("champ vide".into()))).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(body["error"].as_str().unwrap().contains("vide"));
 }
@@ -77,7 +86,8 @@ async fn timeout_maps_to_504() {
 
 #[tokio::test]
 async fn internal_maps_to_500_and_hides_detail() {
-    let (status, body) = response_parts(ApiError(DomainError::Internal("SECRET SQL err".into()))).await;
+    let (status, body) =
+        response_parts(ApiError(DomainError::Internal("SECRET SQL err".into()))).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
     let msg = body["error"].as_str().unwrap();
     assert!(!msg.contains("SECRET"));

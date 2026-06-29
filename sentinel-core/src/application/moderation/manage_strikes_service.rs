@@ -57,15 +57,16 @@ impl ManageStrikesUseCase for ManageStrikesService {
             });
         }
 
-        let active = self.repo.find_active_strikes(&cmd.guild_id, &cmd.user_id, config.window_secs).await?;
+        let active = self
+            .repo
+            .find_active_strikes(&cmd.guild_id, &cmd.user_id, config.window_secs)
+            .await?;
         let active_count = active.len() as u32;
 
         let mut sorted_thresholds = config.thresholds.clone();
         sorted_thresholds.sort_by(|a, b| b.strikes.cmp(&a.strikes));
 
-        let escalation = sorted_thresholds
-            .iter()
-            .find(|t| active_count >= t.strikes);
+        let escalation = sorted_thresholds.iter().find(|t| active_count >= t.strikes);
 
         let (escalation_action, escalation_duration) = match escalation {
             Some(t) => (Some(t.action.clone()), t.duration),
@@ -80,9 +81,15 @@ impl ManageStrikesUseCase for ManageStrikesService {
         })
     }
 
-    async fn get_active_strikes(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserStrike>, DomainError> {
+    async fn get_active_strikes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<UserStrike>, DomainError> {
         let config = self.get_config(guild_id).await?;
-        self.repo.find_active_strikes(guild_id, user_id, config.window_secs).await
+        self.repo
+            .find_active_strikes(guild_id, user_id, config.window_secs)
+            .await
     }
 
     async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {

@@ -62,9 +62,18 @@ fn copy_and_clone() {
 #[test]
 fn equality_total_ordering() {
     use std::cmp::Ordering;
-    assert_eq!(TicketPriority::Low.cmp(&TicketPriority::Low), Ordering::Equal);
-    assert_eq!(TicketPriority::Low.cmp(&TicketPriority::Urgent), Ordering::Less);
-    assert_eq!(TicketPriority::Urgent.cmp(&TicketPriority::Low), Ordering::Greater);
+    assert_eq!(
+        TicketPriority::Low.cmp(&TicketPriority::Low),
+        Ordering::Equal
+    );
+    assert_eq!(
+        TicketPriority::Low.cmp(&TicketPriority::Urgent),
+        Ordering::Less
+    );
+    assert_eq!(
+        TicketPriority::Urgent.cmp(&TicketPriority::Low),
+        Ordering::Greater
+    );
 }
 
 #[test]

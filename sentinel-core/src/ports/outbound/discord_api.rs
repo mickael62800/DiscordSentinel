@@ -19,8 +19,17 @@ pub trait DiscordApi: Send + Sync {
         image_bytes: &[u8],
         mime: &str,
     ) -> Result<(String, String, bool), DomainError>;
-    async fn ban_user(&self, guild_id: &str, user_id: &str, reason: &str) -> Result<(), DomainError>;
-    async fn list_members(&self, guild_id: &str, limit: u32) -> Result<Vec<DiscordMember>, DomainError>;
+    async fn ban_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        reason: &str,
+    ) -> Result<(), DomainError>;
+    async fn list_members(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<DiscordMember>, DomainError>;
     async fn send_dm(&self, user_id: &str, content: &str) -> Result<(), DomainError>;
     async fn create_role(
         &self,

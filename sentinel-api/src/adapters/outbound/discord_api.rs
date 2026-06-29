@@ -54,7 +54,12 @@ async fn parse_channels(
             let id = c.get("id").and_then(|v| v.as_str())?.to_string();
             let name = c.get("name").and_then(|v| v.as_str())?.to_string();
             let position = c.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
-            Some(DiscordChannel { id, name, position, kind })
+            Some(DiscordChannel {
+                id,
+                name,
+                position,
+                kind,
+            })
         })
         .collect();
     channels.sort_by_key(|c| c.position);
@@ -66,10 +71,7 @@ impl DiscordApi for DiscordApiService {
     /// Liste les salons texte d'un serveur Discord (id + name).
     /// Phase 9 Part E : utilise par la page web de config des railleries
     /// pour afficher un dropdown au lieu d'un input ID.
-    async fn list_text_channels(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<DiscordChannel>, DomainError> {
+    async fn list_text_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError> {
         self.ensure_configured()?;
 
         let url = format!("https://discord.com/api/v10/guilds/{}/channels", guild_id);
@@ -97,10 +99,7 @@ impl DiscordApi for DiscordApiService {
         .await
     }
 
-    async fn list_all_channels(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<DiscordChannel>, DomainError> {
+    async fn list_all_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError> {
         self.ensure_configured()?;
 
         let url = format!("https://discord.com/api/v10/guilds/{}/channels", guild_id);
@@ -189,9 +188,10 @@ impl DiscordApi for DiscordApiService {
             });
         }
 
-        let body: serde_json::Value = resp.json().await.map_err(|e| {
-            DomainError::Internal(format!("Discord upload emoji parse: {e}"))
-        })?;
+        let body: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord upload emoji parse: {e}")))?;
         let id = body
             .get("id")
             .and_then(|v| v.as_str())
@@ -298,9 +298,18 @@ impl DiscordApi for DiscordApiService {
                     None => continue,
                 };
 
-                let id = user.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let username = user.get("username").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let display_name = m.get("nick")
+                let id = user
+                    .get("id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let username = user
+                    .get("username")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let display_name = m
+                    .get("nick")
                     .and_then(|v| v.as_str())
                     .or_else(|| user.get("global_name").and_then(|v| v.as_str()))
                     .map(|s| s.to_string());
@@ -329,11 +338,7 @@ impl DiscordApi for DiscordApiService {
     }
 
     /// Envoyer un message prive a un utilisateur Discord.
-    async fn send_dm(
-        &self,
-        user_id: &str,
-        content: &str,
-    ) -> Result<(), DomainError> {
+    async fn send_dm(&self, user_id: &str, content: &str) -> Result<(), DomainError> {
         self.ensure_configured()?;
 
         // 1. Creer un canal DM
@@ -352,14 +357,18 @@ impl DiscordApi for DiscordApiService {
             return Ok(()); // Ne pas faire echouer la suppression si le DM echoue
         }
 
-        let channel: serde_json::Value = dm_resp.json().await
+        let channel: serde_json::Value = dm_resp
+            .json()
+            .await
             .map_err(|e| DomainError::Internal(format!("Discord DM parse error: {e}")))?;
         let channel_id = channel["id"].as_str().unwrap_or_default();
 
         // 2. Envoyer le message
         let msg_resp = self
             .client
-            .post(format!("https://discord.com/api/v10/channels/{channel_id}/messages"))
+            .post(format!(
+                "https://discord.com/api/v10/channels/{channel_id}/messages"
+            ))
             .header("Authorization", format!("Bot {}", self.token))
             .json(&serde_json::json!({ "content": content }))
             .send()
@@ -396,7 +405,8 @@ impl DiscordApi for DiscordApiService {
             body["permissions"] = serde_json::Value::String(perms.to_string());
         }
 
-        let resp = self.client
+        let resp = self
+            .client
             .post(&url)
             .header("Authorization", format!("Bot {}", self.token))
             .json(&body)
@@ -406,7 +416,9 @@ impl DiscordApi for DiscordApiService {
 
         if !resp.status().is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(DomainError::Internal(format!("Discord create_role failed: {body}")));
+            return Err(DomainError::Internal(format!(
+                "Discord create_role failed: {body}"
+            )));
         }
 
         resp.json::<serde_json::Value>()
@@ -426,16 +438,30 @@ impl DiscordApi for DiscordApiService {
         hoist: Option<bool>,
     ) -> Result<serde_json::Value, DomainError> {
         self.ensure_configured()?;
-        let url = format!("https://discord.com/api/v10/guilds/{}/roles/{}", guild_id, role_id);
+        let url = format!(
+            "https://discord.com/api/v10/guilds/{}/roles/{}",
+            guild_id, role_id
+        );
 
         let mut body = serde_json::json!({});
-        if let Some(n) = name { body["name"] = serde_json::Value::String(n.to_string()); }
-        if let Some(c) = color { body["color"] = serde_json::json!(c); }
-        if let Some(p) = permissions { body["permissions"] = serde_json::Value::String(p.to_string()); }
-        if let Some(m) = mentionable { body["mentionable"] = serde_json::json!(m); }
-        if let Some(h) = hoist { body["hoist"] = serde_json::json!(h); }
+        if let Some(n) = name {
+            body["name"] = serde_json::Value::String(n.to_string());
+        }
+        if let Some(c) = color {
+            body["color"] = serde_json::json!(c);
+        }
+        if let Some(p) = permissions {
+            body["permissions"] = serde_json::Value::String(p.to_string());
+        }
+        if let Some(m) = mentionable {
+            body["mentionable"] = serde_json::json!(m);
+        }
+        if let Some(h) = hoist {
+            body["hoist"] = serde_json::json!(h);
+        }
 
-        let resp = self.client
+        let resp = self
+            .client
             .patch(&url)
             .header("Authorization", format!("Bot {}", self.token))
             .json(&body)
@@ -445,7 +471,9 @@ impl DiscordApi for DiscordApiService {
 
         if !resp.status().is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(DomainError::Internal(format!("Discord edit_role failed: {body}")));
+            return Err(DomainError::Internal(format!(
+                "Discord edit_role failed: {body}"
+            )));
         }
 
         resp.json::<serde_json::Value>()
@@ -454,15 +482,15 @@ impl DiscordApi for DiscordApiService {
     }
 
     /// Supprimer un role Discord.
-    async fn delete_role(
-        &self,
-        guild_id: &str,
-        role_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn delete_role(&self, guild_id: &str, role_id: &str) -> Result<(), DomainError> {
         self.ensure_configured()?;
-        let url = format!("https://discord.com/api/v10/guilds/{}/roles/{}", guild_id, role_id);
+        let url = format!(
+            "https://discord.com/api/v10/guilds/{}/roles/{}",
+            guild_id, role_id
+        );
 
-        let resp = self.client
+        let resp = self
+            .client
             .delete(&url)
             .header("Authorization", format!("Bot {}", self.token))
             .send()
@@ -471,18 +499,16 @@ impl DiscordApi for DiscordApiService {
 
         if !resp.status().is_success() {
             let body = resp.text().await.unwrap_or_default();
-            return Err(DomainError::Internal(format!("Discord delete_role failed: {body}")));
+            return Err(DomainError::Internal(format!(
+                "Discord delete_role failed: {body}"
+            )));
         }
 
         Ok(())
     }
 
     /// Debannir un utilisateur d'un serveur Discord.
-    async fn unban_user(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn unban_user(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         self.ensure_configured()?;
 
         let url = format!(
@@ -515,11 +541,7 @@ impl DiscordApi for DiscordApiService {
     /// Si le membre n'a pas de timeout actif, Discord accepte quand meme la
     /// requete (no-op). Un 404 (user pas dans la guild) est tolere comme un
     /// succes logique — on veut juste qu'il n'y ait plus de timeout actif.
-    async fn remove_timeout(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError> {
+    async fn remove_timeout(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         self.ensure_configured()?;
 
         let url = format!(
@@ -594,10 +616,7 @@ impl DiscordApi for DiscordApiService {
     /// Phase 2 B — Recupere la liste des guilds auxquelles un user appartient.
     /// Utilise le `access_token` OAuth2 (Bearer) du user, PAS le bot token.
     /// Endpoint Discord : `GET /users/@me/guilds` (scope `identify` ou `guilds`).
-    async fn get_user_guilds(
-        &self,
-        access_token: &str,
-    ) -> Result<Vec<UserGuild>, DomainError> {
+    async fn get_user_guilds(&self, access_token: &str) -> Result<Vec<UserGuild>, DomainError> {
         let url = "https://discord.com/api/v10/users/@me/guilds";
         let resp = self
             .client
@@ -649,11 +668,14 @@ impl DiscordApi for DiscordApiService {
 /// Construit l'URL d'avatar Discord (CDN) pour un user.
 /// Retourne `None` si le user n'a pas d'avatar custom (hash absent).
 pub(super) fn discord_avatar_url(user_id: &str, avatar_hash: Option<&str>) -> Option<String> {
-    avatar_hash
-        .map(|h| format!("https://cdn.discordapp.com/avatars/{}/{}.png?size=64", user_id, h))
+    avatar_hash.map(|h| {
+        format!(
+            "https://cdn.discordapp.com/avatars/{}/{}.png?size=64",
+            user_id, h
+        )
+    })
 }
 
 #[cfg(test)]
 #[path = "tests/discord_api.rs"]
 mod tests;
-

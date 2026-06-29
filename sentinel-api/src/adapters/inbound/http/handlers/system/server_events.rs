@@ -3,8 +3,8 @@
 //! Helper `record_server_event` insere une row dans la table `server_events`.
 //! Endpoint `GET /api/security/server-events` lit la table avec filtres.
 
-use axum::extract::Query;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use axum::extract::Query;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;

@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
 
 #[derive(sqlx::FromRow)]
 struct VoiceChannelRow {
@@ -82,7 +82,11 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
 
-    async fn find_closed_by_guild(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError> {
+    async fn find_closed_by_guild(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<VoiceChannel>, DomainError> {
         let rows = sqlx::query_as::<_, VoiceChannelRow>(
             "SELECT * FROM voice_channels \
              WHERE guild_id = $1 AND channel_status = 'closed' \
@@ -98,7 +102,10 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
 
-    async fn find_by_channel_id(&self, channel_id: &str) -> Result<Option<VoiceChannel>, DomainError> {
+    async fn find_by_channel_id(
+        &self,
+        channel_id: &str,
+    ) -> Result<Option<VoiceChannel>, DomainError> {
         // BUG FIX : on ne filtre plus sur channel_status='open' pour permettre
         // l'acces aux details des salons fermes (historique). Si un appelant
         // a besoin uniquement des salons actifs, qu'il filtre cote applicatif.
@@ -114,13 +121,12 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<VoiceChannel>, DomainError> {
-        let row = sqlx::query_as::<_, VoiceChannelRow>(
-            "SELECT * FROM voice_channels WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row =
+            sqlx::query_as::<_, VoiceChannelRow>("SELECT * FROM voice_channels WHERE id = $1")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannel::from))
     }
@@ -253,7 +259,12 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         Ok(())
     }
 
-    async fn update_owner(&self, id: Uuid, owner_id: &str, owner_name: &str) -> Result<(), DomainError> {
+    async fn update_owner(
+        &self,
+        id: Uuid,
+        owner_id: &str,
+        owner_name: &str,
+    ) -> Result<(), DomainError> {
         sqlx::query("UPDATE voice_channels SET owner_id = $1, owner_name = $2 WHERE id = $3")
             .bind(owner_id)
             .bind(owner_name)
@@ -265,7 +276,11 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         Ok(())
     }
 
-    async fn update_queue_channel(&self, id: Uuid, queue_channel_id: Option<&str>) -> Result<(), DomainError> {
+    async fn update_queue_channel(
+        &self,
+        id: Uuid,
+        queue_channel_id: Option<&str>,
+    ) -> Result<(), DomainError> {
         sqlx::query("UPDATE voice_channels SET queue_channel_id = $1 WHERE id = $2")
             .bind(queue_channel_id)
             .bind(id)

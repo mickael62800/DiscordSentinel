@@ -13,12 +13,12 @@ use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::coude::taunt::TauntsConfig;
-use sentinel_core::domain::entities::coude::taunt::TauntEvent;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use sentinel_core::domain::entities::coude::taunt::TauntEvent;
+use sentinel_core::domain::entities::coude::taunt::TauntsConfig;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
 
 struct MockTaunts {
     channel_sets: Mutex<Vec<(String, Option<String>)>>,
@@ -66,38 +66,89 @@ impl MockTaunts {
 
 #[async_trait]
 impl ManageCoudeTauntsUseCase for MockTaunts {
-    async fn on_player_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_lost(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_drew(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn on_player_stolen_from(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn on_player_defended_steal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn on_player_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_lost(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_drew(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn on_player_stolen_from(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<TauntEvent>, DomainError> {
+        Ok(None)
+    }
+    async fn on_player_defended_steal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 
     async fn on_bj_natural(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
     async fn on_bj_hand_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
     async fn on_bj_hand_bust(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
     async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> {
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
-    async fn on_jackpot(&self, _: &str, _: &str, amount: i64) -> Result<Option<TauntEvent>, DomainError> {
+    async fn on_jackpot(
+        &self,
+        _: &str,
+        _: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
         *self.last_jackpot_amount.lock().unwrap() = amount;
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
-    async fn on_generous_donor(&self, _: &str, _: &str, amount: i64) -> Result<Option<TauntEvent>, DomainError> {
+    async fn on_generous_donor(
+        &self,
+        _: &str,
+        _: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError> {
         *self.last_jackpot_amount.lock().unwrap() = amount;
-        Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
+        Ok(if *self.emit_on_trigger.lock().unwrap() {
+            Some(Self::sample_event())
+        } else {
+            None
+        })
     }
 
     async fn get_config(&self, _: &str) -> Result<TauntsConfig, DomainError> {
         Ok(self.config.lock().unwrap().clone())
     }
     async fn set_channel(&self, g: &str, c: Option<&str>) -> Result<(), DomainError> {
-        self.channel_sets.lock().unwrap().push((g.into(), c.map(String::from)));
+        self.channel_sets
+            .lock()
+            .unwrap()
+            .push((g.into(), c.map(String::from)));
         Ok(())
     }
     async fn set_enabled(&self, g: &str, e: bool) -> Result<(), DomainError> {
@@ -113,10 +164,15 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
         Ok(())
     }
     async fn set_opt_out(&self, g: &str, u: &str, o: bool) -> Result<(), DomainError> {
-        self.opt_out_calls.lock().unwrap().push((g.into(), u.into(), o));
+        self.opt_out_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), o));
         Ok(())
     }
-    async fn is_opted_out(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn is_opted_out(&self, _: &str, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
     async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> {
         Ok(self.opt_outs_list.lock().unwrap().clone())
     }
@@ -128,19 +184,28 @@ fn state_with(m: Arc<MockTaunts>) -> sentinel_api::adapters::inbound::http::stat
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
-        Some(v) => { b = b.header("content-type", "application/json"); Body::from(serde_json::to_string(&v).unwrap()) }
+        Some(v) => {
+            b = b.header("content-type", "application/json");
+            Body::from(serde_json::to_string(&v).unwrap())
+        }
         None => Body::empty(),
     };
     let req = b.body(body_payload).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Config GET ──
@@ -173,7 +238,10 @@ async fn update_taunts_config_without_rbac_passes_through() {
     });
     let (s, _) = req_json(app, "PUT", "/api/coude/999/config/taunts", Some(body)).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(m.channel_sets.lock().unwrap()[0].1.as_deref(), Some("chan-2"));
+    assert_eq!(
+        m.channel_sets.lock().unwrap()[0].1.as_deref(),
+        Some("chan-2")
+    );
     assert_eq!(m.enabled_sets.lock().unwrap()[0].1, false);
     assert_eq!(m.rename_sets.lock().unwrap()[0].1, true);
     assert_eq!(m.messages_sets.lock().unwrap()[0].1, false);
@@ -184,8 +252,11 @@ async fn update_taunts_config_moderator_forbidden() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m));
     let req = test_helpers::request_with_rbac(
-        "PUT", "/api/coude/999/config/taunts",
-        "u1", Some(Role::Moderator), Some("999".into()),
+        "PUT",
+        "/api/coude/999/config/taunts",
+        "u1",
+        Some(Role::Moderator),
+        Some("999".into()),
         Some(serde_json::json!({"channel_id": null, "enabled": true})),
     );
     let resp = app.oneshot(req).await.unwrap();
@@ -197,8 +268,11 @@ async fn update_taunts_config_admin_ok() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m.clone()));
     let req = test_helpers::request_with_rbac(
-        "PUT", "/api/coude/999/config/taunts",
-        "u1", Some(Role::Admin), Some("999".into()),
+        "PUT",
+        "/api/coude/999/config/taunts",
+        "u1",
+        Some(Role::Admin),
+        Some("999".into()),
         Some(serde_json::json!({"channel_id": null, "enabled": true})),
     );
     let resp = app.oneshot(req).await.unwrap();
@@ -260,7 +334,13 @@ async fn track_bj_bust_routes_to_bust_handler() {
 async fn track_bankruptcy_returns_optional_event() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m));
-    let (s, j) = req_json(app, "POST", "/api/coude/999/taunts/eco/bankruptcy/111", None).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/taunts/eco/bankruptcy/111",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert!(j["event"].is_null());
 }
@@ -270,7 +350,13 @@ async fn track_jackpot_forwards_amount() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m.clone()));
     let body = serde_json::json!({ "amount": 15000 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/taunts/eco/jackpot/111", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/taunts/eco/jackpot/111",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(*m.last_jackpot_amount.lock().unwrap(), 15000);
 }
@@ -280,7 +366,13 @@ async fn track_generous_donor_forwards_amount() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m.clone()));
     let body = serde_json::json!({ "amount": 2000 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/taunts/eco/donor/111", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/taunts/eco/donor/111",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(*m.last_jackpot_amount.lock().unwrap(), 2000);
 }
@@ -292,8 +384,12 @@ async fn remove_opt_out_moderator_forbidden() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m));
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/coude/999/config/taunts/opt-outs/111",
-        "u1", Some(Role::Moderator), Some("999".into()), None,
+        "DELETE",
+        "/api/coude/999/config/taunts/opt-outs/111",
+        "u1",
+        Some(Role::Moderator),
+        Some("999".into()),
+        None,
     );
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
@@ -304,8 +400,12 @@ async fn remove_opt_out_admin_calls_set_opt_out_false() {
     let m = Arc::new(MockTaunts::new());
     let app = router::build_for_test(state_with(m.clone()));
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/coude/999/config/taunts/opt-outs/111",
-        "u1", Some(Role::Admin), Some("999".into()), None,
+        "DELETE",
+        "/api/coude/999/config/taunts/opt-outs/111",
+        "u1",
+        Some(Role::Admin),
+        Some("999".into()),
+        None,
     );
     let resp = app.oneshot(req).await.unwrap();
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);

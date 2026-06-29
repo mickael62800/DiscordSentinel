@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceInviteStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceInviteStore;
 
 #[derive(sqlx::FromRow)]
 struct InviteLinkRow {
@@ -43,7 +43,10 @@ impl From<InviteLinkRow> for VoiceChannelInviteLink {
 
 #[async_trait]
 impl VoiceInviteStore for super::PgVoiceChannelRepository {
-    async fn find_invite_links(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
+    async fn find_invite_links(
+        &self,
+        voice_channel_id: Uuid,
+    ) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
         let rows = sqlx::query_as::<_, InviteLinkRow>(
             "SELECT * FROM voice_channel_invite_links WHERE voice_channel_id = $1 AND revoked = false AND expires_at > NOW() ORDER BY created_at DESC",
         )
@@ -55,7 +58,10 @@ impl VoiceInviteStore for super::PgVoiceChannelRepository {
         Ok(rows.into_iter().map(VoiceChannelInviteLink::from).collect())
     }
 
-    async fn find_invite_by_code(&self, code: &str) -> Result<Option<VoiceChannelInviteLink>, DomainError> {
+    async fn find_invite_by_code(
+        &self,
+        code: &str,
+    ) -> Result<Option<VoiceChannelInviteLink>, DomainError> {
         let row = sqlx::query_as::<_, InviteLinkRow>(
             "SELECT * FROM voice_channel_invite_links WHERE code = $1",
         )

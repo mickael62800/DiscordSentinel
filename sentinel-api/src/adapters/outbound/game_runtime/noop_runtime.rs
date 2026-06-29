@@ -5,10 +5,10 @@
 
 use async_trait::async_trait;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::container_runtime::{
     ContainerRuntime, ContainerSpec, ContainerStats, ContainerStatus, ManagedContainer,
 };
+use sentinel_core::domain::errors::DomainError;
 
 pub struct NoopContainerRuntime;
 
@@ -18,19 +18,49 @@ fn err() -> DomainError {
 
 #[async_trait]
 impl ContainerRuntime for NoopContainerRuntime {
-    async fn ensure_network(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> { Err(err()) }
-    async fn start_container(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Err(err()) }
-    async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Err(err()) }
-    async fn remove_container(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn remove_volume(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
-    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> { Ok(false) }
-    async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> { Ok(None) }
-    async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> { Err(err()) }
-    async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> { Err(err()) }
-    async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> { Ok(vec![]) }
+    async fn ensure_network(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> {
+        Err(err())
+    }
+    async fn start_container(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn remove_container(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn remove_volume(&self, _: &str) -> Result<(), DomainError> {
+        Err(err())
+    }
+    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> {
+        Ok(None)
+    }
+    async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> {
+        Err(err())
+    }
+    async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> {
+        Err(err())
+    }
+    async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> {
+        Ok(vec![])
+    }
 }

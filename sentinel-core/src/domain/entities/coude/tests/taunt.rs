@@ -156,7 +156,13 @@ fn build_taunt_event_no_channel_returns_none() {
 #[test]
 fn build_taunt_event_deterministic_one_shot_kinds() {
     // Couvre la branche `else { 0 }` pour les kinds non threshold-based.
-    let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::BjNatural21, 0, false);
+    let ev = build_taunt_event_deterministic(
+        &cfg_with_channel(),
+        "u1",
+        StreakKind::BjNatural21,
+        0,
+        false,
+    );
     assert!(ev.is_some());
 }
 
@@ -187,7 +193,8 @@ fn build_taunt_event_deterministic_below_threshold_returns_none() {
     // Threshold-based kind + streak hors 3/5/10 → None.
     let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Win, 2, false);
     assert!(ev.is_none());
-    let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Loss, 11, false);
+    let ev =
+        build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Loss, 11, false);
     assert!(ev.is_none());
 }
 

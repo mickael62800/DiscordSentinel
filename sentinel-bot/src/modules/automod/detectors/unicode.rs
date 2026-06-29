@@ -66,7 +66,8 @@ fn is_combining(c: char) -> bool {
 }
 
 fn is_invisible(c: char) -> bool {
-    matches!(c,
+    matches!(
+        c,
         '\u{200B}' // Zero Width Space
         | '\u{200C}' // Zero Width Non-Joiner
         | '\u{200D}' // Zero Width Joiner
@@ -150,7 +151,10 @@ mod tests {
 
     #[test]
     fn invisible_mixed_types() {
-        let msg = format!("a{}b{}c{}d{}e{}", '\u{200B}', '\u{200C}', '\u{200D}', '\u{2060}', '\u{FEFF}');
+        let msg = format!(
+            "a{}b{}c{}d{}e{}",
+            '\u{200B}', '\u{200C}', '\u{200D}', '\u{2060}', '\u{FEFF}'
+        );
         assert!(detect_invisible(msg.as_str(), 5));
     }
 
@@ -170,7 +174,9 @@ mod tests {
 
     #[test]
     fn homoglyph_pure_cyrillic() {
-        assert!(!detect_homoglyphs("\u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442}")); // Привет
+        assert!(!detect_homoglyphs(
+            "\u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442}"
+        )); // Привет
     }
 
     #[test]

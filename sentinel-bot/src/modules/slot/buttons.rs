@@ -84,7 +84,13 @@ pub async fn handle_open_machine(ctx: &Context, component: &ComponentInteraction
     let everyone_role = RoleId::new(guild_id.get());
     let channel_name = format!(
         "slot-{}",
-        component.user.name.chars().take(15).collect::<String>().to_lowercase()
+        component
+            .user
+            .name
+            .chars()
+            .take(15)
+            .collect::<String>()
+            .to_lowercase()
     );
 
     // Categorie ou regrouper les salons slot temp (config slot_category_id).
@@ -100,7 +106,8 @@ pub async fn handle_open_machine(ctx: &Context, component: &ComponentInteraction
                     .get_guild_config_for(&guild_id.to_string(), super::MODULE_BOT_NAME)
                     .await
                     .unwrap_or_default();
-                cfg.get("slot_category_id").and_then(|v| v.parse::<u64>().ok())
+                cfg.get("slot_category_id")
+                    .and_then(|v| v.parse::<u64>().ok())
             }
             None => None,
         }
@@ -127,10 +134,7 @@ pub async fn handle_open_machine(ctx: &Context, component: &ComponentInteraction
         channel_builder = channel_builder.category(ChannelId::new(cat));
     }
 
-    let channel = match guild_id
-        .create_channel(&ctx.http, channel_builder)
-        .await
-    {
+    let channel = match guild_id.create_channel(&ctx.http, channel_builder).await {
         Ok(ch) => ch,
         Err(e) => {
             error!(error = %e, "Echec creation salon slot");
@@ -425,15 +429,21 @@ fn build_result_message(response: &SpinResponse, username: &str) -> CreateMessag
 pub(super) fn action_buttons_row() -> Vec<CreateActionRow> {
     let spin = CreateButton::new(setup::CHANNEL_SPIN_ID)
         .label("Tirer")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3b0}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f3b0}".into(),
+        ))
         .style(ButtonStyle::Success);
     let daily = CreateButton::new(setup::CHANNEL_DAILY_ID)
         .label("Daily Bonus")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f381}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f381}".into(),
+        ))
         .style(ButtonStyle::Primary);
     let close = CreateButton::new(setup::CHANNEL_CLOSE_ID)
         .label("Fermer")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{274c}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{274c}".into(),
+        ))
         .style(ButtonStyle::Danger);
     vec![CreateActionRow::Buttons(vec![spin, daily, close])]
 }
@@ -463,8 +473,8 @@ async fn touch_activity(ctx: &Context, user_id: UserId) {
 }
 
 async fn edit_ephemeral_error(ctx: &Context, component: &ComponentInteraction, message: &str) {
-    let edit = serenity::builder::EditInteractionResponse::new()
-        .embed(embeds::build_error_embed(message));
+    let edit =
+        serenity::builder::EditInteractionResponse::new().embed(embeds::build_error_embed(message));
     if let Err(e) = component.edit_response(&ctx.http, edit).await {
         warn!(error = %e, "Echec edit error response slot");
     }
@@ -496,4 +506,3 @@ pub(crate) fn humanize_api_error(raw: &str) -> String {
 #[cfg(test)]
 #[path = "tests/buttons.rs"]
 mod tests;
-

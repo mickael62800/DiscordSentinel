@@ -13,7 +13,8 @@ use crate::common::api;
 
 pub async fn run(_pool: &PgPool) -> Result<(), String> {
     let body = serde_json::json!({ "days": 30 });
-    match api::post_json::<_, serde_json::Value>("/api/automod/cleanup-expired-cards", &body).await {
+    match api::post_json::<_, serde_json::Value>("/api/automod/cleanup-expired-cards", &body).await
+    {
         Ok(v) => {
             let n = v.get("expired").and_then(|x| x.as_u64()).unwrap_or(0);
             if n > 0 {

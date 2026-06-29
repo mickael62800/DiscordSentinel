@@ -1,44 +1,44 @@
 use std::sync::Arc;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::adapters::outbound::job_client::JobClient;
-use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::adapters::outbound::discord_api::DiscordApi;
 use crate::adapters::outbound::inference_service::InferenceService;
+use crate::adapters::outbound::job_client::JobClient;
+use crate::adapters::outbound::redis_cache::RedisCache;
+use crate::application::casino::blackjack_service::BlackjackService;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
+use crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
 use crate::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase;
 use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
-use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
-use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
-use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
-use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
-use crate::application::casino::blackjack_service::BlackjackService;
 use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::system::guild_repository::GuildRepository;
 use crate::ports::outbound::system::log_repository::LogRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
-use crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
-use crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 #[derive(Clone)]
 pub struct AppState {
     pub analyze_uc: Arc<dyn AnalyzeMessageUseCase>,
@@ -160,7 +160,11 @@ impl AppState {
     /// Lit le delai de rappel avant expiration depuis la config guild
     /// (cle `reminder_advance_secs` du bot `moderation-bot`). Default 3600s = 1h.
     pub async fn bot_config_reminder_advance_secs(&self, guild_id: &str) -> u64 {
-        match self.bot_config_repo.get_config(guild_id, "moderation-bot").await {
+        match self
+            .bot_config_repo
+            .get_config(guild_id, "moderation-bot")
+            .await
+        {
             Ok(entries) => entries
                 .iter()
                 .find(|e| e.config_key == "reminder_advance_secs")

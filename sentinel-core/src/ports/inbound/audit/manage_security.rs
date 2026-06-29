@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::audit::security_event::SecurityEvent;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 use crate::domain::services::audit::security_analyzer::JoinInfo;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct ReportSecurityEventCommand {
     pub guild_id: GuildId,

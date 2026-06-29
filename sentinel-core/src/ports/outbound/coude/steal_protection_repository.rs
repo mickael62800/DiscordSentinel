@@ -1,10 +1,10 @@
 //! Port outbound pour les abonnements anti-vol (Phase 9 Part B).
 
+use crate::domain::entities::coude::steal::protection::StealProtection;
+use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal::protection::StealProtection;
-use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait StealProtectionRepository: Send + Sync {

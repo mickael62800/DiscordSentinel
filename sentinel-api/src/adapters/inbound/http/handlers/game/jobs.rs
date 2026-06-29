@@ -11,8 +11,7 @@ use std::sync::Arc;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::application::game::worker_jobs::{
-    run_health_check, run_idle_shutdown, run_image_cleanup, run_reconciler, JobContext,
-    JobReport,
+    run_health_check, run_idle_shutdown, run_image_cleanup, run_reconciler, JobContext, JobReport,
 };
 
 fn ctx(state: &AppState) -> JobContext {
@@ -28,27 +27,19 @@ fn ctx(state: &AppState) -> JobContext {
     }
 }
 
-pub async fn job_health_check(
-    State(state): State<AppState>,
-) -> Result<Json<JobReport>, ApiError> {
+pub async fn job_health_check(State(state): State<AppState>) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(run_health_check(&ctx(&state)).await?))
 }
 
-pub async fn job_idle_shutdown(
-    State(state): State<AppState>,
-) -> Result<Json<JobReport>, ApiError> {
+pub async fn job_idle_shutdown(State(state): State<AppState>) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(run_idle_shutdown(&ctx(&state)).await?))
 }
 
-pub async fn job_reconcile(
-    State(state): State<AppState>,
-) -> Result<Json<JobReport>, ApiError> {
+pub async fn job_reconcile(State(state): State<AppState>) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(run_reconciler(&ctx(&state)).await?))
 }
 
-pub async fn job_image_cleanup(
-    State(state): State<AppState>,
-) -> Result<Json<JobReport>, ApiError> {
+pub async fn job_image_cleanup(State(state): State<AppState>) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(run_image_cleanup(&ctx(&state)).await?))
 }
 

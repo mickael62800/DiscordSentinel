@@ -82,11 +82,12 @@ impl IpBanRepository for PgIpBanRepository {
     }
 
     async fn delete_api_logs_for_ip(&self, ip: &str) -> Result<u64, DomainError> {
-        let res = sqlx::query("DELETE FROM logs WHERE category = 'api' AND details->>'client_ip' = $1")
-            .bind(ip)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        let res =
+            sqlx::query("DELETE FROM logs WHERE category = 'api' AND details->>'client_ip' = $1")
+                .bind(ip)
+                .execute(&self.pool)
+                .await
+                .map_err(pg_err)?;
         Ok(res.rows_affected())
     }
 }

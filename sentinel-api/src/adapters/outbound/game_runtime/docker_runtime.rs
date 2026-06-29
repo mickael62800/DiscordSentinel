@@ -29,11 +29,11 @@ use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::game::container_runtime::{
     ContainerRuntime, ContainerSpec, ContainerState, ContainerStats, ContainerStatus,
     ManagedContainer, PortProtocol, RestartPolicy,
 };
+use sentinel_core::domain::errors::DomainError;
 
 const SENTINEL_LABEL_KEY: &str = "sentinel.managed";
 const SENTINEL_LABEL_VALUE: &str = "game-portal";
@@ -90,8 +90,8 @@ fn proto_str(p: PortProtocol) -> &'static str {
 /// Calcule le pourcentage CPU a partir des stats bollard. Formule officielle :
 /// ((cpu_total_delta - precpu_total_delta) / system_cpu_delta) * online_cpus * 100.
 fn compute_cpu_percent(s: &BollardStats) -> f64 {
-    let cpu_delta = s.cpu_stats.cpu_usage.total_usage as f64
-        - s.precpu_stats.cpu_usage.total_usage as f64;
+    let cpu_delta =
+        s.cpu_stats.cpu_usage.total_usage as f64 - s.precpu_stats.cpu_usage.total_usage as f64;
     let system_delta = s.cpu_stats.system_cpu_usage.unwrap_or(0) as f64
         - s.precpu_stats.system_cpu_usage.unwrap_or(0) as f64;
     let online = s.cpu_stats.online_cpus.unwrap_or(1).max(1) as f64;
@@ -208,11 +208,7 @@ impl ContainerRuntime for DockerContainerRuntime {
         );
 
         // ── Env vars ──────────────────────────────────────────────────
-        let env: Vec<String> = spec
-            .env
-            .iter()
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect();
+        let env: Vec<String> = spec.env.iter().map(|(k, v)| format!("{k}={v}")).collect();
 
         let host_config = HostConfig {
             mounts: Some(mounts),
@@ -298,9 +294,8 @@ impl ContainerRuntime for DockerContainerRuntime {
             for i in 1..parts.len() {
                 let dir = format!("{}/", parts[..i].join("/"));
                 let mut h = tar::Header::new_gnu();
-                h.set_path(&dir).map_err(|e| {
-                    DomainError::Internal(format!("tar dir set_path: {e}"))
-                })?;
+                h.set_path(&dir)
+                    .map_err(|e| DomainError::Internal(format!("tar dir set_path: {e}")))?;
                 h.set_size(0);
                 h.set_mode(0o755);
                 h.set_entry_type(tar::EntryType::Directory);
@@ -312,9 +307,9 @@ impl ContainerRuntime for DockerContainerRuntime {
 
             // Entry du fichier lui-meme.
             let mut header = tar::Header::new_gnu();
-            header.set_path(rel_path).map_err(|e| {
-                DomainError::Internal(format!("tar file set_path: {e}"))
-            })?;
+            header
+                .set_path(rel_path)
+                .map_err(|e| DomainError::Internal(format!("tar file set_path: {e}")))?;
             header.set_size(bytes.len() as u64);
             header.set_mode(0o644);
             header.set_cksum();
@@ -418,10 +413,7 @@ impl ContainerRuntime for DockerContainerRuntime {
         }
     }
 
-    async fn inspect(
-        &self,
-        container_id: &str,
-    ) -> Result<Option<ContainerStatus>, DomainError> {
+    async fn inspect(&self, container_id: &str) -> Result<Option<ContainerStatus>, DomainError> {
         let resp = match self.docker.inspect_container(container_id, None).await {
             Ok(r) => r,
             Err(e) => {
@@ -467,9 +459,9 @@ impl ContainerRuntime for DockerContainerRuntime {
         let mem_limit = s.memory_stats.limit.unwrap_or(0);
         // Aggregate network rx/tx tous interfaces confondues.
         let (rx, tx) = if let Some(networks) = s.networks {
-            networks.values().fold((0u64, 0u64), |(r, t), n| {
-                (r + n.rx_bytes, t + n.tx_bytes)
-            })
+            networks
+                .values()
+                .fold((0u64, 0u64), |(r, t), n| (r + n.rx_bytes, t + n.tx_bytes))
         } else {
             (0, 0)
         };
@@ -482,11 +474,7 @@ impl ContainerRuntime for DockerContainerRuntime {
         })
     }
 
-    async fn logs(
-        &self,
-        container_id: &str,
-        lines: u32,
-    ) -> Result<Vec<String>, DomainError> {
+    async fn logs(&self, container_id: &str, lines: u32) -> Result<Vec<String>, DomainError> {
         let mut stream = self.docker.logs(
             container_id,
             Some(LogsOptions::<String> {

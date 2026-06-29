@@ -1,6 +1,6 @@
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -89,6 +89,9 @@ pub async fn get_guild_voice_stats(
 ) -> Result<Json<GuildVoiceStatsDto>, ApiError> {
     let days = params.days.unwrap_or(30).min(90);
     let limit = params.limit.unwrap_or(20).min(50);
-    let stats = state.stats_uc.get_guild_voice_stats(&guild_id, days, limit).await?;
+    let stats = state
+        .stats_uc
+        .get_guild_voice_stats(&guild_id, days, limit)
+        .await?;
     Ok(Json(GuildVoiceStatsDto::from(stats)))
 }

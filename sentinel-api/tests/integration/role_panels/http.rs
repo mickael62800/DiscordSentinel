@@ -16,15 +16,15 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use test_helpers::build_test_state_role_panels;
 
 #[derive(Default)]
@@ -35,8 +35,13 @@ struct MockRolePanelsUC {
 }
 
 impl MockRolePanelsUC {
-    fn new() -> Self { Self::default() }
-    fn with_panel(self, p: RolePanel) -> Self { self.panels.lock().unwrap().push(p); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with_panel(self, p: RolePanel) -> Self {
+        self.panels.lock().unwrap().push(p);
+        self
+    }
 }
 
 fn sample_panel(guild_id: &str) -> RolePanel {
@@ -58,44 +63,91 @@ fn sample_panel(guild_id: &str) -> RolePanel {
 
 #[async_trait]
 impl ManageRolePanelsUseCase for MockRolePanelsUC {
-    async fn create_panel(&self, cmd: CreateRolePanelCommand) -> Result<RolePanelDetail, DomainError> {
+    async fn create_panel(
+        &self,
+        cmd: CreateRolePanelCommand,
+    ) -> Result<RolePanelDetail, DomainError> {
         let now = Utc::now();
         let panel = RolePanel {
             id: Uuid::new_v4(),
-            guild_id: cmd.guild_id, channel_id: cmd.channel_id,
-            message_id: None, title: cmd.title, description: cmd.description,
-            mode: cmd.mode, max_roles: cmd.max_roles,
-            enabled: true, created_at: now, updated_at: now,
+            guild_id: cmd.guild_id,
+            channel_id: cmd.channel_id,
+            message_id: None,
+            title: cmd.title,
+            description: cmd.description,
+            mode: cmd.mode,
+            max_roles: cmd.max_roles,
+            enabled: true,
+            created_at: now,
+            updated_at: now,
         };
-        let entries: Vec<RolePanelEntry> = cmd.entries.into_iter().map(|e| RolePanelEntry {
-            id: Uuid::new_v4(), panel_id: panel.id,
-            role_id: e.role_id, role_name: e.role_name, emoji: e.emoji,
-            label: e.label, style: e.style, position: e.position,
-        }).collect();
+        let entries: Vec<RolePanelEntry> = cmd
+            .entries
+            .into_iter()
+            .map(|e| RolePanelEntry {
+                id: Uuid::new_v4(),
+                panel_id: panel.id,
+                role_id: e.role_id,
+                role_name: e.role_name,
+                emoji: e.emoji,
+                label: e.label,
+                style: e.style,
+                position: e.position,
+            })
+            .collect();
         self.panels.lock().unwrap().push(panel.clone());
         self.entries.lock().unwrap().extend(entries.clone());
         Ok(RolePanelDetail { panel, entries })
     }
     async fn get_panel(&self, panel_id: &str) -> Result<RolePanelDetail, DomainError> {
-        let uuid = Uuid::parse_str(panel_id).map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
+        let uuid = Uuid::parse_str(panel_id)
+            .map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
         let panels = self.panels.lock().unwrap();
-        let panel = panels.iter().find(|p| p.id == uuid).cloned()
+        let panel = panels
+            .iter()
+            .find(|p| p.id == uuid)
+            .cloned()
             .ok_or_else(|| DomainError::NotFound("panel".into()))?;
-        let entries = self.entries.lock().unwrap().iter()
-            .filter(|e| e.panel_id == uuid).cloned().collect();
+        let entries = self
+            .entries
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|e| e.panel_id == uuid)
+            .cloned()
+            .collect();
         Ok(RolePanelDetail { panel, entries })
     }
-    async fn get_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
+    async fn get_panel_by_message(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<RolePanelDetail>, DomainError> {
         let panels = self.panels.lock().unwrap();
-        let Some(panel) = panels.iter().find(|p| p.message_id.as_deref() == Some(message_id)).cloned()
-        else { return Ok(None) };
-        Ok(Some(RolePanelDetail { panel, entries: vec![] }))
+        let Some(panel) = panels
+            .iter()
+            .find(|p| p.message_id.as_deref() == Some(message_id))
+            .cloned()
+        else {
+            return Ok(None);
+        };
+        Ok(Some(RolePanelDetail {
+            panel,
+            entries: vec![],
+        }))
     }
     async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, DomainError> {
-        Ok(self.panels.lock().unwrap().iter().filter(|p| p.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .panels
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|p| p.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
     async fn set_message_id(&self, cmd: SetMessageIdCommand) -> Result<(), DomainError> {
-        let uuid = Uuid::parse_str(&cmd.panel_id).map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
+        let uuid = Uuid::parse_str(&cmd.panel_id)
+            .map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
         let mut panels = self.panels.lock().unwrap();
         for p in panels.iter_mut() {
             if p.id == uuid {
@@ -105,52 +157,90 @@ impl ManageRolePanelsUseCase for MockRolePanelsUC {
         Ok(())
     }
     async fn delete_panel(&self, panel_id: &str) -> Result<(), DomainError> {
-        let uuid = Uuid::parse_str(panel_id).map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
+        let uuid = Uuid::parse_str(panel_id)
+            .map_err(|_| DomainError::ValidationError("bad uuid".into()))?;
         self.panels.lock().unwrap().retain(|p| p.id != uuid);
         Ok(())
     }
     async fn list_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, DomainError> {
-        Ok(self.auto_roles.lock().unwrap().iter().filter(|a| a.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .auto_roles
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|a| a.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
     async fn add_auto_role(&self, cmd: CreateAutoRoleCommand) -> Result<AutoRole, DomainError> {
         let ar = AutoRole {
             id: Uuid::new_v4(),
-            guild_id: cmd.guild_id, role_id: cmd.role_id, role_name: cmd.role_name,
-            delay_secs: cmd.delay_secs, enabled: true,
+            guild_id: cmd.guild_id,
+            role_id: cmd.role_id,
+            role_name: cmd.role_name,
+            delay_secs: cmd.delay_secs,
+            enabled: true,
         };
         self.auto_roles.lock().unwrap().push(ar.clone());
         Ok(ar)
     }
     async fn delete_auto_role(&self, guild_id: &str, role_id: &str) -> Result<(), DomainError> {
-        self.auto_roles.lock().unwrap().retain(|a| !(a.guild_id == guild_id && a.role_id == role_id));
+        self.auto_roles
+            .lock()
+            .unwrap()
+            .retain(|a| !(a.guild_id == guild_id && a.role_id == role_id));
         Ok(())
     }
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn build_app(uc: Arc<MockRolePanelsUC>) -> axum::Router {
@@ -252,8 +342,10 @@ async fn delete_auto_role_success() {
     uc.auto_roles.lock().unwrap().push(AutoRole {
         id: Uuid::new_v4(),
         guild_id: "111111111111111111".into(),
-        role_id: "r1".into(), role_name: "X".into(),
-        delay_secs: 0, enabled: true,
+        role_id: "r1".into(),
+        role_name: "X".into(),
+        delay_secs: 0,
+        enabled: true,
     });
     let app = build_app(uc.clone());
     let (status, _) = delete(app, "/api/auto-roles/111111111111111111/r1").await;

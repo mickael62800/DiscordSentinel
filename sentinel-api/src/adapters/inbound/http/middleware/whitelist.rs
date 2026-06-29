@@ -45,10 +45,7 @@ use crate::adapters::inbound::http::state::AppState;
 const WHITELIST_CACHE_TTL_SECS: u64 = 300; // 5 min : compromis fraicheur / DB load
 const WHITELIST_CACHE_PREFIX: &str = "user_whitelisted:";
 
-const EXEMPT_PATHS: &[&str] = &[
-    "/api/auth/check-access",
-    "/api/auth/redeem-invitation",
-];
+const EXEMPT_PATHS: &[&str] = &["/api/auth/check-access", "/api/auth/redeem-invitation"];
 
 pub async fn whitelist_middleware(
     State(state): State<AppState>,
@@ -68,7 +65,11 @@ pub async fn whitelist_middleware(
     }
 
     // 3. Superadmin -> autorise sans question.
-    if state.superadmin_user_ids.iter().any(|id| id == &ctx.discord_user_id) {
+    if state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &ctx.discord_user_id)
+    {
         return Ok(next.run(request).await);
     }
 
@@ -105,9 +106,7 @@ pub async fn whitelist_middleware(
     // Cache du resultat (best-effort).
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         let val = if exists { "1" } else { "0" };
-        let _: Result<(), _> = conn
-            .set_ex(&cache_key, val, WHITELIST_CACHE_TTL_SECS)
-            .await;
+        let _: Result<(), _> = conn.set_ex(&cache_key, val, WHITELIST_CACHE_TTL_SECS).await;
     }
 
     if !exists {

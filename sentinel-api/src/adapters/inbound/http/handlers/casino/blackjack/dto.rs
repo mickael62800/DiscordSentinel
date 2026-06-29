@@ -1,12 +1,12 @@
 //! DTOs HTTP pour le blackjack (solo + multiplayer tables).
 
-use serde::Deserialize;
-use serde::Serialize;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 use sentinel_core::domain::entities::casino::blackjack::Card;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use serde::Deserialize;
+use serde::Serialize;
 // ══════════════════════════════════════════════════════════════════════
 // ── Solo game DTOs ──
 // ══════════════════════════════════════════════════════════════════════

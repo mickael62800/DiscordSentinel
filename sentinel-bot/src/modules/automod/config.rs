@@ -14,39 +14,85 @@ pub(super) struct EmbedColors {
 }
 
 /// Construit la config des detecteurs depuis la guild config.
-pub(super) fn build_detector_config(config: &std::collections::HashMap<String, String>) -> DetectorConfig {
+pub(super) fn build_detector_config(
+    config: &std::collections::HashMap<String, String>,
+) -> DetectorConfig {
     DetectorConfig {
         spam_enabled: BaseApiClient::config_bool(config, "spam_detection_enabled", true),
-        spam_repeat_char_threshold: BaseApiClient::config_u64(config, "spam_repeat_char_threshold", 6) as usize,
-        spam_repeat_word_threshold: BaseApiClient::config_u64(config, "spam_repeat_word_threshold", 5) as usize,
+        spam_repeat_char_threshold: BaseApiClient::config_u64(
+            config,
+            "spam_repeat_char_threshold",
+            6,
+        ) as usize,
+        spam_repeat_word_threshold: BaseApiClient::config_u64(
+            config,
+            "spam_repeat_word_threshold",
+            5,
+        ) as usize,
         caps_enabled: BaseApiClient::config_bool(config, "caps_warning_enabled", true),
         caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8) as usize,
         insult_enabled: BaseApiClient::config_bool(config, "insult_detection_enabled", true),
-        insult_custom_words: crate::shared::parsers::split_csv(&BaseApiClient::config_or(config, "insult_custom_words", "")),
+        insult_custom_words: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
+            config,
+            "insult_custom_words",
+            "",
+        )),
         link_enabled: BaseApiClient::config_bool(config, "link_detection_enabled", true),
         allow_discord_invites: BaseApiClient::config_bool(config, "allow_discord_invites", false),
-        allowed_domains: crate::shared::parsers::split_csv(&BaseApiClient::config_or(config, "allowed_domains", "")),
+        allowed_domains: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
+            config,
+            "allowed_domains",
+            "",
+        )),
         phishing_enabled: BaseApiClient::config_bool(config, "phishing_detection_enabled", true),
-        phishing_extra_whitelist: crate::shared::parsers::split_csv(&BaseApiClient::config_or(config, "phishing_extra_whitelist", "")),
+        phishing_extra_whitelist: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
+            config,
+            "phishing_extra_whitelist",
+            "",
+        )),
         emoji_spam_enabled: BaseApiClient::config_bool(config, "emoji_spam_enabled", true),
         emoji_spam_max: BaseApiClient::config_u64(config, "emoji_spam_max", 10) as usize,
         mentions_enabled: BaseApiClient::config_bool(config, "mentions_enabled", true),
         mentions_max: BaseApiClient::config_u64(config, "mentions_max", 5) as usize,
-        suspicious_files_enabled: BaseApiClient::config_bool(config, "suspicious_files_enabled", true),
-        suspicious_file_extensions: crate::shared::parsers::split_csv(&BaseApiClient::config_or(config, "suspicious_file_extensions", "")),
+        suspicious_files_enabled: BaseApiClient::config_bool(
+            config,
+            "suspicious_files_enabled",
+            true,
+        ),
+        suspicious_file_extensions: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
+            config,
+            "suspicious_file_extensions",
+            "",
+        )),
         unicode_enabled: BaseApiClient::config_bool(config, "unicode_detection_enabled", true),
-        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3) as usize,
-        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5) as usize,
+        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3)
+            as usize,
+        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5)
+            as usize,
     }
 }
 
 /// Construit les couleurs d'embeds depuis la guild config.
-pub(super) fn build_embed_colors(config: &std::collections::HashMap<String, String>) -> EmbedColors {
+pub(super) fn build_embed_colors(
+    config: &std::collections::HashMap<String, String>,
+) -> EmbedColors {
     EmbedColors {
-        warn:   parse_color(&BaseApiClient::config_or(config, "color_warn",   "f59e0b"), 0xf59e0b),
-        delete: parse_color(&BaseApiClient::config_or(config, "color_delete", "f97316"), 0xf97316),
-        mute:   parse_color(&BaseApiClient::config_or(config, "color_mute",   "ef4444"), 0xef4444),
-        ban:    parse_color(&BaseApiClient::config_or(config, "color_ban",    "dc2626"), 0xdc2626),
+        warn: parse_color(
+            &BaseApiClient::config_or(config, "color_warn", "f59e0b"),
+            0xf59e0b,
+        ),
+        delete: parse_color(
+            &BaseApiClient::config_or(config, "color_delete", "f97316"),
+            0xf97316,
+        ),
+        mute: parse_color(
+            &BaseApiClient::config_or(config, "color_mute", "ef4444"),
+            0xef4444,
+        ),
+        ban: parse_color(
+            &BaseApiClient::config_or(config, "color_ban", "dc2626"),
+            0xdc2626,
+        ),
     }
 }
 

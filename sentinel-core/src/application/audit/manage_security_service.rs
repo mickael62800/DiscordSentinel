@@ -12,18 +12,18 @@ use tracing::warn;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
 use crate::domain::services::audit::security_analyzer;
-use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 use crate::ports::inbound::audit::manage_security::SecurityDecision;
-use crate::ports::outbound::system::cache_helpers::cached_json;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::system::cache::CachePort;
-use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::cache_helpers::cached_json;
 const EVENTS_TTL: u64 = 60; // 1 minute
 
 pub struct ManageSecurityService {
@@ -43,7 +43,14 @@ impl ManageSecurityService {
         bot_config_repo: Arc<dyn BotConfigRepository>,
         moderation_repo: Arc<dyn ModerationRepository>,
     ) -> Self {
-        Self { repo, cache, watched_repo, audit_logs_uc: None, bot_config_repo, moderation_repo }
+        Self {
+            repo,
+            cache,
+            watched_repo,
+            audit_logs_uc: None,
+            bot_config_repo,
+            moderation_repo,
+        }
     }
 
     /// Phase 1 dual-write : copie chaque evenement de securite dans audit_logs
@@ -75,9 +82,7 @@ impl ManageSecurityUseCase for ManageSecurityService {
         self.repo.save(&event).await?;
 
         let uc = self.audit_logs_uc.as_ref().ok_or_else(|| {
-            DomainError::Internal(
-                "audit_logs_uc non injecte dans ManageSecurityService".into(),
-            )
+            DomainError::Internal("audit_logs_uc non injecte dans ManageSecurityService".into())
         })?;
         let event_type_str = format!("security_{}", event.event_type);
         let details = serde_json::json!({
@@ -119,7 +124,11 @@ impl ManageSecurityUseCase for ManageSecurityService {
         if let Err(e) = self.cache.invalidate("security:all").await {
             warn!(error = %e, "Echec invalidation cache security:all");
         }
-        if let Err(e) = self.cache.invalidate(&format!("security:{}", event.guild_id)).await {
+        if let Err(e) = self
+            .cache
+            .invalidate(&format!("security:{}", event.guild_id))
+            .await
+        {
             warn!(error = %e, guild_id = %event.guild_id, "Echec invalidation cache security guild");
         }
 
@@ -136,15 +145,21 @@ impl ManageSecurityUseCase for ManageSecurityService {
         }
 
         // Charger config guild.
-        let configs = self.bot_config_repo.get_config(&cmd.guild_id, "security-bot").await.unwrap_or_default();
+        let configs = self
+            .bot_config_repo
+            .get_config(&cmd.guild_id, "security-bot")
+            .await
+            .unwrap_or_default();
         let cfg = |key: &str, default: u64| -> u64 {
-            configs.iter()
+            configs
+                .iter()
                 .find(|c| c.config_key == key)
                 .and_then(|c| c.config_value.parse().ok())
                 .unwrap_or(default)
         };
         let cfg_bool = |key: &str, default: bool| -> bool {
-            configs.iter()
+            configs
+                .iter()
                 .find(|c| c.config_key == key)
                 .map(|c| c.config_value == "true" || c.config_value == "1")
                 .unwrap_or(default)
@@ -165,7 +180,8 @@ impl ManageSecurityUseCase for ManageSecurityService {
 
         // 1. Analyse raid pattern.
         if raid_pattern_enabled && cmd.recent_joins.len() >= 3 {
-            let analysis = security_analyzer::analyze_joins(&cmd.recent_joins, name_distance, creation_spread);
+            let analysis =
+                security_analyzer::analyze_joins(&cmd.recent_joins, name_distance, creation_spread);
             if analysis.score >= raid_score_threshold {
                 decision.is_raid = true;
                 decision.raid_score = analysis.score;
@@ -193,10 +209,12 @@ impl ManageSecurityUseCase for ManageSecurityService {
                 decision.send_captcha = quarantine_enabled && captcha_enabled;
                 if decision.event_type.is_empty() {
                     decision.event_type = "suspicious_account".into();
-                    let age_hours = (chrono::Utc::now().timestamp() - cmd.account_created_timestamp) / 3600;
+                    let age_hours =
+                        (chrono::Utc::now().timestamp() - cmd.account_created_timestamp) / 3600;
                     decision.event_description = format!(
                         "Compte suspect : age {} heures (min requis : {} heures)",
-                        age_hours, min_account_age / 3600
+                        age_hours,
+                        min_account_age / 3600
                     );
                 }
             }
@@ -216,7 +234,10 @@ impl ManageSecurityUseCase for ManageSecurityService {
                 );
                 if alt.is_suspicious() {
                     decision.is_alt_account = true;
-                    decision.alt_similar_to = alt.similar_to_banned.or(alt.creation_near_banned).unwrap_or_default();
+                    decision.alt_similar_to = alt
+                        .similar_to_banned
+                        .or(alt.creation_near_banned)
+                        .unwrap_or_default();
                     decision.quarantine = quarantine_enabled;
                     decision.send_captcha = quarantine_enabled && captcha_enabled;
                     if decision.event_type.is_empty() {
@@ -232,13 +253,15 @@ impl ManageSecurityUseCase for ManageSecurityService {
 
         // Auto-report si un event a ete detecte.
         if !decision.event_type.is_empty() {
-            let _ = self.report_event(ReportSecurityEventCommand {
-                guild_id: cmd.guild_id.clone(),
-                event_type: decision.event_type.clone(),
-                severity: if decision.is_raid { "critical" } else { "high" }.into(),
-                description: decision.event_description.clone(),
-                user_ids: vec![cmd.user_id.clone().into()],
-            }).await;
+            let _ = self
+                .report_event(ReportSecurityEventCommand {
+                    guild_id: cmd.guild_id.clone(),
+                    event_type: decision.event_type.clone(),
+                    severity: if decision.is_raid { "critical" } else { "high" }.into(),
+                    description: decision.event_description.clone(),
+                    user_ids: vec![cmd.user_id.clone().into()],
+                })
+                .await;
         }
 
         Ok(decision)
@@ -263,7 +286,10 @@ impl ManageSecurityUseCase for ManageSecurityService {
 impl ManageSecurityService {
     /// Charge les usernames et dates de creation des bans recents (7j)
     /// depuis le repo moderation pour l'alt detection.
-    async fn load_recent_ban_usernames(&self, guild_id: &str) -> Vec<security_analyzer::BannedUserInfo> {
+    async fn load_recent_ban_usernames(
+        &self,
+        guild_id: &str,
+    ) -> Vec<security_analyzer::BannedUserInfo> {
         let bans = match self.moderation_repo.find_bans(Some(guild_id), 100, 0).await {
             Ok(actions) => actions,
             Err(_) => return vec![],

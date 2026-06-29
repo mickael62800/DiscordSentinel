@@ -1,10 +1,10 @@
 //! Port outbound pour les abonnements boost voleur (Phase 9 Part C).
 
+use crate::domain::entities::coude::steal::boost::StealBoost;
+use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal::boost::StealBoost;
-use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait StealBoostRepository: Send + Sync {

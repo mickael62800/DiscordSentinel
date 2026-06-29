@@ -22,7 +22,10 @@ use tonic::transport::ServerTlsConfig;
 
 /// Lit `GRPC_TLS_DIR` depuis l'env. Retourne None si non defini -> mode plain.
 pub fn tls_dir() -> Option<PathBuf> {
-    std::env::var("GRPC_TLS_DIR").ok().filter(|s| !s.is_empty()).map(PathBuf::from)
+    std::env::var("GRPC_TLS_DIR")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Construit la config TLS serveur (cert + key + verifie le client via CA).
@@ -35,9 +38,7 @@ pub fn server_tls_config(dir: &Path) -> Result<ServerTlsConfig, std::io::Error> 
     let identity = Identity::from_pem(&server_pem, &server_key);
     let ca = Certificate::from_pem(&ca_pem);
 
-    Ok(ServerTlsConfig::new()
-        .identity(identity)
-        .client_ca_root(ca))
+    Ok(ServerTlsConfig::new().identity(identity).client_ca_root(ca))
 }
 
 /// Construit la config TLS client (cert client + verifie le serveur via CA).

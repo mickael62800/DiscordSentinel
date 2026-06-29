@@ -122,7 +122,9 @@ impl WelcomeApiClient {
             .guarded(|| async move { client.get_config(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(|e| match e {
-                GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+                GrpcCallError::Unavailable => {
+                    "API indisponible (circuit breaker ouvert)".to_string()
+                }
                 GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
                 GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
             })?;

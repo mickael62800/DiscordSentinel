@@ -6,16 +6,18 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
+use sentinel_core::domain::entities::coude::cashbox::Cashbox;
 use sentinel_core::domain::entities::coude::cashbox::CashboxRedistribution;
 use sentinel_core::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use sentinel_core::domain::entities::coude::cashbox::CashboxSource;
-use sentinel_core::domain::entities::coude::cashbox::Cashbox;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "cashbox";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgCashboxRepository {
     pool: PgPool,
@@ -137,11 +139,7 @@ impl CashboxRepository for PgCashboxRepository {
         Ok(())
     }
 
-    async fn withdraw(
-        &self,
-        guild_id: &str,
-        amount: i64,
-    ) -> Result<i64, DomainError> {
+    async fn withdraw(&self, guild_id: &str, amount: i64) -> Result<i64, DomainError> {
         if amount <= 0 {
             return Ok(0);
         }
@@ -150,13 +148,12 @@ impl CashboxRepository for PgCashboxRepository {
         // si la caisse etait trop petite).
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        let row: Option<(i64,)> = sqlx::query_as(
-            "SELECT balance FROM coude_cashbox WHERE guild_id = $1 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT balance FROM coude_cashbox WHERE guild_id = $1 FOR UPDATE")
+                .bind(guild_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(pg_err)?;
 
         let balance = row.map(|(v,)| v).unwrap_or(0);
         if balance <= 0 {
@@ -182,22 +179,18 @@ impl CashboxRepository for PgCashboxRepository {
         Ok(actual)
     }
 
-    async fn claim_all_for_redistribution(
-        &self,
-        guild_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn claim_all_for_redistribution(&self, guild_id: &str) -> Result<i64, DomainError> {
         // Transaction : SELECT FOR UPDATE puis UPDATE. Garantit l'atomicite
         // entre le read de balance et le reset (empeche une double redistribution
         // si 2 workers tournent en parallele).
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        let row: Option<(i64,)> = sqlx::query_as(
-            "SELECT balance FROM coude_cashbox WHERE guild_id = $1 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT balance FROM coude_cashbox WHERE guild_id = $1 FOR UPDATE")
+                .bind(guild_id)
+                .fetch_optional(&mut *tx)
+                .await
+                .map_err(pg_err)?;
 
         let balance = row.map(|(v,)| v).unwrap_or(0);
         if balance <= 0 {
@@ -254,12 +247,15 @@ impl CashboxRepository for PgCashboxRepository {
             let (user_ids, usernames, amounts): (Vec<_>, Vec<_>, Vec<_>) = entries
                 .iter()
                 .map(|(u, n, a)| (u.as_str(), n.as_str(), *a))
-                .fold((Vec::new(), Vec::new(), Vec::new()), |mut acc, (u, n, a)| {
-                    acc.0.push(u);
-                    acc.1.push(n);
-                    acc.2.push(a);
-                    acc
-                });
+                .fold(
+                    (Vec::new(), Vec::new(), Vec::new()),
+                    |mut acc, (u, n, a)| {
+                        acc.0.push(u);
+                        acc.1.push(n);
+                        acc.2.push(a);
+                        acc
+                    },
+                );
             sqlx::query(
                 r#"INSERT INTO coude_cashbox_redistribution_entries
                      (redistribution_id, user_id, username, amount_won)

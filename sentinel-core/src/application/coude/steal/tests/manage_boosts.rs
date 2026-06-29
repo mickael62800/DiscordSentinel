@@ -11,13 +11,25 @@ struct MockRepo {
 
 #[async_trait]
 impl StealBoostRepository for MockRepo {
-    async fn list_active(&self, _guild_id: &str, _user_id: &str) -> Result<Vec<StealBoost>, DomainError> {
+    async fn list_active(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<Vec<StealBoost>, DomainError> {
         Ok(self.actives.clone())
     }
-    async fn upsert(&self, _guild_id: &str, _user_id: &str, _item_key: &str, days_to_add: i64) -> Result<DateTime<Utc>, DomainError> {
+    async fn upsert(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _item_key: &str,
+        days_to_add: i64,
+    ) -> Result<DateTime<Utc>, DomainError> {
         Ok(Utc::now() + ChronoDuration::days(days_to_add))
     }
-    async fn purge_expired(&self) -> Result<u64, DomainError> { Ok(0) }
+    async fn purge_expired(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 fn mk_boost(item_key: &str) -> StealBoost {
@@ -34,9 +46,15 @@ fn mk_boost(item_key: &str) -> StealBoost {
 #[tokio::test]
 async fn price_for_known_item_uses_grid() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let p = svc.price_for("crochet", StealBoostDuration::OneDay).await.unwrap();
+    let p = svc
+        .price_for("crochet", StealBoostDuration::OneDay)
+        .await
+        .unwrap();
     assert_eq!(p, 60);
-    let p = svc.price_for("marteau", StealBoostDuration::SevenDays).await.unwrap();
+    let p = svc
+        .price_for("marteau", StealBoostDuration::SevenDays)
+        .await
+        .unwrap();
     assert_eq!(p, 2800);
 }
 
@@ -61,8 +79,14 @@ struct MockBotConfigRepo {
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfigRepo {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
-    async fn get_config(&self, _guild_id: &str, _bot_name: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(
+        &self,
+        _guild_id: &str,
+        _bot_name: &str,
+    ) -> Result<Vec<BotGuildConfig>, DomainError> {
         let mut out = Vec::new();
         if let Some(cap) = self.cap {
             out.push(BotGuildConfig {
@@ -76,9 +100,26 @@ impl BotConfigRepository for MockBotConfigRepo {
         }
         Ok(out)
     }
-    async fn get_all_config(&self, _guild_id: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _guild_id: &str, _bot_name: &str, _key: &str, _value: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _guild_id: &str, _bot_name: &str, _key: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all_config(&self, _guild_id: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(
+        &self,
+        _guild_id: &str,
+        _bot_name: &str,
+        _key: &str,
+        _value: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(
+        &self,
+        _guild_id: &str,
+        _bot_name: &str,
+        _key: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[tokio::test]
@@ -87,7 +128,10 @@ async fn subscribe_refuse_quand_cap_atteint() {
         actives: vec![mk_boost("crochet"), mk_boost("marteau")],
     }))
     .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("2") }));
-    let err = svc.subscribe("g", "u", "fumigene", StealBoostDuration::OneDay).await.unwrap_err();
+    let err = svc
+        .subscribe("g", "u", "fumigene", StealBoostDuration::OneDay)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
@@ -97,7 +141,9 @@ async fn subscribe_autorise_re_souscription_meme_au_cap() {
         actives: vec![mk_boost("crochet"), mk_boost("marteau")],
     }))
     .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("2") }));
-    let res = svc.subscribe("g", "u", "crochet", StealBoostDuration::OneDay).await;
+    let res = svc
+        .subscribe("g", "u", "crochet", StealBoostDuration::OneDay)
+        .await;
     assert!(res.is_ok());
 }
 
@@ -105,12 +151,16 @@ async fn subscribe_autorise_re_souscription_meme_au_cap() {
 async fn subscribe_cap_zero_ne_bloque_jamais() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
         actives: vec![
-            mk_boost("crochet"), mk_boost("marteau"),
-            mk_boost("fumigene"), mk_boost("passe_partout"),
+            mk_boost("crochet"),
+            mk_boost("marteau"),
+            mk_boost("fumigene"),
+            mk_boost("passe_partout"),
         ],
     }))
     .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("0") }));
-    let res = svc.subscribe("g", "u", "deguisement", StealBoostDuration::OneDay).await;
+    let res = svc
+        .subscribe("g", "u", "deguisement", StealBoostDuration::OneDay)
+        .await;
     assert!(res.is_ok());
 }
 
@@ -119,7 +169,9 @@ async fn subscribe_sans_config_repo_applique_default_3() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
         actives: vec![mk_boost("marteau"), mk_boost("fumigene")],
     }));
-    let res = svc.subscribe("g", "u", "crochet", StealBoostDuration::OneDay).await;
+    let res = svc
+        .subscribe("g", "u", "crochet", StealBoostDuration::OneDay)
+        .await;
     assert!(res.is_ok());
 }
 
@@ -136,21 +188,31 @@ async fn list_active_passes_through() {
 #[tokio::test]
 async fn price_for_unknown_item_returns_validation_error() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let err = svc.price_for("wibble", StealBoostDuration::OneDay).await.unwrap_err();
+    let err = svc
+        .price_for("wibble", StealBoostDuration::OneDay)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
 async fn subscribe_unknown_item_returns_validation_error() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
-    let err = svc.subscribe("g", "u", "wibble", StealBoostDuration::OneDay).await.unwrap_err();
+    let err = svc
+        .subscribe("g", "u", "wibble", StealBoostDuration::OneDay)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
 async fn price_for_all_durations_returns_positive() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
-    for d in [StealBoostDuration::OneDay, StealBoostDuration::ThreeDays, StealBoostDuration::SevenDays] {
+    for d in [
+        StealBoostDuration::OneDay,
+        StealBoostDuration::ThreeDays,
+        StealBoostDuration::SevenDays,
+    ] {
         let p = svc.price_for("crochet", d).await.unwrap();
         assert!(p > 0);
     }
@@ -162,8 +224,12 @@ async fn subscribe_cap_config_invalid_fallback_to_default() {
     let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
         actives: vec![mk_boost("crochet"), mk_boost("marteau")],
     }))
-    .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("not_a_number") }));
+    .with_bot_config_repo(Arc::new(MockBotConfigRepo {
+        cap: Some("not_a_number"),
+    }));
     // Default 3 : 2 actifs, ajout OK.
-    let res = svc.subscribe("g", "u", "fumigene", StealBoostDuration::OneDay).await;
+    let res = svc
+        .subscribe("g", "u", "fumigene", StealBoostDuration::OneDay)
+        .await;
     assert!(res.is_ok());
 }

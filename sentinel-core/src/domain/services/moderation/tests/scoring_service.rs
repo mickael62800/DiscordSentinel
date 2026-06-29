@@ -4,7 +4,12 @@ use chrono::Utc;
 use uuid::Uuid;
 
 fn make_flags(spam: bool, insult: bool, link: bool) -> DetectionFlags {
-    DetectionFlags { spam, insult, link, phishing: false }
+    DetectionFlags {
+        spam,
+        insult,
+        link,
+        phishing: false,
+    }
 }
 
 fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
@@ -85,7 +90,12 @@ fn test_disabled_rule_uses_default() {
 
 #[test]
 fn test_phishing_default_triggers_mute() {
-    let flags = DetectionFlags { spam: false, insult: false, link: false, phishing: true };
+    let flags = DetectionFlags {
+        spam: false,
+        insult: false,
+        link: false,
+        phishing: true,
+    };
     let result = ScoringService::score(&flags, &[]);
     assert_eq!(result.action, Action::Mute);
     assert_eq!(result.score, 7.0);
@@ -93,7 +103,12 @@ fn test_phishing_default_triggers_mute() {
 
 #[test]
 fn test_phishing_plus_spam_triggers_ban() {
-    let flags = DetectionFlags { spam: true, insult: false, link: false, phishing: true };
+    let flags = DetectionFlags {
+        spam: true,
+        insult: false,
+        link: false,
+        phishing: true,
+    };
     let result = ScoringService::score(&flags, &[]);
     assert_eq!(result.action, Action::Ban);
     assert_eq!(result.score, 10.0);
@@ -139,7 +154,9 @@ fn test_harassment_default_weight() {
 #[test]
 fn test_custom_nsfw_rule_overrides_weight() {
     let rules = [make_rule(FlagType::Nsfw, 4.0)];
-    let rule = rules.iter().find(|r| r.flag_type == FlagType::Nsfw && r.enabled);
+    let rule = rules
+        .iter()
+        .find(|r| r.flag_type == FlagType::Nsfw && r.enabled);
     assert_eq!(rule.unwrap().weight, 4.0);
 }
 

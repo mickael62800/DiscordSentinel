@@ -24,9 +24,7 @@ pub fn validate_config_key(key: &str) -> Result<(), String> {
         return Err("config_key doit commencer par une lettre majuscule".into());
     }
     if !chars.all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_') {
-        return Err(
-            "config_key invalide : majuscules, chiffres et underscores uniquement".into(),
-        );
+        return Err("config_key invalide : majuscules, chiffres et underscores uniquement".into());
     }
     Ok(())
 }

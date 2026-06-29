@@ -1,6 +1,6 @@
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::enums::moderation::flag_type::FlagType;
 /// Poids par défaut quand aucune règle n'est configurée pour un flag.
 const DEFAULT_WEIGHT_SPAM: f64 = 3.0;
@@ -49,7 +49,11 @@ impl ScoringService {
     }
 
     /// Version paramétrique avec durée de mute configurable.
-    pub fn score_with_mute_duration(flags: &DetectionFlags, rules: &[Rule], mute_duration: u64) -> ScoringResult {
+    pub fn score_with_mute_duration(
+        flags: &DetectionFlags,
+        rules: &[Rule],
+        mute_duration: u64,
+    ) -> ScoringResult {
         let active = flags.active_flags();
 
         if active.is_empty() {
@@ -135,14 +139,25 @@ pub fn resolve_thresholds(rules: &[Rule]) -> (f64, f64, f64, f64) {
         );
     }
 
-    let warn = enabled.iter().map(|r| r.threshold_warn).fold(f64::MAX, f64::min);
-    let delete = enabled.iter().map(|r| r.threshold_delete).fold(f64::MAX, f64::min);
-    let mute = enabled.iter().map(|r| r.threshold_mute).fold(f64::MAX, f64::min);
-    let ban = enabled.iter().map(|r| r.threshold_ban).fold(f64::MAX, f64::min);
+    let warn = enabled
+        .iter()
+        .map(|r| r.threshold_warn)
+        .fold(f64::MAX, f64::min);
+    let delete = enabled
+        .iter()
+        .map(|r| r.threshold_delete)
+        .fold(f64::MAX, f64::min);
+    let mute = enabled
+        .iter()
+        .map(|r| r.threshold_mute)
+        .fold(f64::MAX, f64::min);
+    let ban = enabled
+        .iter()
+        .map(|r| r.threshold_ban)
+        .fold(f64::MAX, f64::min);
 
     (warn, delete, mute, ban)
 }
-
 
 #[cfg(test)]
 #[path = "tests/scoring_service.rs"]

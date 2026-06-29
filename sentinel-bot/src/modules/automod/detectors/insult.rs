@@ -67,7 +67,10 @@ pub fn detect(content: &str, custom_words: &[String]) -> bool {
     // Mots personnalisés (case-insensitive, substring match)
     if !custom_words.is_empty() {
         let content_lower = content.to_lowercase();
-        if custom_words.iter().any(|w| content_lower.contains(w.as_str())) {
+        if custom_words
+            .iter()
+            .any(|w| content_lower.contains(w.as_str()))
+        {
             return true;
         }
     }
@@ -82,92 +85,170 @@ mod tests {
     // ── Insultes francaises ──
 
     #[test]
-    fn fr_connard() { assert!(detect("t'es un connard", &[])); }
+    fn fr_connard() {
+        assert!(detect("t'es un connard", &[]));
+    }
     #[test]
-    fn fr_connasse() { assert!(detect("quelle connasse", &[])); }
+    fn fr_connasse() {
+        assert!(detect("quelle connasse", &[]));
+    }
     #[test]
-    fn fr_con_seul() { assert!(detect("espece de con", &[])); }
+    fn fr_con_seul() {
+        assert!(detect("espece de con", &[]));
+    }
     #[test]
-    fn fr_putain() { assert!(detect("putain de merde", &[])); }
+    fn fr_putain() {
+        assert!(detect("putain de merde", &[]));
+    }
     #[test]
-    fn fr_merde() { assert!(detect("c'est de la merde", &[])); }
+    fn fr_merde() {
+        assert!(detect("c'est de la merde", &[]));
+    }
     #[test]
-    fn fr_encule() { assert!(detect("va te faire enculé", &[])); }
+    fn fr_encule() {
+        assert!(detect("va te faire enculé", &[]));
+    }
     #[test]
-    fn fr_fdp() { assert!(detect("fdp va", &[])); }
+    fn fr_fdp() {
+        assert!(detect("fdp va", &[]));
+    }
     #[test]
-    fn fr_ntm() { assert!(detect("ntm grave", &[])); }
+    fn fr_ntm() {
+        assert!(detect("ntm grave", &[]));
+    }
     #[test]
-    fn fr_nique() { assert!(detect("je te nique", &[])); }
+    fn fr_nique() {
+        assert!(detect("je te nique", &[]));
+    }
     #[test]
-    fn fr_batard() { assert!(detect("sale bâtard", &[])); }
+    fn fr_batard() {
+        assert!(detect("sale bâtard", &[]));
+    }
     #[test]
-    fn fr_pd() { assert!(detect("espece de pd", &[])); }
+    fn fr_pd() {
+        assert!(detect("espece de pd", &[]));
+    }
     #[test]
-    fn fr_salope() { assert!(detect("quelle salope", &[])); }
+    fn fr_salope() {
+        assert!(detect("quelle salope", &[]));
+    }
     #[test]
-    fn fr_salopard() { assert!(detect("quel salopard", &[])); }
+    fn fr_salopard() {
+        assert!(detect("quel salopard", &[]));
+    }
     #[test]
-    fn fr_bordel() { assert!(detect("bordel de merde", &[])); }
+    fn fr_bordel() {
+        assert!(detect("bordel de merde", &[]));
+    }
     #[test]
-    fn fr_ta_gueule() { assert!(detect("ta gueule", &[])); }
+    fn fr_ta_gueule() {
+        assert!(detect("ta gueule", &[]));
+    }
     #[test]
-    fn fr_ferme_la() { assert!(detect("ferme-la", &[])); }
+    fn fr_ferme_la() {
+        assert!(detect("ferme-la", &[]));
+    }
     #[test]
-    fn fr_degage() { assert!(detect("dégage d'ici", &[])); }
+    fn fr_degage() {
+        assert!(detect("dégage d'ici", &[]));
+    }
 
     // ── Insultes anglaises ──
 
     #[test]
-    fn en_fuck() { assert!(detect("fuck you", &[])); }
+    fn en_fuck() {
+        assert!(detect("fuck you", &[]));
+    }
     #[test]
-    fn en_fucking() { assert!(detect("that's fucking stupid", &[])); }
+    fn en_fucking() {
+        assert!(detect("that's fucking stupid", &[]));
+    }
     #[test]
-    fn en_shit() { assert!(detect("this is shit", &[])); }
+    fn en_shit() {
+        assert!(detect("this is shit", &[]));
+    }
     #[test]
-    fn en_bitch() { assert!(detect("you bitch", &[])); }
+    fn en_bitch() {
+        assert!(detect("you bitch", &[]));
+    }
     #[test]
-    fn en_asshole() { assert!(detect("you're an asshole", &[])); }
+    fn en_asshole() {
+        assert!(detect("you're an asshole", &[]));
+    }
     #[test]
-    fn en_stfu() { assert!(detect("stfu noob", &[])); }
+    fn en_stfu() {
+        assert!(detect("stfu noob", &[]));
+    }
     #[test]
-    fn en_retard() { assert!(detect("you retard", &[])); }
+    fn en_retard() {
+        assert!(detect("you retard", &[]));
+    }
     #[test]
-    fn en_dumbass() { assert!(detect("what a dumbass", &[])); }
+    fn en_dumbass() {
+        assert!(detect("what a dumbass", &[]));
+    }
     #[test]
-    fn en_cunt() { assert!(detect("stupid cunt", &[])); }
+    fn en_cunt() {
+        assert!(detect("stupid cunt", &[]));
+    }
 
     // ── Case insensitive ──
 
     #[test]
-    fn case_insensitive_upper() { assert!(detect("CONNARD", &[])); }
+    fn case_insensitive_upper() {
+        assert!(detect("CONNARD", &[]));
+    }
     #[test]
-    fn case_insensitive_mixed() { assert!(detect("FdP", &[])); }
+    fn case_insensitive_mixed() {
+        assert!(detect("FdP", &[]));
+    }
     #[test]
-    fn case_insensitive_en() { assert!(detect("FUCK OFF", &[])); }
+    fn case_insensitive_en() {
+        assert!(detect("FUCK OFF", &[]));
+    }
 
     // ── Leet speak ──
 
     #[test]
-    fn leet_connard_0() { assert!(detect("c0nnard", &[])); }
+    fn leet_connard_0() {
+        assert!(detect("c0nnard", &[]));
+    }
     #[test]
-    fn leet_connard_mixed() { assert!(detect("c0nn4rd", &[])); }
+    fn leet_connard_mixed() {
+        assert!(detect("c0nn4rd", &[]));
+    }
     #[test]
-    fn leet_fuck_star() { assert!(detect("f*ck you", &[])); }
+    fn leet_fuck_star() {
+        assert!(detect("f*ck you", &[]));
+    }
     #[test]
-    fn leet_fuck_star_full() { assert!(detect("f*cking idiot", &[])); }
+    fn leet_fuck_star_full() {
+        assert!(detect("f*cking idiot", &[]));
+    }
     #[test]
-    fn leet_shit_dollar() { assert!(detect("$hit", &[])); }
+    fn leet_shit_dollar() {
+        assert!(detect("$hit", &[]));
+    }
     #[test]
-    fn leet_asshole_at() { assert!(detect("@sshole", &[])); }
+    fn leet_asshole_at() {
+        assert!(detect("@sshole", &[]));
+    }
     #[test]
-    fn leet_bastard_4() { assert!(detect("b4stard", &[])); }
+    fn leet_bastard_4() {
+        assert!(detect("b4stard", &[]));
+    }
     #[test]
-    fn leet_merde_3() { assert!(detect("m3rde", &[])); }
+    fn leet_merde_3() {
+        assert!(detect("m3rde", &[]));
+    }
     #[test]
-    fn leet_putain_4() { assert!(detect("put4in", &[])); }
+    fn leet_putain_4() {
+        assert!(detect("put4in", &[]));
+    }
     #[test]
-    fn leet_encule_3() { assert!(detect("encul3", &[])); }
+    fn leet_encule_3() {
+        assert!(detect("encul3", &[]));
+    }
 
     // ── Mots personnalisés ──
 
@@ -200,23 +281,41 @@ mod tests {
     // ── Faux positifs a eviter ──
 
     #[test]
-    fn clean_french() { assert!(!detect("Salut tout le monde !", &[])); }
+    fn clean_french() {
+        assert!(!detect("Salut tout le monde !", &[]));
+    }
     #[test]
-    fn clean_english() { assert!(!detect("Hello how are you?", &[])); }
+    fn clean_english() {
+        assert!(!detect("Hello how are you?", &[]));
+    }
     #[test]
-    fn clean_discussion() { assert!(!detect("On se retrouve a 20h pour la game", &[])); }
+    fn clean_discussion() {
+        assert!(!detect("On se retrouve a 20h pour la game", &[]));
+    }
     #[test]
-    fn clean_connaitre() { assert!(!detect("Je vais te faire connaitre ce jeu", &[])); }
+    fn clean_connaitre() {
+        assert!(!detect("Je vais te faire connaitre ce jeu", &[]));
+    }
     #[test]
-    fn clean_discourse() { assert!(!detect("C'est un discours interessant", &[])); }
+    fn clean_discourse() {
+        assert!(!detect("C'est un discours interessant", &[]));
+    }
     #[test]
-    fn clean_context_shift() { assert!(!detect("Le concert etait super", &[])); }
+    fn clean_context_shift() {
+        assert!(!detect("Le concert etait super", &[]));
+    }
     #[test]
-    fn clean_number() { assert!(!detect("1234567890", &[])); }
+    fn clean_number() {
+        assert!(!detect("1234567890", &[]));
+    }
     #[test]
-    fn clean_emoji() { assert!(!detect("Haha super game", &[])); }
+    fn clean_emoji() {
+        assert!(!detect("Haha super game", &[]));
+    }
     #[test]
-    fn clean_empty() { assert!(!detect("", &[])); }
+    fn clean_empty() {
+        assert!(!detect("", &[]));
+    }
 
     // ── normalize_leet unitaire ──
 
@@ -245,9 +344,13 @@ mod tests {
         assert_eq!(normalize_leet("c.o.n.n.a.r.d"), "connard");
     }
     #[test]
-    fn leet_bitch_excl() { assert!(detect("b!tch", &[])); }
+    fn leet_bitch_excl() {
+        assert!(detect("b!tch", &[]));
+    }
     #[test]
-    fn leet_separated_dots() { assert!(detect("c.o.n.n.a.r.d", &[])); }
+    fn leet_separated_dots() {
+        assert!(detect("c.o.n.n.a.r.d", &[]));
+    }
     #[test]
     fn normalize_clean_unchanged() {
         assert_eq!(normalize_leet("hello"), "hello");

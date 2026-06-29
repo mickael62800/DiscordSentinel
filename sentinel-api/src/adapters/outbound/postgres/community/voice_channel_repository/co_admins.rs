@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
 
 #[derive(sqlx::FromRow)]
 struct CoAdminRow {
@@ -29,7 +29,10 @@ impl From<CoAdminRow> for VoiceChannelCoAdmin {
 
 #[async_trait]
 impl VoiceCoAdminStore for super::PgVoiceChannelRepository {
-    async fn find_co_admins(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelCoAdmin>, DomainError> {
+    async fn find_co_admins(
+        &self,
+        voice_channel_id: Uuid,
+    ) -> Result<Vec<VoiceChannelCoAdmin>, DomainError> {
         let rows = sqlx::query_as::<_, CoAdminRow>(
             "SELECT * FROM voice_channel_co_admins WHERE voice_channel_id = $1 ORDER BY granted_at ASC",
         )
@@ -61,13 +64,19 @@ impl VoiceCoAdminStore for super::PgVoiceChannelRepository {
         Ok(())
     }
 
-    async fn remove_co_admin(&self, voice_channel_id: Uuid, user_id: &str) -> Result<(), DomainError> {
-        sqlx::query("DELETE FROM voice_channel_co_admins WHERE voice_channel_id = $1 AND user_id = $2")
-            .bind(voice_channel_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+    async fn remove_co_admin(
+        &self,
+        voice_channel_id: Uuid,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM voice_channel_co_admins WHERE voice_channel_id = $1 AND user_id = $2",
+        )
+        .bind(voice_channel_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
         Ok(())
     }

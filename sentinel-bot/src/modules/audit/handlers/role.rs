@@ -4,17 +4,26 @@ use serenity::prelude::*;
 
 use super::audit_event;
 use super::permission_diff;
-use super::{AnomalyDetectorKey, WeeklyTrackerKey};
-use super::{send_event, log, post_to_channel};
 use super::weekly_report::StatField;
+use super::{log, post_to_channel, send_event};
+use super::{AnomalyDetectorKey, WeeklyTrackerKey};
 
 pub async fn handle_create(ctx: &Context, new: &Role) {
     let gid = new.guild_id;
     let gid_str = gid.to_string();
 
-    log(ctx, "info", &gid_str, &format!(
-        "Role cree : @{} (couleur: #{:06x}, permissions: {})", new.name, new.colour.0, new.permissions.bits()
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid_str,
+        &format!(
+            "Role cree : @{} (couleur: #{:06x}, permissions: {})",
+            new.name,
+            new.colour.0,
+            new.permissions.bits()
+        ),
+    )
+    .await;
 
     send_event(
         ctx,
@@ -48,14 +57,17 @@ pub async fn handle_delete(
         .map(|r| r.name.clone())
         .unwrap_or_else(|| removed_role_id.to_string());
 
-    log(ctx, "warn", &gid_str, &format!(
-        "Role supprime : @{}", role_name
-    )).await;
+    log(
+        ctx,
+        "warn",
+        &gid_str,
+        &format!("Role supprime : @{}", role_name),
+    )
+    .await;
 
     send_event(
         ctx,
-        audit_event::simple(gid_str, "role_delete")
-            .with_target(removed_role_id, &role_name),
+        audit_event::simple(gid_str, "role_delete").with_target(removed_role_id, &role_name),
     )
     .await;
 
@@ -77,7 +89,10 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
             changes.push(format!("nom: {} -> {}", old_role.name, new.name));
         }
         if old_role.colour != new.colour {
-            changes.push(format!("couleur: #{:06x} -> #{:06x}", old_role.colour.0, new.colour.0));
+            changes.push(format!(
+                "couleur: #{:06x} -> #{:06x}",
+                old_role.colour.0, new.colour.0
+            ));
         }
         if old_role.permissions != new.permissions {
             let diff = permission_diff::diff_permissions(old_role.permissions, new.permissions);
@@ -85,10 +100,16 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
             changes.push(format!("permissions:\n{}", perm_diff_text));
         }
         if old_role.hoist != new.hoist {
-            changes.push(format!("affiche separement: {} -> {}", old_role.hoist, new.hoist));
+            changes.push(format!(
+                "affiche separement: {} -> {}",
+                old_role.hoist, new.hoist
+            ));
         }
         if old_role.mentionable != new.mentionable {
-            changes.push(format!("mentionnable: {} -> {}", old_role.mentionable, new.mentionable));
+            changes.push(format!(
+                "mentionnable: {} -> {}",
+                old_role.mentionable, new.mentionable
+            ));
         }
     }
 
@@ -96,9 +117,13 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
         return;
     }
 
-    log(ctx, "info", &gid_str, &format!(
-        "Role modifie : @{} -- {}", new.name, changes.join(", ")
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid_str,
+        &format!("Role modifie : @{} -- {}", new.name, changes.join(", ")),
+    )
+    .await;
 
     let mut details = serde_json::json!({
         "changes": changes,
@@ -128,40 +153,54 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
 
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
-            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
-        ).await { return; }
+            ctx,
+            &gid_str,
+            "audit-bot",
+            "anomaly_enabled",
+            true,
+        )
+        .await
+        {
+            return;
+        }
 
         log(
             ctx,
             "error",
             &gid_str,
-            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-        ).await;
+            &format!(
+                "ANOMALIE : {} ({} en {}s)",
+                alert.anomaly_type, alert.count, alert.window_secs
+            ),
+        )
+        .await;
 
         // Embed Discord -> anomaly_channel_id (URGENT)
-        let anomaly_embed = crate::shared::embeds::critical_embed(format!(
-            "ANOMALIE -- {}",
-            alert.anomaly_type
-        ))
-        .field("Count", alert.count.to_string(), true)
-        .field("Fenetre", format!("{}s", alert.window_secs), true)
-        .description(format!(
-            "Un pattern anormal de **{}** a ete detecte.\nDernier role : **@{}**",
-            alert.anomaly_type, new.name
-        ))
-        .timestamp(serenity::model::Timestamp::now())
-        .footer(serenity::builder::CreateEmbedFooter::new("Audit | Sentinel -- Urgence"));
+        let anomaly_embed =
+            crate::shared::embeds::critical_embed(format!("ANOMALIE -- {}", alert.anomaly_type))
+                .field("Count", alert.count.to_string(), true)
+                .field("Fenetre", format!("{}s", alert.window_secs), true)
+                .description(format!(
+                    "Un pattern anormal de **{}** a ete detecte.\nDernier role : **@{}**",
+                    alert.anomaly_type, new.name
+                ))
+                .timestamp(serenity::model::Timestamp::now())
+                .footer(serenity::builder::CreateEmbedFooter::new(
+                    "Audit | Sentinel -- Urgence",
+                ));
         post_to_channel(ctx, &gid_str, &["anomaly_channel_id"], anomaly_embed).await;
 
         send_event(
             ctx,
-            audit_event::simple(gid_str.clone(), "anomaly_detected")
-                .with_details(serde_json::json!({
+            audit_event::simple(gid_str.clone(), "anomaly_detected").with_details(
+                serde_json::json!({
                     "anomaly_type": alert.anomaly_type,
                     "count": alert.count,
                     "window_secs": alert.window_secs,
-                })),
-        ).await;
+                }),
+            ),
+        )
+        .await;
 
         let data = ctx.data.read().await;
         if let Some(tracker) = data.get::<WeeklyTrackerKey>() {

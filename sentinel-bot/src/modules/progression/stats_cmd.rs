@@ -1,7 +1,6 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateCommandOption, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::error;
 
@@ -17,13 +16,11 @@ pub fn register() -> CreateCommand {
                 "user",
                 "Statistiques d'un utilisateur",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::User,
-                    "target",
-                    "Utilisateur cible (par défaut : vous)",
-                ),
-            ),
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::User,
+                "target",
+                "Utilisateur cible (par défaut : vous)",
+            )),
         )
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
@@ -64,13 +61,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// /stats user [target]
-async fn handle_user(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+async fn handle_user(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => return reply_text(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await,
+        None => {
+            return reply_text(
+                ctx,
+                command,
+                "Cette commande ne fonctionne que dans un serveur.",
+            )
+            .await
+        }
     };
 
     let sub_options = match &command.data.options[0].value {
@@ -87,7 +88,10 @@ async fn handle_user(
         })
         .unwrap_or(command.user.id);
 
-    let target_user = target_id.to_user(&ctx.http).await.unwrap_or(command.user.clone());
+    let target_user = target_id
+        .to_user(&ctx.http)
+        .await
+        .unwrap_or(command.user.clone());
 
     let data = ctx.data.read().await;
     let api = match data.get::<StatsApiKey>() {
@@ -118,10 +122,22 @@ async fn handle_user(
         .filter(|i| i.user_id == user_id_str)
         .collect();
 
-    let warn_count = user_infractions.iter().filter(|i| i.action == "warn").count();
-    let delete_count = user_infractions.iter().filter(|i| i.action == "delete").count();
-    let mute_count = user_infractions.iter().filter(|i| i.action == "mute").count();
-    let ban_count = user_infractions.iter().filter(|i| i.action == "ban").count();
+    let warn_count = user_infractions
+        .iter()
+        .filter(|i| i.action == "warn")
+        .count();
+    let delete_count = user_infractions
+        .iter()
+        .filter(|i| i.action == "delete")
+        .count();
+    let mute_count = user_infractions
+        .iter()
+        .filter(|i| i.action == "mute")
+        .count();
+    let ban_count = user_infractions
+        .iter()
+        .filter(|i| i.action == "ban")
+        .count();
 
     let hours = voice_seconds / 3600;
     let minutes = (voice_seconds % 3600) / 60;
@@ -131,13 +147,21 @@ async fn handle_user(
         .thumbnail(target_user.face())
         .color(0x5865F2)
         .field("Messages envoyés", format!("{message_count}"), true)
-        .field("Temps en vocal", format!("{}h {:02}min", hours, minutes), true)
+        .field(
+            "Temps en vocal",
+            format!("{}h {:02}min", hours, minutes),
+            true,
+        )
         .field("\u{200b}", "\u{200b}", true)
         .field("Avertissements", format!("{warn_count}"), true)
         .field("Messages supprimés", format!("{delete_count}"), true)
         .field("Mutes", format!("{mute_count}"), true)
         .field("Bans", format!("{ban_count}"), true)
-        .field("Total infractions", format!("{}", user_infractions.len()), true)
+        .field(
+            "Total infractions",
+            format!("{}", user_infractions.len()),
+            true,
+        )
         .footer(serenity::builder::CreateEmbedFooter::new(
             "Données persistées via l'API Sentinel",
         ));
@@ -146,13 +170,17 @@ async fn handle_user(
 }
 
 /// /stats server
-async fn handle_server(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+async fn handle_server(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => return reply_text(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await,
+        None => {
+            return reply_text(
+                ctx,
+                command,
+                "Cette commande ne fonctionne que dans un serveur.",
+            )
+            .await
+        }
     };
 
     let data = ctx.data.read().await;
@@ -165,7 +193,12 @@ async fn handle_server(
         Ok(o) => o,
         Err(e) => {
             error!(error = %e, "Erreur récupération overview");
-            return reply_text(ctx, command, "Impossible de récupérer les statistiques du serveur.").await;
+            return reply_text(
+                ctx,
+                command,
+                "Impossible de récupérer les statistiques du serveur.",
+            )
+            .await;
         }
     };
 
@@ -181,13 +214,29 @@ async fn handle_server(
     let embed = CreateEmbed::new()
         .title(format!("Statistiques de {guild_name}"))
         .color(0x57F287)
-        .field("Messages totaux", format!("{}", overview.total_messages), true)
-        .field("Temps vocal total", format!("{}h {:02}min", hours, minutes), true)
-        .field("Membres actifs", format!("{}", overview.active_members), true)
+        .field(
+            "Messages totaux",
+            format!("{}", overview.total_messages),
+            true,
+        )
+        .field(
+            "Temps vocal total",
+            format!("{}h {:02}min", hours, minutes),
+            true,
+        )
+        .field(
+            "Membres actifs",
+            format!("{}", overview.active_members),
+            true,
+        )
         .field("Avertissements", format!("{}", overview.total_warns), true)
         .field("Mutes", format!("{}", overview.total_mutes), true)
         .field("Bans", format!("{}", overview.total_bans), true)
-        .field("Total infractions", format!("{}", overview.total_infractions), true)
+        .field(
+            "Total infractions",
+            format!("{}", overview.total_infractions),
+            true,
+        )
         .footer(serenity::builder::CreateEmbedFooter::new(
             "Données persistées via l'API Sentinel",
         ));
@@ -196,13 +245,17 @@ async fn handle_server(
 }
 
 /// /stats top [limit]
-async fn handle_top(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Result<(), serenity::Error> {
+async fn handle_top(ctx: &Context, command: &CommandInteraction) -> Result<(), serenity::Error> {
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => return reply_text(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await,
+        None => {
+            return reply_text(
+                ctx,
+                command,
+                "Cette commande ne fonctionne que dans un serveur.",
+            )
+            .await
+        }
     };
 
     let sub_options = match &command.data.options[0].value {
@@ -234,7 +287,12 @@ async fn handle_top(
     };
 
     if leaderboard.is_empty() {
-        return reply_text(ctx, command, "Aucune statistique disponible pour le moment.").await;
+        return reply_text(
+            ctx,
+            command,
+            "Aucune statistique disponible pour le moment.",
+        )
+        .await;
     }
 
     let mut description = String::new();

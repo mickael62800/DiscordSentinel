@@ -9,8 +9,7 @@ use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait ManageSecurityAuditUseCase: Send + Sync {
-    async fn audit_logs(&self, filter: AuditLogFilter)
-        -> Result<Vec<AuditLogEntry>, DomainError>;
+    async fn audit_logs(&self, filter: AuditLogFilter) -> Result<Vec<AuditLogEntry>, DomainError>;
 
     async fn recent_logins(&self, limit: i64) -> Result<Vec<SuccessfulLogin>, DomainError>;
 

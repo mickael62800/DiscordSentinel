@@ -16,7 +16,6 @@ pub mod sla;
 pub mod templates;
 pub mod transcript;
 
-
 use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand, ModalInteraction,
 };
@@ -216,14 +215,18 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                 info!(ticket_id = %ticket_id, first_response = %formatted, "SLA premiere reponse enregistree");
 
                 let now = chrono::Utc::now().to_rfc3339();
-                api.update_ticket_sla(&ticket_id, Some(&now), None, None).await;
+                api.update_ticket_sla(&ticket_id, Some(&now), None, None)
+                    .await;
 
                 if let Some(base) = data.get::<ApiClientKey>() {
-                    base.publish_event("ticket_sla_updated", serde_json::json!({
-                        "ticket_id": ticket_id,
-                        "first_response_at": now,
-                        "first_response_duration": formatted,
-                    }));
+                    base.publish_event(
+                        "ticket_sla_updated",
+                        serde_json::json!({
+                            "ticket_id": ticket_id,
+                            "first_response_at": now,
+                            "first_response_duration": formatted,
+                        }),
+                    );
                 }
             }
         }
@@ -278,7 +281,10 @@ async fn deploy_panel_if_needed(ctx: &Context) {
     } else if let Some(base) = data.get::<ApiClientKey>() {
         let mut ids = Vec::new();
         for guild in ctx.cache.guilds() {
-            let guild_config = match base.get_guild_config_for(&guild.to_string(), MODULE_BOT_NAME).await {
+            let guild_config = match base
+                .get_guild_config_for(&guild.to_string(), MODULE_BOT_NAME)
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     warn!(error = %e, guild_id = %guild, "Echec chargement config guild");
@@ -306,7 +312,10 @@ async fn deploy_panel_if_needed(ctx: &Context) {
     for ch_id in channel_ids {
         let channel_id = ChannelId::new(ch_id);
 
-        if let Ok(messages) = channel_id.messages(&ctx.http, serenity::all::GetMessages::new().limit(20)).await {
+        if let Ok(messages) = channel_id
+            .messages(&ctx.http, serenity::all::GetMessages::new().limit(20))
+            .await
+        {
             for msg in &messages {
                 if msg.author.id == bot_id
                     && !msg.components.is_empty()
@@ -319,9 +328,14 @@ async fn deploy_panel_if_needed(ctx: &Context) {
             }
         }
 
-        match channel_id.send_message(&ctx.http, ticket::build_panel_message()).await {
+        match channel_id
+            .send_message(&ctx.http, ticket::build_panel_message())
+            .await
+        {
             Ok(_) => info!(channel_id = %ch_id, "Panel de tickets deploye"),
-            Err(e) => error!(error = %e, channel_id = %ch_id, "Impossible de deployer le panel de tickets"),
+            Err(e) => {
+                error!(error = %e, channel_id = %ch_id, "Impossible de deployer le panel de tickets")
+            }
         }
     }
 }
@@ -330,8 +344,10 @@ async fn deploy_panel_if_needed(ctx: &Context) {
 /// verrouiller le channel Discord (deny SendMessages au @everyone) et
 /// editer le message de bienvenue pour signaler la fermeture.
 async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
-    use serenity::all::{ChannelId, EditChannel, GetMessages, MessageId, PermissionOverwrite,
-                        PermissionOverwriteType, Permissions, RoleId};
+    use serenity::all::{
+        ChannelId, EditChannel, GetMessages, MessageId, PermissionOverwrite,
+        PermissionOverwriteType, Permissions, RoleId,
+    };
 
     // 1. Recupere le mapping discord_action_messages pour cet action_id.
     let data = ctx.data.read().await;
@@ -414,10 +430,7 @@ async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
         deny: Permissions::SEND_MESSAGES,
         kind: PermissionOverwriteType::Role(everyone_role),
     };
-    if let Err(e) = channel_id
-        .create_permission(&ctx.http, overwrite)
-        .await
-    {
+    if let Err(e) = channel_id.create_permission(&ctx.http, overwrite).await {
         warn!(error = %e, %channel_id, "Echec lock channel ticket apres close web");
     }
 
@@ -457,8 +470,14 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
     // ticket non-repondu depasse sla_first_response_minutes. Bot poste
     // un rappel dans le channel pour ping le staff.
     if event_type == "ticket_sla_warned" {
-        let channel_id_str = data.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
-        let warn_minutes = data.get("warn_minutes").and_then(|v| v.as_i64()).unwrap_or(30);
+        let channel_id_str = data
+            .get("channel_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let warn_minutes = data
+            .get("warn_minutes")
+            .and_then(|v| v.as_i64())
+            .unwrap_or(30);
         if channel_id_str.is_empty() {
             return;
         }
@@ -526,13 +545,11 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
             Err(_) => return,
         };
         let channel_id = ChannelId::new(ch_id);
-        let embed = crate::shared::embeds::neutral_embed(
-            "\u{1f550} Ticket ferme automatiquement",
-        )
-        .description(format!(
-            "Ce ticket a ete ferme apres {} jours d'inactivite.",
-            timeout_days
-        ));
+        let embed = crate::shared::embeds::neutral_embed("\u{1f550} Ticket ferme automatiquement")
+            .description(format!(
+                "Ce ticket a ete ferme apres {} jours d'inactivite.",
+                timeout_days
+            ));
         if let Err(e) = channel_id
             .send_message(
                 &ctx.http,
@@ -577,7 +594,10 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
         Some(id) => id,
         None => return,
     };
-    let author_name = data.get("author_name").and_then(|v| v.as_str()).unwrap_or("Staff");
+    let author_name = data
+        .get("author_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Staff");
 
     let bot_id = ctx.cache.current_user().id;
     for guild_id in ctx.cache.guilds() {
@@ -603,21 +623,35 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
                         if let Ok(detail) = api.get_ticket(ticket_id).await {
                             if let Some(last_msg) = detail.messages.last() {
                                 if last_msg.author_role == "moderator" {
-                                    let already_in_channel = channel.id
-                                        .messages(&ctx.http, serenity::all::GetMessages::new().limit(5))
+                                    let already_in_channel = channel
+                                        .id
+                                        .messages(
+                                            &ctx.http,
+                                            serenity::all::GetMessages::new().limit(5),
+                                        )
                                         .await
                                         .ok()
-                                        .map(|msgs| msgs.iter().any(|m| {
-                                            (!m.author.bot && m.content == last_msg.content)
-                                            || (m.author.id == bot_id && m.content.contains(&last_msg.content))
-                                        }))
+                                        .map(|msgs| {
+                                            msgs.iter().any(|m| {
+                                                (!m.author.bot && m.content == last_msg.content)
+                                                    || (m.author.id == bot_id
+                                                        && m.content.contains(&last_msg.content))
+                                            })
+                                        })
                                         .unwrap_or(false);
 
                                     if !already_in_channel {
-                                        if let Err(e) = channel.id.say(
-                                            &ctx.http,
-                                            format!("**[staff]** {} :\n> {}", author_name, last_msg.content),
-                                        ).await {
+                                        if let Err(e) = channel
+                                            .id
+                                            .say(
+                                                &ctx.http,
+                                                format!(
+                                                    "**[staff]** {} :\n> {}",
+                                                    author_name, last_msg.content
+                                                ),
+                                            )
+                                            .await
+                                        {
                                             warn!(error = %e, "Failed to relay staff message from Redis");
                                         }
                                     }

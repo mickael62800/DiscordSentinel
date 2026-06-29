@@ -50,11 +50,7 @@ pub trait EconomyRepository: Send + Sync {
 
     /// Lecture rapide du solde d'un joueur pour clamp pre-mutation
     /// (vol, penalite). Retourne `NotFound` si le wallet n'existe pas.
-    async fn get_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn get_coins(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
 
     // ── Casino ──
     //
@@ -97,11 +93,7 @@ pub trait EconomyRepository: Send + Sync {
     ) -> Result<i64, DomainError>;
 
     /// Nombre d'actions casino dans les 24h (via `coude_cooldowns`).
-    async fn count_casino_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
 
     /// Somme des gains casino positifs dans les 24h (via `coude_casino_log`).
     async fn sum_casino_gains_today(
@@ -111,9 +103,5 @@ pub trait EconomyRepository: Send + Sync {
     ) -> Result<i64, DomainError>;
 
     /// Nombre de vols effectués dans les 24h (via `coude_cooldowns`).
-    async fn count_steal_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError>;
+    async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
 }

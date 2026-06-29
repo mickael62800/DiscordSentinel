@@ -9,11 +9,11 @@ pub mod voice;
 
 // Re-exports pour les enfants de handlers/ (evite les super::super::)
 pub(super) use super::audit_event;
-pub(super) use super::weekly_report;
-pub(super) use super::watched_users;
 pub(super) use super::permission_diff;
-pub(super) use super::{WeeklyTrackerKey, MessageCacheKey, AnomalyDetectorKey};
-pub(super) use super::{send_event, log, post_to_channel};
+pub(super) use super::watched_users;
+pub(super) use super::weekly_report;
+pub(super) use super::{log, post_to_channel, send_event};
+pub(super) use super::{AnomalyDetectorKey, MessageCacheKey, WeeklyTrackerKey};
 
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;

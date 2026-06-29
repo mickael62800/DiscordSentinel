@@ -1,6 +1,6 @@
 use super::*;
-use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
@@ -31,7 +31,9 @@ impl MockRepo {
         *m.resolve_returns.lock().unwrap() = returns;
         m
     }
-    fn ok_cancel() -> Self { Self::with_cancel(true) }
+    fn ok_cancel() -> Self {
+        Self::with_cancel(true)
+    }
 }
 
 fn sample_combat() -> Combat {
@@ -69,13 +71,39 @@ impl CombatRepository for MockRepo {
     async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> {
         Ok(self.get_returns.lock().unwrap().clone())
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_attacker(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn get_pending_for_defender(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_betting_for_participant(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Combat>, DomainError> {
+        Ok(None)
+    }
     async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError> {
         self.created.lock().unwrap().push(new.clone());
         Ok(Combat {
@@ -109,12 +137,18 @@ impl CombatRepository for MockRepo {
         *self.set_betting_arg.lock().unwrap() = Some((id, msg.into()));
         Ok(true)
     }
-    async fn expire(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    async fn expire(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
     async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> {
         Ok(*self.cancel_returns.lock().unwrap())
     }
-    async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn purge_guild_subsystem(&self, g: &str) -> Result<Vec<(String, u64)>, DomainError> {
         *self.purge_guild_received.lock().unwrap() = Some(g.to_string());
         Ok(self.purge_returns.lock().unwrap().clone())
@@ -156,7 +190,10 @@ async fn create_rejects_zero_mise() {
 #[tokio::test]
 async fn create_rejects_self_duel() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    let err = svc.create(new_combat("alice", "alice", 100)).await.unwrap_err();
+    let err = svc
+        .create(new_combat("alice", "alice", 100))
+        .await
+        .unwrap_err();
     match err {
         DomainError::ValidationError(msg) => assert!(msg.contains("lui-meme")),
         other => panic!("Expected ValidationError, got {:?}", other),
@@ -256,7 +293,10 @@ async fn resolve_conflict_when_already_resolved() {
 #[tokio::test]
 async fn set_betting_rejects_empty_message_id() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.set_betting(Uuid::new_v4(), "").await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.set_betting(Uuid::new_v4(), "").await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
@@ -281,7 +321,10 @@ async fn get_guild_id_returns_guild_from_repo_when_present() {
     c.guild_id = "guild-42".into();
     *repo.get_returns.lock().unwrap() = Some(c);
     let svc = ManageCoudeCombatsService::new(Arc::new(repo));
-    assert_eq!(svc.get_guild_id(Uuid::new_v4()).await.unwrap().as_deref(), Some("guild-42"));
+    assert_eq!(
+        svc.get_guild_id(Uuid::new_v4()).await.unwrap().as_deref(),
+        Some("guild-42")
+    );
 }
 
 // ── purge_guild_subsystem ─────────────────────────────────────────────
@@ -300,19 +343,28 @@ async fn purge_guild_subsystem_delegates_to_repo_with_guild_id() {
     let out = svc.purge_guild_subsystem("guild-xyz").await.unwrap();
     assert_eq!(out.len(), 3);
     assert_eq!(out[0], ("coude_bets".into(), 3));
-    assert_eq!(*repo.purge_guild_received.lock().unwrap(), Some("guild-xyz".into()));
+    assert_eq!(
+        *repo.purge_guild_received.lock().unwrap(),
+        Some("guild-xyz".into())
+    );
 }
 
 #[tokio::test]
 async fn set_defender_special_rejects_empty_item() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(matches!(svc.set_defender_special(Uuid::new_v4(), "").await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(
+        svc.set_defender_special(Uuid::new_v4(), "").await,
+        Err(DomainError::ValidationError(_))
+    ));
 }
 
 #[tokio::test]
 async fn set_defender_special_ok_when_repo_updates() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(svc.set_defender_special(Uuid::new_v4(), "fake_plaque").await.is_ok());
+    assert!(svc
+        .set_defender_special(Uuid::new_v4(), "fake_plaque")
+        .await
+        .is_ok());
 }
 
 #[tokio::test]
@@ -327,35 +379,88 @@ async fn expire_not_found_when_repo_returns_false() {
     struct FalseExpireRepo;
     #[async_trait]
     impl CombatRepository for FalseExpireRepo {
-        async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
-        async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> { Ok(false) }
-        async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(false) }
-        async fn expire(&self, _: Uuid) -> Result<bool, DomainError> { Ok(false) }
-        async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> { Ok(false) }
-        async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(false) }
-        async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+        async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn get_pending_for_attacker(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn get_pending_for_defender(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get_betting_for_participant(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> {
+            unimplemented!()
+        }
+        async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> {
+            Ok(false)
+        }
+        async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+            Ok(false)
+        }
+        async fn expire(&self, _: Uuid) -> Result<bool, DomainError> {
+            Ok(false)
+        }
+        async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> {
+            Ok(false)
+        }
+        async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+            Ok(false)
+        }
+        async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
     }
     let svc = ManageCoudeCombatsService::new(Arc::new(FalseExpireRepo));
-    assert!(matches!(svc.expire(Uuid::new_v4()).await, Err(DomainError::NotFound(_))));
-    assert!(matches!(svc.set_defender_special(Uuid::new_v4(), "k").await, Err(DomainError::NotFound(_))));
+    assert!(matches!(
+        svc.expire(Uuid::new_v4()).await,
+        Err(DomainError::NotFound(_))
+    ));
+    assert!(matches!(
+        svc.set_defender_special(Uuid::new_v4(), "k").await,
+        Err(DomainError::NotFound(_))
+    ));
 }
 
 #[tokio::test]
 async fn resolve_ok_when_repo_returns_true() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::with_resolve(true)));
     let res = CombatResolution {
-        status: "resolved".into(), winner_id: Some("a".into()),
-        attacker_roll: Some(10), defender_roll: Some(5),
-        chaos_event: None, result_message: Some("ok".into()),
+        status: "resolved".into(),
+        winner_id: Some("a".into()),
+        attacker_roll: Some(10),
+        defender_roll: Some(5),
+        chaos_event: None,
+        result_message: Some("ok".into()),
         coins_transferred: 100,
     };
     assert!(svc.resolve(Uuid::new_v4(), res).await.is_ok());
@@ -364,13 +469,21 @@ async fn resolve_ok_when_repo_returns_true() {
 #[tokio::test]
 async fn get_pending_for_attacker_delegates() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(svc.get_pending_for_attacker("g", "a").await.unwrap().is_none());
+    assert!(svc
+        .get_pending_for_attacker("g", "a")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
 async fn get_pending_for_defender_delegates() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(svc.get_pending_for_defender("g", "d").await.unwrap().is_none());
+    assert!(svc
+        .get_pending_for_defender("g", "d")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -382,7 +495,11 @@ async fn list_expired_pending_delegates() {
 #[tokio::test]
 async fn get_betting_for_participant_delegates() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
-    assert!(svc.get_betting_for_participant("g", "u").await.unwrap().is_none());
+    assert!(svc
+        .get_betting_for_participant("g", "u")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -392,21 +509,63 @@ async fn cancel_continues_even_if_mark_bets_lost_fails() {
     struct BetsFailRepo;
     #[async_trait]
     impl CombatRepository for BetsFailRepo {
-        async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
-        async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
-        async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
-        async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> { Ok(true) }
-        async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
-        async fn expire(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
-        async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
-        async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
+        async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn get_pending_for_attacker(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn get_pending_for_defender(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get_betting_for_participant(
+            &self,
+            _: &str,
+            _: &str,
+        ) -> Result<Option<Combat>, DomainError> {
+            Ok(None)
+        }
+        async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> {
+            unimplemented!()
+        }
+        async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn expire(&self, _: Uuid) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> {
+            Ok(true)
+        }
         async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> {
             Err(DomainError::Internal("simulated".into()))
         }
@@ -417,40 +576,85 @@ async fn cancel_continues_even_if_mark_bets_lost_fails() {
 
 // ── Gate HP (with_surprise_gate) ──
 
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::Player;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::domain::entities::system::bot_config::BotDefinition;
-use crate::domain::entities::coude::player::Player;
-use crate::domain::entities::coude::player::XpProgress;
-use crate::domain::entities::coude::player::CombatStat;
 #[derive(Default)]
 struct StubPlayersUc {
     player: std::sync::Mutex<Option<Player>>,
 }
 #[async_trait]
 impl ManageCoudePlayersUseCase for StubPlayersUc {
-    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Player, DomainError> {
-        self.player.lock().unwrap().clone().ok_or(DomainError::NotFound("no".into()))
+    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> {
+        unimplemented!()
     }
-    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
-    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<XpProgress, DomainError> { unimplemented!() }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Player, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> { unimplemented!() }
-    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<i32, DomainError> { Ok(0) }
-    async fn increment_chaos(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+    async fn get(&self, _: &str, _: &str) -> Result<Player, DomainError> {
+        self.player
+            .lock()
+            .unwrap()
+            .clone()
+            .ok_or(DomainError::NotFound("no".into()))
+    }
+    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
+    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<XpProgress, DomainError> {
+        unimplemented!()
+    }
+    async fn spend_stat_point(
+        &self,
+        _: &str,
+        _: &str,
+        _: CombatStat,
+    ) -> Result<Player, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> {
+        unimplemented!()
+    }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<i32, DomainError> {
+        Ok(0)
+    }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[derive(Default)]
@@ -459,25 +663,54 @@ struct StubBotConfig {
 }
 #[async_trait]
 impl BotConfigRepository for StubBotConfig {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.rows.lock().unwrap().clone())
     }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn healthy_player() -> Player {
     Player {
-        guild_id: "g".into(), user_id: "u".into(), username: "u".into(),
-        coins: 100, total_wins: 0, total_losses: 0, total_draws: 0,
-        total_earned: 0, total_lost: 0, total_stolen: 0,
-        cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
-        level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-        class: None, title: None, class_changed_at: None,
-        hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
-        season: 1, created_at: Utc::now(), updated_at: Utc::now(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "u".into(),
+        coins: 100,
+        total_wins: 0,
+        total_losses: 0,
+        total_draws: 0,
+        total_earned: 0,
+        total_lost: 0,
+        total_stolen: 0,
+        cowardice_count: 0,
+        chaos_events: 0,
+        casino_wins: 0,
+        casino_losses: 0,
+        level: 1,
+        xp: 0,
+        stat_points: 0,
+        atk: 0,
+        def: 0,
+        class: None,
+        title: None,
+        class_changed_at: None,
+        hp_current: 100,
+        hp_max: 100,
+        hp_last_regen: None,
+        repos_last_used: None,
+        season: 1,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
     }
 }
 
@@ -487,8 +720,11 @@ async fn create_with_gate_rejects_low_hp_attacker() {
     let players = Arc::new(StubPlayersUc::default());
     let bot_config = Arc::new(StubBotConfig::default());
     bot_config.rows.lock().unwrap().push(BotGuildConfig {
-        id: Uuid::new_v4(), guild_id: "g".into(), bot_name: "coude-bot".into(),
-        config_key: "combat_min_hp_pct".into(), config_value: "50".into(),
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        bot_name: "coude-bot".into(),
+        config_key: "combat_min_hp_pct".into(),
+        config_value: "50".into(),
         updated_at: Utc::now(),
     });
     let mut attacker = healthy_player();
@@ -521,13 +757,19 @@ async fn create_with_gate_surprise_checks_attacker_hp() {
     let bot_config = Arc::new(StubBotConfig::default());
     bot_config.rows.lock().unwrap().extend(vec![
         BotGuildConfig {
-            id: Uuid::new_v4(), guild_id: "g".into(), bot_name: "coude-bot".into(),
-            config_key: "combat_min_hp_pct".into(), config_value: "0".into(),
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            bot_name: "coude-bot".into(),
+            config_key: "combat_min_hp_pct".into(),
+            config_value: "0".into(),
             updated_at: Utc::now(),
         },
         BotGuildConfig {
-            id: Uuid::new_v4(), guild_id: "g".into(), bot_name: "coude-bot".into(),
-            config_key: "surprise_min_hp_percent".into(), config_value: "80".into(),
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            bot_name: "coude-bot".into(),
+            config_key: "surprise_min_hp_percent".into(),
+            config_value: "80".into(),
             updated_at: Utc::now(),
         },
     ]);

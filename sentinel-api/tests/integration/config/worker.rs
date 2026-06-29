@@ -4,14 +4,18 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
 fn short_gid() -> String {
     use rand::Rng;
-    format!("{}", rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64))
+    format!(
+        "{}",
+        rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64)
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -121,9 +125,13 @@ async fn worker_config_all_workers_configurable() {
         ).bind(&gid).bind(worker).bind(key).bind(val).execute(&p).await.unwrap();
     }
 
-    let total = sqlx::query_as::<_, (i64,)>(
-        "SELECT COUNT(*) FROM bot_guild_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    let total =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM bot_guild_config WHERE guild_id = $1")
+            .bind(&gid)
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .0;
 
     assert_eq!(total, 5, "5 workers doivent avoir leur config");
 }
@@ -153,10 +161,17 @@ async fn worker_definitions_seeded() {
 
     let workers = sqlx::query_as::<_, (String,)>(
         "SELECT bot_name FROM bot_definitions WHERE bot_name LIKE '%-worker' ORDER BY bot_name",
-    ).fetch_all(&p).await.unwrap();
+    )
+    .fetch_all(&p)
+    .await
+    .unwrap();
 
     // Au moins 5 worker definitions doivent exister
-    assert!(workers.len() >= 5, "Expected >= 5 worker definitions, got {}", workers.len());
+    assert!(
+        workers.len() >= 5,
+        "Expected >= 5 worker definitions, got {}",
+        workers.len()
+    );
 
     let names: Vec<&str> = workers.iter().map(|w| w.0.as_str()).collect();
     assert!(names.contains(&"analytics-worker"));

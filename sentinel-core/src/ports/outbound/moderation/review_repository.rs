@@ -3,8 +3,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]
 pub struct ReviewEntry {
@@ -28,8 +28,22 @@ pub struct ReviewEntry {
 
 #[async_trait]
 pub trait ReviewRepository: Send + Sync {
-    async fn add(&self, action_id: Uuid, guild_id: &str, added_by: &str, added_by_name: &str, reason: Option<&str>) -> Result<ReviewEntry, DomainError>;
+    async fn add(
+        &self,
+        action_id: Uuid,
+        guild_id: &str,
+        added_by: &str,
+        added_by_name: &str,
+        reason: Option<&str>,
+    ) -> Result<ReviewEntry, DomainError>;
     async fn list_pending(&self, guild_id: &str) -> Result<Vec<ReviewEntry>, DomainError>;
-    async fn resolve(&self, review_id: Uuid, reviewer_id: &str, reviewer_name: &str, notes: Option<&str>, status: &str) -> Result<bool, DomainError>;
+    async fn resolve(
+        &self,
+        review_id: Uuid,
+        reviewer_id: &str,
+        reviewer_name: &str,
+        notes: Option<&str>,
+        status: &str,
+    ) -> Result<bool, DomainError>;
     async fn get_guild_id(&self, review_id: Uuid) -> Result<Option<String>, DomainError>;
 }

@@ -41,7 +41,9 @@ pub async fn spin(
     guild_id: &str,
     req: &WheelSpinRequest,
 ) -> Result<WheelSpinResponse, String> {
-    client.post_json(&format!("/api/wheel/{guild_id}/spin"), req).await
+    client
+        .post_json(&format!("/api/wheel/{guild_id}/spin"), req)
+        .await
 }
 
 #[cfg(test)]

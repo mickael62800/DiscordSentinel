@@ -86,9 +86,18 @@ fn positive_amount_accepts_gt_zero() {
 
 #[test]
 fn positive_amount_rejects_zero_and_negative() {
-    assert_eq!(validate_positive_amount(0).unwrap_err(), "Le montant doit etre positif");
-    assert_eq!(validate_positive_amount(-1).unwrap_err(), "Le montant doit etre positif");
-    assert_eq!(validate_positive_amount(i64::MIN).unwrap_err(), "Le montant doit etre positif");
+    assert_eq!(
+        validate_positive_amount(0).unwrap_err(),
+        "Le montant doit etre positif"
+    );
+    assert_eq!(
+        validate_positive_amount(-1).unwrap_err(),
+        "Le montant doit etre positif"
+    );
+    assert_eq!(
+        validate_positive_amount(i64::MIN).unwrap_err(),
+        "Le montant doit etre positif"
+    );
 }
 
 // ── validate_transfer_distinct_users ──

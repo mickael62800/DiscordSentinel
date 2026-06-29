@@ -94,10 +94,20 @@ pub async fn handle_command(_ctx: &Context, _command: &CommandInteraction) {
 pub fn handles_component(cid: &str) -> bool {
     matches!(
         cid,
-        "btn_hide" | "btn_lock" | "btn_limit" | "btn_rename" | "btn_status"
-            | "select_invite" | "btn_kick" | "select_kick" | "btn_ban" | "select_ban"
-            | "btn_coadmin" | "select_coadmin"
-            | "btn_transfer" | "select_transfer"
+        "btn_hide"
+            | "btn_lock"
+            | "btn_limit"
+            | "btn_rename"
+            | "btn_status"
+            | "select_invite"
+            | "btn_kick"
+            | "select_kick"
+            | "btn_ban"
+            | "select_ban"
+            | "btn_coadmin"
+            | "select_coadmin"
+            | "btn_transfer"
+            | "select_transfer"
             | "btn_queue"
     ) || cid.starts_with("limit_")
         || cid.starts_with("ban_duration_")
@@ -285,7 +295,10 @@ pub async fn init_typemap(
     let flood_tracker = Arc::new(FloodTracker::new());
 
     let voice_config = if config.guild_id > 0 {
-        match voice_api.get_voice_config(&config.guild_id.to_string()).await {
+        match voice_api
+            .get_voice_config(&config.guild_id.to_string())
+            .await
+        {
             Ok(cfg) => {
                 cooldown_tracker.set_cooldown_secs(cfg.creation_cooldown_secs);
                 flood_tracker.set_thresholds(cfg.flood_max_messages, cfg.flood_time_window_secs);

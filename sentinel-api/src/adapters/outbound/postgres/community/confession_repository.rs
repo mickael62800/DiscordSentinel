@@ -1,14 +1,14 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
+use crate::ports::outbound::community::confession_repository::ConfessionRepository;
 use sentinel_core::domain::entities::community::confession::{
     Confession, ConfessionConfig, ConfessionReply, ConfessionReport, ReportStatus,
 };
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::confession_repository::ConfessionRepository;
 
 pub struct PgConfessionRepository {
     pool: PgPool,
@@ -285,7 +285,10 @@ impl ConfessionRepository for PgConfessionRepository {
         guild_id: &str,
         public_number: i32,
     ) -> Result<Option<Confession>, DomainError> {
-        let q = format!("{} WHERE guild_id = $1 AND public_number = $2", SELECT_CONFESSION);
+        let q = format!(
+            "{} WHERE guild_id = $1 AND public_number = $2",
+            SELECT_CONFESSION
+        );
         let row = sqlx::query_as::<_, ConfessionRow>(&q)
             .bind(guild_id)
             .bind(public_number)
@@ -302,7 +305,10 @@ impl ConfessionRepository for PgConfessionRepository {
         include_deleted: bool,
     ) -> Result<Vec<Confession>, DomainError> {
         let q = if include_deleted {
-            format!("{} WHERE guild_id = $1 ORDER BY public_number DESC LIMIT $2", SELECT_CONFESSION)
+            format!(
+                "{} WHERE guild_id = $1 ORDER BY public_number DESC LIMIT $2",
+                SELECT_CONFESSION
+            )
         } else {
             format!(
                 "{} WHERE guild_id = $1 AND deleted_at IS NULL ORDER BY public_number DESC LIMIT $2",
@@ -393,7 +399,10 @@ impl ConfessionRepository for PgConfessionRepository {
     }
 
     async fn list_replies(&self, confession_id: Uuid) -> Result<Vec<ConfessionReply>, DomainError> {
-        let q = format!("{} WHERE confession_id = $1 ORDER BY public_number ASC", SELECT_REPLY);
+        let q = format!(
+            "{} WHERE confession_id = $1 ORDER BY public_number ASC",
+            SELECT_REPLY
+        );
         let rows = sqlx::query_as::<_, ReplyRow>(&q)
             .bind(confession_id)
             .fetch_all(&self.pool)

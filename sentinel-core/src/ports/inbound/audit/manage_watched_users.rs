@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::moderation::infraction::Infraction;
-use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::audit::security_event::SecurityEvent;
-use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::entities::audit::watched_user::WatchedUser;
+use crate::domain::entities::moderation::action::applied::ModerationAction;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug)]
@@ -39,9 +39,5 @@ pub trait ManageWatchedUsersUseCase: Send + Sync {
         reason: &str,
     ) -> Result<(), DomainError>;
 
-    async fn remove_manual_watch(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn remove_manual_watch(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 }

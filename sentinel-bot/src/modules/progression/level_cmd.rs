@@ -1,7 +1,6 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateCommandOption, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::error;
 
@@ -18,13 +17,11 @@ pub fn register() -> CreateCommand {
                 "user",
                 "Niveau d'un utilisateur",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::User,
-                    "target",
-                    "Utilisateur cible (par defaut : vous)",
-                ),
-            ),
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::User,
+                "target",
+                "Utilisateur cible (par defaut : vous)",
+            )),
         )
         .add_option(
             CreateCommandOption::new(
@@ -80,7 +77,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
         None => {
-            respond(ctx, command, "Cette commande doit etre utilisee dans un serveur.").await;
+            respond(
+                ctx,
+                command,
+                "Cette commande doit etre utilisee dans un serveur.",
+            )
+            .await;
             return;
         }
     };
@@ -129,7 +131,11 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str
                     "\u{1f4dd} Texte",
                     format!(
                         "**Niveau {}**\n{}\n{}/{} XP ({} XP total)",
-                        level.level_text, text_bar, level.xp_text_current, level.xp_text_needed, level.xp_text
+                        level.level_text,
+                        text_bar,
+                        level.xp_text_current,
+                        level.xp_text_needed,
+                        level.xp_text
                     ),
                     true,
                 )
@@ -137,7 +143,11 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str
                     "\u{1f3a4} Vocal",
                     format!(
                         "**Niveau {}**\n{}\n{}/{} XP ({} XP total)",
-                        level.level_voice, voice_bar, level.xp_voice_current, level.xp_voice_needed, level.xp_voice
+                        level.level_voice,
+                        voice_bar,
+                        level.xp_voice_current,
+                        level.xp_voice_needed,
+                        level.xp_voice
                     ),
                     true,
                 )
@@ -163,7 +173,13 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str
     }
 }
 
-async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str, source: Option<&str>, title: &str) {
+async fn handle_top(
+    ctx: &Context,
+    command: &CommandInteraction,
+    guild_id: &str,
+    source: Option<&str>,
+    title: &str,
+) {
     let sub_options = match &command.data.options[0].value {
         CommandDataOptionValue::SubCommand(opts) => opts,
         _ => return,
@@ -208,7 +224,11 @@ async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str,
 
                 desc.push_str(&format!(
                     "{}{}. **{}** — Niv. {} ({} XP)\n",
-                    medal, i + 1, user.username, level_display, xp_display
+                    medal,
+                    i + 1,
+                    user.username,
+                    level_display,
+                    xp_display
                 ));
             }
 
@@ -231,7 +251,12 @@ async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str,
         }
         Err(e) => {
             error!(error = %e, "Erreur API level leaderboard");
-            respond(ctx, command, "Erreur lors de la recuperation du classement.").await;
+            respond(
+                ctx,
+                command,
+                "Erreur lors de la recuperation du classement.",
+            )
+            .await;
         }
     }
 }
@@ -251,4 +276,3 @@ fn make_progress_bar(current: i64, needed: i64) -> String {
         pct * 100.0
     )
 }
-

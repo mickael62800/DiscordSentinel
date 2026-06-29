@@ -30,20 +30,19 @@ pub async fn run(pool: &PgPool, config: &CleanupConfig) -> Result<(), String> {
     };
 
     // ── Logs ──
-    let logs_deleted = match sqlx::query(
-        "DELETE FROM logs WHERE created_at < NOW() - make_interval(days => $1)",
-    )
-    .bind(config.logs_retention_days)
-    .execute(pool)
-    .await
-    {
-        Ok(r) => r.rows_affected(),
-        Err(e) => {
-            warn!(error = %e, "Erreur suppression logs");
-            errors.push(format!("logs: {e}"));
-            0
-        }
-    };
+    let logs_deleted =
+        match sqlx::query("DELETE FROM logs WHERE created_at < NOW() - make_interval(days => $1)")
+            .bind(config.logs_retention_days)
+            .execute(pool)
+            .await
+        {
+            Ok(r) => r.rows_affected(),
+            Err(e) => {
+                warn!(error = %e, "Erreur suppression logs");
+                errors.push(format!("logs: {e}"));
+                0
+            }
+        };
 
     // ── Ticket messages from closed tickets ──
     let ticket_msgs_deleted = match sqlx::query(

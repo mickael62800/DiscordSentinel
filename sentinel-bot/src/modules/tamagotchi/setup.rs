@@ -34,7 +34,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if let Err(e) = command
         .channel_id
-        .send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row]))
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embed).components(vec![row]),
+        )
         .await
     {
         warn!(error = %e, "Echec envoi panel tamagotchi");

@@ -24,8 +24,16 @@ fn models_status_response_empty() {
 fn models_status_response_multiple_models() {
     let r = ModelsStatusResponse {
         models: vec![
-            ModelInfo { name: "a".into(), model_type: "text".into(), loaded: false },
-            ModelInfo { name: "b".into(), model_type: "vision".into(), loaded: true },
+            ModelInfo {
+                name: "a".into(),
+                model_type: "text".into(),
+                loaded: false,
+            },
+            ModelInfo {
+                name: "b".into(),
+                model_type: "vision".into(),
+                loaded: true,
+            },
         ],
     };
     let json = serde_json::to_string(&r).unwrap();

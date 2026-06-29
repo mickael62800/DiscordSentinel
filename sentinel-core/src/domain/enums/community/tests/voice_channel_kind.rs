@@ -8,15 +8,30 @@ fn as_str_public_and_private() {
 
 #[test]
 fn from_str_lossy_private() {
-    assert_eq!(VoiceChannelKind::from_str_lossy("private"), VoiceChannelKind::Private);
+    assert_eq!(
+        VoiceChannelKind::from_str_lossy("private"),
+        VoiceChannelKind::Private
+    );
 }
 
 #[test]
 fn from_str_lossy_defaults_to_public() {
-    assert_eq!(VoiceChannelKind::from_str_lossy("public"), VoiceChannelKind::Public);
-    assert_eq!(VoiceChannelKind::from_str_lossy(""), VoiceChannelKind::Public);
-    assert_eq!(VoiceChannelKind::from_str_lossy("unknown"), VoiceChannelKind::Public);
-    assert_eq!(VoiceChannelKind::from_str_lossy("PRIVATE"), VoiceChannelKind::Public); // case-sensitive
+    assert_eq!(
+        VoiceChannelKind::from_str_lossy("public"),
+        VoiceChannelKind::Public
+    );
+    assert_eq!(
+        VoiceChannelKind::from_str_lossy(""),
+        VoiceChannelKind::Public
+    );
+    assert_eq!(
+        VoiceChannelKind::from_str_lossy("unknown"),
+        VoiceChannelKind::Public
+    );
+    assert_eq!(
+        VoiceChannelKind::from_str_lossy("PRIVATE"),
+        VoiceChannelKind::Public
+    ); // case-sensitive
 }
 
 #[test]

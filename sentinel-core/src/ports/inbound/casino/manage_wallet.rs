@@ -16,12 +16,12 @@
 //!
 //! Voir `application/manage_wallet_service.rs` pour l'implementation.
 
-use async_trait::async_trait;
-use crate::ports::uow::DbTx;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
+use crate::ports::uow::DbTx;
+use async_trait::async_trait;
 
 /// Resultat d'une mutation de wallet. Contient le nouveau solde + les taunts
 /// declenches par l'operation (faillite, jackpot) — a propager vers le bot.
@@ -148,11 +148,7 @@ pub trait ManageWalletUseCase: Send + Sync {
 
     /// Lit ou cree le wallet (applique `resolve_starting_coins` +
     /// `WALLET_STARTING_COINS` env en interne).
-    async fn get_or_create(
-        &self,
-        _guild_id: &str,
-        _user_id: &str,
-    ) -> Result<Wallet, DomainError> {
+    async fn get_or_create(&self, _guild_id: &str, _user_id: &str) -> Result<Wallet, DomainError> {
         unimplemented!("get_or_create not implemented")
     }
 
@@ -162,11 +158,7 @@ pub trait ManageWalletUseCase: Send + Sync {
     }
 
     /// Top N wallets par solde.
-    async fn leaderboard(
-        &self,
-        _guild_id: &str,
-        _limit: i64,
-    ) -> Result<Vec<Wallet>, DomainError> {
+    async fn leaderboard(&self, _guild_id: &str, _limit: i64) -> Result<Vec<Wallet>, DomainError> {
         unimplemented!("leaderboard not implemented")
     }
 

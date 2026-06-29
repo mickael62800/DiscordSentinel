@@ -22,11 +22,7 @@ pub trait PlayerRepository: Send + Sync {
         username: &str,
     ) -> Result<Player, DomainError>;
 
-    async fn get(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<Option<Player>, DomainError>;
+    async fn get(&self, guild_id: &str, user_id: &str) -> Result<Option<Player>, DomainError>;
 
     async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<Player>, DomainError>;
 
@@ -148,11 +144,7 @@ pub trait PlayerRepository: Send + Sync {
     ) -> Result<Option<i32>, DomainError>;
 
     /// Remet a 0 les deux streaks de combat (draw).
-    async fn reset_combat_streaks(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn reset_combat_streaks(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     /// Lecture des streaks combat courantes (win, loss) sans mutation.
     /// Utilise par la detection Régicide (cf. COUPE_AMELIORATIONS 5.3) :
@@ -226,11 +218,7 @@ pub trait PlayerRepository: Send + Sync {
     ) -> Result<Option<i32>, DomainError>;
 
     /// Reset `bj_bust_streak` (ex : blackjack naturel post-bust).
-    async fn reset_bj_bust_streak(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn reset_bj_bust_streak(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     /// Incrémente le compteur de couardise et retourne sa nouvelle valeur.
     async fn increment_cowardice(
@@ -239,11 +227,7 @@ pub trait PlayerRepository: Send + Sync {
         user_id: &str,
     ) -> Result<Option<i32>, DomainError>;
 
-    async fn increment_chaos(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<bool, DomainError>;
+    async fn increment_chaos(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 
     // ── HP ──
 
@@ -256,11 +240,7 @@ pub trait PlayerRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     /// Restaure les HP au max (commande `/repos`) et touche `repos_last_used`.
-    async fn full_heal(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     /// Phase 4 refacto : tick de regeneration passive des HP. Regen degressive
     /// par palier de % HP courant (0-25% / 25-50% / 50-75% / 75-100%) avec
@@ -275,4 +255,3 @@ pub trait PlayerRepository: Send + Sync {
         rate_75_100: f64,
     ) -> Result<u64, DomainError>;
 }
-

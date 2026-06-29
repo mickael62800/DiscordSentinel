@@ -14,9 +14,9 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage;
 use sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
-use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::MessageId;
 #[derive(Debug, Deserialize)]
 pub struct RegisterDto {
     pub action_id: Uuid,
@@ -78,6 +78,9 @@ pub async fn list_for_action(
         .discord_action_messages_uc
         .list_for_action(action_id)
         .await?;
-    Ok(Json(list.into_iter().map(DiscordActionMessageDto::from).collect()))
+    Ok(Json(
+        list.into_iter()
+            .map(DiscordActionMessageDto::from)
+            .collect(),
+    ))
 }
-

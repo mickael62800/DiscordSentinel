@@ -1,7 +1,7 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -27,9 +27,9 @@ use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 /// Helper Phase 7 B — fetch le `guild_id` associe a un `channel_id` voice
@@ -49,19 +49,19 @@ async fn gate_by_channel_id(
     if rbac.is_none() {
         return Ok(());
     }
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT guild_id FROM voice_channels WHERE channel_id = $1",
-    )
-    .bind(channel_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("fetch voice channel guild"))?;
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT guild_id FROM voice_channels WHERE channel_id = $1")
+            .bind(channel_id)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(sqlx_internal("fetch voice channel guild"))?;
 
     if let Some((guild_id,)) = row {
         check_role_for_guild(state, rbac, &guild_id, required, label).await?;
     }
     Ok(())
 }
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
@@ -70,7 +70,6 @@ use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistComm
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
-use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
@@ -112,7 +111,8 @@ pub async fn list_all_channels(
     State(state): State<AppState>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
-    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
+    let limit =
+        crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
     let channels = state.voice_channels_uc.list_all_channels().await?;
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
@@ -124,7 +124,8 @@ pub async fn list_channels(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
-    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
+    let limit =
+        crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
     let channels = state.voice_channels_uc.list_channels(&guild_id).await?;
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
@@ -163,7 +164,10 @@ pub async fn purge_channel(
         .await
         {
             crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-                &state, &rbac, &gid, "db.purge.voice_channel",
+                &state,
+                &rbac,
+                &gid,
+                "db.purge.voice_channel",
                 "role insuffisant pour purger un voice channel",
             )
             .await?;
@@ -200,18 +204,20 @@ pub async fn purge_history(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.purge.voice_history",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.purge.voice_history",
         "role insuffisant pour purger l'historique voice",
     )
     .await?;
 
-    let res = sqlx::query(
-        "DELETE FROM voice_channels WHERE guild_id = $1 AND channel_status = 'closed'",
-    )
-    .bind(&guild_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("purge history"))?;
+    let res =
+        sqlx::query("DELETE FROM voice_channels WHERE guild_id = $1 AND channel_status = 'closed'")
+            .bind(&guild_id)
+            .execute(&state.pg_pool)
+            .await
+            .map_err(sqlx_internal("purge history"))?;
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
@@ -258,19 +264,31 @@ pub async fn list_channel_events(
 
     let events: Vec<serde_json::Value> = rows
         .into_iter()
-        .map(|(id, guild_id, event_type, actor_id, actor_name, ch_id, ch_name, details, created_at)| {
-            serde_json::json!({
-                "id": id.to_string(),
-                "guild_id": guild_id,
-                "event_type": event_type,
-                "actor_id": actor_id,
-                "actor_name": actor_name,
-                "channel_id": ch_id,
-                "channel_name": ch_name,
-                "details": details,
-                "created_at": created_at.to_rfc3339(),
-            })
-        })
+        .map(
+            |(
+                id,
+                guild_id,
+                event_type,
+                actor_id,
+                actor_name,
+                ch_id,
+                ch_name,
+                details,
+                created_at,
+            )| {
+                serde_json::json!({
+                    "id": id.to_string(),
+                    "guild_id": guild_id,
+                    "event_type": event_type,
+                    "actor_id": actor_id,
+                    "actor_name": actor_name,
+                    "channel_id": ch_id,
+                    "channel_name": ch_name,
+                    "details": details,
+                    "created_at": created_at.to_rfc3339(),
+                })
+            },
+        )
         .collect();
     Ok(Json(events))
 }
@@ -279,7 +297,10 @@ pub async fn get_channel_detail(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
-    let detail = state.voice_channels_uc.get_channel_detail(&channel_id).await?;
+    let detail = state
+        .voice_channels_uc
+        .get_channel_detail(&channel_id)
+        .await?;
     Ok(single_dto(detail))
 }
 
@@ -291,7 +312,10 @@ pub async fn create_channel(
     // Gate RBAC : moderator+ requis pour creer un voice channel.
     // Pass-through pour les appels bot-internal (rbac absent).
     check_role_for_guild(
-        &state, &rbac, &dto.guild_id, Role::Moderator,
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
         "moderator+ requis pour creer un voice channel",
     )
     .await?;
@@ -334,7 +358,11 @@ pub async fn close_channel(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let before = state.voice_channels_uc.get_channel_detail(&channel_id).await.ok();
+    let before = state
+        .voice_channels_uc
+        .get_channel_detail(&channel_id)
+        .await
+        .ok();
     state.voice_channels_uc.close_channel(&channel_id).await?;
 
     let payload = if let Some(d) = &before {
@@ -369,7 +397,14 @@ pub async fn delete_channel(
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate RBAC : moderator+ pour fermer un voice channel.
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour fermer un voice channel").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour fermer un voice channel",
+    )
+    .await?;
     // DELETE fait un soft-delete (close)
     state.voice_channels_uc.delete_channel(&channel_id).await?;
 
@@ -387,7 +422,14 @@ pub async fn update_channel(
     Path(channel_id): Path<String>,
     Json(dto): Json<UpdateVoiceChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour modifier un voice channel").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour modifier un voice channel",
+    )
+    .await?;
 
     let changes = serde_json::json!({
         "visibility": dto.visibility.clone(),
@@ -414,7 +456,11 @@ pub async fn update_channel(
         })
         .await?;
 
-    let detail_opt = state.voice_channels_uc.get_channel_detail(&channel_id).await.ok();
+    let detail_opt = state
+        .voice_channels_uc
+        .get_channel_detail(&channel_id)
+        .await
+        .ok();
     if let Some(detail) = &detail_opt {
         log_voice_event(
             &state,
@@ -445,7 +491,9 @@ pub async fn update_channel(
     } else {
         serde_json::json!({ "channel_id": &channel_id, "actor": { "source": "web" } })
     };
-    state.broadcaster.broadcast("voice_channel_updated", payload);
+    state
+        .broadcaster
+        .broadcast("voice_channel_updated", payload);
 
     Ok(ok_response())
 }
@@ -456,7 +504,14 @@ pub async fn transfer_ownership(
     Path(channel_id): Path<String>,
     Json(dto): Json<TransferOwnershipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour transferer un voice channel").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour transferer un voice channel",
+    )
+    .await?;
     let new_owner_name = dto.new_owner_name.clone();
 
     state
@@ -488,7 +543,14 @@ pub async fn add_co_admin(
     Path(channel_id): Path<String>,
     Json(dto): Json<AddCoAdminDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour ajouter un co-admin voice").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour ajouter un co-admin voice",
+    )
+    .await?;
     state
         .voice_channels_uc
         .add_co_admin(ManageCoAdminCommand {
@@ -506,7 +568,14 @@ pub async fn remove_co_admin(
     rbac: Option<Extension<RoleContext>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour retirer un co-admin voice").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour retirer un co-admin voice",
+    )
+    .await?;
     state
         .voice_channels_uc
         .remove_co_admin(&channel_id, &user_id)
@@ -521,7 +590,10 @@ pub async fn get_whitelist(
     State(state): State<AppState>,
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
-    let entries = state.voice_channels_uc.get_whitelist(&guild_id, &owner_id).await?;
+    let entries = state
+        .voice_channels_uc
+        .get_whitelist(&guild_id, &owner_id)
+        .await?;
     Ok(map_to_dtos(entries))
 }
 
@@ -531,7 +603,10 @@ pub async fn add_to_whitelist(
     Json(dto): Json<AddWhitelistDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_role_for_guild(
-        &state, &rbac, &dto.guild_id, Role::Moderator,
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
         "moderator+ pour ajouter a la whitelist voice",
     )
     .await?;
@@ -555,8 +630,11 @@ pub async fn remove_from_whitelist(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate RBAC : moderator+ pour toucher aux permissions voice.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator)
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour la whitelist voice".into())))?;
+        require_role(&ctx, Role::Moderator).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "moderator+ requis pour la whitelist voice".into(),
+            ))
+        })?;
     }
     state
         .voice_channels_uc
@@ -574,7 +652,14 @@ pub async fn ban_from_channel(
     Path(channel_id): Path<String>,
     Json(dto): Json<BanFromChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour bannir d'un voice channel").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour bannir d'un voice channel",
+    )
+    .await?;
     state
         .voice_channels_uc
         .ban_from_channel(BanFromChannelCommand {
@@ -595,7 +680,14 @@ pub async fn unban_from_channel(
     rbac: Option<Extension<RoleContext>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour unban voice channel").await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour unban voice channel",
+    )
+    .await?;
     state
         .voice_channels_uc
         .unban_from_channel(&channel_id, &user_id)
@@ -608,7 +700,10 @@ pub async fn check_ban(
     State(state): State<AppState>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let banned = state.voice_channels_uc.is_banned(&channel_id, &user_id).await?;
+    let banned = state
+        .voice_channels_uc
+        .is_banned(&channel_id, &user_id)
+        .await?;
     Ok(Json(serde_json::json!({ "banned": banned })))
 }
 
@@ -618,7 +713,10 @@ pub async fn list_invite_links(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<Vec<InviteLinkResponseDto>>, ApiError> {
-    let links = state.voice_channels_uc.list_invite_links(&channel_id).await?;
+    let links = state
+        .voice_channels_uc
+        .list_invite_links(&channel_id)
+        .await?;
     Ok(map_to_dtos(links))
 }
 
@@ -679,8 +777,18 @@ pub async fn revoke_invite_link(
     rbac: Option<Extension<RoleContext>>,
     Path((channel_id, link_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour revoquer un invite voice").await?;
-    state.voice_channels_uc.revoke_invite_link(&channel_id, &link_id).await?;
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour revoquer un invite voice",
+    )
+    .await?;
+    state
+        .voice_channels_uc
+        .revoke_invite_link(&channel_id, &link_id)
+        .await?;
 
     state.broadcaster.broadcast(
         "voice_invite_revoked",
@@ -731,10 +839,16 @@ pub async fn delete_theme(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config themes voice.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin)
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un theme voice".into())))?;
+        require_role(&ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour supprimer un theme voice".into(),
+            ))
+        })?;
     }
-    state.voice_channels_uc.delete_theme(&guild_id, &theme_id).await?;
+    state
+        .voice_channels_uc
+        .delete_theme(&guild_id, &theme_id)
+        .await?;
     Ok(ok_response())
 }
 

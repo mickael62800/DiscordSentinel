@@ -7,8 +7,8 @@
 
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
+    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseFollowup,
+    CreateInteractionResponseMessage,
 };
 
 use crate::shared::discord_helpers::require_guild_id;
@@ -33,10 +33,14 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -190,7 +194,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             command.user.id, name, actually_healed, new_hp, hp_max
         ))
         .color(0x57F287)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command
@@ -222,4 +228,3 @@ async fn followup_info(ctx: &Context, command: &CommandInteraction, content: &st
 // `reply_ephemeral_pre_defer` supprime : `require_guild_id` (shared)
 // utilise `reply_ephemeral` standard, suffisant ici (l'unique caller etait
 // le guard guild_id qui s'execute avant tout defer).
-

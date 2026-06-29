@@ -1,13 +1,13 @@
-use std::sync::atomic::AtomicU64;
-use std::sync::atomic::Ordering;
 use async_trait::async_trait;
 use redis::AsyncCommands;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::outbound::system::cache::CachePort;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::domain::errors::DomainError;
 
 const RULES_TTL: u64 = 300; // 5 minutes
 
@@ -182,7 +182,8 @@ impl CachePort for RedisCache {
     async fn get_json(&self, key: &str) -> Result<Option<String>, DomainError> {
         let mut conn = self.conn().await?;
 
-        let result: Option<String> = conn.get(key)
+        let result: Option<String> = conn
+            .get(key)
             .await
             .map_err(|e| DomainError::Internal(format!("Redis GET {key}: {e}")))?;
 
@@ -245,7 +246,6 @@ impl CachePort for RedisCache {
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/redis_cache.rs"]

@@ -3,22 +3,24 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-
 pub fn register() -> CreateCommand {
-    CreateCommand::new("repos")
-        .description("Repose-toi pour recuperer tous tes HP (cooldown 12h)")
+    CreateCommand::new("repos").description("Repose-toi pour recuperer tous tes HP (cooldown 12h)")
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
+        .await
+    {
         return;
     }
 
@@ -47,8 +49,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     );
     if let Some(ref last_used) = player.repos_last_used {
         if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(last_used) {
-            let elapsed =
-                chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
+            let elapsed = chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
             let cooldown_mins = cooldown_hours * 60;
             if elapsed.num_minutes() < cooldown_mins {
                 let remaining_mins = cooldown_mins - elapsed.num_minutes();
@@ -93,7 +94,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             command.user.id, healed, hp_max, hp_max, cooldown_hours
         ))
         .color(0x57F287)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command
@@ -108,4 +111,3 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         tracing::warn!(error = %e, "Echec response Discord");
     }
 }
-

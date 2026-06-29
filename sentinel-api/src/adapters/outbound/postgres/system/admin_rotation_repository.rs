@@ -3,12 +3,14 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
+use crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository;
 use sentinel_core::domain::entities::system::admin_rotation::{RotationState, ServedEntry};
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository;
 
 const TBL: &str = "admin_rotation";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 #[derive(sqlx::FromRow)]
 struct Row {
@@ -28,7 +30,11 @@ impl From<Row> for RotationState {
         let asked = r
             .asked_this_round
             .as_array()
-            .map(|a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+            .map(|a| {
+                a.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
             .unwrap_or_default();
         RotationState {
             guild_id: r.guild_id,
@@ -49,7 +55,9 @@ pub struct PgAdminRotationRepository {
 }
 
 impl PgAdminRotationRepository {
-    pub fn new(pool: PgPool) -> Self { Self { pool } }
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
 }
 
 #[async_trait]
@@ -104,7 +112,10 @@ impl AdminRotationRepository for PgAdminRotationRepository {
 
     async fn served_entries(&self, guild_id: &str) -> Result<Vec<ServedEntry>, DomainError> {
         #[derive(sqlx::FromRow)]
-        struct E { user_id: String, served_at: DateTime<Utc> }
+        struct E {
+            user_id: String,
+            served_at: DateTime<Utc>,
+        }
         let rows: Vec<E> = sqlx::query_as(
             "SELECT user_id, MAX(served_at) AS served_at FROM admin_rotation_history \
              WHERE guild_id = $1 GROUP BY user_id ORDER BY served_at ASC",
@@ -113,6 +124,12 @@ impl AdminRotationRepository for PgAdminRotationRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(rows.into_iter().map(|e| ServedEntry { user_id: e.user_id, served_at: e.served_at }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|e| ServedEntry {
+                user_id: e.user_id,
+                served_at: e.served_at,
+            })
+            .collect())
     }
 }

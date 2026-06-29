@@ -14,10 +14,10 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use sentinel_api::ports::inbound::coude::manage_economy::StealOutcome;
 use sentinel_core::domain::entities::coude::taunt::TauntEvent;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::coude::manage_economy::StealOutcome;
-use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 
 #[derive(Default)]
 struct MockEconomy {
@@ -35,34 +35,66 @@ struct MockEconomy {
 
 #[async_trait]
 impl ManageCoudeEconomyUseCase for MockEconomy {
-    async fn transfer(&self, g: &str, from: &str, to: &str, amt: i64)
-        -> Result<Vec<TauntEvent>, DomainError>
-    {
-        self.transfers.lock().unwrap().push((g.into(), from.into(), to.into(), amt));
+    async fn transfer(
+        &self,
+        g: &str,
+        from: &str,
+        to: &str,
+        amt: i64,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
+        self.transfers
+            .lock()
+            .unwrap()
+            .push((g.into(), from.into(), to.into(), amt));
         Ok(vec![])
     }
-    async fn steal(&self, g: &str, t: &str, v: &str, amt: i64)
-        -> Result<StealOutcome, DomainError>
-    {
-        self.steals.lock().unwrap().push((g.into(), t.into(), v.into(), amt));
-        Ok(StealOutcome { stolen: *self.steal_stolen.lock().unwrap(), taunt_events: vec![] })
+    async fn steal(
+        &self,
+        g: &str,
+        t: &str,
+        v: &str,
+        amt: i64,
+    ) -> Result<StealOutcome, DomainError> {
+        self.steals
+            .lock()
+            .unwrap()
+            .push((g.into(), t.into(), v.into(), amt));
+        Ok(StealOutcome {
+            stolen: *self.steal_stolen.lock().unwrap(),
+            taunt_events: vec![],
+        })
     }
-    async fn steal_fail_penalty(&self, g: &str, t: &str, amt: i64)
-        -> Result<(i64, Vec<TauntEvent>), DomainError>
-    {
-        self.steal_penalty.lock().unwrap().push((g.into(), t.into(), amt));
+    async fn steal_fail_penalty(
+        &self,
+        g: &str,
+        t: &str,
+        amt: i64,
+    ) -> Result<(i64, Vec<TauntEvent>), DomainError> {
+        self.steal_penalty
+            .lock()
+            .unwrap()
+            .push((g.into(), t.into(), amt));
         Ok((amt / 2, vec![]))
     }
     async fn record_casino_win(&self, g: &str, u: &str, gain: i64) -> Result<(), DomainError> {
-        self.casino_wins.lock().unwrap().push((g.into(), u.into(), gain));
+        self.casino_wins
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), gain));
         Ok(())
     }
     async fn record_casino_loss(&self, g: &str, u: &str, lost: i64) -> Result<(), DomainError> {
-        self.casino_losses.lock().unwrap().push((g.into(), u.into(), lost));
+        self.casino_losses
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), lost));
         Ok(())
     }
     async fn record_casino_faillite(&self, g: &str, u: &str) -> Result<i64, DomainError> {
-        self.casino_faillites.lock().unwrap().push((g.into(), u.into()));
+        self.casino_faillites
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into()));
         Ok(1234)
     }
     async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
@@ -82,19 +114,28 @@ fn state_with(m: Arc<MockEconomy>) -> sentinel_api::adapters::inbound::http::sta
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
-        Some(v) => { b = b.header("content-type", "application/json"); Body::from(serde_json::to_string(&v).unwrap()) }
+        Some(v) => {
+            b = b.header("content-type", "application/json");
+            Body::from(serde_json::to_string(&v).unwrap())
+        }
         None => Body::empty(),
     };
     let req = b.body(body_payload).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Transfer ──
@@ -107,7 +148,10 @@ async fn transfer_coins_forwards_and_returns_taunts() {
     let (s, j) = req_json(app, "POST", "/api/coude/999/transfer", Some(body)).await;
     assert_eq!(s, StatusCode::OK);
     assert!(j["taunt_events"].as_array().unwrap().is_empty());
-    assert_eq!(m.transfers.lock().unwrap()[0], ("999".into(), "111".into(), "222".into(), 500));
+    assert_eq!(
+        m.transfers.lock().unwrap()[0],
+        ("999".into(), "111".into(), "222".into(), 500)
+    );
 }
 
 // ── Steal ──
@@ -132,7 +176,10 @@ async fn steal_fail_penalty_returns_half_amount() {
     let (s, j) = req_json(app, "POST", "/api/coude/999/steal-fail-penalty", Some(body)).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["lost"], 200);
-    assert_eq!(m.steal_penalty.lock().unwrap()[0], ("999".into(), "111".into(), 400));
+    assert_eq!(
+        m.steal_penalty.lock().unwrap()[0],
+        ("999".into(), "111".into(), 400)
+    );
 }
 
 // ── Casino ──
@@ -142,7 +189,13 @@ async fn record_casino_win_forwards_gain() {
     let m = Arc::new(MockEconomy::default());
     let app = router::build_for_test(state_with(m.clone()));
     let body = serde_json::json!({ "gain": 100 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/casino-win", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/casino-win",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(m.casino_wins.lock().unwrap()[0].2, 100);
 }
@@ -152,7 +205,13 @@ async fn record_casino_loss_forwards_lost() {
     let m = Arc::new(MockEconomy::default());
     let app = router::build_for_test(state_with(m.clone()));
     let body = serde_json::json!({ "lost": 50 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/casino-loss", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/casino-loss",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(m.casino_losses.lock().unwrap()[0].2, 50);
 }
@@ -161,10 +220,19 @@ async fn record_casino_loss_forwards_lost() {
 async fn record_casino_faillite_returns_total_lost() {
     let m = Arc::new(MockEconomy::default());
     let app = router::build_for_test(state_with(m.clone()));
-    let (s, j) = req_json(app, "POST", "/api/coude/999/players/111/casino-faillite", None).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/casino-faillite",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["total_lost"], 1234);
-    assert_eq!(m.casino_faillites.lock().unwrap()[0], ("999".into(), "111".into()));
+    assert_eq!(
+        m.casino_faillites.lock().unwrap()[0],
+        ("999".into(), "111".into())
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -181,7 +249,13 @@ async fn sum_casino_gains_today_returns_total() {
     let m = Arc::new(MockEconomy::default());
     *m.sum_gains.lock().unwrap() = 1500;
     let app = router::build_for_test(state_with(m));
-    let (_, j) = req_json(app, "GET", "/api/coude/999/players/111/casino-gains-today", None).await;
+    let (_, j) = req_json(
+        app,
+        "GET",
+        "/api/coude/999/players/111/casino-gains-today",
+        None,
+    )
+    .await;
     assert_eq!(j["total"], 1500);
 }
 

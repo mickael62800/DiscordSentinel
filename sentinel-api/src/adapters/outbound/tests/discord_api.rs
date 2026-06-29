@@ -116,7 +116,10 @@ async fn list_text_channels_unconfigured_returns_internal_error() {
 #[tokio::test]
 async fn upload_emoji_unconfigured_returns_internal_error() {
     let svc = unconfigured_service().await;
-    let err = svc.upload_emoji("g", "name", &[0u8; 10], "image/png").await.unwrap_err();
+    let err = svc
+        .upload_emoji("g", "name", &[0u8; 10], "image/png")
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::Internal(_)));
 }
 
@@ -144,14 +147,20 @@ async fn send_dm_unconfigured_returns_internal_error() {
 #[tokio::test]
 async fn create_role_unconfigured_returns_internal_error() {
     let svc = unconfigured_service().await;
-    let err = svc.create_role("g", "Role", 0xFF0000, None).await.unwrap_err();
+    let err = svc
+        .create_role("g", "Role", 0xFF0000, None)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::Internal(_)));
 }
 
 #[tokio::test]
 async fn edit_role_unconfigured_returns_internal_error() {
     let svc = unconfigured_service().await;
-    let err = svc.edit_role("g", "r", Some("New"), Some(0), None, None, None).await.unwrap_err();
+    let err = svc
+        .edit_role("g", "r", Some("New"), Some(0), None, None, None)
+        .await
+        .unwrap_err();
     assert!(matches!(err, DomainError::Internal(_)));
 }
 
@@ -208,7 +217,12 @@ fn discord_user_with_null_avatar_in_json() {
 
 #[test]
 fn discord_channel_serializes_roundtrip() {
-    let c = DiscordChannel { id: "c".into(), name: "general".into(), position: 5, kind: "text".to_string() };
+    let c = DiscordChannel {
+        id: "c".into(),
+        name: "general".into(),
+        position: 5,
+        kind: "text".to_string(),
+    };
     let json = serde_json::to_value(&c).unwrap();
     let back: DiscordChannel = serde_json::from_value(json).unwrap();
     assert_eq!(back.position, 5);

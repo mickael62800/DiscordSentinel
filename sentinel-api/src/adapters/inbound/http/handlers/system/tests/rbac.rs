@@ -5,13 +5,19 @@ use sentinel_core::domain::errors::DomainError;
 fn parse_role_accepts_all_four() {
     assert!(matches!(parse_role("owner").ok(), Some(Role::Owner)));
     assert!(matches!(parse_role("admin").ok(), Some(Role::Admin)));
-    assert!(matches!(parse_role("moderator").ok(), Some(Role::Moderator)));
+    assert!(matches!(
+        parse_role("moderator").ok(),
+        Some(Role::Moderator)
+    ));
     assert!(matches!(parse_role("viewer").ok(), Some(Role::Viewer)));
 }
 
 #[test]
 fn parse_role_rejects_unknown_with_clear_message() {
-    let err = match parse_role("superuser") { Ok(_) => panic!("expected err"), Err(e) => e };
+    let err = match parse_role("superuser") {
+        Ok(_) => panic!("expected err"),
+        Err(e) => e,
+    };
     match err.0 {
         DomainError::ValidationError(msg) => {
             assert!(msg.contains("superuser"));
@@ -68,7 +74,8 @@ fn status_to_err_service_unavailable_becomes_internal() {
 fn grant_role_dto_default_display_name_none() {
     let dto: GrantRoleDto = serde_json::from_value(serde_json::json!({
         "role": "admin"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.role, "admin");
     assert!(dto.display_name.is_none());
 }
@@ -77,7 +84,8 @@ fn grant_role_dto_default_display_name_none() {
 fn grant_role_dto_with_display_name() {
     let dto: GrantRoleDto = serde_json::from_value(serde_json::json!({
         "role": "owner", "display_name": "Alice"
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.display_name.as_deref(), Some("Alice"));
 }
 

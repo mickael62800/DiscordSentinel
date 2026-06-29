@@ -52,9 +52,7 @@ pub async fn xadd_event_json(
 
 /// Ouvre une connection multiplexee depuis un client. Wrapper trivial
 /// pour rendre le pattern uniforme dans les jobs.
-pub async fn get_conn(
-    client: &redis::Client,
-) -> Result<redis::aio::MultiplexedConnection, String> {
+pub async fn get_conn(client: &redis::Client) -> Result<redis::aio::MultiplexedConnection, String> {
     client
         .get_multiplexed_async_connection()
         .await

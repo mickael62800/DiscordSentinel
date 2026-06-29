@@ -50,7 +50,10 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
 
     let guild_id = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
     let owner_id = data.get("owner_id").and_then(|v| v.as_str()).unwrap_or("");
-    let pet_name = data.get("pet_name").and_then(|v| v.as_str()).unwrap_or("Ton compagnon");
+    let pet_name = data
+        .get("pet_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Ton compagnon");
     let status = data.get("status").and_then(|v| v.as_str()).unwrap_or("");
     if owner_id.is_empty() {
         return;
@@ -149,10 +152,16 @@ async fn edit_card(ctx: &Context, guild_id: &str, owner_id: &str, channel: &str,
 
     let edit = match render_card(&base, guild_id, owner_id, &pet).await {
         Some(png) => EditMessage::new()
-            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .embed(
+                CreateEmbed::new()
+                    .image("attachment://card.png")
+                    .color(0x232838),
+            )
             .attachments(EditAttachments::new().add(CreateAttachment::bytes(png, "card.png")))
             .components(care_buttons()),
-        None => EditMessage::new().embed(card_embed(&pet)).components(care_buttons()),
+        None => EditMessage::new()
+            .embed(card_embed(&pet))
+            .components(care_buttons()),
     };
 
     if let Err(e) = channel_id.edit_message(&ctx.http, message_id, edit).await {

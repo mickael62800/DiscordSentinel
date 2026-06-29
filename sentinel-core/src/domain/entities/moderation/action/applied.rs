@@ -4,9 +4,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModerationAction {

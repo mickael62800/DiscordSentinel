@@ -1,6 +1,6 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -12,11 +12,11 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct WatchedUsersQueryParams {

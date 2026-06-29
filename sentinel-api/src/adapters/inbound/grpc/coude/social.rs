@@ -13,33 +13,36 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::coude::v1 as proto;
+use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::coude::social::Season;
-use sentinel_core::domain::entities::coude::social::Event;
-use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
-use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
-use sentinel_core::domain::entities::coude::social::NewDailyChaos;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use sentinel_core::domain::entities::coude::social::Event;
+use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
+use sentinel_core::domain::entities::coude::social::NewDailyChaos;
+use sentinel_core::domain::entities::coude::social::Season;
 
 use super::taunt_event_to_proto;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
 pub struct SocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
-    pub catalog_uc: Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
-    pub cashbox_uc: Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
+    pub catalog_uc:
+        Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
+    pub cashbox_uc:
+        Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
     pub taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase>,
     pub heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
 }
 
 pub(super) fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
-    match proto::LeaderboardCategory::try_from(v).unwrap_or(proto::LeaderboardCategory::Unspecified) {
+    match proto::LeaderboardCategory::try_from(v).unwrap_or(proto::LeaderboardCategory::Unspecified)
+    {
         proto::LeaderboardCategory::Thieves => LeaderboardCategory::Thieves,
         proto::LeaderboardCategory::Cowards => LeaderboardCategory::Cowards,
         proto::LeaderboardCategory::Chaos => LeaderboardCategory::Chaos,
@@ -110,7 +113,11 @@ impl CoudeSocialService for SocialGrpc {
     ) -> Result<Response<proto::LeaderboardList>, Status> {
         let req = request.into_inner();
         let cat = proto_to_leaderboard_category(req.category);
-        let limit = if req.limit <= 0 { 10 } else { req.limit.min(100) };
+        let limit = if req.limit <= 0 {
+            10
+        } else {
+            req.limit.min(100)
+        };
         let list = self
             .uc
             .leaderboard(&req.guild_id, cat, limit)
@@ -296,7 +303,9 @@ impl CoudeSocialService for SocialGrpc {
             .into_iter()
             .map(|(guild_id, outcome)| redistribution_to_proto(guild_id.into(), outcome))
             .collect();
-        Ok(Response::new(proto::RedistributeDueResponse { redistributed }))
+        Ok(Response::new(proto::RedistributeDueResponse {
+            redistributed,
+        }))
     }
 
     async fn deposit_cashbox(
@@ -512,8 +521,8 @@ mod tests;
 pub(super) fn proto_source_to_domain(
     source: i32,
 ) -> Option<sentinel_core::domain::entities::coude::cashbox::CashboxSource> {
-    use sentinel_core::domain::entities::coude::cashbox::CashboxSource;
     use proto::CashboxDepositSource as P;
+    use sentinel_core::domain::entities::coude::cashbox::CashboxSource;
     match P::try_from(source).ok()? {
         P::CashboxSourceUnspecified => None,
         P::CashboxSourceShopPurchase => Some(CashboxSource::ShopPurchase),

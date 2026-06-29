@@ -2,7 +2,11 @@
 use super::api_client::{Ticket, TicketMessage};
 
 /// Genere un transcript au format Markdown.
-pub fn generate_markdown(ticket: &Ticket, messages: &[TicketMessage], sla_info: Option<&str>) -> String {
+pub fn generate_markdown(
+    ticket: &Ticket,
+    messages: &[TicketMessage],
+    sla_info: Option<&str>,
+) -> String {
     let mut md = format!(
         "# Transcript du ticket #{short_id}\n\n\
          | Champ | Valeur |\n\
@@ -50,7 +54,11 @@ pub fn generate_markdown(ticket: &Ticket, messages: &[TicketMessage], sla_info: 
 }
 
 /// Genere un transcript au format HTML avec CSS inline.
-pub fn generate_html(ticket: &Ticket, messages: &[TicketMessage], sla_info: Option<&str>) -> String {
+pub fn generate_html(
+    ticket: &Ticket,
+    messages: &[TicketMessage],
+    sla_info: Option<&str>,
+) -> String {
     let mut html = format!(
         r#"<!DOCTYPE html>
 <html lang="fr">
@@ -105,7 +113,10 @@ td {{ background: #0f3460; }}
     html.push_str("</table>\n");
 
     if let Some(sla) = sla_info {
-        html.push_str(&format!("<div class=\"sla\"><strong>SLA :</strong> {}</div>\n", html_escape(sla)));
+        html.push_str(&format!(
+            "<div class=\"sla\"><strong>SLA :</strong> {}</div>\n",
+            html_escape(sla)
+        ));
     }
 
     html.push_str("<h2>Messages</h2>\n");

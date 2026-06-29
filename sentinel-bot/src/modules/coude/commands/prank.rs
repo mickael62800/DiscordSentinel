@@ -13,7 +13,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateMessage,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
@@ -50,10 +50,18 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
+    if !crate::modules::coude::channel_check::check_channel(
+        ctx,
+        command,
+        config.channel_activites(),
+    )
+    .await
+    {
         return;
     }
 
@@ -151,10 +159,7 @@ async fn execute_braquage(
     command: &CommandInteraction,
     config: &crate::modules::coude::guild_config::Config,
 ) {
-    let guild_id = command
-        .guild_id
-        .map(|g| g.to_string())
-        .unwrap_or_default();
+    let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
     // Faux montant tire cote API (catalogue editable, decision auditable).
     let fake_amount = {
         let data = ctx.data.read().await;
@@ -162,12 +167,7 @@ async fn execute_braquage(
         match api.roll_prank_braquage_amount(&guild_id).await {
             Ok(r) => r.amount,
             Err(_) => {
-                reply_ephemeral(
-                    ctx,
-                    command,
-                    "API indispo, veuillez reessayer plus tard.",
-                )
-                .await;
+                reply_ephemeral(ctx, command, "API indispo, veuillez reessayer plus tard.").await;
                 return;
             }
         }
@@ -210,12 +210,7 @@ async fn execute_scoop(
         match api.random_flavor("prank_scoop", "fr").await {
             Ok(Some(s)) => s,
             Ok(None) | Err(_) => {
-                reply_ephemeral(
-                    ctx,
-                    command,
-                    "API indispo, veuillez reessayer plus tard.",
-                )
-                .await;
+                reply_ephemeral(ctx, command, "API indispo, veuillez reessayer plus tard.").await;
                 return;
             }
         }
@@ -253,12 +248,7 @@ async fn execute_appel(
         match api.random_flavor("prank_appel", "fr").await {
             Ok(Some(s)) => s,
             Ok(None) | Err(_) => {
-                reply_ephemeral(
-                    ctx,
-                    command,
-                    "API indispo, veuillez reessayer plus tard.",
-                )
-                .await;
+                reply_ephemeral(ctx, command, "API indispo, veuillez reessayer plus tard.").await;
                 return;
             }
         }

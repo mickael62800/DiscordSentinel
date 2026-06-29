@@ -22,16 +22,16 @@ const DISBOARD_ID: u64 = 302050872383242240;
 fn is_bump_success(msg: &Message) -> bool {
     let mut positive = false;
     for e in &msg.embeds {
-        let desc = e
-            .description
-            .as_deref()
-            .unwrap_or("")
-            .to_lowercase();
+        let desc = e.description.as_deref().unwrap_or("").to_lowercase();
         // Echec / cooldown Disboard : "please wait ... minutes", "patienter".
         if desc.contains("minutes") || desc.contains("wait") || desc.contains("patient") {
             return false;
         }
-        if desc.contains("done") || desc.contains("effectu") || desc.contains("👍") || desc.contains(":thumbsup:") {
+        if desc.contains("done")
+            || desc.contains("effectu")
+            || desc.contains("👍")
+            || desc.contains(":thumbsup:")
+        {
             positive = true;
         }
     }
@@ -103,14 +103,19 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
 
     // Module actif pour cette guild ?
-    let cfg = crate::shared::discord_helpers::guild_config_or_default(ctx, &guild_id, MODULE_BOT_NAME).await;
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, &guild_id, MODULE_BOT_NAME)
+            .await;
     if !BaseApiClient::config_bool(&cfg, "enabled", false) {
         return;
     }
 
     let api = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() { Some(a) => a.clone(), None => return }
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
     };
 
     let body = RecordBumpBody {
@@ -136,7 +141,12 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             let rid = serenity::model::id::RoleId::new(rid);
             if let Err(e) = ctx
                 .http
-                .add_member_role(gid, bumper.id, rid, Some("Bump VIP — seuil de bumps atteint"))
+                .add_member_role(
+                    gid,
+                    bumper.id,
+                    rid,
+                    Some("Bump VIP — seuil de bumps atteint"),
+                )
                 .await
             {
                 warn!(error = %e, user = %bumper.id, role = %rid, "Echec attribution role VIP bump");
@@ -183,7 +193,10 @@ pub fn spawn_background(ctx: Context) {
                 data.get::<ApiClientKey>().cloned()
             };
             let Some(api) = api else { continue };
-            let due: Vec<DueReminder> = api.get_json("/api/bump/due-reminders").await.unwrap_or_default();
+            let due: Vec<DueReminder> = api
+                .get_json("/api/bump/due-reminders")
+                .await
+                .unwrap_or_default();
             for d in due {
                 if let Ok(cid) = d.channel_id.parse::<u64>() {
                     let _ = ChannelId::new(cid)

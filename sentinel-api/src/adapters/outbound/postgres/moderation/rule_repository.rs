@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgRuleRepository {
     pool: PgPool,
@@ -66,37 +66,31 @@ impl RuleRepository for PgRuleRepository {
     }
 
     async fn find_all(&self) -> Result<Vec<Rule>, DomainError> {
-        let rows = sqlx::query_as::<_, RuleRow>(
-            "SELECT * FROM rules ORDER BY guild_id, flag_type",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let rows = sqlx::query_as::<_, RuleRow>("SELECT * FROM rules ORDER BY guild_id, flag_type")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Rule::from).collect())
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Rule>, DomainError> {
-        let row = sqlx::query_as::<_, RuleRow>(
-            "SELECT * FROM rules WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row = sqlx::query_as::<_, RuleRow>("SELECT * FROM rules WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(row.map(Rule::from))
     }
 
     async fn toggle(&self, id: Uuid, enabled: bool) -> Result<(), DomainError> {
-        let result = sqlx::query(
-            "UPDATE rules SET enabled = $1, updated_at = NOW() WHERE id = $2",
-        )
-        .bind(enabled)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let result = sqlx::query("UPDATE rules SET enabled = $1, updated_at = NOW() WHERE id = $2")
+            .bind(enabled)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound(format!("Regle {}", id)));

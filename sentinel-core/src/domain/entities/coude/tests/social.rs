@@ -2,11 +2,26 @@ use super::*;
 
 #[test]
 fn leaderboard_category_parse_all_valid() {
-    assert_eq!(LeaderboardCategory::parse("richest"), Some(LeaderboardCategory::Richest));
-    assert_eq!(LeaderboardCategory::parse("thieves"), Some(LeaderboardCategory::Thieves));
-    assert_eq!(LeaderboardCategory::parse("cowards"), Some(LeaderboardCategory::Cowards));
-    assert_eq!(LeaderboardCategory::parse("chaos"), Some(LeaderboardCategory::Chaos));
-    assert_eq!(LeaderboardCategory::parse("level"), Some(LeaderboardCategory::Level));
+    assert_eq!(
+        LeaderboardCategory::parse("richest"),
+        Some(LeaderboardCategory::Richest)
+    );
+    assert_eq!(
+        LeaderboardCategory::parse("thieves"),
+        Some(LeaderboardCategory::Thieves)
+    );
+    assert_eq!(
+        LeaderboardCategory::parse("cowards"),
+        Some(LeaderboardCategory::Cowards)
+    );
+    assert_eq!(
+        LeaderboardCategory::parse("chaos"),
+        Some(LeaderboardCategory::Chaos)
+    );
+    assert_eq!(
+        LeaderboardCategory::parse("level"),
+        Some(LeaderboardCategory::Level)
+    );
 }
 
 #[test]

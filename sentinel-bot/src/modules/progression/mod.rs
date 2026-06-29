@@ -66,7 +66,10 @@ pub fn init_typemap(
     api: &Arc<crate::shared::api_client::BaseApiClient>,
     grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
 ) {
-    data.insert::<StatsApiKey>(api_client::ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<StatsApiKey>(api_client::ApiClient::new(
+        Arc::clone(api),
+        Arc::clone(grpc),
+    ));
     data.insert::<TrackerKey>(tracker::StatsTracker::new());
     data.insert::<XpCooldownKey>(xp_cooldown::XpCooldown::new());
     data.insert::<StreakTrackerKey>(streaks::StreakTracker::new());
@@ -88,13 +91,16 @@ pub async fn on_ready(ctx: &Context, ready: &serenity::model::gateway::Ready) {
                 .voice_states
                 .iter()
                 .filter_map(|(uid, st)| {
-                    st.channel_id.map(|ch| (uid.get(), ch.get(), st.self_mute && st.self_deaf))
+                    st.channel_id
+                        .map(|ch| (uid.get(), ch.get(), st.self_mute && st.self_deaf))
                 })
                 .collect(),
             None => continue,
         };
         for (user_id, channel_id, is_afk) in entries {
-            tracker.hydrate(guild.id.get(), user_id, channel_id, is_afk).await;
+            tracker
+                .hydrate(guild.id.get(), user_id, channel_id, is_afk)
+                .await;
             hydrated += 1;
         }
     }
@@ -123,7 +129,10 @@ async fn announce_level_up(
 
     let template = BaseApiClient::config_or(guild_config, "levelup_message", "");
     let description = if template.is_empty() {
-        format!("<@{}> est maintenant **niveau {} en {}** !", user_id, level, kind)
+        format!(
+            "<@{}> est maintenant **niveau {} en {}** !",
+            user_id, level, kind
+        )
     } else {
         template
             .replace("{user}", &format!("<@{}>", user_id))
@@ -134,7 +143,8 @@ async fn announce_level_up(
     let embed = success_embed(format!("{} LEVEL UP {} !", title_emoji, capitalize(kind)))
         .description(&description);
 
-    let announce_enabled = BaseApiClient::config_bool(guild_config, "levelup_announce_enabled", true);
+    let announce_enabled =
+        BaseApiClient::config_bool(guild_config, "levelup_announce_enabled", true);
     if announce_enabled {
         if let Some(ch_id) = level_channel::resolve_level_up_channel(guild_config) {
             let target = ChannelId::new(ch_id);
@@ -210,23 +220,32 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
         }
         let xp_per_minute = BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
 
-        let channel_mults = multipliers::parse_multipliers(
-            &BaseApiClient::config_or(&gc, "xp_channel_multipliers", ""),
-        );
-        let role_mults = multipliers::parse_multipliers(
-            &BaseApiClient::config_or(&gc, "xp_role_multipliers", ""),
-        );
+        let channel_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
+            &gc,
+            "xp_channel_multipliers",
+            "",
+        ));
+        let role_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
+            &gc,
+            "xp_role_multipliers",
+            "",
+        ));
         let channel_mult = multipliers::get_channel_multiplier(&channel_mults, channel_id);
 
         let user_roles: Vec<u64> = ctx
             .cache
             .guild(serenity::model::id::GuildId::new(guild_id))
-            .and_then(|g| g.members.get(&UserId::new(user_id)).map(|m| m.roles.iter().map(|r| r.get()).collect()))
+            .and_then(|g| {
+                g.members
+                    .get(&UserId::new(user_id))
+                    .map(|m| m.roles.iter().map(|r| r.get()).collect())
+            })
             .unwrap_or_default();
         let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
         let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
-        let xp_amount = multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
+        let xp_amount =
+            multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
         info!(
             guild = %guild_id, user = %user_id, channel = %channel_id,
             seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
@@ -264,7 +283,11 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
-    vec![level_cmd::register(), stats_cmd::register(), resync_cmd::register()]
+    vec![
+        level_cmd::register(),
+        stats_cmd::register(),
+        resync_cmd::register(),
+    ]
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
@@ -288,8 +311,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    let guild_config =
-        guild_config_or_default(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await;
+    let guild_config = guild_config_or_default(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await;
     if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
         return;
     }
@@ -325,7 +347,9 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let data = ctx.data.read().await;
 
     if let Some(tracker) = data.get::<TrackerKey>() {
-        tracker.record_message(guild_id.get(), msg.author.id.get()).await;
+        tracker
+            .record_message(guild_id.get(), msg.author.id.get())
+            .await;
     }
 
     let api = match data.get::<StatsApiKey>() {
@@ -364,7 +388,10 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let streak_mult = if streak_enabled {
         if let Some(streak_tracker) = data.get::<StreakTrackerKey>() {
             if !streak_tracker.has(guild_id.get(), msg.author.id.get()) {
-                if let Ok(streak_data) = api.get_streak(&guild_id.to_string(), &msg.author.id.to_string()).await {
+                if let Ok(streak_data) = api
+                    .get_streak(&guild_id.to_string(), &msg.author.id.to_string())
+                    .await
+                {
                     streak_tracker.seed(
                         guild_id.get(),
                         msg.author.id.get(),
@@ -385,7 +412,8 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             );
 
             if update.new_day {
-                let (current, best) = streak_tracker.get_streak(guild_id.get(), msg.author.id.get());
+                let (current, best) =
+                    streak_tracker.get_streak(guild_id.get(), msg.author.id.get());
                 api.update_streak(
                     &guild_id.to_string(),
                     &msg.author.id.to_string(),
@@ -393,15 +421,19 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                     best,
                     now.ordinal() as u32,
                     now.year(),
-                ).await;
+                )
+                .await;
                 if let Some(base) = data.get::<ApiClientKey>() {
-                    base.publish_event("streak_updated", serde_json::json!({
-                        "guild_id": guild_id.to_string(),
-                        "user_id": msg.author.id.to_string(),
-                        "username": msg.author.name,
-                        "streak_current": current,
-                        "streak_best": best,
-                    }));
+                    base.publish_event(
+                        "streak_updated",
+                        serde_json::json!({
+                            "guild_id": guild_id.to_string(),
+                            "user_id": msg.author.id.to_string(),
+                            "username": msg.author.name,
+                            "streak_current": current,
+                            "streak_best": best,
+                        }),
+                    );
                 }
             }
 
@@ -413,21 +445,28 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         1.0
     };
 
-    let channel_mults = multipliers::parse_multipliers(
-        &BaseApiClient::config_or(&guild_config, "xp_channel_multipliers", ""),
-    );
-    let role_mults = multipliers::parse_multipliers(
-        &BaseApiClient::config_or(&guild_config, "xp_role_multipliers", ""),
-    );
+    let channel_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
+        &guild_config,
+        "xp_channel_multipliers",
+        "",
+    ));
+    let role_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
+        &guild_config,
+        "xp_role_multipliers",
+        "",
+    ));
 
     let channel_mult = multipliers::get_channel_multiplier(&channel_mults, msg.channel_id.get());
-    let user_roles: Vec<u64> = msg.member.as_ref()
+    let user_roles: Vec<u64> = msg
+        .member
+        .as_ref()
         .map(|m| m.roles.iter().map(|r| r.get()).collect())
         .unwrap_or_default();
     let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
     let base_xp = BaseApiClient::config_u64(&guild_config, "xp_per_message", 15) as f64;
-    let final_xp = multipliers::calc_xp_amount(base_xp, channel_mult, role_mult, streak_mult, 1.0, 1000.0);
+    let final_xp =
+        multipliers::calc_xp_amount(base_xp, channel_mult, role_mult, streak_mult, 1.0, 1000.0);
     info!(
         guild = %guild_id, user = %msg.author.id, channel = %msg.channel_id,
         base_xp, channel_mult, role_mult, streak_mult, final_xp,
@@ -459,13 +498,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             // Renommage `[NN]Pseudo` uniquement quand le niveau global change.
             if result.user.level > result.old_level_global {
                 drop(data);
-                nickname::apply_level_prefix(
-                    ctx,
-                    guild_id,
-                    msg.author.id,
-                    result.user.level,
-                )
-                .await;
+                nickname::apply_level_prefix(ctx, guild_id, msg.author.id, result.user.level).await;
             }
         }
         Err(e) => {
@@ -522,7 +555,9 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
             if old_ch != new.channel_id {
                 if let Some(tracker) = tracker {
                     let ch = new.channel_id.map(|c| c.get()).unwrap_or(0);
-                    tracker.set_voice_channel(guild_id.get(), user_id.get(), ch).await;
+                    tracker
+                        .set_voice_channel(guild_id.get(), user_id.get(), ch)
+                        .await;
                 }
             }
         }
@@ -539,7 +574,9 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
 
                     let (channel_id_str, channel_name) = if let Some(old_state) = &old {
                         if let Some(ch_id) = old_state.channel_id {
-                            let name = ch_id.to_channel(&ctx.http).await
+                            let name = ch_id
+                                .to_channel(&ctx.http)
+                                .await
                                 .ok()
                                 .and_then(|c| c.guild())
                                 .map(|c| c.name.clone())
@@ -567,11 +604,21 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             warn!(error = %e, "Impossible d'envoyer les stats vocal au backend");
                         }
 
-                        let (xp_per_minute, channel_mult, role_mult) = if let Some(base) = data.get::<ApiClientKey>() {
-                            let gc = base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default();
-                            let xpm = BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
-                            let ch_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(&gc, "xp_channel_multipliers", ""));
-                            let r_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(&gc, "xp_role_multipliers", ""));
+                        let (xp_per_minute, channel_mult, role_mult) = if let Some(base) =
+                            data.get::<ApiClientKey>()
+                        {
+                            let gc = base
+                                .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+                                .await
+                                .unwrap_or_default();
+                            let xpm =
+                                BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
+                            let ch_mults = multipliers::parse_multipliers(
+                                &BaseApiClient::config_or(&gc, "xp_channel_multipliers", ""),
+                            );
+                            let r_mults = multipliers::parse_multipliers(
+                                &BaseApiClient::config_or(&gc, "xp_role_multipliers", ""),
+                            );
                             let ch_id_u64 = channel_id_str.parse::<u64>().unwrap_or(0);
                             let ch_mult = multipliers::get_channel_multiplier(&ch_mults, ch_id_u64);
                             let user_roles: Vec<u64> = old
@@ -585,7 +632,14 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             (5.0, 1.0, 1.0)
                         };
                         let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
-                        let xp_amount = multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
+                        let xp_amount = multipliers::calc_xp_amount(
+                            base_voice,
+                            channel_mult,
+                            role_mult,
+                            1.0,
+                            0.0,
+                            100_000.0,
+                        );
                         info!(
                             guild = %guild_id, user = %user_id, channel = %channel_id_str,
                             seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
@@ -604,11 +658,17 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             {
                                 Ok(result) => {
                                     if result.leveled_up {
-                                        let voice_guild_config = if let Some(base) = data.get::<ApiClientKey>() {
-                                            base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default()
-                                        } else {
-                                            HashMap::new()
-                                        };
+                                        let voice_guild_config =
+                                            if let Some(base) = data.get::<ApiClientKey>() {
+                                                base.get_guild_config_for(
+                                                    &guild_id.to_string(),
+                                                    MODULE_BOT_NAME,
+                                                )
+                                                .await
+                                                .unwrap_or_default()
+                                            } else {
+                                                HashMap::new()
+                                            };
                                         announce_level_up(
                                             ctx,
                                             &voice_guild_config,
@@ -623,10 +683,7 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                         let new_level = result.user.level;
                                         drop(data);
                                         nickname::apply_level_prefix(
-                                            ctx,
-                                            guild_id,
-                                            user_id,
-                                            new_level,
+                                            ctx, guild_id, user_id, new_level,
                                         )
                                         .await;
                                         return;
@@ -653,7 +710,10 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
 
     let data = ctx.data.read().await;
     let role_ids: Vec<u64> = if let Some(base) = data.get::<ApiClientKey>() {
-        let config = match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
+        let config = match base
+            .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+            .await
+        {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -673,8 +733,12 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
 
     for role_id in role_ids {
         match new_member.add_role(&ctx.http, RoleId::new(role_id)).await {
-            Ok(_) => info!(guild=%guild_id, user=%new_member.user.id, role=%role_id, "Role par defaut attribue"),
-            Err(e) => warn!(guild=%guild_id, user=%new_member.user.id, error=%e, "Echec attribution role par defaut"),
+            Ok(_) => {
+                info!(guild=%guild_id, user=%new_member.user.id, role=%role_id, "Role par defaut attribue")
+            }
+            Err(e) => {
+                warn!(guild=%guild_id, user=%new_member.user.id, error=%e, "Echec attribution role par defaut")
+            }
         }
     }
 }

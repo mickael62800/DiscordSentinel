@@ -1,20 +1,20 @@
-use axum::extract::Query;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::audit::audit_logs::AuditLogQueryParams;
 use crate::adapters::inbound::http::dto::audit::audit_logs::AuditLogResponseDto;
 use crate::adapters::inbound::http::dto::audit::audit_logs::CreateAuditLogDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use sentinel_core::domain::errors::DomainError;
 
 pub async fn create_audit_log(
     State(state): State<AppState>,
@@ -32,12 +32,18 @@ pub async fn purge_audit_logs(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.purge.audit_logs",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.purge.audit_logs",
         "role insuffisant pour purger les audit logs",
     )
     .await?;
 
-    let deleted = state.audit_logs_uc.delete_older_than_days(&guild_id, 0).await?;
+    let deleted = state
+        .audit_logs_uc
+        .delete_older_than_days(&guild_id, 0)
+        .await?;
     Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
@@ -47,7 +53,9 @@ pub async fn list_audit_logs(
 ) -> Result<Json<Vec<AuditLogResponseDto>>, ApiError> {
     // Securite : guild_id obligatoire pour eviter une fuite inter-guild.
     let guild_id = params.guild_id.ok_or_else(|| {
-        ApiError(DomainError::ValidationError("guild_id est obligatoire".into()))
+        ApiError(DomainError::ValidationError(
+            "guild_id est obligatoire".into(),
+        ))
     })?;
 
     let filters = AuditLogFilters {
@@ -58,9 +66,6 @@ pub async fn list_audit_logs(
         offset: normalize_offset(params.offset),
     };
 
-    let logs = state
-        .audit_logs_uc
-        .list(Some(&guild_id), filters)
-        .await?;
+    let logs = state.audit_logs_uc.list(Some(&guild_id), filters).await?;
     Ok(map_to_dtos(logs))
 }

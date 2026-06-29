@@ -8,22 +8,22 @@
 //!
 //! Logique metier zero : on ne fait que deleguer au use case.
 
-use axum::extract::Extension;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use axum::http::StatusCode;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use axum::extract::Extension;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Json;
 use sentinel_core::domain::entities::coude::taunt::TauntEvent;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct TauntEventDto {

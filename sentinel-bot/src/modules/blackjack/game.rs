@@ -8,8 +8,8 @@ use serenity::model::application::ComponentInteraction;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 
-use super::{ChannelManagerKey, GameApiKey, BET_PREFIX, CLOSE_TABLE_ID};
 use super::game_logic;
+use super::{ChannelManagerKey, GameApiKey, BET_PREFIX, CLOSE_TABLE_ID};
 
 /// Selection d'une mise -> demarre la partie.
 pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentInteraction) {
@@ -166,9 +166,6 @@ async fn send_replay_buttons(ctx: &Context, channel_id: ChannelId) {
     let row = CreateActionRow::Buttons(buttons);
 
     let _ = channel_id
-        .send_message(
-            ctx,
-            CreateMessage::new().embed(embed).components(vec![row]),
-        )
+        .send_message(ctx, CreateMessage::new().embed(embed).components(vec![row]))
         .await;
 }

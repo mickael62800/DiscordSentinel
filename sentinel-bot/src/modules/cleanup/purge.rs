@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption, GetMessages, MessageId,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption, GetMessages, MessageId,
 };
 use tracing::error;
 
 use crate::shared::discord_helpers::{defer_ephemeral, followup_ephemeral_embed};
-use crate::shared::embeds::{success_embed, moderate_embed};
+use crate::shared::embeds::{moderate_embed, success_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
 /// Limite Discord : bulk_delete ne fonctionne que sur les messages < 14 jours.
@@ -44,20 +44,16 @@ pub fn register() -> CreateCommand {
                 "user",
                 "Supprimer les messages d'un utilisateur (par membre OU par ID)",
             )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::User,
-                    "utilisateur",
-                    "Membre cible (laisse vide si tu utilises user_id)",
-                ),
-            )
-            .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "user_id",
-                    "ID de l'utilisateur (utile pour un membre parti / banni)",
-                ),
-            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::User,
+                "utilisateur",
+                "Membre cible (laisse vide si tu utilises user_id)",
+            ))
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::String,
+                "user_id",
+                "ID de l'utilisateur (utile pour un membre parti / banni)",
+            ))
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Integer,
@@ -76,12 +72,8 @@ pub fn register() -> CreateCommand {
                 "Supprimer les messages contenant un texte",
             )
             .add_sub_option(
-                CreateCommandOption::new(
-                    CommandOptionType::String,
-                    "texte",
-                    "Texte a rechercher",
-                )
-                .required(true),
+                CreateCommandOption::new(CommandOptionType::String, "texte", "Texte a rechercher")
+                    .required(true),
             )
             .add_sub_option(
                 CreateCommandOption::new(
@@ -169,14 +161,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_error(ctx, command, "Cette commande ne peut etre utilisee que sur un serveur.").await;
+            reply_error(
+                ctx,
+                command,
+                "Cette commande ne peut etre utilisee que sur un serveur.",
+            )
+            .await;
             return;
         }
     };
 
     // Verifier la permission MANAGE_MESSAGES
     if !has_manage_messages(ctx, command).await {
-        reply_error(ctx, command, "Vous n'avez pas la permission **Gerer les messages**.").await;
+        reply_error(
+            ctx,
+            command,
+            "Vous n'avez pas la permission **Gerer les messages**.",
+        )
+        .await;
         return;
     }
 
@@ -285,13 +287,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .iter()
                 .find(|o| o.name == "user_id")
                 .and_then(|o| o.value.as_str())
-                .map(|s| s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>'))
+                .map(|s| {
+                    s.trim()
+                        .trim_start_matches("<@")
+                        .trim_start_matches('!')
+                        .trim_end_matches('>')
+                })
                 .and_then(|s| s.parse::<u64>().ok())
                 .map(serenity::all::UserId::new);
             match from_picker.or(from_id) {
-                Some(uid) => messages.into_iter().filter(|m| m.author.id == uid).collect(),
+                Some(uid) => messages
+                    .into_iter()
+                    .filter(|m| m.author.id == uid)
+                    .collect(),
                 None => {
-                    reply_error(ctx, command, "Indique un membre (`utilisateur`) **ou** un identifiant (`user_id`).").await;
+                    reply_error(
+                        ctx,
+                        command,
+                        "Indique un membre (`utilisateur`) **ou** un identifiant (`user_id`).",
+                    )
+                    .await;
                     return;
                 }
             }
@@ -371,7 +386,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         } else {
                             deleted += 1;
                         }
-                        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
+                        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS))
+                            .await;
                     }
                 }
             }
@@ -459,7 +475,10 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
 
     loop {
         let messages = match channel_id
-            .messages(&ctx.http, GetMessages::new().limit(DISCORD_BULK_DELETE_BATCH as u8))
+            .messages(
+                &ctx.http,
+                GetMessages::new().limit(DISCORD_BULK_DELETE_BATCH as u8),
+            )
             .await
         {
             Ok(m) => m,
@@ -505,7 +524,8 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
                             } else {
                                 deleted += 1;
                             }
-                            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
+                            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS))
+                                .await;
                         }
                     }
                 }

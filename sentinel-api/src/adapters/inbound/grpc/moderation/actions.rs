@@ -10,17 +10,17 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::moderation::v1 as proto;
+use sentinel_proto::moderation::v1::moderation_service_server::ModerationService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::moderation::v1 as proto;
-use sentinel_proto::moderation::v1::moderation_service_server::ModerationService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
 pub struct ModerationGrpc {
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
 }
@@ -101,10 +101,13 @@ fn user_history_to_proto(h: UserModerationHistory) -> proto::UserHistory {
         total_warns: h.total_warns,
         total_mutes: h.total_mutes,
         total_bans: h.total_bans,
-        actions: h.actions.into_iter().map(moderation_action_to_proto).collect(),
+        actions: h
+            .actions
+            .into_iter()
+            .map(moderation_action_to_proto)
+            .collect(),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/actions.rs"]

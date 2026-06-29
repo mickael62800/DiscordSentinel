@@ -85,7 +85,9 @@ struct Src(i32);
 #[derive(serde::Serialize)]
 struct Dst(i32);
 impl From<Src> for Dst {
-    fn from(s: Src) -> Self { Dst(s.0 * 2) }
+    fn from(s: Src) -> Self {
+        Dst(s.0 * 2)
+    }
 }
 
 #[test]

@@ -6,19 +6,19 @@ use uuid::Uuid;
 
 use crate::domain::entities::ai::image_analysis::ImageAnalysis;
 use crate::domain::entities::ai::image_analysis::ImageClassification;
-use crate::domain::entities::moderation::infraction::Infraction;
-use crate::domain::errors::DomainError;
-use crate::ports::outbound::ai::inference_service::InferenceService;
-use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
-use crate::domain::enums::moderation::action::Action;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::enums::moderation::action::Action;
 use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::errors::DomainError;
+use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::ai::inference_service::InferenceService;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_VISION_THRESHOLD: f32 = 0.5;
 
@@ -138,7 +138,11 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
     async fn analyze_image(&self, cmd: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError> {
         // 0. Charger la config automod-bot (cles vision_enabled + vision_threshold,
         //    fusionnees depuis l'ancien ia_config via la migration 146).
-        let automod_entries = match self.bot_config_repo.get_config(&cmd.guild_id, "automod-bot").await {
+        let automod_entries = match self
+            .bot_config_repo
+            .get_config(&cmd.guild_id, "automod-bot")
+            .await
+        {
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config automod-bot (vision), utilisation defauts");
@@ -168,7 +172,11 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         //     analyse cette image (meme bytes -> meme SHA-256), reutilise
         //     les classifications stockees. Evite de relancer l'inference
         //     sur des images repostees (memes/tendances/repost-bot).
-        let img_hash = if vcfg.hash_cache_enabled { Some(image_hash(&cmd.image_bytes)) } else { None };
+        let img_hash = if vcfg.hash_cache_enabled {
+            Some(image_hash(&cmd.image_bytes))
+        } else {
+            None
+        };
         let cache_key = img_hash.as_ref().map(|h| format!("vision_hash:{h}"));
         let classifications = if let Some(key) = &cache_key {
             match self.cache.get_json(key).await {
@@ -185,28 +193,39 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
                 },
                 _ => None,
             }
-        } else { None };
+        } else {
+            None
+        };
 
         let classifications = match classifications {
             Some(c) => c,
             None => {
                 // 2b. Preprocesser l'image (decode, resize, normalize)
-                let image_tensor = preprocess_image(&cmd.image_bytes)
-                    .map_err(|e| DomainError::Internal(format!("Erreur preprocessing image: {e}")))?;
+                let image_tensor = preprocess_image(&cmd.image_bytes).map_err(|e| {
+                    DomainError::Internal(format!("Erreur preprocessing image: {e}"))
+                })?;
 
                 // 3. Inference ONNX (rate limited)
                 let _permit = self.inference_limiter.acquire().await?;
-                let classifs = self.inference.classify_image(image_tensor)
+                let classifs = self
+                    .inference
+                    .classify_image(image_tensor)
                     .map_err(|e| DomainError::Internal(format!("Erreur inference: {e}")))?;
 
                 // Persist cache (best-effort).
                 if let Some(key) = &cache_key {
                     let cached = CachedVisionResult {
-                        classifications: classifs.iter().map(|c| (c.label.clone(), c.confidence)).collect(),
+                        classifications: classifs
+                            .iter()
+                            .map(|c| (c.label.clone(), c.confidence))
+                            .collect(),
                         detected_labels: vec![], // pas utilise au cache miss, on recalcule
                     };
                     if let Ok(json) = serde_json::to_string(&cached) {
-                        let _ = self.cache.set_json(key, &json, vcfg.hash_cache_ttl_secs).await;
+                        let _ = self
+                            .cache
+                            .set_json(key, &json, vcfg.hash_cache_ttl_secs)
+                            .await;
                     }
                 }
                 classifs
@@ -274,7 +293,9 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         let mut triggered: Vec<&str> = Vec::new();
 
         for flag_type in &detected_labels {
-            let rule = rules.iter().find(|r| r.flag_type == *flag_type && r.enabled);
+            let rule = rules
+                .iter()
+                .find(|r| r.flag_type == *flag_type && r.enabled);
             let weight = match rule {
                 Some(r) => r.weight,
                 None => match flag_type {
@@ -351,8 +372,7 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
 fn preprocess_image(bytes: &[u8]) -> Result<ndarray::Array4<f32>, String> {
     use image::GenericImageView;
 
-    let img = image::load_from_memory(bytes)
-        .map_err(|e| format!("Image invalide: {e}"))?;
+    let img = image::load_from_memory(bytes).map_err(|e| format!("Image invalide: {e}"))?;
 
     let resized = img.resize_exact(224, 224, image::imageops::FilterType::Triangle);
 
@@ -365,14 +385,12 @@ fn preprocess_image(bytes: &[u8]) -> Result<ndarray::Array4<f32>, String> {
     for (x, y, pixel) in resized.pixels() {
         let rgb = pixel.0;
         for c in 0..3 {
-            tensor[[0, c, y as usize, x as usize]] =
-                (rgb[c] as f32 / 255.0 - mean[c]) / std[c];
+            tensor[[0, c, y as usize, x as usize]] = (rgb[c] as f32 / 255.0 - mean[c]) / std[c];
         }
     }
 
     Ok(tensor)
 }
-
 
 #[cfg(test)]
 #[path = "tests/analyze_image_service.rs"]

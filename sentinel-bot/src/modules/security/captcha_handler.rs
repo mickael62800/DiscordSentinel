@@ -71,8 +71,8 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
         let guild_id = match target_guild {
             Some(g) => g,
             None => {
-                let embed =
-                    warn_embed("\u{26a0}\u{fe0f} Deja verifie").description("Vous n'etes pas en quarantaine.");
+                let embed = warn_embed("\u{26a0}\u{fe0f} Deja verifie")
+                    .description("Vous n'etes pas en quarantaine.");
                 let response = serenity::builder::CreateInteractionResponse::Message(
                     serenity::builder::CreateInteractionResponseMessage::new()
                         .embed(embed)
@@ -90,7 +90,13 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                 // Bonne reponse — liberer
                 captcha_pending.remove(guild_id, user_id);
 
-                let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::security::MODULE_BOT_NAME).await {
+                let guild_config = match base
+                    .get_guild_config_for(
+                        &guild_id.to_string(),
+                        crate::modules::security::MODULE_BOT_NAME,
+                    )
+                    .await
+                {
                     Ok(cfg) => cfg,
                     Err(e) => {
                         tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -111,10 +117,7 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                 // Phase 5F — supprime la row DB pour eviter que le worker
                 // ne kick le user qui vient juste de valider.
                 if let Some(base) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-                    let path = format!(
-                        "/api/security/quarantine/{}/{}",
-                        guild_id, user_id
-                    );
+                    let path = format!("/api/security/quarantine/{}/{}", guild_id, user_id);
                     let _ = base.delete_json::<serde_json::Value>(&path).await;
                 }
 
@@ -183,7 +186,13 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                 continue;
             }
 
-            let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::security::MODULE_BOT_NAME).await {
+            let guild_config = match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::security::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild (captcha bouton)");
@@ -202,10 +211,7 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
 
                 // Phase 5F — supprime la row DB pour eviter kick worker.
                 if let Some(base) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-                    let path = format!(
-                        "/api/security/quarantine/{}/{}",
-                        guild_id, user_id
-                    );
+                    let path = format!("/api/security/quarantine/{}/{}", guild_id, user_id);
                     let _ = base.delete_json::<serde_json::Value>(&path).await;
                 }
 
@@ -213,10 +219,7 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                     guild_id: guild_id.to_string(),
                     event_type: "captcha_verified".to_string(),
                     severity: "info".to_string(),
-                    description: format!(
-                        "Utilisateur {} a passe le captcha",
-                        component.user.name
-                    ),
+                    description: format!("Utilisateur {} a passe le captcha", component.user.name),
                     user_ids: vec![user_id.to_string()],
                 };
                 if let Err(e) = sec_api.report_event(&event).await {

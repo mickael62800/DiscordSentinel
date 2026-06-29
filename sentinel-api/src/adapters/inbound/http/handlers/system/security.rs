@@ -79,7 +79,11 @@ pub async fn top_ips(
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("1h"));
     let limit = q.limit.unwrap_or(20).clamp(1, 100);
 
-    let rows = state.security_logs_uc.top_ips(window, limit).await.map_err(ApiError)?;
+    let rows = state
+        .security_logs_uc
+        .top_ips(window, limit)
+        .await
+        .map_err(ApiError)?;
     Ok(Json(
         rows.into_iter()
             .map(|r| TopIpEntry {
@@ -113,7 +117,11 @@ pub async fn auth_failures(
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
-    let rows = state.security_logs_uc.auth_failures(window, limit).await.map_err(ApiError)?;
+    let rows = state
+        .security_logs_uc
+        .auth_failures(window, limit)
+        .await
+        .map_err(ApiError)?;
     Ok(Json(
         rows.into_iter()
             .map(|r| AuthFailureEntry {
@@ -173,7 +181,11 @@ pub async fn banned_ips(
     Ok(Json(BannedIpsResponse {
         installed: true,
         updated_at: Some(status.updated_at),
-        message: format!("{} IPs actuellement bannies sur {} jail(s)", total, jails.len()),
+        message: format!(
+            "{} IPs actuellement bannies sur {} jail(s)",
+            total,
+            jails.len()
+        ),
         jails,
     }))
 }
@@ -211,7 +223,11 @@ pub async fn audit_logs(
         event_type_prefix: q.event_type_prefix,
         limit: q.limit.unwrap_or(100).clamp(1, 500),
     };
-    let rows = state.security_audit_uc.audit_logs(filter).await.map_err(ApiError)?;
+    let rows = state
+        .security_audit_uc
+        .audit_logs(filter)
+        .await
+        .map_err(ApiError)?;
     Ok(Json(
         rows.into_iter()
             .map(|e| AuditEntry {
@@ -322,7 +338,10 @@ pub async fn unban_ip(
 
     Ok(Json(BanIpResponse {
         ok: true,
-        message: format!("IP {} retiree de la blocklist (sera applique au prochain tick)", ip),
+        message: format!(
+            "IP {} retiree de la blocklist (sera applique au prochain tick)",
+            ip
+        ),
     }))
 }
 
@@ -335,8 +354,12 @@ async fn read_probe<T: for<'de> serde::Deserialize<'de>>(
     probe: HostProbe,
 ) -> Result<T, ApiError> {
     let value = state.host_probe_uc.read(probe).await.map_err(ApiError)?;
-    serde_json::from_value(value)
-        .map_err(|e| ApiError(DomainError::Internal(format!("parse {}: {e}", probe.feature()))))
+    serde_json::from_value(value).map_err(|e| {
+        ApiError(DomainError::Internal(format!(
+            "parse {}: {e}",
+            probe.feature()
+        )))
+    })
 }
 
 // SSH failures
@@ -542,7 +565,9 @@ pub async fn container_changes(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<ContainerChangesResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let monitor = state.container_monitor.clone()
+    let monitor = state
+        .container_monitor
+        .clone()
         .ok_or_else(|| ApiError(DomainError::Internal("container monitor desactive".into())))?;
     let snap = monitor.read().await;
     Ok(Json(ContainerChangesResponse {
@@ -619,7 +644,11 @@ pub async fn manual_bans(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let bans = state.ip_bans_uc.list_manual_bans().await.map_err(ApiError)?;
+    let bans = state
+        .ip_bans_uc
+        .list_manual_bans()
+        .await
+        .map_err(ApiError)?;
     Ok(Json(
         bans.into_iter()
             .map(|b| ManualBanEntry {
@@ -724,7 +753,11 @@ pub async fn last_successful_logins(
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
     let limit = q.limit.unwrap_or(20).clamp(1, 200);
-    let rows = state.security_audit_uc.recent_logins(limit).await.map_err(ApiError)?;
+    let rows = state
+        .security_audit_uc
+        .recent_logins(limit)
+        .await
+        .map_err(ApiError)?;
     Ok(Json(
         rows.into_iter()
             .map(|l| SuccessfulLoginEntry {
@@ -792,7 +825,9 @@ pub async fn traffic_trend(
             .collect(),
         baseline_avg: trend.baseline_avg,
         peak: trend.peak,
-        peak_at: trend.peak_at.map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        peak_at: trend
+            .peak_at
+            .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
         alert: trend.alert,
         alert_reason: trend.alert_reason,
     }))
@@ -845,7 +880,8 @@ pub async fn cleanup_security_logs(
     let Some(Extension(ctx)) = &rbac else {
         return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
     };
-    require_superadmin(&state, ctx).map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
+    require_superadmin(&state, ctx)
+        .map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
 
     let options = CleanupOptions {
         older_than_days: q.older_than_days.unwrap_or(0).max(0),
@@ -856,7 +892,11 @@ pub async fn cleanup_security_logs(
         include_manual_bans: q.include_manual_bans.unwrap_or(false),
     };
 
-    let report = state.security_audit_uc.cleanup(options.clone()).await.map_err(ApiError)?;
+    let report = state
+        .security_audit_uc
+        .cleanup(options.clone())
+        .await
+        .map_err(ApiError)?;
 
     let actor = rbac
         .as_ref()
@@ -879,7 +919,11 @@ pub async fn cleanup_security_logs(
         None,
         "security.cleanup",
         Some(&format!("days={}", options.older_than_days)),
-        if options.include_audit_logs { "warn" } else { "info" },
+        if options.include_audit_logs {
+            "warn"
+        } else {
+            "info"
+        },
         serde_json::json!({
             "deleted_api_logs": report.deleted_api_logs,
             "deleted_audit_logs": report.deleted_audit_logs,

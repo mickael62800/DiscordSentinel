@@ -7,9 +7,9 @@
 //!   - DELETE : owner+ (action destructive)
 
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -111,9 +111,19 @@ pub async fn list_messages(
     ));
 
     // Bind helper macro-like
-    let mut q_items = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, String, String)>(&sql)
-        .bind(&guild_id)
-        .bind(min_len);
+    let mut q_items = sqlx::query_as::<
+        _,
+        (
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            String,
+            String,
+        ),
+    >(&sql)
+    .bind(&guild_id)
+    .bind(min_len);
     let mut q_count = sqlx::query_scalar::<_, i64>(&count_sql)
         .bind(&guild_id)
         .bind(min_len);
@@ -135,21 +145,20 @@ pub async fn list_messages(
         .fetch_all(&state.pg_pool)
         .await
         .map_err(sqlx_internal("query"))?;
-    let total = q_count
-        .fetch_one(&state.pg_pool)
-        .await
-        .unwrap_or(0);
+    let total = q_count.fetch_one(&state.pg_pool).await.unwrap_or(0);
 
     let items: Vec<DatasetMessageDto> = rows
         .into_iter()
-        .map(|(id, user_id, channel_id, channel_name, content, created_at)| DatasetMessageDto {
-            id,
-            user_id,
-            channel_id,
-            channel_name,
-            content,
-            created_at,
-        })
+        .map(
+            |(id, user_id, channel_id, channel_name, content, created_at)| DatasetMessageDto {
+                id,
+                user_id,
+                channel_id,
+                channel_name,
+                content,
+                created_at,
+            },
+        )
         .collect();
 
     Ok(Json(ListMessagesResponse { items, total }))
@@ -190,7 +199,12 @@ pub async fn bulk_delete(
         .iter()
         .map(|s| uuid::Uuid::parse_str(s))
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| ApiError(DomainError::ValidationError(format!("uuid invalide: {}", e))))?;
+        .map_err(|e| {
+            ApiError(DomainError::ValidationError(format!(
+                "uuid invalide: {}",
+                e
+            )))
+        })?;
 
     let res = sqlx::query(
         "DELETE FROM ai_dataset_messages \

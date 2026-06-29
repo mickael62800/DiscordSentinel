@@ -21,9 +21,5 @@ pub trait WatchedUserRepository: Send + Sync {
         added_by: &str,
     ) -> Result<(), DomainError>;
 
-    async fn remove_manual_watch(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<(), DomainError>;
+    async fn remove_manual_watch(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 }

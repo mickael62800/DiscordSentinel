@@ -166,10 +166,9 @@ impl ApiClient {
         payload: &UpdateMemberPayload,
     ) -> Result<(), String> {
         let roles_json = match &payload.roles {
-            Some(v) => Some(
-                serde_json::to_string(v)
-                    .map_err(|e| format!("serialisation roles: {e}"))?,
-            ),
+            Some(v) => {
+                Some(serde_json::to_string(v).map_err(|e| format!("serialisation roles: {e}"))?)
+            }
             None => None,
         };
         let req = proto_members::UpdateMemberRequest {
@@ -218,9 +217,7 @@ impl ApiClient {
         let mut client = self.grpc.security();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.analyze_new_member(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.analyze_new_member(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(SecurityDecisionResponse {
@@ -265,8 +262,8 @@ pub struct SecurityDecisionResponse {
 }
 
 fn member_payload_to_proto(p: &MemberPayload) -> Result<proto_members::GuildMember, String> {
-    let roles_json = serde_json::to_string(&p.roles)
-        .map_err(|e| format!("serialisation roles: {e}"))?;
+    let roles_json =
+        serde_json::to_string(&p.roles).map_err(|e| format!("serialisation roles: {e}"))?;
     Ok(proto_members::GuildMember {
         guild_id: p.guild_id.clone(),
         user_id: p.user_id.clone(),

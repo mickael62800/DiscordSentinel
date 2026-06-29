@@ -15,13 +15,13 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 use sentinel_core::domain::entities::system::analytics::ActionDistribution;
 use sentinel_core::domain::entities::system::analytics::HourlyActivity;
 use sentinel_core::domain::entities::system::analytics::ModerationTrend;
 use sentinel_core::domain::entities::system::analytics::PeakActivity;
 use sentinel_core::domain::entities::system::analytics::TopInfractor;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 use test_helpers::build_test_state_analytics;
 
@@ -35,46 +35,100 @@ struct MockAnalyticsRepo {
 }
 
 impl MockAnalyticsRepo {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
 }
 
 #[async_trait]
 impl AnalyticsRepository for MockAnalyticsRepo {
-    async fn get_heatmap(&self, _: Option<&str>, _: i32) -> Result<Vec<HourlyActivity>, DomainError> {
+    async fn get_heatmap(
+        &self,
+        _: Option<&str>,
+        _: i32,
+    ) -> Result<Vec<HourlyActivity>, DomainError> {
         self.calls.lock().unwrap().push("heatmap".into());
-        Ok(vec![HourlyActivity { hour: 10, day_of_week: 1, messages: 50, infractions: 2 }])
-    }
-    async fn get_action_distribution(&self, _: Option<&str>, _: i32) -> Result<Vec<ActionDistribution>, DomainError> {
-        self.calls.lock().unwrap().push("actions".into());
-        Ok(vec![ActionDistribution { action: "warn".into(), count: 10, percentage: 50.0 }])
-    }
-    async fn get_top_infractors(&self, _: Option<&str>, _: i32, _: i64) -> Result<Vec<TopInfractor>, DomainError> {
-        self.calls.lock().unwrap().push("infractors".into());
-        Ok(vec![TopInfractor {
-            user_id: "u1".into(), username: "alice".into(),
-            total_infractions: 5, warns: 3, deletes: 1, mutes: 1, bans: 0,
+        Ok(vec![HourlyActivity {
+            hour: 10,
+            day_of_week: 1,
+            messages: 50,
+            infractions: 2,
         }])
     }
-    async fn get_moderation_trend(&self, _: Option<&str>, _: i32) -> Result<Vec<ModerationTrend>, DomainError> {
+    async fn get_action_distribution(
+        &self,
+        _: Option<&str>,
+        _: i32,
+    ) -> Result<Vec<ActionDistribution>, DomainError> {
+        self.calls.lock().unwrap().push("actions".into());
+        Ok(vec![ActionDistribution {
+            action: "warn".into(),
+            count: 10,
+            percentage: 50.0,
+        }])
+    }
+    async fn get_top_infractors(
+        &self,
+        _: Option<&str>,
+        _: i32,
+        _: i64,
+    ) -> Result<Vec<TopInfractor>, DomainError> {
+        self.calls.lock().unwrap().push("infractors".into());
+        Ok(vec![TopInfractor {
+            user_id: "u1".into(),
+            username: "alice".into(),
+            total_infractions: 5,
+            warns: 3,
+            deletes: 1,
+            mutes: 1,
+            bans: 0,
+        }])
+    }
+    async fn get_moderation_trend(
+        &self,
+        _: Option<&str>,
+        _: i32,
+    ) -> Result<Vec<ModerationTrend>, DomainError> {
         self.calls.lock().unwrap().push("trend".into());
         Ok(vec![ModerationTrend {
             day: NaiveDate::from_ymd_opt(2024, 6, 1).unwrap(),
-            total: 10, warns: 5, deletes: 2, mutes: 2, bans: 1,
+            total: 10,
+            warns: 5,
+            deletes: 2,
+            mutes: 2,
+            bans: 1,
         }])
     }
-    async fn get_peak_hours(&self, _: Option<&str>, _: i32) -> Result<Vec<PeakActivity>, DomainError> {
+    async fn get_peak_hours(
+        &self,
+        _: Option<&str>,
+        _: i32,
+    ) -> Result<Vec<PeakActivity>, DomainError> {
         self.calls.lock().unwrap().push("peaks".into());
-        Ok(vec![PeakActivity { hour: 20, avg_messages: 100.0, avg_infractions: 5.0 }])
+        Ok(vec![PeakActivity {
+            hour: 20,
+            avg_messages: 100.0,
+            avg_infractions: 5.0,
+        }])
     }
-    async fn record_hourly(&self, _: &str, _: i16, _: i64, _: i32) -> Result<(), DomainError> { Ok(()) }
+    async fn record_hourly(&self, _: &str, _: i16, _: i64, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn build_app(repo: Arc<MockAnalyticsRepo>) -> axum::Router {
@@ -151,7 +205,15 @@ async fn analytics_params_accept_days_and_guild_and_limit() {
     let repo = Arc::new(MockAnalyticsRepo::new());
     let app = build_app(repo.clone());
     let uniq = uuid::Uuid::new_v4().to_string().replace('-', "");
-    let (status, _) = get(app, &format!("/api/analytics/top-infractors?guild_id={uniq}&days=14&limit=5")).await;
+    let (status, _) = get(
+        app,
+        &format!("/api/analytics/top-infractors?guild_id={uniq}&days=14&limit=5"),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
-    assert!(repo.calls.lock().unwrap().contains(&"infractors".to_string()));
+    assert!(repo
+        .calls
+        .lock()
+        .unwrap()
+        .contains(&"infractors".to_string()));
 }

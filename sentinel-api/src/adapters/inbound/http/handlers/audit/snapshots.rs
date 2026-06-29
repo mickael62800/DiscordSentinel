@@ -71,11 +71,10 @@ async fn module_enabled(state: &AppState, guild_id: &str) -> bool {
 }
 
 async fn list_guild_ids(state: &AppState) -> Result<Vec<String>, ApiError> {
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
-            .fetch_all(&state.pg_pool)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
+        .fetch_all(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
     Ok(rows.into_iter().map(|(g,)| g).collect())
 }
 
@@ -103,14 +102,15 @@ pub async fn snapshot_daily_all(
             skipped += 1;
             continue;
         }
-        let track_voice =
-            parse_bool(read_cfg(&state, guild_id, "track_voice_stats").await, true);
-        let track_msg =
-            parse_bool(read_cfg(&state, guild_id, "track_message_stats").await, true);
+        let track_voice = parse_bool(read_cfg(&state, guild_id, "track_voice_stats").await, true);
+        let track_msg = parse_bool(
+            read_cfg(&state, guild_id, "track_message_stats").await,
+            true,
+        );
         // Heure UTC à laquelle la baseline change (0-23). Permet aux admins
         // qui veulent un "jour" qui finit ailleurs qu'à minuit UTC.
-        let anchor_hour = parse_i64(read_cfg(&state, guild_id, "baseline_anchor_hour").await, 0)
-            .clamp(0, 23);
+        let anchor_hour =
+            parse_i64(read_cfg(&state, guild_id, "baseline_anchor_hour").await, 0).clamp(0, 23);
 
         // Le "stat day" courant : si l'heure UTC >= anchor, on est dans le
         // jour courant ; sinon on est encore dans le jour précédent (la
@@ -130,7 +130,11 @@ pub async fn snapshot_daily_all(
                     COALESCE((SELECT SUM(voice_seconds) FROM user_stats WHERE guild_id = $1), 0) \
              ON CONFLICT (guild_id, day) DO NOTHING"
         );
-        if let Err(e) = sqlx::query(&baseline_sql).bind(guild_id).execute(&state.pg_pool).await {
+        if let Err(e) = sqlx::query(&baseline_sql)
+            .bind(guild_id)
+            .execute(&state.pg_pool)
+            .await
+        {
             tracing::warn!(error = %e, guild = %guild_id, "snapshot_daily baseline insert echec");
             continue;
         }
@@ -175,14 +179,22 @@ pub async fn snapshot_daily_all(
                warns = EXCLUDED.warns, mutes = EXCLUDED.mutes, bans = EXCLUDED.bans"
         );
 
-        if let Err(e) = sqlx::query(&sql).bind(guild_id).execute(&state.pg_pool).await {
+        if let Err(e) = sqlx::query(&sql)
+            .bind(guild_id)
+            .execute(&state.pg_pool)
+            .await
+        {
             tracing::warn!(error = %e, guild = %guild_id, "snapshot_daily echec");
             continue;
         }
         processed += 1;
     }
 
-    Ok(Json(JobReport { guilds_processed: processed, guilds_skipped: skipped, status: "ok" }))
+    Ok(Json(JobReport {
+        guilds_processed: processed,
+        guilds_skipped: skipped,
+        status: "ok",
+    }))
 }
 
 /// POST /api/analytics/snapshot/hourly
@@ -198,8 +210,10 @@ pub async fn snapshot_hourly_all(
             skipped += 1;
             continue;
         }
-        let track_msg =
-            parse_bool(read_cfg(&state, guild_id, "track_message_stats").await, true);
+        let track_msg = parse_bool(
+            read_cfg(&state, guild_id, "track_message_stats").await,
+            true,
+        );
         let msg_expr = if track_msg {
             "COALESCE((SELECT COUNT(DISTINCT user_id) FROM user_stats WHERE guild_id = $1 AND updated_at >= date_trunc('hour', NOW())), 0)::bigint"
         } else {
@@ -213,14 +227,22 @@ pub async fn snapshot_hourly_all(
              ON CONFLICT (guild_id, day, hour) DO UPDATE SET \
                messages = EXCLUDED.messages, infractions = EXCLUDED.infractions"
         );
-        if let Err(e) = sqlx::query(&sql).bind(guild_id).execute(&state.pg_pool).await {
+        if let Err(e) = sqlx::query(&sql)
+            .bind(guild_id)
+            .execute(&state.pg_pool)
+            .await
+        {
             tracing::warn!(error = %e, guild = %guild_id, "snapshot_hourly echec");
             continue;
         }
         processed += 1;
     }
 
-    Ok(Json(JobReport { guilds_processed: processed, guilds_skipped: skipped, status: "ok" }))
+    Ok(Json(JobReport {
+        guilds_processed: processed,
+        guilds_skipped: skipped,
+        status: "ok",
+    }))
 }
 
 /// POST /api/analytics/retention-cleanup
@@ -242,8 +264,10 @@ pub async fn retention_cleanup_all(
         // 0 ou negatif = illimite, on ne purge pas cette dimension.
         let daily_retention =
             parse_i64(read_cfg(&state, guild_id, "data_retention_days").await, 90);
-        let hourly_retention =
-            parse_i64(read_cfg(&state, guild_id, "hourly_retention_days").await, 30);
+        let hourly_retention = parse_i64(
+            read_cfg(&state, guild_id, "hourly_retention_days").await,
+            30,
+        );
 
         if daily_retention <= 0 && hourly_retention <= 0 {
             // tout illimite : on skip
@@ -253,12 +277,14 @@ pub async fn retention_cleanup_all(
 
         if daily_retention > 0 {
             let r = daily_retention as i32;
-            let _ = sqlx::query("DELETE FROM daily_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
-                .bind(guild_id)
-                .bind(r)
-                .execute(&state.pg_pool)
-                .await
-                .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention daily echec"));
+            let _ = sqlx::query(
+                "DELETE FROM daily_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int",
+            )
+            .bind(guild_id)
+            .bind(r)
+            .execute(&state.pg_pool)
+            .await
+            .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention daily echec"));
             let _ = sqlx::query("DELETE FROM analytics_daily_baseline WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
                 .bind(guild_id)
                 .bind(r)
@@ -268,17 +294,23 @@ pub async fn retention_cleanup_all(
         }
         if hourly_retention > 0 {
             let r = hourly_retention as i32;
-            let _ = sqlx::query("DELETE FROM hourly_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int")
-                .bind(guild_id)
-                .bind(r)
-                .execute(&state.pg_pool)
-                .await
-                .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention hourly echec"));
+            let _ = sqlx::query(
+                "DELETE FROM hourly_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int",
+            )
+            .bind(guild_id)
+            .bind(r)
+            .execute(&state.pg_pool)
+            .await
+            .map_err(|e| tracing::warn!(error = %e, guild = %guild_id, "retention hourly echec"));
         }
         processed += 1;
     }
 
-    Ok(Json(JobReport { guilds_processed: processed, guilds_skipped: skipped, status: "ok" }))
+    Ok(Json(JobReport {
+        guilds_processed: processed,
+        guilds_skipped: skipped,
+        status: "ok",
+    }))
 }
 
 /// POST /api/analytics/publish-top-users
@@ -309,8 +341,10 @@ pub async fn publish_top_users_all(
             skipped += 1;
             continue;
         }
-        let enabled =
-            parse_bool(read_cfg(&state, guild_id, "top_users_publish_enabled").await, false);
+        let enabled = parse_bool(
+            read_cfg(&state, guild_id, "top_users_publish_enabled").await,
+            false,
+        );
         if !enabled {
             skipped += 1;
             continue;
@@ -322,8 +356,10 @@ pub async fn publish_top_users_all(
                 continue;
             }
         };
-        let interval_days =
-            parse_i64(read_cfg(&state, guild_id, "top_users_publish_interval_days").await, 7);
+        let interval_days = parse_i64(
+            read_cfg(&state, guild_id, "top_users_publish_interval_days").await,
+            7,
+        );
         if let Some(s) = read_cfg(&state, guild_id, LAST_PUBLISH_KEY).await {
             if let Ok(last) = chrono::DateTime::parse_from_rfc3339(&s) {
                 let elapsed = now.signed_duration_since(last.with_timezone(&chrono::Utc));
@@ -335,7 +371,8 @@ pub async fn publish_top_users_all(
         }
 
         let count = parse_i64(read_cfg(&state, guild_id, "top_users_count").await, 10);
-        let min_total = parse_i64(read_cfg(&state, guild_id, "low_activity_filter").await, 0).max(0);
+        let min_total =
+            parse_i64(read_cfg(&state, guild_id, "low_activity_filter").await, 0).max(0);
         let top = match state
             .analytics_repo
             .get_top_infractors(Some(guild_id), 30, count, min_total)
@@ -402,7 +439,11 @@ pub async fn publish_top_users_all(
         processed += 1;
     }
 
-    Ok(Json(JobReport { guilds_processed: processed, guilds_skipped: skipped, status: "ok" }))
+    Ok(Json(JobReport {
+        guilds_processed: processed,
+        guilds_skipped: skipped,
+        status: "ok",
+    }))
 }
 
 // ── Export ──────────────────────────────────────────────────────────────
@@ -446,15 +487,26 @@ pub async fn export_analytics(
             for a in &activities {
                 out.push_str(&format!(
                     "{},{},{},{},{},{},{},{},{},{}\n",
-                    a.day, a.messages, a.voice_minutes, a.active_members,
-                    a.new_members, a.leaves, a.infractions, a.warns, a.mutes, a.bans
+                    a.day,
+                    a.messages,
+                    a.voice_minutes,
+                    a.active_members,
+                    a.new_members,
+                    a.leaves,
+                    a.infractions,
+                    a.warns,
+                    a.mutes,
+                    a.bans
                 ));
             }
             Ok((
                 StatusCode::OK,
                 [
                     (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
-                    (header::CONTENT_DISPOSITION, "attachment; filename=\"analytics.csv\""),
+                    (
+                        header::CONTENT_DISPOSITION,
+                        "attachment; filename=\"analytics.csv\"",
+                    ),
                 ],
                 out,
             )

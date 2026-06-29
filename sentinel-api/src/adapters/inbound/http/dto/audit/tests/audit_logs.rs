@@ -1,6 +1,6 @@
 use super::*;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use chrono::Utc;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use uuid::Uuid;
 
 #[test]
@@ -76,7 +76,8 @@ fn query_params_deserializes_all_fields() {
         "guild_id": "g", "event_type": "ban",
         "actor_id": "a", "target_id": "t",
         "limit": 50, "offset": 100
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(p.guild_id.as_deref(), Some("g"));
     assert_eq!(p.event_type.as_deref(), Some("ban"));
     assert_eq!(p.actor_id.as_deref(), Some("a"));
@@ -95,7 +96,8 @@ fn create_dto_deserializes_with_custom_details() {
     let dto: CreateAuditLogDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "event_type": "x",
         "details": {"key": "value", "num": 42}
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.details["key"], "value");
     assert_eq!(dto.details["num"], 42);
 }
@@ -104,7 +106,8 @@ fn create_dto_deserializes_with_custom_details() {
 fn create_dto_skips_all_optionals() {
     let dto: CreateAuditLogDto = serde_json::from_value(serde_json::json!({
         "guild_id": "g", "event_type": "join"
-    })).unwrap();
+    }))
+    .unwrap();
     assert!(dto.actor_id.is_none());
     assert!(dto.actor_name.is_none());
     assert!(dto.target_id.is_none());
@@ -143,9 +146,12 @@ fn response_dto_preserves_details_json_unchanged() {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         event_type: "x".into(),
-        actor_id: None, actor_name: None,
-        target_id: None, target_name: None,
-        channel_id: None, channel_name: None,
+        actor_id: None,
+        actor_name: None,
+        target_id: None,
+        target_name: None,
+        channel_id: None,
+        channel_name: None,
         details: serde_json::json!({"array": [1, 2, 3], "nested": {"a": true}}),
         created_at: Utc::now(),
     };

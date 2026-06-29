@@ -10,8 +10,8 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::outbound::system::rate_limiter::RateLimiter;
-use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use crate::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::domain::entities::system::log_entry::LogEntry;
 
 #[derive(Clone)]
 pub struct ApiLoggerState {
@@ -59,7 +59,9 @@ pub async fn api_logger_middleware(
         if rl.observe(&client_ip).await {
             let rl_clone = rl.clone();
             let ip = client_ip.clone();
-            tokio::spawn(async move { rl_clone.trigger_ban(ip).await; });
+            tokio::spawn(async move {
+                rl_clone.trigger_ban(ip).await;
+            });
         }
     }
 
@@ -89,7 +91,14 @@ pub async fn api_logger_middleware(
 
         let status_text = status_label(status);
 
-        let message = format!("[{}] {} {} — {} {}", level.to_uppercase(), method, uri, status, status_text);
+        let message = format!(
+            "[{}] {} {} — {} {}",
+            level.to_uppercase(),
+            method,
+            uri,
+            status,
+            status_text
+        );
 
         let details = serde_json::json!({
             "method": method,

@@ -16,9 +16,9 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
+use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 // ══════════════════════════════════════════════════════════
 // Mock DiscordRoleRepository
@@ -31,8 +31,13 @@ struct MockDiscordRoleRepo {
 }
 
 impl MockDiscordRoleRepo {
-    fn new() -> Self { Self::default() }
-    fn with(self, r: DiscordRole) -> Self { self.roles.lock().unwrap().push(r); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with(self, r: DiscordRole) -> Self {
+        self.roles.lock().unwrap().push(r);
+        self
+    }
 }
 
 fn sample_role(guild_id: &str, id: &str, permissions: i64) -> DiscordRole {
@@ -58,12 +63,27 @@ impl DiscordRoleRepository for MockDiscordRoleRepo {
         Ok(())
     }
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<DiscordRole>, DomainError> {
-        Ok(self.roles.lock().unwrap().iter()
-            .filter(|r| r.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .roles
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
-    async fn find_by_id(&self, guild_id: &str, role_id: &str) -> Result<Option<DiscordRole>, DomainError> {
-        Ok(self.roles.lock().unwrap().iter()
-            .find(|r| r.guild_id == guild_id && r.id == role_id).cloned())
+    async fn find_by_id(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+    ) -> Result<Option<DiscordRole>, DomainError> {
+        Ok(self
+            .roles
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|r| r.guild_id == guild_id && r.id == role_id)
+            .cloned())
     }
 }
 
@@ -75,35 +95,66 @@ fn build_state(repo: Arc<MockDiscordRoleRepo>) -> AppState {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("PATCH").uri(uri)
+async fn patch_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> StatusCode {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
@@ -112,7 +163,10 @@ async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, ser
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -130,8 +184,8 @@ async fn list_roles_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_roles_serializes_permissions_as_string() {
     // Bigint permissions > 2^53 → doit etre string dans le JSON.
-    let repo = MockDiscordRoleRepo::new()
-        .with(sample_role("111111111111111111", "r1", 9007199254740993));
+    let repo =
+        MockDiscordRoleRepo::new().with(sample_role("111111111111111111", "r1", 9007199254740993));
     let app = router::build_for_test(build_state(Arc::new(repo)));
     let (status, json) = get(app, "/api/discord-roles/111111111111111111").await;
     assert_eq!(status, StatusCode::OK);
@@ -204,8 +258,11 @@ async fn delete_role_with_rbac_admin_succeeds() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = router::build_for_test(build_state(Arc::new(MockDiscordRoleRepo::new())));
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/discord-roles/111111111111111111/555",
-        "444444444444444444", Some(Role::Admin), Some("111111111111111111".into()),
+        "DELETE",
+        "/api/discord-roles/111111111111111111/555",
+        "444444444444444444",
+        Some(Role::Admin),
+        Some("111111111111111111".into()),
         None,
     );
     let (status, _) = send_request(app, req).await;
@@ -217,8 +274,11 @@ async fn delete_role_with_rbac_moderator_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = router::build_for_test(build_state(Arc::new(MockDiscordRoleRepo::new())));
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/discord-roles/111111111111111111/555",
-        "444444444444444444", Some(Role::Moderator), Some("111111111111111111".into()),
+        "DELETE",
+        "/api/discord-roles/111111111111111111/555",
+        "444444444444444444",
+        Some(Role::Moderator),
+        Some("111111111111111111".into()),
         None,
     );
     let (status, json) = send_request(app, req).await;

@@ -275,14 +275,19 @@ fn next_monthly(day_of_month: u8, hour: u8, minute: u8, after: DateTime<Utc>) ->
     let year = after.year();
     let month = after.month();
 
-    if let Some(candidate) = at_year_month_day_hour_minute(year, month, day_of_month, hour, minute) {
+    if let Some(candidate) = at_year_month_day_hour_minute(year, month, day_of_month, hour, minute)
+    {
         if candidate > after {
             return candidate;
         }
     }
 
     // Sinon : mois suivant.
-    let (next_year, next_month) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    let (next_year, next_month) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
     at_year_month_day_hour_minute(next_year, next_month, day_of_month, hour, minute)
         // Si meme le mois suivant n'a pas ce jour, on clampe au dernier jour
         // (rare : `day_of_month=31` en fevrier suivant -> 28/29).
@@ -314,7 +319,11 @@ fn at_year_month_day_hour_minute(
 }
 
 fn last_day_of_month(year: i32, month: u32) -> u8 {
-    let (next_y, next_m) = if month == 12 { (year + 1, 1) } else { (year, month + 1) };
+    let (next_y, next_m) = if month == 12 {
+        (year + 1, 1)
+    } else {
+        (year, month + 1)
+    };
     let first_next = NaiveDate::from_ymd_opt(next_y, next_m, 1).expect("valid");
     (first_next - Duration::days(1)).day() as u8
 }

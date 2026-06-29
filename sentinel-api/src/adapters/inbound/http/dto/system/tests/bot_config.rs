@@ -1,7 +1,7 @@
 use super::*;
+use chrono::Utc;
 use sentinel_core::domain::entities::system::bot_config::BotDefinition;
 use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
-use chrono::Utc;
 use uuid::Uuid;
 
 #[test]

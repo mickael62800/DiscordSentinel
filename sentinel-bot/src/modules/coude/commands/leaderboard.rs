@@ -7,8 +7,8 @@ use serenity::all::{
 use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::api_client::LeaderboardEntry;
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 /// custom_id du bouton "Mettre a jour" du panneau de classement. Le panneau
 /// est un message unique persistant : le bouton edite ce meme message avec les
@@ -21,14 +21,27 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_leaderboard()).await {
+    if !crate::modules::coude::channel_check::check_channel(
+        ctx,
+        command,
+        config.channel_leaderboard(),
+    )
+    .await
+    {
         return;
     }
     if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le jeu Coup de Coude est desactive sur ce serveur.",
+        )
+        .await;
         return;
     }
 
@@ -80,35 +93,70 @@ async fn build_leaderboard_embed(ctx: &Context, guild_id: &str) -> CreateEmbed {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
-    let richest = api.leaderboard_richest(guild_id, 5).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API leaderboard_richest");
-        vec![]
-    });
-    let levels = api.leaderboard_level(guild_id, 5).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API leaderboard_level");
-        vec![]
-    });
-    let thieves = api.leaderboard_thieves(guild_id, 5).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API leaderboard_thieves");
-        vec![]
-    });
-    let cowards = api.leaderboard_cowards(guild_id, 5).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API leaderboard_cowards");
-        vec![]
-    });
-    let chaos = api.leaderboard_chaos(guild_id, 5).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API leaderboard_chaos");
-        vec![]
-    });
+    let richest = api
+        .leaderboard_richest(guild_id, 5)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec API leaderboard_richest");
+            vec![]
+        });
+    let levels = api
+        .leaderboard_level(guild_id, 5)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec API leaderboard_level");
+            vec![]
+        });
+    let thieves = api
+        .leaderboard_thieves(guild_id, 5)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec API leaderboard_thieves");
+            vec![]
+        });
+    let cowards = api
+        .leaderboard_cowards(guild_id, 5)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec API leaderboard_cowards");
+            vec![]
+        });
+    let chaos = api
+        .leaderboard_chaos(guild_id, 5)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec API leaderboard_chaos");
+            vec![]
+        });
 
     CreateEmbed::new()
         .title("\u{1f3c6} Classement Coup de Coude")
         .color(0xE67E22)
-        .field("\u{1fa99} Les plus riches", format_leaderboard(&richest, "coins"), false)
-        .field("\u{2b50} Plus haut niveau", format_leaderboard(&levels, "niv."), false)
-        .field("\u{1f5e1}\u{fe0f} Plus gros voleurs", format_leaderboard(&thieves, "voles"), false)
-        .field("\u{1f414} Les plus laches", format_leaderboard(&cowards, "refus"), false)
-        .field("\u{1f300} Rois du chaos", format_leaderboard(&chaos, "events"), false)
+        .field(
+            "\u{1fa99} Les plus riches",
+            format_leaderboard(&richest, "coins"),
+            false,
+        )
+        .field(
+            "\u{2b50} Plus haut niveau",
+            format_leaderboard(&levels, "niv."),
+            false,
+        )
+        .field(
+            "\u{1f5e1}\u{fe0f} Plus gros voleurs",
+            format_leaderboard(&thieves, "voles"),
+            false,
+        )
+        .field(
+            "\u{1f414} Les plus laches",
+            format_leaderboard(&cowards, "refus"),
+            false,
+        )
+        .field(
+            "\u{1f300} Rois du chaos",
+            format_leaderboard(&chaos, "events"),
+            false,
+        )
         .footer(CreateEmbedFooter::new(format!(
             "{} — clique sur Mettre a jour pour rafraichir",
             crate::shared::branding::COUDE_TAGLINE_SHORT
@@ -118,12 +166,12 @@ async fn build_leaderboard_embed(ctx: &Context, guild_id: &str) -> CreateEmbed {
 
 /// Row contenant le bouton "Mettre a jour".
 fn refresh_row() -> CreateActionRow {
-    CreateActionRow::Buttons(vec![
-        CreateButton::new(REFRESH_ID)
-            .label("Mettre a jour")
-            .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f504}".into()))
-            .style(ButtonStyle::Primary),
-    ])
+    CreateActionRow::Buttons(vec![CreateButton::new(REFRESH_ID)
+        .label("Mettre a jour")
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f504}".into(),
+        ))
+        .style(ButtonStyle::Primary)])
 }
 
 fn format_leaderboard(entries: &[LeaderboardEntry], unit: &str) -> String {

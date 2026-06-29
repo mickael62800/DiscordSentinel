@@ -34,13 +34,12 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
             let to_str = next_month.format("%Y-%m-01").to_string();
 
             // Verifier si la partition existe deja
-            let exists: bool = sqlx::query_scalar(
-                "SELECT EXISTS (SELECT 1 FROM pg_class WHERE relname = $1)",
-            )
-            .bind(&part_name)
-            .fetch_one(pool)
-            .await
-            .map_err(|e| format!("check exists {part_name}: {e}"))?;
+            let exists: bool =
+                sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM pg_class WHERE relname = $1)")
+                    .bind(&part_name)
+                    .fetch_one(pool)
+                    .await
+                    .map_err(|e| format!("check exists {part_name}: {e}"))?;
 
             if exists {
                 continue;

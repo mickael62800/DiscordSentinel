@@ -4,8 +4,9 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
@@ -34,8 +35,14 @@ async fn hourly_activity_upsert() {
         "INSERT INTO hourly_activity (guild_id, day, hour, messages) VALUES ($1, $2, 14, 30) ON CONFLICT (guild_id, day, hour) DO UPDATE SET messages = hourly_activity.messages + EXCLUDED.messages",
     ).bind(&gid).bind(today).execute(&p).await.unwrap();
 
-    let msgs = sqlx::query_as::<_, (i64,)>("SELECT messages FROM hourly_activity WHERE guild_id = $1 AND hour = 14")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let msgs = sqlx::query_as::<_, (i64,)>(
+        "SELECT messages FROM hourly_activity WHERE guild_id = $1 AND hour = 14",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(msgs, 80);
 }
 
@@ -45,8 +52,13 @@ async fn hourly_activity_check_constraint() {
     let gid = ugid();
     let today = chrono::Utc::now().date_naive();
     // hour = 24 doit etre rejete (CHECK hour >= 0 AND hour <= 23)
-    let bad = sqlx::query("INSERT INTO hourly_activity (guild_id, day, hour, messages) VALUES ($1, $2, 24, 1)")
-        .bind(&gid).bind(today).execute(&p).await;
+    let bad = sqlx::query(
+        "INSERT INTO hourly_activity (guild_id, day, hour, messages) VALUES ($1, $2, 24, 1)",
+    )
+    .bind(&gid)
+    .bind(today)
+    .execute(&p)
+    .await;
     assert!(bad.is_err(), "hour=24 doit violer le CHECK constraint");
 }
 
@@ -56,15 +68,27 @@ async fn hourly_heatmap_data() {
     let gid = ugid();
     let today = chrono::Utc::now().date_naive();
     for hour in 0..24i16 {
-        sqlx::query("INSERT INTO hourly_activity (guild_id, day, hour, messages) VALUES ($1, $2, $3, $4)")
-            .bind(&gid).bind(today).bind(hour).bind((hour as i64) * 10)
-            .execute(&p).await.unwrap();
+        sqlx::query(
+            "INSERT INTO hourly_activity (guild_id, day, hour, messages) VALUES ($1, $2, $3, $4)",
+        )
+        .bind(&gid)
+        .bind(today)
+        .bind(hour)
+        .bind((hour as i64) * 10)
+        .execute(&p)
+        .await
+        .unwrap();
     }
     let rows = sqlx::query_as::<_, (i16, i64)>(
         "SELECT hour, messages FROM hourly_activity WHERE guild_id = $1 AND day = $2 ORDER BY hour",
-    ).bind(&gid).bind(today).fetch_all(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .bind(today)
+    .fetch_all(&p)
+    .await
+    .unwrap();
     assert_eq!(rows.len(), 24);
-    assert_eq!(rows[0].1, 0);   // midnight
+    assert_eq!(rows[0].1, 0); // midnight
     assert_eq!(rows[23].1, 230); // 23h
 }
 
@@ -80,7 +104,11 @@ async fn watched_user_add_and_query() {
         .bind(&gid).execute(&p).await.unwrap();
     let row = sqlx::query_as::<_, (String, String)>(
         "SELECT username, reason FROM manual_watched_users WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(row.0, "Suspect");
     assert!(row.1.contains("bizarre"));
 }
@@ -89,10 +117,19 @@ async fn watched_user_add_and_query() {
 async fn watched_user_unique_per_guild() {
     let p = pool().await;
     let gid = ugid();
-    sqlx::query("INSERT INTO manual_watched_users (guild_id, user_id, username) VALUES ($1, '444', 'A')")
-        .bind(&gid).execute(&p).await.unwrap();
-    let dup = sqlx::query("INSERT INTO manual_watched_users (guild_id, user_id, username) VALUES ($1, '444', 'B')")
-        .bind(&gid).execute(&p).await;
+    sqlx::query(
+        "INSERT INTO manual_watched_users (guild_id, user_id, username) VALUES ($1, '444', 'A')",
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await
+    .unwrap();
+    let dup = sqlx::query(
+        "INSERT INTO manual_watched_users (guild_id, user_id, username) VALUES ($1, '444', 'B')",
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await;
     assert!(dup.is_err());
 }
 
@@ -110,15 +147,25 @@ async fn pending_action_lifecycle() {
     ).bind(&gid).fetch_one(&p).await.unwrap().0;
 
     // Pending
-    let status = sqlx::query_as::<_, (String,)>("SELECT status FROM pending_mod_actions WHERE id = $1")
-        .bind(id).fetch_one(&p).await.unwrap().0;
+    let status =
+        sqlx::query_as::<_, (String,)>("SELECT status FROM pending_mod_actions WHERE id = $1")
+            .bind(id)
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .0;
     assert_eq!(status, "pending");
 
     // Approve
     sqlx::query("UPDATE pending_mod_actions SET status = 'approved', reviewed_by = '555', updated_at = NOW() WHERE id = $1")
         .bind(id).execute(&p).await.unwrap();
-    let row = sqlx::query_as::<_, (String, Option<String>)>("SELECT status, reviewed_by FROM pending_mod_actions WHERE id = $1")
-        .bind(id).fetch_one(&p).await.unwrap();
+    let row = sqlx::query_as::<_, (String, Option<String>)>(
+        "SELECT status, reviewed_by FROM pending_mod_actions WHERE id = $1",
+    )
+    .bind(id)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(row.0, "approved");
     assert_eq!(row.1.unwrap(), "555");
 }
@@ -131,10 +178,20 @@ async fn pending_action_reject() {
         "INSERT INTO pending_mod_actions (guild_id, moderator_id, moderator_name, target_id, target_name, action_type) VALUES ($1, '333', 'Mod', '444', 'User', 'ban') RETURNING id",
     ).bind(&gid).fetch_one(&p).await.unwrap().0;
 
-    sqlx::query("UPDATE pending_mod_actions SET status = 'rejected', reviewed_by = '555' WHERE id = $1")
-        .bind(id).execute(&p).await.unwrap();
-    let status = sqlx::query_as::<_, (String,)>("SELECT status FROM pending_mod_actions WHERE id = $1")
-        .bind(id).fetch_one(&p).await.unwrap().0;
+    sqlx::query(
+        "UPDATE pending_mod_actions SET status = 'rejected', reviewed_by = '555' WHERE id = $1",
+    )
+    .bind(id)
+    .execute(&p)
+    .await
+    .unwrap();
+    let status =
+        sqlx::query_as::<_, (String,)>("SELECT status FROM pending_mod_actions WHERE id = $1")
+            .bind(id)
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .0;
     assert_eq!(status, "rejected");
 }
 
@@ -150,8 +207,14 @@ async fn voice_session_record() {
         "INSERT INTO voice_sessions (guild_id, user_id, username, channel_id, channel_name, duration_secs, started_at, ended_at) VALUES ($1, '444', 'Alice', '555', 'General', 3600, NOW() - INTERVAL '1 hour', NOW())",
     ).bind(&gid).execute(&p).await.unwrap();
 
-    let dur = sqlx::query_as::<_, (i64,)>("SELECT duration_secs FROM voice_sessions WHERE guild_id = $1 AND user_id = '444'")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let dur = sqlx::query_as::<_, (i64,)>(
+        "SELECT duration_secs FROM voice_sessions WHERE guild_id = $1 AND user_id = '444'",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(dur, 3600);
 }
 
@@ -187,10 +250,14 @@ async fn discord_role_sync() {
 
     let roles = sqlx::query_as::<_, (String, String, i32)>(
         "SELECT id, name, position FROM discord_roles WHERE guild_id = $1 ORDER BY position DESC",
-    ).bind(&gid).fetch_all(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_all(&p)
+    .await
+    .unwrap();
     assert_eq!(roles.len(), 2);
     assert_eq!(roles[0].1, "Admin"); // position 10
-    assert_eq!(roles[1].1, "Mod");   // position 5
+    assert_eq!(roles[1].1, "Mod"); // position 5
 }
 
 // ══════════════════════════════════════════════════════════
@@ -229,25 +296,50 @@ async fn reminder_pending_query() {
 async fn invite_link_lifecycle() {
     let p = pool().await;
     let gid = ugid();
-    let ch_id = format!("ch_{}", uuid::Uuid::new_v4().simple().to_string().chars().take(8).collect::<String>());
+    let ch_id = format!(
+        "ch_{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    );
 
     let vc_id = sqlx::query_as::<_, (uuid::Uuid,)>(
         "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, kind) VALUES (gen_random_uuid(), $1, '444', 'O', $2, 'S', 'private') RETURNING id",
     ).bind(&gid).bind(&ch_id).fetch_one(&p).await.unwrap().0;
 
-    let code = format!("INV{}", uuid::Uuid::new_v4().simple().to_string().chars().take(5).collect::<String>());
+    let code = format!(
+        "INV{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(5)
+            .collect::<String>()
+    );
     sqlx::query(
         r#"INSERT INTO voice_channel_invite_links (voice_channel_id, guild_id, channel_id, created_by, created_by_name, code, max_uses, expires_at)
            VALUES ($1, $2, $3, '444', 'Owner', $4, 5, NOW() + INTERVAL '1 day')"#,
     ).bind(vc_id).bind(&gid).bind(&ch_id).bind(&code).execute(&p).await.unwrap();
 
     // Use the link
-    sqlx::query("UPDATE voice_channel_invite_links SET current_uses = current_uses + 1 WHERE code = $1")
-        .bind(&code).execute(&p).await.unwrap();
+    sqlx::query(
+        "UPDATE voice_channel_invite_links SET current_uses = current_uses + 1 WHERE code = $1",
+    )
+    .bind(&code)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let row = sqlx::query_as::<_, (i32, Option<i32>, bool)>(
         "SELECT current_uses, max_uses, revoked FROM voice_channel_invite_links WHERE code = $1",
-    ).bind(&code).fetch_one(&p).await.unwrap();
+    )
+    .bind(&code)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(row.0, 1);
     assert_eq!(row.1, Some(5));
     assert!(!row.2); // not revoked
@@ -257,8 +349,24 @@ async fn invite_link_lifecycle() {
 async fn invite_link_unique_code() {
     let p = pool().await;
     let gid = ugid();
-    let ch1 = format!("ch1_{}", uuid::Uuid::new_v4().simple().to_string().chars().take(6).collect::<String>());
-    let ch2 = format!("ch2_{}", uuid::Uuid::new_v4().simple().to_string().chars().take(6).collect::<String>());
+    let ch1 = format!(
+        "ch1_{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(6)
+            .collect::<String>()
+    );
+    let ch2 = format!(
+        "ch2_{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(6)
+            .collect::<String>()
+    );
 
     let vc1 = sqlx::query_as::<_, (uuid::Uuid,)>(
         "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, kind) VALUES (gen_random_uuid(), $1, '444', 'O', $2, 'S', 'private') RETURNING id",
@@ -267,7 +375,15 @@ async fn invite_link_unique_code() {
         "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, kind) VALUES (gen_random_uuid(), $1, '444', 'O', $2, 'S', 'private') RETURNING id",
     ).bind(&gid).bind(&ch2).fetch_one(&p).await.unwrap().0;
 
-    let unique_code = format!("UNIQ{}", uuid::Uuid::new_v4().simple().to_string().chars().take(4).collect::<String>());
+    let unique_code = format!(
+        "UNIQ{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(4)
+            .collect::<String>()
+    );
     sqlx::query(
         "INSERT INTO voice_channel_invite_links (voice_channel_id, guild_id, channel_id, created_by, created_by_name, code, expires_at) VALUES ($1, $2, $3, '444', 'O', $4, NOW() + INTERVAL '1 day')",
     ).bind(vc1).bind(&gid).bind(&ch1).bind(&unique_code).execute(&p).await.unwrap();
@@ -301,7 +417,11 @@ async fn combat_resolve_only_pending() {
     let result2 = sqlx::query(
         "UPDATE coude_combats SET status = 'resolved', winner_id = '222', resolved_at = NOW() WHERE id = $1 AND status IN ('pending', 'accepted', 'betting')",
     ).bind(id).execute(&p).await.unwrap();
-    assert_eq!(result2.rows_affected(), 0, "Combat deja resolu ne doit pas etre re-resolu");
+    assert_eq!(
+        result2.rows_affected(),
+        0,
+        "Combat deja resolu ne doit pas etre re-resolu"
+    );
 }
 
 #[tokio::test]
@@ -317,7 +437,13 @@ async fn coude_player_coins_never_negative() {
         "UPDATE coude_players SET coins = coins - LEAST(coins, $3) WHERE guild_id = $1 AND user_id = $2",
     ).bind(&gid).bind("444").bind(200i64).execute(&p).await.unwrap();
 
-    let coins = sqlx::query_as::<_, (i64,)>("SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = '444'")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let coins = sqlx::query_as::<_, (i64,)>(
+        "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = '444'",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(coins, 0, "Coins ne doit pas etre negatif");
 }

@@ -29,7 +29,10 @@ impl ManageAnnouncementsService {
         repo: Arc<dyn AnnouncementRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { repo, bot_config_repo }
+        Self {
+            repo,
+            bot_config_repo,
+        }
     }
 
     /// Lit `fetch_limit` du guild dans bot_guild_config
@@ -60,7 +63,9 @@ impl ManageAnnouncementsService {
             return Err(DomainError::ValidationError("minute doit etre 0-59".into()));
         }
         if cmd.channel_ids.is_empty() {
-            return Err(DomainError::ValidationError("au moins 1 channel requis".into()));
+            return Err(DomainError::ValidationError(
+                "au moins 1 channel requis".into(),
+            ));
         }
         match cmd.recurrence_type {
             RecurrenceType::Once => {
@@ -75,7 +80,9 @@ impl ManageAnnouncementsService {
                     DomainError::ValidationError("day_of_week requis pour weekly".into())
                 })?;
                 if dow > 6 {
-                    return Err(DomainError::ValidationError("day_of_week doit etre 0-6".into()));
+                    return Err(DomainError::ValidationError(
+                        "day_of_week doit etre 0-6".into(),
+                    ));
                 }
             }
             RecurrenceType::Monthly => {
@@ -83,18 +90,26 @@ impl ManageAnnouncementsService {
                     DomainError::ValidationError("day_of_month requis pour monthly".into())
                 })?;
                 if !(1..=31).contains(&dom) {
-                    return Err(DomainError::ValidationError("day_of_month doit etre 1-31".into()));
+                    return Err(DomainError::ValidationError(
+                        "day_of_month doit etre 1-31".into(),
+                    ));
                 }
             }
             RecurrenceType::Daily => {}
         }
         if let (Some(start), Some(end)) = (Some(Utc::now()), cmd.end_date) {
             if end <= start {
-                return Err(DomainError::ValidationError("end_date doit etre dans le futur".into()));
+                return Err(DomainError::ValidationError(
+                    "end_date doit etre dans le futur".into(),
+                ));
             }
         }
         if cmd.content_type == ContentType::Embed
-            && cmd.embed_title.as_deref().map(|s| s.trim().is_empty()).unwrap_or(true)
+            && cmd
+                .embed_title
+                .as_deref()
+                .map(|s| s.trim().is_empty())
+                .unwrap_or(true)
             && cmd.content_text.trim().is_empty()
         {
             return Err(DomainError::ValidationError(
@@ -153,7 +168,10 @@ impl ManageAnnouncementsService {
 
 #[async_trait]
 impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
-    async fn create(&self, cmd: CreateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError> {
+    async fn create(
+        &self,
+        cmd: CreateAnnouncementCommand,
+    ) -> Result<ScheduledAnnouncement, DomainError> {
         self.validate_create(&cmd)?;
         let now = Utc::now();
         let next = compute_next_run_at(
@@ -167,7 +185,9 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             now,
         )
         .ok_or_else(|| {
-            DomainError::ValidationError("Impossible de planifier (date passe / end_date invalide)".into())
+            DomainError::ValidationError(
+                "Impossible de planifier (date passe / end_date invalide)".into(),
+            )
         })?;
 
         let ann = ScheduledAnnouncement {
@@ -205,7 +225,10 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         Ok(ann)
     }
 
-    async fn update(&self, cmd: UpdateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError> {
+    async fn update(
+        &self,
+        cmd: UpdateAnnouncementCommand,
+    ) -> Result<ScheduledAnnouncement, DomainError> {
         let mut ann = self
             .repo
             .get_by_id(cmd.id)
@@ -223,7 +246,9 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             Utc::now(),
         )
         .ok_or_else(|| {
-            DomainError::ValidationError("Impossible de planifier (date passe / end_date invalide)".into())
+            DomainError::ValidationError(
+                "Impossible de planifier (date passe / end_date invalide)".into(),
+            )
         })?;
 
         ann.name = cmd.name;
@@ -264,7 +289,10 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             .ok_or_else(|| DomainError::NotFound(format!("Annonce {} introuvable", id)))
     }
 
-    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<ScheduledAnnouncement>, DomainError> {
+    async fn list_by_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<ScheduledAnnouncement>, DomainError> {
         self.repo.list_by_guild(guild_id).await
     }
 
@@ -375,7 +403,11 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         Ok(Self::render(&ann, Uuid::nil()))
     }
 
-    async fn list_runs(&self, announcement_id: Uuid, limit: i64) -> Result<Vec<AnnouncementRun>, DomainError> {
+    async fn list_runs(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<AnnouncementRun>, DomainError> {
         self.repo.list_runs(announcement_id, limit).await
     }
 
@@ -406,6 +438,8 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         announcement_id: Uuid,
         limit: i64,
     ) -> Result<Vec<ButtonInteraction>, DomainError> {
-        self.repo.list_button_interactions(announcement_id, limit).await
+        self.repo
+            .list_button_interactions(announcement_id, limit)
+            .await
     }
 }

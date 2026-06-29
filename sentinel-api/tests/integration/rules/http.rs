@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;
 use sentinel_api::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_rules;
 
 // ══════════════════════════════════════════════════════════
@@ -34,7 +34,9 @@ struct MockRulesUC {
 }
 
 impl MockRulesUC {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
 
     fn with_rule(self, r: Rule) -> Self {
         self.rules.lock().unwrap().push(r);
@@ -45,12 +47,21 @@ impl MockRulesUC {
 #[async_trait]
 impl ManageRulesUseCase for MockRulesUC {
     async fn get_rules(&self, guild_id: &str) -> Result<Vec<Rule>, DomainError> {
-        Ok(self.rules.lock().unwrap().iter().filter(|r| r.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .rules
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
     async fn get_all_rules(&self) -> Result<Vec<Rule>, DomainError> {
         Ok(self.rules.lock().unwrap().clone())
     }
-    async fn toggle_rule(&self, _: Uuid, _: bool) -> Result<bool, DomainError> { Ok(true) }
+    async fn toggle_rule(&self, _: Uuid, _: bool) -> Result<bool, DomainError> {
+        Ok(true)
+    }
     async fn create_or_update_rule(&self, cmd: CreateRuleCommand) -> Result<Rule, DomainError> {
         let now = Utc::now();
         let rule = Rule {
@@ -70,8 +81,14 @@ impl ManageRulesUseCase for MockRulesUC {
         Ok(rule)
     }
     async fn delete_rule(&self, guild_id: &str, rule_id: Uuid) -> Result<(), DomainError> {
-        self.deleted.lock().unwrap().push((guild_id.into(), rule_id));
-        self.rules.lock().unwrap().retain(|r| !(r.guild_id == guild_id && r.id == rule_id));
+        self.deleted
+            .lock()
+            .unwrap()
+            .push((guild_id.into(), rule_id));
+        self.rules
+            .lock()
+            .unwrap()
+            .retain(|r| !(r.guild_id == guild_id && r.id == rule_id));
         Ok(())
     }
 }
@@ -85,14 +102,25 @@ fn build_app(uc: MockRulesUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
         .method("POST")
         .uri(uri)
@@ -102,15 +130,25 @@ async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (St
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn sample_rule(guild_id: &str, flag_type: FlagType) -> Rule {

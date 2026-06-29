@@ -9,13 +9,33 @@ use crate::domain::errors::DomainError;
 pub trait LevelRepository: Send + Sync {
     async fn get_config(&self, guild_id: &str) -> Result<Option<LevelConfig>, DomainError>;
     async fn upsert_config(&self, config: &LevelConfig) -> Result<(), DomainError>;
-    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<Option<UserLevel>, DomainError>;
+    async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserLevel>, DomainError>;
     async fn upsert_user_level(&self, user: &UserLevel) -> Result<(), DomainError>;
     /// Ajoute de l'XP de maniere atomique (pas de race condition).
     /// Retourne le user_level mis a jour.
-    async fn add_xp_atomic(&self, guild_id: &str, user_id: &str, username: &str, amount: i64, source: XpSource) -> Result<UserLevel, DomainError>;
-    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
-    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
+    async fn add_xp_atomic(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        amount: i64,
+        source: XpSource,
+    ) -> Result<UserLevel, DomainError>;
+    async fn get_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError>;
+    async fn get_leaderboard_by_source(
+        &self,
+        guild_id: &str,
+        source: XpSource,
+        limit: i64,
+    ) -> Result<Vec<UserLevel>, DomainError>;
     /// Force le refresh de la vue materialized mv_level_leaderboard
     /// (utilise apres une mutation admin set/reset XP pour que le
     /// leaderboard cote frontend voit la valeur a jour immediatement).

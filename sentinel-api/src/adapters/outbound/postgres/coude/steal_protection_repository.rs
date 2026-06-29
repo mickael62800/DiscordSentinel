@@ -6,13 +6,15 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 use sentinel_core::domain::entities::coude::steal::protection::StealProtection;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "steal_protection";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgStealProtectionRepository {
     pool: PgPool,

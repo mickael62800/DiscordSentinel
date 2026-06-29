@@ -1,11 +1,11 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use sentinel_core::domain::errors::DomainError;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,
 }
@@ -115,7 +115,8 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         voice_counter_format: "En Vocal : {count}".into(),
         anniversary_enabled: false,
         anniversary_channel_id: None,
-        anniversary_message: "Felicitations {user}, ca fait **{years} an(s)** que tu es sur **{server}** !".into(),
+        anniversary_message:
+            "Felicitations {user}, ca fait **{years} an(s)** que tu es sur **{server}** !".into(),
         rejoin_message: "Content de te revoir {user} ! Tu nous avais manque.".into(),
         welcome_title: "Bienvenue !".into(),
         welcome_image_url: "".into(),
@@ -144,41 +145,123 @@ fn overlay_with_bot_config(
     for (k, v) in kvs {
         match k.as_str() {
             "welcome_enabled" => d.welcome_enabled = parse_bool(&v, d.welcome_enabled),
-            "welcome_channel_id" => d.welcome_channel_id = if v.is_empty() { None } else { Some(v) },
-            "welcome_message" => { if !v.is_empty() { d.welcome_message = v; } }
-            "welcome_embed_color" => { if !v.is_empty() { d.welcome_embed_color = v; } }
+            "welcome_channel_id" => {
+                d.welcome_channel_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "welcome_message" => {
+                if !v.is_empty() {
+                    d.welcome_message = v;
+                }
+            }
+            "welcome_embed_color" => {
+                if !v.is_empty() {
+                    d.welcome_embed_color = v;
+                }
+            }
             "welcome_dm_enabled" => d.welcome_dm_enabled = parse_bool(&v, d.welcome_dm_enabled),
-            "welcome_dm_message" => { if !v.is_empty() { d.welcome_dm_message = v; } }
-            "rejoin_message" => { if !v.is_empty() { d.rejoin_message = v; } }
+            "welcome_dm_message" => {
+                if !v.is_empty() {
+                    d.welcome_dm_message = v;
+                }
+            }
+            "rejoin_message" => {
+                if !v.is_empty() {
+                    d.rejoin_message = v;
+                }
+            }
             "leave_enabled" => d.leave_enabled = parse_bool(&v, d.leave_enabled),
             "leave_channel_id" => d.leave_channel_id = if v.is_empty() { None } else { Some(v) },
-            "leave_message" => { if !v.is_empty() { d.leave_message = v; } }
+            "leave_message" => {
+                if !v.is_empty() {
+                    d.leave_message = v;
+                }
+            }
             "rules_enabled" => d.rules_enabled = parse_bool(&v, d.rules_enabled),
             "rules_channel_id" => d.rules_channel_id = if v.is_empty() { None } else { Some(v) },
-            "rules_message" => { if !v.is_empty() { d.rules_message = v; } }
+            "rules_message" => {
+                if !v.is_empty() {
+                    d.rules_message = v;
+                }
+            }
             "rules_role_id" => d.rules_role_id = if v.is_empty() { None } else { Some(v) },
-            "rules_button_label" => { if !v.is_empty() { d.rules_button_label = v; } }
+            "rules_button_label" => {
+                if !v.is_empty() {
+                    d.rules_button_label = v;
+                }
+            }
             "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
-            "counter_channel_id" => d.counter_channel_id = if v.is_empty() { None } else { Some(v) },
-            "counter_format" => { if !v.is_empty() { d.counter_format = v; } }
-            "voice_counter_enabled" => d.voice_counter_enabled = parse_bool(&v, d.voice_counter_enabled),
-            "voice_counter_channel_id" => d.voice_counter_channel_id = if v.is_empty() { None } else { Some(v) },
-            "voice_counter_format" => { if !v.is_empty() { d.voice_counter_format = v; } }
+            "counter_channel_id" => {
+                d.counter_channel_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "counter_format" => {
+                if !v.is_empty() {
+                    d.counter_format = v;
+                }
+            }
+            "voice_counter_enabled" => {
+                d.voice_counter_enabled = parse_bool(&v, d.voice_counter_enabled)
+            }
+            "voice_counter_channel_id" => {
+                d.voice_counter_channel_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "voice_counter_format" => {
+                if !v.is_empty() {
+                    d.voice_counter_format = v;
+                }
+            }
             "anniversary_enabled" => d.anniversary_enabled = parse_bool(&v, d.anniversary_enabled),
-            "anniversary_channel_id" => d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) },
-            "anniversary_message" => { if !v.is_empty() { d.anniversary_message = v; } }
-            "welcome_title" => { if !v.is_empty() { d.welcome_title = v; } }
+            "anniversary_channel_id" => {
+                d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "anniversary_message" => {
+                if !v.is_empty() {
+                    d.anniversary_message = v;
+                }
+            }
+            "welcome_title" => {
+                if !v.is_empty() {
+                    d.welcome_title = v;
+                }
+            }
             "welcome_image_url" => d.welcome_image_url = v,
-            "welcome_footer_text" => { if !v.is_empty() { d.welcome_footer_text = v; } }
-            "rejoin_title" => { if !v.is_empty() { d.rejoin_title = v; } }
+            "welcome_footer_text" => {
+                if !v.is_empty() {
+                    d.welcome_footer_text = v;
+                }
+            }
+            "rejoin_title" => {
+                if !v.is_empty() {
+                    d.rejoin_title = v;
+                }
+            }
             "rejoin_image_url" => d.rejoin_image_url = v,
-            "rejoin_footer_text" => { if !v.is_empty() { d.rejoin_footer_text = v; } }
-            "leave_title" => { if !v.is_empty() { d.leave_title = v; } }
+            "rejoin_footer_text" => {
+                if !v.is_empty() {
+                    d.rejoin_footer_text = v;
+                }
+            }
+            "leave_title" => {
+                if !v.is_empty() {
+                    d.leave_title = v;
+                }
+            }
             "leave_image_url" => d.leave_image_url = v,
-            "leave_footer_text" => { if !v.is_empty() { d.leave_footer_text = v; } }
-            "anniversary_title" => { if !v.is_empty() { d.anniversary_title = v; } }
+            "leave_footer_text" => {
+                if !v.is_empty() {
+                    d.leave_footer_text = v;
+                }
+            }
+            "anniversary_title" => {
+                if !v.is_empty() {
+                    d.anniversary_title = v;
+                }
+            }
             "anniversary_image_url" => d.anniversary_image_url = v,
-            "anniversary_footer_text" => { if !v.is_empty() { d.anniversary_footer_text = v; } }
+            "anniversary_footer_text" => {
+                if !v.is_empty() {
+                    d.anniversary_footer_text = v;
+                }
+            }
             _ => {}
         }
     }
@@ -209,10 +292,17 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
     /// `get_config` lit desormais depuis `bot_guild_config`. Pour eviter la
     /// desynchronisation save/get, save_config route sa sortie vers la meme
     /// table que get_config.
-    async fn save_config(&self, guild_id: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> {
+    async fn save_config(
+        &self,
+        guild_id: &str,
+        d: &WelcomeConfigData,
+    ) -> Result<WelcomeConfigData, DomainError> {
         let kvs = build_welcome_config_kvs(d);
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("welcome save tx begin", e))?;
 
         for (k, v) in &kvs {
@@ -230,7 +320,8 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
             .map_err(|e| DomainError::Internal(format!("welcome save {}: {e}", k)))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("welcome save tx commit", e))?;
 
         // Relit la config apres upsert pour garantir que get_config renverra bien
@@ -242,8 +333,16 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
 /// Convertit une `WelcomeConfigData` en paires (config_key, config_value)
 /// compatibles avec `overlay_with_bot_config`. Pur helper sans IO pour tests.
 pub(super) fn build_welcome_config_kvs(d: &WelcomeConfigData) -> Vec<(&'static str, String)> {
-    fn b(v: bool) -> String { if v { "true".into() } else { "false".into() } }
-    fn opt(v: &Option<String>) -> String { v.clone().unwrap_or_default() }
+    fn b(v: bool) -> String {
+        if v {
+            "true".into()
+        } else {
+            "false".into()
+        }
+    }
+    fn opt(v: &Option<String>) -> String {
+        v.clone().unwrap_or_default()
+    }
     vec![
         ("welcome_enabled", b(d.welcome_enabled)),
         ("welcome_channel_id", opt(&d.welcome_channel_id)),

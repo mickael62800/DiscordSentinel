@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::audit::audit_log::AuditLog;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 pub struct CreateAuditLogCommand {
     pub guild_id: GuildId,
@@ -27,7 +27,11 @@ pub struct AuditLogFilters {
 #[async_trait]
 pub trait ManageAuditLogsUseCase: Send + Sync {
     async fn create(&self, command: CreateAuditLogCommand) -> Result<AuditLog, DomainError>;
-    async fn list(&self, guild_id: Option<&str>, filters: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError>;
+    async fn list(
+        &self,
+        guild_id: Option<&str>,
+        filters: AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError>;
 
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
 }

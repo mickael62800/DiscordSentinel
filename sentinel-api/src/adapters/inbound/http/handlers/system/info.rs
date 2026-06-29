@@ -17,6 +17,8 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
+use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::state::AppState;
 use axum::extract::State;
 use axum::Json;
 use redis::AsyncCommands;
@@ -25,8 +27,6 @@ use sysinfo::Disks;
 use sysinfo::ProcessRefreshKind;
 use sysinfo::RefreshKind;
 use sysinfo::System;
-use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
 
 /// Moment de demarrage du process API. Initialise une seule fois au premier
 /// appel (ou explicitement depuis main.rs via `record_startup()`).
@@ -39,10 +39,7 @@ pub fn record_startup() {
 }
 
 fn uptime_seconds() -> u64 {
-    STARTED_AT
-        .get_or_init(Instant::now)
-        .elapsed()
-        .as_secs()
+    STARTED_AT.get_or_init(Instant::now).elapsed().as_secs()
 }
 
 #[derive(Debug, Serialize)]
@@ -220,11 +217,15 @@ pub async fn get_system_info(
     };
 
     // ── 4. Health check Redis (PING) ──
-    let redis_responding = if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        redis::cmd("PING").query_async::<String>(&mut conn).await.is_ok()
-    } else {
-        false
-    };
+    let redis_responding =
+        if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+            redis::cmd("PING")
+                .query_async::<String>(&mut conn)
+                .await
+                .is_ok()
+        } else {
+            false
+        };
 
     // ── 5. Disks / mount points ──
     // En priorite : on lit /var/lib/sentinel/disks-current.json genere par
@@ -234,38 +235,39 @@ pub async fn get_system_info(
     //
     // Fallback : sysinfo dans le container (limite mais ne casse rien si
     // setup-host-security.sh n'est pas deploye).
-    let disks: Vec<DiskDto> = read_host_disks_snapshot()
-        .unwrap_or_else(|| {
-            let disks_info = Disks::new_with_refreshed_list();
-            disks_info
-                .iter()
-                .filter(|d| {
-                    let fs = d.file_system().to_string_lossy();
-                    !matches!(fs.as_ref(), "overlay" | "shm" | "tmpfs" | "devtmpfs" | "proc" | "sysfs")
-                        || d.total_space() > 100 * 1024 * 1024
-                })
-                .map(|d| {
-                    let total = d.total_space();
-                    let avail = d.available_space();
-                    let used = total.saturating_sub(avail);
-                    let usage = if total > 0 {
-                        ((used as f64 / total as f64) * 100.0) as f32
-                    } else {
-                        0.0
-                    };
-                    DiskDto {
-                        name: d.name().to_string_lossy().into_owned(),
-                        mount_point: d.mount_point().to_string_lossy().into_owned(),
-                        fs_type: d.file_system().to_string_lossy().into_owned(),
-                        total_gb: bytes_to_gb(total),
-                        used_gb: bytes_to_gb(used),
-                        available_gb: bytes_to_gb(avail),
-                        usage_percent: usage,
-                        is_removable: d.is_removable(),
-                    }
-                })
-                .collect()
-        });
+    let disks: Vec<DiskDto> = read_host_disks_snapshot().unwrap_or_else(|| {
+        let disks_info = Disks::new_with_refreshed_list();
+        disks_info
+            .iter()
+            .filter(|d| {
+                let fs = d.file_system().to_string_lossy();
+                !matches!(
+                    fs.as_ref(),
+                    "overlay" | "shm" | "tmpfs" | "devtmpfs" | "proc" | "sysfs"
+                ) || d.total_space() > 100 * 1024 * 1024
+            })
+            .map(|d| {
+                let total = d.total_space();
+                let avail = d.available_space();
+                let used = total.saturating_sub(avail);
+                let usage = if total > 0 {
+                    ((used as f64 / total as f64) * 100.0) as f32
+                } else {
+                    0.0
+                };
+                DiskDto {
+                    name: d.name().to_string_lossy().into_owned(),
+                    mount_point: d.mount_point().to_string_lossy().into_owned(),
+                    fs_type: d.file_system().to_string_lossy().into_owned(),
+                    total_gb: bytes_to_gb(total),
+                    used_gb: bytes_to_gb(used),
+                    available_gb: bytes_to_gb(avail),
+                    usage_percent: usage,
+                    is_removable: d.is_removable(),
+                }
+            })
+            .collect()
+    });
 
     Ok(Json(SystemInfoDto {
         bots,

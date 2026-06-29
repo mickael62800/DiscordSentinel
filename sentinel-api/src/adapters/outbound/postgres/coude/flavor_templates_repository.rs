@@ -3,12 +3,14 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository;
+use sentinel_core::domain::errors::DomainError;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_flavor_templates";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgFlavorTemplatesRepository {
     pool: PgPool,
@@ -22,11 +24,7 @@ impl PgFlavorTemplatesRepository {
 
 #[async_trait]
 impl FlavorTemplatesRepository for PgFlavorTemplatesRepository {
-    async fn random_by_key(
-        &self,
-        key: &str,
-        locale: &str,
-    ) -> Result<Option<String>, DomainError> {
+    async fn random_by_key(&self, key: &str, locale: &str) -> Result<Option<String>, DomainError> {
         // Tirage pondere : on duplique virtuellement chaque ligne `weight`
         // fois via generate_series, puis ORDER BY random() LIMIT 1. Volumetrie
         // attendue tres faible (<= ~200 lignes par key) → cout negligeable.

@@ -6,13 +6,13 @@
 //! Du coup la web peut lister les reviews pending et resoudre depuis l UI ;
 //! le bot edite la carte Discord en reaction (sync bilateral).
 
+use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::MessageId;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Carte de review close (applied|ignored) et expiree : encore mappee a un
 /// message Discord, a faire disparaitre par le bot. Le `action_id` est l'id
@@ -65,9 +65,17 @@ impl SuggestedAction {
 /// l'agregation : l'action d'une carte regroupee escalade vers le pire vu.
 /// En cas de valeur inconnue, on retombe sur l'autre (ou "warn").
 pub fn more_severe_suggested(a: &str, b: &str) -> String {
-    let rank = |s: &str| SuggestedAction::from_str(s).map(|x| x.severity()).unwrap_or(0);
+    let rank = |s: &str| {
+        SuggestedAction::from_str(s)
+            .map(|x| x.severity())
+            .unwrap_or(0)
+    };
     if rank(a) >= rank(b) {
-        if rank(a) == 0 { "warn".to_string() } else { a.to_string() }
+        if rank(a) == 0 {
+            "warn".to_string()
+        } else {
+            a.to_string()
+        }
     } else {
         b.to_string()
     }
@@ -221,19 +229,27 @@ pub struct TallyResult {
 pub fn tally_votes(votes: &[VoteAction], quorum: usize, tie: TieAction) -> TallyResult {
     let total = votes.len();
     if total == 0 || total < quorum.max(1) {
-        return TallyResult { decided: AppliedAction::Ignore, quorum_met: false, total_votes: total };
+        return TallyResult {
+            decided: AppliedAction::Ignore,
+            quorum_met: false,
+            total_votes: total,
+        };
     }
 
     // Comptage par action.
-    let mut counts: std::collections::HashMap<u8, (AppliedAction, usize)> = std::collections::HashMap::new();
+    let mut counts: std::collections::HashMap<u8, (AppliedAction, usize)> =
+        std::collections::HashMap::new();
     for v in votes {
         let entry = counts.entry(v.severity()).or_insert((v.clone(), 0));
         entry.1 += 1;
     }
 
     let max_count = counts.values().map(|(_, c)| *c).max().unwrap_or(0);
-    let mut leaders: Vec<AppliedAction> =
-        counts.values().filter(|(_, c)| *c == max_count).map(|(a, _)| a.clone()).collect();
+    let mut leaders: Vec<AppliedAction> = counts
+        .values()
+        .filter(|(_, c)| *c == max_count)
+        .map(|(a, _)| a.clone())
+        .collect();
 
     let decided = if leaders.len() == 1 {
         leaders.remove(0)
@@ -246,7 +262,11 @@ pub fn tally_votes(votes: &[VoteAction], quorum: usize, tie: TieAction) -> Tally
         }
     };
 
-    TallyResult { decided, quorum_met: true, total_votes: total }
+    TallyResult {
+        decided,
+        quorum_met: true,
+        total_votes: total,
+    }
 }
 
 // ── Salon de discussion lie a une review ─────────────────────────────

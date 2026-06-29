@@ -1,10 +1,10 @@
 //! Use case du systeme de braquage (Phase 10).
 
+use crate::domain::entities::coude::heist::HeistOutcome;
+use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::heist::HeistOutcome;
-use crate::domain::errors::DomainError;
 
 /// Resultat du check cooldown : si `ready == false`, le joueur doit
 /// attendre jusqu'a `next_attempt_at`.

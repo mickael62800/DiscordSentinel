@@ -1,13 +1,13 @@
+use crate::ports::outbound::casino::slot_repository::SlotRepository;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use sqlx::PgPool;
-use sentinel_core::ports::uow::DbTx;
 use sentinel_core::domain::entities::casino::slot::SlotJackpotPool;
 use sentinel_core::domain::entities::casino::slot::SlotSpin;
 use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::casino::slot_repository::SlotRepository;
+use sentinel_core::ports::uow::DbTx;
+use sqlx::PgPool;
 
 use super::super::pg_err;
 use super::super::uow::as_pg;
@@ -24,16 +24,24 @@ impl PgSlotRepository {
 
 #[async_trait]
 impl SlotRepository for PgSlotRepository {
-    async fn get_jackpot_pool(&self, guild_id: &str) -> Result<Option<SlotJackpotPool>, DomainError> {
-        let row: Option<(String, i64, Option<String>, Option<DateTime<Utc>>, Option<i64>)> =
-            sqlx::query_as(
-                "SELECT guild_id, current_pool, last_won_by, last_won_at, last_won_amount
+    async fn get_jackpot_pool(
+        &self,
+        guild_id: &str,
+    ) -> Result<Option<SlotJackpotPool>, DomainError> {
+        let row: Option<(
+            String,
+            i64,
+            Option<String>,
+            Option<DateTime<Utc>>,
+            Option<i64>,
+        )> = sqlx::query_as(
+            "SELECT guild_id, current_pool, last_won_by, last_won_at, last_won_amount
                  FROM slot_jackpot_pool WHERE guild_id = $1",
-            )
-            .bind(guild_id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        )
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
         Ok(row.map(|(gid, cp, lwb, lwa, lwam)| SlotJackpotPool {
             guild_id: gid.into(),
@@ -44,7 +52,11 @@ impl SlotRepository for PgSlotRepository {
         }))
     }
 
-    async fn init_jackpot_pool_if_absent(&self, guild_id: &str, starting: i64) -> Result<(), DomainError> {
+    async fn init_jackpot_pool_if_absent(
+        &self,
+        guild_id: &str,
+        starting: i64,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             "INSERT INTO slot_jackpot_pool (guild_id, current_pool)
              VALUES ($1, $2)
@@ -111,11 +123,7 @@ impl SlotRepository for PgSlotRepository {
         Ok(())
     }
 
-    async fn log_spin_in_tx(
-        &self,
-        tx: &mut dyn DbTx,
-        spin: &SlotSpin,
-    ) -> Result<(), DomainError> {
+    async fn log_spin_in_tx(&self, tx: &mut dyn DbTx, spin: &SlotSpin) -> Result<(), DomainError> {
         let tx = as_pg(tx);
         sqlx::query(
             "INSERT INTO slot_spin_log
@@ -195,39 +203,49 @@ impl SlotRepository for PgSlotRepository {
         Ok(())
     }
 
-    async fn recent_spins(
-        &self,
-        guild_id: &str,
-        limit: i64,
-    ) -> Result<Vec<SlotSpin>, DomainError> {
-        let rows: Vec<(uuid::Uuid, String, String, String, i64, serde_json::Value, i64, f32, bool, bool, DateTime<Utc>)> =
-            sqlx::query_as(
-                "SELECT id, guild_id, user_id, username, mise, symbols, payout, multiplier,
+    async fn recent_spins(&self, guild_id: &str, limit: i64) -> Result<Vec<SlotSpin>, DomainError> {
+        let rows: Vec<(
+            uuid::Uuid,
+            String,
+            String,
+            String,
+            i64,
+            serde_json::Value,
+            i64,
+            f32,
+            bool,
+            bool,
+            DateTime<Utc>,
+        )> = sqlx::query_as(
+            "SELECT id, guild_id, user_id, username, mise, symbols, payout, multiplier,
                         is_jackpot, is_free, created_at
                  FROM slot_spin_log
                  WHERE guild_id = $1
                  ORDER BY created_at DESC
                  LIMIT $2",
-            )
-            .bind(guild_id)
-            .bind(limit)
-            .fetch_all(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        )
+        .bind(guild_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| SlotSpin {
-            id: r.0,
-            guild_id: r.1.into(),
-            user_id: r.2.into(),
-            username: r.3,
-            mise: r.4,
-            symbols: serde_json::from_value(r.5).unwrap_or_default(),
-            payout: r.6,
-            multiplier: r.7 as f64,
-            is_jackpot: r.8,
-            is_free: r.9,
-            created_at: r.10,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| SlotSpin {
+                id: r.0,
+                guild_id: r.1.into(),
+                user_id: r.2.into(),
+                username: r.3,
+                mise: r.4,
+                symbols: serde_json::from_value(r.5).unwrap_or_default(),
+                payout: r.6,
+                multiplier: r.7 as f64,
+                is_jackpot: r.8,
+                is_free: r.9,
+                created_at: r.10,
+            })
+            .collect())
     }
 
     async fn top_winners(
@@ -259,12 +277,15 @@ impl SlotRepository for PgSlotRepository {
         .await
         .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|(uid, name, total, jackpots, spins)| SlotTopWinner {
-            user_id: uid.into(),
-            username: name,
-            total_payout: total,
-            jackpot_count: jackpots as u32,
-            spin_count: spins as u32,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|(uid, name, total, jackpots, spins)| SlotTopWinner {
+                user_id: uid.into(),
+                username: name,
+                total_payout: total,
+                jackpot_count: jackpots as u32,
+                spin_count: spins as u32,
+            })
+            .collect())
     }
 }

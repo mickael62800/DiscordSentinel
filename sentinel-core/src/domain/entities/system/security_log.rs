@@ -70,9 +70,13 @@ impl TrafficTrend {
         let sum: i64 = datapoints.iter().map(|d| d.total).sum();
         let baseline_avg = if n > 0.0 { sum as f64 / n } else { 0.0 };
         let peak = datapoints.iter().map(|d| d.total).max().unwrap_or(0);
-        let peak_at = datapoints.iter().max_by_key(|d| d.total).map(|d| d.timestamp);
+        let peak_at = datapoints
+            .iter()
+            .max_by_key(|d| d.total)
+            .map(|d| d.timestamp);
 
-        let alert = baseline_avg > 0.0 && datapoints.len() > 10 && (peak as f64) > baseline_avg * 3.0;
+        let alert =
+            baseline_avg > 0.0 && datapoints.len() > 10 && (peak as f64) > baseline_avg * 3.0;
         let alert_reason = if alert {
             Some(format!(
                 "Pic à {peak} req sur 1 bucket (3× moyenne {baseline_avg:.1})"

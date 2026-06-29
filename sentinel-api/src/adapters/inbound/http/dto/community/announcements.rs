@@ -172,8 +172,12 @@ impl From<AnnouncementRun> for AnnouncementRunDto {
 // ── Helpers conversion enum ────────────────────────────────────────────
 
 pub fn parse_recurrence(s: &str) -> Result<RecurrenceType, String> {
-    RecurrenceType::from_str(s)
-        .ok_or_else(|| format!("recurrence_type invalide: {} (attendu once/daily/weekly/monthly)", s))
+    RecurrenceType::from_str(s).ok_or_else(|| {
+        format!(
+            "recurrence_type invalide: {} (attendu once/daily/weekly/monthly)",
+            s
+        )
+    })
 }
 
 pub fn parse_content_type(s: &str) -> Result<ContentType, String> {

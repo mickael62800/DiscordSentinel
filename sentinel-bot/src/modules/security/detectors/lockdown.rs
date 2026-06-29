@@ -139,7 +139,8 @@ impl LockdownManager {
                 "saved_states": saved_states_json,
                 "duration_secs": 600,
             });
-            base.post_fire_and_forget("/api/security/lockdown", &body).await;
+            base.post_fire_and_forget("/api/security/lockdown", &body)
+                .await;
         }
 
         self.active.insert(guild_id, (Instant::now(), saved_states));
@@ -240,10 +241,7 @@ mod tests {
 
         manager.active.insert(
             guild,
-            (
-                Instant::now() - std::time::Duration::from_secs(600),
-                vec![],
-            ),
+            (Instant::now() - std::time::Duration::from_secs(600), vec![]),
         );
 
         let expired = manager.expired_guilds(300);
@@ -258,10 +256,7 @@ mod tests {
 
         manager.active.insert(
             guild,
-            (
-                Instant::now() - std::time::Duration::from_secs(100),
-                vec![],
-            ),
+            (Instant::now() - std::time::Duration::from_secs(100), vec![]),
         );
 
         let expired = manager.expired_guilds(300);
@@ -276,17 +271,11 @@ mod tests {
 
         manager.active.insert(
             guild_a,
-            (
-                Instant::now() - std::time::Duration::from_secs(600),
-                vec![],
-            ),
+            (Instant::now() - std::time::Duration::from_secs(600), vec![]),
         );
         manager.active.insert(
             guild_b,
-            (
-                Instant::now() - std::time::Duration::from_secs(100),
-                vec![],
-            ),
+            (Instant::now() - std::time::Duration::from_secs(100), vec![]),
         );
 
         let expired = manager.expired_guilds(300);

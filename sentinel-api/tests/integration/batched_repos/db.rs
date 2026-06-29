@@ -11,17 +11,18 @@ use sqlx::PgPool;
 use std::time::Duration;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::batching::batch_writer::BatchWriterConfig;
 use sentinel_api::adapters::outbound::batching::audit_log_batcher::BatchedPgAuditLogRepository;
+use sentinel_api::adapters::outbound::batching::batch_writer::BatchWriterConfig;
 use sentinel_api::adapters::outbound::batching::log_batcher::BatchedPgLogRepository;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use sentinel_api::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::entities::system::log_entry::LogEntry;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
@@ -58,9 +59,12 @@ fn make_audit(guild_id: &str, event_type: &str) -> AuditLog {
         id: Uuid::new_v4(),
         guild_id: guild_id.into(),
         event_type: event_type.into(),
-        actor_id: None, actor_name: None,
-        target_id: None, target_name: None,
-        channel_id: None, channel_name: None,
+        actor_id: None,
+        actor_name: None,
+        target_id: None,
+        target_name: None,
+        channel_id: None,
+        channel_name: None,
         details: serde_json::json!({}),
         created_at: chrono::Utc::now(),
     }
@@ -77,15 +81,21 @@ async fn log_save_is_async_enqueue_and_flushes_to_db() {
     let category = fresh_tag();
 
     // save retourne immediatement
-    repo.save(&make_log("bot1", &category, "msg1")).await.unwrap();
-    repo.save(&make_log("bot1", &category, "msg2")).await.unwrap();
+    repo.save(&make_log("bot1", &category, "msg1"))
+        .await
+        .unwrap();
+    repo.save(&make_log("bot1", &category, "msg2"))
+        .await
+        .unwrap();
 
     // Wait pour que le flush interval se declenche (100ms + marge)
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM logs WHERE category = $1")
         .bind(&category)
-        .fetch_one(&p).await.unwrap();
+        .fetch_one(&p)
+        .await
+        .unwrap();
     assert_eq!(count.0, 2);
 }
 
@@ -108,17 +118,24 @@ async fn log_delete_by_category_removes_matching_rows() {
     for i in 0..3 {
         sqlx::query(
             "INSERT INTO logs (id, timestamp, level, bot, server, message, category, details) \
-             VALUES ($1, NOW(), 'info', 'b', 's', $2, $3, '{}'::jsonb)"
+             VALUES ($1, NOW(), 'info', 'b', 's', $2, $3, '{}'::jsonb)",
         )
-        .bind(Uuid::new_v4()).bind(format!("m{i}")).bind(&category)
-        .execute(&p).await.unwrap();
+        .bind(Uuid::new_v4())
+        .bind(format!("m{i}"))
+        .bind(&category)
+        .execute(&p)
+        .await
+        .unwrap();
     }
 
     let deleted = repo.delete_by_category(&category).await.unwrap();
     assert_eq!(deleted, 3);
 
     let remaining: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM logs WHERE category = $1")
-        .bind(&category).fetch_one(&p).await.unwrap();
+        .bind(&category)
+        .fetch_one(&p)
+        .await
+        .unwrap();
     assert_eq!(remaining.0, 0);
 }
 
@@ -144,14 +161,19 @@ async fn log_max_batch_size_triggers_immediate_flush() {
 
     // Enqueue 5 entries → doit flusher immediatement (pas attendre 60s)
     for i in 0..5 {
-        repo.save(&make_log("bot", &category, &format!("m{i}"))).await.unwrap();
+        repo.save(&make_log("bot", &category, &format!("m{i}")))
+            .await
+            .unwrap();
     }
 
     // 500ms est largement suffisant pour l'insert batch + round trip
     tokio::time::sleep(Duration::from_millis(500)).await;
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM logs WHERE category = $1")
-        .bind(&category).fetch_one(&p).await.unwrap();
+        .bind(&category)
+        .fetch_one(&p)
+        .await
+        .unwrap();
     assert_eq!(count.0, 5, "max_batch_size doit declencher le flush");
 }
 
@@ -163,7 +185,10 @@ async fn log_max_batch_size_triggers_immediate_flush() {
 async fn audit_save_enqueues_and_flushes() {
     let p = pool().await;
     let repo = BatchedPgAuditLogRepository::new(p.clone(), fast_config());
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
 
     repo.save(&make_audit(&guild_id, "evt1")).await.unwrap();
     repo.save(&make_audit(&guild_id, "evt2")).await.unwrap();
@@ -171,7 +196,10 @@ async fn audit_save_enqueues_and_flushes() {
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1")
-        .bind(&guild_id).fetch_one(&p).await.unwrap();
+        .bind(&guild_id)
+        .fetch_one(&p)
+        .await
+        .unwrap();
     assert_eq!(count.0, 2);
 }
 
@@ -179,17 +207,25 @@ async fn audit_save_enqueues_and_flushes() {
 async fn audit_find_all_delegates_with_filters() {
     let p = pool().await;
     let repo = BatchedPgAuditLogRepository::new(p.clone(), fast_config());
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
 
     // Seed + attend flush
     for i in 0..3 {
-        repo.save(&make_audit(&guild_id, &format!("evt{i}"))).await.unwrap();
+        repo.save(&make_audit(&guild_id, &format!("evt{i}")))
+            .await
+            .unwrap();
     }
     tokio::time::sleep(Duration::from_millis(300)).await;
 
     let filters = AuditLogFilters {
-        event_type: None, actor_id: None, target_id: None,
-        limit: 100, offset: 0,
+        event_type: None,
+        actor_id: None,
+        target_id: None,
+        limit: 100,
+        offset: 0,
     };
     let logs = repo.find_all(Some(&guild_id), &filters).await.unwrap();
     assert_eq!(logs.len(), 3);
@@ -200,6 +236,9 @@ async fn audit_delete_older_than_days_delegates() {
     let p = pool().await;
     let repo = BatchedPgAuditLogRepository::new(p, fast_config());
     // Pas d'anciens logs a supprimer → returns 0.
-    let deleted = repo.delete_older_than_days("nonexistent-guild", 90).await.unwrap();
+    let deleted = repo
+        .delete_older_than_days("nonexistent-guild", 90)
+        .await
+        .unwrap();
     assert_eq!(deleted, 0);
 }

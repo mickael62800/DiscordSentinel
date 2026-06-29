@@ -46,64 +46,115 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
         // ── Nettoyages base de donnees ─────────────────────────────────
         // default = Owner (par defaut tout owner-only),
         // floor   = Admin (un owner peut descendre a Admin mais pas plus).
-        m.insert("db.purge.audit_logs", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.purge.security_events", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.purge.voice_history", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.purge.voice_channel", GateDef {
-            default_role: Role::Owner, floor: Role::Moderator,
-        });
-        m.insert("db.purge.coude", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.purge.blackjack", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.reset.wallets", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("db.reset.coude_stats", GateDef {
-            default_role: Role::Owner, floor: Role::Moderator,
-        });
+        m.insert(
+            "db.purge.audit_logs",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.purge.security_events",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.purge.voice_history",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.purge.voice_channel",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Moderator,
+            },
+        );
+        m.insert(
+            "db.purge.coude",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.purge.blackjack",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.reset.wallets",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "db.reset.coude_stats",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Moderator,
+            },
+        );
 
         // ── Game Portal ──────────────────────────────────────────────
-        m.insert("game.server.create", GateDef {
-            default_role: Role::Admin, floor: Role::Moderator,
-        });
-        m.insert("game.server.delete", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
-        m.insert("game.server.start_stop", GateDef {
-            default_role: Role::Moderator, floor: Role::Moderator,
-        });
-        m.insert("game.server.config_edit", GateDef {
-            default_role: Role::Admin, floor: Role::Moderator,
-        });
+        m.insert(
+            "game.server.create",
+            GateDef {
+                default_role: Role::Admin,
+                floor: Role::Moderator,
+            },
+        );
+        m.insert(
+            "game.server.delete",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
+        m.insert(
+            "game.server.start_stop",
+            GateDef {
+                default_role: Role::Moderator,
+                floor: Role::Moderator,
+            },
+        );
+        m.insert(
+            "game.server.config_edit",
+            GateDef {
+                default_role: Role::Admin,
+                floor: Role::Moderator,
+            },
+        );
         // RCON = console admin avec /op, /whitelist, /kick. Strictement
         // owner par defaut, descendable a Admin maximum.
-        m.insert("game.server.command_rcon", GateDef {
-            default_role: Role::Owner, floor: Role::Admin,
-        });
+        m.insert(
+            "game.server.command_rcon",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Admin,
+            },
+        );
 
         m
     })
 }
 
 /// Resout le role effectif pour (guild, component_key). Cache Redis 60s.
-async fn resolve_min_role(
-    state: &AppState,
-    guild_id: &str,
-    component_key: &str,
-) -> Role {
+async fn resolve_min_role(state: &AppState, guild_id: &str, component_key: &str) -> Role {
     let def = match registry().get(component_key) {
         Some(d) => *d,
         None => {
-            tracing::error!(component_key, "component_gates: cle inconnue, fallback Owner");
+            tracing::error!(
+                component_key,
+                "component_gates: cle inconnue, fallback Owner"
+            );
             return Role::Owner;
         }
     };
@@ -140,7 +191,11 @@ async fn resolve_min_role(
 }
 
 fn clamp_to_floor(r: Role, def: GateDef) -> Role {
-    if r < def.floor { def.floor } else { r }
+    if r < def.floor {
+        def.floor
+    } else {
+        r
+    }
 }
 
 /// Helper public : resout le min_role et delegue a `check_role_for_guild`.
@@ -163,11 +218,7 @@ pub async fn check_component_role(
 
 /// Invalide le cache Redis pour (guild, component_key). A appeler apres
 /// upsert/delete dans la table `rbac_component_min_role`.
-pub async fn invalidate_cache(
-    state: &AppState,
-    guild_id: &str,
-    component_key: &str,
-) {
+pub async fn invalidate_cache(state: &AppState, guild_id: &str, component_key: &str) {
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         let key = format!("rbac:min_role:{}:{}", guild_id, component_key);
         let _ = conn.del::<_, ()>(&key).await;

@@ -66,25 +66,78 @@ impl DiscordApi for DiscordApiWithChannels {
     async fn list_text_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> {
         Ok(self.0.clone())
     }
-    async fn upload_emoji(&self, _: &str, _: &str, _: &[u8], _: &str) -> Result<(String, String, bool), DomainError> { unimplemented!() }
-    async fn ban_user(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn list_members(&self, _: &str, _: u32) -> Result<Vec<DiscordMember>, DomainError> { Ok(vec![]) }
-    async fn send_dm(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn create_role(&self, _: &str, _: &str, _: u32, _: Option<&str>) -> Result<serde_json::Value, DomainError> { unimplemented!() }
-    async fn edit_role(&self, _: &str, _: &str, _: Option<&str>, _: Option<u32>, _: Option<&str>, _: Option<bool>, _: Option<bool>) -> Result<serde_json::Value, DomainError> { unimplemented!() }
-    async fn delete_role(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn unban_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_timeout(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn apply_timeout(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> { Ok(()) }
-    async fn get_user_guilds(&self, _: &str) -> Result<Vec<UserGuild>, DomainError> { Ok(vec![]) }
-    async fn get_user_me(&self, _: &str) -> Result<DiscordUser, DomainError> { unimplemented!() }
+    async fn upload_emoji(
+        &self,
+        _: &str,
+        _: &str,
+        _: &[u8],
+        _: &str,
+    ) -> Result<(String, String, bool), DomainError> {
+        unimplemented!()
+    }
+    async fn ban_user(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_members(&self, _: &str, _: u32) -> Result<Vec<DiscordMember>, DomainError> {
+        Ok(vec![])
+    }
+    async fn send_dm(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn create_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: u32,
+        _: Option<&str>,
+    ) -> Result<serde_json::Value, DomainError> {
+        unimplemented!()
+    }
+    async fn edit_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+        _: Option<u32>,
+        _: Option<&str>,
+        _: Option<bool>,
+        _: Option<bool>,
+    ) -> Result<serde_json::Value, DomainError> {
+        unimplemented!()
+    }
+    async fn delete_role(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn unban_user(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_timeout(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn apply_timeout(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_user_guilds(&self, _: &str) -> Result<Vec<UserGuild>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_user_me(&self, _: &str) -> Result<DiscordUser, DomainError> {
+        unimplemented!()
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_text_channels_returns_non_empty_response() {
     let channels = vec![
-        DiscordChannel { id: "c1".into(), name: "general".into(), position: 0 },
-        DiscordChannel { id: "c2".into(), name: "random".into(), position: 0 },
+        DiscordChannel {
+            id: "c1".into(),
+            name: "general".into(),
+            position: 0,
+        },
+        DiscordChannel {
+            id: "c2".into(),
+            name: "random".into(),
+            position: 0,
+        },
     ];
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
     state.discord_api = Arc::new(DiscordApiWithChannels(channels));
@@ -106,9 +159,11 @@ async fn list_text_channels_returns_non_empty_response() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_text_channels_caches_and_second_call_returns_same() {
-    let channels = vec![
-        DiscordChannel { id: "cached1".into(), name: "salon".into(), position: 0 },
-    ];
+    let channels = vec![DiscordChannel {
+        id: "cached1".into(),
+        name: "salon".into(),
+        position: 0,
+    }];
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
     state.discord_api = Arc::new(DiscordApiWithChannels(channels));
     let app = router::build_for_test(state);

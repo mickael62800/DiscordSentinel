@@ -27,13 +27,11 @@ pub fn register() -> CreateCommand {
                 .required(true),
             ),
         )
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "list",
-                "Lister les panels de roles du serveur",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "list",
+            "Lister les panels de roles du serveur",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -81,14 +79,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            respond(ctx, command, "Cette commande doit etre utilisee dans un serveur.").await;
+            respond(
+                ctx,
+                command,
+                "Cette commande doit etre utilisee dans un serveur.",
+            )
+            .await;
             return;
         }
     };
 
     let sub = match command.data.options.first() {
         Some(s) => s,
-        None => { respond(ctx, command, "Aucune sous-commande fournie.").await; return; }
+        None => {
+            respond(ctx, command, "Aucune sous-commande fournie.").await;
+            return;
+        }
     };
 
     match sub.name.as_str() {
@@ -142,8 +148,10 @@ async fn handle_deploy(ctx: &Context, command: &CommandInteraction, _guild_id: &
             respond_embed(
                 ctx,
                 command,
-                success_embed("\u{2705} Panel deploye")
-                    .description(format!("Le panel **{}** a ete deploye dans ce salon.", panel.panel.title)),
+                success_embed("\u{2705} Panel deploye").description(format!(
+                    "Le panel **{}** a ete deploye dans ce salon.",
+                    panel.panel.title
+                )),
             )
             .await;
         }
@@ -164,13 +172,22 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str
     match api.list_panels(guild_id).await {
         Ok(panels) => {
             if panels.is_empty() {
-                respond(ctx, command, "Aucun panel de roles configure. Creez-en un depuis le dashboard desktop.").await;
+                respond(
+                    ctx,
+                    command,
+                    "Aucun panel de roles configure. Creez-en un depuis le dashboard desktop.",
+                )
+                .await;
                 return;
             }
 
             let mut desc = String::new();
             for p in &panels {
-                let status = if p.message_id.is_some() { "deploye" } else { "non deploye" };
+                let status = if p.message_id.is_some() {
+                    "deploye"
+                } else {
+                    "non deploye"
+                };
                 desc.push_str(&format!("- **{}** (`{}`) — {}\n", p.title, p.id, status));
             }
 

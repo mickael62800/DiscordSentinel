@@ -3,9 +3,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::game::server::{GameServer, GameServerStatus};
 use crate::ports::inbound::game::manage_game_servers::GameServerDetail;
 use crate::ports::outbound::game::container_runtime::ContainerStats;
+use sentinel_core::domain::entities::game::server::{GameServer, GameServerStatus};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateGameServerDto {

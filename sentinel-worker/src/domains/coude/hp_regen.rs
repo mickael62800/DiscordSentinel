@@ -8,9 +8,9 @@ use sqlx::PgPool;
 use tonic::Request;
 use tracing::{debug, error, warn};
 
+use crate::common::grpc;
 use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceClient;
 use sentinel_proto::coude::v1::HpRegenTickRequest;
-use crate::common::grpc;
 
 const DEFAULT_RATE_0_25: f64 = 100.0;
 const DEFAULT_RATE_25_50: f64 = 50.0;

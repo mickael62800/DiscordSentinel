@@ -2,14 +2,22 @@ use serenity::model::channel::{GuildChannel, PartialGuildChannel};
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::{send_event, log};
+use super::{log, send_event};
 
 pub async fn handle_create(ctx: &Context, thread: &GuildChannel) {
     let gid = thread.guild_id.to_string();
 
-    log(ctx, "info", &gid, &format!(
-        "Fil cree : #{} (parent: {})", thread.name, thread.parent_id.map(|p| p.to_string()).unwrap_or_default()
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid,
+        &format!(
+            "Fil cree : #{} (parent: {})",
+            thread.name,
+            thread.parent_id.map(|p| p.to_string()).unwrap_or_default()
+        ),
+    )
+    .await;
 
     let mut evt = audit_event::simple(gid, "thread_create")
         .with_target(thread.id, &thread.name)
@@ -32,13 +40,18 @@ pub async fn handle_delete(
         .map(|t| t.name.clone())
         .unwrap_or_else(|| thread.id.to_string());
 
-    log(ctx, "warn", &gid, &format!(
-        "Fil supprime : #{}", thread_name
-    )).await;
+    log(
+        ctx,
+        "warn",
+        &gid,
+        &format!("Fil supprime : #{}", thread_name),
+    )
+    .await;
 
-    let mut evt = audit_event::simple(gid, "thread_delete")
-        .with_target(thread.id, &thread_name);
-    evt.channel_id = full_thread.as_ref().and_then(|t| t.parent_id.map(|p| p.to_string()));
+    let mut evt = audit_event::simple(gid, "thread_delete").with_target(thread.id, &thread_name);
+    evt.channel_id = full_thread
+        .as_ref()
+        .and_then(|t| t.parent_id.map(|p| p.to_string()));
 
     send_event(ctx, evt).await;
 }

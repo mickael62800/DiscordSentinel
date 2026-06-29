@@ -14,17 +14,17 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::coude::expire::cowardice_penalty;
-use crate::domain::entities::coude::cowardice_relief::should_count_as_cowardice;
 use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cowardice_relief::should_count_as_cowardice;
+use crate::domain::entities::coude::expire::cowardice_penalty;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
 use crate::ports::inbound::coude::expire_combats_batch::ExpiredCombatOutput;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// 24h par defaut, override par guild via bot_guild_config.
 const DEFAULT_EXPIRY_HOURS: i64 = 24;
 
@@ -44,7 +44,13 @@ impl ExpireCombatsBatchService {
         cashbox_repo: Arc<dyn CashboxRepository>,
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     ) -> Self {
-        Self { combat_repo, player_repo, wallet_repo, cashbox_repo, bets_uc }
+        Self {
+            combat_repo,
+            player_repo,
+            wallet_repo,
+            cashbox_repo,
+            bets_uc,
+        }
     }
 }
 

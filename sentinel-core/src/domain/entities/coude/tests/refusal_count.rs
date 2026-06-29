@@ -16,7 +16,10 @@ fn honor_debt_owed_below_threshold() {
     };
     assert!(!r.honor_debt_owed());
 
-    let r2 = RefusalCount { count: 2, ..r.clone() };
+    let r2 = RefusalCount {
+        count: 2,
+        ..r.clone()
+    };
     assert!(!r2.honor_debt_owed());
 }
 
@@ -30,6 +33,9 @@ fn honor_debt_owed_at_or_above_threshold() {
         last_refused_at: Utc::now(),
     };
     assert!(r.honor_debt_owed());
-    let r2 = RefusalCount { count: 5, ..r.clone() };
+    let r2 = RefusalCount {
+        count: 5,
+        ..r.clone()
+    };
     assert!(r2.honor_debt_owed());
 }

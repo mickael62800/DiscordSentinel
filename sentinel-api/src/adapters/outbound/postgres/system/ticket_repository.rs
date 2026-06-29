@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::system::ticket_repository::TicketRepository;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::ticket_repository::TicketRepository;
 
 pub struct PgTicketRepository {
     pool: PgPool,
@@ -86,7 +86,15 @@ impl From<MessageRow> for TicketMessage {
 
 #[async_trait]
 impl TicketRepository for PgTicketRepository {
-    async fn find_all(&self, status: Option<&str>, priority: Option<&str>, search: Option<&str>, author_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<Ticket>, DomainError> {
+    async fn find_all(
+        &self,
+        status: Option<&str>,
+        priority: Option<&str>,
+        search: Option<&str>,
+        author_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Ticket>, DomainError> {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             r#"
             SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
@@ -131,7 +139,8 @@ impl TicketRepository for PgTicketRepository {
         qb.push(" OFFSET ");
         qb.push_bind(offset);
 
-        let rows = qb.build_query_as::<TicketRow>()
+        let rows = qb
+            .build_query_as::<TicketRow>()
             .fetch_all(&self.pool)
             .await
             .map_err(pg_err)?;
@@ -247,7 +256,11 @@ impl TicketRepository for PgTicketRepository {
         Ok(())
     }
 
-    async fn update_voice_channel(&self, id: Uuid, voice_channel_id: Option<&str>) -> Result<(), DomainError> {
+    async fn update_voice_channel(
+        &self,
+        id: Uuid,
+        voice_channel_id: Option<&str>,
+    ) -> Result<(), DomainError> {
         sqlx::query("UPDATE tickets SET voice_channel_id = $1, updated_at = NOW() WHERE id = $2")
             .bind(voice_channel_id)
             .bind(id)
@@ -258,7 +271,11 @@ impl TicketRepository for PgTicketRepository {
         Ok(())
     }
 
-    async fn update_invited_user(&self, id: Uuid, invited_user_id: Option<&str>) -> Result<(), DomainError> {
+    async fn update_invited_user(
+        &self,
+        id: Uuid,
+        invited_user_id: Option<&str>,
+    ) -> Result<(), DomainError> {
         sqlx::query("UPDATE tickets SET invited_user_id = $1, updated_at = NOW() WHERE id = $2")
             .bind(invited_user_id)
             .bind(id)
@@ -296,9 +313,14 @@ impl TicketRepository for PgTicketRepository {
                 .map_err(pg_err)?;
         }
         if let Some(rating) = satisfaction_rating {
-            sqlx::query("UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2")
-                .bind(rating).bind(id).execute(&self.pool).await
-                .map_err(pg_err)?;
+            sqlx::query(
+                "UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2",
+            )
+            .bind(rating)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         }
         Ok(())
     }

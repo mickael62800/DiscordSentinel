@@ -25,8 +25,5 @@ pub trait SafetyNetRepository: Send + Sync {
 
     /// Liste les filets actifs (pour message quotidien). Retourne (user_id,
     /// expires_at).
-    async fn list_active(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<ActiveSafetyNet>, DomainError>;
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<ActiveSafetyNet>, DomainError>;
 }

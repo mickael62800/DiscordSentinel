@@ -21,15 +21,7 @@ use std::fmt;
 macro_rules! discord_id {
     ($name:ident, $doc:literal) => {
         #[doc = $doc]
-        #[derive(
-            Debug,
-            Clone,
-            PartialEq,
-            Eq,
-            Hash,
-            Serialize,
-            Deserialize,
-        )]
+        #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
         #[serde(transparent)]
         pub struct $name(pub String);
 
@@ -94,11 +86,23 @@ macro_rules! discord_id {
     };
 }
 
-discord_id!(GuildId,   "ID d'une guild Discord (snowflake u64 stocke en VARCHAR).");
-discord_id!(UserId,    "ID d'un user Discord (snowflake u64 stocke en VARCHAR).");
-discord_id!(ChannelId, "ID d'un channel Discord (text/voice/category/thread).");
-discord_id!(MessageId, "ID d'un message Discord (unique au sein d'un channel).");
-discord_id!(RoleId,    "ID d'un role Discord (unique au sein d'une guild).");
+discord_id!(
+    GuildId,
+    "ID d'une guild Discord (snowflake u64 stocke en VARCHAR)."
+);
+discord_id!(
+    UserId,
+    "ID d'un user Discord (snowflake u64 stocke en VARCHAR)."
+);
+discord_id!(
+    ChannelId,
+    "ID d'un channel Discord (text/voice/category/thread)."
+);
+discord_id!(
+    MessageId,
+    "ID d'un message Discord (unique au sein d'un channel)."
+);
+discord_id!(RoleId, "ID d'un role Discord (unique au sein d'une guild).");
 
 #[cfg(test)]
 mod tests {

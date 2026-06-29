@@ -18,17 +18,17 @@ use uuid::Uuid;
 
 use crate::domain::entities::casino::wheel::is_memorable_case;
 use crate::domain::entities::casino::wheel::spin_with_rng_curses as wheel_spin_with_rng_curses;
-use crate::domain::entities::coude::curse::CurseKind;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
+use crate::domain::entities::coude::curse::CurseKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
-use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::uow::UnitOfWork;
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
@@ -43,7 +43,12 @@ impl ManageWheelService {
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         uow: Arc<dyn UnitOfWork>,
     ) -> Self {
-        Self { repo, wallet_uc, curses_repo: None, uow }
+        Self {
+            repo,
+            wallet_uc,
+            curses_repo: None,
+            uow,
+        }
     }
 
     /// Branche le repo des maledictions pour activer "Heartbreak"
@@ -60,7 +65,11 @@ impl ManageWheelService {
 impl ManageWheelUseCase for ManageWheelService {
     async fn spin(&self, cmd: WheelSpinCommand) -> Result<WheelSpinResult, DomainError> {
         // 1. Verif daily.
-        if self.repo.has_claimed_today(&cmd.guild_id, &cmd.user_id).await? {
+        if self
+            .repo
+            .has_claimed_today(&cmd.guild_id, &cmd.user_id)
+            .await?
+        {
             return Err(DomainError::ValidationError(
                 "Tu as deja tire la Roue du Destin aujourd hui.".into(),
             ));
@@ -93,19 +102,36 @@ impl ManageWheelUseCase for ManageWheelService {
 
         // Wallet : credit ou debit selon le signe du payout.
         if payout > 0 {
-            let m = self.wallet_uc
-                .credit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, payout, "wheel_payout",
-                    &format!("Roue du Destin : {}", outcome.case.label))
+            let m = self
+                .wallet_uc
+                .credit_tx(
+                    &mut *tx,
+                    &cmd.guild_id,
+                    &cmd.user_id,
+                    payout,
+                    "wheel_payout",
+                    &format!("Roue du Destin : {}", outcome.case.label),
+                )
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), m));
         } else if payout < 0 {
             // Clamp : on ne peut pas debiter plus que le solde.
-            let balance = self.wallet_uc.get_balance(&cmd.guild_id, &cmd.user_id).await?;
+            let balance = self
+                .wallet_uc
+                .get_balance(&cmd.guild_id, &cmd.user_id)
+                .await?;
             let actual_debit = (-payout).min(balance);
             if actual_debit > 0 {
-                let m = self.wallet_uc
-                    .debit_tx(&mut *tx, &cmd.guild_id, &cmd.user_id, actual_debit, "wheel_loss",
-                        &format!("Roue du Destin : {}", outcome.case.label))
+                let m = self
+                    .wallet_uc
+                    .debit_tx(
+                        &mut *tx,
+                        &cmd.guild_id,
+                        &cmd.user_id,
+                        actual_debit,
+                        "wheel_loss",
+                        &format!("Roue du Destin : {}", outcome.case.label),
+                    )
                     .await?;
                 taunt_mutations.push((cmd.user_id.clone(), m));
             }
@@ -125,18 +151,26 @@ impl ManageWheelUseCase for ManageWheelService {
         self.repo.log_spin_in_tx(&mut *tx, &spin).await?;
 
         // Mark daily.
-        self.repo.mark_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id).await?;
+        self.repo
+            .mark_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
+            .await?;
 
         self.uow.commit(tx).await?;
 
         // 4. Post-commit taunts.
         let mut triggered_taunts: Vec<TauntEvent> = Vec::new();
         for (uid, mutation) in &taunt_mutations {
-            let evs = self.wallet_uc.post_commit_taunts(&cmd.guild_id, uid, mutation).await;
+            let evs = self
+                .wallet_uc
+                .post_commit_taunts(&cmd.guild_id, uid, mutation)
+                .await;
             triggered_taunts.extend(evs);
         }
 
-        let balance_after = self.wallet_uc.get_balance(&cmd.guild_id, &cmd.user_id).await?;
+        let balance_after = self
+            .wallet_uc
+            .get_balance(&cmd.guild_id, &cmd.user_id)
+            .await?;
         let is_memorable = is_memorable_case(outcome.case.key);
 
         Ok(WheelSpinResult {
@@ -148,7 +182,11 @@ impl ManageWheelUseCase for ManageWheelService {
         })
     }
 
-    async fn recent_spins(&self, guild_id: &str, limit: i64) -> Result<Vec<WheelSpin>, DomainError> {
+    async fn recent_spins(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WheelSpin>, DomainError> {
         self.repo.recent_spins(guild_id, limit).await
     }
 

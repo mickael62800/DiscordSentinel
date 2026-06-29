@@ -11,8 +11,8 @@
 //!    `taunts_dispatch` (meme pattern que `tournament_resolved`).
 
 use sqlx::PgPool;
-use tonic::transport::Channel;
 use tonic::metadata::MetadataValue;
+use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{info, warn};
 
@@ -44,10 +44,20 @@ pub async fn run(_pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), S
     for guild_id in &guild_ids {
         // Sub-feature gate : chaos_enabled (top-level) +
         // daily_chaos_enabled (sub-toggle). Default true pour les deux.
-        if !crate::common::is_feature_enabled(_pool, guild_id, "coude-bot", "chaos_enabled", true).await {
+        if !crate::common::is_feature_enabled(_pool, guild_id, "coude-bot", "chaos_enabled", true)
+            .await
+        {
             continue;
         }
-        if !crate::common::is_feature_enabled(_pool, guild_id, "coude-bot", "daily_chaos_enabled", true).await {
+        if !crate::common::is_feature_enabled(
+            _pool,
+            guild_id,
+            "coude-bot",
+            "daily_chaos_enabled",
+            true,
+        )
+        .await
+        {
             continue;
         }
 
@@ -90,10 +100,7 @@ pub async fn run(_pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), S
             if let Some(client) = &redis_client {
                 publish_taunts(client, guild_id, &resp.taunt_events).await;
             } else {
-                warn!(
-                    guild_id,
-                    "Redis indispo, daily_chaos_taunts non publies"
-                );
+                warn!(guild_id, "Redis indispo, daily_chaos_taunts non publies");
             }
         }
     }
@@ -129,11 +136,9 @@ async fn publish_taunts(
 
     match client.get_multiplexed_async_connection().await {
         Ok(mut conn) => {
-            let res = crate::common::redis_helpers::xadd_event(
-                &mut conn,
-                &event_payload.to_string(),
-            )
-            .await;
+            let res =
+                crate::common::redis_helpers::xadd_event(&mut conn, &event_payload.to_string())
+                    .await;
             if let Err(e) = res {
                 warn!(error = %e, guild_id, "XADD daily_chaos_taunts failed");
             } else {
@@ -151,11 +156,10 @@ async fn connect_grpc(_api_url: &str) -> Result<Channel, String> {
 }
 
 async fn fetch_guild_ids(pool: &PgPool) -> Result<Vec<String>, String> {
-    let rows: Vec<(String,)> =
-        sqlx::query_as("SELECT DISTINCT guild_id FROM coude_players")
-            .fetch_all(pool)
-            .await
-            .map_err(|e| format!("fetch guild_ids: {e}"))?;
+    let rows: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT guild_id FROM coude_players")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("fetch guild_ids: {e}"))?;
     Ok(rows.into_iter().map(|r| r.0).collect())
 }
 

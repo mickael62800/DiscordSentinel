@@ -110,7 +110,10 @@ pub fn build_for_test(state: AppState) -> Router {
     let protected = Router::new()
         // Endpoints lourds (sans rate limit en test)
         .route("/analyze", post(handlers::ai::analyze::analyze))
-        .route("/analyze/image", post(handlers::ai::analyze_image::analyze_image))
+        .route(
+            "/analyze/image",
+            post(handlers::ai::analyze_image::analyze_image),
+        )
         .merge(routes::analytics::routes())
         // Routes standard
         .merge(protected_domain_routes())
@@ -121,8 +124,14 @@ pub fn build_for_test(state: AppState) -> Router {
 
     let public = Router::new()
         .route("/health", get(handlers::system::health::health))
-        .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::system::oauth::callback))
+        .route(
+            "/auth/discord/authorize",
+            get(handlers::system::oauth::authorize),
+        )
+        .route(
+            "/auth/discord/callback",
+            get(handlers::system::oauth::callback),
+        )
         .route("/auth/refresh", post(handlers::system::oauth::refresh))
         .route("/auth/logout", post(handlers::system::oauth::logout));
 
@@ -132,7 +141,12 @@ pub fn build_for_test(state: AppState) -> Router {
         .with_state(state)
 }
 
-pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, allowed_origins: &str) -> Router {
+pub fn build(
+    state: AppState,
+    max_body_size: usize,
+    rate_limit_per_sec: u64,
+    allowed_origins: &str,
+) -> Router {
     let limiter = RateLimiter::new(rate_limit_per_sec);
 
     // Limiter strict pour les endpoints lourds (inference IA, analytics)
@@ -157,7 +171,10 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
     // Routes lourdes avec rate limit strict (inference IA + analytics)
     let heavy_routes = Router::new()
         .route("/analyze", post(handlers::ai::analyze::analyze))
-        .route("/analyze/image", post(handlers::ai::analyze_image::analyze_image))
+        .route(
+            "/analyze/image",
+            post(handlers::ai::analyze_image::analyze_image),
+        )
         .merge(routes::analytics::routes())
         .route_layer(middleware::from_fn_with_state(
             heavy_limiter,
@@ -214,8 +231,14 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/metrics", get(metrics_handler))
         // OAuth Discord web : publiques car pas de token prealable.
         // Le state CSRF + l'echange code cote serveur protegent le flux.
-        .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::system::oauth::callback))
+        .route(
+            "/auth/discord/authorize",
+            get(handlers::system::oauth::authorize),
+        )
+        .route(
+            "/auth/discord/callback",
+            get(handlers::system::oauth::callback),
+        )
         // Refresh/logout de session web (cookie httpOnly) : publiques car
         // l'auth se fait via le cookie de session, pas le X-Discord-Token.
         .route("/auth/refresh", post(handlers::system::oauth::refresh))
@@ -229,49 +252,56 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
     }
 
     // TraceLayer configure pour inclure le request_id dans chaque span
-    let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
-        let request_id = request
-            .headers()
-            .get("x-request-id")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("-");
-        let path = request.uri().path();
-        let low = is_low_verbosity_path(path);
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(|request: &axum::http::Request<_>| {
+            let request_id = request
+                .headers()
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-");
+            let path = request.uri().path();
+            let low = is_low_verbosity_path(path);
 
-        if low {
-            tracing::debug_span!(
-                "http_request",
-                method = %request.method(),
-                uri = %request.uri(),
-                request_id = %request_id,
-                low_verbosity = true,
-            )
-        } else {
-            tracing::info_span!(
-                "http_request",
-                method = %request.method(),
-                uri = %request.uri(),
-                request_id = %request_id,
-            )
-        }
-    }).on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, span: &Span| {
-        let status = response.status().as_u16();
-        let latency_ms = latency.as_millis() as u64;
-        // Si la span est marquee low_verbosity (heartbeat/health), on emet en DEBUG.
-        // Sinon INFO. tracing-subscriber filtre selon RUST_LOG.
-        if span.field("low_verbosity").is_some() {
-            tracing::debug!(status = status, latency_ms = latency_ms, "response");
-        } else {
-            tracing::info!(status = status, latency_ms = latency_ms, "response");
-        }
-    });
+            if low {
+                tracing::debug_span!(
+                    "http_request",
+                    method = %request.method(),
+                    uri = %request.uri(),
+                    request_id = %request_id,
+                    low_verbosity = true,
+                )
+            } else {
+                tracing::info_span!(
+                    "http_request",
+                    method = %request.method(),
+                    uri = %request.uri(),
+                    request_id = %request_id,
+                )
+            }
+        })
+        .on_response(
+            |response: &axum::http::Response<_>, latency: std::time::Duration, span: &Span| {
+                let status = response.status().as_u16();
+                let latency_ms = latency.as_millis() as u64;
+                // Si la span est marquee low_verbosity (heartbeat/health), on emet en DEBUG.
+                // Sinon INFO. tracing-subscriber filtre selon RUST_LOG.
+                if span.field("low_verbosity").is_some() {
+                    tracing::debug!(status = status, latency_ms = latency_ms, "response");
+                } else {
+                    tracing::info!(status = status, latency_ms = latency_ms, "response");
+                }
+            },
+        );
 
     let logger_state = ApiLoggerState::from_app(&state);
 
     Router::new()
         .merge(protected)
         .merge(public)
-        .layer(middleware::from_fn_with_state(logger_state, api_logger_middleware))
+        .layer(middleware::from_fn_with_state(
+            logger_state,
+            api_logger_middleware,
+        ))
         // Métriques Prometheus : enregistre count + latency par (route, method, status).
         // Doit s'appliquer APRÈS le matching de route pour récupérer le `MatchedPath`.
         .layer(middleware::from_fn(metrics_middleware))

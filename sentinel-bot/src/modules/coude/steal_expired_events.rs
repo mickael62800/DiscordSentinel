@@ -15,8 +15,8 @@ use serenity::all::{ChannelId, Context, EditMessage, MessageId};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::modules::coude::commands::voler::resolve_steal_attempt;
 use crate::modules::coude::catalog::CatalogCacheKey;
+use crate::modules::coude::commands::voler::resolve_steal_attempt;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::taunts_dispatch;
 use crate::modules::coude::GameApiKey;
@@ -53,12 +53,21 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         None => return,
     };
 
-    let attempt_id_str = data.get("attempt_id").and_then(|v| v.as_str()).unwrap_or("");
+    let attempt_id_str = data
+        .get("attempt_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let guild_id = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
     let thief_id = data.get("thief_id").and_then(|v| v.as_str()).unwrap_or("");
     let target_id = data.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
-    let message_id_str = data.get("message_id").and_then(|v| v.as_str()).unwrap_or("");
-    let channel_id_str = data.get("channel_id").and_then(|v| v.as_str()).unwrap_or("");
+    let message_id_str = data
+        .get("message_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let channel_id_str = data
+        .get("channel_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
 
     if attempt_id_str.is_empty()
         || guild_id.is_empty()

@@ -12,50 +12,158 @@ use super::super::state::AppState;
 /// Routes bot standard (sans les endpoints lourds d'inference deplacés dans heavy_routes).
 pub fn routes() -> Router<AppState> {
     Router::new()
-        .route("/rules/{guild_id}", get(handlers::moderation::rules::get_rules))
+        .route(
+            "/rules/{guild_id}",
+            get(handlers::moderation::rules::get_rules),
+        )
         .route("/rules", post(handlers::moderation::rules::create_rule))
-        .route("/rules/{guild_id}/{rule_id}", delete(handlers::moderation::rules::delete_rule))
-        .route("/infractions/{guild_id}", get(handlers::moderation::infractions::list_infractions))
-        .route("/infractions/delete/{id}", delete(handlers::moderation::infractions::delete_infraction))
+        .route(
+            "/rules/{guild_id}/{rule_id}",
+            delete(handlers::moderation::rules::delete_rule),
+        )
+        .route(
+            "/infractions/{guild_id}",
+            get(handlers::moderation::infractions::list_infractions),
+        )
+        .route(
+            "/infractions/delete/{id}",
+            delete(handlers::moderation::infractions::delete_infraction),
+        )
         // Wallet (shared coin system)
-        .route("/api/wallet/{guild_id}/{user_id}", get(handlers::casino::wallet::get_wallet))
-        .route("/api/wallet/{guild_id}/{user_id}/credit", post(handlers::casino::wallet::credit))
-        .route("/api/wallet/{guild_id}/{user_id}/debit", post(handlers::casino::wallet::debit))
-        .route("/api/wallet/transfer", post(handlers::casino::wallet::transfer))
-        .route("/api/wallet/{guild_id}/leaderboard", get(handlers::casino::wallet::leaderboard))
-        .route("/api/wallet/{guild_id}/{user_id}/transactions", get(handlers::casino::wallet::transactions))
+        .route(
+            "/api/wallet/{guild_id}/{user_id}",
+            get(handlers::casino::wallet::get_wallet),
+        )
+        .route(
+            "/api/wallet/{guild_id}/{user_id}/credit",
+            post(handlers::casino::wallet::credit),
+        )
+        .route(
+            "/api/wallet/{guild_id}/{user_id}/debit",
+            post(handlers::casino::wallet::debit),
+        )
+        .route(
+            "/api/wallet/transfer",
+            post(handlers::casino::wallet::transfer),
+        )
+        .route(
+            "/api/wallet/{guild_id}/leaderboard",
+            get(handlers::casino::wallet::leaderboard),
+        )
+        .route(
+            "/api/wallet/{guild_id}/{user_id}/transactions",
+            get(handlers::casino::wallet::transactions),
+        )
         // Phase 8 — administration wallets (pluriel pour eviter collision
         // avec les routes dynamiques /api/wallet/{guild}/{user_id}).
-        .route("/api/wallets/{guild_id}", get(handlers::casino::wallet::list_wallets))
-        .route("/api/wallets/{guild_id}/reset-all", post(handlers::casino::wallet::reset_all_wallets))
-        .route("/api/wallets/{guild_id}/{user_id}/reset", post(handlers::casino::wallet::reset_wallet))
+        .route(
+            "/api/wallets/{guild_id}",
+            get(handlers::casino::wallet::list_wallets),
+        )
+        .route(
+            "/api/wallets/{guild_id}/reset-all",
+            post(handlers::casino::wallet::reset_all_wallets),
+        )
+        .route(
+            "/api/wallets/{guild_id}/{user_id}/reset",
+            post(handlers::casino::wallet::reset_wallet),
+        )
         // Blackjack
-        .route("/api/blackjack/start", post(handlers::casino::blackjack::game::start_game))
-        .route("/api/blackjack/{game_id}/hit", post(handlers::casino::blackjack::game::hit))
-        .route("/api/blackjack/{game_id}/stand", post(handlers::casino::blackjack::game::stand))
-        .route("/api/blackjack/{game_id}/double", post(handlers::casino::blackjack::game::double_down))
-        .route("/api/blackjack/{guild_id}/{user_id}/active", get(handlers::casino::blackjack::game::get_active))
+        .route(
+            "/api/blackjack/start",
+            post(handlers::casino::blackjack::game::start_game),
+        )
+        .route(
+            "/api/blackjack/{game_id}/hit",
+            post(handlers::casino::blackjack::game::hit),
+        )
+        .route(
+            "/api/blackjack/{game_id}/stand",
+            post(handlers::casino::blackjack::game::stand),
+        )
+        .route(
+            "/api/blackjack/{game_id}/double",
+            post(handlers::casino::blackjack::game::double_down),
+        )
+        .route(
+            "/api/blackjack/{guild_id}/{user_id}/active",
+            get(handlers::casino::blackjack::game::get_active),
+        )
         // Phase 8 — administration blackjack (prefixe "admin" pour eviter
         // collision avec les routes dynamiques /api/blackjack/{game_id}/*).
-        .route("/api/blackjack/admin/{guild_id}/games", get(handlers::casino::blackjack::game::list_games))
-        .route("/api/blackjack/admin/games/{game_id}", delete(handlers::casino::blackjack::game::cancel_game))
-        .route("/api/blackjack/admin/{guild_id}/purge", delete(handlers::casino::blackjack::game::purge_all))
+        .route(
+            "/api/blackjack/admin/{guild_id}/games",
+            get(handlers::casino::blackjack::game::list_games),
+        )
+        .route(
+            "/api/blackjack/admin/games/{game_id}",
+            delete(handlers::casino::blackjack::game::cancel_game),
+        )
+        .route(
+            "/api/blackjack/admin/{guild_id}/purge",
+            delete(handlers::casino::blackjack::game::purge_all),
+        )
         // Blackjack tables (multijoueur)
-        .route("/api/blackjack/tables", post(handlers::casino::blackjack::tables::create_table))
-        .route("/api/blackjack/tables/{table_id}/join", post(handlers::casino::blackjack::tables::join_table))
-        .route("/api/blackjack/tables/{table_id}/players", get(handlers::casino::blackjack::tables::list_table_players))
-        .route("/api/blackjack/tables/{table_id}/games", get(handlers::casino::blackjack::tables::list_table_games))
-        .route("/api/blackjack/tables/{table_id}", delete(handlers::casino::blackjack::tables::close_table))
-        .route("/api/blackjack/tables/by-channel/{channel_id}", get(handlers::casino::blackjack::tables::get_table_by_channel))
-        .route("/api/blackjack/admin/{guild_id}/tables", get(handlers::casino::blackjack::tables::list_tables_by_guild))
+        .route(
+            "/api/blackjack/tables",
+            post(handlers::casino::blackjack::tables::create_table),
+        )
+        .route(
+            "/api/blackjack/tables/{table_id}/join",
+            post(handlers::casino::blackjack::tables::join_table),
+        )
+        .route(
+            "/api/blackjack/tables/{table_id}/players",
+            get(handlers::casino::blackjack::tables::list_table_players),
+        )
+        .route(
+            "/api/blackjack/tables/{table_id}/games",
+            get(handlers::casino::blackjack::tables::list_table_games),
+        )
+        .route(
+            "/api/blackjack/tables/{table_id}",
+            delete(handlers::casino::blackjack::tables::close_table),
+        )
+        .route(
+            "/api/blackjack/tables/by-channel/{channel_id}",
+            get(handlers::casino::blackjack::tables::get_table_by_channel),
+        )
+        .route(
+            "/api/blackjack/admin/{guild_id}/tables",
+            get(handlers::casino::blackjack::tables::list_tables_by_guild),
+        )
         // Slot machine (migration 157)
-        .route("/api/slot/{guild_id}/spin", post(handlers::casino::slot::spin))
-        .route("/api/slot/{guild_id}/daily", post(handlers::casino::slot::daily))
-        .route("/api/slot/{guild_id}/jackpot", get(handlers::casino::slot::get_jackpot))
-        .route("/api/slot/{guild_id}/recent", get(handlers::casino::slot::recent_spins))
-        .route("/api/slot/{guild_id}/leaderboard", get(handlers::casino::slot::leaderboard))
+        .route(
+            "/api/slot/{guild_id}/spin",
+            post(handlers::casino::slot::spin),
+        )
+        .route(
+            "/api/slot/{guild_id}/daily",
+            post(handlers::casino::slot::daily),
+        )
+        .route(
+            "/api/slot/{guild_id}/jackpot",
+            get(handlers::casino::slot::get_jackpot),
+        )
+        .route(
+            "/api/slot/{guild_id}/recent",
+            get(handlers::casino::slot::recent_spins),
+        )
+        .route(
+            "/api/slot/{guild_id}/leaderboard",
+            get(handlers::casino::slot::leaderboard),
+        )
         // Roue du Destin (migration 158)
-        .route("/api/wheel/{guild_id}/spin", post(handlers::casino::wheel::spin))
-        .route("/api/wheel/{guild_id}/recent", get(handlers::casino::wheel::recent))
-        .route("/api/wheel/{guild_id}/leaderboard", get(handlers::casino::wheel::leaderboard))
+        .route(
+            "/api/wheel/{guild_id}/spin",
+            post(handlers::casino::wheel::spin),
+        )
+        .route(
+            "/api/wheel/{guild_id}/recent",
+            get(handlers::casino::wheel::recent),
+        )
+        .route(
+            "/api/wheel/{guild_id}/leaderboard",
+            get(handlers::casino::wheel::leaderboard),
+        )
 }

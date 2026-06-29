@@ -22,23 +22,23 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
 use crate::domain::entities::coude::balance::BalanceParams;
+use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
 use crate::domain::entities::coude::combat::Combat;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine as engine;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
 use crate::domain::services::coude::coude_combat_engine::ServerEventLite;
-use crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase;
-use crate::ports::inbound::coude::resolve_betting_batch::ResolvedBettingCombatOutput;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolvedBettingCombatOutput;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 /// Delai de paris par defaut (5 min), override par guild via bot_guild_config.
 const DEFAULT_BET_DELAY_SECS: i64 = 300;
 /// Au-dela de 120s en 'resolving', on considere le combat stuck et on retry.
@@ -88,11 +88,7 @@ impl ResolveBettingBatchService {
     }
 
     /// Charge un joueur et le convertit en `PlayerLite` pour le moteur.
-    async fn load_player(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<PlayerLite, DomainError> {
+    async fn load_player(&self, guild_id: &str, user_id: &str) -> Result<PlayerLite, DomainError> {
         let p = self
             .player_repo
             .get(guild_id, user_id)
@@ -114,8 +110,12 @@ impl ResolveBettingBatchService {
         &self,
         combat: &Combat,
     ) -> Result<ResolvedBettingCombatOutput, DomainError> {
-        let attacker = self.load_player(&combat.guild_id, &combat.attacker_id).await?;
-        let defender = self.load_player(&combat.guild_id, &combat.defender_id).await?;
+        let attacker = self
+            .load_player(&combat.guild_id, &combat.attacker_id)
+            .await?;
+        let defender = self
+            .load_player(&combat.guild_id, &combat.defender_id)
+            .await?;
 
         let events = self
             .social_uc
@@ -127,7 +127,9 @@ impl ResolveBettingBatchService {
             });
         let engine_events: Vec<ServerEventLite> = events
             .into_iter()
-            .map(|e| ServerEventLite { event_type: e.event_type })
+            .map(|e| ServerEventLite {
+                event_type: e.event_type,
+            })
             .collect();
 
         // HP courants (deja lus dans load_player)
@@ -205,7 +207,13 @@ impl ResolveBettingBatchService {
                 let desc = format!("Explosion combat {}", combat.id);
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(&combat.guild_id, &combat.attacker_id, explosion_loss, "coude_combat_explosion", &desc)
+                    .debit(
+                        &combat.guild_id,
+                        &combat.attacker_id,
+                        explosion_loss,
+                        "coude_combat_explosion",
+                        &desc,
+                    )
                     .await
                 {
                     tracing::error!(
@@ -221,7 +229,13 @@ impl ResolveBettingBatchService {
                 }
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(&combat.guild_id, &combat.defender_id, explosion_loss, "coude_combat_explosion", &desc)
+                    .debit(
+                        &combat.guild_id,
+                        &combat.defender_id,
+                        explosion_loss,
+                        "coude_combat_explosion",
+                        &desc,
+                    )
                     .await
                 {
                     tracing::error!(
@@ -300,7 +314,9 @@ impl ResolveBettingBatchService {
             .wallet_repo
             .get(&combat.guild_id, &loser_id)
             .await?
-            .ok_or_else(|| DomainError::NotFound(format!("Wallet perdant {loser_id} introuvable")))?;
+            .ok_or_else(|| {
+                DomainError::NotFound(format!("Wallet perdant {loser_id} introuvable"))
+            })?;
         let loser_balance = loser_wallet.coins;
 
         // Assurance : regles pures → domain::apply_insurance_to_loss
@@ -369,7 +385,13 @@ impl ResolveBettingBatchService {
         if coins_transferred > 0 {
             if let Err(e) = self
                 .wallet_repo
-                .credit(&combat.guild_id, &winner_id, coins_transferred, "coude_combat_win", &combat_desc)
+                .credit(
+                    &combat.guild_id,
+                    &winner_id,
+                    coins_transferred,
+                    "coude_combat_win",
+                    &combat_desc,
+                )
                 .await
             {
                 tracing::error!(
@@ -387,7 +409,13 @@ impl ResolveBettingBatchService {
         if actual_loss > 0 {
             if let Err(e) = self
                 .wallet_repo
-                .debit(&combat.guild_id, &loser_id, actual_loss, "coude_combat_loss", &combat_desc)
+                .debit(
+                    &combat.guild_id,
+                    &loser_id,
+                    actual_loss,
+                    "coude_combat_loss",
+                    &combat_desc,
+                )
                 .await
             {
                 tracing::error!(
@@ -406,7 +434,12 @@ impl ResolveBettingBatchService {
         // Stats (wins/losses via record_*)
         if let Err(e) = self
             .player_repo
-            .record_win(&combat.guild_id, &winner_id, coins_transferred, result.stolen_bonus)
+            .record_win(
+                &combat.guild_id,
+                &winner_id,
+                coins_transferred,
+                result.stolen_bonus,
+            )
             .await
         {
             warn!(error = %e, "Echec record_win");
@@ -434,7 +467,13 @@ impl ResolveBettingBatchService {
                 // BUG critique fix : `let _` -> tracing::error! pour visibilite.
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(&combat.guild_id, &loser_id, vol_capped, "coude_combat_vol_victim", &vol_desc)
+                    .debit(
+                        &combat.guild_id,
+                        &loser_id,
+                        vol_capped,
+                        "coude_combat_vol_victim",
+                        &vol_desc,
+                    )
                     .await
                 {
                     tracing::error!(
@@ -450,7 +489,13 @@ impl ResolveBettingBatchService {
                 }
                 if let Err(e) = self
                     .wallet_repo
-                    .credit(&combat.guild_id, &winner_id, vol_capped, "coude_combat_vol_bonus", &vol_desc)
+                    .credit(
+                        &combat.guild_id,
+                        &winner_id,
+                        vol_capped,
+                        "coude_combat_vol_bonus",
+                        &vol_desc,
+                    )
                     .await
                 {
                     tracing::error!(

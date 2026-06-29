@@ -5,24 +5,24 @@ use tracing::debug;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
-use crate::domain::errors::DomainError;
-use crate::ports::outbound::ai::inference_service::InferenceService;
-use crate::ports::outbound::ai::text_tokenizer::TextTokenizer;
-use crate::domain::services::moderation::channel_tension::ChannelTensionBuffer;
-use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
-use crate::domain::services::moderation::scoring_service::ScoringService;
-use crate::domain::services::moderation::channel_tension::TensionAction;
-use crate::domain::services::moderation::channel_tension::TensionEntry;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::enums::moderation::action::Action;
 use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::errors::DomainError;
+use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
+use crate::domain::services::moderation::channel_tension::ChannelTensionBuffer;
+use crate::domain::services::moderation::channel_tension::TensionAction;
+use crate::domain::services::moderation::channel_tension::TensionEntry;
+use crate::domain::services::moderation::scoring_service::ScoringService;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::ai::inference_service::InferenceService;
+use crate::ports::outbound::ai::text_tokenizer::TextTokenizer;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_TEXT_THRESHOLD: f32 = 0.5;
 
@@ -163,7 +163,9 @@ impl Default for TensionConfig {
 
 /// Parse la config tension depuis la liste des `BotGuildConfig` de
 /// `automod-bot`. Defaut si cles absentes/mal formees.
-fn parse_tension_config(entries: &[crate::domain::entities::system::bot_config::BotGuildConfig]) -> TensionConfig {
+fn parse_tension_config(
+    entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
+) -> TensionConfig {
     let mut cfg = TensionConfig::default();
     for e in entries {
         match e.config_key.as_str() {
@@ -179,16 +181,24 @@ fn parse_tension_config(entries: &[crate::domain::entities::system::bot_config::
                 }
             }
             "channel_tension_threshold_warn" => {
-                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_warn = n; }
+                if let Ok(n) = e.config_value.parse::<f64>() {
+                    cfg.threshold_warn = n;
+                }
             }
             "channel_tension_threshold_delete" => {
-                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_delete = n; }
+                if let Ok(n) = e.config_value.parse::<f64>() {
+                    cfg.threshold_delete = n;
+                }
             }
             "channel_tension_threshold_mute" => {
-                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_mute = n; }
+                if let Ok(n) = e.config_value.parse::<f64>() {
+                    cfg.threshold_mute = n;
+                }
             }
             "channel_tension_mute_duration_secs" => {
-                if let Ok(n) = e.config_value.parse::<u64>() { cfg.mute_duration_secs = n; }
+                if let Ok(n) = e.config_value.parse::<u64>() {
+                    cfg.mute_duration_secs = n;
+                }
             }
             _ => {}
         }
@@ -279,7 +289,11 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // Charger la config automod-bot (fusionnee avec l'ancien `ia_config`
         // par la migration 146). On recupere toutes les cles une fois pour
         // partager la lecture avec le bloc "tension de salon" plus bas.
-        let automod_entries = match self.bot_config_repo.get_config(&cmd.guild_id, "automod-bot").await {
+        let automod_entries = match self
+            .bot_config_repo
+            .get_config(&cmd.guild_id, "automod-bot")
+            .await
+        {
             Ok(e) => e,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec lecture config automod-bot, utilisation defauts");
@@ -309,12 +323,17 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 content_empty = cmd.content.is_empty(),
                 "Check inference conditions"
             );
-            if text_enabled && inference.text_available() && tokenizer.available() && !cmd.content.is_empty() {
+            if text_enabled
+                && inference.text_available()
+                && tokenizer.available()
+                && !cmd.content.is_empty()
+            {
                 // Rate limit inference
                 let _permit = self.inference_limiter.acquire().await?;
 
                 debug!("Lancement inference text...");
-                let contextual_content = build_contextual_content(&cmd.content, &cmd.context_messages, &context_format);
+                let contextual_content =
+                    build_contextual_content(&cmd.content, &cmd.context_messages, &context_format);
                 let has_context = !cmd.context_messages.is_empty();
                 // Timeout 5s pour eviter qu'une inference bloquee ne stalle le hot path.
                 let inference_result = tokio::time::timeout(
@@ -327,7 +346,11 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                         move || {
                             let (input_ids, attention_mask) = tok.tokenize(&content)?;
                             let classifications = inf.classify_text(input_ids, attention_mask)?;
-                            Ok::<_, String>(score_classifications(&classifications, &rules, text_threshold))
+                            Ok::<_, String>(score_classifications(
+                                &classifications,
+                                &rules,
+                                text_threshold,
+                            ))
                         }
                     }),
                 )
@@ -416,12 +439,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                     message_id: cmd.message_id.clone(),
                     timestamp_ms: chrono::Utc::now().timestamp_millis(),
                 };
-                let total = buffer.push_and_sum(
-                    &cmd.guild_id,
-                    &cmd.channel_id,
-                    entry,
-                    tcfg.buffer_size,
-                );
+                let total =
+                    buffer.push_and_sum(&cmd.guild_id, &cmd.channel_id, entry, tcfg.buffer_size);
                 let action = ChannelTensionBuffer::decide_action(
                     total,
                     tcfg.threshold_warn,
@@ -474,10 +493,14 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                     .map(|e| e.config_value.as_str())
             };
             let cfg_bool = |k: &str, d: bool| {
-                cfg_str(k).map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")).unwrap_or(d)
+                cfg_str(k)
+                    .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+                    .unwrap_or(d)
             };
-            let cfg_f64 = |k: &str, d: f64| cfg_str(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
-            let cfg_u64 = |k: &str, d: u64| cfg_str(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
+            let cfg_f64 =
+                |k: &str, d: f64| cfg_str(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
+            let cfg_u64 =
+                |k: &str, d: u64| cfg_str(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
             decide(&RoutingInputs {
                 flags: &cmd.flags,
                 content: &cmd.content,
@@ -564,7 +587,9 @@ pub fn score_classifications(
     let mut triggered: Vec<String> = Vec::new();
 
     for (flag_type, confidence) in &detected {
-        let rule = rules.iter().find(|r| r.flag_type == *flag_type && r.enabled);
+        let rule = rules
+            .iter()
+            .find(|r| r.flag_type == *flag_type && r.enabled);
         let base_weight = match rule {
             Some(r) => r.weight,
             None => match flag_type {
@@ -577,11 +602,19 @@ pub fn score_classifications(
         };
         let weighted = base_weight * (*confidence as f64);
         ia_score += weighted;
-        triggered.push(format!("{}({:.0}%)", flag_type.as_str(), confidence * 100.0));
+        triggered.push(format!(
+            "{}({:.0}%)",
+            flag_type.as_str(),
+            confidence * 100.0
+        ));
     }
 
     let reason = format!("IA sentiment : {}", triggered.join(", "));
-    Some((ia_score, detected.into_iter().map(|(f, _)| f).collect(), reason))
+    Some((
+        ia_score,
+        detected.into_iter().map(|(f, _)| f).collect(),
+        reason,
+    ))
 }
 
 /// Construit un contenu enrichi avec le contexte conversationnel pour l'inference IA.
@@ -602,7 +635,10 @@ fn build_contextual_content(
         .collect::<Vec<_>>()
         .join("\n");
     match format {
-        "tagged" => format!("[message] {} [/message] [context] {} [/context]", content, ctx_str),
+        "tagged" => format!(
+            "[message] {} [/message] [context] {} [/context]",
+            content, ctx_str
+        ),
         _ => format!("{}\n---\n{}", ctx_str, content),
     }
 }
@@ -613,7 +649,9 @@ const DEFAULT_THRESHOLD_DELETE: f64 = 4.0;
 const DEFAULT_THRESHOLD_MUTE: f64 = 6.0;
 const DEFAULT_THRESHOLD_BAN: f64 = 9.0;
 
-fn resolve_thresholds(rules: &[crate::domain::entities::system::rule::Rule]) -> (f64, f64, f64, f64) {
+fn resolve_thresholds(
+    rules: &[crate::domain::entities::system::rule::Rule],
+) -> (f64, f64, f64, f64) {
     let enabled: Vec<_> = rules.iter().filter(|r| r.enabled).collect();
 
     if enabled.is_empty() {
@@ -625,14 +663,25 @@ fn resolve_thresholds(rules: &[crate::domain::entities::system::rule::Rule]) -> 
         );
     }
 
-    let warn = enabled.iter().map(|r| r.threshold_warn).fold(f64::MAX, f64::min);
-    let delete = enabled.iter().map(|r| r.threshold_delete).fold(f64::MAX, f64::min);
-    let mute = enabled.iter().map(|r| r.threshold_mute).fold(f64::MAX, f64::min);
-    let ban = enabled.iter().map(|r| r.threshold_ban).fold(f64::MAX, f64::min);
+    let warn = enabled
+        .iter()
+        .map(|r| r.threshold_warn)
+        .fold(f64::MAX, f64::min);
+    let delete = enabled
+        .iter()
+        .map(|r| r.threshold_delete)
+        .fold(f64::MAX, f64::min);
+    let mute = enabled
+        .iter()
+        .map(|r| r.threshold_mute)
+        .fold(f64::MAX, f64::min);
+    let ban = enabled
+        .iter()
+        .map(|r| r.threshold_ban)
+        .fold(f64::MAX, f64::min);
 
     (warn, delete, mute, ban)
 }
-
 
 #[cfg(test)]
 #[path = "tests/analyze_message_service.rs"]

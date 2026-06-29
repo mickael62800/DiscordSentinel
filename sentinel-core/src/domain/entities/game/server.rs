@@ -122,7 +122,10 @@ pub fn validate_server_name(name: &str) -> Result<(), String> {
     if name.is_empty() || name.len() > 64 {
         return Err("nom invalide : 1-64 caracteres".into());
     }
-    if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_' || c == '-') {
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == ' ' || c == '_' || c == '-')
+    {
         return Err("nom invalide : alphanumerique + espaces, _ ou - uniquement".into());
     }
     Ok(())

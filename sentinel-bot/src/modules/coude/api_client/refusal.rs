@@ -13,17 +13,10 @@ pub struct RefusalCountResp {
 impl ApiClient {
     /// Increment best-effort : si l API casse on log mais on ne casse
     /// pas le flow /refuser.
-    pub async fn increment_refusal(
-        &self,
-        guild_id: &str,
-        requester_id: &str,
-        refuser_id: &str,
-    ) {
+    pub async fn increment_refusal(&self, guild_id: &str, requester_id: &str, refuser_id: &str) {
         self.base
             .post_fire_and_forget(
-                &format!(
-                    "/api/coude/{guild_id}/refusals/{requester_id}/{refuser_id}/increment"
-                ),
+                &format!("/api/coude/{guild_id}/refusals/{requester_id}/{refuser_id}/increment"),
                 &serde_json::json!({}),
             )
             .await;
@@ -42,17 +35,10 @@ impl ApiClient {
             .await
     }
 
-    pub async fn reset_refusal(
-        &self,
-        guild_id: &str,
-        requester_id: &str,
-        refuser_id: &str,
-    ) {
+    pub async fn reset_refusal(&self, guild_id: &str, requester_id: &str, refuser_id: &str) {
         self.base
             .post_fire_and_forget(
-                &format!(
-                    "/api/coude/{guild_id}/refusals/{requester_id}/{refuser_id}/reset"
-                ),
+                &format!("/api/coude/{guild_id}/refusals/{requester_id}/{refuser_id}/reset"),
                 &serde_json::json!({}),
             )
             .await;

@@ -5,17 +5,26 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
 
 #[allow(dead_code)]
 fn short_gid() -> String {
     use rand::Rng;
-    format!("{}", rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64))
+    format!(
+        "{}",
+        rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64)
+    )
 }
 
 // ── Guild members ──
@@ -29,7 +38,11 @@ async fn guild_member_register() {
         r#"INSERT INTO guild_members (guild_id, user_id, username, display_name, roles, joined_at)
            VALUES ($1, '444', 'Alice', 'Alice Cool', '["111","222"]'::jsonb, NOW())
            ON CONFLICT (guild_id, user_id) DO UPDATE SET username = EXCLUDED.username"#,
-    ).bind(&gid).execute(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let row = sqlx::query_as::<_, (String, Option<String>, serde_json::Value)>(
         "SELECT username, display_name, roles FROM guild_members WHERE guild_id = $1 AND user_id = '444'",
@@ -47,8 +60,14 @@ async fn guild_member_unique_per_guild() {
         .bind(&gid).execute(&p).await.unwrap();
     sqlx::query("INSERT INTO guild_members (guild_id, user_id, username) VALUES ($1, '444', 'B') ON CONFLICT (guild_id, user_id) DO UPDATE SET username = EXCLUDED.username")
         .bind(&gid).execute(&p).await.unwrap();
-    let name = sqlx::query_as::<_, (String,)>("SELECT username FROM guild_members WHERE guild_id = $1 AND user_id = '444'")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let name = sqlx::query_as::<_, (String,)>(
+        "SELECT username FROM guild_members WHERE guild_id = $1 AND user_id = '444'",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(name, "B");
 }
 
@@ -69,8 +88,13 @@ async fn ticket_assignment_history() {
     sqlx::query("INSERT INTO ticket_assignments (id, ticket_id, assigned_to, assigned_by) VALUES (gen_random_uuid(), $1, '666', '333')")
         .bind(ticket_id).execute(&p).await.unwrap();
 
-    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM ticket_assignments WHERE ticket_id = $1")
-        .bind(ticket_id).fetch_one(&p).await.unwrap().0;
+    let count =
+        sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM ticket_assignments WHERE ticket_id = $1")
+            .bind(ticket_id)
+            .fetch_one(&p)
+            .await
+            .unwrap()
+            .0;
     assert_eq!(count, 2);
 }
 
@@ -87,7 +111,11 @@ async fn voice_theme_crud() {
 
     let row = sqlx::query_as::<_, (String, Option<i32>, Option<i32>)>(
         "SELECT name, bitrate, member_limit FROM voice_channel_themes WHERE id = $1",
-    ).bind(id).fetch_one(&p).await.unwrap();
+    )
+    .bind(id)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(row.0, "Gaming");
     assert_eq!(row.1.unwrap(), 96000);
     assert_eq!(row.2.unwrap(), 10);
@@ -105,7 +133,12 @@ async fn whitelist_add_and_unique() {
 
     let count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM voice_channel_whitelists WHERE guild_id = $1 AND owner_id = '111'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(count, 1);
 
     // Duplicate doit etre rejete
@@ -120,8 +153,16 @@ async fn whitelist_add_and_unique() {
 async fn bot_definitions_seeded() {
     let p = pool().await;
     // Les definitions sont seedees par les migrations
-    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM bot_definitions").fetch_one(&p).await.unwrap().0;
-    assert!(count >= 5, "Au moins 5 bot definitions doivent etre seedees (got {})", count);
+    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM bot_definitions")
+        .fetch_one(&p)
+        .await
+        .unwrap()
+        .0;
+    assert!(
+        count >= 5,
+        "Au moins 5 bot definitions doivent etre seedees (got {})",
+        count
+    );
 }
 
 #[tokio::test]
@@ -129,11 +170,17 @@ async fn bot_definition_has_config_schema() {
     let p = pool().await;
     let automod = sqlx::query_as::<_, (String, serde_json::Value)>(
         "SELECT display_name, config_schema FROM bot_definitions WHERE bot_name = 'automod-bot'",
-    ).fetch_optional(&p).await.unwrap();
+    )
+    .fetch_optional(&p)
+    .await
+    .unwrap();
 
     if let Some((name, schema)) = automod {
         assert!(!name.is_empty());
-        assert!(!schema.as_array().unwrap().is_empty(), "automod-bot doit avoir des config keys");
+        assert!(
+            !schema.as_array().unwrap().is_empty(),
+            "automod-bot doit avoir des config keys"
+        );
     }
 }
 
@@ -150,7 +197,11 @@ async fn daily_chaos_log() {
 
     let row = sqlx::query_as::<_, (String, String, i64)>(
         "SELECT loser_name, winner_name, amount FROM coude_daily_chaos WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap();
     assert_eq!(row.0, "Loser");
     assert_eq!(row.1, "Winner");
     assert_eq!(row.2, 50);
@@ -170,7 +221,12 @@ async fn user_activity_log_record() {
 
     let count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM user_activity_log WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(count, 1);
 }
 

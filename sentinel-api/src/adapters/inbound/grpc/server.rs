@@ -14,6 +14,28 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
+use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
+use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
+use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
+use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsServiceServer;
+use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsServiceServer;
+use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyServiceServer;
+use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryServiceServer;
+use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerServiceServer;
+use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialServiceServer;
+use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
+use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
+use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
+use sentinel_proto::moderation::v1::moderation_service_server::ModerationServiceServer;
+use sentinel_proto::progression::v1::progression_service_server::ProgressionServiceServer;
+use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
+use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
+use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
+use sentinel_proto::tamagotchi::v1::tamagotchi_service_server::TamagotchiServiceServer;
+use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
+use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
+use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 use tonic::codec::CompressionEncoding;
 use tonic::metadata::MetadataValue;
 use tonic::service::interceptor::InterceptedService;
@@ -22,51 +44,29 @@ use tonic::Request;
 use tonic::Status;
 use tracing::error;
 use tracing::info;
-use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
-use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
-use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
-use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
-use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
-use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsServiceServer;
-use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsServiceServer;
-use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyServiceServer;
-use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryServiceServer;
-use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerServiceServer;
-use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialServiceServer;
-use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
-use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
-use sentinel_proto::moderation::v1::moderation_service_server::ModerationServiceServer;
-use sentinel_proto::progression::v1::progression_service_server::ProgressionServiceServer;
-use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
-use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
-use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
-use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
-use sentinel_proto::tamagotchi::v1::tamagotchi_service_server::TamagotchiServiceServer;
-use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
-use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 
 use crate::adapters::inbound::grpc::ai::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::ai::dataset::AiDatasetGrpc;
+use crate::adapters::inbound::grpc::ai::images::ImagesGrpc;
+use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
+use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
 use crate::adapters::inbound::grpc::casino::blackjack::BlackjackGrpc;
+use crate::adapters::inbound::grpc::community::members::MembersGrpc;
+use crate::adapters::inbound::grpc::community::progression::ProgressionGrpc;
+use crate::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use crate::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
+use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use crate::adapters::inbound::grpc::coude::bets::BetsGrpc;
 use crate::adapters::inbound::grpc::coude::combats::CombatsGrpc;
 use crate::adapters::inbound::grpc::coude::economy::EconomyGrpc;
 use crate::adapters::inbound::grpc::coude::inventory::InventoryGrpc;
 use crate::adapters::inbound::grpc::coude::players::PlayerGrpc;
 use crate::adapters::inbound::grpc::coude::social::SocialGrpc;
-use crate::adapters::inbound::grpc::ai::images::ImagesGrpc;
-use crate::adapters::inbound::grpc::community::members::MembersGrpc;
 use crate::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
-use crate::adapters::inbound::grpc::community::progression::ProgressionGrpc;
-use crate::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
-use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
-use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
-use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
-use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use crate::adapters::inbound::grpc::system::export::ExportGrpc;
-use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
 use crate::adapters::inbound::grpc::system::tamagotchi::TamagotchiGrpc;
+use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
+use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
 use crate::adapters::inbound::http::state::AppState;
 
 /// Lance le serveur gRPC. A spawn dans une task tokio depuis `main.rs`.
@@ -352,9 +352,10 @@ fn build_auth_interceptor(
             // Comparaison constant-time (comme le chemin HTTP auth.rs) pour
             // eviter une timing attack sur l'API key via gRPC.
             Some(token)
-                if bool::from(
-                    subtle::ConstantTimeEq::ct_eq(token.as_bytes(), expected.as_bytes()),
-                ) =>
+                if bool::from(subtle::ConstantTimeEq::ct_eq(
+                    token.as_bytes(),
+                    expected.as_bytes(),
+                )) =>
             {
                 Ok(req)
             }
@@ -362,7 +363,6 @@ fn build_auth_interceptor(
         }
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/server.rs"]

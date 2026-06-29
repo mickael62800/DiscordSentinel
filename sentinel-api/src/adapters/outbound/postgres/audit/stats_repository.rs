@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::entities::audit::user_stats::VoiceSessionStats;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::audit::stats_repository::StatsRepository;
 
 pub struct PgStatsRepository {
     pool: PgPool,
@@ -71,7 +71,11 @@ impl StatsRepository for PgStatsRepository {
         Ok(())
     }
 
-    async fn find_by_user(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError> {
+    async fn find_by_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserStats>, DomainError> {
         let row = sqlx::query_as::<_, StatsRow>(
             "SELECT * FROM user_stats WHERE guild_id = $1 AND user_id = $2",
         )
@@ -84,7 +88,11 @@ impl StatsRepository for PgStatsRepository {
         Ok(row.map(UserStats::from))
     }
 
-    async fn find_by_guild(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError> {
+    async fn find_by_guild(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<UserStats>, DomainError> {
         let rows = sqlx::query_as::<_, StatsRow>(
             "SELECT * FROM user_stats WHERE guild_id = $1 ORDER BY message_count DESC LIMIT $2",
         )
@@ -97,7 +105,13 @@ impl StatsRepository for PgStatsRepository {
         Ok(rows.into_iter().map(UserStats::from).collect())
     }
 
-    async fn increment_messages(&self, guild_id: &str, user_id: &str, username: &str, count: u64) -> Result<(), DomainError> {
+    async fn increment_messages(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        count: u64,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO user_stats (id, guild_id, user_id, username, message_count, voice_seconds, updated_at)
@@ -120,7 +134,13 @@ impl StatsRepository for PgStatsRepository {
         Ok(())
     }
 
-    async fn add_voice_seconds(&self, guild_id: &str, user_id: &str, username: &str, seconds: u64) -> Result<(), DomainError> {
+    async fn add_voice_seconds(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        seconds: u64,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO user_stats (id, guild_id, user_id, username, message_count, voice_seconds, updated_at)
@@ -144,23 +164,19 @@ impl StatsRepository for PgStatsRepository {
     }
 
     async fn count_distinct_guilds(&self) -> Result<u64, DomainError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(DISTINCT guild_id) FROM user_stats",
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(DISTINCT guild_id) FROM user_stats")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
 
     async fn count_distinct_users(&self) -> Result<u64, DomainError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(DISTINCT user_id) FROM user_stats",
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(DISTINCT user_id) FROM user_stats")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
@@ -198,7 +214,12 @@ impl StatsRepository for PgStatsRepository {
         Ok(())
     }
 
-    async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<Vec<VoiceSessionStats>, DomainError> {
+    async fn get_guild_voice_stats(
+        &self,
+        guild_id: &str,
+        days: u32,
+        limit: u32,
+    ) -> Result<Vec<VoiceSessionStats>, DomainError> {
         let since = chrono::Utc::now() - chrono::Duration::days(days as i64);
 
         #[derive(sqlx::FromRow)]
@@ -239,19 +260,26 @@ impl StatsRepository for PgStatsRepository {
         .await
         .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(|r| VoiceSessionStats {
-            channel_id: r.channel_id.into(),
-            channel_name: r.channel_name,
-            is_temporary: r.is_temporary,
-            total_sessions: r.total_sessions,
-            total_duration_secs: r.total_duration_secs,
-            unique_users: r.unique_users,
-            avg_duration_secs: r.avg_duration_secs,
-            last_activity: r.last_activity,
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| VoiceSessionStats {
+                channel_id: r.channel_id.into(),
+                channel_name: r.channel_name,
+                is_temporary: r.is_temporary,
+                total_sessions: r.total_sessions,
+                total_duration_secs: r.total_duration_secs,
+                unique_users: r.unique_users,
+                avg_duration_secs: r.avg_duration_secs,
+                last_activity: r.last_activity,
+            })
+            .collect())
     }
 
-    async fn count_unique_voice_users(&self, guild_id: &str, days: u32) -> Result<i64, DomainError> {
+    async fn count_unique_voice_users(
+        &self,
+        guild_id: &str,
+        days: u32,
+    ) -> Result<i64, DomainError> {
         let since = chrono::Utc::now() - chrono::Duration::days(days as i64);
 
         let row: (i64,) = sqlx::query_as(

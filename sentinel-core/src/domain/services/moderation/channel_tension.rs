@@ -5,11 +5,11 @@
 //! Buffer in-memory, thread-safe, pas persistant (on reinitialise si le
 //! bot restart — c'est OK, les messages toxiques passes sont deja traites).
 
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use crate::domain::entities::system::discord_ids::MessageId;
-use crate::domain::entities::system::discord_ids::UserId;
 
 /// Entry dans le buffer glissant : score IA + auteur + message_id pour
 /// pouvoir agir sur le dernier speaker si un seuil est franchi.

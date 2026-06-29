@@ -1,8 +1,8 @@
-use serde::Deserialize;
-use serde::Serialize;
 use sentinel_core::domain::entities::system::bot_config::BotDefinition;
 use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use serde::Deserialize;
+use serde::Serialize;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BotDefinitionDto {
     pub bot_name: String,

@@ -71,7 +71,8 @@ fn keys_are_snake_case() {
         let key = e.key();
         assert!(
             key.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
-            "{:?} key not snake_case: {key}", e
+            "{:?} key not snake_case: {key}",
+            e
         );
     }
 }
@@ -88,7 +89,10 @@ fn roll_chaos_returns_something_eventually() {
             break;
         }
     }
-    assert!(any, "roll_chaos a donne None 10000 fois de suite (proba < 1e-360)");
+    assert!(
+        any,
+        "roll_chaos a donne None 10000 fois de suite (proba < 1e-360)"
+    );
 }
 
 #[test]
@@ -104,9 +108,15 @@ fn roll_chaos_produces_all_variants_over_many_rolls() {
             Some(ChaosEvent::Vol) => seen[4] = true,
             None => {}
         }
-        if seen.iter().all(|&b| b) { break; }
+        if seen.iter().all(|&b| b) {
+            break;
+        }
     }
-    assert!(seen.iter().all(|&b| b), "tous les 5 chaos events devraient apparaitre : {:?}", seen);
+    assert!(
+        seen.iter().all(|&b| b),
+        "tous les 5 chaos events devraient apparaitre : {:?}",
+        seen
+    );
 }
 
 #[test]
@@ -116,12 +126,15 @@ fn roll_chaos_distribution_approximately_8_percent() {
     let mut hits = 0;
     let total = 50_000;
     for _ in 0..total {
-        if roll_chaos().is_some() { hits += 1; }
+        if roll_chaos().is_some() {
+            hits += 1;
+        }
     }
     let pct = hits as f64 / total as f64 * 100.0;
     assert!(
         (5.0..=11.0).contains(&pct),
-        "chaos rate {:.2}% hors tolerance 5-11%", pct
+        "chaos rate {:.2}% hors tolerance 5-11%",
+        pct
     );
 }
 
@@ -135,7 +148,9 @@ fn roll_chaos_thresholds_sum_to_80_promille() {
     let iterations = 200_000;
     let mut total_hits: usize = 0;
     for _ in 0..iterations {
-        if roll_chaos().is_some() { total_hits += 1; }
+        if roll_chaos().is_some() {
+            total_hits += 1;
+        }
     }
     let expected = (iterations as f64 * 0.08) as usize;
     // Tolerance : ±20% autour de 8%.

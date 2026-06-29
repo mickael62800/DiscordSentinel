@@ -24,15 +24,15 @@ use tracing::info;
 use tracing::warn;
 use uuid::Uuid;
 
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
 use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
-use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 /// Nombre max de gagnants par redistribution. Au-dela, on ne cape pas
 /// strictement : on met la valeur en env var lors de l'init ou on cape ici.
 ///
@@ -52,10 +52,7 @@ pub struct ManageCoudeCashboxService {
 }
 
 impl ManageCoudeCashboxService {
-    pub fn new(
-        repo: Arc<dyn CashboxRepository>,
-        wallet_repo: Arc<dyn WalletRepository>,
-    ) -> Self {
+    pub fn new(repo: Arc<dyn CashboxRepository>, wallet_repo: Arc<dyn WalletRepository>) -> Self {
         Self { repo, wallet_repo }
     }
 
@@ -119,9 +116,15 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
         guild_id: &str,
     ) -> Result<Option<RedistributionOutcome>, DomainError> {
         // 1. Liste des joueurs actifs (7j)
-        let active = self.repo.list_active_players(guild_id, ACTIVE_WINDOW_DAYS).await?;
+        let active = self
+            .repo
+            .list_active_players(guild_id, ACTIVE_WINDOW_DAYS)
+            .await?;
         if active.is_empty() {
-            info!(guild_id, "Redistribution skip : aucun joueur actif dans les 7j");
+            info!(
+                guild_id,
+                "Redistribution skip : aucun joueur actif dans les 7j"
+            );
             return Ok(None);
         }
 
@@ -175,7 +178,13 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
             let desc = format!("Redistribution hebdomadaire caisse coude #{redistribution_id}");
             if let Err(e) = self
                 .wallet_repo
-                .credit(guild_id, user_id, *amount_won, "coude_cashbox_redist", &desc)
+                .credit(
+                    guild_id,
+                    user_id,
+                    *amount_won,
+                    "coude_cashbox_redist",
+                    &desc,
+                )
                 .await
             {
                 warn!(error = %e, user_id, amount_won, "Echec credit redistribution");
@@ -224,7 +233,11 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
         for guild_id in guilds {
             match self.redistribute_weekly(&guild_id).await {
                 Ok(Some(outcome)) => {
-                    info!(guild_id, winners = outcome.winners.len(), "Cashbox redistributee via worker hebdo");
+                    info!(
+                        guild_id,
+                        winners = outcome.winners.len(),
+                        "Cashbox redistributee via worker hebdo"
+                    );
                     out.push((guild_id, outcome));
                 }
                 Ok(None) => {
@@ -239,7 +252,6 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
         Ok(out)
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/manage_cashbox.rs"]

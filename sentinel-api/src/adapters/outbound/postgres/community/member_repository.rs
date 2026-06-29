@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
 
+use crate::ports::outbound::community::member_repository::MemberRepository;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::member_repository::MemberRepository;
 
 pub struct PgMemberRepository {
     pool: PgPool,
@@ -66,7 +66,11 @@ impl MemberRepository for PgMemberRepository {
         Ok(rows.into_iter().map(GuildMember::from).collect())
     }
 
-    async fn find_one(&self, guild_id: &str, user_id: &str) -> Result<Option<GuildMember>, DomainError> {
+    async fn find_one(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<GuildMember>, DomainError> {
         let row = sqlx::query_as::<_, MemberRow>(
             "SELECT guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at, left_at
              FROM guild_members WHERE guild_id = $1 AND user_id = $2"
@@ -117,7 +121,10 @@ impl MemberRepository for PgMemberRepository {
         let total = members.len();
         tracing::info!(count = total, "Debut sync batch membres");
 
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| pg_err_ctx("begin tx upsert_many", e))?;
 
         let mut count = 0u64;
@@ -150,7 +157,8 @@ impl MemberRepository for PgMemberRepository {
             count += 1;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| pg_err_ctx("commit tx upsert_many", e))?;
 
         tracing::info!(synced = count, "Sync batch membres terminee");
@@ -168,12 +176,14 @@ impl MemberRepository for PgMemberRepository {
     }
 
     async fn update_last_seen(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
-        sqlx::query("UPDATE guild_members SET last_seen_at = NOW() WHERE guild_id = $1 AND user_id = $2")
-            .bind(guild_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| pg_err_ctx("update_last_seen", e))?;
+        sqlx::query(
+            "UPDATE guild_members SET last_seen_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| pg_err_ctx("update_last_seen", e))?;
         Ok(())
     }
 

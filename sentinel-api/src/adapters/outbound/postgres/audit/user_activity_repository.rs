@@ -17,7 +17,6 @@ impl PgUserActivityRepository {
     }
 }
 
-
 #[derive(sqlx::FromRow)]
 struct ActivityRow {
     id: uuid::Uuid,

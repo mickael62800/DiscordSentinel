@@ -165,8 +165,13 @@ async fn get_or_fetch_user_guilds(
     let mut got_lock = false;
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         let res: Result<Option<String>, _> = redis::cmd("SET")
-            .arg(&lock_key).arg("1").arg("NX").arg("EX").arg(5)
-            .query_async(&mut conn).await;
+            .arg(&lock_key)
+            .arg("1")
+            .arg("NX")
+            .arg("EX")
+            .arg(5)
+            .query_async(&mut conn)
+            .await;
         got_lock = matches!(res, Ok(Some(_)));
         if !got_lock {
             // Un autre worker fait l'appel : poll le cache live ~2s.
@@ -239,7 +244,6 @@ fn short_hash(input: &str) -> String {
     input.hash(&mut hasher);
     format!("{:x}", hasher.finish())
 }
-
 
 #[cfg(test)]
 #[path = "tests/guild_auth.rs"]

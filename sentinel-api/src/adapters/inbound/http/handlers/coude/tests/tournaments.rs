@@ -43,8 +43,18 @@ fn current_tournament_dto_with_standings() {
         week_end: ts(),
         prize_pool_estimated: 10000,
         standings: vec![
-            StandingDto { user_id: "u1".into(), username: "A".into(), net_gain: 100, rank: 1 },
-            StandingDto { user_id: "u2".into(), username: "B".into(), net_gain: 50, rank: 2 },
+            StandingDto {
+                user_id: "u1".into(),
+                username: "A".into(),
+                net_gain: 100,
+                rank: 1,
+            },
+            StandingDto {
+                user_id: "u2".into(),
+                username: "B".into(),
+                net_gain: 50,
+                rank: 2,
+            },
         ],
     };
     let json = serde_json::to_string(&t).unwrap();

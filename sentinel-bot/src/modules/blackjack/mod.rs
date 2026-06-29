@@ -43,10 +43,10 @@ impl TypeMapKey for ChannelManagerKey {
 
 // ── Constants (custom IDs pour les boutons) ──
 
- const BET_PREFIX: &str = "bj_bet:";
- const CLOSE_TABLE_ID: &str = "bj_close_table";
- const INVITE_BUTTON_ID: &str = "bj_invite";
- const JOIN_BUTTON_ID: &str = "bj_join_table";
+const BET_PREFIX: &str = "bj_bet:";
+const CLOSE_TABLE_ID: &str = "bj_close_table";
+const INVITE_BUTTON_ID: &str = "bj_invite";
+const JOIN_BUTTON_ID: &str = "bj_join_table";
 
 // ── Slash commands ──
 

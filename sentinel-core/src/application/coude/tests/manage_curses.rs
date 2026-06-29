@@ -109,26 +109,95 @@ fn mk_wallet(g: &str, u: &str) -> Wallet {
 
 #[async_trait]
 impl WalletRepository for SpyWalletRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> { Ok(None) }
-    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn debit(&self, g: &str, u: &str, amount: i64, source: &str, _: &str) -> Result<Wallet, DomainError> {
+    async fn get_or_create(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> {
+        Ok(None)
+    }
+    async fn credit(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn debit(
+        &self,
+        g: &str,
+        u: &str,
+        amount: i64,
+        source: &str,
+        _: &str,
+    ) -> Result<Wallet, DomainError> {
         if *self.debit_should_fail.lock().unwrap() {
             return Err(DomainError::ValidationError("solde insuffisant".into()));
         }
-        self.debits.lock().unwrap().push((g.into(), u.into(), amount, source.into()));
+        self.debits
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), amount, source.into()));
         Ok(mk_wallet(g, u))
     }
-    async fn transfer(&self, g: &str, from: &str, to: &str, amount: i64, source: &str, _: &str) -> Result<(), DomainError> {
-        self.transfers.lock().unwrap().push((g.into(), from.into(), to.into(), amount, source.into()));
+    async fn transfer(
+        &self,
+        g: &str,
+        from: &str,
+        to: &str,
+        amount: i64,
+        source: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        self.transfers.lock().unwrap().push((
+            g.into(),
+            from.into(),
+            to.into(),
+            amount,
+            source.into(),
+        ));
         Ok(())
     }
-    async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
-    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
-    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> { Ok(0) }
+    async fn pay_combat_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_transactions(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> {
+        Ok(vec![])
+    }
+    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> {
+        unimplemented!()
+    }
+    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 fn make_service() -> (
@@ -178,7 +247,9 @@ async fn cast_random_when_kind_omitted() {
 #[tokio::test]
 async fn cast_rejected_when_active_curse_exists() {
     let (svc, _, _) = make_service();
-    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana)).await.unwrap();
+    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana))
+        .await
+        .unwrap();
     let err = svc
         .cast("g", "other", "n2", "tgt", Some(CurseKind::Chicken))
         .await
@@ -189,7 +260,9 @@ async fn cast_rejected_when_active_curse_exists() {
 #[tokio::test]
 async fn cast_no_debit_if_active_curse_exists() {
     let (svc, _, wallet) = make_service();
-    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana)).await.unwrap();
+    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana))
+        .await
+        .unwrap();
     let err = svc
         .cast("g", "other", "n2", "tgt", Some(CurseKind::Chicken))
         .await;
@@ -207,13 +280,19 @@ async fn cast_propagates_wallet_failure() {
         .await
         .unwrap_err();
     matches!(err, DomainError::ValidationError(_));
-    assert_eq!(*curses.cast_calls.lock().unwrap(), 0, "pas d insert si debit a foire");
+    assert_eq!(
+        *curses.cast_calls.lock().unwrap(),
+        0,
+        "pas d insert si debit a foire"
+    );
 }
 
 #[tokio::test]
 async fn lift_transfers_double_to_source() {
     let (svc, _, wallet) = make_service();
-    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana)).await.unwrap();
+    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Banana))
+        .await
+        .unwrap();
     let updated = svc.lift_own("g", "tgt", "tname").await.unwrap();
     assert!(updated.lifted_at.is_some());
     let transfers = wallet.transfers.lock().unwrap();
@@ -234,7 +313,9 @@ async fn lift_when_no_curse_returns_not_found() {
 #[tokio::test]
 async fn get_active_returns_curse_when_present() {
     let (svc, _, _) = make_service();
-    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Insomnia)).await.unwrap();
+    svc.cast("g", "src", "n", "tgt", Some(CurseKind::Insomnia))
+        .await
+        .unwrap();
     let got = svc.get_active("g", "tgt").await.unwrap();
     assert!(got.is_some());
     assert_eq!(got.unwrap().kind, CurseKind::Insomnia);

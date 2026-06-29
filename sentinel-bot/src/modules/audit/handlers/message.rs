@@ -3,12 +3,12 @@ use serenity::model::event::MessageUpdateEvent;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
 
-use crate::shared::embeds::{critical_embed, moderate_embed, info_embed};
+use crate::shared::embeds::{critical_embed, info_embed, moderate_embed};
 
-use super::{audit_event, watched_users};
-use super::{AnomalyDetectorKey, MessageCacheKey, WeeklyTrackerKey};
-use super::{send_event, log, post_to_channel};
 use super::weekly_report::StatField;
+use super::{audit_event, watched_users};
+use super::{log, post_to_channel, send_event};
+use super::{AnomalyDetectorKey, MessageCacheKey, WeeklyTrackerKey};
 
 /// Formate un contenu de message pour un field embed : tronque a `max`,
 /// neutralise les mentions de masse et les blocs ``` pour eviter le bris de
@@ -19,7 +19,11 @@ fn fmt_block(content: &str, max: usize) -> String {
         .replace("```", "` ` `")
         .replace("@everyone", "@\u{200b}everyone")
         .replace("@here", "@\u{200b}here");
-    let safe = if content.chars().count() > max { format!("{safe}…") } else { safe };
+    let safe = if content.chars().count() > max {
+        format!("{safe}…")
+    } else {
+        safe
+    };
     if safe.trim().is_empty() {
         "*(vide / pièce jointe / embed)*".to_string()
     } else {
@@ -121,15 +125,25 @@ pub async fn handle_delete(
 
     // Embed dans le salon de logs Discord (message_log_channel_id -> log_channel_id).
     {
-        let mut embed = moderate_embed("🗑️ Message supprimé")
-            .field("Salon", format!("<#{}>", channel_id), true);
+        let mut embed = moderate_embed("🗑️ Message supprimé").field(
+            "Salon",
+            format!("<#{}>", channel_id),
+            true,
+        );
         if let Some(c) = &cached {
             embed = embed
-                .field("Auteur", format!("<@{}> (`{}`)", c.author_id, c.author_name), true)
+                .field(
+                    "Auteur",
+                    format!("<@{}> (`{}`)", c.author_id, c.author_name),
+                    true,
+                )
                 .field("Contenu", fmt_block(&c.content, 1000), false);
         } else {
-            embed = embed
-                .field("Message", format!("`{}` (contenu hors cache)", message_id), false);
+            embed = embed.field(
+                "Message",
+                format!("`{}` (contenu hors cache)", message_id),
+                false,
+            );
         }
         embed = embed.timestamp(serenity::model::Timestamp::now());
         post_to_channel(ctx, &gid_str, MESSAGE_LOG_KEYS, embed).await;
@@ -138,11 +152,16 @@ pub async fn handle_delete(
     // Surveillance : tracker la suppression si l'auteur est surveille
     if let Some(c) = &cached {
         watched_users::track_activity(
-            ctx, &gid_str, &c.author_id, "message_deleted",
-            Some(&channel_id.to_string()), Some(&chan_label),
+            ctx,
+            &gid_str,
+            &c.author_id,
+            "message_deleted",
+            Some(&channel_id.to_string()),
+            Some(&chan_label),
             Some(&c.content),
             serde_json::json!({"message_id": message_id.to_string()}),
-        ).await;
+        )
+        .await;
     }
 
     // Weekly stats
@@ -161,33 +180,49 @@ pub async fn handle_delete(
     };
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
-            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
-        ).await { return; }
+            ctx,
+            &gid_str,
+            "audit-bot",
+            "anomaly_enabled",
+            true,
+        )
+        .await
+        {
+            return;
+        }
 
         log(
             ctx,
             "error",
             &gid_str,
-            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-        ).await;
+            &format!(
+                "ANOMALIE : {} ({} en {}s)",
+                alert.anomaly_type, alert.count, alert.window_secs
+            ),
+        )
+        .await;
 
         post_anomaly_embed(
-            ctx, &gid_str,
+            ctx,
+            &gid_str,
             &alert.anomaly_type,
             alert.count,
             alert.window_secs,
             &format!("Dernier salon : <#{}>", channel_id),
-        ).await;
+        )
+        .await;
 
         send_event(
             ctx,
-            audit_event::simple(gid_str.clone(), "anomaly_detected")
-                .with_details(serde_json::json!({
+            audit_event::simple(gid_str.clone(), "anomaly_detected").with_details(
+                serde_json::json!({
                     "anomaly_type": alert.anomaly_type,
                     "count": alert.count,
                     "window_secs": alert.window_secs,
-                })),
-        ).await;
+                }),
+            ),
+        )
+        .await;
 
         let data = ctx.data.read().await;
         if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
@@ -243,11 +278,7 @@ pub async fn handle_update(
             struct ActivityHit {
                 content: Option<String>,
             }
-            let url = format!(
-                "/api/user-activity/{}/by-message/{}",
-                gid,
-                event.id
-            );
+            let url = format!("/api/user-activity/{}/by-message/{}", gid, event.id);
             match api.get_json::<Option<ActivityHit>>(&url).await {
                 Ok(Some(hit)) => {
                     if let Some(c) = hit.content {
@@ -267,12 +298,22 @@ pub async fn handle_update(
     }
 
     let name = author_name.as_deref().unwrap_or("?");
-    log(ctx, "info", &gid, &format!(
-        "{} a modifie un message -- avant: \"{}\" | apres: \"{}\"",
-        name,
-        if old_content.is_empty() { "(inconnu)" } else { &old_content },
-        new_content
-    )).await;
+    log(
+        ctx,
+        "info",
+        &gid,
+        &format!(
+            "{} a modifie un message -- avant: \"{}\" | apres: \"{}\"",
+            name,
+            if old_content.is_empty() {
+                "(inconnu)"
+            } else {
+                &old_content
+            },
+            new_content
+        ),
+    )
+    .await;
 
     let mut evt = audit_event::simple(gid.clone(), "message_edit")
         .with_channel(event.channel_id, None)
@@ -302,7 +343,18 @@ pub async fn handle_update(
         let embed = info_embed("✏️ Message modifié")
             .field("Auteur", format!("<@{}> (`{}`)", a_id, a_name), true)
             .field("Salon", format!("<#{}>", event.channel_id), true)
-            .field("Avant", fmt_block(if old_content.is_empty() { "(inconnu)" } else { &old_content }, 1000), false)
+            .field(
+                "Avant",
+                fmt_block(
+                    if old_content.is_empty() {
+                        "(inconnu)"
+                    } else {
+                        &old_content
+                    },
+                    1000,
+                ),
+                false,
+            )
             .field("Après", fmt_block(&new_content, 1000), false)
             .field("Lien", format!("[Aller au message]({url})"), false)
             .timestamp(serenity::model::Timestamp::now());
@@ -333,11 +385,16 @@ pub async fn handle_update(
     // Surveillance : tracker l'edition si l'auteur est surveille
     if let Some(ref author) = event.author {
         watched_users::track_activity(
-            ctx, &gid, &author.id.to_string(), "message_edited",
-            Some(&event.channel_id.to_string()), None,
+            ctx,
+            &gid,
+            &author.id.to_string(),
+            "message_edited",
+            Some(&event.channel_id.to_string()),
+            None,
             Some(&new_content),
             serde_json::json!({"old_content": old_content, "message_id": event.id.to_string()}),
-        ).await;
+        )
+        .await;
     }
 
     // Weekly stats
@@ -365,9 +422,13 @@ pub async fn handle_delete_bulk(
     let channel_name = super::resolve_channel_name(ctx, channel_id).await;
     let chan_label = channel_name.as_deref().unwrap_or("?");
 
-    log(ctx, "error", &gid_str, &format!(
-        "Purge : {} messages supprimes dans #{}", count, chan_label
-    )).await;
+    log(
+        ctx,
+        "error",
+        &gid_str,
+        &format!("Purge : {} messages supprimes dans #{}", count, chan_label),
+    )
+    .await;
 
     send_event(
         ctx,
@@ -399,33 +460,49 @@ pub async fn handle_delete_bulk(
 
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
-            ctx, &gid_str, "audit-bot", "anomaly_enabled", true,
-        ).await { return; }
+            ctx,
+            &gid_str,
+            "audit-bot",
+            "anomaly_enabled",
+            true,
+        )
+        .await
+        {
+            return;
+        }
 
         log(
             ctx,
             "error",
             &gid_str,
-            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-        ).await;
+            &format!(
+                "ANOMALIE : {} ({} en {}s)",
+                alert.anomaly_type, alert.count, alert.window_secs
+            ),
+        )
+        .await;
 
         post_anomaly_embed(
-            ctx, &gid_str,
+            ctx,
+            &gid_str,
             &alert.anomaly_type,
             alert.count,
             alert.window_secs,
             &format!("Purge bulk dans <#{}> ({} messages)", channel_id, count),
-        ).await;
+        )
+        .await;
 
         send_event(
             ctx,
-            audit_event::simple(gid_str.clone(), "anomaly_detected")
-                .with_details(serde_json::json!({
+            audit_event::simple(gid_str.clone(), "anomaly_detected").with_details(
+                serde_json::json!({
                     "anomaly_type": alert.anomaly_type,
                     "count": alert.count,
                     "window_secs": alert.window_secs,
-                })),
-        ).await;
+                }),
+            ),
+        )
+        .await;
 
         let data = ctx.data.read().await;
         if let Some(tracker) = data.get::<WeeklyTrackerKey>() {

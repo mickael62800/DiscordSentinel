@@ -28,19 +28,29 @@ const MAX_SEARCH_LEN: usize = 200;
 /// Format : 17-20 chiffres uniquement.
 pub fn validate_discord_id(field: &str, value: &str) -> Result<(), DomainError> {
     if value.is_empty() {
-        return Err(DomainError::ValidationError(format!("{field} ne peut pas etre vide")));
+        return Err(DomainError::ValidationError(format!(
+            "{field} ne peut pas etre vide"
+        )));
     }
     if value.len() > MAX_DISCORD_ID_LEN {
-        return Err(DomainError::ValidationError(format!("{field} trop long ({} chars, max {MAX_DISCORD_ID_LEN})", value.len())));
+        return Err(DomainError::ValidationError(format!(
+            "{field} trop long ({} chars, max {MAX_DISCORD_ID_LEN})",
+            value.len()
+        )));
     }
     if !value.chars().all(|c| c.is_ascii_digit()) {
-        return Err(DomainError::ValidationError(format!("{field} doit etre un ID numerique (snowflake)")));
+        return Err(DomainError::ValidationError(format!(
+            "{field} doit etre un ID numerique (snowflake)"
+        )));
     }
     Ok(())
 }
 
 /// Valide qu'un Discord ID optionnel est valide s'il est present.
-pub fn validate_optional_discord_id(field: &str, value: &Option<String>) -> Result<(), DomainError> {
+pub fn validate_optional_discord_id(
+    field: &str,
+    value: &Option<String>,
+) -> Result<(), DomainError> {
     if let Some(v) = value {
         if !v.is_empty() {
             validate_discord_id(field, v)?;
@@ -52,9 +62,10 @@ pub fn validate_optional_discord_id(field: &str, value: &Option<String>) -> Resu
 /// Valide la longueur d'un champ string obligatoire.
 fn validate_string(field: &str, value: &str, max_len: usize) -> Result<(), DomainError> {
     if value.len() > max_len {
-        return Err(DomainError::ValidationError(
-            format!("{field} trop long ({} chars, max {max_len})", value.len())
-        ));
+        return Err(DomainError::ValidationError(format!(
+            "{field} trop long ({} chars, max {max_len})",
+            value.len()
+        )));
     }
     Ok(())
 }
@@ -62,13 +73,19 @@ fn validate_string(field: &str, value: &str, max_len: usize) -> Result<(), Domai
 /// Valide la longueur d'un champ string obligatoire et non-vide.
 fn validate_required_string(field: &str, value: &str, max_len: usize) -> Result<(), DomainError> {
     if value.is_empty() {
-        return Err(DomainError::ValidationError(format!("{field} ne peut pas etre vide")));
+        return Err(DomainError::ValidationError(format!(
+            "{field} ne peut pas etre vide"
+        )));
     }
     validate_string(field, value, max_len)
 }
 
 /// Valide un champ optionnel string.
-fn validate_optional_string(field: &str, value: &Option<String>, max_len: usize) -> Result<(), DomainError> {
+fn validate_optional_string(
+    field: &str,
+    value: &Option<String>,
+    max_len: usize,
+) -> Result<(), DomainError> {
     if let Some(v) = value {
         validate_string(field, v, max_len)?;
     }

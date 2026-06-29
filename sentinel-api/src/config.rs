@@ -33,10 +33,8 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn from_env() -> Self {
         Self {
-            database_url: std::env::var("DATABASE_URL")
-                .expect("DATABASE_URL manquant"),
-            redis_url: std::env::var("REDIS_URL")
-                .expect("REDIS_URL manquant"),
+            database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL manquant"),
+            redis_url: std::env::var("REDIS_URL").expect("REDIS_URL manquant"),
             api_key: {
                 let key = std::env::var("API_KEY").unwrap_or_default();
                 let require = std::env::var("REQUIRE_API_KEY")
@@ -47,7 +45,10 @@ impl AppConfig {
                     std::process::exit(1);
                 }
                 if !key.is_empty() && key.len() < 16 {
-                    tracing::warn!("API_KEY trop courte ({} chars). Utiliser au moins 32 chars en production.", key.len());
+                    tracing::warn!(
+                        "API_KEY trop courte ({} chars). Utiliser au moins 32 chars en production.",
+                        key.len()
+                    );
                 }
                 key
             },

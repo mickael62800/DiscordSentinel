@@ -29,12 +29,15 @@ impl ChannelManager {
 
     /// Enregistre un nouveau channel de blackjack pour un joueur.
     pub fn register(&self, user_id: UserId, channel_id: ChannelId, guild_id: GuildId) {
-        self.active.insert(user_id, ActiveTable {
-            channel_id,
-            guild_id,
-            game_id: None,
-            last_activity: Instant::now(),
-        });
+        self.active.insert(
+            user_id,
+            ActiveTable {
+                channel_id,
+                guild_id,
+                game_id: None,
+                last_activity: Instant::now(),
+            },
+        );
     }
 
     /// Associe un game_id au channel du joueur.
@@ -195,7 +198,10 @@ mod tests {
         }
 
         mgr.touch(user);
-        assert!(mgr.afk_channels(1800).is_empty(), "Touch doit remettre a zero le timer");
+        assert!(
+            mgr.afk_channels(1800).is_empty(),
+            "Touch doit remettre a zero le timer"
+        );
     }
 
     #[test]

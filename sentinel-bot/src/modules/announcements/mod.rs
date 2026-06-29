@@ -138,7 +138,10 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
 pub const BUTTON_CUSTOM_ID_PREFIX: &str = "ann:";
 
 fn build_button_custom_id(announcement_id: &str, run_id: &str, user_id: &str) -> String {
-    format!("{}{}:{}:{}", BUTTON_CUSTOM_ID_PREFIX, announcement_id, run_id, user_id)
+    format!(
+        "{}{}:{}:{}",
+        BUTTON_CUSTOM_ID_PREFIX, announcement_id, run_id, user_id
+    )
 }
 
 /// Decompose un custom_id genere par build_button_custom_id.
@@ -381,11 +384,7 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     }
 }
 
-async fn report_run_result(
-    api: &Arc<BaseApiClient>,
-    run_id: &str,
-    results: &[ChannelPostResult],
-) {
+async fn report_run_result(api: &Arc<BaseApiClient>, run_id: &str, results: &[ChannelPostResult]) {
     let body = RecordRunResultBody {
         channels_posted: results
             .iter()

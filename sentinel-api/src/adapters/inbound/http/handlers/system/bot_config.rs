@@ -1,6 +1,6 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -14,10 +14,10 @@ use crate::adapters::inbound::http::dto::system::bot_config::DeleteConfigDto;
 use crate::adapters::inbound::http::dto::system::bot_config::SetConfigDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use sentinel_core::domain::enums::system::role::Role;
 
 const DEFINITIONS_TTL: u64 = 3600; // 1 heure
 const GUILD_CONFIG_TTL: u64 = 900; // 15 minutes
@@ -41,7 +41,10 @@ pub async fn get_definitions(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            if let Err(e) = conn.set_ex::<_, _, ()>("bot:definitions", json, DEFINITIONS_TTL).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>("bot:definitions", json, DEFINITIONS_TTL)
+                .await
+            {
                 warn!(error = %e, "Echec cache set bot:definitions");
             }
         }
@@ -74,7 +77,10 @@ pub async fn get_guild_config(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL)
+                .await
+            {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set guild config");
             }
         }
@@ -102,13 +108,19 @@ pub async fn get_bot_config(
         }
     }
 
-    let configs = state.bot_config_repo.get_config(&guild_id, &bot_name).await?;
+    let configs = state
+        .bot_config_repo
+        .get_config(&guild_id, &bot_name)
+        .await?;
     let dtos: Vec<BotGuildConfigDto> = configs.into_iter().map(BotGuildConfigDto::from).collect();
 
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL)
+                .await
+            {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set bot config");
             }
         }
@@ -125,8 +137,12 @@ pub async fn set_config(
 ) -> Result<StatusCode, ApiError> {
     // Validation
     validation::validate_bot_config(
-        &dto.guild_id, &dto.bot_name, &dto.config_key, &dto.config_value,
-    ).map_err(ApiError)?;
+        &dto.guild_id,
+        &dto.bot_name,
+        &dto.config_key,
+        &dto.config_value,
+    )
+    .map_err(ApiError)?;
 
     // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config bot.
     // Body-based -> check_role_for_guild (lookup DB explicite + distingue
@@ -142,15 +158,26 @@ pub async fn set_config(
 
     state
         .bot_config_repo
-        .set_config(&dto.guild_id, &dto.bot_name, &dto.config_key, &dto.config_value)
+        .set_config(
+            &dto.guild_id,
+            &dto.bot_name,
+            &dto.config_key,
+            &dto.config_value,
+        )
         .await?;
 
     // Invalider les caches
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}", dto.guild_id)).await {
+        if let Err(e) = conn
+            .del::<_, ()>(format!("bot:config:{}", dto.guild_id))
+            .await
+        {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config guild");
         }
-        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await {
+        if let Err(e) = conn
+            .del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name))
+            .await
+        {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config bot");
         }
     }
@@ -201,10 +228,16 @@ pub async fn delete_config(
 
     // Invalider les caches
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}", dto.guild_id)).await {
+        if let Err(e) = conn
+            .del::<_, ()>(format!("bot:config:{}", dto.guild_id))
+            .await
+        {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config guild");
         }
-        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await {
+        if let Err(e) = conn
+            .del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name))
+            .await
+        {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config bot");
         }
     }

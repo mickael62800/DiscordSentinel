@@ -127,15 +127,14 @@ async fn resolve_guild(
         .unwrap_or(DEFAULT_PRIZE_PCT)
         .clamp(0, 100);
 
-    let cashbox_balance: i64 = sqlx::query_scalar(
-        "SELECT balance FROM coude_cashbox WHERE guild_id = $1",
-    )
-    .bind(guild_id)
-    .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .unwrap_or(0);
+    let cashbox_balance: i64 =
+        sqlx::query_scalar("SELECT balance FROM coude_cashbox WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_optional(pool)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(0);
 
     let prize = (cashbox_balance * prize_pct) / 100;
 
@@ -292,11 +291,9 @@ async fn resolve_guild(
 
     match redis.get_multiplexed_async_connection().await {
         Ok(mut conn) => {
-            let res = crate::common::redis_helpers::xadd_event(
-                &mut conn,
-                &event_payload.to_string(),
-            )
-            .await;
+            let res =
+                crate::common::redis_helpers::xadd_event(&mut conn, &event_payload.to_string())
+                    .await;
             if let Err(e) = res {
                 warn!(error = %e, guild_id = %guild_id, "XADD tournament_resolved failed");
             } else {

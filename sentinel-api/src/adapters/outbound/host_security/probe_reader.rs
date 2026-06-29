@@ -41,7 +41,6 @@ impl HostProbeReader for FileHostProbeReader {
                 "{feature} non disponible. Setup : sudo bash sentinel-infrastructure/scripts/setup-host-security.sh {feature}. (lecture {path}: {e})"
             ))
         })?;
-        serde_json::from_str(&raw)
-            .map_err(|e| DomainError::Internal(format!("parse {path}: {e}")))
+        serde_json::from_str(&raw).map_err(|e| DomainError::Internal(format!("parse {path}: {e}")))
     }
 }

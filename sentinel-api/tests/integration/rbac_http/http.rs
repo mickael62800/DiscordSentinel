@@ -13,38 +13,57 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_core::domain::enums::system::role::Role;
 
 fn state() -> sentinel_api::adapters::inbound::http::state::AppState {
     test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels))
 }
 
 async fn pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     sqlx::PgPool::connect(&url).await.unwrap()
 }
 
 // Discord ID tient dans VARCHAR(20) -> 18 digits suffisent.
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 async fn seed_user_role(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &str) {
-    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) \
-                 VALUES ($1, 'test') ON CONFLICT DO NOTHING")
-        .bind(user_id).execute(pool).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) \
-                 VALUES ($1, $2, $3)")
-        .bind(user_id).bind(guild_id).bind(role).execute(pool).await.unwrap();
+    sqlx::query(
+        "INSERT INTO api_users (discord_user_id, display_name) \
+                 VALUES ($1, 'test') ON CONFLICT DO NOTHING",
+    )
+    .bind(user_id)
+    .execute(pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) \
+                 VALUES ($1, $2, $3)",
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .bind(role)
+    .execute(pool)
+    .await
+    .unwrap();
 }
 
 async fn send(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -55,8 +74,11 @@ async fn send(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json:
 async fn grant_role_viewer_forbidden() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "POST", &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
-        "caller", Some(Role::Admin), None,
+        "POST",
+        &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
+        "caller",
+        Some(Role::Admin),
+        None,
         Some(serde_json::json!({"role": "viewer"})),
     );
     let (s, _) = send(app, req).await;
@@ -67,8 +89,11 @@ async fn grant_role_viewer_forbidden() {
 async fn grant_role_invalid_guild_id_422() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "POST", "/api/rbac/guilds/not-a-snowflake/users/1111",
-        "caller", Some(Role::Owner), None,
+        "POST",
+        "/api/rbac/guilds/not-a-snowflake/users/1111",
+        "caller",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "viewer"})),
     );
     let (s, _) = send(app, req).await;
@@ -79,8 +104,11 @@ async fn grant_role_invalid_guild_id_422() {
 async fn grant_role_invalid_role_name_422() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "POST", &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
-        "caller", Some(Role::Owner), None,
+        "POST",
+        &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
+        "caller",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "superhero"})),
     );
     let (s, j) = send(app, req).await;
@@ -99,8 +127,11 @@ async fn grant_role_owner_success_inserts_row() {
     seed_user_role(&pool, &caller, &guild, "owner").await;
 
     let req = test_helpers::request_with_rbac(
-        "POST", &format!("/api/rbac/guilds/{guild}/users/{target}"),
-        &caller, Some(Role::Owner), None,
+        "POST",
+        &format!("/api/rbac/guilds/{guild}/users/{target}"),
+        &caller,
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "moderator", "display_name": "Alice"})),
     );
     let (s, j) = send(app, req).await;
@@ -109,8 +140,13 @@ async fn grant_role_owner_success_inserts_row() {
     assert_eq!(j["granted_by"], caller);
 
     let (role,): (String,) = sqlx::query_as(
-        "SELECT role FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2")
-        .bind(&target).bind(&guild).fetch_one(&pool).await.unwrap();
+        "SELECT role FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2",
+    )
+    .bind(&target)
+    .bind(&guild)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(role, "moderator");
 }
 
@@ -123,8 +159,11 @@ async fn grant_role_duplicate_returns_422_with_hint() {
     seed_user_role(&pool, &target, &guild, "viewer").await;
 
     let req = test_helpers::request_with_rbac(
-        "POST", &format!("/api/rbac/guilds/{guild}/users/{target}"),
-        "caller", Some(Role::Owner), None,
+        "POST",
+        &format!("/api/rbac/guilds/{guild}/users/{target}"),
+        "caller",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "admin"})),
     );
     let (s, j) = send(app, req).await;
@@ -145,8 +184,11 @@ async fn update_role_self_demotion_refused() {
     seed_user_role(&pool, &caller, &guild, "owner").await;
 
     let req = test_helpers::request_with_rbac(
-        "PATCH", &format!("/api/rbac/guilds/{guild}/users/{caller}"),
-        &caller, Some(Role::Owner), None,
+        "PATCH",
+        &format!("/api/rbac/guilds/{guild}/users/{caller}"),
+        &caller,
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "admin"})),
     );
     let (s, j) = send(app, req).await;
@@ -164,8 +206,11 @@ async fn update_role_self_to_owner_allowed() {
     seed_user_role(&pool, &caller, &guild, "owner").await;
 
     let req = test_helpers::request_with_rbac(
-        "PATCH", &format!("/api/rbac/guilds/{guild}/users/{caller}"),
-        &caller, Some(Role::Owner), None,
+        "PATCH",
+        &format!("/api/rbac/guilds/{guild}/users/{caller}"),
+        &caller,
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "owner"})),
     );
     let (s, _) = send(app, req).await;
@@ -176,8 +221,11 @@ async fn update_role_self_to_owner_allowed() {
 async fn update_role_unknown_user_404() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "PATCH", &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
-        "caller", Some(Role::Owner), None,
+        "PATCH",
+        &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
+        "caller",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "viewer"})),
     );
     let (s, _) = send(app, req).await;
@@ -193,16 +241,24 @@ async fn update_role_changes_existing_row() {
     seed_user_role(&pool, &target, &guild, "viewer").await;
 
     let req = test_helpers::request_with_rbac(
-        "PATCH", &format!("/api/rbac/guilds/{guild}/users/{target}"),
-        "caller", Some(Role::Owner), None,
+        "PATCH",
+        &format!("/api/rbac/guilds/{guild}/users/{target}"),
+        "caller",
+        Some(Role::Owner),
+        None,
         Some(serde_json::json!({"role": "admin"})),
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["role"], "admin");
     let (role,): (String,) = sqlx::query_as(
-        "SELECT role FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2")
-        .bind(&target).bind(&guild).fetch_one(&pool).await.unwrap();
+        "SELECT role FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2",
+    )
+    .bind(&target)
+    .bind(&guild)
+    .fetch_one(&pool)
+    .await
+    .unwrap();
     assert_eq!(role, "admin");
 }
 
@@ -219,8 +275,12 @@ async fn revoke_role_last_owner_refused() {
     seed_user_role(&pool, &owner, &guild, "owner").await;
 
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/rbac/guilds/{guild}/users/{owner}"),
-        "caller", Some(Role::Owner), None, None,
+        "DELETE",
+        &format!("/api/rbac/guilds/{guild}/users/{owner}"),
+        "caller",
+        Some(Role::Owner),
+        None,
+        None,
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
@@ -238,8 +298,12 @@ async fn revoke_role_one_of_many_owners_allowed() {
     seed_user_role(&pool, &owner_b, &guild, "owner").await;
 
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/rbac/guilds/{guild}/users/{owner_a}"),
-        "caller", Some(Role::Owner), None, None,
+        "DELETE",
+        &format!("/api/rbac/guilds/{guild}/users/{owner_a}"),
+        "caller",
+        Some(Role::Owner),
+        None,
+        None,
     );
     let (s, _) = send(app, req).await;
     assert_eq!(s, StatusCode::OK);
@@ -254,8 +318,12 @@ async fn revoke_role_non_owner_target_never_blocks() {
     seed_user_role(&pool, &target, &guild, "moderator").await;
 
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/rbac/guilds/{guild}/users/{target}"),
-        "caller", Some(Role::Owner), None, None,
+        "DELETE",
+        &format!("/api/rbac/guilds/{guild}/users/{target}"),
+        "caller",
+        Some(Role::Owner),
+        None,
+        None,
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::OK);
@@ -266,8 +334,12 @@ async fn revoke_role_non_owner_target_never_blocks() {
 async fn revoke_role_unknown_user_404() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
-        "caller", Some(Role::Owner), None, None,
+        "DELETE",
+        &format!("/api/rbac/guilds/{}/users/{}", fresh_id(), fresh_id()),
+        "caller",
+        Some(Role::Owner),
+        None,
+        None,
     );
     let (s, _) = send(app, req).await;
     assert_eq!(s, StatusCode::NOT_FOUND);
@@ -281,8 +353,12 @@ async fn revoke_role_unknown_user_404() {
 async fn list_guild_users_moderator_forbidden() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "GET", &format!("/api/rbac/guilds/{}/users", fresh_id()),
-        "caller", Some(Role::Moderator), None, None,
+        "GET",
+        &format!("/api/rbac/guilds/{}/users", fresh_id()),
+        "caller",
+        Some(Role::Moderator),
+        None,
+        None,
     );
     let (s, _) = send(app, req).await;
     assert_eq!(s, StatusCode::FORBIDDEN);
@@ -294,22 +370,41 @@ async fn list_guild_users_ordered_by_role_then_name() {
     let app = router::build_for_test(state());
     let guild = fresh_id();
     for (uid, role, name) in [
-        ("u1", "viewer", "Zebra"), ("u2", "owner", "Alice"),
-        ("u3", "admin", "Bob"),    ("u4", "moderator", "Chad"),
+        ("u1", "viewer", "Zebra"),
+        ("u2", "owner", "Alice"),
+        ("u3", "admin", "Bob"),
+        ("u4", "moderator", "Chad"),
     ] {
         let id = fresh_id() + uid;
         let id = &id[..18.min(id.len())]; // tronque pour VARCHAR(20)
-        sqlx::query("INSERT INTO api_users (discord_user_id, display_name) \
-                     VALUES ($1, $2)")
-            .bind(id).bind(name).execute(&pool).await.unwrap();
-        sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) \
-                     VALUES ($1, $2, $3)")
-            .bind(id).bind(&guild).bind(role).execute(&pool).await.unwrap();
+        sqlx::query(
+            "INSERT INTO api_users (discord_user_id, display_name) \
+                     VALUES ($1, $2)",
+        )
+        .bind(id)
+        .bind(name)
+        .execute(&pool)
+        .await
+        .unwrap();
+        sqlx::query(
+            "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) \
+                     VALUES ($1, $2, $3)",
+        )
+        .bind(id)
+        .bind(&guild)
+        .bind(role)
+        .execute(&pool)
+        .await
+        .unwrap();
     }
 
     let req = test_helpers::request_with_rbac(
-        "GET", &format!("/api/rbac/guilds/{guild}/users"),
-        "caller", Some(Role::Admin), None, None,
+        "GET",
+        &format!("/api/rbac/guilds/{guild}/users"),
+        "caller",
+        Some(Role::Admin),
+        None,
+        None,
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::OK);
@@ -331,8 +426,12 @@ async fn get_my_role_returns_context_role() {
     let app = router::build_for_test(state());
     let guild = fresh_id();
     let req = test_helpers::request_with_rbac(
-        "GET", &format!("/api/rbac/me/{guild}"),
-        "caller", Some(Role::Moderator), Some(guild.clone()), None,
+        "GET",
+        &format!("/api/rbac/me/{guild}"),
+        "caller",
+        Some(Role::Moderator),
+        Some(guild.clone()),
+        None,
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::OK);
@@ -345,8 +444,12 @@ async fn get_my_role_returns_context_role() {
 async fn get_my_role_without_role_in_ctx_returns_404() {
     let app = router::build_for_test(state());
     let req = test_helpers::request_with_rbac(
-        "GET", &format!("/api/rbac/me/{}", fresh_id()),
-        "caller", None, None, None,
+        "GET",
+        &format!("/api/rbac/me/{}", fresh_id()),
+        "caller",
+        None,
+        None,
+        None,
     );
     let (s, j) = send(app, req).await;
     assert_eq!(s, StatusCode::NOT_FOUND);

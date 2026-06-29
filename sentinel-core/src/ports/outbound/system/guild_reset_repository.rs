@@ -20,7 +20,10 @@ pub trait GuildResetRepository: Send + Sync {
     async fn guild_name(&self, guild_id: &str) -> Result<Option<String>, DomainError>;
 
     /// Collecte les ids Discord necessaires au bot AVANT le wipe.
-    async fn collect_discord_context(&self, guild_id: &str) -> Result<ResetDiscordContext, DomainError>;
+    async fn collect_discord_context(
+        &self,
+        guild_id: &str,
+    ) -> Result<ResetDiscordContext, DomainError>;
 
     /// Efface toutes les lignes `WHERE guild_id = $1` de toutes les tables
     /// guild-scopees (sauf exclusions : `guilds`, RBAC, `bot_definitions`),

@@ -14,8 +14,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use serenity::all::{
-    CommandInteraction, ComponentInteraction, ComponentInteractionDataKind, Context,
-    CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage, RoleId,
+    CommandInteraction, ComponentInteraction, ComponentInteractionDataKind, Context, CreateCommand,
+    CreateInteractionResponse, CreateInteractionResponseMessage, RoleId,
 };
 use tracing::warn;
 
@@ -69,7 +69,9 @@ async fn handle_deploy_event(ctx: &Context, payload_json: &str) {
         .get("channel_id")
         .and_then(|v| v.as_str())
         .and_then(|s| s.parse::<u64>().ok());
-    let (Some(g), Some(c)) = (guild_id, channel_id) else { return };
+    let (Some(g), Some(c)) = (guild_id, channel_id) else {
+        return;
+    };
     // category vide / absente => jeux sans categorie (None).
     let category = data
         .get("category")
@@ -77,7 +79,14 @@ async fn handle_deploy_event(ctx: &Context, payload_json: &str) {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string());
 
-    match commands::deploy_or_refresh_panel(ctx, GuildId::new(g), category.as_deref(), ChannelId::new(c)).await {
+    match commands::deploy_or_refresh_panel(
+        ctx,
+        GuildId::new(g),
+        category.as_deref(),
+        ChannelId::new(c),
+    )
+    .await
+    {
         Ok(status) => tracing::info!(guild = g, %status, "Panneau jeux deploye (web)"),
         Err(e) => tracing::warn!(guild = g, error = %e, "Echec deploiement panneau jeux (web)"),
     }
@@ -154,10 +163,18 @@ async fn handle_panel_button(ctx: &Context, component: &ComponentInteraction) {
         }
     };
     let Some(panel) = panel else {
-        reply_ephemeral(ctx, component, "Ce panneau n'existe plus. Demande a un admin de le redeployer.").await;
+        reply_ephemeral(
+            ctx,
+            component,
+            "Ce panneau n'existe plus. Demande a un admin de le redeployer.",
+        )
+        .await;
         return;
     };
-    let games = match api.list_games_by_category(&guild_id_str, panel.category.as_deref()).await {
+    let games = match api
+        .list_games_by_category(&guild_id_str, panel.category.as_deref())
+        .await
+    {
         Ok(g) => g,
         Err(e) => {
             warn!(error = %e, "Erreur list_games_by_category (bouton jeu)");
@@ -176,7 +193,12 @@ async fn handle_panel_button(ctx: &Context, component: &ComponentInteraction) {
     let role_id = match game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok()) {
         Some(id) => RoleId::new(id),
         None => {
-            reply_ephemeral(ctx, component, "Ce jeu n'a pas de role associe. Demande a un admin de le recreer.").await;
+            reply_ephemeral(
+                ctx,
+                component,
+                "Ce jeu n'a pas de role associe. Demande a un admin de le recreer.",
+            )
+            .await;
             return;
         }
     };
@@ -201,7 +223,10 @@ async fn handle_panel_button(ctx: &Context, component: &ComponentInteraction) {
         }
     } else {
         match member.add_role(&ctx.http, role_id).await {
-            Ok(()) => format!("\u{2705} Tu suis maintenant **{}** ! Tu seras notifie.", game.game_name),
+            Ok(()) => format!(
+                "\u{2705} Tu suis maintenant **{}** ! Tu seras notifie.",
+                game.game_name
+            ),
             Err(e) => {
                 warn!(error = %e, "Erreur add_role (bouton jeu)");
                 "Erreur lors de l'abonnement (hierarchie des roles ?).".to_string()
@@ -212,14 +237,18 @@ async fn handle_panel_button(ctx: &Context, component: &ComponentInteraction) {
     reply_ephemeral(ctx, component, &confirm).await;
 
     // Re-render du panneau (compteurs a jour). Edition directe du message.
-    let games_slice: Vec<&api_client::Game> = games.iter().take(commands::MAX_BUTTONS_PER_PANEL).collect();
+    let games_slice: Vec<&api_client::Game> =
+        games.iter().take(commands::MAX_BUTTONS_PER_PANEL).collect();
     let embed = commands::build_panel_embed(panel.category.as_deref(), &games_slice);
-    let components = commands::build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
+    let components =
+        commands::build_panel_button_components(ctx, guild_id, &panel.id, &games_slice);
     let mut msg = component.message.clone();
     if let Err(e) = msg
         .edit(
             &ctx.http,
-            serenity::all::EditMessage::new().embed(embed).components(components),
+            serenity::all::EditMessage::new()
+                .embed(embed)
+                .components(components),
         )
         .await
     {
@@ -272,7 +301,12 @@ async fn handle_panel_select(ctx: &Context, component: &ComponentInteraction) {
     let panel = match panels.into_iter().find(|p| p.id == panel_id) {
         Some(p) => p,
         None => {
-            reply_ephemeral(ctx, component, "Ce panel n'existe plus. Demande a un admin de le redeployer.").await;
+            reply_ephemeral(
+                ctx,
+                component,
+                "Ce panel n'existe plus. Demande a un admin de le redeployer.",
+            )
+            .await;
             return;
         }
     };
@@ -370,7 +404,10 @@ async fn handle_panel_select(ctx: &Context, component: &ComponentInteraction) {
     // (toutes categories confondues, pas juste le chunk courant). Permet a
     // l'user de voir son etat a chaque interaction puisque Discord ne peut
     // pas pre-cocher les options du panel public.
-    let all_games = api.list_games_by_category(&guild_id_str, None).await.unwrap_or_default();
+    let all_games = api
+        .list_games_by_category(&guild_id_str, None)
+        .await
+        .unwrap_or_default();
     let active_games: Vec<String> = all_games
         .iter()
         .filter_map(|g| {
@@ -400,7 +437,11 @@ fn build_sync_response(
         if !added.is_empty() {
             let shown: Vec<&String> = added.iter().take(10).collect();
             let extra = added.len().saturating_sub(shown.len());
-            let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            let names = shown
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
             if extra > 0 {
                 lines.push(format!("+ {} (+{} autres)", names, extra));
             } else {
@@ -410,7 +451,11 @@ fn build_sync_response(
         if !removed.is_empty() {
             let shown: Vec<&String> = removed.iter().take(10).collect();
             let extra = removed.len().saturating_sub(shown.len());
-            let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
+            let names = shown
+                .iter()
+                .map(|s| s.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
             if extra > 0 {
                 lines.push(format!("- {} (+{} autres)", names, extra));
             } else {
@@ -435,8 +480,16 @@ fn build_sync_response(
     } else {
         let shown: Vec<&String> = active_games.iter().take(20).collect();
         let extra = active_games.len().saturating_sub(shown.len());
-        let names = shown.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-        let suffix = if extra > 0 { format!(" (+{} autres)", extra) } else { String::new() };
+        let names = shown
+            .iter()
+            .map(|s| s.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        let suffix = if extra > 0 {
+            format!(" (+{} autres)", extra)
+        } else {
+            String::new()
+        };
         lines.push(format!(
             "\n**Tu suis actuellement ({}) :** {}{}",
             active_games.len(),

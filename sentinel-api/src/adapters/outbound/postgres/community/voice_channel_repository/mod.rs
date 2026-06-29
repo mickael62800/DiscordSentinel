@@ -10,10 +10,10 @@ impl PgVoiceChannelRepository {
     }
 }
 
+mod bans;
 mod channels;
 mod co_admins;
-mod whitelist;
-mod presets;
-mod bans;
 mod invites;
+mod presets;
 mod themes;
+mod whitelist;

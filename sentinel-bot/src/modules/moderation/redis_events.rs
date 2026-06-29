@@ -1,8 +1,6 @@
 //! Consumer des events moderation publies sur Redis (log + rappels + escalades SLA).
 
-use serenity::all::{
-    Context, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage,
-};
+use serenity::all::{Context, CreateEmbed, CreateEmbedAuthor, CreateEmbedFooter, CreateMessage};
 use serenity::model::id::UserId;
 use tracing::{error, info, warn};
 
@@ -27,7 +25,10 @@ pub(super) async fn handle_redis_moderation_event(ctx: &Context, payload: &str) 
 }
 
 async fn handle_moderation_action_log(ctx: &Context, data: &serde_json::Value) {
-    let action_type = data.get("action_type").and_then(|v| v.as_str()).unwrap_or("");
+    let action_type = data
+        .get("action_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let target_id = data.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
     let target_name = data
         .get("target_name")
@@ -54,7 +55,12 @@ async fn handle_moderation_action_log(ctx: &Context, data: &serde_json::Value) {
         return;
     }
 
-    let Some(log_channel) = crate::shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
+    let Some(log_channel) = crate::shared::discord_helpers::get_log_channel(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await
     else {
         return;
     };
@@ -118,17 +124,35 @@ async fn handle_moderation_action_log(ctx: &Context, data: &serde_json::Value) {
 }
 
 async fn handle_sanction_expiry_reminder(ctx: &Context, data: &serde_json::Value) {
-    let moderator_id = data.get("moderator_id").and_then(|v| v.as_str()).unwrap_or("");
-    let target_name = data.get("target_name").and_then(|v| v.as_str()).unwrap_or("?");
-    let action_type = data.get("action_type").and_then(|v| v.as_str()).unwrap_or("?");
-    let reason = data.get("reason").and_then(|v| v.as_str()).unwrap_or("Aucune raison");
-    let minutes_left = data.get("minutes_left").and_then(|v| v.as_i64()).unwrap_or(0);
+    let moderator_id = data
+        .get("moderator_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let target_name = data
+        .get("target_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+    let action_type = data
+        .get("action_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
+    let reason = data
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Aucune raison");
+    let minutes_left = data
+        .get("minutes_left")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let target_id = data.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
 
     let mod_uid = match moderator_id.parse::<u64>() {
         Ok(u) => u,
         Err(_) => {
-            warn!(moderator_id, "sanction_expiry_reminder: moderator_id invalide");
+            warn!(
+                moderator_id,
+                "sanction_expiry_reminder: moderator_id invalide"
+            );
             return;
         }
     };
@@ -163,7 +187,11 @@ async fn handle_sanction_expiry_reminder(ctx: &Context, data: &serde_json::Value
             format!("<@{}> (`{}`)", target_id, target_name),
             true,
         )
-        .field("\u{23f3} Temps restant", format!("{} minutes", minutes_left), true)
+        .field(
+            "\u{23f3} Temps restant",
+            format!("{} minutes", minutes_left),
+            true,
+        )
         .field("\u{1f4dd} Raison", format!("```{}```", reason_trunc), false)
         .footer(CreateEmbedFooter::new(
             "Rappel automatique envoye par le moderation-bot",
@@ -182,21 +210,31 @@ async fn handle_sanction_expiry_reminder(ctx: &Context, data: &serde_json::Value
         warn!(error = %e, moderator_id, "sanction_expiry_reminder: DM send failed");
     } else {
         info!(
-            moderator_id, target_name, action_type, minutes_left, "DM rappel expiration envoye"
+            moderator_id,
+            target_name, action_type, minutes_left, "DM rappel expiration envoye"
         );
     }
 }
 
 async fn handle_appeal_sla_escalated(ctx: &Context, data: &serde_json::Value) {
     let guild_id = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
-    let ticket_id = data.get("ticket_id").and_then(|v| v.as_str()).unwrap_or("?");
+    let ticket_id = data
+        .get("ticket_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
     let author_id = data.get("author_id").and_then(|v| v.as_str()).unwrap_or("");
-    let author_name = data.get("author_name").and_then(|v| v.as_str()).unwrap_or("?");
+    let author_name = data
+        .get("author_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("?");
     let title = data
         .get("title")
         .and_then(|v| v.as_str())
         .unwrap_or("Appel de sanction");
-    let age_minutes = data.get("age_minutes").and_then(|v| v.as_i64()).unwrap_or(0);
+    let age_minutes = data
+        .get("age_minutes")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(0);
     let sla_escalation_minutes = data
         .get("sla_escalation_minutes")
         .and_then(|v| v.as_i64())
@@ -206,7 +244,12 @@ async fn handle_appeal_sla_escalated(ctx: &Context, data: &serde_json::Value) {
         return;
     }
 
-    let Some(log_channel) = crate::shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
+    let Some(log_channel) = crate::shared::discord_helpers::get_log_channel(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await
     else {
         return;
     };
@@ -242,6 +285,9 @@ async fn handle_appeal_sla_escalated(ctx: &Context, data: &serde_json::Value) {
     if let Err(e) = log_channel.send_message(&ctx.http, msg).await {
         warn!(error = %e, ticket_id, "appeal_sla_escalated: log send failed");
     } else {
-        info!(ticket_id, guild_id, age_minutes, "Escalade appel SLA postee dans logs");
+        info!(
+            ticket_id,
+            guild_id, age_minutes, "Escalade appel SLA postee dans logs"
+        );
     }
 }

@@ -1,4 +1,6 @@
-use serenity::builder::{CreateActionRow, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption};
+use serenity::builder::{
+    CreateActionRow, CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+};
 
 /// Template de reponse rapide pour le staff.
 #[derive(Debug, Clone, PartialEq)]
@@ -34,11 +36,9 @@ pub fn build_template_select(templates: &[Template]) -> CreateActionRow {
         })
         .collect();
 
-    let select = CreateSelectMenu::new(
-        TEMPLATE_SELECT_ID,
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez une reponse rapide...");
+    let select =
+        CreateSelectMenu::new(TEMPLATE_SELECT_ID, CreateSelectMenuKind::String { options })
+            .placeholder("Choisissez une reponse rapide...");
 
     CreateActionRow::SelectMenu(select)
 }

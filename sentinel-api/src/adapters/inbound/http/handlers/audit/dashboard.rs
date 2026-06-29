@@ -1,6 +1,6 @@
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
@@ -77,9 +77,11 @@ pub async fn delete_logs_by_category(
     Path(category): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     if category == "discord" {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-            "Impossible de supprimer les journaux Discord".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::ValidationError(
+                "Impossible de supprimer les journaux Discord".into(),
+            ),
+        ));
     }
     redis_log_stream::delete_stream(&state.redis_client, &category).await;
     let count = state.log_repo.delete_by_category(&category).await?;
@@ -100,9 +102,13 @@ pub async fn create_log(
 ) -> Result<StatusCode, ApiError> {
     let bot_name = dto.bot.unwrap_or_default();
     let category = dto.category.unwrap_or_else(|| {
-        if bot_name.contains("worker") { "worker".to_string() }
-        else if bot_name.contains("-bot") { "bot".to_string() }
-        else { "discord".to_string() }
+        if bot_name.contains("worker") {
+            "worker".to_string()
+        } else if bot_name.contains("-bot") {
+            "bot".to_string()
+        } else {
+            "discord".to_string()
+        }
     });
     let entry = LogEntry {
         id: Uuid::new_v4(),
@@ -153,12 +159,13 @@ pub async fn get_all_infractions(
 ) -> Result<Json<Vec<DashboardInfractionDto>>, ApiError> {
     let infractions = match &params.guild_id {
         Some(gid) => {
-            let filters = crate::ports::inbound::moderation::manage_infractions::InfractionFilters {
-                user_id: None,
-                action: None,
-                limit: 200,
-                offset: 0,
-            };
+            let filters =
+                crate::ports::inbound::moderation::manage_infractions::InfractionFilters {
+                    user_id: None,
+                    action: None,
+                    limit: 200,
+                    offset: 0,
+                };
             state.infractions_uc.list_infractions(gid, filters).await?
         }
         None => state.infractions_uc.list_all_infractions(200, 0).await?,
@@ -192,7 +199,9 @@ pub async fn get_all_rules(
         Some(gid) => state.rules_uc.get_rules(gid).await?,
         None => state.rules_uc.get_all_rules().await?,
     };
-    Ok(Json(rules.into_iter().map(DashboardRuleDto::from).collect()))
+    Ok(Json(
+        rules.into_iter().map(DashboardRuleDto::from).collect(),
+    ))
 }
 
 /// PATCH /api/rules/{id} — toggle enabled/disabled
@@ -242,9 +251,7 @@ pub struct HeartbeatPayload {
 }
 
 /// GET /api/guilds — liste des serveurs connus (cache 5min)
-pub async fn list_guilds(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<GuildDto>>, ApiError> {
+pub async fn list_guilds(State(state): State<AppState>) -> Result<Json<Vec<GuildDto>>, ApiError> {
     // Cache-first
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(Some(json)) = conn.get::<_, Option<String>>("guilds:all").await {

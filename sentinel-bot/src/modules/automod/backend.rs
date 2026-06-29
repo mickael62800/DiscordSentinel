@@ -7,22 +7,30 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{debug, error, info, warn};
 
-use crate::shared::embeds::{moderate_embed, critical_embed};
+use crate::shared::embeds::{critical_embed, moderate_embed};
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::{Action, AnalyzeRequest, ApiClient, MessageMetadata};
 use super::config::EmbedColors;
 use super::detectors;
-use super::review::{send_review_card, sanitize_embed_content};
+use super::review::{sanitize_embed_content, send_review_card};
 
 /// Genere une raison descriptive a partir des flags detecteurs
 /// quand le backend n'en retourne pas.
 fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
     let mut parts = Vec::new();
-    if flags.phishing { parts.push("lien de phishing"); }
-    if flags.insult { parts.push("langage inapproprie"); }
-    if flags.spam { parts.push("spam"); }
-    if flags.link { parts.push("lien non autorise"); }
+    if flags.phishing {
+        parts.push("lien de phishing");
+    }
+    if flags.insult {
+        parts.push("langage inapproprie");
+    }
+    if flags.spam {
+        parts.push("spam");
+    }
+    if flags.link {
+        parts.push("lien non autorise");
+    }
     if parts.is_empty() {
         "Contenu inapproprie detecte".to_string()
     } else {
@@ -53,7 +61,11 @@ pub(super) async fn post_auto_mute_notice(
         reason.to_string()
     };
     let embed = critical_embed("\u{1f507} AutoMod — Mute automatique")
-        .field("Membre", format!("<@{}> (`{}`)", msg.author.id, msg.author.id), true)
+        .field(
+            "Membre",
+            format!("<@{}> (`{}`)", msg.author.id, msg.author.id),
+            true,
+        )
         .field("Duree", format!("{} min", mins), true)
         .field("Auteur", "AutoMod (protection auto)", true)
         .field("Raison", reason_txt, false)
@@ -61,7 +73,10 @@ pub(super) async fn post_auto_mute_notice(
         .thumbnail(msg.author.face())
         .timestamp(serenity::model::Timestamp::now());
     if let Err(e) = target
-        .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+        .send_message(
+            &ctx.http,
+            serenity::builder::CreateMessage::new().embed(embed),
+        )
         .await
     {
         warn!(error = %e, "Echec envoi notice auto-mute");
@@ -92,14 +107,21 @@ pub(super) async fn apply_auto_protect(
     if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(now_secs + safe as i64) {
         let timeout = serenity::model::Timestamp::from(dt);
         match guild_id.member(&ctx.http, msg.author.id).await {
-            Ok(mut member) => match member.disable_communication_until_datetime(&ctx.http, timeout).await {
+            Ok(mut member) => match member
+                .disable_communication_until_datetime(&ctx.http, timeout)
+                .await
+            {
                 Ok(_) => {
                     mute_ok = true;
                     info!(user = %msg.author.name, duration_secs = safe, "Auto-protection : mute applique");
                 }
-                Err(e) => warn!(error = %e, user = %msg.author.name, "Auto-protection : echec mute (permission MODERATE_MEMBERS ?)"),
+                Err(e) => {
+                    warn!(error = %e, user = %msg.author.name, "Auto-protection : echec mute (permission MODERATE_MEMBERS ?)")
+                }
             },
-            Err(e) => warn!(error = %e, user = %msg.author.name, "Auto-protection : membre introuvable pour mute"),
+            Err(e) => {
+                warn!(error = %e, user = %msg.author.name, "Auto-protection : membre introuvable pour mute")
+            }
         }
     }
 
@@ -140,7 +162,10 @@ pub(super) async fn apply_auto_protect(
         );
         if let Ok(ch) = msg.author.create_dm_channel(&ctx.http).await {
             let _ = ch
-                .send_message(&ctx.http, serenity::builder::CreateMessage::new().content(dm))
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().content(dm),
+                )
                 .await;
         }
     }
@@ -256,13 +281,15 @@ pub(super) async fn send_to_backend(
                 };
                 let log_message = format!(
                     "{} -- {} : {}",
-                    action_label,
-                    msg.author.name,
-                    effective_reason,
+                    action_label, msg.author.name, effective_reason,
                 );
 
                 base.send_log(
-                    if matches!(response.action, Action::Ban) { "error" } else { "warn" },
+                    if matches!(response.action, Action::Ban) {
+                        "error"
+                    } else {
+                        "warn"
+                    },
                     &guild_id,
                     &log_message,
                 );
@@ -276,7 +303,14 @@ pub(super) async fn send_to_backend(
             // Cas SEVERE (phishing / pub Discord) : protection auto reversible
             // immediate (mute + suppression + trace + DM appel), meme en human_only.
             let auto_note = if response.severe {
-                apply_auto_protect(ctx, msg, mute_duration_secs, &effective_reason, notify_member).await
+                apply_auto_protect(
+                    ctx,
+                    msg,
+                    mute_duration_secs,
+                    &effective_reason,
+                    notify_member,
+                )
+                .await
             } else {
                 None
             };
@@ -289,7 +323,10 @@ pub(super) async fn send_to_backend(
                 base.send_log(
                     "warn",
                     &request.guild_id,
-                    &format!("Lien non autorise supprime -- {} : {}", msg.author.name, effective_reason),
+                    &format!(
+                        "Lien non autorise supprime -- {} : {}",
+                        msg.author.name, effective_reason
+                    ),
                 );
                 info!(user = %msg.author.name, "Lien non autorise (hors image) supprime automatiquement");
                 return;
@@ -299,13 +336,17 @@ pub(super) async fn send_to_backend(
             match response.route {
                 Routing::Card => {
                     send_review_card(
-                        ctx, msg, &response.action,
+                        ctx,
+                        msg,
+                        &response.action,
                         &effective_reason,
                         score,
                         &request.flags,
-                        log_channel_id, colors,
+                        log_channel_id,
+                        colors,
                         auto_note,
-                    ).await;
+                    )
+                    .await;
                 }
                 Routing::None => {
                     if response.severe {
@@ -314,13 +355,30 @@ pub(super) async fn send_to_backend(
                         // QUI a ete mute et POURQUOI (sinon trace invisible).
                         info!(user = %msg.author.name, "Cas severe protege automatiquement (pas de salon de review)");
                         if auto_note.is_some() {
-                            post_auto_mute_notice(ctx, msg, &effective_reason, mute_duration_secs, log_channel_id).await;
+                            post_auto_mute_notice(
+                                ctx,
+                                msg,
+                                &effective_reason,
+                                mute_duration_secs,
+                                log_channel_id,
+                            )
+                            .await;
                         }
                     }
                     // Sinon : human_only sans salon, ou rien a faire.
                 }
                 Routing::Auto => {
-                    if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors, appeal).await {
+                    if let Err(e) = execute_action(
+                        ctx,
+                        msg,
+                        &response.action,
+                        Some(effective_reason.as_str()),
+                        mute_duration_secs,
+                        colors,
+                        appeal,
+                    )
+                    .await
+                    {
                         error!(error = %e, "Erreur lors de l'execution de l'action");
                     }
                 }
@@ -389,7 +447,11 @@ pub(super) async fn execute_action(
         Action::Delete => {
             let content_preview = sanitize_embed_content(&msg.content, 200);
             let embed = sanction_notice("delete", reason_text, None, None, appeal)
-                .field("Contenu original", format!("```{}```", content_preview), false)
+                .field(
+                    "Contenu original",
+                    format!("```{}```", content_preview),
+                    false,
+                )
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
             if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
@@ -410,8 +472,7 @@ pub(super) async fn execute_action(
                 let mut member = guild_id_val.member(&ctx.http, member.user.id).await?;
                 const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
                 let safe_duration = mute_duration_secs.min(MAX_MUTE_SECS);
-                let secs = match std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
+                let secs = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
                 {
                     Ok(d) => match (d.as_secs() as i64).checked_add(safe_duration as i64) {
                         Some(v) => v,
@@ -488,33 +549,45 @@ pub(super) async fn analyze_message_images(
 
     // Lecture de la config automod-bot (ex-image-bot fusionne par la 156).
     let config = crate::shared::discord_helpers::guild_config_or_default(
-        ctx, &guild_id, crate::modules::automod::MODULE_BOT_NAME,
-    ).await;
+        ctx,
+        &guild_id,
+        crate::modules::automod::MODULE_BOT_NAME,
+    )
+    .await;
 
     // vision_queue_enabled : kill switch pour la file async ai_jobs.
     // Si false, on skip toute l'analyse (meme si vision_enabled est true).
     let queue_enabled = crate::shared::api_client::BaseApiClient::config_bool(
-        &config, "vision_queue_enabled", true,
+        &config,
+        "vision_queue_enabled",
+        true,
     );
     if !queue_enabled {
         return;
     }
 
     let max_image_size_mb = crate::shared::api_client::BaseApiClient::config_u64(
-        &config, "vision_max_image_size_mb", 14,
+        &config,
+        "vision_max_image_size_mb",
+        14,
     );
     let max_image_bytes = (max_image_size_mb as usize) * 1024 * 1024;
-    let scan_embeds = crate::shared::api_client::BaseApiClient::config_bool(
-        &config, "vision_scan_embeds", true,
-    );
+    let scan_embeds =
+        crate::shared::api_client::BaseApiClient::config_bool(&config, "vision_scan_embeds", true);
     let queue_max_retries = crate::shared::api_client::BaseApiClient::config_u64(
-        &config, "vision_queue_max_retries", 3,
+        &config,
+        "vision_queue_max_retries",
+        3,
     ) as usize;
     let auto_delete_nsfw = crate::shared::api_client::BaseApiClient::config_bool(
-        &config, "vision_auto_delete_nsfw", false,
+        &config,
+        "vision_auto_delete_nsfw",
+        false,
     );
     let auto_delete_illicit = crate::shared::api_client::BaseApiClient::config_bool(
-        &config, "vision_auto_delete_illicit", true,
+        &config,
+        "vision_auto_delete_illicit",
+        true,
     );
 
     // Collecte des URLs : pieces jointes + (optionnel) images dans embeds.
@@ -562,14 +635,28 @@ pub(super) async fn analyze_message_images(
         let bytes = match http_client.get(url).send().await {
             Ok(resp) if resp.status().is_success() => match resp.bytes().await {
                 Ok(b) => b.to_vec(),
-                Err(e) => { warn!(error = %e, url, "Echec lecture bytes image"); continue; }
+                Err(e) => {
+                    warn!(error = %e, url, "Echec lecture bytes image");
+                    continue;
+                }
             },
-            Ok(resp) => { warn!(status = %resp.status(), url, "Image download non-success"); continue; }
-            Err(e) => { warn!(error = %e, url, "Echec download image"); continue; }
+            Ok(resp) => {
+                warn!(status = %resp.status(), url, "Image download non-success");
+                continue;
+            }
+            Err(e) => {
+                warn!(error = %e, url, "Echec download image");
+                continue;
+            }
         };
 
         if bytes.len() > max_image_bytes {
-            debug!(size_bytes = bytes.len(), max_bytes = max_image_bytes, url, "Image > vision_max_image_size_mb, skip");
+            debug!(
+                size_bytes = bytes.len(),
+                max_bytes = max_image_bytes,
+                url,
+                "Image > vision_max_image_size_mb, skip"
+            );
             continue;
         }
 
@@ -630,8 +717,14 @@ pub(super) async fn analyze_message_images(
         };
 
         // 4. Extraire l'action retournee par l'API.
-        let action_str = result_json.get("action").and_then(|v| v.as_str()).unwrap_or("none");
-        let reason = result_json.get("reason").and_then(|v| v.as_str()).unwrap_or("Image detectee");
+        let action_str = result_json
+            .get("action")
+            .and_then(|v| v.as_str())
+            .unwrap_or("none");
+        let reason = result_json
+            .get("reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("Image detectee");
 
         let api_action = match action_str {
             "warn" => Action::Warn,
@@ -661,8 +754,22 @@ pub(super) async fn analyze_message_images(
         }
 
         info!(user = %msg.author.name, action = ?action, reason, "Image moderation (via ai-worker)");
-        let appeal = crate::shared::api_client::BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
-        if let Err(e) = execute_action(ctx, msg, &action, Some(reason), mute_duration_secs, colors, appeal).await {
+        let appeal = crate::shared::api_client::BaseApiClient::config_bool(
+            &config,
+            "sanction_appeal_enabled",
+            true,
+        );
+        if let Err(e) = execute_action(
+            ctx,
+            msg,
+            &action,
+            Some(reason),
+            mute_duration_secs,
+            colors,
+            appeal,
+        )
+        .await
+        {
             warn!(error = %e, "Echec execution action image");
         }
         break;

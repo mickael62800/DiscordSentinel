@@ -131,12 +131,14 @@ pub fn render_table(player_hand: &[CardDto], dealer_hand: &[CardDto]) -> Option<
     let d_count = dealer_hand.len().max(1) as u32;
     let max_count = p_count.max(d_count);
 
-    let width =
-        PADDING * 2 + max_count * CARD_WIDTH + (max_count.saturating_sub(1)) * CARD_GAP;
+    let width = PADDING * 2 + max_count * CARD_WIDTH + (max_count.saturating_sub(1)) * CARD_GAP;
     let height = PADDING * 2 + CARD_HEIGHT * 2 + ROW_GAP + DIVIDER_HEIGHT;
 
-    let mut canvas =
-        RgbaImage::from_pixel(width, height, Rgba([BG_COLOR[0], BG_COLOR[1], BG_COLOR[2], 255]));
+    let mut canvas = RgbaImage::from_pixel(
+        width,
+        height,
+        Rgba([BG_COLOR[0], BG_COLOR[1], BG_COLOR[2], 255]),
+    );
 
     // Rangee dealer (haut)
     draw_row(&mut canvas, dealer_hand, PADDING);
@@ -198,8 +200,11 @@ pub fn render_hand(hand: &[CardDto]) -> Option<Vec<u8>> {
     let width = PADDING * 2 + n * CARD_WIDTH + (n.saturating_sub(1)) * CARD_GAP;
     let height = PADDING * 2 + CARD_HEIGHT;
 
-    let mut canvas =
-        RgbaImage::from_pixel(width, height, Rgba([BG_COLOR[0], BG_COLOR[1], BG_COLOR[2], 255]));
+    let mut canvas = RgbaImage::from_pixel(
+        width,
+        height,
+        Rgba([BG_COLOR[0], BG_COLOR[1], BG_COLOR[2], 255]),
+    );
     draw_row(&mut canvas, hand, PADDING);
 
     let mut buf = Vec::with_capacity(width as usize * height as usize * 3);

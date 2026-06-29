@@ -53,9 +53,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_bets();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_for_combat(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_for_combat(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list
@@ -85,7 +83,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.get_betting_for_participant(req).await.map(|r| r.into_inner())
+                client
+                    .get_betting_for_participant(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -98,14 +99,7 @@ impl ApiClient {
         &self,
         combat_id: &str,
         winner_id: Option<&str>,
-    ) -> Result<
-        (
-            Vec<BetResult>,
-            Option<FighterBetBonus>,
-            Vec<TauntEvent>,
-        ),
-        String,
-    > {
+    ) -> Result<(Vec<BetResult>, Option<FighterBetBonus>, Vec<TauntEvent>), String> {
         let req = proto_coude::ResolveBetsRequest {
             combat_id: combat_id.to_string(),
             winner_id: winner_id.map(str::to_string),

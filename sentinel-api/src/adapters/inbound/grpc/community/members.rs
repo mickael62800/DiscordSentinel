@@ -5,19 +5,19 @@
 use std::sync::Arc;
 
 use chrono::DateTime;
+use sentinel_proto::members::v1 as proto;
+use sentinel_proto::members::v1::members_service_server::MembersService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::members::v1 as proto;
-use sentinel_proto::members::v1::members_service_server::MembersService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::errors::DomainError;
 pub struct MembersGrpc {
     pub uc: Arc<dyn ManageMembersUseCase>,
 }
@@ -164,7 +164,6 @@ fn parse_rfc3339(s: Option<String>) -> Result<Option<DateTime<chrono::Utc>>, Sta
             .map_err(|e| Status::invalid_argument(format!("date invalide: {e}"))),
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/members.rs"]

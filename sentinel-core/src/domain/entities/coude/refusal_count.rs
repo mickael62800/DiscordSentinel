@@ -1,8 +1,8 @@
 //! Compteur de refus par paire (cf. COUPE_AMELIORATIONS 5.3 — Dette d honneur).
 
+use crate::domain::entities::system::discord_ids::GuildId;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::system::discord_ids::GuildId;
 /// Seuil au-dessus duquel le requester peut invoquer la dette d honneur.
 pub const HONOR_DEBT_THRESHOLD: i32 = 3;
 

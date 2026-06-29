@@ -159,11 +159,7 @@ pub trait ContainerRuntime: Send + Sync {
     async fn stats(&self, container_id: &str) -> Result<ContainerStats, DomainError>;
 
     /// Logs (last N lines), pas de follow.
-    async fn logs(
-        &self,
-        container_id: &str,
-        lines: u32,
-    ) -> Result<Vec<String>, DomainError>;
+    async fn logs(&self, container_id: &str, lines: u32) -> Result<Vec<String>, DomainError>;
 
     /// Liste tous les containers managed (filtre par label `sentinel.managed=true`).
     /// Pour le reconciler.

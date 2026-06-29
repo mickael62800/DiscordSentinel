@@ -7,8 +7,8 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod broadcaster;
 mod config;
 mod handler;
-mod logger;
 mod health;
+mod logger;
 mod redis_subscriber;
 
 use std::sync::Arc;
@@ -83,7 +83,10 @@ async fn main() {
     let gw_logger = GatewayLogger::new(config.api_url.clone());
 
     // Broadcaster local (capacite configurable)
-    let broadcaster = Arc::new(EventBroadcaster::new(config.broadcast_capacity, config.max_connections));
+    let broadcaster = Arc::new(EventBroadcaster::new(
+        config.broadcast_capacity,
+        config.max_connections,
+    ));
 
     // Lancer le subscriber Redis en background avec exponential backoff
     let redis_broadcaster = broadcaster.clone();
@@ -100,7 +103,8 @@ async fn main() {
             redis_logger,
             redis_base_delay,
             redis_max_delay,
-        ).await;
+        )
+        .await;
     });
 
     // CORS
@@ -157,11 +161,14 @@ async fn main() {
         .await
         .expect("Impossible de bind le port");
 
-    gw_logger.info("Gateway WebSocket demarree", serde_json::json!({
-        "event_type": "gateway.startup",
-        "bind": config.bind_addr(),
-        "max_connections": config.max_connections,
-    }));
+    gw_logger.info(
+        "Gateway WebSocket demarree",
+        serde_json::json!({
+            "event_type": "gateway.startup",
+            "bind": config.bind_addr(),
+            "max_connections": config.max_connections,
+        }),
+    );
 
     info!("Sentinel Gateway pret (WebSocket sur /ws)");
 
@@ -175,30 +182,38 @@ async fn main() {
 
     // Graceful shutdown avec timeout
     let timeout = std::time::Duration::from_secs(config.shutdown_timeout_secs);
-    info!(timeout_secs = config.shutdown_timeout_secs, "Arret en cours, attente des connexions...");
+    info!(
+        timeout_secs = config.shutdown_timeout_secs,
+        "Arret en cours, attente des connexions..."
+    );
     tokio::time::sleep(timeout).await;
 
-    gw_logger.warn("Gateway WebSocket arretee", serde_json::json!({"event_type": "gateway.shutdown"}));
+    gw_logger.warn(
+        "Gateway WebSocket arretee",
+        serde_json::json!({"event_type": "gateway.shutdown"}),
+    );
 
     info!("Sentinel Gateway arrete proprement");
 }
 
 fn build_cors(allowed_origins: &str, max_age_secs: u64) -> CorsLayer {
-    let allow_origin = if allowed_origins.is_empty() || allowed_origins == "*" {
-        AllowOrigin::any()
-    } else {
-        let origins: Vec<HeaderValue> = allowed_origins
-            .split(',')
-            .filter_map(|o| {
-                let trimmed = o.trim();
-                trimmed.parse().map_err(|e| {
+    let allow_origin =
+        if allowed_origins.is_empty() || allowed_origins == "*" {
+            AllowOrigin::any()
+        } else {
+            let origins: Vec<HeaderValue> =
+                allowed_origins
+                    .split(',')
+                    .filter_map(|o| {
+                        let trimmed = o.trim();
+                        trimmed.parse().map_err(|e| {
                     warn!(origin = %trimmed, error = %e, "CORS origin invalide, ignore");
                     e
                 }).ok()
-            })
-            .collect();
-        AllowOrigin::list(origins)
-    };
+                    })
+                    .collect();
+            AllowOrigin::list(origins)
+        };
 
     CorsLayer::new()
         .allow_origin(allow_origin)
@@ -210,4 +225,3 @@ fn build_cors(allowed_origins: &str, max_age_secs: u64) -> CorsLayer {
         ])
         .max_age(std::time::Duration::from_secs(max_age_secs))
 }
-

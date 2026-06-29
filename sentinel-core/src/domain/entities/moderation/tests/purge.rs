@@ -17,8 +17,14 @@ fn allow_zero_accepts_zero_as_purge_all() {
 
 #[test]
 fn allow_zero_rejects_negative() {
-    assert_eq!(validate_purge_days_allow_zero(-1).unwrap_err(), "days doit etre >= 0");
-    assert_eq!(validate_purge_days_allow_zero(i32::MIN).unwrap_err(), "days doit etre >= 0");
+    assert_eq!(
+        validate_purge_days_allow_zero(-1).unwrap_err(),
+        "days doit etre >= 0"
+    );
+    assert_eq!(
+        validate_purge_days_allow_zero(i32::MIN).unwrap_err(),
+        "days doit etre >= 0"
+    );
 }
 
 // ── validate_purge_days_strictly_positive ──
@@ -33,11 +39,20 @@ fn strictly_positive_accepts_one_and_above() {
 #[test]
 fn strictly_positive_rejects_zero() {
     // 0 serait "tout supprimer" mais refuse pour audit/system logs.
-    assert_eq!(validate_purge_days_strictly_positive(0).unwrap_err(), "days doit etre >= 1");
+    assert_eq!(
+        validate_purge_days_strictly_positive(0).unwrap_err(),
+        "days doit etre >= 1"
+    );
 }
 
 #[test]
 fn strictly_positive_rejects_negative() {
-    assert_eq!(validate_purge_days_strictly_positive(-5).unwrap_err(), "days doit etre >= 1");
-    assert_eq!(validate_purge_days_strictly_positive(i32::MIN).unwrap_err(), "days doit etre >= 1");
+    assert_eq!(
+        validate_purge_days_strictly_positive(-5).unwrap_err(),
+        "days doit etre >= 1"
+    );
+    assert_eq!(
+        validate_purge_days_strictly_positive(i32::MIN).unwrap_err(),
+        "days doit etre >= 1"
+    );
 }

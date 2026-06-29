@@ -65,7 +65,10 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
                 deny: Permissions::VIEW_CHANNEL,
                 kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
             };
-            if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            if let Err(e) = voice_channel_id
+                .create_permission(&ctx.http, overwrite)
+                .await
+            {
                 tracing::warn!(error = %e, "failed to restore hidden state after disabling queue");
             }
         }
@@ -95,7 +98,12 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
-        super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **desactivee**.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "La file d'attente a ete **desactivee**.",
+        )
+        .await;
         info!(voice = %voice_channel_id, "File d'attente desactivee");
     } else {
         // Enable queue: create the queue voice channel dans la MEME categorie
@@ -123,7 +131,12 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             Ok(c) => c,
             Err(e) => {
                 error!(error = %e, "Erreur creation queue channel");
-                super::respond_followup_ephemeral(ctx, component, "Erreur lors de la creation de la file d'attente.").await;
+                super::respond_followup_ephemeral(
+                    ctx,
+                    component,
+                    "Erreur lors de la creation de la file d'attente.",
+                )
+                .await;
                 return;
             }
         };
@@ -137,7 +150,10 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::SPEAK,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = queue_channel_id.create_permission(&ctx.http, queue_overwrite).await {
+        if let Err(e) = queue_channel_id
+            .create_permission(&ctx.http, queue_overwrite)
+            .await
+        {
             tracing::warn!(error = %e, "failed to set queue channel permissions");
         }
 
@@ -157,7 +173,10 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             deny: voice_deny,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = voice_channel_id.create_permission(&ctx.http, voice_overwrite).await {
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, voice_overwrite)
+            .await
+        {
             tracing::warn!(error = %e, "failed to lock voice channel behind queue");
         }
 
@@ -195,7 +214,8 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
-        super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **activee**.").await;
+        super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **activee**.")
+            .await;
         info!(voice = %voice_channel_id, queue = %queue_channel_id, "File d'attente activee");
     }
 }
@@ -251,7 +271,10 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await
+    {
         tracing::warn!(error = %e, "failed to grant accepted user permission on voice channel");
     }
 
@@ -310,10 +333,13 @@ async fn handle_queue_refuse(ctx: &Context, component: &ComponentInteraction) {
                 .color(0xED4245)
                 .timestamp(serenity::model::Timestamp::now());
 
-            if let Err(e) = dm.send_message(
-                &ctx.http,
-                serenity::builder::CreateMessage::new().embed(embed),
-            ).await {
+            if let Err(e) = dm
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
                 tracing::warn!(error = %e, "failed to send queue refusal DM");
             }
         }

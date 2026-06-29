@@ -1,15 +1,15 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
+use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
     ScheduledAnnouncement,
 };
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
 
 pub struct PgAnnouncementRepository {
     pool: PgPool,
@@ -253,8 +253,14 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         Ok(row.map(ScheduledAnnouncement::from))
     }
 
-    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<ScheduledAnnouncement>, DomainError> {
-        let q = format!("{} WHERE guild_id = $1 ORDER BY created_at DESC", SELECT_ANNOUNCEMENT);
+    async fn list_by_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<ScheduledAnnouncement>, DomainError> {
+        let q = format!(
+            "{} WHERE guild_id = $1 ORDER BY created_at DESC",
+            SELECT_ANNOUNCEMENT
+        );
         let rows = sqlx::query_as::<_, AnnouncementRow>(&q)
             .bind(guild_id)
             .fetch_all(&self.pool)
@@ -264,12 +270,14 @@ impl AnnouncementRepository for PgAnnouncementRepository {
     }
 
     async fn set_enabled(&self, id: Uuid, enabled: bool) -> Result<bool, DomainError> {
-        sqlx::query("UPDATE scheduled_announcements SET enabled = $2, updated_at = NOW() WHERE id = $1")
-            .bind(id)
-            .bind(enabled)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        sqlx::query(
+            "UPDATE scheduled_announcements SET enabled = $2, updated_at = NOW() WHERE id = $1",
+        )
+        .bind(id)
+        .bind(enabled)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(enabled)
     }
 
@@ -384,10 +392,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         Ok(rows.into_iter().map(AnnouncementRun::from).collect())
     }
 
-    async fn record_button_interaction(
-        &self,
-        i: &ButtonInteraction,
-    ) -> Result<(), DomainError> {
+    async fn record_button_interaction(&self, i: &ButtonInteraction) -> Result<(), DomainError> {
         sqlx::query(
             r#"INSERT INTO announcement_button_interactions
                 (id, announcement_id, run_id, user_id, user_name, button_custom_id, button_label, clicked_at)

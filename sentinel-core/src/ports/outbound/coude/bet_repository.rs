@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::bet::BetResolutionPlan;
 use crate::domain::entities::coude::bet::Bet;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;

@@ -1,15 +1,15 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 
 pub struct PgInfractionRepository {
     pool: PgPool,
@@ -81,8 +81,8 @@ const INFRACTION_SELECT: &str = "SELECT i.id, i.guild_id, i.channel_id, i.user_i
 #[async_trait]
 impl InfractionRepository for PgInfractionRepository {
     async fn save(&self, infraction: &Infraction) -> Result<(), DomainError> {
-        let flags_json =
-            serde_json::to_value(&infraction.flags).map_err(|e| DomainError::Internal(e.to_string()))?;
+        let flags_json = serde_json::to_value(&infraction.flags)
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         sqlx::query(
             r#"
@@ -127,7 +127,11 @@ impl InfractionRepository for PgInfractionRepository {
             param_idx += 1;
         }
 
-        query.push_str(&format!(" ORDER BY i.created_at DESC LIMIT ${} OFFSET ${}", param_idx, param_idx + 1));
+        query.push_str(&format!(
+            " ORDER BY i.created_at DESC LIMIT ${} OFFSET ${}",
+            param_idx,
+            param_idx + 1
+        ));
 
         let mut q = sqlx::query_as::<_, InfractionRow>(&query).bind(guild_id);
 
@@ -140,10 +144,7 @@ impl InfractionRepository for PgInfractionRepository {
 
         q = q.bind(filters.limit).bind(filters.offset);
 
-        let rows = q
-            .fetch_all(&self.pool)
-            .await
-            .map_err(pg_err)?;
+        let rows = q.fetch_all(&self.pool).await.map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Infraction::from).collect())
     }
@@ -151,29 +152,28 @@ impl InfractionRepository for PgInfractionRepository {
     async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Infraction>, DomainError> {
         let sql = format!("{INFRACTION_SELECT} ORDER BY i.created_at DESC LIMIT $1 OFFSET $2");
         let rows = sqlx::query_as::<_, InfractionRow>(&sql)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(pg_err)?;
+            .bind(limit)
+            .bind(offset)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(Infraction::from).collect())
     }
 
     async fn count_today(&self) -> Result<u64, DomainError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM infractions WHERE created_at >= CURRENT_DATE",
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM infractions WHERE created_at >= CURRENT_DATE")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(pg_err)?;
 
         Ok(row.0 as u64)
     }
 
     async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError> {
-        let uuid = Uuid::parse_str(id)
-            .map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
+        let uuid =
+            Uuid::parse_str(id).map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
 
         let sql = format!("{INFRACTION_SELECT} WHERE i.id = $1");
         let row = sqlx::query_as::<_, InfractionRow>(&sql)
@@ -186,8 +186,8 @@ impl InfractionRepository for PgInfractionRepository {
     }
 
     async fn delete_by_id(&self, id: &str) -> Result<bool, DomainError> {
-        let uuid = Uuid::parse_str(id)
-            .map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
+        let uuid =
+            Uuid::parse_str(id).map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
 
         let result = sqlx::query("DELETE FROM infractions WHERE id = $1")
             .bind(uuid)

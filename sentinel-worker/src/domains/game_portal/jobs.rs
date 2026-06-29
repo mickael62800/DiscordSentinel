@@ -12,7 +12,7 @@ use std::time::Duration;
 use serde::Deserialize;
 use tracing::{error, info, warn};
 
-use crate::common as common;
+use crate::common;
 
 const WORKER_NAME: &str = "game-portal";
 
@@ -44,10 +44,34 @@ pub fn start(api_url: String) {
         }
     };
 
-    spawn_job(http.clone(), api_url.clone(), api_key.clone(), "health-check", Duration::from_secs(30));
-    spawn_job(http.clone(), api_url.clone(), api_key.clone(), "idle-shutdown", Duration::from_secs(3600));
-    spawn_job(http.clone(), api_url.clone(), api_key.clone(), "reconcile", Duration::from_secs(3600));
-    spawn_job(http, api_url, api_key, "image-cleanup", Duration::from_secs(86400));
+    spawn_job(
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
+        "health-check",
+        Duration::from_secs(30),
+    );
+    spawn_job(
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
+        "idle-shutdown",
+        Duration::from_secs(3600),
+    );
+    spawn_job(
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
+        "reconcile",
+        Duration::from_secs(3600),
+    );
+    spawn_job(
+        http,
+        api_url,
+        api_key,
+        "image-cleanup",
+        Duration::from_secs(86400),
+    );
 }
 
 fn spawn_job(

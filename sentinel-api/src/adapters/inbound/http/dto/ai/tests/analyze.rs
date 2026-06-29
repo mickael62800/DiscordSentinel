@@ -3,7 +3,10 @@ use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags
 
 fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
     let context_messages = (0..n_context)
-        .map(|i| ContextMessageDto { username: format!("u{i}"), content: format!("msg{i}") })
+        .map(|i| ContextMessageDto {
+            username: format!("u{i}"),
+            content: format!("msg{i}"),
+        })
         .collect();
     AnalyzeRequestDto {
         guild_id: "g".into(),
@@ -11,8 +14,16 @@ fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
         user_id: "u".into(),
         username: "alice".into(),
         content,
-        flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
-        metadata: MetadataDto { message_id: "m1".into(), timestamp: "2026-01-01T00:00:00Z".into() },
+        flags: DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
+        metadata: MetadataDto {
+            message_id: "m1".into(),
+            timestamp: "2026-01-01T00:00:00Z".into(),
+        },
         context_messages,
     }
 }

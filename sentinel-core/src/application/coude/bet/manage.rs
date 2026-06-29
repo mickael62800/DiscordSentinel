@@ -5,18 +5,18 @@ use uuid::Uuid;
 
 use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::bet::calculate_bet_resolution;
-use crate::domain::entities::coude::safety_net::boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier;
 use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::safety_net::boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
 use crate::ports::outbound::coude::bet_repository::BetRepository;
+use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
 use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeBetsService {
     bet_repo: Arc<dyn BetRepository>,
     combat_query: Arc<dyn CombatQueryRepository>,
@@ -29,7 +29,12 @@ impl ManageCoudeBetsService {
         bet_repo: Arc<dyn BetRepository>,
         combat_query: Arc<dyn CombatQueryRepository>,
     ) -> Self {
-        Self { bet_repo, combat_query, safety_net_repo: None, bot_config_repo: None }
+        Self {
+            bet_repo,
+            combat_query,
+            safety_net_repo: None,
+            bot_config_repo: None,
+        }
     }
 
     /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
@@ -46,7 +51,9 @@ impl ManageCoudeBetsService {
     }
 
     async fn bettor_has_safety_net(&self, guild_id: &str, user_id: &str) -> bool {
-        let Some(repo) = &self.safety_net_repo else { return false; };
+        let Some(repo) = &self.safety_net_repo else {
+            return false;
+        };
         matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_)))
     }
 }
@@ -112,7 +119,10 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
                 if !p.won || p.payout <= 0 {
                     continue;
                 }
-                if self.bettor_has_safety_net(&combat.guild_id, &p.bettor_id).await {
+                if self
+                    .bettor_has_safety_net(&combat.guild_id, &p.bettor_id)
+                    .await
+                {
                     p.payout = safety_net_boost_bet_gain_with_multiplier(p.payout, true, mult);
                 }
             }

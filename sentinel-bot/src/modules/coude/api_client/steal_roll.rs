@@ -24,11 +24,7 @@ pub struct RollStealResp {
 }
 
 impl ApiClient {
-    pub async fn roll_steal(
-        &self,
-        guild_id: &str,
-        afk: bool,
-    ) -> Result<RollStealResp, String> {
+    pub async fn roll_steal(&self, guild_id: &str, afk: bool) -> Result<RollStealResp, String> {
         let body = RollStealBody { afk };
         self.base
             .post_json(&format!("/api/coude/{guild_id}/steal/roll"), &body)

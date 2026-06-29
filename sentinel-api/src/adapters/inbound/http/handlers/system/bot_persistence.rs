@@ -5,9 +5,9 @@
 //! Approche pragmatique : sqlx direct depuis le handler (pas de full hexagonal)
 //! car ces endpoints sont simples et fire-and-forget cote bot.
 
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Path;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -18,14 +18,14 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::RoleId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::domain::errors::DomainError;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -58,7 +58,6 @@ pub async fn list_name_history(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
-
     use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
     let logs = state
         .audit_logs_uc
@@ -162,7 +161,9 @@ pub async fn update_streak(
     .bind(&user_id)
     .execute(&state.pg_pool)
     .await
-    .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, user_id = %user_id, "Echec update streak"))
+    .inspect_err(
+        |e| warn!(error = %e, guild_id = %guild_id, user_id = %user_id, "Echec update streak"),
+    )
     .ok();
 
     Ok(ok_response())
@@ -186,8 +187,14 @@ pub async fn update_ticket_sla(
     Json(dto): Json<UpdateTicketSlaDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
-    state.tickets_uc
-        .update_sla(uuid, dto.first_response_at.as_deref(), dto.resolved_at.as_deref(), dto.satisfaction_rating)
+    state
+        .tickets_uc
+        .update_sla(
+            uuid,
+            dto.first_response_at.as_deref(),
+            dto.resolved_at.as_deref(),
+            dto.satisfaction_rating,
+        )
         .await
         .inspect_err(|e| warn!(error = %e, ticket_id = %id, "Echec update_sla"))
         .ok();
@@ -229,12 +236,16 @@ pub async fn create_sponsorship(
     // C4 — Gate RBAC : moderator+ requis pour creer un parrainage.
     // Pass-through pour les appels bot-internal (rbac absent).
     check_role_for_guild(
-        &state, &rbac, &dto.guild_id, Role::Moderator,
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
         "moderator+ requis pour creer un parrainage",
     )
     .await?;
 
-    state.sponsorship_repo
+    state
+        .sponsorship_repo
         .create(&dto.guild_id, &dto.sponsor_id, &dto.sponsored_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert sponsorship"))
@@ -247,13 +258,18 @@ pub async fn create_sponsorship(
 pub async fn list_sponsorships(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::coude::sponsorship_repository::Sponsorship>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::coude::sponsorship_repository::Sponsorship>>, ApiError>
+{
     // Validation
 
-    let entries = state.sponsorship_repo.list(&guild_id).await.unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec list sponsorships");
-        vec![]
-    });
+    let entries = state
+        .sponsorship_repo
+        .list(&guild_id)
+        .await
+        .unwrap_or_else(|e| {
+            warn!(error = %e, guild_id = %guild_id, "Echec list sponsorships");
+            vec![]
+        });
 
     Ok(Json(entries))
 }
@@ -293,12 +309,16 @@ pub async fn create_temp_role(
 
     // C5 — Gate RBAC : moderator+ requis pour assigner un role temporaire.
     check_role_for_guild(
-        &state, &rbac, &dto.guild_id, Role::Moderator,
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
         "moderator+ requis pour creer un temp_role",
     )
     .await?;
 
-    state.temp_role_repo
+    state
+        .temp_role_repo
         .create(&dto.guild_id, &dto.user_id, &dto.role_id, &dto.expires_at)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert temp_role"))
@@ -311,13 +331,18 @@ pub async fn create_temp_role(
 pub async fn list_temp_roles(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
+{
     // Validation
 
-    let entries = state.temp_role_repo.list_active(&guild_id).await.unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec list temp_roles");
-        vec![]
-    });
+    let entries = state
+        .temp_role_repo
+        .list_active(&guild_id)
+        .await
+        .unwrap_or_else(|e| {
+            warn!(error = %e, guild_id = %guild_id, "Echec list temp_roles");
+            vec![]
+        });
 
     Ok(Json(entries))
 }
@@ -337,11 +362,15 @@ pub async fn delete_temp_role(
     // (community-bot qui consume l'event temp_role_expire) appellent sans
     // X-Discord-Token → pass-through non-breaking.
     if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator)
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour supprimer un temp role".into())))?;
+        require_role(&ctx, Role::Moderator).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "moderator+ requis pour supprimer un temp role".into(),
+            ))
+        })?;
     }
 
-    state.temp_role_repo
+    state
+        .temp_role_repo
         .delete(&guild_id, &user_id, &role_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, "Echec delete temp_role"))
@@ -392,14 +421,29 @@ pub async fn create_pending_action(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_moderation_action(
-        &dto.guild_id, &dto.moderator_id, &dto.target_id, &dto.reason, &dto.action_type,
-    ).map_err(ApiError)?;
+        &dto.guild_id,
+        &dto.moderator_id,
+        &dto.target_id,
+        &dto.reason,
+        &dto.action_type,
+    )
+    .map_err(ApiError)?;
 
-    match state.pending_action_repo.create(
-        &dto.guild_id, &dto.moderator_id, &dto.moderator_name,
-        &dto.target_id, &dto.target_name, &dto.action_type,
-        &dto.reason, dto.gravity.as_deref(), dto.duration,
-    ).await {
+    match state
+        .pending_action_repo
+        .create(
+            &dto.guild_id,
+            &dto.moderator_id,
+            &dto.moderator_name,
+            &dto.target_id,
+            &dto.target_name,
+            &dto.action_type,
+            &dto.reason,
+            dto.gravity.as_deref(),
+            dto.duration,
+        )
+        .await
+    {
         Ok(id) => Ok(Json(serde_json::json!({ "id": id.to_string() }))),
         Err(e) => {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec creation pending_action");
@@ -412,13 +456,20 @@ pub async fn create_pending_action(
 pub async fn list_pending_actions(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>, ApiError> {
+) -> Result<
+    Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>,
+    ApiError,
+> {
     // Validation
 
-    let entries = state.pending_action_repo.list_pending(&guild_id).await.unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec list pending_mod_actions");
-        vec![]
-    });
+    let entries = state
+        .pending_action_repo
+        .list_pending(&guild_id)
+        .await
+        .unwrap_or_else(|e| {
+            warn!(error = %e, guild_id = %guild_id, "Echec list pending_mod_actions");
+            vec![]
+        });
 
     Ok(Json(entries))
 }
@@ -442,11 +493,19 @@ pub async fn resolve_pending_action(
 
     if rbac.is_some() {
         if let Some(guild_id) = state.pending_action_repo.get_guild_id(uuid).await? {
-            check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour resoudre une action en attente").await?;
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour resoudre une action en attente",
+            )
+            .await?;
         }
     }
 
-    state.pending_action_repo
+    state
+        .pending_action_repo
         .resolve(uuid, &dto.status, &dto.reviewed_by)
         .await
         .inspect_err(|e| warn!(error = %e, action_id = %id, "Echec resolution pending_action"))

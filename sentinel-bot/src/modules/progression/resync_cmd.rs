@@ -100,10 +100,12 @@ fn sub_user_target(sub: &serenity::all::CommandDataOption) -> Option<UserId> {
     let CommandDataOptionValue::SubCommand(opts) = &sub.value else {
         return None;
     };
-    opts.iter().find(|o| o.name == "target").and_then(|o| match &o.value {
-        CommandDataOptionValue::User(id) => Some(*id),
-        _ => None,
-    })
+    opts.iter()
+        .find(|o| o.name == "target")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::User(id) => Some(*id),
+            _ => None,
+        })
 }
 
 fn sub_limit(sub: &serenity::all::CommandDataOption) -> u32 {
@@ -151,7 +153,9 @@ async fn handle_single(
     if let Err(e) = command
         .create_followup(
             &ctx.http,
-            CreateInteractionResponseFollowup::new().embed(embed).ephemeral(true),
+            CreateInteractionResponseFollowup::new()
+                .embed(embed)
+                .ephemeral(true),
         )
         .await
     {
@@ -159,12 +163,7 @@ async fn handle_single(
     }
 }
 
-async fn handle_all(
-    ctx: &Context,
-    command: &CommandInteraction,
-    guild_id: GuildId,
-    limit: u32,
-) {
+async fn handle_all(ctx: &Context, command: &CommandInteraction, guild_id: GuildId, limit: u32) {
     if !defer_ephemeral(ctx, command).await {
         return;
     }
@@ -233,7 +232,9 @@ async fn handle_all(
     if let Err(e) = command
         .create_followup(
             &ctx.http,
-            CreateInteractionResponseFollowup::new().embed(embed).ephemeral(true),
+            CreateInteractionResponseFollowup::new()
+                .embed(embed)
+                .ephemeral(true),
         )
         .await
     {
@@ -244,7 +245,9 @@ async fn handle_all(
 /// Recupere le niveau global du joueur via l'API.
 async fn fetch_level(ctx: &Context, guild_id: &str, user_id: &str) -> Result<i32, String> {
     let data = ctx.data.read().await;
-    let api = data.get::<StatsApiKey>().ok_or_else(|| "API indisponible".to_string())?;
+    let api = data
+        .get::<StatsApiKey>()
+        .ok_or_else(|| "API indisponible".to_string())?;
     match api.get_user_level(guild_id, user_id).await {
         Ok(Some(u)) => Ok(u.level),
         Ok(None) => Err("Ce membre n'a pas encore d'XP.".to_string()),
@@ -256,7 +259,10 @@ fn build_single_embed(user_id: UserId, level: i32, outcome: &ResyncOutcome) -> C
     let (status, color) = match outcome {
         ResyncOutcome::Renamed => ("\u{270f}\u{fe0f} Pseudo mis a jour", 0x3498DB),
         ResyncOutcome::AlreadyOk => ("\u{2705} Deja a jour", 0x57F287),
-        ResyncOutcome::Skipped => ("\u{23ed}\u{fe0f} Skipped (owner / member introuvable)", 0x95A5A6),
+        ResyncOutcome::Skipped => (
+            "\u{23ed}\u{fe0f} Skipped (owner / member introuvable)",
+            0x95A5A6,
+        ),
         ResyncOutcome::Error(msg) => {
             return CreateEmbed::new()
                 .title("\u{1f504} Resync pseudo")
@@ -291,7 +297,9 @@ async fn followup(ctx: &Context, command: &CommandInteraction, content: &str) {
     if let Err(e) = command
         .create_followup(
             &ctx.http,
-            CreateInteractionResponseFollowup::new().content(content).ephemeral(true),
+            CreateInteractionResponseFollowup::new()
+                .content(content)
+                .ephemeral(true),
         )
         .await
     {

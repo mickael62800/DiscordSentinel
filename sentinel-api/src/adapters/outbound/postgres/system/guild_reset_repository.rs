@@ -2,21 +2,16 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::outbound::system::guild_reset_repository::{
     GuildResetRepository, ResetDiscordContext,
 };
+use sentinel_core::domain::errors::DomainError;
 
 /// Tables a NE JAMAIS effacer lors d'un reset par serveur :
 /// - `guilds` : enregistrement du serveur (reste visible dans le dashboard)
 /// - RBAC : l'owner garde son acces
 /// - `bot_definitions` : metadata globale (non guild-scopee)
-const EXCLUDED_TABLES: &[&str] = &[
-    "guilds",
-    "api_user_guilds",
-    "api_users",
-    "bot_definitions",
-];
+const EXCLUDED_TABLES: &[&str] = &["guilds", "api_user_guilds", "api_users", "bot_definitions"];
 
 pub struct PgGuildResetRepository {
     pool: PgPool,
@@ -43,7 +38,10 @@ impl GuildResetRepository for PgGuildResetRepository {
         Ok(row.map(|(n,)| n))
     }
 
-    async fn collect_discord_context(&self, guild_id: &str) -> Result<ResetDiscordContext, DomainError> {
+    async fn collect_discord_context(
+        &self,
+        guild_id: &str,
+    ) -> Result<ResetDiscordContext, DomainError> {
         // Role de quarantaine (config security-bot).
         let quarantine_role_id: Option<(String,)> = sqlx::query_as(
             "SELECT config_value FROM bot_guild_config \
@@ -55,13 +53,12 @@ impl GuildResetRepository for PgGuildResetRepository {
         .map_err(pg_err)?;
 
         // Roles temporaires poses par le bot.
-        let temp_roles: Vec<(String,)> = sqlx::query_as(
-            "SELECT DISTINCT role_id FROM temp_roles WHERE guild_id = $1",
-        )
-        .bind(guild_id)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let temp_roles: Vec<(String,)> =
+            sqlx::query_as("SELECT DISTINCT role_id FROM temp_roles WHERE guild_id = $1")
+                .bind(guild_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(pg_err)?;
 
         Ok(ResetDiscordContext {
             quarantine_role_id: quarantine_role_id
@@ -100,17 +97,26 @@ impl GuildResetRepository for PgGuildResetRepository {
             let mut progressed = false;
 
             for table in &remaining {
-                sqlx::query("SAVEPOINT wipe_sp").execute(&mut *tx).await.map_err(pg_err)?;
+                sqlx::query("SAVEPOINT wipe_sp")
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(pg_err)?;
                 // Nom de table issu du catalogue (jamais d'input utilisateur) -> quote.
                 let sql = format!("DELETE FROM \"{}\" WHERE guild_id = $1", table);
                 match sqlx::query(&sql).bind(guild_id).execute(&mut *tx).await {
                     Ok(res) => {
-                        sqlx::query("RELEASE SAVEPOINT wipe_sp").execute(&mut *tx).await.map_err(pg_err)?;
+                        sqlx::query("RELEASE SAVEPOINT wipe_sp")
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(pg_err)?;
                         progressed = true;
                         summary.push((table.clone(), res.rows_affected()));
                     }
                     Err(_) => {
-                        sqlx::query("ROLLBACK TO SAVEPOINT wipe_sp").execute(&mut *tx).await.map_err(pg_err)?;
+                        sqlx::query("ROLLBACK TO SAVEPOINT wipe_sp")
+                            .execute(&mut *tx)
+                            .await
+                            .map_err(pg_err)?;
                         still_failed.push(table.clone());
                     }
                 }

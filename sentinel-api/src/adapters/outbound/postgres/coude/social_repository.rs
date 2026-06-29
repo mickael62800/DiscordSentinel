@@ -4,11 +4,11 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::coude::social::Season;
 use sentinel_core::domain::entities::coude::social::Event;
-use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
 use sentinel_core::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_core::domain::entities::coude::social::LeaderboardEntry;
 use sentinel_core::domain::entities::coude::social::NewDailyChaos;
+use sentinel_core::domain::entities::coude::social::Season;
 use sentinel_core::domain::errors::DomainError;
 
 use super::super::pg_err;
@@ -23,7 +23,6 @@ impl PgSocialRepository {
         Self { pool }
     }
 }
-
 
 #[derive(sqlx::FromRow)]
 struct LeaderboardRow {
@@ -125,8 +124,7 @@ impl SocialRepository for PgSocialRepository {
         // Filtre commun : exclut les users dont guild_members.left_at est set.
         // NOT EXISTS preserve les users qui n'ont jamais ete syncs dans
         // guild_members (pas filtres par accident).
-        let active_filter =
-            "AND NOT EXISTS (SELECT 1 FROM guild_members gm \
+        let active_filter = "AND NOT EXISTS (SELECT 1 FROM guild_members gm \
              WHERE gm.guild_id = $1 AND gm.user_id = cp.user_id \
              AND gm.left_at IS NOT NULL)";
         let sql = match category {
@@ -213,10 +211,7 @@ impl SocialRepository for PgSocialRepository {
 
     // ── Saison ──
 
-    async fn get_or_bootstrap_current_season(
-        &self,
-        guild_id: &str,
-    ) -> Result<Season, DomainError> {
+    async fn get_or_bootstrap_current_season(&self, guild_id: &str) -> Result<Season, DomainError> {
         // 1. Tenter de récupérer la saison active (ended_at IS NULL).
         let existing: Option<(i32, DateTime<Utc>)> = sqlx::query_as(
             r#"SELECT season_number, started_at

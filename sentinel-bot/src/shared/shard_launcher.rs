@@ -77,8 +77,7 @@ pub async fn start_bot(client: &mut Client) -> Result<(), serenity::Error> {
             if shard_id >= shard_total {
                 warn!(
                     shard_id,
-                    shard_total,
-                    "SHARD_ID >= SHARD_TOTAL, fallback sur single shard"
+                    shard_total, "SHARD_ID >= SHARD_TOTAL, fallback sur single shard"
                 );
                 return client.start().await;
             }
@@ -96,4 +95,3 @@ pub async fn start_bot(client: &mut Client) -> Result<(), serenity::Error> {
         }
     }
 }
-

@@ -66,7 +66,9 @@ async fn connect() -> Channel {
         .timeout(Duration::from_secs(15))
         .connect()
         .await
-        .unwrap_or_else(|e| panic!("Connexion gRPC echouee vers {url} : {e}. Lance `docker compose up -d api`."))
+        .unwrap_or_else(|e| {
+            panic!("Connexion gRPC echouee vers {url} : {e}. Lance `docker compose up -d api`.")
+        })
 }
 
 fn auth<T>(mut req: Request<T>) -> Request<T> {
@@ -125,7 +127,9 @@ async fn live_get_or_create_then_get_player() {
     assert_eq!(fetched.username, "live_test_user");
     // L'horodatage created_at doit etre du jour meme.
     assert!(
-        fetched.created_at.starts_with(&chrono::Utc::now().format("%Y-%m-%d").to_string()),
+        fetched
+            .created_at
+            .starts_with(&chrono::Utc::now().format("%Y-%m-%d").to_string()),
         "created_at attendu aujourd'hui, recu {}",
         fetched.created_at
     );
@@ -136,11 +140,7 @@ async fn live_get_or_create_then_get_player() {
         user_id: user_id.clone().into(),
         username: "different_name".into(),
     }));
-    let again = client
-        .get_or_create_player(req)
-        .await
-        .unwrap()
-        .into_inner();
+    let again = client.get_or_create_player(req).await.unwrap().into_inner();
     assert_eq!(again.user_id, user_id, "doit etre le meme joueur");
 }
 
@@ -187,7 +187,7 @@ async fn live_get_unknown_player_returns_not_found() {
     let mut client = CoudePlayerServiceClient::new(channel);
 
     let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: unique_id(),  // guild qui n'existe pas
+        guild_id: unique_id(), // guild qui n'existe pas
         user_id: unique_id(),
     }));
     let err = client.get_player(req).await.expect_err("doit echouer");
@@ -249,7 +249,11 @@ async fn live_welcome_get_config_returns_default_or_existing() {
     }));
     // GetConfig doit toujours reussir (renvoie une config par defaut si
     // pas en DB).
-    let cfg = client.get_config(req).await.expect("get_config reussi").into_inner();
+    let cfg = client
+        .get_config(req)
+        .await
+        .expect("get_config reussi")
+        .into_inner();
     // La config existe forcement (champ welcome_enabled doit etre lisible).
     let _ = cfg.welcome_enabled;
 }
@@ -292,6 +296,10 @@ async fn live_blackjack_get_active_returns_none_for_new_user() {
         guild_id: unique_id(),
         user_id: unique_id(),
     }));
-    let resp = client.get_active(req).await.expect("get_active reussi").into_inner();
+    let resp = client
+        .get_active(req)
+        .await
+        .expect("get_active reussi")
+        .into_inner();
     assert!(resp.game.is_none(), "nouveau user n'a pas de partie active");
 }

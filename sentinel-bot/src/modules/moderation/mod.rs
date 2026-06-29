@@ -17,8 +17,8 @@ use std::time::Instant;
 
 use dashmap::DashMap;
 use serenity::all::{
-    AutocompleteChoice, CommandDataOptionValue, CommandInteraction, ComponentInteraction,
-    Context, CreateAutocompleteResponse, CreateInteractionResponse,
+    AutocompleteChoice, CommandDataOptionValue, CommandInteraction, ComponentInteraction, Context,
+    CreateAutocompleteResponse, CreateInteractionResponse,
 };
 use serenity::builder::CreateCommand;
 use serenity::prelude::*;
@@ -61,10 +61,7 @@ pub fn init_typemap(
     api: &Arc<crate::shared::api_client::BaseApiClient>,
     grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
 ) {
-    data.insert::<ModerationApiKey>(Arc::new(ApiClient::new(
-        Arc::clone(api),
-        Arc::clone(grpc),
-    )));
+    data.insert::<ModerationApiKey>(Arc::new(ApiClient::new(Arc::clone(api), Arc::clone(grpc))));
     data.insert::<PendingActionsKey>(DashMap::new());
     data.insert::<risk_check::RiskyPendingKey>(DashMap::new());
 }
@@ -162,7 +159,10 @@ pub fn handles_autocomplete(cmd_name: &str) -> bool {
 }
 
 pub async fn handle_autocomplete(ctx: &Context, autocomplete: &CommandInteraction) {
-    let guild_id = autocomplete.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let guild_id = autocomplete
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
 
     let current_input = autocomplete
         .data
@@ -222,19 +222,28 @@ pub async fn post_to_appeal_channel(
     let cfg = {
         let data = ctx.data.read().await;
         match data.get::<ApiClientKey>() {
-            Some(api) => api.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default(),
+            Some(api) => api
+                .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
             None => return,
         }
     };
-    let channel_id = match cfg.get("appeal_channel_id").and_then(|s| s.parse::<u64>().ok()) {
+    let channel_id = match cfg
+        .get("appeal_channel_id")
+        .and_then(|s| s.parse::<u64>().ok())
+    {
         Some(n) if n > 0 => n,
         _ => return,
     };
     let ch = serenity::model::id::ChannelId::new(channel_id);
-    if let Err(e) = ch.send_message(
-        &ctx.http,
-        serenity::builder::CreateMessage::new().embed(embed),
-    ).await {
+    if let Err(e) = ch
+        .send_message(
+            &ctx.http,
+            serenity::builder::CreateMessage::new().embed(embed),
+        )
+        .await
+    {
         warn!(error = %e, channel_id, "Echec post appeal channel");
     }
 }

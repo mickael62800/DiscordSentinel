@@ -1,8 +1,8 @@
 //! Handlers inventaire/primes/assurances. Délèguent à `state.coude_inventory_uc`.
 
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Path;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Json;
 
@@ -31,7 +31,9 @@ pub async fn get_inventory(
         .coude_inventory_uc
         .list_inventory(&guild_id, &user_id)
         .await?;
-    Ok(Json(items.into_iter().map(InventoryItemDto::from).collect()))
+    Ok(Json(
+        items.into_iter().map(InventoryItemDto::from).collect(),
+    ))
 }
 
 /// POST /api/coude/{guild_id}/inventory/{user_id}/add
@@ -114,7 +116,12 @@ pub async fn claim_primes(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let total = state
         .coude_inventory_uc
-        .claim_primes(&guild_id, &dto.target_id, &dto.claimer_id, &dto.claimer_name)
+        .claim_primes(
+            &guild_id,
+            &dto.target_id,
+            &dto.claimer_id,
+            &dto.claimer_name,
+        )
         .await?;
     Ok(Json(serde_json::json!({ "total_claimed": total })))
 }
@@ -132,9 +139,11 @@ pub async fn buy_insurance(
         .buy_insurance(&guild_id, &dto.user_id, dto.is_scam, dto.duration_seconds)
         .await?;
     if !inserted {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::Conflict(
-            "Une assurance active existe deja pour ce joueur".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::Conflict(
+                "Une assurance active existe deja pour ce joueur".into(),
+            ),
+        ));
     }
     Ok(StatusCode::NO_CONTENT)
 }
@@ -174,9 +183,11 @@ pub async fn buy_insurance_with_roll(
         )
         .await?;
     if !created {
-        return Err(ApiError(sentinel_core::domain::errors::DomainError::Conflict(
-            "Une assurance active existe deja pour ce joueur".into(),
-        )));
+        return Err(ApiError(
+            sentinel_core::domain::errors::DomainError::Conflict(
+                "Une assurance active existe deja pour ce joueur".into(),
+            ),
+        ));
     }
     Ok(Json(BuyInsuranceResolvedDto { created, is_scam }))
 }

@@ -156,10 +156,7 @@ async fn process_job(
         req = req.bearer_auth(&api_key);
     }
 
-    let resp = req
-        .send()
-        .await
-        .map_err(|e| format!("HTTP send: {e}"))?;
+    let resp = req.send().await.map_err(|e| format!("HTTP send: {e}"))?;
 
     let status = resp.status();
     let body: serde_json::Value = resp
@@ -203,7 +200,10 @@ async fn publish_result(redis: &redis::Client, job_id: Uuid, payload: &serde_jso
             if let Err(e) = conn.publish::<_, _, ()>(&channel, &serialized).await {
                 tracing::warn!(error = %e, channel, "Echec Redis publish resultat AI");
             }
-            if let Err(e) = conn.set_ex::<_, _, ()>(&key, &serialized, REDIS_RESULT_TTL_SECS).await {
+            if let Err(e) = conn
+                .set_ex::<_, _, ()>(&key, &serialized, REDIS_RESULT_TTL_SECS)
+                .await
+            {
                 tracing::warn!(error = %e, key, "Echec Redis set_ex resultat AI");
             }
         }

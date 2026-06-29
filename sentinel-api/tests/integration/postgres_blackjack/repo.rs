@@ -5,33 +5,47 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
+use sentinel_api::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use sentinel_core::domain::entities::casino::blackjack::BlackjackGame;
 use sentinel_core::domain::entities::casino::blackjack::Card;
-use sentinel_api::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 fn card(rank: &str, suit: &str) -> Card {
-    Card { rank: rank.into(), suit: suit.into() }
+    Card {
+        rank: rank.into(),
+        suit: suit.into(),
+    }
 }
 fn sample(guild: &str, user: &str, status: &str) -> BlackjackGame {
     BlackjackGame {
         id: Uuid::new_v4(),
-        guild_id: guild.into(), user_id: user.into(), username: user.into(),
+        guild_id: guild.into(),
+        user_id: user.into(),
+        username: user.into(),
         bet: 100,
         player_hand: vec![card("A", "spades"), card("10", "hearts")],
         dealer_hand: vec![card("5", "clubs")],
-        deck: (0..20).map(|i| card(&format!("{}", i % 10 + 2), "diamonds")).collect(),
+        deck: (0..20)
+            .map(|i| card(&format!("{}", i % 10 + 2), "diamonds"))
+            .collect(),
         status: status.into(),
-        player_score: 21, dealer_score: 5,
-        doubled: false, payout: 0,
-        created_at: Utc::now(), finished_at: None,
+        player_score: 21,
+        dealer_score: 5,
+        doubled: false,
+        payout: 0,
+        created_at: Utc::now(),
+        finished_at: None,
     }
 }
 
@@ -50,7 +64,8 @@ async fn create_and_get_by_id() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_active_returns_only_active_game() {
     let repo = PgBlackjackRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     // Cree une partie active
     let active = sample(&g, &u, "playing");
     repo.create(&active).await.unwrap();
@@ -61,7 +76,11 @@ async fn get_active_returns_only_active_game() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_active_none_when_absent() {
     let repo = PgBlackjackRepository::new(pool().await);
-    assert!(repo.get_active(&fresh_id(), &fresh_id()).await.unwrap().is_none());
+    assert!(repo
+        .get_active(&fresh_id(), &fresh_id())
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -148,8 +167,13 @@ async fn cancel_game_refunds_bet_to_wallet() {
     repo.create(&game).await.unwrap();
     repo.cancel_game(game.id).await.unwrap();
 
-    let coins: i64 = sqlx::query_scalar("SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2")
-        .bind(&g).bind(&u).fetch_one(&p).await.unwrap();
+    let coins: i64 =
+        sqlx::query_scalar("SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2")
+            .bind(&g)
+            .bind(&u)
+            .fetch_one(&p)
+            .await
+            .unwrap();
     assert_eq!(coins, 575); // 500 + 75 refund
 }
 
@@ -159,15 +183,26 @@ async fn cancel_game_doubled_refunds_double_bet() {
     let repo = PgBlackjackRepository::new(p.clone());
     let g = fresh_id();
     let u = fresh_id();
-    sqlx::query("INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)")
-        .bind(&g).bind(&u).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)",
+    )
+    .bind(&g)
+    .bind(&u)
+    .execute(&p)
+    .await
+    .unwrap();
     let mut game = sample(&g, &u, "playing");
     game.bet = 50;
     game.doubled = true;
     repo.create(&game).await.unwrap();
     repo.cancel_game(game.id).await.unwrap();
-    let coins: i64 = sqlx::query_scalar("SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2")
-        .bind(&g).bind(&u).fetch_one(&p).await.unwrap();
+    let coins: i64 =
+        sqlx::query_scalar("SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2")
+            .bind(&g)
+            .bind(&u)
+            .fetch_one(&p)
+            .await
+            .unwrap();
     // 100 + (50 + 50 double) = 200
     assert_eq!(coins, 200);
 }
@@ -178,8 +213,14 @@ async fn cancel_game_writes_audit_transaction() {
     let repo = PgBlackjackRepository::new(p.clone());
     let g = fresh_id();
     let u = fresh_id();
-    sqlx::query("INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)")
-        .bind(&g).bind(&u).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)",
+    )
+    .bind(&g)
+    .bind(&u)
+    .execute(&p)
+    .await
+    .unwrap();
     let game = sample(&g, &u, "playing");
     repo.create(&game).await.unwrap();
     repo.cancel_game(game.id).await.unwrap();
@@ -193,7 +234,10 @@ async fn cancel_game_writes_audit_transaction() {
 async fn cancel_game_not_found_returns_error() {
     let repo = PgBlackjackRepository::new(pool().await);
     let err = repo.cancel_game(Uuid::new_v4()).await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::NotFound(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::NotFound(_)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -202,12 +246,21 @@ async fn cancel_game_already_terminated_returns_conflict() {
     let repo = PgBlackjackRepository::new(p.clone());
     let g = fresh_id();
     let u = fresh_id();
-    sqlx::query("INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)")
-        .bind(&g).bind(&u).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)",
+    )
+    .bind(&g)
+    .bind(&u)
+    .execute(&p)
+    .await
+    .unwrap();
     let game = sample(&g, &u, "dealer_wins"); // status terminé
     repo.create(&game).await.unwrap();
     let err = repo.cancel_game(game.id).await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::Conflict(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::Conflict(_)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -217,8 +270,14 @@ async fn cancel_game_waiting_status_also_cancellable() {
     let repo = PgBlackjackRepository::new(p.clone());
     let g = fresh_id();
     let u = fresh_id();
-    sqlx::query("INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)")
-        .bind(&g).bind(&u).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO user_wallets (guild_id, user_id, username, coins) VALUES ($1, $2, 'A', 100)",
+    )
+    .bind(&g)
+    .bind(&u)
+    .execute(&p)
+    .await
+    .unwrap();
     let game = sample(&g, &u, "waiting");
     repo.create(&game).await.unwrap();
     assert!(repo.cancel_game(game.id).await.is_ok());
@@ -228,14 +287,18 @@ async fn cancel_game_waiting_status_also_cancellable() {
 async fn update_already_terminated_returns_conflict() {
     let p = pool().await;
     let repo = PgBlackjackRepository::new(p.clone());
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let mut game = sample(&g, &u, "player_wins"); // pas playing
     game.finished_at = Some(Utc::now());
     repo.create(&game).await.unwrap();
     // Update avec id existant mais status != playing → conflict
     game.status = "player_bust".into();
     let err = repo.update(&game).await.unwrap_err();
-    assert!(matches!(err, sentinel_core::domain::errors::DomainError::Conflict(_)));
+    assert!(matches!(
+        err,
+        sentinel_core::domain::errors::DomainError::Conflict(_)
+    ));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -253,11 +316,15 @@ async fn get_active_excludes_stale_games() {
     // Partie creee > 30 min → get_active doit retourner None.
     let p = pool().await;
     let repo = PgBlackjackRepository::new(p.clone());
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let mut game = sample(&g, &u, "playing");
     // Backdate created_at au-dela de 30 min
     game.created_at = Utc::now() - chrono::Duration::hours(1);
     repo.create(&game).await.unwrap();
     let active = repo.get_active(&g, &u).await.unwrap();
-    assert!(active.is_none(), "partie > 30 min ne devrait plus etre active");
+    assert!(
+        active.is_none(),
+        "partie > 30 min ne devrait plus etre active"
+    );
 }

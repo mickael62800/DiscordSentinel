@@ -1,11 +1,11 @@
 //! Use case des abonnements boost voleur (Phase 9 Part C).
 
-use async_trait::async_trait;
-use chrono::DateTime;
-use chrono::Utc;
 use crate::domain::entities::coude::steal::boost::StealBoost;
 use crate::domain::entities::coude::steal::boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
+use async_trait::async_trait;
+use chrono::DateTime;
+use chrono::Utc;
 
 #[async_trait]
 pub trait ManageCoudeStealBoostsUseCase: Send + Sync {
@@ -32,9 +32,5 @@ pub trait ManageCoudeStealBoostsUseCase: Send + Sync {
     /// Retourne la somme des roll bonuses des items de boost actifs pour
     /// un voleur. Appele par le flow de vol cote bot (via gRPC) pour
     /// ajouter au thief_total avant la comparaison.
-    async fn total_bonus(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i32, DomainError>;
+    async fn total_bonus(&self, guild_id: &str, user_id: &str) -> Result<i32, DomainError>;
 }

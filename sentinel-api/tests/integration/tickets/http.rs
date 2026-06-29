@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::system::manage_tickets::*;
 use sentinel_core::domain::entities::system::ticket::*;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::system::manage_tickets::*;
 
 use test_helpers::build_test_state_tickets;
 
@@ -32,7 +32,10 @@ struct MockTicketsUC {
 
 impl MockTicketsUC {
     fn new() -> Self {
-        Self { tickets: vec![], messages: vec![] }
+        Self {
+            tickets: vec![],
+            messages: vec![],
+        }
     }
 
     fn with_ticket(mut self, t: Ticket) -> Self {
@@ -64,7 +67,15 @@ fn make_ticket(id: Uuid, title: &str, status: &str, priority: &str) -> Ticket {
 
 #[async_trait]
 impl ManageTicketsUseCase for MockTicketsUC {
-    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, _search: Option<String>, _author_id: Option<String>, _limit: i64, _offset: i64) -> Result<Vec<Ticket>, DomainError> {
+    async fn list_tickets(
+        &self,
+        status: Option<String>,
+        priority: Option<String>,
+        _search: Option<String>,
+        _author_id: Option<String>,
+        _limit: i64,
+        _offset: i64,
+    ) -> Result<Vec<Ticket>, DomainError> {
         let mut result = self.tickets.clone();
         if let Some(s) = status {
             result.retain(|t| t.status == s);
@@ -76,12 +87,23 @@ impl ManageTicketsUseCase for MockTicketsUC {
     }
 
     async fn get_ticket_detail(&self, id: &str) -> Result<TicketDetail, DomainError> {
-        let uuid = Uuid::parse_str(id)
-            .map_err(|_| DomainError::NotFound(format!("Ticket {id}")))?;
-        let ticket = self.tickets.iter().find(|t| t.id == uuid)
+        let uuid =
+            Uuid::parse_str(id).map_err(|_| DomainError::NotFound(format!("Ticket {id}")))?;
+        let ticket = self
+            .tickets
+            .iter()
+            .find(|t| t.id == uuid)
             .ok_or_else(|| DomainError::NotFound(format!("Ticket {id}")))?;
-        let msgs = self.messages.iter().filter(|m| m.ticket_id == uuid).cloned().collect();
-        Ok(TicketDetail { ticket: ticket.clone(), messages: msgs })
+        let msgs = self
+            .messages
+            .iter()
+            .filter(|m| m.ticket_id == uuid)
+            .cloned()
+            .collect();
+        Ok(TicketDetail {
+            ticket: ticket.clone(),
+            messages: msgs,
+        })
     }
 
     async fn create_ticket(&self, cmd: CreateTicketCommand) -> Result<Ticket, DomainError> {
@@ -105,13 +127,36 @@ impl ManageTicketsUseCase for MockTicketsUC {
         })
     }
 
-    async fn reply_ticket(&self, _: ReplyTicketCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn close_ticket(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn assign_ticket(&self, _: AssignTicketCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn update_status(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn update_ticket_channel(&self, _: UpdateTicketChannelCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn update_priority(&self, _: uuid::Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn update_sla(&self, _: uuid::Uuid, _: Option<&str>, _: Option<&str>, _: Option<i32>) -> Result<(), DomainError> { Ok(()) }
+    async fn reply_ticket(&self, _: ReplyTicketCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn close_ticket(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn assign_ticket(&self, _: AssignTicketCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_status(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_ticket_channel(
+        &self,
+        _: UpdateTicketChannelCommand,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_priority(&self, _: uuid::Uuid, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_sla(
+        &self,
+        _: uuid::Uuid,
+        _: Option<&str>,
+        _: Option<&str>,
+        _: Option<i32>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -124,33 +169,58 @@ fn build_app(uc: MockTicketsUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&body).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("POST").uri(uri)
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
+async fn patch_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
-        .method("PATCH").uri(uri)
+        .method("PATCH")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -296,7 +366,12 @@ async fn close_ticket_success() {
     let id = Uuid::new_v4();
     let uc = MockTicketsUC::new().with_ticket(make_ticket(id, "Bug", "open", "high"));
     let app = build_app(uc);
-    let (status, json) = patch_json(app, &format!("/api/tickets/{id}/close"), serde_json::json!({})).await;
+    let (status, json) = patch_json(
+        app,
+        &format!("/api/tickets/{id}/close"),
+        serde_json::json!({}),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["ok"], true);
 }
@@ -381,13 +456,16 @@ async fn update_ticket_channel_success() {
 // ══════════════════════════════════════════════════════════
 
 async fn pool() -> sqlx::PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     sqlx::PgPool::connect(&url).await.unwrap()
 }
 
 async fn insert_ticket(
-    pool: &sqlx::PgPool, server: &str, author_id: &str,
+    pool: &sqlx::PgPool,
+    server: &str,
+    author_id: &str,
     created_at: Option<chrono::DateTime<chrono::Utc>>,
 ) -> Uuid {
     let id = Uuid::new_v4();
@@ -410,15 +488,26 @@ async fn insert_ticket(
 
 async fn count_tickets_for_server(pool: &sqlx::PgPool, server: &str) -> i64 {
     sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tickets WHERE server = $1")
-        .bind(server).fetch_one(pool).await.unwrap().0
+        .bind(server)
+        .fetch_one(pool)
+        .await
+        .unwrap()
+        .0
 }
 
 async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -432,28 +521,53 @@ async fn bulk_delete_requires_filter_or_all_flag_422() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bulk_delete_filter_by_author_id_targeted() {
     let p = pool().await;
-    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let author_target = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let author_other = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let server = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let author_target = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let author_other = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     insert_ticket(&p, &server, &author_target, None).await;
     insert_ticket(&p, &server, &author_target, None).await;
     insert_ticket(&p, &server, &author_other, None).await;
 
     let app = build_app(MockTicketsUC::new());
-    let (status, json) = delete_req(app, &format!("/api/tickets/bulk?author_id={author_target}")).await;
+    let (status, json) =
+        delete_req(app, &format!("/api/tickets/bulk?author_id={author_target}")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["deleted"], 2);
-    let remaining = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tickets WHERE server = $1 AND author_id = $2")
-        .bind(&server).bind(&author_other).fetch_one(&p).await.unwrap().0;
+    let remaining = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM tickets WHERE server = $1 AND author_id = $2",
+    )
+    .bind(&server)
+    .bind(&author_other)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(remaining, 1);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bulk_delete_filter_by_date_range_rfc3339() {
     let p = pool().await;
-    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let old_dt = chrono::DateTime::parse_from_rfc3339("2020-06-15T12:00:00Z").unwrap().with_timezone(&Utc);
+    let server = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let author = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let old_dt = chrono::DateTime::parse_from_rfc3339("2020-06-15T12:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
     insert_ticket(&p, &server, &author, Some(old_dt)).await;
     insert_ticket(&p, &server, &author, None).await;
 
@@ -471,16 +585,25 @@ async fn bulk_delete_filter_by_date_range_rfc3339() {
 async fn bulk_delete_filter_by_date_range_yyyy_mm_dd() {
     // Le format YYYY-MM-DD emprunte la branche 2 de parse_date.
     let p = pool().await;
-    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
-    let old_dt = chrono::DateTime::parse_from_rfc3339("2021-03-15T12:00:00Z").unwrap().with_timezone(&Utc);
+    let server = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let author = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
+    let old_dt = chrono::DateTime::parse_from_rfc3339("2021-03-15T12:00:00Z")
+        .unwrap()
+        .with_timezone(&Utc);
     insert_ticket(&p, &server, &author, Some(old_dt)).await;
 
     let app = build_app(MockTicketsUC::new());
     let (status, _) = delete_req(
         app,
         &format!("/api/tickets/bulk?author_id={author}&from=2021-01-01&to=2021-12-31"),
-    ).await;
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(count_tickets_for_server(&p, &server).await, 0);
 }
@@ -495,21 +618,34 @@ async fn bulk_delete_invalid_date_format_422() {
 
 // bulk_delete avec RBAC injecte
 
-async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+async fn send_request(
+    app: axum::Router,
+    req: axum::http::Request<Body>,
+) -> (StatusCode, serde_json::Value) {
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bulk_delete_with_rbac_admin_allowed() {
     use sentinel_core::domain::enums::system::role::Role;
-    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let author = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let app = build_app(MockTicketsUC::new());
     let req = test_helpers::request_with_rbac(
-        "DELETE", &format!("/api/tickets/bulk?author_id={author}"),
-        "444444444444444444", Some(Role::Admin), None, None,
+        "DELETE",
+        &format!("/api/tickets/bulk?author_id={author}"),
+        "444444444444444444",
+        Some(Role::Admin),
+        None,
+        None,
     );
     let (status, _) = send_request(app, req).await;
     assert_eq!(status, StatusCode::OK);
@@ -520,8 +656,12 @@ async fn bulk_delete_with_rbac_moderator_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = build_app(MockTicketsUC::new());
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/tickets/bulk?all=true",
-        "444444444444444444", Some(Role::Moderator), None, None,
+        "DELETE",
+        "/api/tickets/bulk?all=true",
+        "444444444444444444",
+        Some(Role::Moderator),
+        None,
+        None,
     );
     let (status, json) = send_request(app, req).await;
     assert_eq!(status, StatusCode::FORBIDDEN);

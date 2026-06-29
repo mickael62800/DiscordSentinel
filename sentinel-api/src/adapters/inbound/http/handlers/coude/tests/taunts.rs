@@ -132,7 +132,8 @@ fn update_taunts_config_minimal_required_fields() {
 
 #[test]
 fn update_taunts_config_full() {
-    let raw = r#"{"channel_id":"c1","enabled":true,"rename_enabled":false,"messages_enabled":true}"#;
+    let raw =
+        r#"{"channel_id":"c1","enabled":true,"rename_enabled":false,"messages_enabled":true}"#;
     let dto: UpdateTauntsConfigDto = serde_json::from_str(raw).unwrap();
     assert_eq!(dto.channel_id.as_deref(), Some("c1"));
     assert!(dto.enabled);

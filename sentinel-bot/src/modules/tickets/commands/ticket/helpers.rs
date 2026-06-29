@@ -1,8 +1,8 @@
-use serenity::all::{
-    CommandDataOption, CommandDataOptionValue, CommandInteraction, Context,
-    CreateInteractionResponse, CreateInteractionResponseMessage, ChannelId,
-};
 use super::constants::*;
+use serenity::all::{
+    ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, Context,
+    CreateInteractionResponse, CreateInteractionResponseMessage,
+};
 
 // ── Helpers ──
 
@@ -11,7 +11,11 @@ pub fn extract_ticket_id_from_topic(topic: &str) -> Option<&str> {
     let start = topic.find("[ticket:")? + "[ticket:".len();
     let end = topic[start..].find(']')? + start;
     let id = &topic[start..end];
-    if id.is_empty() { None } else { Some(id) }
+    if id.is_empty() {
+        None
+    } else {
+        Some(id)
+    }
 }
 
 /// Recupere l'UUID du ticket depuis le topic d'un salon Discord.

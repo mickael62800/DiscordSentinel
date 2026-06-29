@@ -3,14 +3,14 @@
 //! 10 cases ponderees, chaque case a un effet coins (positif, negatif, ou
 //! neutre). RNG seedable via `spin_with_rng(rng)` -> testable.
 
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
 use rand::RngCore;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Une case de la roue : identifiant stable, libelle affiche, payout fixe
 /// en coins, et poids RNG (plus eleve = sort plus souvent).
@@ -32,16 +32,66 @@ pub struct WheelCase {
 /// - 9% : gros gains ou grosses pertes (les moments memes)
 /// - 1% : LICORNE jackpot rare
 pub const WHEEL_CASES: &[WheelCase] = &[
-    WheelCase { key: "blanche",   label: "🌀 Blanche — Rien. Du tout.",                payout: 0,      weight: 25 },
-    WheelCase { key: "pq",        label: "🧻 PQ — +50c (collection)",                  payout: 50,     weight: 20 },
-    WheelCase { key: "sieste",    label: "💤 Sieste — +200c",                          payout: 200,    weight: 15 },
-    WheelCase { key: "colis",     label: "📦 Colis — +500c",                           payout: 500,    weight: 12 },
-    WheelCase { key: "trefle",    label: "🍀 Trefle — +1000c",                         payout: 1000,   weight: 10 },
-    WheelCase { key: "couronne",  label: "👑 Couronne — +1500c (Roi du jour)",         payout: 1500,   weight: 7 },
-    WheelCase { key: "ruine",     label: "💀 Ruine — -500c",                           payout: -500,   weight: 5 },
-    WheelCase { key: "jackpot",   label: "🎰 Jackpot — +5000c",                        payout: 5000,   weight: 3 },
-    WheelCase { key: "bombe",     label: "💣 Bombe — -2000c (apocalypse)",             payout: -2000,  weight: 2 },
-    WheelCase { key: "licorne",   label: "🦄 LICORNE — +10000c",                       payout: 10000,  weight: 1 },
+    WheelCase {
+        key: "blanche",
+        label: "🌀 Blanche — Rien. Du tout.",
+        payout: 0,
+        weight: 25,
+    },
+    WheelCase {
+        key: "pq",
+        label: "🧻 PQ — +50c (collection)",
+        payout: 50,
+        weight: 20,
+    },
+    WheelCase {
+        key: "sieste",
+        label: "💤 Sieste — +200c",
+        payout: 200,
+        weight: 15,
+    },
+    WheelCase {
+        key: "colis",
+        label: "📦 Colis — +500c",
+        payout: 500,
+        weight: 12,
+    },
+    WheelCase {
+        key: "trefle",
+        label: "🍀 Trefle — +1000c",
+        payout: 1000,
+        weight: 10,
+    },
+    WheelCase {
+        key: "couronne",
+        label: "👑 Couronne — +1500c (Roi du jour)",
+        payout: 1500,
+        weight: 7,
+    },
+    WheelCase {
+        key: "ruine",
+        label: "💀 Ruine — -500c",
+        payout: -500,
+        weight: 5,
+    },
+    WheelCase {
+        key: "jackpot",
+        label: "🎰 Jackpot — +5000c",
+        payout: 5000,
+        weight: 3,
+    },
+    WheelCase {
+        key: "bombe",
+        label: "💣 Bombe — -2000c (apocalypse)",
+        payout: -2000,
+        weight: 2,
+    },
+    WheelCase {
+        key: "licorne",
+        label: "🦄 LICORNE — +10000c",
+        payout: 10000,
+        weight: 1,
+    },
 ];
 
 /// Resultat d un spin (pas encore persiste).

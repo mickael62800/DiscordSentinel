@@ -4,12 +4,18 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
 
 // ══════════════════════════════════════════════════════════
 //  User levels — XP, level, text/voice split
@@ -30,11 +36,11 @@ async fn user_level_create_and_read() {
     ).bind(&gid).fetch_one(&p).await.unwrap();
 
     assert_eq!(row.0, 500); // xp total
-    assert_eq!(row.1, 3);   // level
+    assert_eq!(row.1, 3); // level
     assert_eq!(row.2, 300); // xp_text
     assert_eq!(row.3, 200); // xp_voice
-    assert_eq!(row.4, 2);   // level_text
-    assert_eq!(row.5, 1);   // level_voice
+    assert_eq!(row.4, 2); // level_text
+    assert_eq!(row.5, 1); // level_voice
 }
 
 #[tokio::test]
@@ -48,8 +54,14 @@ async fn user_level_xp_increment() {
     sqlx::query("UPDATE user_levels SET xp = xp + $3, xp_text = xp_text + $3 WHERE guild_id = $1 AND user_id = $2")
         .bind(&gid).bind("444").bind(50i64).execute(&p).await.unwrap();
 
-    let xp = sqlx::query_as::<_, (i64,)>("SELECT xp FROM user_levels WHERE guild_id = $1 AND user_id = '444'")
-        .bind(&gid).fetch_one(&p).await.unwrap().0;
+    let xp = sqlx::query_as::<_, (i64,)>(
+        "SELECT xp FROM user_levels WHERE guild_id = $1 AND user_id = '444'",
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(xp, 150);
 }
 
@@ -65,7 +77,11 @@ async fn user_level_leaderboard_sorted() {
 
     let lb = sqlx::query_as::<_, (String, i64)>(
         "SELECT username, xp FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT 10",
-    ).bind(&gid).fetch_all(&p).await.unwrap();
+    )
+    .bind(&gid)
+    .fetch_all(&p)
+    .await
+    .unwrap();
 
     assert_eq!(lb.len(), 3);
     assert_eq!(lb[0].0, "rich");
@@ -79,8 +95,12 @@ async fn user_level_unique_per_guild_user() {
     let gid = ugid();
     sqlx::query("INSERT INTO user_levels (guild_id, user_id, username) VALUES ($1, '444', 'A') ON CONFLICT DO NOTHING")
         .bind(&gid).execute(&p).await.unwrap();
-    let dup = sqlx::query("INSERT INTO user_levels (guild_id, user_id, username) VALUES ($1, '444', 'B')")
-        .bind(&gid).execute(&p).await;
+    let dup = sqlx::query(
+        "INSERT INTO user_levels (guild_id, user_id, username) VALUES ($1, '444', 'B')",
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await;
     assert!(dup.is_err(), "Duplicate guild+user doit etre rejete");
 }
 
@@ -133,7 +153,12 @@ async fn user_stats_upsert() {
 
     let msgs = sqlx::query_as::<_, (i64,)>(
         "SELECT message_count FROM user_stats WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(msgs, 150);
 }
@@ -148,7 +173,12 @@ async fn user_stats_voice_seconds_tracked() {
 
     let secs = sqlx::query_as::<_, (i64,)>(
         "SELECT voice_seconds FROM user_stats WHERE guild_id = $1 AND user_id = '444'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(secs, 7200); // 2h
 }
 
@@ -166,7 +196,12 @@ async fn level_config_channel_id_persisted() {
 
     let ch_id = sqlx::query_as::<_, (Option<String>,)>(
         "SELECT level_up_channel_id FROM level_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(ch_id.unwrap(), "987654321012345678");
 }
@@ -176,13 +211,25 @@ async fn level_config_channel_id_null_by_default() {
     let p = pool().await;
     let gid = ugid();
 
-    sqlx::query("INSERT INTO level_config (guild_id) VALUES ($1)").bind(&gid).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO level_config (guild_id) VALUES ($1)")
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
     let ch_id = sqlx::query_as::<_, (Option<String>,)>(
         "SELECT level_up_channel_id FROM level_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
-    assert!(ch_id.is_none(), "level_up_channel_id doit etre NULL par defaut");
+    assert!(
+        ch_id.is_none(),
+        "level_up_channel_id doit etre NULL par defaut"
+    );
 }
 
 #[tokio::test]
@@ -190,7 +237,10 @@ async fn level_config_channel_id_via_bot_config() {
     let p = pool().await;
     // Utiliser un snowflake court pour bot_guild_config (varchar 20)
     use rand::Rng;
-    let gid = format!("{}", rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64));
+    let gid = format!(
+        "{}",
+        rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64)
+    );
 
     // Le bot lit level_up_channel_id depuis bot_guild_config
     sqlx::query(
@@ -217,12 +267,22 @@ async fn level_config_channel_id_update() {
         .bind(&gid).execute(&p).await.unwrap();
 
     // Update
-    sqlx::query("UPDATE level_config SET level_up_channel_id = '999999999999999999' WHERE guild_id = $1")
-        .bind(&gid).execute(&p).await.unwrap();
+    sqlx::query(
+        "UPDATE level_config SET level_up_channel_id = '999999999999999999' WHERE guild_id = $1",
+    )
+    .bind(&gid)
+    .execute(&p)
+    .await
+    .unwrap();
 
     let ch_id = sqlx::query_as::<_, (Option<String>,)>(
         "SELECT level_up_channel_id FROM level_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(ch_id.unwrap(), "999999999999999999");
 }
@@ -237,11 +297,19 @@ async fn level_config_channel_id_set_to_null() {
 
     // Remettre a null (desactiver le canal dedie)
     sqlx::query("UPDATE level_config SET level_up_channel_id = NULL WHERE guild_id = $1")
-        .bind(&gid).execute(&p).await.unwrap();
+        .bind(&gid)
+        .execute(&p)
+        .await
+        .unwrap();
 
     let ch_id = sqlx::query_as::<_, (Option<String>,)>(
         "SELECT level_up_channel_id FROM level_config WHERE guild_id = $1",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(&gid)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert!(ch_id.is_none());
 }

@@ -2,14 +2,14 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
+use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeResult;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
-use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
-use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -45,7 +45,11 @@ impl SaveStrikeConfigDto {
         SaveStrikeConfigCommand {
             guild_id,
             window_secs: self.window_secs,
-            thresholds: self.thresholds.into_iter().map(StrikeThreshold::from).collect(),
+            thresholds: self
+                .thresholds
+                .into_iter()
+                .map(StrikeThreshold::from)
+                .collect(),
             enabled: self.enabled,
         }
     }
@@ -93,7 +97,11 @@ impl From<StrikeConfig> for StrikeConfigDto {
         Self {
             guild_id: c.guild_id,
             window_secs: c.window_secs,
-            thresholds: c.thresholds.into_iter().map(StrikeThresholdDto::from).collect(),
+            thresholds: c
+                .thresholds
+                .into_iter()
+                .map(StrikeThresholdDto::from)
+                .collect(),
             enabled: c.enabled,
         }
     }

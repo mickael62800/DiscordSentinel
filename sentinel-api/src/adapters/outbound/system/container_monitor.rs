@@ -36,7 +36,10 @@ pub fn spawn(pg_pool: PgPool) -> Arc<RwLock<ContainerMonitorState>> {
         let mut first_run = true;
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
-            let opts = ListContainersOptions::<String> { all: true, ..Default::default() };
+            let opts = ListContainersOptions::<String> {
+                all: true,
+                ..Default::default()
+            };
             let conts = match docker.list_containers(Some(opts)).await {
                 Ok(c) => c,
                 Err(e) => {
@@ -49,8 +52,12 @@ pub fn spawn(pg_pool: PgPool) -> Arc<RwLock<ContainerMonitorState>> {
             let mut current_vec: Vec<ContainerSnapshot> = Vec::new();
             for c in conts {
                 let id = c.id.clone().unwrap_or_default();
-                if id.is_empty() { continue; }
-                let name = c.names.as_ref()
+                if id.is_empty() {
+                    continue;
+                }
+                let name = c
+                    .names
+                    .as_ref()
                     .and_then(|v| v.first())
                     .map(|s| s.trim_start_matches('/').to_string())
                     .unwrap_or_default();
@@ -108,9 +115,17 @@ pub fn spawn(pg_pool: PgPool) -> Arc<RwLock<ContainerMonitorState>> {
             // Logue chaque change dans server_events
             for ch in &changes {
                 let action = format!("docker.{}", ch.kind);
-                let target = format!("{} ({})", ch.container.name, &ch.container.id[..12.min(ch.container.id.len())]);
+                let target = format!(
+                    "{} ({})",
+                    ch.container.name,
+                    &ch.container.id[..12.min(ch.container.id.len())]
+                );
                 let details = serde_json::to_value(ch).unwrap_or(serde_json::Value::Null);
-                let severity = if ch.kind == "removed" || ch.kind == "added" { "warn" } else { "info" };
+                let severity = if ch.kind == "removed" || ch.kind == "added" {
+                    "warn"
+                } else {
+                    "info"
+                };
                 let _ = sqlx::query(
                     "INSERT INTO server_events (timestamp, actor, actor_name, action, target, severity, details)
                      VALUES (NOW(), $1, NULL, $2, $3, $4, $5)"
@@ -128,7 +143,9 @@ pub fn spawn(pg_pool: PgPool) -> Arc<RwLock<ContainerMonitorState>> {
             let mut w = st.write().await;
             w.last_check = now.clone();
             w.current = current_vec;
-            for ch in changes { w.recent_changes.push(ch); }
+            for ch in changes {
+                w.recent_changes.push(ch);
+            }
             // Trim : garde 200 derniers changes
             if w.recent_changes.len() > 200 {
                 let drop_n = w.recent_changes.len() - 200;

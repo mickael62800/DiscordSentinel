@@ -65,7 +65,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.get_steal_boost_total(req).await.map(|r| r.into_inner())
+                client
+                    .get_steal_boost_total(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;

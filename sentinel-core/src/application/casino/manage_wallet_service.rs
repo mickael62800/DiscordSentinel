@@ -29,19 +29,19 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use crate::ports::uow::DbTx;
+use async_trait::async_trait;
 
 use crate::domain::entities::casino::wallet::resolve_reset_balance;
 use crate::domain::entities::casino::wallet::resolve_starting_coins;
-use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::community::member_repository::MemberRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -63,11 +63,21 @@ impl ManageWalletService {
         member_repo: Arc<dyn MemberRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { repo, taunts_uc, member_repo, bot_config_repo }
+        Self {
+            repo,
+            taunts_uc,
+            member_repo,
+            bot_config_repo,
+        }
     }
 
     /// Renvoie une erreur si le user est marque comme parti (left_at IS NOT NULL).
-    async fn ensure_active(&self, guild_id: &str, user_id: &str, role: &str) -> Result<(), DomainError> {
+    async fn ensure_active(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        role: &str,
+    ) -> Result<(), DomainError> {
         if self.member_repo.is_left(guild_id, user_id).await? {
             return Err(DomainError::ValidationError(format!(
                 "{role} a quitte le serveur — operation impossible"
@@ -115,11 +125,7 @@ impl ManageWalletUseCase for ManageWalletService {
 
         // Jackpot detection : le palier est porte par la taunts config (default
         // 10_000 cote service taunts).
-        if let Ok(Some(evt)) = self
-            .taunts_uc
-            .on_jackpot(guild_id, user_id, amount)
-            .await
-        {
+        if let Ok(Some(evt)) = self.taunts_uc.on_jackpot(guild_id, user_id, amount).await {
             triggered_taunts.push(evt);
         }
 
@@ -189,7 +195,8 @@ impl ManageWalletUseCase for ManageWalletService {
         // Pas la peine de bloquer credit/debit standalone : l'emetteur ne peut
         // pas declencher d'action s'il est parti (pas dans Discord).
         self.ensure_active(guild_id, from_user, "Emetteur").await?;
-        self.ensure_active(guild_id, to_user, "Destinataire").await?;
+        self.ensure_active(guild_id, to_user, "Destinataire")
+            .await?;
 
         let sender_before = self.read_balance(guild_id, from_user).await?;
 
@@ -230,7 +237,8 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<TxWalletMutation, DomainError> {
-        let (previous, after) = self.repo
+        let (previous, after) = self
+            .repo
             .credit_in_tx(tx, guild_id, user_id, amount, source, description)
             .await?;
         Ok(TxWalletMutation {
@@ -250,7 +258,8 @@ impl ManageWalletUseCase for ManageWalletService {
         source: &str,
         description: &str,
     ) -> Result<TxWalletMutation, DomainError> {
-        let (previous, after) = self.repo
+        let (previous, after) = self
+            .repo
             .debit_in_tx(tx, guild_id, user_id, amount, source, description)
             .await?;
         Ok(TxWalletMutation {
@@ -283,11 +292,7 @@ impl ManageWalletUseCase for ManageWalletService {
 
     // ── Lectures + admin ─────────────────────────────────────────────────
 
-    async fn get_or_create(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<Wallet, DomainError> {
+    async fn get_or_create(&self, guild_id: &str, user_id: &str) -> Result<Wallet, DomainError> {
         // Solde de depart : config web par serveur (cle `starting_coins` du
         // bot economie), sinon defaut metier. Le coeur ne lit aucune variable
         // d'env (respect hexagonal) — seule la config injectee via le port
@@ -313,11 +318,7 @@ impl ManageWalletUseCase for ManageWalletService {
         self.repo.list_by_guild(guild_id).await
     }
 
-    async fn leaderboard(
-        &self,
-        guild_id: &str,
-        limit: i64,
-    ) -> Result<Vec<Wallet>, DomainError> {
+    async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
         self.repo.leaderboard(guild_id, limit).await
     }
 
@@ -337,7 +338,10 @@ impl ManageWalletUseCase for ManageWalletService {
         new_balance_input: Option<i64>,
     ) -> Result<(Wallet, i64), DomainError> {
         let new_balance = resolve_reset_balance(new_balance_input);
-        let wallet = self.repo.reset_wallet(guild_id, user_id, new_balance).await?;
+        let wallet = self
+            .repo
+            .reset_wallet(guild_id, user_id, new_balance)
+            .await?;
         Ok((wallet, new_balance))
     }
 
@@ -351,7 +355,6 @@ impl ManageWalletUseCase for ManageWalletService {
         Ok((affected, new_balance))
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/manage_wallet.rs"]

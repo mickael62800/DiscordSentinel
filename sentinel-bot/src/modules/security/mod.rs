@@ -217,8 +217,7 @@ pub async fn on_ready_sync(ctx: &Context, guilds: &[serenity::model::guild::Unav
                 let payloads: Vec<MemberPayload> = members
                     .iter()
                     .map(|m| {
-                        let roles: Vec<String> =
-                            m.roles.iter().map(|r| r.to_string()).collect();
+                        let roles: Vec<String> = m.roles.iter().map(|r| r.to_string()).collect();
                         MemberPayload {
                             guild_id: guild_id.to_string(),
                             user_id: m.user.id.to_string(),

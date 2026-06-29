@@ -6,14 +6,16 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use sentinel_core::domain::entities::coude::curse::ActiveCurse;
 use sentinel_core::domain::entities::coude::curse::CurseKind;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::curses_repository::CursesRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_curses";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgCursesRepository {
     pool: PgPool,

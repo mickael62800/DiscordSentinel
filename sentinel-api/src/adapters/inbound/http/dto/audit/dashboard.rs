@@ -1,12 +1,12 @@
-use serde::Deserialize;
-use serde::Serialize;
 use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use serde::Deserialize;
+use serde::Serialize;
 // ── Stats DTO (format desktop) ──
 
 #[derive(Debug, Serialize)]
@@ -127,8 +127,12 @@ impl From<Infraction> for DashboardInfractionDto {
     }
 }
 
-impl From<sentinel_core::domain::entities::moderation::action::applied::ModerationAction> for DashboardInfractionDto {
-    fn from(action: sentinel_core::domain::entities::moderation::action::applied::ModerationAction) -> Self {
+impl From<sentinel_core::domain::entities::moderation::action::applied::ModerationAction>
+    for DashboardInfractionDto
+{
+    fn from(
+        action: sentinel_core::domain::entities::moderation::action::applied::ModerationAction,
+    ) -> Self {
         Self {
             id: action.id.to_string(),
             user_id: action.target_id.into(),

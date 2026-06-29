@@ -73,7 +73,9 @@ fn frames_form_progressive_reveal_sequence() {
     // en nb de symboles reveles.
     let final_syms = final_3();
     let count_revealed = |f: &[String; 3]| {
-        f.iter().filter(|s| s.as_str() != SPINNING_PLACEHOLDER).count()
+        f.iter()
+            .filter(|s| s.as_str() != SPINNING_PLACEHOLDER)
+            .count()
     };
     let f0 = frame_symbols(&final_syms, 0);
     let f1 = frame_symbols(&final_syms, 1);

@@ -1,8 +1,8 @@
 use super::*;
+use chrono::Utc;
 use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
 use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
 use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
-use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_action() -> ModerationAction {
@@ -107,7 +107,8 @@ fn log_action_dto_deserializes_from_json() {
         "target_id": "t", "target_name": "T",
         "action_type": "mute", "reason": "spam",
         "gravity": "high", "duration": 1800
-    })).unwrap();
+    }))
+    .unwrap();
     assert_eq!(dto.action_type, "mute");
     assert_eq!(dto.gravity.as_deref(), Some("high"));
     assert_eq!(dto.duration, Some(1800));
@@ -120,7 +121,8 @@ fn log_action_dto_deserializes_without_optionals() {
         "moderator_id": "m", "moderator_name": "M",
         "target_id": "t", "target_name": "T",
         "action_type": "warn", "reason": "r"
-    })).unwrap();
+    }))
+    .unwrap();
     assert!(dto.gravity.is_none());
     assert!(dto.duration.is_none());
 }
@@ -193,7 +195,9 @@ fn user_history_empty_actions() {
     let history = UserModerationHistory {
         target_id: "u".into(),
         target_name: "X".into(),
-        total_warns: 0, total_mutes: 0, total_bans: 0,
+        total_warns: 0,
+        total_mutes: 0,
+        total_bans: 0,
         actions: vec![],
     };
     let dto: UserHistoryDto = history.into();
@@ -214,12 +218,16 @@ fn log_action_dto_long_reason_truncation_is_service_side() {
     // Le service ManageModerationService truncate a 500 chars.
     let long = "x".repeat(1000);
     let dto = LogActionDto {
-        guild_id: "g".into(), channel_id: "c".into(),
-        moderator_id: "m".into(), moderator_name: "M".into(),
-        target_id: "t".into(), target_name: "T".into(),
+        guild_id: "g".into(),
+        channel_id: "c".into(),
+        moderator_id: "m".into(),
+        moderator_name: "M".into(),
+        target_id: "t".into(),
+        target_name: "T".into(),
         action_type: "warn".into(),
         reason: long.clone(),
-        gravity: None, duration: None,
+        gravity: None,
+        duration: None,
     };
     let cmd: LogModerationCommand = dto.into();
     assert_eq!(cmd.reason.len(), 1000);

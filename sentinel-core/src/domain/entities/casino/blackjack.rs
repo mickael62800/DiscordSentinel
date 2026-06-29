@@ -1,11 +1,11 @@
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use rand::seq::SliceRandom;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
@@ -44,8 +44,7 @@ pub fn calculate_score(hand: &[Card]) -> i32 {
 pub fn create_deck() -> Vec<Card> {
     let suits = ["hearts", "diamonds", "clubs", "spades"];
     let ranks = [
-        "2", "3", "4", "5", "6", "7", "8", "9", "10",
-        "Jack", "Queen", "King", "As",
+        "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "As",
     ];
     let mut deck = Vec::with_capacity(52);
     for suit in &suits {
@@ -126,10 +125,34 @@ impl BlackjackConfig {
         let mut cfg = d;
         for (k, v) in pairs {
             match k.as_str() {
-                "min_bet" => { if let Ok(n) = v.parse::<i64>() { if n > 0 { cfg.min_bet = n; } } }
-                "max_bet" => { if let Ok(n) = v.parse::<i64>() { if n > 0 { cfg.max_bet = n; } } }
-                "starting_coins" => { if let Ok(n) = v.parse::<i64>() { if n >= 0 { cfg.starting_coins = n; } } }
-                "blackjack_payout" => { if let Ok(n) = v.parse::<f64>() { if n > 0.0 { cfg.blackjack_payout = n; } } }
+                "min_bet" => {
+                    if let Ok(n) = v.parse::<i64>() {
+                        if n > 0 {
+                            cfg.min_bet = n;
+                        }
+                    }
+                }
+                "max_bet" => {
+                    if let Ok(n) = v.parse::<i64>() {
+                        if n > 0 {
+                            cfg.max_bet = n;
+                        }
+                    }
+                }
+                "starting_coins" => {
+                    if let Ok(n) = v.parse::<i64>() {
+                        if n >= 0 {
+                            cfg.starting_coins = n;
+                        }
+                    }
+                }
+                "blackjack_payout" => {
+                    if let Ok(n) = v.parse::<f64>() {
+                        if n > 0.0 {
+                            cfg.blackjack_payout = n;
+                        }
+                    }
+                }
                 _ => {}
             }
         }

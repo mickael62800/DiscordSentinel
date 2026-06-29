@@ -4,9 +4,9 @@
 //! Localise (raw sqlx + wallet_uc) : la table bump_events est un simple journal
 //! et la recompense est un calcul pur ; pas de regle metier transverse a isoler.
 
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::State;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -24,13 +24,28 @@ fn cfg_str<'a>(
     entries: &'a [sentinel_core::domain::entities::system::bot_config::BotGuildConfig],
     key: &str,
 ) -> Option<&'a str> {
-    entries.iter().find(|e| e.config_key == key).map(|e| e.config_value.as_str())
+    entries
+        .iter()
+        .find(|e| e.config_key == key)
+        .map(|e| e.config_value.as_str())
 }
-fn cfg_bool(entries: &[sentinel_core::domain::entities::system::bot_config::BotGuildConfig], key: &str, d: bool) -> bool {
-    cfg_str(entries, key).map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")).unwrap_or(d)
+fn cfg_bool(
+    entries: &[sentinel_core::domain::entities::system::bot_config::BotGuildConfig],
+    key: &str,
+    d: bool,
+) -> bool {
+    cfg_str(entries, key)
+        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .unwrap_or(d)
 }
-fn cfg_i64(entries: &[sentinel_core::domain::entities::system::bot_config::BotGuildConfig], key: &str, d: i64) -> i64 {
-    cfg_str(entries, key).and_then(|v| v.parse::<i64>().ok()).unwrap_or(d)
+fn cfg_i64(
+    entries: &[sentinel_core::domain::entities::system::bot_config::BotGuildConfig],
+    key: &str,
+    d: i64,
+) -> i64 {
+    cfg_str(entries, key)
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(d)
 }
 
 #[derive(Debug, Deserialize)]
@@ -65,9 +80,20 @@ pub async fn record_bump(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(body): Json<RecordBumpBody>,
 ) -> Result<Json<BumpRewardDto>, ApiError> {
-    let cfg = state.bot_config_repo.get_config(&guild_id, "bump-bot").await.unwrap_or_default();
+    let cfg = state
+        .bot_config_repo
+        .get_config(&guild_id, "bump-bot")
+        .await
+        .unwrap_or_default();
     if !cfg_bool(&cfg, "enabled", false) {
-        return Ok(Json(BumpRewardDto { rewarded: false, reward: 0, weekly_count: 0, new_balance: None, vip_role_id: None, vip_just_unlocked: false }));
+        return Ok(Json(BumpRewardDto {
+            rewarded: false,
+            reward: 0,
+            weekly_count: 0,
+            new_balance: None,
+            vip_role_id: None,
+            vip_just_unlocked: false,
+        }));
     }
     let base = cfg_i64(&cfg, "bump_reward_base", 100).max(0);
     let step = cfg_i64(&cfg, "bump_reward_step", 50).max(0);
@@ -75,8 +101,15 @@ pub async fn record_bump(
     let cooldown = cfg_i64(&cfg, "bump_cooldown_minutes", 120).clamp(1, 1440);
     let reminder_enabled = cfg_bool(&cfg, "bump_reminder_enabled", true);
     let channel = {
-        let c = cfg_str(&cfg, "bump_channel_id").unwrap_or("").trim().to_string();
-        if c.is_empty() { body.channel_id.clone() } else { c }
+        let c = cfg_str(&cfg, "bump_channel_id")
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if c.is_empty() {
+            body.channel_id.clone()
+        } else {
+            c
+        }
     };
 
     // Nieme bump de la semaine (fenetre glissante 7 jours).
@@ -109,7 +142,13 @@ pub async fn record_bump(
     let new_balance = if reward > 0 {
         match state
             .wallet_uc
-            .credit(&guild_id, &user_id, reward, "disboard-bump", &format!("Bump #{n} de la semaine"))
+            .credit(
+                &guild_id,
+                &user_id,
+                reward,
+                "disboard-bump",
+                &format!("Bump #{n} de la semaine"),
+            )
             .await
         {
             Ok(m) => Some(m.new_balance),
@@ -144,7 +183,10 @@ pub async fn record_bump(
     let mut vip_role_id: Option<String> = None;
     let mut vip_just_unlocked = false;
     if cfg_bool(&cfg, "vip_enabled", false) {
-        let vip_role = cfg_str(&cfg, "vip_role_id").unwrap_or("").trim().to_string();
+        let vip_role = cfg_str(&cfg, "vip_role_id")
+            .unwrap_or("")
+            .trim()
+            .to_string();
         let vip_threshold = cfg_i64(&cfg, "vip_bump_threshold", 10).max(1);
         if !vip_role.is_empty() {
             let total_bumps: i64 = sqlx::query_scalar(
@@ -201,10 +243,12 @@ pub async fn mark_reminder_sent(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    sqlx::query("UPDATE bump_guild_state SET reminder_sent = TRUE, updated_at = NOW() WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("mark reminder"))?;
+    sqlx::query(
+        "UPDATE bump_guild_state SET reminder_sent = TRUE, updated_at = NOW() WHERE guild_id = $1",
+    )
+    .bind(&guild_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(sqlx_internal("mark reminder"))?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }

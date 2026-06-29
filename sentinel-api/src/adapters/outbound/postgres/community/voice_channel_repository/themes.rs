@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceThemeStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceThemeStore;
 
 #[derive(sqlx::FromRow)]
 struct ThemeRow {
@@ -62,13 +62,11 @@ impl VoiceThemeStore for super::PgVoiceChannelRepository {
     }
 
     async fn find_theme(&self, id: Uuid) -> Result<Option<VoiceChannelTheme>, DomainError> {
-        let row = sqlx::query_as::<_, ThemeRow>(
-            "SELECT * FROM voice_channel_themes WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let row = sqlx::query_as::<_, ThemeRow>("SELECT * FROM voice_channel_themes WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
 
         Ok(row.map(VoiceChannelTheme::from))
     }

@@ -29,17 +29,23 @@ pub fn build_panel_message() -> CreateMessage {
             "🪙 **Une fois par jour**, tente ta chance.\n\n\
              Le destin peut te rendre **riche** (jackpot, licorne) ou **ridicule**\n\
              (PQ, ruine, bombe). Un seul spin par jour, alors choisis bien... ou pas.\n\n\
-             *Le resultat est annonce publiquement. Tout le serveur en parle.*"
+             *Le resultat est annonce publiquement. Tout le serveur en parle.*",
         )
         .color(0xf1c40f)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::WHEEL_TAGLINE));
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::WHEEL_TAGLINE,
+        ));
 
     let btn = CreateButton::new(PANEL_SPIN_ID)
         .label("Tirer la Roue")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f300}".into()))
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{1f300}".into(),
+        ))
         .style(ButtonStyle::Success);
 
-    CreateMessage::new().embed(embed).components(vec![CreateActionRow::Buttons(vec![btn])])
+    CreateMessage::new()
+        .embed(embed)
+        .components(vec![CreateActionRow::Buttons(vec![btn])])
 }
 
 /// "Message collant" : republie le panneau EN BAS du salon et supprime les
@@ -61,7 +67,9 @@ pub async fn repost_panel(ctx: &Context, channel_id: ChannelId) {
             .into_iter()
             .filter(|m| {
                 m.author.id == bot_id
-                    && m.embeds.iter().any(|e| e.title.as_deref() == Some(PANEL_TITLE))
+                    && m.embeds
+                        .iter()
+                        .any(|e| e.title.as_deref() == Some(PANEL_TITLE))
             })
             .map(|m| m.id)
             .collect(),
@@ -72,7 +80,10 @@ pub async fn repost_panel(ctx: &Context, channel_id: ChannelId) {
     };
 
     // 2. Poster le nouveau panneau en bas.
-    if let Err(e) = channel_id.send_message(&ctx.http, build_panel_message()).await {
+    if let Err(e) = channel_id
+        .send_message(&ctx.http, build_panel_message())
+        .await
+    {
         warn!(error = %e, "Echec repost panneau wheel");
         return;
     }

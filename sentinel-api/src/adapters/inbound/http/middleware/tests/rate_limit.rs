@@ -59,17 +59,16 @@ fn client_ip_invalid_x_real_ip_falls_through() {
 
 #[test]
 fn client_ip_prefers_xff_over_real_ip() {
-    let req = make_req(&[
-        ("x-forwarded-for", "1.2.3.4"),
-        ("x-real-ip", "5.6.7.8"),
-    ]);
+    let req = make_req(&[("x-forwarded-for", "1.2.3.4"), ("x-real-ip", "5.6.7.8")]);
     let ip = client_ip(&req, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
     assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(1, 2, 3, 4)));
 }
 
 // ── RateLimiter::check ──
 
-fn ip(s: &str) -> IpAddr { s.parse().unwrap() }
+fn ip(s: &str) -> IpAddr {
+    s.parse().unwrap()
+}
 
 #[tokio::test]
 async fn check_allows_up_to_burst_then_blocks() {
@@ -95,7 +94,7 @@ async fn check_independent_per_ip() {
 #[tokio::test]
 async fn check_refills_over_time() {
     let rl = RateLimiter::new(100); // burst = 1000
-    // Consomme 999 tokens rapidement.
+                                    // Consomme 999 tokens rapidement.
     for _ in 0..999 {
         rl.check(ip("10.0.0.1")).await;
     }

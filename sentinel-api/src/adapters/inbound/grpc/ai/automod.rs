@@ -4,20 +4,20 @@
 
 use std::sync::Arc;
 
+use sentinel_proto::automod::v1 as proto;
+use sentinel_proto::automod::v1::automod_service_server::AutomodService;
 use tonic::Request;
 use tonic::Response;
 use tonic::Status;
-use sentinel_proto::automod::v1 as proto;
-use sentinel_proto::automod::v1::automod_service_server::AutomodService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;
+use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::enums::moderation::action::Action;
 pub struct AutomodGrpc {
     pub uc: Arc<dyn AnalyzeMessageUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
@@ -47,10 +47,12 @@ impl AutomodService for AutomodGrpc {
         let guild_id_evt = req.guild_id.clone();
         let username_evt = req.username.clone();
 
-        let flags = req
-            .flags
-            .map(proto_to_flags)
-            .unwrap_or(DetectionFlags { spam: false, insult: false, link: false, phishing: false });
+        let flags = req.flags.map(proto_to_flags).unwrap_or(DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        });
         let context_messages = req
             .context_messages
             .into_iter()
@@ -144,7 +146,9 @@ fn action_to_proto(a: Action) -> i32 {
     }
 }
 
-fn routing_to_proto(r: sentinel_core::domain::services::moderation::automod_routing::Routing) -> i32 {
+fn routing_to_proto(
+    r: sentinel_core::domain::services::moderation::automod_routing::Routing,
+) -> i32 {
     use sentinel_core::domain::services::moderation::automod_routing::Routing;
     match r {
         Routing::None => proto::Routing::None as i32,
@@ -164,7 +168,6 @@ fn analysis_to_proto(a: MessageAnalysis) -> proto::AnalyzeMessageResponse {
         auto_delete_link: a.auto_delete_link,
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/automod.rs"]

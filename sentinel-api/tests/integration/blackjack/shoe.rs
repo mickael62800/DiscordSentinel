@@ -3,13 +3,29 @@
 use sqlx::PgPool;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
-fn uch() -> String { format!("ch_{}", uuid::Uuid::new_v4().simple().to_string().chars().take(8).collect::<String>()) }
+fn ugid() -> String {
+    format!(
+        "{}",
+        uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
+}
+fn uch() -> String {
+    format!(
+        "ch_{}",
+        uuid::Uuid::new_v4()
+            .simple()
+            .to_string()
+            .chars()
+            .take(8)
+            .collect::<String>()
+    )
+}
 
 // ══════════════════════════════════════════════════════════
 //  Sabot partage
@@ -29,7 +45,11 @@ async fn table_has_deck_column() {
 
     let row = sqlx::query_as::<_, (serde_json::Value,)>(
         "SELECT deck FROM blackjack_tables WHERE channel_id = $1",
-    ).bind(&ch).fetch_one(&p).await.unwrap();
+    )
+    .bind(&ch)
+    .fetch_one(&p)
+    .await
+    .unwrap();
 
     let cards = row.0.as_array().unwrap();
     assert_eq!(cards.len(), 2);
@@ -44,7 +64,9 @@ async fn shoe_6_decks_312_cards() {
 
     // Simuler la creation d'un sabot de 6 decks
     let suits = ["hearts", "diamonds", "clubs", "spades"];
-    let ranks = ["2","3","4","5","6","7","8","9","10","Jack","Queen","King","As"];
+    let ranks = [
+        "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King", "As",
+    ];
     let mut shoe = Vec::new();
     for _ in 0..6 {
         for suit in &suits {
@@ -62,7 +84,11 @@ async fn shoe_6_decks_312_cards() {
 
     let row = sqlx::query_as::<_, (serde_json::Value,)>(
         "SELECT deck FROM blackjack_tables WHERE channel_id = $1",
-    ).bind(&ch).fetch_one(&p).await.unwrap();
+    )
+    .bind(&ch)
+    .fetch_one(&p)
+    .await
+    .unwrap();
 
     assert_eq!(row.0.as_array().unwrap().len(), 312);
 }
@@ -109,7 +135,12 @@ async fn max_players_enforced() {
 
     let count = sqlx::query_as::<_, (i64,)>(
         "SELECT COUNT(*) FROM blackjack_table_players WHERE table_id = $1",
-    ).bind(table_id).fetch_one(&p).await.unwrap().0;
+    )
+    .bind(table_id)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
 
     assert_eq!(count, 7);
 
@@ -130,12 +161,29 @@ async fn round_status_transitions() {
     ).bind(&gid).bind(&ch).execute(&p).await.unwrap();
 
     // waiting → betting → dealing → playing → dealer_turn → resolved → waiting
-    for status in &["betting", "dealing", "playing", "dealer_turn", "resolved", "waiting"] {
+    for status in &[
+        "betting",
+        "dealing",
+        "playing",
+        "dealer_turn",
+        "resolved",
+        "waiting",
+    ] {
         sqlx::query("UPDATE blackjack_tables SET round_status = $2 WHERE channel_id = $1")
-            .bind(&ch).bind(status).execute(&p).await.unwrap();
+            .bind(&ch)
+            .bind(status)
+            .execute(&p)
+            .await
+            .unwrap();
 
-        let current = sqlx::query_as::<_, (String,)>("SELECT round_status FROM blackjack_tables WHERE channel_id = $1")
-            .bind(&ch).fetch_one(&p).await.unwrap().0;
+        let current = sqlx::query_as::<_, (String,)>(
+            "SELECT round_status FROM blackjack_tables WHERE channel_id = $1",
+        )
+        .bind(&ch)
+        .fetch_one(&p)
+        .await
+        .unwrap()
+        .0;
         assert_eq!(current, *status);
     }
 }
@@ -154,7 +202,13 @@ async fn current_player_index_tracks_turn() {
     sqlx::query("UPDATE blackjack_tables SET current_player_index = current_player_index + 1 WHERE channel_id = $1")
         .bind(&ch).execute(&p).await.unwrap();
 
-    let idx = sqlx::query_as::<_, (i32,)>("SELECT current_player_index FROM blackjack_tables WHERE channel_id = $1")
-        .bind(&ch).fetch_one(&p).await.unwrap().0;
+    let idx = sqlx::query_as::<_, (i32,)>(
+        "SELECT current_player_index FROM blackjack_tables WHERE channel_id = $1",
+    )
+    .bind(&ch)
+    .fetch_one(&p)
+    .await
+    .unwrap()
+    .0;
     assert_eq!(idx, 1);
 }

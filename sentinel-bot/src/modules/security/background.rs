@@ -18,7 +18,9 @@ pub fn spawn_background(ctx: Context) {
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
 
             let data = ctx_s.data.read().await;
-            let Some(slowmode) = data.get::<SlowmodeKey>() else { continue };
+            let Some(slowmode) = data.get::<SlowmodeKey>() else {
+                continue;
+            };
             let duration = data
                 .get::<SecurityConfigKey>()
                 .map(|c| c.slowmode_duration_secs)
@@ -38,7 +40,9 @@ pub fn spawn_background(ctx: Context) {
             tokio::time::sleep(std::time::Duration::from_secs(15)).await;
 
             let data = ctx_l.data.read().await;
-            let Some(lockdown) = data.get::<LockdownKey>() else { continue };
+            let Some(lockdown) = data.get::<LockdownKey>() else {
+                continue;
+            };
             let duration = data
                 .get::<SecurityConfigKey>()
                 .map(|c| c.lockdown_duration_secs)

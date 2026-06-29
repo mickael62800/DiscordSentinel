@@ -6,9 +6,9 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::handlers::casino::slot::SlotSpinDto;
 use crate::adapters::inbound::http::handlers::casino::slot::SlotTopWinnerDto;
 use crate::adapters::inbound::http::handlers::casino::slot::SpinResponseDto;
+use crate::ports::inbound::casino::manage_slot::SpinResult;
 use sentinel_core::domain::entities::casino::slot::SlotSpin;
 use sentinel_core::domain::entities::casino::slot::SlotTopWinner;
-use crate::ports::inbound::casino::manage_slot::SpinResult;
 
 fn sample_spin() -> SlotSpin {
     SlotSpin {
@@ -34,7 +34,10 @@ fn slot_spin_dto_from_entity() {
     assert_eq!(dto.user_id, "u".into());
     assert_eq!(dto.username, "Alice");
     assert_eq!(dto.mise, 100);
-    assert_eq!(dto.symbols, vec!["🍒".to_string(), "🍒".to_string(), "🍋".to_string()]);
+    assert_eq!(
+        dto.symbols,
+        vec!["🍒".to_string(), "🍒".to_string(), "🍋".to_string()]
+    );
     assert_eq!(dto.payout, 100);
     assert!(!dto.is_jackpot);
     assert!(!dto.is_free);

@@ -20,36 +20,67 @@ fn base_state() -> AppState {
     test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels))
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("PATCH").uri(uri)
+async fn patch_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> StatusCode {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
@@ -58,7 +89,10 @@ async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, ser
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -112,7 +146,12 @@ async fn update_streak_success() {
         "streak_current": 5, "streak_best": 10,
         "streak_last_day": 42, "streak_last_year": 2024
     });
-    let (status, _) = patch_json(app, "/api/levels/111111111111111111/444444444444444444/streak", body).await;
+    let (status, _) = patch_json(
+        app,
+        "/api/levels/111111111111111111/444444444444444444/streak",
+        body,
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
@@ -136,7 +175,10 @@ async fn update_ticket_sla_invalid_uuid_422() {
     let body = serde_json::json!({"satisfaction_rating": 5});
     let (status, json) = patch_json(app, "/api/tickets/not-a-uuid/sla", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-    assert!(json["error"].as_str().unwrap().contains("ticket id invalide"));
+    assert!(json["error"]
+        .as_str()
+        .unwrap()
+        .contains("ticket id invalide"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -186,8 +228,10 @@ async fn create_sponsorship_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = router::build_for_test(base_state());
     let req = test_helpers::request_with_rbac(
-        "POST", "/api/sponsorships",
-        "444444444444444444", Some(Role::Viewer),
+        "POST",
+        "/api/sponsorships",
+        "444444444444444444",
+        Some(Role::Viewer),
         Some("111111111111111111".into()),
         Some(serde_json::json!({
             "guild_id": "111111111111111111",
@@ -255,14 +299,22 @@ async fn list_temp_roles_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_temp_role_success_without_rbac() {
     let app = router::build_for_test(base_state());
-    let status = delete(app, "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555").await;
+    let status = delete(
+        app,
+        "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555",
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_temp_role_invalid_role_id_422() {
     let app = router::build_for_test(base_state());
-    let status = delete(app, "/api/temp-roles/111111111111111111/444444444444444444/bad").await;
+    let status = delete(
+        app,
+        "/api/temp-roles/111111111111111111/444444444444444444/bad",
+    )
+    .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -271,8 +323,11 @@ async fn delete_temp_role_with_rbac_viewer_forbidden() {
     use sentinel_core::domain::enums::system::role::Role;
     let app = router::build_for_test(base_state());
     let req = test_helpers::request_with_rbac(
-        "DELETE", "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555",
-        "444444444444444444", Some(Role::Viewer), Some("111111111111111111".into()),
+        "DELETE",
+        "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555",
+        "444444444444444444",
+        Some(Role::Viewer),
+        Some("111111111111111111".into()),
         None,
     );
     let (status, json) = send_request(app, req).await;

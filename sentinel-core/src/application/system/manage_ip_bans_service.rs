@@ -25,7 +25,11 @@ impl ManageIpBansService {
         queue: Arc<dyn HostBanQueue>,
         fail2ban: Arc<dyn Fail2banStatusReader>,
     ) -> Self {
-        Self { repo, queue, fail2ban }
+        Self {
+            repo,
+            queue,
+            fail2ban,
+        }
     }
 }
 

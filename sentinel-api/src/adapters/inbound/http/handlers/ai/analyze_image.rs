@@ -6,8 +6,8 @@ use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageRequestD
 use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_core::domain::errors::DomainError;
 
 // Limites et content-types autorises sont definis dans `domain/entities/image_analysis.rs`.
 use sentinel_core::domain::entities::ai::image_analysis::is_allowed_image_content_type;
@@ -24,9 +24,11 @@ pub async fn analyze_image(
             user_id = %dto.user_id,
             "Image trop volumineuse rejetee"
         );
-        return Err(ApiError(DomainError::ValidationError(
-            format!("Image trop volumineuse ({} octets, max {})", dto.image_data.len(), MAX_IMAGE_BASE64_LEN)
-        )));
+        return Err(ApiError(DomainError::ValidationError(format!(
+            "Image trop volumineuse ({} octets, max {})",
+            dto.image_data.len(),
+            MAX_IMAGE_BASE64_LEN
+        ))));
     }
 
     // Validation content_type — regle metier dans le domain.
@@ -36,15 +38,20 @@ pub async fn analyze_image(
             user_id = %dto.user_id,
             "Content-type image non autorise"
         );
-        return Err(ApiError(DomainError::ValidationError(
-            format!("Content-type non autorise: {}", dto.content_type)
-        )));
+        return Err(ApiError(DomainError::ValidationError(format!(
+            "Content-type non autorise: {}",
+            dto.content_type
+        ))));
     }
 
     // Decoder le base64
     let image_bytes = base64::engine::general_purpose::STANDARD
         .decode(&dto.image_data)
-        .map_err(|e| ApiError(DomainError::ValidationError(format!("Base64 invalide: {e}"))))?;
+        .map_err(|e| {
+            ApiError(DomainError::ValidationError(format!(
+                "Base64 invalide: {e}"
+            )))
+        })?;
 
     let username = dto.username.clone();
 

@@ -8,12 +8,16 @@ use uuid::Uuid;
 use sentinel_api::application::system::export_service::ExecuteExportUseCase;
 use sentinel_api::application::system::export_service::ExportService;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 async fn seed_infraction(p: &PgPool, guild: &str) {
@@ -28,22 +32,35 @@ async fn seed_audit_log(p: &PgPool, guild: &str) {
     sqlx::query(
         "INSERT INTO audit_logs (id, guild_id, event_type, actor_id, actor_name, \
           target_id, target_name, channel_id, channel_name, created_at) \
-         VALUES ($1, $2, 'message_deleted', 'a1', 'Admin', 'u1', 'alice', 'c1', 'general', NOW())"
-    ).bind(Uuid::new_v4()).bind(guild).execute(p).await.unwrap();
+         VALUES ($1, $2, 'message_deleted', 'a1', 'Admin', 'u1', 'alice', 'c1', 'general', NOW())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(guild)
+    .execute(p)
+    .await
+    .unwrap();
 }
 
 async fn seed_moderation_action(p: &PgPool, guild: &str) {
     sqlx::query(
         "INSERT INTO moderation_actions (id, guild_id, channel_id, moderator_id, moderator_name, \
           target_id, target_name, action_type, reason, duration, created_at) \
-         VALUES ($1, $2, 'c1', 'm1', 'Mod', 'u1', 'alice', 'mute', 'spam', 300, NOW())"
-    ).bind(Uuid::new_v4()).bind(guild).execute(p).await.unwrap();
+         VALUES ($1, $2, 'c1', 'm1', 'Mod', 'u1', 'alice', 'mute', 'spam', 300, NOW())",
+    )
+    .bind(Uuid::new_v4())
+    .bind(guild)
+    .execute(p)
+    .await
+    .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_unknown_job_type_returns_validation_error() {
     let svc = ExportService::new(pool().await);
-    let err = svc.execute(&fresh_id(), "unknown_job", "csv", 100).await.unwrap_err();
+    let err = svc
+        .execute(&fresh_id(), "unknown_job", "csv", 100)
+        .await
+        .unwrap_err();
     assert!(format!("{err:?}").contains("job_type"));
 }
 
@@ -90,7 +107,10 @@ async fn execute_moderation_actions_json() {
     let svc = ExportService::new(p.clone());
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
-    let res = svc.execute(&g, "moderation_actions", "json", 100).await.unwrap();
+    let res = svc
+        .execute(&g, "moderation_actions", "json", 100)
+        .await
+        .unwrap();
     assert_eq!(res.row_count, 1);
     assert!(res.data.contains("\"action_type\":\"mute\""));
 }
@@ -101,7 +121,10 @@ async fn execute_unknown_format_returns_validation_error() {
     let svc = ExportService::new(p.clone());
     let g = fresh_id();
     seed_infraction(&p, &g).await;
-    let err = svc.execute(&g, "infractions", "xml", 100).await.unwrap_err();
+    let err = svc
+        .execute(&g, "infractions", "xml", 100)
+        .await
+        .unwrap_err();
     assert!(format!("{err:?}").contains("format"));
 }
 
@@ -120,7 +143,10 @@ async fn execute_max_rows_clamped_to_minimum_one() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_empty_guild_returns_header_only_csv() {
     let svc = ExportService::new(pool().await);
-    let res = svc.execute(&fresh_id(), "infractions", "csv", 100).await.unwrap();
+    let res = svc
+        .execute(&fresh_id(), "infractions", "csv", 100)
+        .await
+        .unwrap();
     assert_eq!(res.row_count, 0);
     assert_eq!(res.data, "id,channel_id,user_id,username,message_id,content,score,action,reason,duration_secs,created_at\n");
 }
@@ -133,7 +159,10 @@ async fn execute_moderation_actions_csv() {
     let svc = ExportService::new(p.clone());
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
-    let res = svc.execute(&g, "moderation_actions", "csv", 100).await.unwrap();
+    let res = svc
+        .execute(&g, "moderation_actions", "csv", 100)
+        .await
+        .unwrap();
     assert_eq!(res.row_count, 1);
     assert!(res.data.starts_with("id,moderator_id,"));
     assert!(res.data.contains("mute"));
@@ -166,7 +195,10 @@ async fn execute_moderation_actions_unknown_format_returns_error() {
     let svc = ExportService::new(p.clone());
     let g = fresh_id();
     seed_moderation_action(&p, &g).await;
-    let err = svc.execute(&g, "moderation_actions", "xml", 100).await.unwrap_err();
+    let err = svc
+        .execute(&g, "moderation_actions", "xml", 100)
+        .await
+        .unwrap_err();
     assert!(format!("{err:?}").contains("format"));
 }
 
@@ -175,6 +207,9 @@ async fn execute_max_rows_clamped_to_50k_cap() {
     // max_rows > 50_000 est clampe a 50_000. Sans donnees, on verifie juste que
     // l'appel reussit sans depassement numerique.
     let svc = ExportService::new(pool().await);
-    let res = svc.execute(&fresh_id(), "infractions", "csv", 1_000_000).await.unwrap();
+    let res = svc
+        .execute(&fresh_id(), "infractions", "csv", 1_000_000)
+        .await
+        .unwrap();
     assert_eq!(res.row_count, 0);
 }

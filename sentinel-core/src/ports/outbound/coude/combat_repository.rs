@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::Combat;
+use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
@@ -83,11 +83,7 @@ pub trait CombatRepository: Send + Sync {
     /// Tente de résoudre un combat. Retourne `false` si le combat n'est pas dans
     /// un état actif (`pending`/`accepted`/`betting`) — c'est-à-dire si une autre
     /// race a déjà clôturé.
-    async fn resolve(
-        &self,
-        id: Uuid,
-        resolution: CombatResolution,
-    ) -> Result<bool, DomainError>;
+    async fn resolve(&self, id: Uuid, resolution: CombatResolution) -> Result<bool, DomainError>;
 
     /// Passe un combat en phase de paris et stocke le `message_id` Discord.
     /// Retourne `false` si le combat n'est plus en `pending`.
@@ -101,11 +97,7 @@ pub trait CombatRepository: Send + Sync {
     /// Retourne `false` sinon. Utilisé pour `cancel_combat`.
     async fn cancel_pending(&self, id: Uuid) -> Result<bool, DomainError>;
 
-    async fn set_defender_special(
-        &self,
-        id: Uuid,
-        item_key: &str,
-    ) -> Result<bool, DomainError>;
+    async fn set_defender_special(&self, id: Uuid, item_key: &str) -> Result<bool, DomainError>;
 
     /// Marque tous les paris non encore résolus d'un combat comme perdus.
     /// Utilisé après l'annulation/expiration d'un combat avant la résolution

@@ -12,7 +12,9 @@ pub struct RedisServiceRegistry {
 }
 
 impl RedisServiceRegistry {
-    pub fn new(client: redis::Client) -> Self { Self { client } }
+    pub fn new(client: redis::Client) -> Self {
+        Self { client }
+    }
 }
 
 #[async_trait]
@@ -22,7 +24,12 @@ impl ServiceRegistry for RedisServiceRegistry {
             Ok(c) => c,
             Err(e) => {
                 warn!(error = %e, "Redis indisponible pour count_services");
-                return ServiceCounts { bots_online: 0, bots_total: 0, workers_online: 0, workers_total: 0 };
+                return ServiceCounts {
+                    bots_online: 0,
+                    bots_total: 0,
+                    workers_online: 0,
+                    workers_total: 0,
+                };
             }
         };
 
@@ -31,11 +38,21 @@ impl ServiceRegistry for RedisServiceRegistry {
             Ok(k) => k,
             Err(e) => {
                 warn!(error = %e, "Echec Redis SMEMBERS bots:known");
-                return ServiceCounts { bots_online: 0, bots_total: 0, workers_online: 0, workers_total: 0 };
+                return ServiceCounts {
+                    bots_online: 0,
+                    bots_total: 0,
+                    workers_online: 0,
+                    workers_total: 0,
+                };
             }
         };
 
-        let mut counts = ServiceCounts { bots_online: 0, bots_total: 0, workers_online: 0, workers_total: 0 };
+        let mut counts = ServiceCounts {
+            bots_online: 0,
+            bots_total: 0,
+            workers_online: 0,
+            workers_total: 0,
+        };
 
         for name in &known {
             let is_worker = is_worker_service(name);
@@ -48,10 +65,14 @@ impl ServiceRegistry for RedisServiceRegistry {
             };
             if is_worker {
                 counts.workers_total += 1;
-                if exists { counts.workers_online += 1; }
+                if exists {
+                    counts.workers_online += 1;
+                }
             } else {
                 counts.bots_total += 1;
-                if exists { counts.bots_online += 1; }
+                if exists {
+                    counts.bots_online += 1;
+                }
             }
         }
         counts

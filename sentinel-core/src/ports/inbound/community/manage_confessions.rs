@@ -43,28 +43,68 @@ pub trait ManageConfessionsUseCase: Send + Sync {
         thread_id: Option<String>,
     ) -> Result<(), DomainError>;
 
-    async fn edit_content(&self, id: Uuid, author_user_id: &str, new_content: String) -> Result<Confession, DomainError>;
+    async fn edit_content(
+        &self,
+        id: Uuid,
+        author_user_id: &str,
+        new_content: String,
+    ) -> Result<Confession, DomainError>;
 
     /// Soft delete (depuis web admin OU depuis bot slash command).
-    async fn delete(&self, id: Uuid, deleted_by: String, reason: Option<String>) -> Result<Confession, DomainError>;
+    async fn delete(
+        &self,
+        id: Uuid,
+        deleted_by: String,
+        reason: Option<String>,
+    ) -> Result<Confession, DomainError>;
 
     async fn get(&self, id: Uuid) -> Result<Confession, DomainError>;
     async fn get_by_message_id(&self, message_id: &str) -> Result<Option<Confession>, DomainError>;
-    async fn get_by_public_number(&self, guild_id: &str, public_number: i32) -> Result<Confession, DomainError>;
-    async fn list(&self, guild_id: &str, limit: i64, include_deleted: bool) -> Result<Vec<Confession>, DomainError>;
+    async fn get_by_public_number(
+        &self,
+        guild_id: &str,
+        public_number: i32,
+    ) -> Result<Confession, DomainError>;
+    async fn list(
+        &self,
+        guild_id: &str,
+        limit: i64,
+        include_deleted: bool,
+    ) -> Result<Vec<Confession>, DomainError>;
 
     // ── Replies ────────────────────────────────────────────────────────
 
     async fn create_reply(&self, cmd: CreateReplyCommand) -> Result<ConfessionReply, DomainError>;
-    async fn update_reply_message_id(&self, id: Uuid, message_id: String) -> Result<(), DomainError>;
-    async fn delete_reply(&self, id: Uuid, deleted_by: String) -> Result<ConfessionReply, DomainError>;
+    async fn update_reply_message_id(
+        &self,
+        id: Uuid,
+        message_id: String,
+    ) -> Result<(), DomainError>;
+    async fn delete_reply(
+        &self,
+        id: Uuid,
+        deleted_by: String,
+    ) -> Result<ConfessionReply, DomainError>;
     async fn list_replies(&self, confession_id: Uuid) -> Result<Vec<ConfessionReply>, DomainError>;
 
     // ── Reports ────────────────────────────────────────────────────────
 
-    async fn create_report(&self, cmd: CreateReportCommand) -> Result<ConfessionReport, DomainError>;
-    async fn list_reports(&self, guild_id: &str, status: Option<ReportStatus>, limit: i64) -> Result<Vec<ConfessionReport>, DomainError>;
-    async fn resolve_report(&self, id: Uuid, status: ReportStatus, resolved_by: String) -> Result<(), DomainError>;
+    async fn create_report(
+        &self,
+        cmd: CreateReportCommand,
+    ) -> Result<ConfessionReport, DomainError>;
+    async fn list_reports(
+        &self,
+        guild_id: &str,
+        status: Option<ReportStatus>,
+        limit: i64,
+    ) -> Result<Vec<ConfessionReport>, DomainError>;
+    async fn resolve_report(
+        &self,
+        id: Uuid,
+        status: ReportStatus,
+        resolved_by: String,
+    ) -> Result<(), DomainError>;
 
     // ── Config ─────────────────────────────────────────────────────────
 

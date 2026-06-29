@@ -41,7 +41,10 @@ fn catalog_prices_are_ascending() {
         assert!(
             pair[0].price <= pair[1].price,
             "catalog heist tools non tries par prix ascending : {} ({}) vs {} ({})",
-            pair[0].key, pair[0].price, pair[1].key, pair[1].price
+            pair[0].key,
+            pair[0].price,
+            pair[1].key,
+            pair[1].price
         );
     }
 }
@@ -124,9 +127,15 @@ fn chance_invariant_dedup_equivalence() {
 #[test]
 fn chance_empty_input_equals_base() {
     let empty_str: Vec<String> = vec![];
-    assert_eq!(compute_success_chance(empty_str), HEIST_BASE_SUCCESS_PERCENT);
+    assert_eq!(
+        compute_success_chance(empty_str),
+        HEIST_BASE_SUCCESS_PERCENT
+    );
     let empty_ref: Vec<&str> = vec![];
-    assert_eq!(compute_success_chance(empty_ref), HEIST_BASE_SUCCESS_PERCENT);
+    assert_eq!(
+        compute_success_chance(empty_ref),
+        HEIST_BASE_SUCCESS_PERCENT
+    );
 }
 
 #[test]

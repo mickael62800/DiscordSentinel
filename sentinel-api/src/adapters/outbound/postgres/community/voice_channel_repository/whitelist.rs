@@ -1,10 +1,10 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::voice_channel_repository::VoiceWhitelistStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoiceWhitelistStore;
 
 #[derive(sqlx::FromRow)]
 struct WhitelistRow {
@@ -31,7 +31,11 @@ impl From<WhitelistRow> for VoiceChannelWhitelistEntry {
 
 #[async_trait]
 impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
-    async fn find_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
+    async fn find_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
         let rows = sqlx::query_as::<_, WhitelistRow>(
             "SELECT * FROM voice_channel_whitelists WHERE guild_id = $1 AND owner_id = $2 ORDER BY created_at ASC",
         )
@@ -41,10 +45,16 @@ impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
         .await
         .map_err(pg_err)?;
 
-        Ok(rows.into_iter().map(VoiceChannelWhitelistEntry::from).collect())
+        Ok(rows
+            .into_iter()
+            .map(VoiceChannelWhitelistEntry::from)
+            .collect())
     }
 
-    async fn add_to_whitelist(&self, entry: &VoiceChannelWhitelistEntry) -> Result<(), DomainError> {
+    async fn add_to_whitelist(
+        &self,
+        entry: &VoiceChannelWhitelistEntry,
+    ) -> Result<(), DomainError> {
         sqlx::query(
             r#"
             INSERT INTO voice_channel_whitelists (id, guild_id, owner_id, target_id, target_name, created_at)
@@ -65,7 +75,12 @@ impl VoiceWhitelistStore for super::PgVoiceChannelRepository {
         Ok(())
     }
 
-    async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError> {
+    async fn remove_from_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError> {
         sqlx::query("DELETE FROM voice_channel_whitelists WHERE guild_id = $1 AND owner_id = $2 AND target_id = $3")
             .bind(guild_id)
             .bind(owner_id)

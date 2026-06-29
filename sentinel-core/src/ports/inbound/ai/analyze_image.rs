@@ -22,5 +22,8 @@ pub struct AnalyzeImageCommand {
 
 #[async_trait]
 pub trait AnalyzeImageUseCase: Send + Sync {
-    async fn analyze_image(&self, command: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError>;
+    async fn analyze_image(
+        &self,
+        command: AnalyzeImageCommand,
+    ) -> Result<ImageAnalysis, DomainError>;
 }

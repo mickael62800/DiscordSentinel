@@ -36,8 +36,16 @@ fn clustered_creation() {
 #[test]
 fn raid_analysis_scoring() {
     let joins = vec![
-        JoinInfo { username: "raid1".into(), has_avatar: false, account_created_timestamp: 1000 },
-        JoinInfo { username: "raid2".into(), has_avatar: false, account_created_timestamp: 1500 },
+        JoinInfo {
+            username: "raid1".into(),
+            has_avatar: false,
+            account_created_timestamp: 1000,
+        },
+        JoinInfo {
+            username: "raid2".into(),
+            has_avatar: false,
+            account_created_timestamp: 1500,
+        },
     ];
     let analysis = analyze_joins(&joins, 2, 3600);
     assert!(analysis.score >= 60);
@@ -45,14 +53,20 @@ fn raid_analysis_scoring() {
 
 #[test]
 fn alt_detection_similar_name() {
-    let bans = vec![BannedUserInfo { username: "raider".into(), account_created_timestamp: 5000 }];
+    let bans = vec![BannedUserInfo {
+        username: "raider".into(),
+        account_created_timestamp: 5000,
+    }];
     let result = check_alt_account("ra1der", 99999, &bans, 2, 3600);
     assert!(result.similar_to_banned.is_some());
 }
 
 #[test]
 fn alt_detection_no_match() {
-    let bans = vec![BannedUserInfo { username: "bob".into(), account_created_timestamp: 5000 }];
+    let bans = vec![BannedUserInfo {
+        username: "bob".into(),
+        account_created_timestamp: 5000,
+    }];
     let result = check_alt_account("alice", 99999, &bans, 1, 3600);
     assert!(!result.is_suspicious());
 }
@@ -71,7 +85,11 @@ fn suspicious_account_old() {
 
 #[test]
 fn raid_analysis_single_join_no_raid() {
-    let joins = vec![JoinInfo { username: "solo".into(), has_avatar: true, account_created_timestamp: 1000 }];
+    let joins = vec![JoinInfo {
+        username: "solo".into(),
+        has_avatar: true,
+        account_created_timestamp: 1000,
+    }];
     assert_eq!(analyze_joins(&joins, 2, 3600).score, 0);
 }
 
@@ -82,7 +100,10 @@ fn similar_names_single_name() {
 
 #[test]
 fn alt_detection_creation_near() {
-    let bans = vec![BannedUserInfo { username: "zzzzz".into(), account_created_timestamp: 5000 }];
+    let bans = vec![BannedUserInfo {
+        username: "zzzzz".into(),
+        account_created_timestamp: 5000,
+    }];
     let result = check_alt_account("completely_different", 5500, &bans, 1, 3600);
     assert!(result.creation_near_banned.is_some());
 }
@@ -99,8 +120,14 @@ fn alt_detection_breaks_when_both_conditions_on_same_ban() {
     // conditions (similaire + creation proche), on sort de la boucle sans
     // visiter les bans suivants.
     let bans = vec![
-        BannedUserInfo { username: "raider1".into(), account_created_timestamp: 5000 },
-        BannedUserInfo { username: "other_completely_different_name".into(), account_created_timestamp: 999_999 },
+        BannedUserInfo {
+            username: "raider1".into(),
+            account_created_timestamp: 5000,
+        },
+        BannedUserInfo {
+            username: "other_completely_different_name".into(),
+            account_created_timestamp: 999_999,
+        },
     ];
     let result = check_alt_account("raider2", 5100, &bans, 2, 3600);
     assert_eq!(result.similar_to_banned, Some("raider1".into()));
@@ -112,8 +139,14 @@ fn alt_detection_similar_and_creation_from_different_bans() {
     // Cas ou les 2 conditions sont satisfaites mais par des bans differents
     // (pas de break apres la 1re iteration).
     let bans = vec![
-        BannedUserInfo { username: "raider".into(), account_created_timestamp: 999_999 },
-        BannedUserInfo { username: "total_diff".into(), account_created_timestamp: 5100 },
+        BannedUserInfo {
+            username: "raider".into(),
+            account_created_timestamp: 999_999,
+        },
+        BannedUserInfo {
+            username: "total_diff".into(),
+            account_created_timestamp: 5100,
+        },
     ];
     let result = check_alt_account("ra1der", 5000, &bans, 2, 3600);
     assert_eq!(result.similar_to_banned, Some("raider".into()));
@@ -160,8 +193,16 @@ fn analyze_joins_no_raid_indicator_score_zero() {
     // Couvre les branches `score += X` quand la condition est false :
     // deux joins tres espaces, avatars differents, noms differents → score=0.
     let joins = vec![
-        JoinInfo { username: "alice".into(), has_avatar: true, account_created_timestamp: 0 },
-        JoinInfo { username: "zebra".into(), has_avatar: true, account_created_timestamp: 999_999_999 },
+        JoinInfo {
+            username: "alice".into(),
+            has_avatar: true,
+            account_created_timestamp: 0,
+        },
+        JoinInfo {
+            username: "zebra".into(),
+            has_avatar: true,
+            account_created_timestamp: 999_999_999,
+        },
     ];
     let analysis = analyze_joins(&joins, 0, 60);
     assert_eq!(analysis.score, 0);

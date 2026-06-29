@@ -23,10 +23,7 @@ const BOT_NAME: &str = "coude-bot";
 /// `resolve_combat_now_service`. Fallback silencieux sur `default()` si
 /// le repo est down — les services qui ont besoin d'un comportement
 /// strict doivent gerer les erreurs avant d'appeler.
-pub async fn load_balance_params(
-    repo: &dyn BotConfigRepository,
-    guild_id: &str,
-) -> BalanceParams {
+pub async fn load_balance_params(repo: &dyn BotConfigRepository, guild_id: &str) -> BalanceParams {
     match repo.get_config(guild_id, BOT_NAME).await {
         Ok(entries) => {
             let map: HashMap<String, String> = entries

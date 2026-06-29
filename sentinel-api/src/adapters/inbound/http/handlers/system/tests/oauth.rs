@@ -31,7 +31,10 @@ fn percent_encode_empty() {
 fn percent_encode_hex_uppercase() {
     // %20 et non %20 en lowercase
     let out = percent_encode("?=&");
-    assert!(out.chars().filter(|c| c.is_ascii_hexdigit()).all(|c| !c.is_lowercase()));
+    assert!(out
+        .chars()
+        .filter(|c| c.is_ascii_hexdigit())
+        .all(|c| !c.is_lowercase()));
 }
 
 #[test]
@@ -55,7 +58,12 @@ fn redirect_to_invalid_header_returns_500() {
 fn front_error_redirect_builds_login_url_with_encoded_reason() {
     let resp = front_error_redirect("https://front.example/", "state mismatch");
     assert_eq!(resp.status(), StatusCode::FOUND);
-    let loc = resp.headers().get(header::LOCATION).unwrap().to_str().unwrap();
+    let loc = resp
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert!(loc.starts_with("https://front.example/login?error="));
     assert!(loc.contains("state%20mismatch"));
 }
@@ -63,7 +71,12 @@ fn front_error_redirect_builds_login_url_with_encoded_reason() {
 #[test]
 fn front_error_redirect_strips_trailing_slash() {
     let resp = front_error_redirect("https://front.example///", "oops");
-    let loc = resp.headers().get(header::LOCATION).unwrap().to_str().unwrap();
+    let loc = resp
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
     // Ne doit pas contenir "////login"
     assert!(loc.starts_with("https://front.example/login?error="));
 }
@@ -118,8 +131,16 @@ fn percent_encode_question_mark() {
 
 #[test]
 fn front_error_redirect_complex_error_reason() {
-    let resp = front_error_redirect("https://front.example", "invalid state: expected ABC got XYZ");
-    let loc = resp.headers().get(header::LOCATION).unwrap().to_str().unwrap();
+    let resp = front_error_redirect(
+        "https://front.example",
+        "invalid state: expected ABC got XYZ",
+    );
+    let loc = resp
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
     // L'espace et le colon doivent etre encodes
     assert!(loc.contains("%20"));
     assert!(loc.contains("%3A"));
@@ -128,6 +149,11 @@ fn front_error_redirect_complex_error_reason() {
 #[test]
 fn redirect_to_preserves_query_string() {
     let resp = redirect_to("/path?foo=bar&baz=qux");
-    let loc = resp.headers().get(header::LOCATION).unwrap().to_str().unwrap();
+    let loc = resp
+        .headers()
+        .get(header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert_eq!(loc, "/path?foo=bar&baz=qux");
 }

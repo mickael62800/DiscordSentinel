@@ -3,13 +3,13 @@
 //! Les `save()` enqueue en memoire et retournent `Ok(())` immediatement (at-most-once).
 //! Les autres methodes delegent au repository direct.
 
-use async_trait::async_trait;
-use sqlx::PgPool;
-use sqlx::QueryBuilder;
 use crate::adapters::outbound::postgres::system::log_repository::PgLogRepository;
+use crate::ports::outbound::system::log_repository::LogRepository;
+use async_trait::async_trait;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::system::log_repository::LogRepository;
+use sqlx::PgPool;
+use sqlx::QueryBuilder;
 
 use super::batch_writer::BatchWriter;
 use super::batch_writer::BatchWriterConfig;

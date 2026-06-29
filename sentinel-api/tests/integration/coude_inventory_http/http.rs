@@ -17,12 +17,12 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use sentinel_core::domain::entities::coude::inventory::Insurance;
 use sentinel_core::domain::entities::coude::inventory::InventoryItem;
-use sentinel_core::domain::entities::coude::inventory::Prime;
 use sentinel_core::domain::entities::coude::inventory::NewCoudePrime;
+use sentinel_core::domain::entities::coude::inventory::Prime;
 use sentinel_core::domain::errors::DomainError;
-use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 #[derive(Default)]
 struct MockInventory {
@@ -51,16 +51,24 @@ impl MockInventory {
 impl ManageCoudeInventoryUseCase for MockInventory {
     async fn list_inventory(&self, g: &str, u: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(vec![InventoryItem {
-            guild_id: g.into(), user_id: u.into(),
-            item_key: "potion".into(), quantity: 3,
+            guild_id: g.into(),
+            user_id: u.into(),
+            item_key: "potion".into(),
+            quantity: 3,
         }])
     }
     async fn add_item(&self, g: &str, u: &str, k: &str) -> Result<(), DomainError> {
-        self.added.lock().unwrap().push((g.into(), u.into(), k.into()));
+        self.added
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), k.into()));
         Ok(())
     }
     async fn use_item(&self, g: &str, u: &str, k: &str) -> Result<bool, DomainError> {
-        self.used.lock().unwrap().push((g.into(), u.into(), k.into()));
+        self.used
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), k.into()));
         Ok(*self.use_item_result.lock().unwrap())
     }
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
@@ -88,7 +96,10 @@ impl ManageCoudeInventoryUseCase for MockInventory {
         Ok(vec![])
     }
     async fn claim_primes(&self, g: &str, t: &str, c: &str, n: &str) -> Result<i64, DomainError> {
-        self.claimed.lock().unwrap().push((g.into(), t.into(), c.into(), n.into()));
+        self.claimed
+            .lock()
+            .unwrap()
+            .push((g.into(), t.into(), c.into(), n.into()));
         Ok(750)
     }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
@@ -96,7 +107,11 @@ impl ManageCoudeInventoryUseCase for MockInventory {
         *self.insurance_bought.lock().unwrap() = r;
         Ok(r)
     }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> {
+    async fn get_active_insurance(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Insurance>, DomainError> {
         if *self.insurance_active.lock().unwrap() {
             Ok(Some(Insurance {
                 id: Uuid::new_v4(),
@@ -119,19 +134,28 @@ fn state_with(m: Arc<MockInventory>) -> sentinel_api::adapters::inbound::http::s
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
-        Some(v) => { b = b.header("content-type", "application/json"); Body::from(serde_json::to_string(&v).unwrap()) }
+        Some(v) => {
+            b = b.header("content-type", "application/json");
+            Body::from(serde_json::to_string(&v).unwrap())
+        }
         None => Body::empty(),
     };
     let req = b.body(body_payload).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Items ──
@@ -155,7 +179,10 @@ async fn add_item_forwards_key() {
     let body = serde_json::json!({ "item_key": "sword" });
     let (s, _) = req_json(app, "POST", "/api/coude/999/inventory/111/add", Some(body)).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(m.added.lock().unwrap()[0], ("999".into(), "111".into(), "sword".into()));
+    assert_eq!(
+        m.added.lock().unwrap()[0],
+        ("999".into(), "111".into(), "sword".into())
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -228,7 +255,10 @@ async fn claim_primes_returns_total() {
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["total_claimed"], 750);
     let claimed = m.claimed.lock().unwrap();
-    assert_eq!(claimed[0], ("999".into(), "111".into(), "222".into(), "Hunter".into()));
+    assert_eq!(
+        claimed[0],
+        ("999".into(), "111".into(), "222".into(), "Hunter".into())
+    );
 }
 
 // ── Insurance ──
@@ -291,7 +321,13 @@ async fn expire_insurance_success_204() {
     let m = Arc::new(MockInventory::new());
     let app = router::build_for_test(state_with(m.clone()));
     let id = Uuid::new_v4();
-    let (s, _) = req_json(app, "POST", &format!("/api/coude/insurance/{id}/expire"), None).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        &format!("/api/coude/insurance/{id}/expire"),
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(m.expired.lock().unwrap()[0], id);
 }

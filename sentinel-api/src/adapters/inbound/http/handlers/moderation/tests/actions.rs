@@ -50,7 +50,10 @@ fn review_entry_to_dto_resolved_none_preserved() {
 fn review_entry_to_dto_resolved_formatted_when_some() {
     let resolved = Utc.with_ymd_and_hms(2024, 6, 15, 12, 30, 0).unwrap();
     let dto = review_entry_to_dto(sample_entry(Some(resolved)));
-    assert_eq!(dto.resolved_at.as_deref(), Some("2024-06-15T12:30:00+00:00"));
+    assert_eq!(
+        dto.resolved_at.as_deref(),
+        Some("2024-06-15T12:30:00+00:00")
+    );
 }
 
 #[test]
@@ -88,35 +91,32 @@ fn bans_query_deserializes_full() {
 
 #[test]
 fn execute_ban_dto_deserializes() {
-    let dto: ExecuteBanDto = serde_json::from_str(
-        r#"{"guild_id":"g","user_id":"u","reason":"spam"}"#
-    ).unwrap();
+    let dto: ExecuteBanDto =
+        serde_json::from_str(r#"{"guild_id":"g","user_id":"u","reason":"spam"}"#).unwrap();
     assert_eq!(dto.guild_id, "g".into());
     assert_eq!(dto.reason, "spam");
 }
 
 #[test]
 fn execute_mute_dto_default_duration() {
-    let dto: ExecuteMuteDto = serde_json::from_str(
-        r#"{"guild_id":"g","user_id":"u","reason":"r"}"#
-    ).unwrap();
+    let dto: ExecuteMuteDto =
+        serde_json::from_str(r#"{"guild_id":"g","user_id":"u","reason":"r"}"#).unwrap();
     // duration a un default → doit etre present meme si absent du JSON
     assert_eq!(dto.guild_id, "g".into());
 }
 
 #[test]
 fn execute_unban_dto_deserializes() {
-    let dto: ExecuteUnbanDto = serde_json::from_str(
-        r#"{"guild_id":"g","user_id":"u"}"#
-    ).unwrap();
+    let dto: ExecuteUnbanDto = serde_json::from_str(r#"{"guild_id":"g","user_id":"u"}"#).unwrap();
     assert_eq!(dto.user_id, "u".into());
 }
 
 #[test]
 fn add_evidence_dto_optional_description() {
     let dto: AddEvidenceDto = serde_json::from_str(
-        r#"{"action_id":"a","url":"https://x/y","uploaded_by":"u1","uploaded_by_name":"User"}"#
-    ).unwrap();
+        r#"{"action_id":"a","url":"https://x/y","uploaded_by":"u1","uploaded_by_name":"User"}"#,
+    )
+    .unwrap();
     assert!(dto.description.is_none());
     assert_eq!(dto.uploaded_by, "u1");
 }
@@ -131,8 +131,8 @@ fn add_review_dto_deserializes_full() {
 
 #[test]
 fn resolve_review_dto_default_notes() {
-    let dto: ResolveReviewDto = serde_json::from_str(
-        r#"{"status":"approved","reviewer_id":"r","reviewer_name":"Rev"}"#
-    ).unwrap();
+    let dto: ResolveReviewDto =
+        serde_json::from_str(r#"{"status":"approved","reviewer_id":"r","reviewer_name":"Rev"}"#)
+            .unwrap();
     assert_eq!(dto.status, "approved");
 }

@@ -27,13 +27,11 @@ pub async fn run(_pool: &PgPool, min_days: i64) -> Result<(), String> {
         .parse()
         .map_err(|e| format!("invalid api_key: {e}"))?;
 
-    let mut client = CoudeSocialServiceClient::with_interceptor(
-        channel,
-        move |mut req: Request<()>| {
+    let mut client =
+        CoudeSocialServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", auth.clone());
             Ok(req)
-        },
-    );
+        });
 
     let req = RedistributeDueRequest {
         min_days_since_last: min_days,
@@ -71,4 +69,3 @@ pub async fn run(_pool: &PgPool, min_days: i64) -> Result<(), String> {
         }
     }
 }
-

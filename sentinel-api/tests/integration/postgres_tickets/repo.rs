@@ -5,30 +5,41 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
+use sentinel_api::ports::outbound::system::ticket_repository::TicketRepository;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;
-use sentinel_api::ports::outbound::system::ticket_repository::TicketRepository;
 
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 fn sample(title: &str) -> Ticket {
     let now = Utc::now();
     Ticket {
         id: Uuid::new_v4(),
-        title: title.into(), status: "open".into(), priority: "medium".into(),
-        author_id: fresh_id(), author_name: "Alice".into(),
+        title: title.into(),
+        status: "open".into(),
+        priority: "medium".into(),
+        author_id: fresh_id(),
+        author_name: "Alice".into(),
         assigned_to: None,
-        server: fresh_id(), category: "support".into(),
+        server: fresh_id(),
+        category: "support".into(),
         ticket_type: "standard".into(),
-        channel_id: None, voice_channel_id: None, invited_user_id: None,
-        created_at: now, updated_at: now,
+        channel_id: None,
+        voice_channel_id: None,
+        invited_user_id: None,
+        created_at: now,
+        updated_at: now,
         messages_count: 0,
     }
 }
@@ -36,7 +47,17 @@ fn sample(title: &str) -> Ticket {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn find_all_empty() {
     let repo = PgTicketRepository::new(pool().await);
-    let before = repo.find_all(None, None, Some("__no_match_search_term_xyz__"), None, 50, 0).await.unwrap();
+    let before = repo
+        .find_all(
+            None,
+            None,
+            Some("__no_match_search_term_xyz__"),
+            None,
+            50,
+            0,
+        )
+        .await
+        .unwrap();
     assert!(before.is_empty());
 }
 
@@ -91,8 +112,12 @@ async fn update_voice_channel_and_invited_user() {
     let repo = PgTicketRepository::new(pool().await);
     let t = sample("x");
     repo.save(&t).await.unwrap();
-    repo.update_voice_channel(t.id, Some("voice1")).await.unwrap();
-    repo.update_invited_user(t.id, Some("invited1")).await.unwrap();
+    repo.update_voice_channel(t.id, Some("voice1"))
+        .await
+        .unwrap();
+    repo.update_invited_user(t.id, Some("invited1"))
+        .await
+        .unwrap();
     let got = repo.find_by_id(t.id).await.unwrap().unwrap();
     assert_eq!(got.voice_channel_id.as_deref(), Some("voice1"));
     assert_eq!(got.invited_user_id.as_deref(), Some("invited1"));
@@ -111,14 +136,20 @@ async fn save_and_find_messages() {
     repo.save(&t).await.unwrap();
 
     let m1 = TicketMessage {
-        id: Uuid::new_v4(), ticket_id: t.id,
-        author_name: "Alice".into(), author_role: "user".into(),
-        content: "Hello".into(), created_at: Utc::now() - chrono::Duration::seconds(5),
+        id: Uuid::new_v4(),
+        ticket_id: t.id,
+        author_name: "Alice".into(),
+        author_role: "user".into(),
+        content: "Hello".into(),
+        created_at: Utc::now() - chrono::Duration::seconds(5),
     };
     let m2 = TicketMessage {
-        id: Uuid::new_v4(), ticket_id: t.id,
-        author_name: "Mod".into(), author_role: "staff".into(),
-        content: "Hi there".into(), created_at: Utc::now(),
+        id: Uuid::new_v4(),
+        ticket_id: t.id,
+        author_name: "Mod".into(),
+        author_role: "staff".into(),
+        content: "Hi there".into(),
+        created_at: Utc::now(),
     };
     repo.save_message(&m1).await.unwrap();
     repo.save_message(&m2).await.unwrap();
@@ -143,18 +174,30 @@ async fn find_all_filters_by_author_and_status() {
     let repo = PgTicketRepository::new(pool().await);
     // Meme author pour scope unique au test.
     let author = fresh_id();
-    let mut t1 = sample("one"); t1.status = "open".into(); t1.author_id = author.clone();
-    let mut t2 = sample("two"); t2.status = "closed".into(); t2.author_id = author.clone();
-    let mut t3 = sample("three"); t3.status = "open".into(); t3.author_id = author.clone();
+    let mut t1 = sample("one");
+    t1.status = "open".into();
+    t1.author_id = author.clone();
+    let mut t2 = sample("two");
+    t2.status = "closed".into();
+    t2.author_id = author.clone();
+    let mut t3 = sample("three");
+    t3.status = "open".into();
+    t3.author_id = author.clone();
     repo.save(&t1).await.unwrap();
     repo.save(&t2).await.unwrap();
     repo.save(&t3).await.unwrap();
 
-    let open = repo.find_all(Some("open"), None, None, Some(&author), 50, 0).await.unwrap();
+    let open = repo
+        .find_all(Some("open"), None, None, Some(&author), 50, 0)
+        .await
+        .unwrap();
     assert_eq!(open.len(), 2);
     assert!(open.iter().all(|t| t.status == "open"));
 
-    let all = repo.find_all(None, None, None, Some(&author), 50, 0).await.unwrap();
+    let all = repo
+        .find_all(None, None, None, Some(&author), 50, 0)
+        .await
+        .unwrap();
     assert_eq!(all.len(), 3);
 }
 

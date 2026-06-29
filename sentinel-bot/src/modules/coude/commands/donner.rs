@@ -3,7 +3,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
+use crate::shared::discord_helpers::{reply_api_err, reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
@@ -47,10 +47,18 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
+    if !crate::modules::coude::channel_check::check_channel(
+        ctx,
+        command,
+        config.channel_activites(),
+    )
+    .await
+    {
         return;
     }
 
@@ -156,10 +164,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             reply_ephemeral(
                 ctx,
                 command,
-                &format!(
-                    "Pas assez de coins ! Tu as {} coins.",
-                    donor.coins
-                ),
+                &format!("Pas assez de coins ! Tu as {} coins.", donor.coins),
             )
             .await;
             return;
@@ -242,7 +247,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
         // Set cooldown
         if let Err(e) = api
-            .set_cooldown(&guild_id, &donor_id, "donner_coins", config.gift_cooldown_secs())
+            .set_cooldown(
+                &guild_id,
+                &donor_id,
+                "donner_coins",
+                config.gift_cooldown_secs(),
+            )
             .await
         {
             tracing::warn!(error = %e, "Echec set_cooldown donner_coins");
@@ -258,10 +268,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 command.user.id, amount, target_id, amount, tax, received
             ))
             .color(0x57F287)
-            .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+            .footer(CreateEmbedFooter::new(
+                crate::shared::branding::COUDE_TAGLINE_SHORT,
+            ))
             .timestamp(serenity::model::Timestamp::now());
 
-        crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+        crate::modules::coude::channel_check::post_activity(
+            ctx,
+            command,
+            config.channel_activites(),
+            embed,
+        )
+        .await;
 
         // Migration wallet unifie : dispatch en un seul passage les
         // TauntEvents retournes par l'API (faillite cote emetteur si le
@@ -302,13 +320,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         for i in 0..qty {
             let has = match api.has_item(&guild_id, &donor_id, item_key).await {
                 Ok(h) => h,
-                Err(e) => { error_message = Some(e); break; }
+                Err(e) => {
+                    error_message = Some(e);
+                    break;
+                }
             };
             if !has {
                 error_message = Some(if i == 0 {
                     format!("Tu n'as pas de **{}** dans ton inventaire !", item.name)
                 } else {
-                    format!("Tu n'as que {} **{}** ! (don partiel impossible)", i, item.name)
+                    format!(
+                        "Tu n'as que {} **{}** ! (don partiel impossible)",
+                        i, item.name
+                    )
                 });
                 break;
             }
@@ -358,10 +382,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 command.user.id, qty_label, item.name, item.emoji, target_id
             ))
             .color(0x3498DB)
-            .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+            .footer(CreateEmbedFooter::new(
+                crate::shared::branding::COUDE_TAGLINE_SHORT,
+            ))
             .timestamp(serenity::model::Timestamp::now());
 
-        crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+        crate::modules::coude::channel_check::post_activity(
+            ctx,
+            command,
+            config.channel_activites(),
+            embed,
+        )
+        .await;
     }
 }
-

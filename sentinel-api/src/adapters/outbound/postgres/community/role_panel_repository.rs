@@ -1,14 +1,14 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,
@@ -59,19 +59,47 @@ struct AutoRoleRow {
 
 impl From<PanelRow> for RolePanel {
     fn from(r: PanelRow) -> Self {
-        Self { id: r.id, guild_id: r.guild_id.into(), channel_id: r.channel_id.into(), message_id: r.message_id.into(), title: r.title, description: r.description, mode: r.mode, max_roles: r.max_roles, enabled: r.enabled, created_at: r.created_at, updated_at: r.updated_at }
+        Self {
+            id: r.id,
+            guild_id: r.guild_id.into(),
+            channel_id: r.channel_id.into(),
+            message_id: r.message_id.into(),
+            title: r.title,
+            description: r.description,
+            mode: r.mode,
+            max_roles: r.max_roles,
+            enabled: r.enabled,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
     }
 }
 
 impl From<EntryRow> for RolePanelEntry {
     fn from(r: EntryRow) -> Self {
-        Self { id: r.id, panel_id: r.panel_id, role_id: r.role_id.into(), role_name: r.role_name, emoji: r.emoji, label: r.label, style: r.style, position: r.position }
+        Self {
+            id: r.id,
+            panel_id: r.panel_id,
+            role_id: r.role_id.into(),
+            role_name: r.role_name,
+            emoji: r.emoji,
+            label: r.label,
+            style: r.style,
+            position: r.position,
+        }
     }
 }
 
 impl From<AutoRoleRow> for AutoRole {
     fn from(r: AutoRoleRow) -> Self {
-        Self { id: r.id, guild_id: r.guild_id.into(), role_id: r.role_id.into(), role_name: r.role_name, delay_secs: r.delay_secs, enabled: r.enabled }
+        Self {
+            id: r.id,
+            guild_id: r.guild_id.into(),
+            role_id: r.role_id.into(),
+            role_name: r.role_name,
+            delay_secs: r.delay_secs,
+            enabled: r.enabled,
+        }
     }
 }
 
@@ -101,55 +129,102 @@ impl RolePanelRepository for PgRolePanelRepository {
     }
 
     async fn find_panel(&self, panel_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
-        let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
+        let id: Uuid = panel_id
+            .parse()
+            .map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         let panel = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE id = $1")
-            .bind(id).fetch_optional(&self.pool).await.map_err(pg_err)?;
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
         match panel {
             Some(p) => {
-                let entries = sqlx::query_as::<_, EntryRow>("SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC")
-                    .bind(id).fetch_all(&self.pool).await.map_err(pg_err)?;
-                Ok(Some(RolePanelDetail { panel: p.into(), entries: entries.into_iter().map(RolePanelEntry::from).collect() }))
+                let entries = sqlx::query_as::<_, EntryRow>(
+                    "SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC",
+                )
+                .bind(id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(pg_err)?;
+                Ok(Some(RolePanelDetail {
+                    panel: p.into(),
+                    entries: entries.into_iter().map(RolePanelEntry::from).collect(),
+                }))
             }
             None => Ok(None),
         }
     }
 
-    async fn find_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, DomainError> {
-        let panel = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE message_id = $1")
-            .bind(message_id).fetch_optional(&self.pool).await.map_err(pg_err)?;
+    async fn find_panel_by_message(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<RolePanelDetail>, DomainError> {
+        let panel =
+            sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE message_id = $1")
+                .bind(message_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
         match panel {
             Some(p) => {
-                let entries = sqlx::query_as::<_, EntryRow>("SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC")
-                    .bind(p.id).fetch_all(&self.pool).await.map_err(pg_err)?;
-                Ok(Some(RolePanelDetail { panel: p.into(), entries: entries.into_iter().map(RolePanelEntry::from).collect() }))
+                let entries = sqlx::query_as::<_, EntryRow>(
+                    "SELECT * FROM role_panel_entries WHERE panel_id = $1 ORDER BY position ASC",
+                )
+                .bind(p.id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(pg_err)?;
+                Ok(Some(RolePanelDetail {
+                    panel: p.into(),
+                    entries: entries.into_iter().map(RolePanelEntry::from).collect(),
+                }))
             }
             None => Ok(None),
         }
     }
 
     async fn find_panels_by_guild(&self, guild_id: &str) -> Result<Vec<RolePanel>, DomainError> {
-        let rows = sqlx::query_as::<_, PanelRow>("SELECT * FROM role_panels WHERE guild_id = $1 ORDER BY created_at DESC")
-            .bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
+        let rows = sqlx::query_as::<_, PanelRow>(
+            "SELECT * FROM role_panels WHERE guild_id = $1 ORDER BY created_at DESC",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(rows.into_iter().map(RolePanel::from).collect())
     }
 
     async fn update_message_id(&self, panel_id: &str, message_id: &str) -> Result<(), DomainError> {
-        let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
+        let id: Uuid = panel_id
+            .parse()
+            .map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         sqlx::query("UPDATE role_panels SET message_id = $1, updated_at = NOW() WHERE id = $2")
-            .bind(message_id).bind(id).execute(&self.pool).await.map_err(pg_err)?;
+            .bind(message_id)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(())
     }
 
     async fn delete_panel(&self, panel_id: &str) -> Result<(), DomainError> {
-        let id: Uuid = panel_id.parse().map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
+        let id: Uuid = panel_id
+            .parse()
+            .map_err(|_| DomainError::ValidationError("ID invalide".into()))?;
         sqlx::query("DELETE FROM role_panels WHERE id = $1")
-            .bind(id).execute(&self.pool).await.map_err(pg_err)?;
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(())
     }
 
     async fn find_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, DomainError> {
         let rows = sqlx::query_as::<_, AutoRoleRow>("SELECT * FROM auto_roles WHERE guild_id = $1")
-            .bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
+            .bind(guild_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(rows.into_iter().map(AutoRole::from).collect())
     }
 
@@ -164,7 +239,11 @@ impl RolePanelRepository for PgRolePanelRepository {
 
     async fn delete_auto_role(&self, guild_id: &str, role_id: &str) -> Result<(), DomainError> {
         sqlx::query("DELETE FROM auto_roles WHERE guild_id = $1 AND role_id = $2")
-            .bind(guild_id).bind(role_id).execute(&self.pool).await.map_err(pg_err)?;
+            .bind(guild_id)
+            .bind(role_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(())
     }
 }

@@ -10,8 +10,8 @@ use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::api_client::ApiClient;
 use crate::modules::coude::catalog::{CatalogCache, CatalogCacheKey};
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub const STEAL_DEFEND_PREFIX: &str = "steal_defend:";
 
@@ -67,7 +67,9 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let target_id = command
         .data
@@ -89,7 +91,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
+    if !crate::modules::coude::channel_check::check_channel(
+        ctx,
+        command,
+        config.channel_activites(),
+    )
+    .await
+    {
         return;
     }
     if !config.steal_enabled() {
@@ -110,7 +118,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Verifier la limite quotidienne de vols
     let max_daily = config.steal_max_daily();
     if max_daily > 0 {
-        let today_count = api.count_steal_today(&guild_id, &thief_id).await.unwrap_or(0);
+        let today_count = api
+            .count_steal_today(&guild_id, &thief_id)
+            .await
+            .unwrap_or(0);
         if today_count >= max_daily {
             crate::modules::coude::interaction_helper::followup_text(
                 ctx,
@@ -168,13 +179,23 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let target_user = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
         Err(_) => {
-            crate::modules::coude::interaction_helper::followup_text(ctx, command, "Utilisateur introuvable.").await;
+            crate::modules::coude::interaction_helper::followup_text(
+                ctx,
+                command,
+                "Utilisateur introuvable.",
+            )
+            .await;
             return;
         }
     };
 
     if target_user.bot {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, "Tu ne peux pas voler un bot !").await;
+        crate::modules::coude::interaction_helper::followup_text(
+            ctx,
+            command,
+            "Tu ne peux pas voler un bot !",
+        )
+        .await;
         return;
     }
 
@@ -237,7 +258,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             target_id, target_id
         ))
         .color(0xFFA500)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel — 60s pour reagir"))
+        .footer(CreateEmbedFooter::new(
+            "Coup de Coude | Sentinel — 60s pour reagir",
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     let defend_btn = CreateButton::new(&custom_id)
@@ -318,7 +341,10 @@ pub(crate) async fn resolve_steal_attempt(
     target_player: &crate::modules::coude::api_client::Player,
     afk: bool,
     failure_penalty_pct: u64,
-) -> (CreateEmbed, Vec<crate::modules::coude::api_client::TauntEvent>) {
+) -> (
+    CreateEmbed,
+    Vec<crate::modules::coude::api_client::TauntEvent>,
+) {
     // Phase 2 #4 audit : tirage RNG (d20 thief/victim + % wallet) cote API.
     // Pas de fallback local : si l'API est down on retourne une erreur.
     let api_roll = match api.roll_steal(guild_id, afk).await {
@@ -383,7 +409,9 @@ pub(crate) async fn resolve_steal_attempt(
         // Le voleur a gagne le roll — mais une protection active peut
         // encore bloquer le vol (Phase 9 Part B : abonnements temps-base,
         // plus de consommation d'item).
-        if let Some((_key, name, rolled, chance)) = try_trigger_protection(api, guild_id, target_id).await {
+        if let Some((_key, name, rolled, chance)) =
+            try_trigger_protection(api, guild_id, target_id).await
+        {
             // Phase 9 Part D : blocage reussi → reset le victim streak.
             if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
                 tracing::warn!(error = %e, "Echec track_steal_defended");
@@ -416,9 +444,14 @@ pub(crate) async fn resolve_steal_attempt(
             }
             let embed = CreateEmbed::new()
                 .title("\u{1f6e1}\u{fe0f} Vol bloque !")
-                .description(format!("{}{}{}{}", block_msg, roll_detail, protection_detail, xp_line))
+                .description(format!(
+                    "{}{}{}{}",
+                    block_msg, roll_detail, protection_detail, xp_line
+                ))
                 .color(0x3498DB)
-                .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+                .footer(CreateEmbedFooter::new(
+                    crate::shared::branding::COUDE_TAGLINE_SHORT,
+                ))
                 .timestamp(serenity::model::Timestamp::now());
             return (embed, taunt_events);
         }
@@ -471,7 +504,11 @@ pub(crate) async fn resolve_steal_attempt(
 
         // Phase 3 #9 audit : tirage du template via l'API (catalogue
         // editable runtime). Pas de fallback local.
-        let key = if afk { "steal_success_afk" } else { "steal_success_fight" };
+        let key = if afk {
+            "steal_success_afk"
+        } else {
+            "steal_success_fight"
+        };
         let template_str: String = match api.random_flavor(key, "fr").await {
             Ok(Some(s)) => s,
             Ok(None) | Err(_) => {
@@ -493,7 +530,9 @@ pub(crate) async fn resolve_steal_attempt(
             .title("\u{1f4b0} Vol reussi !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0x57F287)
-            .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+            .footer(CreateEmbedFooter::new(
+                crate::shared::branding::COUDE_TAGLINE_SHORT,
+            ))
             .timestamp(serenity::model::Timestamp::now());
         (embed, taunt_events)
     } else {
@@ -507,7 +546,10 @@ pub(crate) async fn resolve_steal_attempt(
         // auto-detectee cote voleur). Le montant reellement perdu peut
         // etre clamp au solde du voleur cote serveur ; le message
         // affiche utilise la valeur du serveur pour coherence.
-        let lost = match api.record_steal_fail_penalty(guild_id, thief_id, lost).await {
+        let lost = match api
+            .record_steal_fail_penalty(guild_id, thief_id, lost)
+            .await
+        {
             Ok((actual_lost, wallet_taunts)) => {
                 taunt_events.extend(wallet_taunts);
                 actual_lost.max(1)
@@ -558,7 +600,9 @@ pub(crate) async fn resolve_steal_attempt(
             .title("\u{1f6a8} Vol rate !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0xED4245)
-            .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+            .footer(CreateEmbedFooter::new(
+                crate::shared::branding::COUDE_TAGLINE_SHORT,
+            ))
             .timestamp(serenity::model::Timestamp::now());
         (embed, taunt_events)
     }
@@ -590,16 +634,31 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
                     if component_guild_id_str.is_empty() {
                         return;
                     }
-                    (Some(aid), parts[2].to_string(), parts[3].to_string(), component_guild_id_str)
+                    (
+                        Some(aid),
+                        parts[2].to_string(),
+                        parts[3].to_string(),
+                        component_guild_id_str,
+                    )
                 } else {
                     // Legacy : steal_defend:{thief}:{target}:{guild}
-                    (None, parts[1].to_string(), parts[2].to_string(), parts[3].to_string())
+                    (
+                        None,
+                        parts[1].to_string(),
+                        parts[2].to_string(),
+                        parts[3].to_string(),
+                    )
                 }
             }
             5 => {
                 // Phase 5 deprecated : steal_defend:{uuid}:{thief}:{target}:{guild}
                 let aid = Uuid::parse_str(parts[1]).ok();
-                (aid, parts[2].to_string(), parts[3].to_string(), parts[4].to_string())
+                (
+                    aid,
+                    parts[2].to_string(),
+                    parts[3].to_string(),
+                    parts[4].to_string(),
+                )
             }
             _ => return,
         };
@@ -649,10 +708,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Fetch both players
-    let thief_player = match api
-        .get_or_create_player(guild_id, thief_id, "")
-        .await
-    {
+    let thief_player = match api.get_or_create_player(guild_id, thief_id, "").await {
         Ok(p) => p,
         Err(e) => {
             let _ = component
@@ -719,8 +775,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         if let Err(e2) = component
             .create_followup(
                 &ctx.http,
-                serenity::all::CreateInteractionResponseFollowup::new()
-                    .embed(embed),
+                serenity::all::CreateInteractionResponseFollowup::new().embed(embed),
             )
             .await
         {
@@ -740,4 +795,3 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         }
     }
 }
-

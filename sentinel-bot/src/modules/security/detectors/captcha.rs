@@ -223,11 +223,13 @@ pub async fn send_challenge(ctx: &Context, user_id: UserId, guild_name: &str) ->
              Cliquez sur le bouton ci-dessous pour confirmer que vous etes humain.",
             guild_name
         ))
-        .field("\u{23f1}\u{fe0f}", "Vous avez **5 minutes** pour vous verifier, sinon vous serez expulse.", false);
+        .field(
+            "\u{23f1}\u{fe0f}",
+            "Vous avez **5 minutes** pour vous verifier, sinon vous serez expulse.",
+            false,
+        );
 
-    let message = CreateMessage::new()
-        .embed(embed)
-        .components(vec![row]);
+    let message = CreateMessage::new().embed(embed).components(vec![row]);
 
     match dm_channel.send_message(&ctx.http, message).await {
         Ok(_) => {
@@ -357,8 +359,12 @@ mod tests {
     #[test]
     fn code_is_alphanumeric_uppercase() {
         let code = generate_code();
-        assert!(code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()),
-            "Code doit etre alphanumerique majuscule, got: {}", code);
+        assert!(
+            code.chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()),
+            "Code doit etre alphanumerique majuscule, got: {}",
+            code
+        );
     }
 
     #[test]
@@ -366,6 +372,9 @@ mod tests {
         let codes: Vec<String> = (0..10).map(|_| generate_code()).collect();
         // Au moins 2 codes differents sur 10
         let unique: std::collections::HashSet<&String> = codes.iter().collect();
-        assert!(unique.len() >= 2, "generate_code doit produire des valeurs variees");
+        assert!(
+            unique.len() >= 2,
+            "generate_code doit produire des valeurs variees"
+        );
     }
 }

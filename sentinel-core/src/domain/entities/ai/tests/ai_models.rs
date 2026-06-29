@@ -41,7 +41,10 @@ fn path_basename_empty_stays_empty() {
 
 #[test]
 fn format_model_display_name_empty_path() {
-    assert_eq!(format_model_display_name("Vision", ""), "Vision ONNX (non configure)");
+    assert_eq!(
+        format_model_display_name("Vision", ""),
+        "Vision ONNX (non configure)"
+    );
 }
 
 #[test]

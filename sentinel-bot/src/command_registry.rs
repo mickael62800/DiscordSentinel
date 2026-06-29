@@ -104,7 +104,9 @@ pub async fn refresh_guild_commands(ctx: &Context, guild_id: GuildId) {
     let commands = compute_guild_commands(&api, &guild_id.to_string()).await;
     let count = commands.len();
     match guild_id.set_commands(&ctx.http, commands).await {
-        Ok(_) => info!(guild_id = %guild_id, commands = count, "Slash commands refreshed for guild"),
+        Ok(_) => {
+            info!(guild_id = %guild_id, commands = count, "Slash commands refreshed for guild")
+        }
         Err(e) => warn!(error = %e, guild_id = %guild_id, "Echec refresh commandes guild"),
     }
 }
@@ -113,7 +115,10 @@ pub async fn refresh_guild_commands(ctx: &Context, guild_id: GuildId) {
 /// commandes filtrees. Remplace l'ancien set_global_commands qui
 /// enregistrait TOUT pour TOUTES les guilds.
 pub async fn refresh_all_guilds(ctx: &Context, guild_ids: &[GuildId]) {
-    info!(guilds = guild_ids.len(), "Refreshing slash commands per guild...");
+    info!(
+        guilds = guild_ids.len(),
+        "Refreshing slash commands per guild..."
+    );
     for &gid in guild_ids {
         refresh_guild_commands(ctx, gid).await;
     }
@@ -149,9 +154,18 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         Some(d) => d,
         None => return,
     };
-    let guild_id_str = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or_default();
-    let bot_name = data.get("bot_name").and_then(|v| v.as_str()).unwrap_or_default();
-    let enabled = data.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+    let guild_id_str = data
+        .get("guild_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let bot_name = data
+        .get("bot_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+    let enabled = data
+        .get("enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
     let Ok(gid_u64) = guild_id_str.parse::<u64>() else {
         return;
     };

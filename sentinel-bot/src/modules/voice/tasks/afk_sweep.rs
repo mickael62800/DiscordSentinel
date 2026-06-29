@@ -42,7 +42,13 @@ async fn run_afk_sweep(ctx: &Context) {
     drop(data);
 
     for guild_id in ctx.cache.guilds() {
-        let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME).await {
+        let guild_config = match base
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::voice::MODULE_BOT_NAME,
+            )
+            .await
+        {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -60,7 +66,8 @@ async fn run_afk_sweep(ctx: &Context) {
             continue;
         }
 
-        let afk_timeout_minutes = BaseApiClient::config_u64(&guild_config, "afk_timeout_minutes", 10);
+        let afk_timeout_minutes =
+            BaseApiClient::config_u64(&guild_config, "afk_timeout_minutes", 10);
         let afk_move_owner = BaseApiClient::config_bool(&guild_config, "afk_move_owner", false);
         let afk_channel = ChannelId::new(afk_channel_id);
 
@@ -74,7 +81,8 @@ async fn run_afk_sweep(ctx: &Context) {
 
             // Trouver le salon vocal actuel de l'utilisateur
             let current_channel = if let Some(guild) = ctx.cache.guild(guild_id) {
-                guild.voice_states
+                guild
+                    .voice_states
                     .get(&user_id)
                     .and_then(|vs| vs.channel_id)
             } else {
@@ -117,7 +125,8 @@ async fn run_afk_sweep(ctx: &Context) {
                     let to_name = embeds::get_channel_name(ctx, afk_channel).await;
                     let afk_minutes = elapsed_secs / 60;
 
-                    embeds::log_afk_move(ctx, user_id.get(), &from_name, &to_name, afk_minutes).await;
+                    embeds::log_afk_move(ctx, user_id.get(), &from_name, &to_name, afk_minutes)
+                        .await;
                     afk_tracker.clear(user_id);
 
                     info!(

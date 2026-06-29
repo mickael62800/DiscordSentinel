@@ -21,9 +21,9 @@ use crate::ports::inbound::community::manage_voice_channels::SavePresetCommand;
 use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::system::cache::CachePort;
-use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 mod access_control;
 mod co_admin;
 mod config;
@@ -46,7 +46,11 @@ impl ManageVoiceChannelsService {
         cache: Arc<dyn CachePort>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { repo, cache, bot_config_repo }
+        Self {
+            repo,
+            cache,
+            bot_config_repo,
+        }
     }
 
     pub(super) fn generate_code() -> String {
@@ -68,48 +72,75 @@ impl ManageVoiceChannelsService {
                 return Ok(code);
             }
         }
-        Err(DomainError::Internal("Impossible de generer un code unique apres 5 tentatives".to_string()))
+        Err(DomainError::Internal(
+            "Impossible de generer un code unique apres 5 tentatives".to_string(),
+        ))
     }
 
     pub(super) fn validate_theme(cmd: &CreateThemeCommand) -> Result<(), DomainError> {
         if cmd.name.trim().is_empty() {
-            return Err(DomainError::ValidationError("Le nom du theme est obligatoire".to_string()));
+            return Err(DomainError::ValidationError(
+                "Le nom du theme est obligatoire".to_string(),
+            ));
         }
         if cmd.name.len() > 100 {
-            return Err(DomainError::ValidationError("Le nom du theme ne peut pas depasser 100 caracteres".to_string()));
+            return Err(DomainError::ValidationError(
+                "Le nom du theme ne peut pas depasser 100 caracteres".to_string(),
+            ));
         }
         if let Some(limit) = cmd.member_limit {
             if !(0..=99).contains(&limit) {
-                return Err(DomainError::ValidationError("La limite de membres doit etre entre 0 et 99".to_string()));
+                return Err(DomainError::ValidationError(
+                    "La limite de membres doit etre entre 0 et 99".to_string(),
+                ));
             }
         }
         if let Some(bitrate) = cmd.bitrate {
             if !(8000..=384000).contains(&bitrate) {
-                return Err(DomainError::ValidationError("Le bitrate doit etre entre 8000 et 384000".to_string()));
+                return Err(DomainError::ValidationError(
+                    "Le bitrate doit etre entre 8000 et 384000".to_string(),
+                ));
             }
         }
         if let Some(slowmode) = cmd.slowmode_secs {
             if !(0..=21600).contains(&slowmode) {
-                return Err(DomainError::ValidationError("Le slowmode doit etre entre 0 et 21600 secondes".to_string()));
+                return Err(DomainError::ValidationError(
+                    "Le slowmode doit etre entre 0 et 21600 secondes".to_string(),
+                ));
             }
         }
         match cmd.visibility.as_str() {
             "visible" | "hidden" => {}
-            _ => return Err(DomainError::ValidationError("La visibilite doit etre 'visible' ou 'hidden'".to_string())),
+            _ => {
+                return Err(DomainError::ValidationError(
+                    "La visibilite doit etre 'visible' ou 'hidden'".to_string(),
+                ))
+            }
         }
         Ok(())
     }
 
     pub(super) async fn invalidate_cache(&self, guild_id: &str, channel_id: &str) {
-        if let Err(e) = self.cache.invalidate(&format!("voice_channels:{guild_id}")).await {
+        if let Err(e) = self
+            .cache
+            .invalidate(&format!("voice_channels:{guild_id}"))
+            .await
+        {
             tracing::warn!(error = %e, guild_id, "Echec invalidation cache voice_channels");
         }
-        if let Err(e) = self.cache.invalidate(&format!("voice_channel:{channel_id}")).await {
+        if let Err(e) = self
+            .cache
+            .invalidate(&format!("voice_channel:{channel_id}"))
+            .await
+        {
             tracing::warn!(error = %e, channel_id, "Echec invalidation cache voice_channel");
         }
     }
 
-    pub(super) async fn resolve_channel(&self, channel_id: &str) -> Result<VoiceChannel, DomainError> {
+    pub(super) async fn resolve_channel(
+        &self,
+        channel_id: &str,
+    ) -> Result<VoiceChannel, DomainError> {
         self.repo
             .find_by_channel_id(channel_id)
             .await?
@@ -127,15 +158,25 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.list_channels_impl(guild_id).await
     }
 
-    async fn list_history_channels(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError> {
+    async fn list_history_channels(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<VoiceChannel>, DomainError> {
         self.list_history_channels_impl(guild_id, limit).await
     }
 
-    async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError> {
+    async fn get_channel_detail(
+        &self,
+        channel_id: &str,
+    ) -> Result<VoiceChannelDetail, DomainError> {
         self.get_channel_detail_impl(channel_id).await
     }
 
-    async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError> {
+    async fn create_channel(
+        &self,
+        cmd: CreateVoiceChannelCommand,
+    ) -> Result<VoiceChannel, DomainError> {
         self.create_channel_impl(cmd).await
     }
 
@@ -163,7 +204,11 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.remove_co_admin_impl(channel_id, user_id).await
     }
 
-    async fn get_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
+    async fn get_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
         self.get_whitelist_impl(guild_id, owner_id).await
     }
 
@@ -171,11 +216,21 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.add_to_whitelist_impl(cmd).await
     }
 
-    async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError> {
-        self.remove_from_whitelist_impl(guild_id, owner_id, target_id).await
+    async fn remove_from_whitelist(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError> {
+        self.remove_from_whitelist_impl(guild_id, owner_id, target_id)
+            .await
     }
 
-    async fn get_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError> {
+    async fn get_preset(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<VoiceChannelPreset>, DomainError> {
         self.get_preset_impl(guild_id, owner_id).await
     }
 
@@ -197,15 +252,24 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
 
     // ── Invite Links ──
 
-    async fn create_invite_link(&self, cmd: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
+    async fn create_invite_link(
+        &self,
+        cmd: CreateInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
         self.create_invite_link_impl(cmd).await
     }
 
-    async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
+    async fn list_invite_links(
+        &self,
+        channel_id: &str,
+    ) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
         self.list_invite_links_impl(channel_id).await
     }
 
-    async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
+    async fn use_invite_link(
+        &self,
+        cmd: UseInviteLinkCommand,
+    ) -> Result<VoiceChannelInviteLink, DomainError> {
         self.use_invite_link_impl(cmd).await
     }
 
@@ -225,11 +289,18 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.list_themes_impl(guild_id).await
     }
 
-    async fn create_theme(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    async fn create_theme(
+        &self,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         self.create_theme_impl(cmd).await
     }
 
-    async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    async fn update_theme(
+        &self,
+        theme_id: &str,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         self.update_theme_impl(theme_id, cmd).await
     }
 
@@ -237,7 +308,6 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.delete_theme_impl(guild_id, theme_id).await
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/mod_tests.rs"]

@@ -4,10 +4,10 @@
 //! Lecture : ouverte aux Admin+ (visualiser la config).
 //! Ecriture : Owner+ (la config c'est de la securite).
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use axum::extract::State;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -104,15 +104,19 @@ pub async fn upsert_min_role(
 
     if Role::from_str(&dto.min_role).is_none() {
         return Err(ApiError(DomainError::ValidationError(format!(
-            "min_role invalide: {}", dto.min_role
+            "min_role invalide: {}",
+            dto.min_role
         ))));
     }
     // On verifie que la cle est connue (sinon override inutile).
     let known_keys: Vec<&'static str> = component_gates::list_gates()
-        .into_iter().map(|(k, _)| k).collect();
+        .into_iter()
+        .map(|(k, _)| k)
+        .collect();
     if !known_keys.contains(&dto.component_key.as_str()) {
         return Err(ApiError(DomainError::ValidationError(format!(
-            "component_key inconnu: {}", dto.component_key
+            "component_key inconnu: {}",
+            dto.component_key
         ))));
     }
 

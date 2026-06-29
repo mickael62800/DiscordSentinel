@@ -9,8 +9,15 @@ use super::super::state::AppState;
 
 fn security_inner() -> Router<AppState> {
     Router::new()
-        .route("/events", post(handlers::audit::security::report_event).get(handlers::audit::security::list_events))
-        .route("/events/{guild_id}", delete(handlers::audit::security::purge_events))
+        .route(
+            "/events",
+            post(handlers::audit::security::report_event)
+                .get(handlers::audit::security::list_events),
+        )
+        .route(
+            "/events/{guild_id}",
+            delete(handlers::audit::security::purge_events),
+        )
         // Phase 5F — quarantaine (timer kick deplace dans sentinel-worker).
         .route(
             "/quarantine",

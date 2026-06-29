@@ -145,9 +145,7 @@ impl ApiClient {
         };
         let mut client = self.grpc.stats();
         self.grpc
-            .guarded(|| async move {
-                client.record_messages(req).await.map(|_| ())
-            })
+            .guarded(|| async move { client.record_messages(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
     }
@@ -171,9 +169,7 @@ impl ApiClient {
         };
         let mut client = self.grpc.stats();
         self.grpc
-            .guarded(|| async move {
-                client.record_voice(req).await.map(|_| ())
-            })
+            .guarded(|| async move { client.record_voice(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
     }
@@ -190,9 +186,7 @@ impl ApiClient {
         let mut client = self.grpc.stats();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.get_user_stats(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_user_stats(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(resp.stats.map(proto_user_stats_to_response))
@@ -208,9 +202,7 @@ impl ApiClient {
         let mut client = self.grpc.stats();
         let overview = self
             .grpc
-            .guarded(|| async move {
-                client.get_guild_overview(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_guild_overview(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(GuildOverviewResponse {
@@ -243,12 +235,14 @@ impl ApiClient {
         let mut client = self.grpc.stats();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.get_leaderboard(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_leaderboard(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(list.users.into_iter().map(proto_user_stats_to_response).collect())
+        Ok(list
+            .users
+            .into_iter()
+            .map(proto_user_stats_to_response)
+            .collect())
     }
 
     // ── Levels / XP (gRPC) ──
@@ -271,9 +265,7 @@ impl ApiClient {
         let mut client = self.grpc.progression();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.add_xp(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.add_xp(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(proto_add_xp_to_response(resp))
@@ -291,9 +283,7 @@ impl ApiClient {
         let mut client = self.grpc.progression();
         let result = self
             .grpc
-            .guarded(|| async move {
-                client.get_user_level(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_user_level(req).await.map(|r| r.into_inner()) })
             .await;
         match result {
             Ok(level) => Ok(Some(proto_user_level_to_response(level))),
@@ -318,9 +308,7 @@ impl ApiClient {
         let mut client = self.grpc.progression();
         let board = self
             .grpc
-            .guarded(|| async move {
-                client.get_leaderboard(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_leaderboard(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(board

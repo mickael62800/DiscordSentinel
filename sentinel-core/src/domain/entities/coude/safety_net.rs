@@ -9,11 +9,11 @@
 //! Logique pure ici. La persistance vit dans `coude_safety_nets` et est
 //! geree par le service `ManageCoudeSafetyNetService`.
 
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Seuil de declenchement (en coins). Si le wallet tombe sous ce
 /// montant, le filet s active.

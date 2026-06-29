@@ -6,7 +6,6 @@ use sentinel_core::domain::errors::DomainError;
 use super::super::pg_err;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 
-
 pub struct PgEconomyRepository {
     pool: PgPool,
 }
@@ -16,7 +15,6 @@ impl PgEconomyRepository {
         Self { pool }
     }
 }
-
 
 #[async_trait]
 impl EconomyRepository for PgEconomyRepository {
@@ -47,8 +45,12 @@ impl EconomyRepository for PgEconomyRepository {
             "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id).bind(victim_id).bind(amount)
-        .execute(&mut *tx).await.map_err(pg_err)?;
+        .bind(guild_id)
+        .bind(victim_id)
+        .bind(amount)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
 
         sqlx::query(
             "UPDATE coude_players SET total_stolen = total_stolen + $3, total_earned = total_earned + $3, updated_at = NOW()
@@ -74,24 +76,23 @@ impl EconomyRepository for PgEconomyRepository {
             "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id).bind(thief_id).bind(amount)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .bind(guild_id)
+        .bind(thief_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(())
     }
 
-    async fn get_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
-        let row: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(pg_err)?;
+    async fn get_coins(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2")
+                .bind(guild_id)
+                .bind(user_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_err)?;
         let (coins,) = row.ok_or_else(|| DomainError::NotFound("Wallet introuvable".into()))?;
         Ok(coins)
     }
@@ -220,11 +221,7 @@ impl EconomyRepository for PgEconomyRepository {
         Ok(row.0)
     }
 
-    async fn count_casino_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         let row: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM coude_cooldowns
                WHERE guild_id = $1 AND user_id = $2 AND action = 'casino'
@@ -256,11 +253,7 @@ impl EconomyRepository for PgEconomyRepository {
         Ok(row.0)
     }
 
-    async fn count_steal_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         let row: (i64,) = sqlx::query_as(
             r#"SELECT COUNT(*) FROM coude_cooldowns
                WHERE guild_id = $1 AND user_id = $2 AND action = 'voler'

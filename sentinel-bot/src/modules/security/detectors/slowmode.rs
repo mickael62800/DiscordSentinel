@@ -23,12 +23,7 @@ impl SlowmodeManager {
     }
 
     /// Active le slowmode sur tous les salons texte d'un serveur.
-    pub async fn activate(
-        &self,
-        ctx: &Context,
-        guild_id: GuildId,
-        slowmode_secs: u16,
-    ) {
+    pub async fn activate(&self, ctx: &Context, guild_id: GuildId, slowmode_secs: u16) {
         if self.active.contains_key(&guild_id) {
             return; // Deja actif
         }
@@ -83,10 +78,12 @@ impl SlowmodeManager {
                 "previous_states": states_json,
                 "duration_secs": 300,
             });
-            base.post_fire_and_forget("/api/security/slowmode", &body).await;
+            base.post_fire_and_forget("/api/security/slowmode", &body)
+                .await;
         }
 
-        self.active.insert(guild_id, (Instant::now(), previous_states));
+        self.active
+            .insert(guild_id, (Instant::now(), previous_states));
 
         info!(
             guild_id = %guild_id,

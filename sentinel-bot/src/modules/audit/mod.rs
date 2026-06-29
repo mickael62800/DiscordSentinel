@@ -13,15 +13,15 @@
 
 pub const MODULE_BOT_NAME: &str = "audit-bot";
 
+pub mod anomaly;
 pub mod api_client;
 pub mod audit_event;
+pub mod commands;
+pub mod handlers;
 pub mod message_cache;
-pub mod anomaly;
-pub mod weekly_report;
 pub mod permission_diff;
 pub mod watched_users;
-pub mod handlers;
-pub mod commands;
+pub mod weekly_report;
 
 use std::sync::Arc;
 
@@ -85,7 +85,10 @@ impl Default for AuditConfig {
             message_cache_size: crate::shared::config::load_env("MESSAGE_CACHE_SIZE", 10_000),
             anomaly_window_secs: crate::shared::config::load_env("ANOMALY_WINDOW_SECS", 60),
             anomaly_mass_ban_threshold: crate::shared::config::load_env("ANOMALY_MASS_BAN", 5),
-            anomaly_mass_delete_threshold: crate::shared::config::load_env("ANOMALY_MASS_DELETE", 20),
+            anomaly_mass_delete_threshold: crate::shared::config::load_env(
+                "ANOMALY_MASS_DELETE",
+                20,
+            ),
             anomaly_mass_role_threshold: crate::shared::config::load_env("ANOMALY_MASS_ROLE", 10),
         }
     }
@@ -96,7 +99,9 @@ impl Default for AuditConfig {
 /// Insere les TypeMapKeys du module audit.
 pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     let audit_config = AuditConfig::default();
-    data.insert::<MessageCacheKey>(message_cache::MessageCache::new(audit_config.message_cache_size));
+    data.insert::<MessageCacheKey>(message_cache::MessageCache::new(
+        audit_config.message_cache_size,
+    ));
     data.insert::<AnomalyDetectorKey>(anomaly::AnomalyDetector::new(
         audit_config.anomaly_window_secs,
         anomaly::AnomalyThresholds {
@@ -144,27 +149,35 @@ pub async fn send_event(ctx: &Context, event: AuditEvent) {
 pub async fn anomaly_thresholds_for(ctx: &Context, guild_id: &str) -> anomaly::AnomalyThresholds {
     let default = {
         let data = ctx.data.read().await;
-        data.get::<ConfigKey>().map(|c| anomaly::AnomalyThresholds {
-            mass_ban: c.anomaly_mass_ban_threshold,
-            mass_delete: c.anomaly_mass_delete_threshold,
-            mass_role_change: c.anomaly_mass_role_threshold,
-        }).unwrap_or_default()
+        data.get::<ConfigKey>()
+            .map(|c| anomaly::AnomalyThresholds {
+                mass_ban: c.anomaly_mass_ban_threshold,
+                mass_delete: c.anomaly_mass_delete_threshold,
+                mass_role_change: c.anomaly_mass_role_threshold,
+            })
+            .unwrap_or_default()
     };
     let cfg = {
         let data = ctx.data.read().await;
         match data.get::<ApiClientKey>() {
-            Some(api) => api.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default(),
+            Some(api) => api
+                .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
             None => return default,
         }
     };
     anomaly::AnomalyThresholds {
-        mass_ban: cfg.get("anomaly_mass_ban_threshold")
+        mass_ban: cfg
+            .get("anomaly_mass_ban_threshold")
             .and_then(|v| v.parse().ok())
             .unwrap_or(default.mass_ban),
-        mass_delete: cfg.get("anomaly_mass_delete_threshold")
+        mass_delete: cfg
+            .get("anomaly_mass_delete_threshold")
             .and_then(|v| v.parse().ok())
             .unwrap_or(default.mass_delete),
-        mass_role_change: cfg.get("anomaly_mass_role_threshold")
+        mass_role_change: cfg
+            .get("anomaly_mass_role_threshold")
             .and_then(|v| v.parse().ok())
             .unwrap_or(default.mass_role_change),
     }
@@ -190,7 +203,10 @@ pub async fn post_to_channel(
     let config = {
         let data = ctx.data.read().await;
         match data.get::<ApiClientKey>() {
-            Some(base) => base.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default(),
+            Some(base) => base
+                .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
             None => return,
         }
     };

@@ -74,10 +74,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         .and_then(|v| v.as_array())
         .unwrap_or(&empty);
 
-    let taunts: Vec<TauntEvent> = taunts_json
-        .iter()
-        .filter_map(parse_taunt)
-        .collect();
+    let taunts: Vec<TauntEvent> = taunts_json.iter().filter_map(parse_taunt).collect();
 
     if taunts.is_empty() {
         return;
@@ -104,10 +101,7 @@ fn parse_taunt(v: &serde_json::Value) -> Option<TauntEvent> {
         .and_then(|x| x.as_str())?
         .to_string();
     let streak_kind = v.get("streak_kind").and_then(|x| x.as_str())?.to_string();
-    let streak_value = v
-        .get("streak_value")
-        .and_then(|x| x.as_i64())
-        .unwrap_or(0) as i32;
+    let streak_value = v.get("streak_value").and_then(|x| x.as_i64()).unwrap_or(0) as i32;
 
     Some(TauntEvent {
         channel_id,

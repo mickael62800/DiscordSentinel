@@ -1,17 +1,21 @@
 use serenity::all::{
-    ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 
 use crate::shared::discord_helpers::component_reply_ephemeral as respond_ephemeral;
 
-use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
+use crate::modules::coude::GameApiKey;
 
 pub const CANCEL_PREFIX: &str = "coude_cancel:";
 
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
-    let combat_id = component.data.custom_id.trim_start_matches(CANCEL_PREFIX).to_string();
+    let combat_id = component
+        .data
+        .custom_id
+        .trim_start_matches(CANCEL_PREFIX)
+        .to_string();
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
@@ -50,7 +54,10 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
-    let attacker = match api.get_or_create_player(&guild_id, &combat.attacker_id, &combat.attacker_name).await {
+    let attacker = match api
+        .get_or_create_player(&guild_id, &combat.attacker_id, &combat.attacker_name)
+        .await
+    {
         Ok(p) => p,
         Err(e) => {
             respond_ephemeral(ctx, component, &e).await;
@@ -70,7 +77,10 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Retirer la penalite + comptabiliser dans total_lost
-    if let Err(e) = api.record_coins_lost(&guild_id, &combat.attacker_id, penalty).await {
+    if let Err(e) = api
+        .record_coins_lost(&guild_id, &combat.attacker_id, penalty)
+        .await
+    {
         respond_ephemeral(ctx, component, &format!("Erreur penalite : {e}")).await;
         return;
     }
@@ -93,7 +103,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             attacker.coins - penalty,
         ))
         .color(0x95A5A6)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = component
@@ -110,4 +122,3 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         tracing::warn!(error = %e, "Echec response Discord");
     }
 }
-

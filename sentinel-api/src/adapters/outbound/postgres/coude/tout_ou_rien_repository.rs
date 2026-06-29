@@ -6,15 +6,17 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
+use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
 use sentinel_core::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_tout_ou_rien_log";
-fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
+fn pg_err(e: sqlx::Error) -> DomainError {
+    pg_err_ctx(TBL, e)
+}
 
 pub struct PgToutOuRienRepository {
     pool: PgPool,

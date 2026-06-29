@@ -11,19 +11,23 @@ use sentinel_api::adapters::outbound::postgres::coude::heist_repository::PgHeist
 use sentinel_api::adapters::outbound::postgres::coude::steal_boost_repository::PgStealBoostRepository;
 use sentinel_api::adapters::outbound::postgres::coude::steal_protection_repository::PgStealProtectionRepository;
 use sentinel_api::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
-use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
 use sentinel_api::ports::outbound::coude::heist_repository::HeistRepository;
 use sentinel_api::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
 use sentinel_api::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
+use sentinel_core::domain::entities::system::guild::Guild;
 async fn pool() -> PgPool {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
+    });
     PgPool::connect(&url).await.unwrap()
 }
 fn fresh_id() -> String {
-    format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
+    format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -33,10 +37,12 @@ fn fresh_id() -> String {
 fn sample_guild(id: &str, name: &str) -> Guild {
     let now = Utc::now();
     Guild {
-        guild_id: id.into(), name: name.into(),
+        guild_id: id.into(),
+        name: name.into(),
         icon: Some("icon-hash".into()),
         member_count: 42,
-        registered_at: now, updated_at: now,
+        registered_at: now,
+        updated_at: now,
     }
 }
 
@@ -85,15 +91,23 @@ async fn guild_find_all_includes_inserted() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_last_attempt_none_when_absent() {
     let repo = PgHeistRepository::new(pool().await);
-    assert!(repo.last_attempt(&fresh_id(), &fresh_id()).await.unwrap().is_none());
+    assert!(repo
+        .last_attempt(&fresh_id(), &fresh_id())
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_record_attempt_and_last() {
     let repo = PgHeistRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let tools = vec!["crowbar".to_string(), "mask".to_string()];
-    let a = repo.record_attempt(&g, &u, true, 500, 65, &tools).await.unwrap();
+    let a = repo
+        .record_attempt(&g, &u, true, 500, 65, &tools)
+        .await
+        .unwrap();
     assert!(a.success);
     assert_eq!(a.amount_stolen, 500);
     assert_eq!(a.chance_percent, 65);
@@ -105,11 +119,14 @@ async fn heist_record_attempt_and_last() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_prison_lifecycle() {
     let repo = PgHeistRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     assert!(repo.get_prison(&g, &u).await.unwrap().is_none());
 
     let released = Utc::now() + Duration::hours(4);
-    repo.send_to_prison(&g, &u, released, "caught").await.unwrap();
+    repo.send_to_prison(&g, &u, released, "caught")
+        .await
+        .unwrap();
     let state = repo.get_prison(&g, &u).await.unwrap().unwrap();
     assert_eq!(state.reason, "caught");
     assert!(state.is_active());
@@ -118,7 +135,8 @@ async fn heist_prison_lifecycle() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_send_to_prison_is_upsert() {
     let repo = PgHeistRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let t1 = Utc::now() + Duration::hours(1);
     let t2 = Utc::now() + Duration::hours(10);
     repo.send_to_prison(&g, &u, t1, "first").await.unwrap();
@@ -134,13 +152,18 @@ async fn heist_send_to_prison_is_upsert() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn protection_list_active_empty() {
     let repo = PgStealProtectionRepository::new(pool().await);
-    assert!(repo.list_active(&fresh_id(), &fresh_id()).await.unwrap().is_empty());
+    assert!(repo
+        .list_active(&fresh_id(), &fresh_id())
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn protection_upsert_adds_days() {
     let repo = PgStealProtectionRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     let first = repo.upsert(&g, &u, "alarm", 3).await.unwrap();
     let protection = repo.list_active(&g, &u).await.unwrap();
     assert_eq!(protection.len(), 1);
@@ -157,13 +180,18 @@ async fn protection_upsert_adds_days() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn boost_list_active_empty() {
     let repo = PgStealBoostRepository::new(pool().await);
-    assert!(repo.list_active(&fresh_id(), &fresh_id()).await.unwrap().is_empty());
+    assert!(repo
+        .list_active(&fresh_id(), &fresh_id())
+        .await
+        .unwrap()
+        .is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn boost_upsert_and_list() {
     let repo = PgStealBoostRepository::new(pool().await);
-    let g = fresh_id(); let u = fresh_id();
+    let g = fresh_id();
+    let u = fresh_id();
     repo.upsert(&g, &u, "lockpick", 7).await.unwrap();
     let boosts = repo.list_active(&g, &u).await.unwrap();
     assert_eq!(boosts.len(), 1);
@@ -186,7 +214,10 @@ async fn bj_table_create_and_status() {
     let g = fresh_id();
     let deck = serde_json::json!([{"rank":"A","suit":"spades"}]);
     let ch = format!("s-{:08x}", Uuid::new_v4().as_u128() as u32);
-    let table = repo.create(&g, &ch, "owner1", "Owner", &deck).await.unwrap();
+    let table = repo
+        .create(&g, &ch, "owner1", "Owner", &deck)
+        .await
+        .unwrap();
     let sg = repo.get_status_and_guild(&table.id).await.unwrap().unwrap();
     assert_eq!(sg.1, g);
     let gid = repo.get_guild_id(&table.id).await.unwrap().unwrap();

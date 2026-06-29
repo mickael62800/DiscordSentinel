@@ -19,28 +19,28 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
-use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
-use sentinel_core::domain::entities::moderation::infraction::Infraction;
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::entities::system::rule::Rule;
-use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
-use sentinel_core::domain::enums::moderation::flag_type::FlagType;
-use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
-use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
-use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
-use sentinel_api::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use sentinel_api::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
+use sentinel_core::domain::entities::audit::user_stats::UserStats;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
+use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
+use sentinel_core::domain::entities::moderation::infraction::Infraction;
+use sentinel_core::domain::entities::system::rule::Rule;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_stats;
 
 // ══════════════════════════════════════════════════════════
@@ -53,15 +53,30 @@ struct MockStatsUC {
 
 #[async_trait]
 impl ManageStatsUseCase for MockStatsUC {
-    async fn record_messages(&self, _: RecordMessagesCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn record_voice(&self, _: RecordVoiceCommand) -> Result<(), DomainError> { Ok(()) }
-    async fn get_user_stats(&self, _: &str, _: &str) -> Result<Option<UserStats>, DomainError> { Ok(None) }
-    async fn get_guild_overview(&self, _: &str) -> Result<GuildStatsOverview, DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: u32) -> Result<Vec<UserStats>, DomainError> { Ok(vec![]) }
+    async fn record_messages(&self, _: RecordMessagesCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn record_voice(&self, _: RecordVoiceCommand) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_user_stats(&self, _: &str, _: &str) -> Result<Option<UserStats>, DomainError> {
+        Ok(None)
+    }
+    async fn get_guild_overview(&self, _: &str) -> Result<GuildStatsOverview, DomainError> {
+        unimplemented!()
+    }
+    async fn get_leaderboard(&self, _: &str, _: u32) -> Result<Vec<UserStats>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> {
         Ok(self.dashboard.clone())
     }
-    async fn get_guild_voice_stats(&self, _: &str, _: u32, _: u32) -> Result<GuildVoiceStats, DomainError> {
+    async fn get_guild_voice_stats(
+        &self,
+        _: &str,
+        _: u32,
+        _: u32,
+    ) -> Result<GuildVoiceStats, DomainError> {
         unimplemented!()
     }
 }
@@ -73,16 +88,35 @@ struct MockInfractionsUC {
 
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfractionsUC {
-    async fn list_infractions(&self, guild_id: &str, _: InfractionFilters) -> Result<Vec<Infraction>, DomainError> {
-        Ok(self.items.lock().unwrap().iter().filter(|i| i.guild_id == guild_id).cloned().collect())
+    async fn list_infractions(
+        &self,
+        guild_id: &str,
+        _: InfractionFilters,
+    ) -> Result<Vec<Infraction>, DomainError> {
+        Ok(self
+            .items
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|i| i.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
     async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> {
         Ok(self.items.lock().unwrap().clone())
     }
-    async fn count_today(&self) -> Result<u64, DomainError> { Ok(0) }
-    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> { Ok(None) }
-    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+    async fn count_today(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> {
+        Ok(None)
+    }
+    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[derive(Default)]
@@ -92,10 +126,19 @@ struct MockModerationUC {
 
 #[async_trait]
 impl ManageModerationUseCase for MockModerationUC {
-    async fn list_actions(&self, guild_id: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> {
-        Ok(self.actions.lock().unwrap().iter()
+    async fn list_actions(
+        &self,
+        guild_id: Option<&str>,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
+        Ok(self
+            .actions
+            .lock()
+            .unwrap()
+            .iter()
             .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
-            .cloned().collect())
+            .cloned()
+            .collect())
     }
     async fn log_action(&self, _: LogModerationCommand) -> Result<ModerationAction, DomainError> {
         unimplemented!()
@@ -103,11 +146,20 @@ impl ManageModerationUseCase for MockModerationUC {
     async fn get_history(&self, _: &str, _: &str) -> Result<UserModerationHistory, DomainError> {
         unimplemented!()
     }
-    async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn list_bans(
+        &self,
+        _: Option<&str>,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         Ok(vec![])
     }
-    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> {
+        Ok(true)
+    }
 }
 
 #[derive(Default)]
@@ -119,7 +171,14 @@ struct MockRulesUC {
 #[async_trait]
 impl ManageRulesUseCase for MockRulesUC {
     async fn get_rules(&self, guild_id: &str) -> Result<Vec<Rule>, DomainError> {
-        Ok(self.rules.lock().unwrap().iter().filter(|r| r.guild_id == guild_id).cloned().collect())
+        Ok(self
+            .rules
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.guild_id == guild_id)
+            .cloned()
+            .collect())
     }
     async fn get_all_rules(&self) -> Result<Vec<Rule>, DomainError> {
         Ok(self.rules.lock().unwrap().clone())
@@ -131,7 +190,9 @@ impl ManageRulesUseCase for MockRulesUC {
     async fn create_or_update_rule(&self, _: CreateRuleCommand) -> Result<Rule, DomainError> {
         unimplemented!()
     }
-    async fn delete_rule(&self, _: &str, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_rule(&self, _: &str, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -159,32 +220,51 @@ fn sample_dashboard() -> DashboardStats {
         total_users: 100,
         messages_today: 1234,
         infractions_today: 7,
-        bots_online: 3, bots_total: 4,
-        workers_online: 2, workers_total: 2,
-        postgres_online: true, redis_online: true,
+        bots_online: 3,
+        bots_total: 4,
+        workers_online: 2,
+        workers_total: 2,
+        postgres_online: true,
+        redis_online: true,
     }
 }
 
 fn sample_infraction(guild_id: &str, action: Action) -> Infraction {
     Infraction {
         id: Uuid::new_v4(),
-        guild_id: guild_id.into(), channel_id: "c".into(),
-        user_id: "u".into(), username: "alice".into(),
-        message_id: "m".into(), content: "x".into(),
-        flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
-        score: 0.5, action, reason: "r".into(),
-        duration: None, created_at: Utc::now(),
+        guild_id: guild_id.into(),
+        channel_id: "c".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
+        message_id: "m".into(),
+        content: "x".into(),
+        flags: DetectionFlags {
+            spam: false,
+            insult: false,
+            link: false,
+            phishing: false,
+        },
+        score: 0.5,
+        action,
+        reason: "r".into(),
+        duration: None,
+        created_at: Utc::now(),
     }
 }
 
 fn sample_action(guild_id: &str, action_type: &str) -> ModerationAction {
     ModerationAction {
         id: Uuid::new_v4(),
-        guild_id: guild_id.into(), channel_id: "c".into(),
-        moderator_id: "m".into(), moderator_name: "Mod".into(),
-        target_id: "u".into(), target_name: "alice".into(),
-        action_type: action_type.into(), reason: "r".into(),
-        gravity: Some(ModerationGravity::Medium), duration: None,
+        guild_id: guild_id.into(),
+        channel_id: "c".into(),
+        moderator_id: "m".into(),
+        moderator_name: "Mod".into(),
+        target_id: "u".into(),
+        target_name: "alice".into(),
+        action_type: action_type.into(),
+        reason: "r".into(),
+        gravity: Some(ModerationGravity::Medium),
+        duration: None,
         created_at: Utc::now(),
     }
 }
@@ -192,29 +272,53 @@ fn sample_action(guild_id: &str, action_type: &str) -> ModerationAction {
 fn sample_rule(guild_id: &str, flag: FlagType, enabled: bool) -> Rule {
     let now = Utc::now();
     Rule {
-        id: Uuid::new_v4(), guild_id: guild_id.into(), flag_type: flag,
-        weight: 3.0, threshold_warn: 2.0, threshold_delete: 4.0,
-        threshold_mute: 6.0, threshold_ban: 9.0,
-        enabled, created_at: now, updated_at: now,
+        id: Uuid::new_v4(),
+        guild_id: guild_id.into(),
+        flag_type: flag,
+        weight: 3.0,
+        threshold_warn: 2.0,
+        threshold_delete: 4.0,
+        threshold_mute: 6.0,
+        threshold_ban: 9.0,
+        enabled,
+        created_at: now,
+        updated_at: now,
     }
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("PATCH").uri(uri)
+async fn patch_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("PATCH")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ══════════════════════════════════════════════════════════
@@ -224,7 +328,9 @@ async fn patch_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (S
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_dashboard_stats_returns_dto() {
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(MockInfractionsUC::default()),
         moderation: Arc::new(MockModerationUC::default()),
         rules: Arc::new(MockRulesUC::default()),
@@ -244,12 +350,22 @@ async fn get_dashboard_stats_returns_dto() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_all_infractions_merges_and_sorts() {
     let infractions = MockInfractionsUC::default();
-    infractions.items.lock().unwrap().push(sample_infraction("111111111111111111", Action::Warn));
+    infractions
+        .items
+        .lock()
+        .unwrap()
+        .push(sample_infraction("111111111111111111", Action::Warn));
     let moderation = MockModerationUC::default();
-    moderation.actions.lock().unwrap().push(sample_action("111111111111111111", "ban_permanent"));
+    moderation
+        .actions
+        .lock()
+        .unwrap()
+        .push(sample_action("111111111111111111", "ban_permanent"));
 
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(infractions),
         moderation: Arc::new(moderation),
         rules: Arc::new(MockRulesUC::default()),
@@ -269,11 +385,21 @@ async fn get_all_infractions_merges_and_sorts() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_all_infractions_filter_by_guild() {
     let infractions = MockInfractionsUC::default();
-    infractions.items.lock().unwrap().push(sample_infraction("111111111111111111", Action::Warn));
-    infractions.items.lock().unwrap().push(sample_infraction("222222222222222222", Action::Mute));
+    infractions
+        .items
+        .lock()
+        .unwrap()
+        .push(sample_infraction("111111111111111111", Action::Warn));
+    infractions
+        .items
+        .lock()
+        .unwrap()
+        .push(sample_infraction("222222222222222222", Action::Mute));
 
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(infractions),
         moderation: Arc::new(MockModerationUC::default()),
         rules: Arc::new(MockRulesUC::default()),
@@ -289,7 +415,9 @@ async fn get_all_infractions_filter_by_guild() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_all_infractions_empty() {
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(MockInfractionsUC::default()),
         moderation: Arc::new(MockModerationUC::default()),
         rules: Arc::new(MockRulesUC::default()),
@@ -307,10 +435,20 @@ async fn get_all_infractions_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_all_rules_without_filter_returns_all() {
     let rules = MockRulesUC::default();
-    rules.rules.lock().unwrap().push(sample_rule("g1", FlagType::Spam, true));
-    rules.rules.lock().unwrap().push(sample_rule("g2", FlagType::Insult, false));
+    rules
+        .rules
+        .lock()
+        .unwrap()
+        .push(sample_rule("g1", FlagType::Spam, true));
+    rules
+        .rules
+        .lock()
+        .unwrap()
+        .push(sample_rule("g2", FlagType::Insult, false));
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(MockInfractionsUC::default()),
         moderation: Arc::new(MockModerationUC::default()),
         rules: Arc::new(rules),
@@ -325,10 +463,20 @@ async fn get_all_rules_without_filter_returns_all() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_all_rules_filter_by_guild() {
     let rules = MockRulesUC::default();
-    rules.rules.lock().unwrap().push(sample_rule("111111111111111111", FlagType::Spam, true));
-    rules.rules.lock().unwrap().push(sample_rule("222222222222222222", FlagType::Insult, true));
+    rules
+        .rules
+        .lock()
+        .unwrap()
+        .push(sample_rule("111111111111111111", FlagType::Spam, true));
+    rules
+        .rules
+        .lock()
+        .unwrap()
+        .push(sample_rule("222222222222222222", FlagType::Insult, true));
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(MockInfractionsUC::default()),
         moderation: Arc::new(MockModerationUC::default()),
         rules: Arc::new(rules),
@@ -347,14 +495,21 @@ async fn get_all_rules_filter_by_guild() {
 async fn toggle_rule_forwards_call_and_returns_new_state() {
     let rules = Arc::new(MockRulesUC::default());
     let mocks = TestMocks {
-        stats: Arc::new(MockStatsUC { dashboard: sample_dashboard() }),
+        stats: Arc::new(MockStatsUC {
+            dashboard: sample_dashboard(),
+        }),
         infractions: Arc::new(MockInfractionsUC::default()),
         moderation: Arc::new(MockModerationUC::default()),
         rules: rules.clone(),
     };
     let app = router::build_for_test(build_state(&mocks));
     let id = Uuid::new_v4();
-    let (status, json) = patch_json(app, &format!("/api/rules/{id}"), serde_json::json!({"enabled": false})).await;
+    let (status, json) = patch_json(
+        app,
+        &format!("/api/rules/{id}"),
+        serde_json::json!({"enabled": false}),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["enabled"], false);
     let toggled = rules.toggled.lock().unwrap();

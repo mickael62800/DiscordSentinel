@@ -1,20 +1,20 @@
-use axum::extract::Path;
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
-use axum::Extension;
-use axum::Json;
 use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use sentinel_core::domain::enums::system::role::Role;
 
 /// POST /api/notes
 pub async fn add_note(
@@ -51,7 +51,11 @@ pub async fn get_notes(
 
     // Moderator+ requis : les notes sont sensibles (contexte interne de modo).
     use crate::adapters::inbound::http::middleware::rbac::check_role;
-    check_role(&rbac, Role::Moderator, "moderator+ requis pour lire les notes")?;
+    check_role(
+        &rbac,
+        Role::Moderator,
+        "moderator+ requis pour lire les notes",
+    )?;
 
     let notes = state.notes_uc.get_notes(&guild_id, &user_id).await?;
     Ok(map_to_dtos(notes))
@@ -68,13 +72,12 @@ pub async fn delete_note(
     // "ressource-id-based" — plus simple qu'ajouter une methode au repo).
     if rbac.is_some() {
         let note_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
-        let row: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM user_notes WHERE id = $1",
-        )
-        .bind(note_uuid)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("fetch note guild_id"))?;
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT guild_id FROM user_notes WHERE id = $1")
+                .bind(note_uuid)
+                .fetch_optional(&state.pg_pool)
+                .await
+                .map_err(sqlx_internal("fetch note guild_id"))?;
 
         if let Some((guild_id,)) = row {
             check_role_for_guild(

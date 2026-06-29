@@ -101,7 +101,10 @@ impl Pet {
             self.cooldowns = serde_json::json!({});
         }
         if let Some(map) = self.cooldowns.as_object_mut() {
-            map.insert(action.to_string(), serde_json::Value::String(now.to_rfc3339()));
+            map.insert(
+                action.to_string(),
+                serde_json::Value::String(now.to_rfc3339()),
+            );
         }
     }
 
@@ -113,9 +116,15 @@ impl Pet {
     /// Compteur journalier stocke dans `cooldowns` ({key}_date / {key}_count).
     /// Retourne le compteur du jour `today` (0 si le jour a change).
     pub fn daily_counter(&self, key: &str, today: &str) -> i64 {
-        let date = self.cooldowns.get(format!("{key}_date")).and_then(|v| v.as_str());
+        let date = self
+            .cooldowns
+            .get(format!("{key}_date"))
+            .and_then(|v| v.as_str());
         if date == Some(today) {
-            self.cooldowns.get(format!("{key}_count")).and_then(|v| v.as_i64()).unwrap_or(0)
+            self.cooldowns
+                .get(format!("{key}_count"))
+                .and_then(|v| v.as_i64())
+                .unwrap_or(0)
         } else {
             0
         }
@@ -128,7 +137,10 @@ impl Pet {
             self.cooldowns = serde_json::json!({});
         }
         if let Some(map) = self.cooldowns.as_object_mut() {
-            map.insert(format!("{key}_date"), serde_json::Value::String(today.to_string()));
+            map.insert(
+                format!("{key}_date"),
+                serde_json::Value::String(today.to_string()),
+            );
             map.insert(format!("{key}_count"), serde_json::Value::from(next));
         }
     }
@@ -179,9 +191,13 @@ impl Pet {
 
         let before = (self.hunger, self.happiness, self.energy, self.status);
 
-        self.hunger = clamp_gauge(self.hunger - (cfg.hunger_decay_per_hour as f64 * hours).round() as i32);
-        self.happiness = clamp_gauge(self.happiness - (cfg.happiness_decay_per_hour as f64 * hours).round() as i32);
-        self.energy = clamp_gauge(self.energy - (cfg.energy_decay_per_hour as f64 * hours).round() as i32);
+        self.hunger =
+            clamp_gauge(self.hunger - (cfg.hunger_decay_per_hour as f64 * hours).round() as i32);
+        self.happiness = clamp_gauge(
+            self.happiness - (cfg.happiness_decay_per_hour as f64 * hours).round() as i32,
+        );
+        self.energy =
+            clamp_gauge(self.energy - (cfg.energy_decay_per_hour as f64 * hours).round() as i32);
 
         // Suivi "faim a 0".
         if self.hunger == 0 {
@@ -195,11 +211,12 @@ impl Pet {
         self.last_decay_at = now;
 
         // Transitions de sante.
-        let mut outcome = if before.0 != self.hunger || before.1 != self.happiness || before.2 != self.energy {
-            TickOutcome::Decayed
-        } else {
-            TickOutcome::Unchanged
-        };
+        let mut outcome =
+            if before.0 != self.hunger || before.1 != self.happiness || before.2 != self.energy {
+                TickOutcome::Decayed
+            } else {
+                TickOutcome::Unchanged
+            };
 
         match self.status {
             Health::Healthy => {
@@ -257,7 +274,15 @@ pub struct PetEvent {
 
 /// Puissance de combat = stats ponderees + bonus aleatoire (`roll`).
 /// `roll` est fourni par l'appelant (testabilite / pas de RNG dans le core).
-pub fn combat_power(str_: i32, vit: i32, agi: i32, w_str: i32, w_vit: i32, w_agi: i32, roll: i32) -> i64 {
+pub fn combat_power(
+    str_: i32,
+    vit: i32,
+    agi: i32,
+    w_str: i32,
+    w_vit: i32,
+    w_agi: i32,
+    roll: i32,
+) -> i64 {
     (str_.max(0) as i64) * w_str.max(0) as i64
         + (vit.max(0) as i64) * w_vit.max(0) as i64
         + (agi.max(0) as i64) * w_agi.max(0) as i64

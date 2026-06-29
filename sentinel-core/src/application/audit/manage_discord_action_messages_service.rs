@@ -28,10 +28,7 @@ impl ManageDiscordActionMessagesService {
 
 #[async_trait]
 impl ManageDiscordActionMessagesUseCase for ManageDiscordActionMessagesService {
-    async fn register(
-        &self,
-        msg: NewDiscordActionMessage,
-    ) -> Result<(), DomainError> {
+    async fn register(&self, msg: NewDiscordActionMessage) -> Result<(), DomainError> {
         if msg.kind.trim().is_empty() {
             return Err(DomainError::ValidationError("kind requis".into()));
         }

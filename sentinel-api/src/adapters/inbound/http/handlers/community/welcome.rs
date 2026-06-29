@@ -1,13 +1,13 @@
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use axum::extract::State;
+use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 pub struct WelcomeConfigDto {
@@ -53,27 +53,42 @@ pub struct WelcomeConfigDto {
 impl From<WelcomeConfigData> for WelcomeConfigDto {
     fn from(c: WelcomeConfigData) -> Self {
         Self {
-            guild_id: c.guild_id, welcome_enabled: c.welcome_enabled,
-            welcome_channel_id: c.welcome_channel_id, welcome_message: c.welcome_message,
-            welcome_embed_color: c.welcome_embed_color, welcome_dm_enabled: c.welcome_dm_enabled,
-            welcome_dm_message: c.welcome_dm_message, leave_enabled: c.leave_enabled,
-            leave_channel_id: c.leave_channel_id, leave_message: c.leave_message,
-            rules_enabled: c.rules_enabled, rules_channel_id: c.rules_channel_id,
-            rules_message: c.rules_message, rules_role_id: c.rules_role_id,
-            rules_button_label: c.rules_button_label, counter_enabled: c.counter_enabled,
-            counter_channel_id: c.counter_channel_id, counter_format: c.counter_format,
+            guild_id: c.guild_id,
+            welcome_enabled: c.welcome_enabled,
+            welcome_channel_id: c.welcome_channel_id,
+            welcome_message: c.welcome_message,
+            welcome_embed_color: c.welcome_embed_color,
+            welcome_dm_enabled: c.welcome_dm_enabled,
+            welcome_dm_message: c.welcome_dm_message,
+            leave_enabled: c.leave_enabled,
+            leave_channel_id: c.leave_channel_id,
+            leave_message: c.leave_message,
+            rules_enabled: c.rules_enabled,
+            rules_channel_id: c.rules_channel_id,
+            rules_message: c.rules_message,
+            rules_role_id: c.rules_role_id,
+            rules_button_label: c.rules_button_label,
+            counter_enabled: c.counter_enabled,
+            counter_channel_id: c.counter_channel_id,
+            counter_format: c.counter_format,
             voice_counter_enabled: c.voice_counter_enabled,
             voice_counter_channel_id: c.voice_counter_channel_id,
             voice_counter_format: c.voice_counter_format,
-            anniversary_enabled: c.anniversary_enabled, anniversary_channel_id: c.anniversary_channel_id,
-            anniversary_message: c.anniversary_message, rejoin_message: c.rejoin_message,
-            welcome_title: c.welcome_title, welcome_image_url: c.welcome_image_url,
+            anniversary_enabled: c.anniversary_enabled,
+            anniversary_channel_id: c.anniversary_channel_id,
+            anniversary_message: c.anniversary_message,
+            rejoin_message: c.rejoin_message,
+            welcome_title: c.welcome_title,
+            welcome_image_url: c.welcome_image_url,
             welcome_footer_text: c.welcome_footer_text,
-            rejoin_title: c.rejoin_title, rejoin_image_url: c.rejoin_image_url,
+            rejoin_title: c.rejoin_title,
+            rejoin_image_url: c.rejoin_image_url,
             rejoin_footer_text: c.rejoin_footer_text,
-            leave_title: c.leave_title, leave_image_url: c.leave_image_url,
+            leave_title: c.leave_title,
+            leave_image_url: c.leave_image_url,
             leave_footer_text: c.leave_footer_text,
-            anniversary_title: c.anniversary_title, anniversary_image_url: c.anniversary_image_url,
+            anniversary_title: c.anniversary_title,
+            anniversary_image_url: c.anniversary_image_url,
             anniversary_footer_text: c.anniversary_footer_text,
         }
     }
@@ -168,9 +183,10 @@ pub async fn publish_rules(
             ),
         ));
     }
-    state
-        .broadcaster
-        .broadcast("welcome_rules_publish", serde_json::json!({ "guild_id": guild_id }));
+    state.broadcaster.broadcast(
+        "welcome_rules_publish",
+        serde_json::json!({ "guild_id": guild_id }),
+    );
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 

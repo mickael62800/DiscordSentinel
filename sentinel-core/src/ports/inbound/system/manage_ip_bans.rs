@@ -18,12 +18,8 @@ pub trait ManageIpBansUseCase: Send + Sync {
     ) -> Result<BanIpOutcome, DomainError>;
 
     /// Leve un ban : valide, met en file host, marque la ligne DB comme levee.
-    async fn unban(
-        &self,
-        ip: &str,
-        reason: Option<String>,
-        actor: &str,
-    ) -> Result<(), DomainError>;
+    async fn unban(&self, ip: &str, reason: Option<String>, actor: &str)
+        -> Result<(), DomainError>;
 
     /// Liste des bans manuels actifs (non leves).
     async fn list_manual_bans(&self) -> Result<Vec<ManualIpBan>, DomainError>;

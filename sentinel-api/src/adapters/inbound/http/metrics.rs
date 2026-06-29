@@ -13,9 +13,6 @@
 //! pas l'URI réelle) pour éviter une explosion de séries — `/users/123` et
 //! `/users/456` partagent le label `/users/{id}`.
 
-use std::sync::OnceLock;
-use std::time::Duration;
-use std::time::Instant;
 use axum::extract::MatchedPath;
 use axum::http::Request;
 use axum::middleware::Next;
@@ -23,6 +20,9 @@ use axum::response::IntoResponse;
 use axum::response::Response;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use metrics_exporter_prometheus::PrometheusHandle;
+use std::sync::OnceLock;
+use std::time::Duration;
+use std::time::Instant;
 /// Handle global vers le recorder Prometheus.
 ///
 /// Initialisé une seule fois via `init_prometheus()` au démarrage.
@@ -47,9 +47,7 @@ pub fn init_prometheus() {
 
     let handle = PrometheusBuilder::new()
         .set_buckets_for_metric(
-            metrics_exporter_prometheus::Matcher::Full(
-                "http_request_duration_seconds".to_string(),
-            ),
+            metrics_exporter_prometheus::Matcher::Full("http_request_duration_seconds".to_string()),
             HTTP_LATENCY_BUCKETS,
         )
         .expect("buckets HTTP latency valides")
@@ -235,14 +233,10 @@ pub fn spawn_tokio_runtime_sampler() {
             tokio::time::sleep(Duration::from_secs(interval_secs)).await;
 
             if let Some(snapshot) = intervals.next() {
-                metrics::gauge!("tokio_workers_count")
-                    .set(snapshot.workers_count as f64);
-                metrics::gauge!("tokio_live_tasks_count")
-                    .set(snapshot.live_tasks_count as f64);
-                metrics::gauge!("tokio_global_queue_depth")
-                    .set(snapshot.global_queue_depth as f64);
-                metrics::gauge!("tokio_total_park_count")
-                    .set(snapshot.total_park_count as f64);
+                metrics::gauge!("tokio_workers_count").set(snapshot.workers_count as f64);
+                metrics::gauge!("tokio_live_tasks_count").set(snapshot.live_tasks_count as f64);
+                metrics::gauge!("tokio_global_queue_depth").set(snapshot.global_queue_depth as f64);
+                metrics::gauge!("tokio_total_park_count").set(snapshot.total_park_count as f64);
                 metrics::gauge!("tokio_max_busy_duration_seconds")
                     .set(snapshot.max_busy_duration.as_secs_f64());
 

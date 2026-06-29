@@ -14,11 +14,11 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_analyze;
 
 // ══════════════════════════════════════════════════════════
@@ -33,7 +33,12 @@ struct MockAnalyzeUC {
 impl MockAnalyzeUC {
     fn returning(action: Action, reason: &str) -> Self {
         Self {
-            response: MessageAnalysis { action, reason: reason.into(), score: 0.7, duration: None },
+            response: MessageAnalysis {
+                action,
+                reason: reason.into(),
+                score: 0.7,
+                duration: None,
+            },
             calls: Mutex::new(Vec::new()),
         }
     }
@@ -51,14 +56,24 @@ fn build_app(uc: MockAnalyzeUC) -> axum::Router {
     router::build_for_test(build_test_state_analyze(Arc::new(uc)))
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn analyze_body(guild_id: &str, content: &str) -> serde_json::Value {
@@ -77,7 +92,8 @@ fn analyze_body(guild_id: &str, content: &str) -> serde_json::Value {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_returns_action_and_reason() {
     let app = build_app(MockAnalyzeUC::returning(Action::Warn, "spam detecte"));
-    let (status, json) = post_json(app, "/analyze", analyze_body("111111111111111111", "hello")).await;
+    let (status, json) =
+        post_json(app, "/analyze", analyze_body("111111111111111111", "hello")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["action"], "warn");
     assert_eq!(json["reason"], "spam detecte");

@@ -85,7 +85,10 @@ pub async fn followup_text(ctx: &Context, command: &CommandInteraction, content:
 /// Followup embed public — pour la reponse de succes visible a tous.
 pub async fn followup_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
     if let Err(e) = command
-        .create_followup(&ctx.http, CreateInteractionResponseFollowup::new().embed(embed))
+        .create_followup(
+            &ctx.http,
+            CreateInteractionResponseFollowup::new().embed(embed),
+        )
         .await
     {
         tracing::warn!(error = %e, cmd = %command.data.name, "Echec followup_embed");

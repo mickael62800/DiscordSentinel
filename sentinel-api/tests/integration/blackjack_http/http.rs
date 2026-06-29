@@ -17,10 +17,10 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTable;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTablePlayer;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
+use sentinel_core::domain::errors::DomainError;
 // ══════════════════════════════════════════════════════════
 // Mock BlackjackTableRepository
 // ══════════════════════════════════════════════════════════
@@ -33,8 +33,13 @@ struct MockTableRepo {
 }
 
 impl MockTableRepo {
-    fn new() -> Self { Self::default() }
-    fn with_table(self, t: BlackjackTable) -> Self { self.tables.lock().unwrap().push(t); self }
+    fn new() -> Self {
+        Self::default()
+    }
+    fn with_table(self, t: BlackjackTable) -> Self {
+        self.tables.lock().unwrap().push(t);
+        self
+    }
 }
 
 fn sample_table(guild_id: &str, id: &str, status: &str) -> BlackjackTable {
@@ -51,7 +56,14 @@ fn sample_table(guild_id: &str, id: &str, status: &str) -> BlackjackTable {
 
 #[async_trait]
 impl BlackjackTableRepository for MockTableRepo {
-    async fn create(&self, guild_id: &str, channel_id: &str, owner_id: &str, owner_name: &str, _shoe: &serde_json::Value) -> Result<BlackjackTable, DomainError> {
+    async fn create(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+        owner_id: &str,
+        owner_name: &str,
+        _shoe: &serde_json::Value,
+    ) -> Result<BlackjackTable, DomainError> {
         let t = BlackjackTable {
             id: Uuid::new_v4().to_string(),
             guild_id: guild_id.into(),
@@ -64,22 +76,48 @@ impl BlackjackTableRepository for MockTableRepo {
         self.tables.lock().unwrap().push(t.clone());
         Ok(t)
     }
-    async fn get_status_and_guild(&self, table_id: &str) -> Result<Option<(String, String)>, DomainError> {
-        Ok(self.tables.lock().unwrap().iter()
+    async fn get_status_and_guild(
+        &self,
+        table_id: &str,
+    ) -> Result<Option<(String, String)>, DomainError> {
+        Ok(self
+            .tables
+            .lock()
+            .unwrap()
+            .iter()
             .find(|t| t.id == table_id)
             .map(|t| (t.status.clone(), t.guild_id.clone())))
     }
     async fn count_players(&self, table_id: &str) -> Result<i64, DomainError> {
-        Ok(self.players.lock().unwrap().iter()
-            .filter(|(t, _, _)| t == table_id).count() as i64)
+        Ok(self
+            .players
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(t, _, _)| t == table_id)
+            .count() as i64)
     }
-    async fn add_player(&self, table_id: &str, user_id: &str, user_name: &str) -> Result<(), DomainError> {
-        self.players.lock().unwrap().push((table_id.into(), user_id.into(), user_name.into()));
+    async fn add_player(
+        &self,
+        table_id: &str,
+        user_id: &str,
+        user_name: &str,
+    ) -> Result<(), DomainError> {
+        self.players
+            .lock()
+            .unwrap()
+            .push((table_id.into(), user_id.into(), user_name.into()));
         Ok(())
     }
-    async fn touch_activity(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn touch_activity(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn list_players(&self, table_id: &str) -> Result<Vec<BlackjackTablePlayer>, DomainError> {
-        Ok(self.players.lock().unwrap().iter()
+        Ok(self
+            .players
+            .lock()
+            .unwrap()
+            .iter()
             .filter(|(t, _, _)| t == table_id)
             .map(|(_, uid, uname)| BlackjackTablePlayer {
                 user_id: uid.clone().into(),
@@ -88,24 +126,39 @@ impl BlackjackTableRepository for MockTableRepo {
             })
             .collect())
     }
-    async fn find_open_by_channel(&self, channel_id: &str) -> Result<Option<BlackjackTable>, DomainError> {
-        Ok(self.tables.lock().unwrap().iter()
+    async fn find_open_by_channel(
+        &self,
+        channel_id: &str,
+    ) -> Result<Option<BlackjackTable>, DomainError> {
+        Ok(self
+            .tables
+            .lock()
+            .unwrap()
+            .iter()
             .find(|t| t.channel_id == channel_id && t.status == "open")
             .cloned())
     }
     async fn get_guild_id(&self, table_id: &str) -> Result<Option<String>, DomainError> {
-        Ok(self.tables.lock().unwrap().iter()
+        Ok(self
+            .tables
+            .lock()
+            .unwrap()
+            .iter()
             .find(|t| t.id == table_id)
             .map(|t| t.guild_id.clone()))
     }
     async fn close(&self, table_id: &str) -> Result<(), DomainError> {
         self.closed.lock().unwrap().push(table_id.into());
         for t in self.tables.lock().unwrap().iter_mut() {
-            if t.id == table_id { t.status = "closed".into(); }
+            if t.id == table_id {
+                t.status = "closed".into();
+            }
         }
         Ok(())
     }
-    async fn list_games(&self, _: &str) -> Result<Vec<serde_json::Value>, DomainError> { Ok(vec![]) }
+    async fn list_games(&self, _: &str) -> Result<Vec<serde_json::Value>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 fn build_state(repo: Arc<MockTableRepo>) -> AppState {
@@ -115,25 +168,46 @@ fn build_state(repo: Arc<MockTableRepo>) -> AppState {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> StatusCode {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
@@ -174,7 +248,11 @@ async fn join_table_not_found_returns_404() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn join_table_closed_returns_conflict() {
     let table_id = Uuid::new_v4().to_string();
-    let repo = Arc::new(MockTableRepo::new().with_table(sample_table("111111111111111111", &table_id, "closed")));
+    let repo = Arc::new(MockTableRepo::new().with_table(sample_table(
+        "111111111111111111",
+        &table_id,
+        "closed",
+    )));
     let app = router::build_for_test(build_state(repo));
     let body = serde_json::json!({
         "user_id": "555555555555555555", "user_name": "Bob"
@@ -186,7 +264,11 @@ async fn join_table_closed_returns_conflict() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn join_table_open_adds_player() {
     let table_id = Uuid::new_v4().to_string();
-    let repo = Arc::new(MockTableRepo::new().with_table(sample_table("111111111111111111", &table_id, "open")));
+    let repo = Arc::new(MockTableRepo::new().with_table(sample_table(
+        "111111111111111111",
+        &table_id,
+        "open",
+    )));
     let app = router::build_for_test(build_state(repo.clone()));
     let body = serde_json::json!({
         "user_id": "555555555555555555", "user_name": "Bob"
@@ -200,15 +282,23 @@ async fn join_table_open_adds_player() {
 async fn join_table_full_returns_validation() {
     // 7 joueurs max par defaut → 8e rejete
     let table_id = Uuid::new_v4().to_string();
-    let repo = Arc::new(MockTableRepo::new().with_table(sample_table("111111111111111111", &table_id, "open")));
+    let repo = Arc::new(MockTableRepo::new().with_table(sample_table(
+        "111111111111111111",
+        &table_id,
+        "open",
+    )));
     for i in 0..7 {
-        repo.players.lock().unwrap().push((table_id.clone(), format!("u{i}"), format!("User{i}")));
+        repo.players
+            .lock()
+            .unwrap()
+            .push((table_id.clone(), format!("u{i}"), format!("User{i}")));
     }
     let app = router::build_for_test(build_state(repo));
     let body = serde_json::json!({
         "user_id": "555555555555555555", "user_name": "Extra"
     });
-    let (status, json) = post_json(app, &format!("/api/blackjack/tables/{table_id}/join"), body).await;
+    let (status, json) =
+        post_json(app, &format!("/api/blackjack/tables/{table_id}/join"), body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(json["error"].as_str().unwrap().contains("pleine"));
 }
@@ -236,7 +326,11 @@ async fn list_table_games_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn close_table_success() {
     let table_id = Uuid::new_v4().to_string();
-    let repo = Arc::new(MockTableRepo::new().with_table(sample_table("111111111111111111", &table_id, "open")));
+    let repo = Arc::new(MockTableRepo::new().with_table(sample_table(
+        "111111111111111111",
+        &table_id,
+        "open",
+    )));
     let app = router::build_for_test(build_state(repo.clone()));
     let status = delete(app, &format!("/api/blackjack/tables/{table_id}")).await;
     assert!(status.is_success() || status == StatusCode::NO_CONTENT);
@@ -246,7 +340,11 @@ async fn close_table_success() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_table_by_channel_found() {
     let table_id = Uuid::new_v4().to_string();
-    let repo = Arc::new(MockTableRepo::new().with_table(sample_table("111111111111111111", &table_id, "open")));
+    let repo = Arc::new(MockTableRepo::new().with_table(sample_table(
+        "111111111111111111",
+        &table_id,
+        "open",
+    )));
     let app = router::build_for_test(build_state(repo));
     let (status, json) = get(app, "/api/blackjack/tables/by-channel/c1").await;
     assert_eq!(status, StatusCode::OK);
@@ -261,7 +359,10 @@ async fn get_table_by_channel_found() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_all_returns_counts() {
     let app = router::build_for_test(build_state(Arc::new(MockTableRepo::new())));
-    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let guild_id = format!(
+        "{}",
+        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
+    );
     let status = delete(app, &format!("/api/blackjack/admin/{guild_id}/purge")).await;
     assert_eq!(status, StatusCode::OK);
 }

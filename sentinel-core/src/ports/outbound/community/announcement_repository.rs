@@ -13,7 +13,10 @@ pub trait AnnouncementRepository: Send + Sync {
     async fn update(&self, ann: &ScheduledAnnouncement) -> Result<(), DomainError>;
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
     async fn get_by_id(&self, id: Uuid) -> Result<Option<ScheduledAnnouncement>, DomainError>;
-    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<ScheduledAnnouncement>, DomainError>;
+    async fn list_by_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<ScheduledAnnouncement>, DomainError>;
 
     /// Toggle enabled. Retourne le nouvel etat.
     async fn set_enabled(&self, id: Uuid, enabled: bool) -> Result<bool, DomainError>;

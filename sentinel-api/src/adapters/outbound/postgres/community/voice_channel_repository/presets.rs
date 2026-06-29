@@ -1,9 +1,9 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
+use async_trait::async_trait;
 
+use crate::ports::outbound::community::voice_channel_repository::VoicePresetStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::community::voice_channel_repository::VoicePresetStore;
 
 #[derive(sqlx::FromRow)]
 struct PresetRow {
@@ -34,7 +34,11 @@ impl From<PresetRow> for VoiceChannelPreset {
 
 #[async_trait]
 impl VoicePresetStore for super::PgVoiceChannelRepository {
-    async fn find_preset(&self, guild_id: &str, owner_id: &str) -> Result<Option<VoiceChannelPreset>, DomainError> {
+    async fn find_preset(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<VoiceChannelPreset>, DomainError> {
         let row = sqlx::query_as::<_, PresetRow>(
             "SELECT * FROM voice_channel_presets WHERE guild_id = $1 AND owner_id = $2",
         )

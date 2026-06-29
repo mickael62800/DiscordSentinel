@@ -15,10 +15,10 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
 use sentinel_api::ports::inbound::audit::manage_watched_users::UserDossier;
+use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_watched_users;
 
 // ══════════════════════════════════════════════════════════
@@ -34,17 +34,27 @@ struct MockWatchedUsersUC {
 }
 
 impl MockWatchedUsersUC {
-    fn new() -> Self { Self::default() }
+    fn new() -> Self {
+        Self::default()
+    }
     fn with_user(self, u: WatchedUser) -> Self {
         self.users.lock().unwrap().push(u);
         self
     }
-    fn dossier_fails(mut self) -> Self { self.dossier_not_found = true; self }
+    fn dossier_fails(mut self) -> Self {
+        self.dossier_not_found = true;
+        self
+    }
 }
 
 #[async_trait]
 impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
-    async fn list_watched_users(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<WatchedUser>, DomainError> {
+    async fn list_watched_users(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<WatchedUser>, DomainError> {
         let users = self.users.lock().unwrap();
         let matching: Vec<WatchedUser> = users
             .iter()
@@ -55,12 +65,18 @@ impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
             .collect();
         Ok(matching)
     }
-    async fn get_user_dossier(&self, guild_id: &str, user_id: &str) -> Result<UserDossier, DomainError> {
+    async fn get_user_dossier(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserDossier, DomainError> {
         if self.dossier_not_found {
             return Err(DomainError::NotFound("user".into()));
         }
         let users = self.users.lock().unwrap();
-        let user = users.iter().find(|u| u.guild_id == guild_id && u.user_id == user_id)
+        let user = users
+            .iter()
+            .find(|u| u.guild_id == guild_id && u.user_id == user_id)
             .cloned()
             .ok_or_else(|| DomainError::NotFound("user".into()))?;
         Ok(UserDossier {
@@ -71,12 +87,26 @@ impl ManageWatchedUsersUseCase for MockWatchedUsersUC {
             notes: vec![],
         })
     }
-    async fn add_manual_watch(&self, guild_id: &str, user_id: &str, username: &str, reason: &str) -> Result<(), DomainError> {
-        self.added.lock().unwrap().push((guild_id.into(), user_id.into(), username.into(), reason.into()));
+    async fn add_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        reason: &str,
+    ) -> Result<(), DomainError> {
+        self.added.lock().unwrap().push((
+            guild_id.into(),
+            user_id.into(),
+            username.into(),
+            reason.into(),
+        ));
         Ok(())
     }
     async fn remove_manual_watch(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
-        self.removed.lock().unwrap().push((guild_id.into(), user_id.into()));
+        self.removed
+            .lock()
+            .unwrap()
+            .push((guild_id.into(), user_id.into()));
         Ok(())
     }
 }
@@ -86,29 +116,53 @@ fn build_app(uc: MockWatchedUsersUC) -> axum::Router {
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("POST").uri(uri)
+async fn post_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("POST")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 async fn delete(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("DELETE")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn sample_user(guild_id: &str, user_id: &str, risk: &str) -> WatchedUser {
@@ -170,7 +224,8 @@ async fn list_watched_users_respects_limit() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_dossier_returns_user_with_empty_relations() {
-    let uc = MockWatchedUsersUC::new().with_user(sample_user("111111111111111111", "u1", "critical"));
+    let uc =
+        MockWatchedUsersUC::new().with_user(sample_user("111111111111111111", "u1", "critical"));
     let app = build_app(uc);
     let (status, json) = get(app, "/api/watched-users/111111111111111111/u1").await;
     assert_eq!(status, StatusCode::OK);

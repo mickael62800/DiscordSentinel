@@ -1,10 +1,9 @@
 /// Helpers Discord partages entre les bots.
 /// Evite la duplication des reply_text, reply_ephemeral, etc.
-
 use serenity::all::{
     ChannelId, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
-    CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateInteractionResponseMessage, ModalInteraction,
+    CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
+    ModalInteraction,
 };
 use tracing::warn;
 
@@ -18,10 +17,7 @@ use tracing::warn;
 ///
 /// Elimine le bloc `match command.guild_id { Some(id) => id.to_string(),
 /// None => { reply_ephemeral(...); return; } }` duplique dans ~40 commandes.
-pub async fn require_guild_id(
-    ctx: &Context,
-    command: &CommandInteraction,
-) -> Option<String> {
+pub async fn require_guild_id(ctx: &Context, command: &CommandInteraction) -> Option<String> {
     match command.guild_id {
         Some(id) => Some(id.to_string()),
         None => {
@@ -61,7 +57,11 @@ pub async fn defer_ephemeral(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// Followup ephemere embed apres un `defer_ephemeral`.
-pub async fn followup_ephemeral_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
+pub async fn followup_ephemeral_embed(
+    ctx: &Context,
+    command: &CommandInteraction,
+    embed: CreateEmbed,
+) {
     if let Err(e) = command
         .create_followup(
             &ctx.http,
@@ -124,7 +124,11 @@ pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, conten
 }
 
 /// Reponse ephemere embed a une slash command.
-pub async fn reply_ephemeral_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
+pub async fn reply_ephemeral_embed(
+    ctx: &Context,
+    command: &CommandInteraction,
+    embed: CreateEmbed,
+) {
     if let Err(e) = command
         .create_response(
             &ctx.http,
@@ -141,7 +145,11 @@ pub async fn reply_ephemeral_embed(ctx: &Context, command: &CommandInteraction, 
 }
 
 /// Reponse ephemere texte a un component interaction (bouton/menu).
-pub async fn component_reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
+pub async fn component_reply_ephemeral(
+    ctx: &Context,
+    component: &ComponentInteraction,
+    content: &str,
+) {
     if let Err(e) = component
         .create_response(
             &ctx.http,
@@ -225,7 +233,9 @@ pub async fn is_module_enabled_or_reply_command(
     command: &CommandInteraction,
     module_bot_name: &str,
 ) -> bool {
-    let Some(guild_id) = command.guild_id else { return true; };
+    let Some(guild_id) = command.guild_id else {
+        return true;
+    };
     if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
         return true;
     }
@@ -251,7 +261,9 @@ pub async fn is_module_enabled_or_reply_component(
     component: &ComponentInteraction,
     module_bot_name: &str,
 ) -> bool {
-    let Some(guild_id) = component.guild_id else { return true; };
+    let Some(guild_id) = component.guild_id else {
+        return true;
+    };
     if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
         return true;
     }
@@ -277,7 +289,9 @@ pub async fn is_module_enabled_or_reply_modal(
     modal: &ModalInteraction,
     module_bot_name: &str,
 ) -> bool {
-    let Some(guild_id) = modal.guild_id else { return true; };
+    let Some(guild_id) = modal.guild_id else {
+        return true;
+    };
     if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
         return true;
     }
@@ -307,7 +321,9 @@ pub async fn guild_config_or_default(
     let Some(api) = data.get::<super::heartbeat::ApiClientKey>() else {
         return std::collections::HashMap::new();
     };
-    api.get_guild_config_for(guild_id, module_bot_name).await.unwrap_or_default()
+    api.get_guild_config_for(guild_id, module_bot_name)
+        .await
+        .unwrap_or_default()
 }
 
 /// Lit une option String d'une slash command par son nom.
@@ -317,26 +333,35 @@ pub fn option_str<'a>(
     options: &'a [serenity::all::CommandDataOption],
     name: &str,
 ) -> Option<&'a str> {
-    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        serenity::all::CommandDataOptionValue::String(s) => Some(s.as_str()),
-        _ => None,
-    })
+    options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
 }
 
 /// Lit une option Integer d'une slash command par son nom.
 pub fn option_i64(options: &[serenity::all::CommandDataOption], name: &str) -> Option<i64> {
-    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        serenity::all::CommandDataOptionValue::Integer(n) => Some(*n),
-        _ => None,
-    })
+    options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::Integer(n) => Some(*n),
+            _ => None,
+        })
 }
 
 /// Lit une option Boolean d'une slash command par son nom.
 pub fn option_bool(options: &[serenity::all::CommandDataOption], name: &str) -> Option<bool> {
-    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        serenity::all::CommandDataOptionValue::Boolean(b) => Some(*b),
-        _ => None,
-    })
+    options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::Boolean(b) => Some(*b),
+            _ => None,
+        })
 }
 
 /// Lit une option User d'une slash command par son nom.
@@ -344,14 +369,21 @@ pub fn option_user(
     options: &[serenity::all::CommandDataOption],
     name: &str,
 ) -> Option<serenity::all::UserId> {
-    options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        serenity::all::CommandDataOptionValue::User(id) => Some(*id),
-        _ => None,
-    })
+    options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::User(id) => Some(*id),
+            _ => None,
+        })
 }
 
 /// Lit le `log_channel_id` dans la config guild du module donne.
-pub async fn get_log_channel(ctx: &Context, guild_id: &str, module_bot_name: &str) -> Option<ChannelId> {
+pub async fn get_log_channel(
+    ctx: &Context,
+    guild_id: &str,
+    module_bot_name: &str,
+) -> Option<ChannelId> {
     let config = guild_config_or_default(ctx, guild_id, module_bot_name).await;
     config
         .get("log_channel_id")

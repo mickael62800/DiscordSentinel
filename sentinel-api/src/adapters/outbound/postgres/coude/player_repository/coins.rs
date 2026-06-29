@@ -23,8 +23,12 @@ pub(super) async fn record_coins_earned(
         "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(guild_id).bind(user_id).bind(amount)
-    .execute(&repo.pool).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(amount)
+    .execute(&repo.pool)
+    .await
+    .map_err(pg_err)?;
     Ok(result.rows_affected() > 0)
 }
 
@@ -38,7 +42,11 @@ pub(super) async fn record_coins_lost(
         "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(guild_id).bind(user_id).bind(amount)
-    .execute(&repo.pool).await.map_err(pg_err)?;
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(amount)
+    .execute(&repo.pool)
+    .await
+    .map_err(pg_err)?;
     Ok(result.rows_affected() > 0)
 }

@@ -70,17 +70,41 @@ impl Species {
     pub fn base_stats(&self) -> SpeciesBase {
         match self {
             // Bourrin : grosse FORCE.
-            Species::Sanglier => SpeciesBase { str_: 16, vit: 10, agi: 4 },
+            Species::Sanglier => SpeciesBase {
+                str_: 16,
+                vit: 10,
+                agi: 4,
+            },
             // Rapide et fourbe : AGILITE.
-            Species::Renard => SpeciesBase { str_: 6, vit: 8, agi: 16 },
+            Species::Renard => SpeciesBase {
+                str_: 6,
+                vit: 8,
+                agi: 16,
+            },
             // Mur : VITALITE.
-            Species::Tortue => SpeciesBase { str_: 6, vit: 18, agi: 6 },
+            Species::Tortue => SpeciesBase {
+                str_: 6,
+                vit: 18,
+                agi: 6,
+            },
             // Equilibre offensif.
-            Species::Loup => SpeciesBase { str_: 12, vit: 10, agi: 8 },
+            Species::Loup => SpeciesBase {
+                str_: 12,
+                vit: 10,
+                agi: 8,
+            },
             // Vif, peu robuste.
-            Species::Lapin => SpeciesBase { str_: 7, vit: 7, agi: 16 },
+            Species::Lapin => SpeciesBase {
+                str_: 7,
+                vit: 7,
+                agi: 16,
+            },
             // Tank offensif.
-            Species::Ours => SpeciesBase { str_: 14, vit: 14, agi: 2 },
+            Species::Ours => SpeciesBase {
+                str_: 14,
+                vit: 14,
+                agi: 2,
+            },
         }
     }
 }

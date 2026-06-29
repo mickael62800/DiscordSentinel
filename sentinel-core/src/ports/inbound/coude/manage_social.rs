@@ -1,13 +1,13 @@
+use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::Season;
+use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::social::Season;
-use crate::domain::entities::coude::social::Event;
-use crate::domain::entities::coude::social::LeaderboardEntry;
-use crate::domain::entities::coude::social::DailyChaosOutcome;
-use crate::domain::entities::coude::social::LeaderboardCategory;
-use crate::domain::entities::coude::social::NewDailyChaos;
-use crate::domain::errors::DomainError;
 
 /// Use case "fonctionnalités sociales Coup de Coude".
 #[async_trait]

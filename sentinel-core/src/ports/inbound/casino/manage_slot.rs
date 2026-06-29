@@ -20,9 +20,9 @@ use async_trait::async_trait;
 use crate::domain::entities::casino::slot::SlotSpin;
 use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::entities::coude::taunt::TauntEvent;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]
 pub struct SpinCommand {

@@ -14,9 +14,9 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_welcome;
 
 #[derive(Default)]
@@ -69,30 +69,56 @@ fn default_data(guild_id: &str) -> WelcomeConfigData {
 #[async_trait]
 impl WelcomeConfigRepository for MockWelcomeRepo {
     async fn get_config(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError> {
-        Ok(self.data.lock().unwrap().clone().unwrap_or_else(|| default_data(guild_id)))
+        Ok(self
+            .data
+            .lock()
+            .unwrap()
+            .clone()
+            .unwrap_or_else(|| default_data(guild_id)))
     }
-    async fn save_config(&self, _guild_id: &str, data: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> {
+    async fn save_config(
+        &self,
+        _guild_id: &str,
+        data: &WelcomeConfigData,
+    ) -> Result<WelcomeConfigData, DomainError> {
         *self.data.lock().unwrap() = Some(data.clone());
         Ok(data.clone())
     }
 }
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
-async fn put_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (StatusCode, serde_json::Value) {
-    let req = Request::builder().method("PUT").uri(uri)
+async fn put_json(
+    app: axum::Router,
+    uri: &str,
+    body: serde_json::Value,
+) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder()
+        .method("PUT")
+        .uri(uri)
         .header("content-type", "application/json")
-        .body(Body::from(serde_json::to_string(&body).unwrap())).unwrap();
+        .body(Body::from(serde_json::to_string(&body).unwrap()))
+        .unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let status = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (status, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        status,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn build_app() -> (axum::Router, Arc<MockWelcomeRepo>) {
@@ -150,7 +176,12 @@ async fn put_then_get_returns_saved_data() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn put_empty_body_keeps_defaults() {
     let (app, _repo) = build_app();
-    let (status, json) = put_json(app, "/api/welcome/111111111111111111", serde_json::json!({})).await;
+    let (status, json) = put_json(
+        app,
+        "/api/welcome/111111111111111111",
+        serde_json::json!({}),
+    )
+    .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["welcome_enabled"], false);
     assert_eq!(json["welcome_message"], "Welcome!");

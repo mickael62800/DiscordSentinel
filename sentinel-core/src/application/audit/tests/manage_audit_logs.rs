@@ -1,6 +1,6 @@
+use async_trait::async_trait;
 use std::sync::Arc;
 use std::sync::Mutex;
-use async_trait::async_trait;
 
 use crate::application::audit::manage_audit_logs_service::ManageAuditLogsService;
 use crate::domain::entities::audit::audit_log::AuditLog;
@@ -20,10 +20,18 @@ struct MockRepo {
 #[async_trait]
 impl AuditLogRepository for MockRepo {
     async fn save(&self, log: &AuditLog) -> Result<(), DomainError> {
-        self.saved.lock().unwrap().push(log.clone()); Ok(())
+        self.saved.lock().unwrap().push(log.clone());
+        Ok(())
     }
-    async fn find_all(&self, g: Option<&str>, f: &AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> {
-        self.find_calls.lock().unwrap().push((g.map(String::from), f.limit, f.offset));
+    async fn find_all(
+        &self,
+        g: Option<&str>,
+        f: &AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        self.find_calls
+            .lock()
+            .unwrap()
+            .push((g.map(String::from), f.limit, f.offset));
         Ok(self.saved.lock().unwrap().clone())
     }
     async fn delete_older_than_days(&self, g: &str, d: i32) -> Result<u64, DomainError> {
@@ -37,10 +45,14 @@ async fn create_generates_uuid_and_saves_timestamped_log() {
     let r = Arc::new(MockRepo::default());
     let svc = ManageAuditLogsService::new(r.clone());
     let cmd = CreateAuditLogCommand {
-        guild_id: "g".into(), event_type: "test_event".into(),
-        actor_id: Some("a".into()), actor_name: Some("Actor".into()),
-        target_id: Some("t".into()), target_name: Some("Target".into()),
-        channel_id: None, channel_name: None,
+        guild_id: "g".into(),
+        event_type: "test_event".into(),
+        actor_id: Some("a".into()),
+        actor_name: Some("Actor".into()),
+        target_id: Some("t".into()),
+        target_name: Some("Target".into()),
+        channel_id: None,
+        channel_name: None,
         details: serde_json::json!({"key":"val"}),
     };
     let log = svc.create(cmd).await.unwrap();
@@ -55,8 +67,11 @@ async fn list_forwards_filters() {
     let r = Arc::new(MockRepo::default());
     let svc = ManageAuditLogsService::new(r.clone());
     let f = AuditLogFilters {
-        event_type: Some("x".into()), actor_id: None,
-        target_id: None, limit: 50, offset: 10,
+        event_type: Some("x".into()),
+        actor_id: None,
+        target_id: None,
+        limit: 50,
+        offset: 10,
     };
     svc.list(Some("guild-1"), f).await.unwrap();
     let calls = r.find_calls.lock().unwrap();

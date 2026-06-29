@@ -1,9 +1,9 @@
 //! Mapping `DomainError` -> `tonic::Status`. Aligne sur les codes HTTP
 //! deja utilises cote Axum (cf. `adapters/inbound/http/errors.rs`).
 
+use sentinel_core::domain::errors::DomainError;
 use tonic::Code;
 use tonic::Status;
-use sentinel_core::domain::errors::DomainError;
 
 pub fn domain_to_status(err: DomainError) -> Status {
     let (code, msg) = match &err {
@@ -25,7 +25,6 @@ pub fn domain_to_status(err: DomainError) -> Status {
 pub fn sqlx_to_status(context: &str) -> impl Fn(sqlx::Error) -> Status + '_ {
     move |e| Status::internal(format!("{context}: {e}"))
 }
-
 
 #[cfg(test)]
 #[path = "tests/errors.rs"]

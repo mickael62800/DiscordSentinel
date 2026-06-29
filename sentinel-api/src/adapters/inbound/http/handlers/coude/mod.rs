@@ -11,23 +11,23 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use sentinel_core::domain::errors::DomainError;
 
-pub mod dto;
-pub mod players;
-pub mod combats;
 pub mod bets;
-pub mod economy;
-pub mod inventory;
-pub mod social;
-pub mod taunts;
-pub mod tournaments;
+pub mod combats;
 pub mod curses;
-pub mod tout_ou_rien;
-pub mod steal_roll;
-pub mod steal_attempts;
+pub mod dto;
+pub mod economy;
 pub mod flavor;
+pub mod friendly_duel;
+pub mod inventory;
+pub mod players;
 pub mod prank;
 pub mod refusal;
-pub mod friendly_duel;
+pub mod social;
+pub mod steal_attempts;
+pub mod steal_roll;
+pub mod taunts;
+pub mod tournaments;
+pub mod tout_ou_rien;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///

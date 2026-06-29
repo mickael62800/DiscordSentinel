@@ -28,13 +28,21 @@ fn configured_state(front_url: &str) -> sentinel_api::adapters::inbound::http::s
 }
 
 async fn get_resp(app: axum::Router, uri: &str) -> axum::response::Response {
-    let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(Body::empty())
+        .unwrap();
     app.oneshot(req).await.unwrap()
 }
 
 fn location(resp: &axum::response::Response) -> String {
-    resp.headers().get(axum::http::header::LOCATION).unwrap()
-        .to_str().unwrap().to_string()
+    resp.headers()
+        .get(axum::http::header::LOCATION)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string()
 }
 
 // ── /auth/discord/authorize ──
@@ -64,12 +72,25 @@ async fn authorize_success_redirects_to_discord_with_state_in_redis() {
     assert!(loc.contains("redirect_uri=https%3A%2F%2Fapi.example%2Fauth%2Fdiscord%2Fcallback"));
 
     // state=<uuid> extrait + verifie en Redis.
-    let state_val = loc.split("state=").nth(1).unwrap().split('&').next().unwrap();
-    let mut conn = redis_client.get_multiplexed_async_connection().await.unwrap();
+    let state_val = loc
+        .split("state=")
+        .nth(1)
+        .unwrap()
+        .split('&')
+        .next()
+        .unwrap();
+    let mut conn = redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
     let key = format!("oauth:web:state:{}", state_val);
     let stored: Option<String> = conn.get(&key).await.unwrap();
     assert_eq!(stored.as_deref(), Some("1"));
-    let ttl: i64 = redis::cmd("TTL").arg(&key).query_async(&mut conn).await.unwrap();
+    let ttl: i64 = redis::cmd("TTL")
+        .arg(&key)
+        .query_async(&mut conn)
+        .await
+        .unwrap();
     assert!(ttl > 0 && ttl <= 600);
 }
 
@@ -79,8 +100,11 @@ async fn authorize_success_redirects_to_discord_with_state_in_redis() {
 async fn callback_discord_error_redirects_with_description() {
     let state = configured_state("https://front.example");
     let app = router::build_for_test(state);
-    let resp = get_resp(app,
-        "/auth/discord/callback?error=access_denied&error_description=User%20refused").await;
+    let resp = get_resp(
+        app,
+        "/auth/discord/callback?error=access_denied&error_description=User%20refused",
+    )
+    .await;
     assert_eq!(resp.status(), StatusCode::FOUND);
     let loc = location(&resp);
     assert!(loc.starts_with("https://front.example/login?error="));
@@ -128,8 +152,7 @@ async fn callback_unknown_state_redirects_with_state_invalide() {
     let state = configured_state("https://front.example");
     let app = router::build_for_test(state);
     // state non present en Redis -> state_invalide.
-    let resp = get_resp(app,
-        "/auth/discord/callback?code=xyz&state=never-existed").await;
+    let resp = get_resp(app, "/auth/discord/callback?code=xyz&state=never-existed").await;
     let loc = location(&resp);
     assert!(loc.contains("error=state_invalide"));
 }
@@ -142,8 +165,10 @@ async fn callback_empty_web_front_falls_back_to_root() {
     let resp = get_resp(app, "/auth/discord/callback?code=xyz").await;
     let loc = location(&resp);
     // "/" + trim_end_matches('/') -> "" -> "/login?error=..."
-    assert!(loc.starts_with("/login?error=") || loc.starts_with("login?error="),
-            "loc attendue relative: {loc}");
+    assert!(
+        loc.starts_with("/login?error=") || loc.starts_with("login?error="),
+        "loc attendue relative: {loc}"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -157,23 +182,36 @@ async fn callback_valid_state_is_consumed_one_shot() {
     let app = router::build_for_test(state);
 
     // Seed un state en Redis a la main.
-    let mut conn = redis_client.get_multiplexed_async_connection().await.unwrap();
+    let mut conn = redis_client
+        .get_multiplexed_async_connection()
+        .await
+        .unwrap();
     let csrf = "test-csrf-one-shot";
     let key = format!("oauth:web:state:{}", csrf);
     conn.set_ex::<_, _, ()>(&key, "1", 600).await.unwrap();
 
     // 1er hit : passe le state check, mais echoue plus tard (reqwest Discord).
-    let resp1 = get_resp(app.clone(),
-        &format!("/auth/discord/callback?code=fake&state={csrf}")).await;
+    let resp1 = get_resp(
+        app.clone(),
+        &format!("/auth/discord/callback?code=fake&state={csrf}"),
+    )
+    .await;
     let loc1 = location(&resp1);
     // state_invalide NE doit PAS apparaitre — on a passe le check.
-    assert!(!loc1.contains("error=state_invalide"),
-            "1er appel: state devait etre accepte, recu: {loc1}");
+    assert!(
+        !loc1.contains("error=state_invalide"),
+        "1er appel: state devait etre accepte, recu: {loc1}"
+    );
 
     // 2eme hit avec le meme state : Redis ne contient plus la cle.
-    let resp2 = get_resp(app,
-        &format!("/auth/discord/callback?code=fake&state={csrf}")).await;
+    let resp2 = get_resp(
+        app,
+        &format!("/auth/discord/callback?code=fake&state={csrf}"),
+    )
+    .await;
     let loc2 = location(&resp2);
-    assert!(loc2.contains("error=state_invalide"),
-            "2eme appel: state devait etre consomme, recu: {loc2}");
+    assert!(
+        loc2.contains("error=state_invalide"),
+        "2eme appel: state devait etre consomme, recu: {loc2}"
+    );
 }

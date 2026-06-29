@@ -65,7 +65,10 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     }
 
     if reverted > 0 {
-        info!(reverted, "Lockdowns expires -> events publies pour restauration");
+        info!(
+            reverted,
+            "Lockdowns expires -> events publies pour restauration"
+        );
     }
     Ok(())
 }

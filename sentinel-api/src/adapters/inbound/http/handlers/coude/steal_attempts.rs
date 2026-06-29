@@ -12,8 +12,8 @@
 //!   - Pattern aligne avec `bot_persistence.rs` qui fait pareil pour
 //!     les heartbeats / lifecycle logs.
 
-use axum::extract::Path;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;

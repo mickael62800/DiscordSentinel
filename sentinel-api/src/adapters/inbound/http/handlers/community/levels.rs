@@ -1,25 +1,25 @@
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::community::levels::AddXpDto;
 use crate::adapters::inbound::http::dto::community::levels::AddXpResponseDto;
 use crate::adapters::inbound::http::dto::community::levels::LevelConfigDto;
 use crate::adapters::inbound::http::dto::community::levels::LevelLeaderboardParams;
+use crate::adapters::inbound::http::dto::community::levels::ResetUserXpDto;
 use crate::adapters::inbound::http::dto::community::levels::SaveLevelConfigDto;
+use crate::adapters::inbound::http::dto::community::levels::SetUserXpDto;
 use crate::adapters::inbound::http::dto::community::levels::UserLevelDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::entities::community::level::XpSource;
-use crate::adapters::inbound::http::dto::community::levels::ResetUserXpDto;
-use crate::adapters::inbound::http::dto::community::levels::SetUserXpDto;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::ResetTarget;
 use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
+use sentinel_core::domain::entities::community::level::XpSource;
 
 pub async fn get_config(
     State(state): State<AppState>,
@@ -85,8 +85,18 @@ pub async fn get_leaderboard(
 ) -> Result<Json<Vec<UserLevelDto>>, ApiError> {
     let limit = normalize_limit(params.limit, 25, 100);
     let levels = match params.source.as_deref() {
-        Some("text") => state.levels_uc.get_leaderboard_by_source(&guild_id, XpSource::Text, limit).await?,
-        Some("voice") => state.levels_uc.get_leaderboard_by_source(&guild_id, XpSource::Voice, limit).await?,
+        Some("text") => {
+            state
+                .levels_uc
+                .get_leaderboard_by_source(&guild_id, XpSource::Text, limit)
+                .await?
+        }
+        Some("voice") => {
+            state
+                .levels_uc
+                .get_leaderboard_by_source(&guild_id, XpSource::Voice, limit)
+                .await?
+        }
         _ => state.levels_uc.get_leaderboard(&guild_id, limit).await?,
     };
     Ok(map_to_dtos(levels))
@@ -128,9 +138,11 @@ pub async fn reset_user_xp(
         "voice" => ResetTarget::Voice,
         "all" => ResetTarget::All,
         other => {
-            return Err(ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
-                format!("target invalide: {other} (attendu: all/text/voice)"),
-            )));
+            return Err(ApiError(
+                sentinel_core::domain::errors::DomainError::ValidationError(format!(
+                    "target invalide: {other} (attendu: all/text/voice)"
+                )),
+            ));
         }
     };
     let guild_id = dto.guild_id.clone();

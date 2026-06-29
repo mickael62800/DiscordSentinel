@@ -25,7 +25,8 @@ impl FloodTracker {
     /// Met a jour les seuils depuis la config API.
     pub fn set_thresholds(&self, max_messages: u64, time_window_secs: u64) {
         self.max_messages.store(max_messages, Ordering::Relaxed);
-        self.time_window_secs.store(time_window_secs, Ordering::Relaxed);
+        self.time_window_secs
+            .store(time_window_secs, Ordering::Relaxed);
     }
 
     /// Enregistre un message. Retourne true si flood detecte.
@@ -52,8 +53,12 @@ impl FloodTracker {
 mod tests {
     use super::*;
 
-    fn cid(id: u64) -> ChannelId { ChannelId::new(id) }
-    fn uid(id: u64) -> UserId { UserId::new(id) }
+    fn cid(id: u64) -> ChannelId {
+        ChannelId::new(id)
+    }
+    fn uid(id: u64) -> UserId {
+        UserId::new(id)
+    }
 
     #[test]
     fn test_no_flood_below_threshold() {

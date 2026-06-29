@@ -10,11 +10,17 @@ use super::ManageVoiceChannelsService;
 impl ManageVoiceChannelsService {
     // ── Themes ──
 
-    pub(super) async fn list_themes_impl(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
+    pub(super) async fn list_themes_impl(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<VoiceChannelTheme>, DomainError> {
         self.repo.find_themes(guild_id).await
     }
 
-    pub(super) async fn create_theme_impl(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    pub(super) async fn create_theme_impl(
+        &self,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         Self::validate_theme(&cmd)?;
 
         if cmd.is_default {
@@ -43,18 +49,27 @@ impl ManageVoiceChannelsService {
         Ok(theme)
     }
 
-    pub(super) async fn update_theme_impl(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+    pub(super) async fn update_theme_impl(
+        &self,
+        theme_id: &str,
+        cmd: CreateThemeCommand,
+    ) -> Result<VoiceChannelTheme, DomainError> {
         Self::validate_theme(&cmd)?;
 
         let id = Uuid::parse_str(theme_id)
             .map_err(|_| DomainError::ValidationError(format!("ID invalide : {theme_id}")))?;
 
-        let existing = self.repo.find_theme(id).await?
+        let existing = self
+            .repo
+            .find_theme(id)
+            .await?
             .ok_or_else(|| DomainError::NotFound(format!("Theme introuvable : {theme_id}")))?;
 
         // Verifier que le theme appartient au bon guild
         if existing.guild_id != cmd.guild_id {
-            return Err(DomainError::ValidationError("Ce theme n'appartient pas a ce serveur".to_string()));
+            return Err(DomainError::ValidationError(
+                "Ce theme n'appartient pas a ce serveur".to_string(),
+            ));
         }
 
         if cmd.is_default {
@@ -83,16 +98,25 @@ impl ManageVoiceChannelsService {
         Ok(theme)
     }
 
-    pub(super) async fn delete_theme_impl(&self, guild_id: &str, theme_id: &str) -> Result<(), DomainError> {
+    pub(super) async fn delete_theme_impl(
+        &self,
+        guild_id: &str,
+        theme_id: &str,
+    ) -> Result<(), DomainError> {
         let id = Uuid::parse_str(theme_id)
             .map_err(|_| DomainError::ValidationError(format!("ID invalide : {theme_id}")))?;
 
         // Verifier que le theme appartient au bon guild
-        let existing = self.repo.find_theme(id).await?
+        let existing = self
+            .repo
+            .find_theme(id)
+            .await?
             .ok_or_else(|| DomainError::NotFound(format!("Theme introuvable : {theme_id}")))?;
 
         if existing.guild_id.as_str() != guild_id {
-            return Err(DomainError::ValidationError("Ce theme n'appartient pas a ce serveur".to_string()));
+            return Err(DomainError::ValidationError(
+                "Ce theme n'appartient pas a ce serveur".to_string(),
+            ));
         }
 
         self.repo.delete_theme(id).await

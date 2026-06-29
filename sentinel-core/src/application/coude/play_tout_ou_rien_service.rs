@@ -9,18 +9,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::coude::tout_ou_rien::coin_delta as coin_delta;
-use crate::domain::entities::coude::tout_ou_rien::resolve_outcome as resolve_outcome;
-use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
+use crate::domain::entities::coude::tout_ou_rien::coin_delta;
+use crate::domain::entities::coude::tout_ou_rien::resolve_outcome;
 use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_COOLDOWN_KEY;
 use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_COOLDOWN_SECS;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
 use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase;
 use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
 use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
@@ -38,7 +38,12 @@ impl PlayToutOuRienService {
         social_repo: Arc<dyn SocialRepository>,
         log_repo: Arc<dyn ToutOuRienRepository>,
     ) -> Self {
-        Self { player_repo, wallet_uc, social_repo, log_repo }
+        Self {
+            player_repo,
+            wallet_uc,
+            social_repo,
+            log_repo,
+        }
     }
 
     /// Tirage uniforme dans [0, 1). Isole dans une fonction pour faciliter
@@ -51,11 +56,12 @@ impl PlayToutOuRienService {
 
 #[async_trait]
 impl PlayToutOuRienUseCase for PlayToutOuRienService {
-    async fn play(
-        &self,
-        cmd: PlayToutOuRienCommand,
-    ) -> Result<ToutOuRienResolution, DomainError> {
-        let PlayToutOuRienCommand { guild_id, user_id, username } = cmd;
+    async fn play(&self, cmd: PlayToutOuRienCommand) -> Result<ToutOuRienResolution, DomainError> {
+        let PlayToutOuRienCommand {
+            guild_id,
+            user_id,
+            username,
+        } = cmd;
 
         // 1. Cooldown weekly. Si actif -> RateLimited (mappe 429).
         if let Some(expires_at) = self
@@ -132,7 +138,14 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
         };
         if let Err(e) = self
             .log_repo
-            .record(&guild_id, &user_id, &username, initial_coins, log_outcome, delta)
+            .record(
+                &guild_id,
+                &user_id,
+                &username,
+                initial_coins,
+                log_outcome,
+                delta,
+            )
             .await
         {
             tracing::warn!(error = %e, user_id = %user_id, "Echec record tout-ou-rien log");

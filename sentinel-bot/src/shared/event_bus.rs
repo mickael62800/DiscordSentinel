@@ -115,7 +115,8 @@ where
     F: Fn(String) -> Fut + Send + Sync + Clone + 'static,
     Fut: Future<Output = ()> + Send,
 {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let redis_url =
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
 
     loop {
         match run_consumer(&redis_url, &group, &consumer, handler.clone()).await {
@@ -156,9 +157,8 @@ where
 
     loop {
         // XREADGROUP STREAMS sentinel:events >  (> = seulement les nouveaux)
-        let reply: Option<StreamReadReply> = conn
-            .xread_options(&[STREAM_KEY], &[">"], &opts)
-            .await?;
+        let reply: Option<StreamReadReply> =
+            conn.xread_options(&[STREAM_KEY], &[">"], &opts).await?;
 
         if let Some(reply) = reply {
             for key in reply.keys {
@@ -272,7 +272,9 @@ fn parse_autoclaim_entries(value: &redis::Value) -> Vec<StreamId> {
 
     let mut result = Vec::new();
     for entry in entries {
-        let redis::Value::Array(ref pair) = *entry else { continue };
+        let redis::Value::Array(ref pair) = *entry else {
+            continue;
+        };
         if pair.len() < 2 {
             continue;
         }
@@ -281,7 +283,9 @@ fn parse_autoclaim_entries(value: &redis::Value) -> Vec<StreamId> {
             redis::Value::SimpleString(s) => s.clone(),
             _ => continue,
         };
-        let redis::Value::Array(ref fields) = pair[1] else { continue };
+        let redis::Value::Array(ref fields) = pair[1] else {
+            continue;
+        };
         let mut map = std::collections::HashMap::new();
         let mut i = 0;
         while i + 1 < fields.len() {
@@ -358,8 +362,13 @@ mod tests {
 
     // ── Tests extract_payload edge cases ─────────────────
 
-    fn build_map(entries: Vec<(&str, redis::Value)>) -> std::collections::HashMap<String, redis::Value> {
-        entries.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+    fn build_map(
+        entries: Vec<(&str, redis::Value)>,
+    ) -> std::collections::HashMap<String, redis::Value> {
+        entries
+            .into_iter()
+            .map(|(k, v)| (k.to_string(), v))
+            .collect()
     }
 
     #[test]

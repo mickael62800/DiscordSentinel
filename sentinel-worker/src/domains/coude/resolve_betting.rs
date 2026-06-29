@@ -14,8 +14,8 @@
 //! Apres Phase 3 : ~130 lignes de IO pur (gRPC client + Discord API).
 
 use sqlx::PgPool;
-use tonic::transport::Channel;
 use tonic::metadata::MetadataValue;
+use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{error, info, warn};
 
@@ -46,7 +46,10 @@ pub async fn run(_pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), 
         return Ok(());
     }
 
-    info!(count = combats.len(), "Combats resolus par l'API, post sur Discord");
+    info!(
+        count = combats.len(),
+        "Combats resolus par l'API, post sur Discord"
+    );
 
     // Post des resultats sur Discord (seul IO conserve cote worker).
     for combat in combats {
@@ -89,13 +92,11 @@ async fn call_resolve_batch() -> Result<Vec<ResolvedBettingCombat>, String> {
         .parse()
         .map_err(|e| format!("invalid api_key: {e}"))?;
 
-    let mut client = CoudeCombatsServiceClient::with_interceptor(
-        channel,
-        move |mut req: Request<()>| {
+    let mut client =
+        CoudeCombatsServiceClient::with_interceptor(channel, move |mut req: Request<()>| {
             req.metadata_mut().insert("authorization", auth.clone());
             Ok(req)
-        },
-    );
+        });
 
     let resp = client
         .resolve_betting_batch(Request::new(ProtoEmpty {}))
@@ -119,7 +120,10 @@ async fn post_result_to_discord(
 
     // Editer le message existant si on a le message_id (challenge original).
     if let Some(mid) = message_id {
-        let url = format!("https://discord.com/api/v10/channels/{}/messages/{}", channel_id, mid);
+        let url = format!(
+            "https://discord.com/api/v10/channels/{}/messages/{}",
+            channel_id, mid
+        );
         let resp = client
             .patch(&url)
             .header("Authorization", format!("Bot {}", bot_token))
@@ -142,7 +146,10 @@ async fn post_result_to_discord(
     }
 
     // Fallback : poster un nouveau message
-    let url = format!("https://discord.com/api/v10/channels/{}/messages", channel_id);
+    let url = format!(
+        "https://discord.com/api/v10/channels/{}/messages",
+        channel_id
+    );
     if let Err(e) = client
         .post(&url)
         .header("Authorization", format!("Bot {}", bot_token))

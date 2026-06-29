@@ -29,14 +29,22 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !config.casino_enabled() {
         reply_ephemeral(ctx, command, "Le casino est desactive pour ce serveur.").await;
         return;
     }
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
+    if !crate::modules::coude::channel_check::check_channel(
+        ctx,
+        command,
+        config.channel_activites(),
+    )
+    .await
+    {
         return;
     }
 
@@ -47,14 +55,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // 1. Appel API atomique : check cooldown + verif solde + RNG +
     //    mutation wallet + cooldown + memorial. Toute la decision est
     //    serveur (auditable, rejouable). Cf. Phase 2 #1 audit.
-    let resp: PlayToutOuRienResp =
-        match api.play_tout_ou_rien(&guild_id, &user_id, &command.user.name).await {
-            Ok(r) => r,
-            Err(e) => {
-                reply_ephemeral(ctx, command, &e).await;
-                return;
-            }
-        };
+    let resp: PlayToutOuRienResp = match api
+        .play_tout_ou_rien(&guild_id, &user_id, &command.user.name)
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            reply_ephemeral(ctx, command, &e).await;
+            return;
+        }
+    };
 
     // 2. Annonce de l animation : message public deferred-style.
     //    On a deja le verdict, on attend juste 10s pour le suspense.
@@ -67,7 +77,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             command.user.id, resp.initial_coins
         ))
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::COUDE_TAGLINE_SHORT))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command
@@ -84,7 +96,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // 3. Suspense.
-    tokio::time::sleep(std::time::Duration::from_secs(config.tout_ou_rien_animation_secs())).await;
+    tokio::time::sleep(std::time::Duration::from_secs(
+        config.tout_ou_rien_animation_secs(),
+    ))
+    .await;
 
     // 4. Edit message final.
     let won = resp.outcome == "won";
@@ -114,7 +129,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 command.user.id, resp.initial_coins, -resp.delta, resp.final_balance
             ))
             .color(0xC0392B) // rouge sombre
-            .footer(CreateEmbedFooter::new("Tout-ou-rien · le destin t a craches dessus"))
+            .footer(CreateEmbedFooter::new(
+                "Tout-ou-rien · le destin t a craches dessus",
+            ))
             .timestamp(serenity::model::Timestamp::now())
     };
 

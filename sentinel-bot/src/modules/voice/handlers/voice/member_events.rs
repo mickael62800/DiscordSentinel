@@ -16,11 +16,7 @@ use crate::modules::voice::{AfkTrackerKey, ConfigKey};
 use super::channel_lifecycle::{check_and_delete_empty, create_temp_channel};
 
 /// Point d'entree appele par le handler Discord sur chaque changement de voice state.
-pub async fn handle_voice_state_update(
-    ctx: &Context,
-    old: &Option<VoiceState>,
-    new: &VoiceState,
-) {
+pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, new: &VoiceState) {
     let guild_id = match new.guild_id.or(old.as_ref().and_then(|o| o.guild_id)) {
         Some(id) => id,
         None => return,
@@ -38,7 +34,13 @@ pub async fn handle_voice_state_update(
         };
 
         if let Some(base) = data.get::<ApiClientKey>() {
-            match base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME).await {
+            match base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::voice::MODULE_BOT_NAME,
+                )
+                .await
+            {
                 Ok(config) => {
                     if !BaseApiClient::config_bool(&config, "enabled", true) {
                         return;
@@ -98,7 +100,14 @@ pub async fn handle_voice_state_update(
                 } else if observed_channels.contains(&channel_id) {
                     // Permanent observe : creation paresseuse de la carte.
                     let count = count_members_in_channel(ctx, guild_id, channel_id);
-                    embeds::ensure_card_and_member_joined(ctx, guild_id, channel_id, &user_label, count).await;
+                    embeds::ensure_card_and_member_joined(
+                        ctx,
+                        guild_id,
+                        channel_id,
+                        &user_label,
+                        count,
+                    )
+                    .await;
                 }
             }
         }
@@ -217,7 +226,10 @@ async fn maybe_auto_transfer_ownership(
         deny: serenity::model::Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(leaving_user),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, old_perm).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, old_perm)
+        .await
+    {
         tracing::warn!(error = %e, "failed to downgrade old owner permissions");
     }
 
@@ -225,11 +237,12 @@ async fn maybe_auto_transfer_ownership(
     // refonte), on retire l'acces ; sinon on cible directement le vocal.
     let text_channel_id = {
         let data = ctx.data.read().await;
-        data.get::<crate::modules::voice::TextToVoiceMapKey>().and_then(|map| {
-            map.iter()
-                .find(|entry| *entry.value() == voice_channel_id)
-                .map(|entry| *entry.key())
-        })
+        data.get::<crate::modules::voice::TextToVoiceMapKey>()
+            .and_then(|map| {
+                map.iter()
+                    .find(|entry| *entry.value() == voice_channel_id)
+                    .map(|entry| *entry.key())
+            })
     };
     if let Some(tid) = text_channel_id {
         let deny_perm = serenity::model::channel::PermissionOverwrite {
@@ -242,7 +255,8 @@ async fn maybe_auto_transfer_ownership(
         }
     }
 
-    let co_admin_candidate = find_co_admin_in_voice(ctx, guild_id, voice_channel_id, leaving_user).await;
+    let co_admin_candidate =
+        find_co_admin_in_voice(ctx, guild_id, voice_channel_id, leaving_user).await;
 
     if let Some(new_owner) = co_admin_candidate {
         // On passe le chat integre du vocal comme cible pour le message de
@@ -259,20 +273,23 @@ async fn maybe_auto_transfer_ownership(
         .title("\u{1f6a8} Le proprietaire a quitte le salon !")
         .description(
             "Le salon n'a plus d'admin.\n\
-             Clique sur le bouton ci-dessous pour reprendre le controle."
+             Clique sur le bouton ci-dessous pour reprendre le controle.",
         )
         .color(0xE67E22)
         .timestamp(serenity::model::Timestamp::now());
 
-    let button = serenity::builder::CreateButton::new(
-        format!("btn_claim_ownership_{}", voice_channel_id.get()),
-    )
+    let button = serenity::builder::CreateButton::new(format!(
+        "btn_claim_ownership_{}",
+        voice_channel_id.get()
+    ))
     .label("Reprendre le salon")
     .style(serenity::all::ButtonStyle::Success);
 
     let msg = serenity::builder::CreateMessage::new()
         .embed(embed)
-        .components(vec![serenity::builder::CreateActionRow::Buttons(vec![button])]);
+        .components(vec![serenity::builder::CreateActionRow::Buttons(vec![
+            button,
+        ])]);
 
     if let Err(e) = prompt_target.send_message(&ctx.http, msg).await {
         tracing::warn!(error = %e, "failed to send claim ownership prompt");
@@ -294,7 +311,10 @@ async fn find_co_admin_in_voice(
     let co_admin_ids: Vec<u64> = {
         let data = ctx.data.read().await;
         let api = crate::modules::voice::api_client::ApiClient::from_data(&data)?;
-        match api.get_channel_co_admins(&voice_channel_id.get().to_string()).await {
+        match api
+            .get_channel_co_admins(&voice_channel_id.get().to_string())
+            .await
+        {
             Ok(ids) => ids.iter().filter_map(|s| s.parse().ok()).collect(),
             Err(e) => {
                 tracing::warn!(error = %e, "failed to fetch co-admins for auto-transfer");
@@ -358,7 +378,10 @@ async fn do_direct_transfer(
         deny: serenity::model::Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_perm).await {
+    if let Err(e) = voice_channel_id
+        .create_permission(&ctx.http, owner_perm)
+        .await
+    {
         tracing::warn!(error = %e, "failed to grant co-admin owner permission");
     }
 
@@ -385,7 +408,10 @@ async fn do_direct_transfer(
             .timestamp(serenity::model::Timestamp::now());
 
         if let Err(e) = tid
-            .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+            .send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new().embed(embed),
+            )
             .await
         {
             tracing::warn!(error = %e, "failed to send co-admin promotion notification");

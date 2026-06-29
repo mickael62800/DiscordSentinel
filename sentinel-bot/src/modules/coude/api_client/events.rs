@@ -51,19 +51,14 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    pub async fn get_active_events(
-        &self,
-        guild_id: &str,
-    ) -> Result<Vec<ServerEvent>, String> {
+    pub async fn get_active_events(&self, guild_id: &str) -> Result<Vec<ServerEvent>, String> {
         let req = proto_coude::ListActiveEventsRequest {
             guild_id: guild_id.to_string(),
         };
         let mut client = self.grpc.coude_social();
         let list = self
             .grpc
-            .guarded(|| async move {
-                client.list_active_events(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.list_active_events(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(list

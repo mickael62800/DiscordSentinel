@@ -2,21 +2,21 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::domain::entities::coude::curse::CurseKind;
+use crate::domain::entities::coude::curse::LEAKY_WALLET_FEE_COINS;
 use crate::domain::entities::coude::economy::clamp_steal_amount;
 use crate::domain::entities::coude::economy::clamp_steal_fail_penalty;
-use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
-use crate::domain::entities::coude::curse::LEAKY_WALLET_FEE_COINS;
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::manage_economy::GiftOutcome;
 use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 use crate::ports::inbound::coude::manage_economy::StealOutcome;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Service "economie Coup de Coude".
 ///
 /// # Migration wallet unifie (PoC `/donner`)
@@ -93,9 +93,16 @@ impl ManageCoudeEconomyService {
     /// active pour le voleur. Retourne 0 si pas de saison ou pas
     /// de player_repo branche.
     async fn season_steal_bonus(&self, guild_id: &str, thief_id: &str, stolen: i64) -> i64 {
-        let Some(repo) = &self.player_repo else { return 0; };
-        let Ok(Some(player)) = repo.get(guild_id, thief_id).await else { return 0; };
-        crate::domain::entities::coude::season_theme::compute_season_steal_bonus(player.season, stolen)
+        let Some(repo) = &self.player_repo else {
+            return 0;
+        };
+        let Ok(Some(player)) = repo.get(guild_id, thief_id).await else {
+            return 0;
+        };
+        crate::domain::entities::coude::season_theme::compute_season_steal_bonus(
+            player.season,
+            stolen,
+        )
     }
 }
 
@@ -132,7 +139,14 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         let description = format!("Don entre joueurs ({} -> {})", from_id, to_id);
         let mut taunts = self
             .wallet_uc
-            .transfer(guild_id, from_id, to_id, amount, "coude_donner", &description)
+            .transfer(
+                guild_id,
+                from_id,
+                to_id,
+                amount,
+                "coude_donner",
+                &description,
+            )
             .await?;
 
         // 1.bis Branchement Leaky Wallet (cf. COUPE_AMELIORATIONS 5.1) :
@@ -163,7 +177,11 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         //    threshold configure (logique interne au service taunts). Ne
         //    peut pas etre detecte par le wallet service car c'est
         //    domaine-specifique Coup de Coude.
-        if let Ok(Some(ev)) = self.taunts_uc.on_generous_donor(guild_id, from_id, amount).await {
+        if let Ok(Some(ev)) = self
+            .taunts_uc
+            .on_generous_donor(guild_id, from_id, amount)
+            .await
+        {
             taunts.push(ev);
         }
 
@@ -202,7 +220,9 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         // Transfert atomique de la part recue (reutilise `transfer` : faillite/
         // jackpot/don-genereux detectes comme avant, calcule sur `received` —
         // comportement identique au legacy qui transferait deja `received`).
-        let taunts = self.transfer(guild_id, donor_id, target_id, received).await?;
+        let taunts = self
+            .transfer(guild_id, donor_id, target_id, received)
+            .await?;
 
         // Debit de la taxe a l'emetteur (best-effort : le don est deja passe).
         if tax > 0 {
@@ -216,7 +236,11 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
             }
         }
 
-        Ok(GiftOutcome { received, tax, taunt_events: taunts })
+        Ok(GiftOutcome {
+            received,
+            tax,
+            taunt_events: taunts,
+        })
     }
 
     async fn steal(
@@ -344,7 +368,13 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         if gain > 0 {
             let _ = self
                 .wallet_uc
-                .credit(guild_id, user_id, gain, "coude_casino_win", "Blackjack gagne")
+                .credit(
+                    guild_id,
+                    user_id,
+                    gain,
+                    "coude_casino_win",
+                    "Blackjack gagne",
+                )
                 .await?;
         }
         self.repo
@@ -415,11 +445,7 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
             .await
     }
 
-    async fn count_casino_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         self.repo.count_casino_today(guild_id, user_id).await
     }
 
@@ -431,15 +457,10 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         self.repo.sum_casino_gains_today(guild_id, user_id).await
     }
 
-    async fn count_steal_today(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i64, DomainError> {
+    async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         self.repo.count_steal_today(guild_id, user_id).await
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/manage_economy.rs"]

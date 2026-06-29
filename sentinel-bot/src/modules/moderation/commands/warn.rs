@@ -1,12 +1,13 @@
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateMessage,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
 };
 use serenity::builder::CreateEmbedFooter;
 use tracing::{error, info, warn};
 
-use crate::shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, danger_embed, moderate_embed};
+use crate::shared::embeds::{
+    danger_embed, gravity_color, gravity_emoji, moderate_embed, sentinel_embed,
+};
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
@@ -18,44 +19,61 @@ pub fn register() -> CreateCommand {
         .description("Avertir un utilisateur")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "gravity", "Gravite de l'avertissement")
-                .required(true)
-                .add_string_choice("Faible", "low")
-                .add_string_choice("Moyenne", "medium")
-                .add_string_choice("Haute", "high"),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "gravity",
+                "Gravite de l'avertissement",
+            )
+            .required(true)
+            .add_string_choice("Faible", "low")
+            .add_string_choice("Moyenne", "medium")
+            .add_string_choice("Haute", "high"),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison de l'avertissement")
-                .required(true),
+            CreateCommandOption::new(
+                CommandOptionType::String,
+                "reason",
+                "Raison de l'avertissement",
+            )
+            .required(true),
         )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a avertir (ou utilise user_id)"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur (ex. membre parti / banni)"),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::User,
+            "user",
+            "Utilisateur a avertir (ou utilise user_id)",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::String,
+            "user_id",
+            "ID de l'utilisateur (ex. membre parti / banni)",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
-        let _ = command.create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("❌ Permission MODERATE_MEMBERS requise pour /warn.")
-                    .ephemeral(true),
-            ),
-        ).await;
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MODERATE_MEMBERS requise pour /warn.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
         warn!(user = %command.user.name, "Tentative /warn sans permission");
         return;
     }
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Defer(
-            CreateInteractionResponseMessage::new().ephemeral(true),
-        ),
-    ).await {
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
         warn!(error = %e, cmd = "warn", "Echec defer interaction Discord");
         return;
     }
@@ -64,24 +82,38 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Indique un membre (`user`) ou un identifiant (`user_id`).").await; return; }
+        None => {
+            edit_response_text(
+                ctx,
+                command,
+                "Indique un membre (`user`) ou un identifiant (`user_id`).",
+            )
+            .await;
+            return;
+        }
     };
 
-    let gravity = crate::shared::discord_helpers::option_str(options, "gravity")
-        .unwrap_or("medium");
+    let gravity =
+        crate::shared::discord_helpers::option_str(options, "gravity").unwrap_or("medium");
 
-    let reason_raw = crate::shared::discord_helpers::option_str(options, "reason")
-        .unwrap_or("Aucune raison");
+    let reason_raw =
+        crate::shared::discord_helpers::option_str(options, "reason").unwrap_or("Aucune raison");
     let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
+            return;
+        }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => {
+            edit_response_text(ctx, command, "Utilisateur introuvable.").await;
+            return;
+        }
     };
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
@@ -92,7 +124,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
 
     let action = ModerationAction {
@@ -119,26 +154,35 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 "Warn enregistre"
             );
 
-            let guild_name = guild_id.to_partial_guild(&ctx.http).await
-                .map(|g| g.name).unwrap_or_else(|_| "le serveur".into());
+            let guild_name = guild_id
+                .to_partial_guild(&ctx.http)
+                .await
+                .map(|g| g.name)
+                .unwrap_or_else(|_| "le serveur".into());
 
             if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
                 let dm_embed = sentinel_embed(
-                    format!("{} Avertissement sur **{guild_name}**", gravity_emoji(gravity)),
+                    format!(
+                        "{} Avertissement sur **{guild_name}**",
+                        gravity_emoji(gravity)
+                    ),
                     gravity_color(gravity),
                 )
                 .field("Gravite", gravity, true)
                 .field("Raison", reason, false);
 
-                if let Err(e) = dm.send_message(
-                    &ctx.http,
-                    CreateMessage::new().embed(dm_embed),
-                ).await {
+                if let Err(e) = dm
+                    .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
+                    .await
+                {
                     warn!(error = %e, "Failed to send warn DM to user");
                 }
             }
 
-            let strikes_label = resp.strikes_count.map(|c| format!(" — Strike {c}")).unwrap_or_default();
+            let strikes_label = resp
+                .strikes_count
+                .map(|c| format!(" — Strike {c}"))
+                .unwrap_or_default();
             let channel_embed = sentinel_embed(
                 format!("{} Warn ({gravity}){strikes_label}", gravity_emoji(gravity)),
                 gravity_color(gravity),
@@ -149,16 +193,25 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .field("Gravite", gravity, true)
             .field("ID Cible", target.id.to_string(), true)
             .field("Salon", format!("<#{}>", command.channel_id), true)
-            .field("Strikes", resp.strikes_count.map(|c| c.to_string()).unwrap_or_else(|| "—".to_string()), true)
+            .field(
+                "Strikes",
+                resp.strikes_count
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "—".to_string()),
+                true,
+            )
             .field("Raison", reason, false)
             .timestamp(serenity::model::Timestamp::now())
             .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
-            if let Err(e) = command.edit_response(
-                &ctx.http,
-                serenity::builder::EditInteractionResponse::new()
-                    .content(format!("✅ Avertissement envoye a <@{}>.", target.id)),
-            ).await {
+            if let Err(e) = command
+                .edit_response(
+                    &ctx.http,
+                    serenity::builder::EditInteractionResponse::new()
+                        .content(format!("✅ Avertissement envoye a <@{}>.", target.id)),
+                )
+                .await
+            {
                 warn!(error = %e, "Failed to edit warn response");
             }
 
@@ -175,33 +228,55 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         let ts = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
-                            .as_secs() as i64 + secs as i64;
-                        let datetime = time::OffsetDateTime::from_unix_timestamp(ts).unwrap_or_else(|_| time::OffsetDateTime::now_utc());
+                            .as_secs() as i64
+                            + secs as i64;
+                        let datetime = time::OffsetDateTime::from_unix_timestamp(ts)
+                            .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
                         let timeout = serenity::model::Timestamp::from(datetime);
-                        if let Err(e) = member.disable_communication_until_datetime(&ctx.http, timeout).await {
+                        if let Err(e) = member
+                            .disable_communication_until_datetime(&ctx.http, timeout)
+                            .await
+                        {
                             warn!(error = %e, "Escalation mute echouee");
                         } else {
-                            let esc_embed = moderate_embed(format!("🔇 Mute auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
-                                .field("Cible", format!("<@{}>", target.id), true)
-                                .field("ID Cible", target.id.to_string(), true)
-                                .field("Duree", format!("{}min", secs / 60), true)
-                                .field("Declencheur", format!("/warn par <@{}>", command.user.id), false)
-                                .thumbnail(target.face())
-                                .timestamp(serenity::model::Timestamp::now())
-                                .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
+                            let esc_embed = moderate_embed(format!(
+                                "🔇 Mute auto (escalation — {} strikes)",
+                                resp.strikes_count.unwrap_or(0)
+                            ))
+                            .field("Cible", format!("<@{}>", target.id), true)
+                            .field("ID Cible", target.id.to_string(), true)
+                            .field("Duree", format!("{}min", secs / 60), true)
+                            .field(
+                                "Declencheur",
+                                format!("/warn par <@{}>", command.user.id),
+                                false,
+                            )
+                            .thumbnail(target.face())
+                            .timestamp(serenity::model::Timestamp::now())
+                            .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                             super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
                         }
                     }
                     "ban" => {
-                        let esc_embed = danger_embed(format!("🔨 Ban auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
-                            .field("Cible", format!("<@{}>", target.id), true)
-                            .field("ID Cible", target.id.to_string(), true)
-                            .field("Declencheur", format!("/warn par <@{}>", command.user.id), false)
-                            .thumbnail(target.face())
-                            .timestamp(serenity::model::Timestamp::now())
-                            .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
+                        let esc_embed = danger_embed(format!(
+                            "🔨 Ban auto (escalation — {} strikes)",
+                            resp.strikes_count.unwrap_or(0)
+                        ))
+                        .field("Cible", format!("<@{}>", target.id), true)
+                        .field("ID Cible", target.id.to_string(), true)
+                        .field(
+                            "Declencheur",
+                            format!("/warn par <@{}>", command.user.id),
+                            false,
+                        )
+                        .thumbnail(target.face())
+                        .timestamp(serenity::model::Timestamp::now())
+                        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                         super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
-                        if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, 1, reason).await {
+                        if let Err(e) = guild_id
+                            .ban_with_reason(&ctx.http, target.id, 1, reason)
+                            .await
+                        {
                             warn!(error = %e, "Escalation ban echouee");
                         }
                     }

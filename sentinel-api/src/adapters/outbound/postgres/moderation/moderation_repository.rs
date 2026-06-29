@@ -1,14 +1,14 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::errors::DomainError;
-use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use sentinel_core::domain::errors::DomainError;
 
 /// Phase 2 helper : reconstruit une ModerationAction a partir d'une ligne
 /// audit_logs (event_type `mod_*`).
@@ -155,7 +155,12 @@ impl ModerationRepository for PgModerationRepository {
         Ok(row.map(ModerationAction::from))
     }
 
-    async fn find_by_target(&self, guild_id: &str, target_id: &str, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_by_target(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+        limit: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         let limit = limit.min(1000).max(1);
         let sql = format!(
             "{AUDIT_MOD_SELECT} WHERE guild_id = $1 AND target_id = $2 AND event_type LIKE 'mod_%' ORDER BY created_at DESC LIMIT {limit}"
@@ -170,7 +175,12 @@ impl ModerationRepository for PgModerationRepository {
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
 
-    async fn find_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_bans(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         // Phase 2 : lecture depuis audit_logs.
         // Pour chaque (guild_id, target_id), on prend la derniere action ban*/unban
         // et on ne garde que celles dont l'event_type final commence par 'mod_ban'.
@@ -233,7 +243,11 @@ impl ModerationRepository for PgModerationRepository {
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
 
-    async fn find_all_for_guild(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_all_for_guild(
+        &self,
+        guild_id: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<ModerationAction>, DomainError> {
         // Phase 2 : lecture depuis audit_logs.
         let rows = match guild_id {
             Some(gid) => {
@@ -261,7 +275,11 @@ impl ModerationRepository for PgModerationRepository {
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
 
-    async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
+    async fn delete_bans_for_user(
+        &self,
+        guild_id: &str,
+        target_id: &str,
+    ) -> Result<(), DomainError> {
         // Phase 4 : on supprime depuis audit_logs.
         sqlx::query(
             "DELETE FROM audit_logs WHERE guild_id = $1 AND target_id = $2 AND event_type LIKE 'mod_ban%'",
@@ -287,19 +305,22 @@ impl ModerationRepository for PgModerationRepository {
     }
 
     async fn action_guild_id(&self, action_id: Uuid) -> Result<Option<String>, DomainError> {
-        let row: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM moderation_actions WHERE id = $1",
-        )
-        .bind(action_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(|e| pg_err_ctx("fetch action guild_id", e))?;
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT guild_id FROM moderation_actions WHERE id = $1")
+                .bind(action_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| pg_err_ctx("fetch action guild_id", e))?;
         Ok(row.map(|(g,)| g))
     }
 
     async fn find_action_for_reversal(
-        &self, action_id: Uuid,
-    ) -> Result<Option<sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo>, DomainError> {
+        &self,
+        action_id: Uuid,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo>,
+        DomainError,
+    > {
         // Phase 4 : lookup dans `audit_logs` (event_type='mod_*') ; action_id est
         // stocke dans `details->>'action_id'`. action_type derive de event_type
         // en strippant le prefixe 'mod_'.
@@ -314,14 +335,19 @@ impl ModerationRepository for PgModerationRepository {
         .await
         .map_err(|e| pg_err_ctx("fetch action", e))?;
 
-        Ok(row.map(|(guild_id, target_id_opt, target_name_opt, event_type)| {
-            let action_type = event_type.strip_prefix("mod_").unwrap_or(&event_type).to_string();
-            sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo {
-                guild_id,
-                target_id: target_id_opt.unwrap_or_default(),
-                target_name: target_name_opt.unwrap_or_default(),
-                action_type,
-            }
-        }))
+        Ok(
+            row.map(|(guild_id, target_id_opt, target_name_opt, event_type)| {
+                let action_type = event_type
+                    .strip_prefix("mod_")
+                    .unwrap_or(&event_type)
+                    .to_string();
+                sentinel_core::domain::entities::moderation::action::reversal::ActionReversalInfo {
+                    guild_id,
+                    target_id: target_id_opt.unwrap_or_default(),
+                    target_name: target_name_opt.unwrap_or_default(),
+                    action_type,
+                }
+            }),
+        )
     }
 }

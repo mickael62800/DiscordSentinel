@@ -1,12 +1,12 @@
-use async_trait::async_trait;
 use crate::adapters::outbound::postgres::pg_err_ctx;
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
+use crate::ports::outbound::game::player_session_repository::PlayerSessionRepository;
 use sentinel_core::domain::entities::game::player_session::PlayerSession;
 use sentinel_core::domain::errors::DomainError;
-use crate::ports::outbound::game::player_session_repository::PlayerSessionRepository;
 
 pub struct PgPlayerSessionRepository {
     pool: PgPool,

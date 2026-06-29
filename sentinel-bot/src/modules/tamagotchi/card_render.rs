@@ -51,7 +51,10 @@ fn fontdb() -> Arc<usvg::fontdb::Database> {
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 /// Largeur remplie d'une barre (sur `max_w`) pour une jauge 0-100.
@@ -188,7 +191,13 @@ fn build_svg(d: &CardData) -> String {
     let gold = "#f1c40f";
     let green = "#5fd17a";
 
-    let initial = d.name.chars().next().unwrap_or('?').to_uppercase().to_string();
+    let initial = d
+        .name
+        .chars()
+        .next()
+        .unwrap_or('?')
+        .to_uppercase()
+        .to_string();
 
     let status_txt = match d.status.as_str() {
         "sick" => "· 🤒 malade",
@@ -197,9 +206,20 @@ fn build_svg(d: &CardData) -> String {
     };
     let spec = d.specialization.clone().unwrap_or_default();
     let subtitle = if spec.is_empty() {
-        format!("{} · {} jours {}", esc(&d.species_label), d.age_days, status_txt)
+        format!(
+            "{} · {} jours {}",
+            esc(&d.species_label),
+            d.age_days,
+            status_txt
+        )
     } else {
-        format!("{} ({}) · {} jours {}", esc(&d.species_label), esc(&spec), d.age_days, status_txt)
+        format!(
+            "{} ({}) · {} jours {}",
+            esc(&d.species_label),
+            esc(&spec),
+            d.age_days,
+            status_txt
+        )
     };
 
     // Barre XP.
@@ -243,18 +263,21 @@ fn build_svg(d: &CardData) -> String {
     // sinon placeholder (cercle + initiale).
     let avatar_block = if d.status == "dead" {
         // Tombstone d'origine recentree/agrandie dans le cadre (centre ~450,290).
-        format!(r##"<g transform="translate(247.5,86) scale(1.5)">{}</g>"##, dead_avatar_svg())
+        format!(
+            r##"<g transform="translate(247.5,86) scale(1.5)">{}</g>"##,
+            dead_avatar_svg()
+        )
     } else {
         match load_sprite_b64(d) {
-        Some(b64) => format!(
-            r##"<image x="318" y="158" width="264" height="264" href="data:image/png;base64,{b64}" preserveAspectRatio="xMidYMid meet"/>"##
-        ),
-        None => format!(
-            r##"<circle cx="450" cy="290" r="120" fill="#{species_color}"/>
+            Some(b64) => format!(
+                r##"<image x="318" y="158" width="264" height="264" href="data:image/png;base64,{b64}" preserveAspectRatio="xMidYMid meet"/>"##
+            ),
+            None => format!(
+                r##"<circle cx="450" cy="290" r="120" fill="#{species_color}"/>
   <text x="450" y="335" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="120" fill="#ffffff" opacity="0.9">{initial}</text>"##,
-            species_color = d.species_color,
-            initial = esc(&initial),
-        ),
+                species_color = d.species_color,
+                initial = esc(&initial),
+            ),
         }
     };
 
@@ -332,7 +355,10 @@ pub fn render_card_png(d: &CardData) -> Option<Vec<u8>> {
     };
     let size = tree.size().to_int_size();
     let mut pixmap = resvg::tiny_skia::Pixmap::new(size.width(), size.height())?;
-    resvg::render(&tree, resvg::tiny_skia::Transform::identity(), &mut pixmap.as_mut());
+    resvg::render(
+        &tree,
+        resvg::tiny_skia::Transform::identity(),
+        &mut pixmap.as_mut(),
+    );
     pixmap.encode_png().ok()
 }
-

@@ -8,9 +8,9 @@
 
 use async_trait::async_trait;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 /// Info minimale pour chaque combat expire (utilisee pour logging + eventuel
 /// post Discord a decider cote worker).

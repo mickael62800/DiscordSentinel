@@ -53,7 +53,19 @@ pub struct ModerationActionExport {
 
 #[async_trait]
 pub trait ExportRepository: Send + Sync {
-    async fn fetch_infractions(&self, guild_id: &str, max_rows: i64) -> Result<Vec<InfractionExport>, DomainError>;
-    async fn fetch_audit_logs(&self, guild_id: &str, max_rows: i64) -> Result<Vec<AuditLogExport>, DomainError>;
-    async fn fetch_moderation_actions(&self, guild_id: &str, max_rows: i64) -> Result<Vec<ModerationActionExport>, DomainError>;
+    async fn fetch_infractions(
+        &self,
+        guild_id: &str,
+        max_rows: i64,
+    ) -> Result<Vec<InfractionExport>, DomainError>;
+    async fn fetch_audit_logs(
+        &self,
+        guild_id: &str,
+        max_rows: i64,
+    ) -> Result<Vec<AuditLogExport>, DomainError>;
+    async fn fetch_moderation_actions(
+        &self,
+        guild_id: &str,
+        max_rows: i64,
+    ) -> Result<Vec<ModerationActionExport>, DomainError>;
 }

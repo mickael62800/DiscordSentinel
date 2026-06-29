@@ -11,16 +11,25 @@ pub fn parse_groups(raw: &str) -> Vec<ExclusiveGroup> {
     raw.lines()
         .filter_map(|line| {
             let line = line.trim();
-            if line.is_empty() { return None; }
+            if line.is_empty() {
+                return None;
+            }
             let (name, ids_str) = line.split_once(':')?;
             let name = name.trim();
-            if name.is_empty() { return None; }
+            if name.is_empty() {
+                return None;
+            }
             let role_ids: Vec<u64> = ids_str
                 .split(',')
                 .filter_map(|s| s.trim().parse().ok())
                 .collect();
-            if role_ids.len() < 2 { return None; } // un groupe doit avoir au moins 2 roles
-            Some(ExclusiveGroup { name: name.to_string(), role_ids })
+            if role_ids.len() < 2 {
+                return None;
+            } // un groupe doit avoir au moins 2 roles
+            Some(ExclusiveGroup {
+                name: name.to_string(),
+                role_ids,
+            })
         })
         .collect()
 }
@@ -100,8 +109,14 @@ mod tests {
     #[test]
     fn conflicting_roles_multiple_groups() {
         let groups = vec![
-            ExclusiveGroup { name: "A".into(), role_ids: vec![1, 2] },
-            ExclusiveGroup { name: "B".into(), role_ids: vec![2, 3] },
+            ExclusiveGroup {
+                name: "A".into(),
+                role_ids: vec![1, 2],
+            },
+            ExclusiveGroup {
+                name: "B".into(),
+                role_ids: vec![2, 3],
+            },
         ];
         // Role 2 est dans les deux groupes → conflits avec 1 et 3
         let conflicts = get_conflicting_roles(&groups, 2);

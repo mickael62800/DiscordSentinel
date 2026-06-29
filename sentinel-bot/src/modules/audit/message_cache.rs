@@ -97,10 +97,7 @@ impl MessageCache {
     /// Nombre de messages en cache pour un guild.
     #[allow(dead_code)]
     pub fn count(&self, guild_id: GuildId) -> usize {
-        self.counts
-            .get(&guild_id)
-            .map(|c| *c)
-            .unwrap_or(0)
+        self.counts.get(&guild_id).map(|c| *c).unwrap_or(0)
     }
 }
 

@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::errors::DomainError;
 
 /// Use case "gérer les joueurs Coup de Coude".
 ///
@@ -30,11 +30,7 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
 
     async fn list(&self, guild_id: &str) -> Result<Vec<Player>, DomainError>;
 
-    async fn random_active(
-        &self,
-        guild_id: &str,
-        count: i64,
-    ) -> Result<Vec<Player>, DomainError>;
+    async fn random_active(&self, guild_id: &str, count: i64) -> Result<Vec<Player>, DomainError>;
 
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError>;
 
@@ -92,11 +88,7 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
         lost: i64,
     ) -> Result<(), DomainError>;
 
-    async fn increment_cowardice(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<i32, DomainError>;
+    async fn increment_cowardice(&self, guild_id: &str, user_id: &str) -> Result<i32, DomainError>;
 
     async fn increment_chaos(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 

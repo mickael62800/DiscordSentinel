@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::GuildId;
+use uuid::Uuid;
 
 /// Pari posé sur un combat Coup de Coude.
 #[derive(Debug, Clone)]

@@ -281,10 +281,7 @@ impl WorkerConfig {
             export_scan_interval_secs: load_env("EXPORT_SCAN_INTERVAL", DEFAULT_EXPORT_SCAN_SECS),
 
             // discord_audit_sync
-            audit_sync_interval_secs: load_env(
-                "AUDIT_SYNC_INTERVAL",
-                DEFAULT_AUDIT_SYNC_SECS,
-            ),
+            audit_sync_interval_secs: load_env("AUDIT_SYNC_INTERVAL", DEFAULT_AUDIT_SYNC_SECS),
             discord_bot_token: std::env::var("SENTINEL_DISCORD_TOKEN")
                 .or_else(|_| std::env::var("DISCORD_TOKEN"))
                 .unwrap_or_default(),
@@ -514,8 +511,12 @@ impl WorkerConfig {
         );
 
         // ai
-        self.ai_poll_interval_secs =
-            config_or_env(db, "ai_poll_interval", "AI_POLL_INTERVAL", DEFAULT_AI_POLL_SECS);
+        self.ai_poll_interval_secs = config_or_env(
+            db,
+            "ai_poll_interval",
+            "AI_POLL_INTERVAL",
+            DEFAULT_AI_POLL_SECS,
+        );
         self.ai_job_timeout_secs = config_or_env(
             db,
             "ai_job_timeout",

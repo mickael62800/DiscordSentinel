@@ -29,11 +29,21 @@ impl CombatOutcomeFlags {
     /// Etiquettes humaines pour l affichage dans l embed.
     pub fn labels(&self) -> Vec<&'static str> {
         let mut out = Vec::new();
-        if self.clutch { out.push("🔥 CLUTCH"); }
-        if self.comeback { out.push("⚡ COMEBACK"); }
-        if self.perfect { out.push("💎 PERFECT"); }
-        if self.ridicule { out.push("🤡 RIDICULE"); }
-        if self.zero_pointe { out.push("🪦 ZERO POINTE"); }
+        if self.clutch {
+            out.push("🔥 CLUTCH");
+        }
+        if self.comeback {
+            out.push("⚡ COMEBACK");
+        }
+        if self.perfect {
+            out.push("💎 PERFECT");
+        }
+        if self.ridicule {
+            out.push("🤡 RIDICULE");
+        }
+        if self.zero_pointe {
+            out.push("🪦 ZERO POINTE");
+        }
         out
     }
 }

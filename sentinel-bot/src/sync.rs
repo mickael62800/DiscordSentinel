@@ -74,10 +74,7 @@ pub fn build_action_custom_id(namespace: &str, verb: &str, action_id: Uuid) -> S
 /// Parse un custom_id au format `{namespace}:{verb}:{action_id}`.
 /// Retourne `(verb, action_id)` si le namespace correspond, sinon None.
 #[allow(dead_code)]
-pub fn parse_action_custom_id(
-    custom_id: &str,
-    expected_namespace: &str,
-) -> Option<(String, Uuid)> {
+pub fn parse_action_custom_id(custom_id: &str, expected_namespace: &str) -> Option<(String, Uuid)> {
     let mut parts = custom_id.splitn(3, ':');
     let ns = parts.next()?;
     if ns != expected_namespace {

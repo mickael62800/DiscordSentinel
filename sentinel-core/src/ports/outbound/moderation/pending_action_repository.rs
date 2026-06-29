@@ -3,8 +3,8 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct PendingAction {
@@ -27,9 +27,16 @@ pub struct PendingAction {
 #[async_trait]
 pub trait PendingActionRepository: Send + Sync {
     async fn create(
-        &self, guild_id: &str, moderator_id: &str, moderator_name: &str,
-        target_id: &str, target_name: &str, action_type: &str, reason: &str,
-        gravity: Option<&str>, duration: Option<i64>,
+        &self,
+        guild_id: &str,
+        moderator_id: &str,
+        moderator_name: &str,
+        target_id: &str,
+        target_name: &str,
+        action_type: &str,
+        reason: &str,
+        gravity: Option<&str>,
+        duration: Option<i64>,
     ) -> Result<Uuid, DomainError>;
     async fn list_pending(&self, guild_id: &str) -> Result<Vec<PendingAction>, DomainError>;
     async fn get_guild_id(&self, id: Uuid) -> Result<Option<String>, DomainError>;

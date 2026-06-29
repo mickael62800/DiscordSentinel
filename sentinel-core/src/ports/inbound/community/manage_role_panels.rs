@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::community::role_panel::AutoRole;
 use crate::domain::entities::community::role_panel::RolePanel;
 use crate::domain::entities::community::role_panel::RolePanelDetail;
-use crate::domain::errors::DomainError;
-use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::errors::DomainError;
 
 pub struct CreateRolePanelCommand {
     pub guild_id: GuildId,
@@ -42,9 +42,15 @@ pub struct CreateAutoRoleCommand {
 
 #[async_trait]
 pub trait ManageRolePanelsUseCase: Send + Sync {
-    async fn create_panel(&self, cmd: CreateRolePanelCommand) -> Result<RolePanelDetail, DomainError>;
+    async fn create_panel(
+        &self,
+        cmd: CreateRolePanelCommand,
+    ) -> Result<RolePanelDetail, DomainError>;
     async fn get_panel(&self, panel_id: &str) -> Result<RolePanelDetail, DomainError>;
-    async fn get_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, DomainError>;
+    async fn get_panel_by_message(
+        &self,
+        message_id: &str,
+    ) -> Result<Option<RolePanelDetail>, DomainError>;
     async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, DomainError>;
     async fn set_message_id(&self, cmd: SetMessageIdCommand) -> Result<(), DomainError>;
     async fn delete_panel(&self, panel_id: &str) -> Result<(), DomainError>;

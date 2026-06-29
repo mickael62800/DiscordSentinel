@@ -1,10 +1,10 @@
-use serde::Deserialize;
-use serde::Serialize;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
 use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
-use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use serde::Deserialize;
+use serde::Serialize;
 
 #[derive(Debug, Deserialize)]
 pub struct LogActionDto {
@@ -122,7 +122,11 @@ impl From<UserModerationHistory> for UserHistoryDto {
             total_warns: h.total_warns,
             total_mutes: h.total_mutes,
             total_bans: h.total_bans,
-            actions: h.actions.into_iter().map(ModerationActionResponseDto::from).collect(),
+            actions: h
+                .actions
+                .into_iter()
+                .map(ModerationActionResponseDto::from)
+                .collect(),
         }
     }
 }

@@ -6,12 +6,12 @@ use uuid::Uuid;
 use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::inventory::Insurance;
 use crate::domain::entities::coude::inventory::InventoryItem;
-use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeInventoryService {
     repo: Arc<dyn InventoryRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
@@ -19,7 +19,10 @@ pub struct ManageCoudeInventoryService {
 
 impl ManageCoudeInventoryService {
     pub fn new(repo: Arc<dyn InventoryRepository>) -> Self {
-        Self { repo, bot_config_repo: None }
+        Self {
+            repo,
+            bot_config_repo: None,
+        }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
@@ -132,13 +135,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         };
         let max_slots = if level >= unlock_level { 2 } else { 1 };
         self.repo
-            .buy_insurance_with_max_slots(
-                guild_id,
-                user_id,
-                is_scam,
-                duration_seconds,
-                max_slots,
-            )
+            .buy_insurance_with_max_slots(guild_id, user_id, is_scam, duration_seconds, max_slots)
             .await
     }
 
@@ -165,13 +162,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         let max_slots = if level >= unlock_level { 2 } else { 1 };
         let created = self
             .repo
-            .buy_insurance_with_max_slots(
-                guild_id,
-                user_id,
-                is_scam,
-                duration_seconds,
-                max_slots,
-            )
+            .buy_insurance_with_max_slots(guild_id, user_id, is_scam, duration_seconds, max_slots)
             .await?;
         Ok((created, is_scam))
     }

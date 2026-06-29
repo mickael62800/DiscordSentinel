@@ -7,5 +7,9 @@ use crate::domain::errors::DomainError;
 pub trait DiscordRoleRepository: Send + Sync {
     async fn sync_roles(&self, guild_id: &str, roles: Vec<DiscordRole>) -> Result<(), DomainError>;
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<DiscordRole>, DomainError>;
-    async fn find_by_id(&self, guild_id: &str, role_id: &str) -> Result<Option<DiscordRole>, DomainError>;
+    async fn find_by_id(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+    ) -> Result<Option<DiscordRole>, DomainError>;
 }

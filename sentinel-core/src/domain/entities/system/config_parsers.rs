@@ -18,7 +18,9 @@ pub fn parse_bool_config(map: &HashMap<String, String>, key: &str, default: bool
 /// Parse un entier i64 depuis un map de config. Si la cle est absente
 /// ou si la valeur ne parse pas, retourne `default`.
 pub fn parse_i64_config(map: &HashMap<String, String>, key: &str, default: i64) -> i64 {
-    map.get(key).and_then(|v| v.parse::<i64>().ok()).unwrap_or(default)
+    map.get(key)
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(default)
 }
 
 /// Convention de nommage : les services de type "worker" (jobs batch

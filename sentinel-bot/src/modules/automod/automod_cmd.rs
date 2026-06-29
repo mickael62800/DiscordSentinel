@@ -1,6 +1,5 @@
 use serenity::all::{
-    CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption,
+    CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
 };
 
 use crate::shared::discord_helpers::{reply_ephemeral, reply_ephemeral_embed};
@@ -28,13 +27,11 @@ pub fn register() -> CreateCommand {
     CreateCommand::new("automod")
         .description("Commandes de l'automod bot")
         .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
-        .add_option(
-            CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "status",
-                "Affiche l'etat actuel de l'automod",
-            ),
-        )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "status",
+            "Affiche l'etat actuel de l'automod",
+        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -93,10 +90,7 @@ async fn handle_status(ctx: &Context, command: &CommandInteraction) {
         .map(|s| s.len())
         .unwrap_or(0);
 
-    let flood_count = data
-        .get::<FloodTrackerKey>()
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let flood_count = data.get::<FloodTrackerKey>().map(|m| m.len()).unwrap_or(0);
 
     let slowmode_channels = data
         .get::<SlowmodeTrackerKey>()
@@ -104,7 +98,11 @@ async fn handle_status(ctx: &Context, command: &CommandInteraction) {
         .unwrap_or(0);
 
     let embed = info_embed("Automod -- Statut")
-        .field("Messages traites (cache)", processed_count.to_string(), true)
+        .field(
+            "Messages traites (cache)",
+            processed_count.to_string(),
+            true,
+        )
         .field("Flood trackers actifs", flood_count.to_string(), true)
         .field("Channels slowmode", slowmode_channels.to_string(), true);
 
@@ -117,20 +115,17 @@ async fn handle_test(ctx: &Context, command: &CommandInteraction) {
         .options
         .first()
         .and_then(|sub| {
-            sub.value
-                .as_str()
-                .map(|s| s.to_string())
-                .or_else(|| {
-                    // SubCommand: options are nested
-                    use serenity::all::CommandDataOptionValue;
-                    if let CommandDataOptionValue::SubCommand(opts) = &sub.value {
-                        opts.iter()
-                            .find(|o| o.name == "message")
-                            .and_then(|o| o.value.as_str().map(|s| s.to_string()))
-                    } else {
-                        None
-                    }
-                })
+            sub.value.as_str().map(|s| s.to_string()).or_else(|| {
+                // SubCommand: options are nested
+                use serenity::all::CommandDataOptionValue;
+                if let CommandDataOptionValue::SubCommand(opts) = &sub.value {
+                    opts.iter()
+                        .find(|o| o.name == "message")
+                        .and_then(|o| o.value.as_str().map(|s| s.to_string()))
+                } else {
+                    None
+                }
+            })
         })
         .unwrap_or_default();
 

@@ -1,8 +1,8 @@
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::enums::coude::coude_class::PlayerClass;
-use crate::domain::entities::system::discord_ids::UserId;
-use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Niveau maximum atteignable par un joueur.
 pub const COUDE_MAX_LEVEL: i32 = 25;

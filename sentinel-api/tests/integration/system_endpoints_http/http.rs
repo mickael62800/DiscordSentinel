@@ -14,9 +14,12 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 
-async fn json_req(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn json_req(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
         Some(v) => {
@@ -29,7 +32,10 @@ async fn json_req(app: axum::Router, method: &str, uri: &str, body: Option<serde
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 fn state() -> sentinel_api::adapters::inbound::http::state::AppState {
@@ -72,7 +78,10 @@ async fn models_status_returns_vision_and_text_entries() {
     assert_eq!(status, StatusCode::OK);
     let models = json["models"].as_array().unwrap();
     assert_eq!(models.len(), 2);
-    let types: Vec<&str> = models.iter().map(|m| m["model_type"].as_str().unwrap()).collect();
+    let types: Vec<&str> = models
+        .iter()
+        .map(|m| m["model_type"].as_str().unwrap())
+        .collect();
     assert!(types.contains(&"vision"));
     assert!(types.contains(&"text"));
     // InferenceService::new(None, None) -> vision/text pas charges.
@@ -138,14 +147,30 @@ async fn system_info_lists_bots_and_workers_from_redis() {
     use redis::AsyncCommands;
     // Seed un bot et un worker dans Redis
     let client = redis::Client::open(
-        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6380".into())
-    ).unwrap();
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6380".into()),
+    )
+    .unwrap();
     let mut conn = client.get_multiplexed_async_connection().await.unwrap();
-    let bot_name = format!("sysinfo-test-bot-{}", uuid::Uuid::new_v4().as_u128() % 10_000_000);
-    let worker_name = format!("sysinfo-test-worker-{}", uuid::Uuid::new_v4().as_u128() % 10_000_000);
-    let _: () = conn.sadd::<_, _, ()>("bots:known", &bot_name).await.unwrap();
-    let _: () = conn.sadd::<_, _, ()>("bots:known", &worker_name).await.unwrap();
-    let _: () = conn.set_ex::<_, _, ()>(format!("bot:online:{bot_name}"), "1", 60).await.unwrap();
+    let bot_name = format!(
+        "sysinfo-test-bot-{}",
+        uuid::Uuid::new_v4().as_u128() % 10_000_000
+    );
+    let worker_name = format!(
+        "sysinfo-test-worker-{}",
+        uuid::Uuid::new_v4().as_u128() % 10_000_000
+    );
+    let _: () = conn
+        .sadd::<_, _, ()>("bots:known", &bot_name)
+        .await
+        .unwrap();
+    let _: () = conn
+        .sadd::<_, _, ()>("bots:known", &worker_name)
+        .await
+        .unwrap();
+    let _: () = conn
+        .set_ex::<_, _, ()>(format!("bot:online:{bot_name}"), "1", 60)
+        .await
+        .unwrap();
 
     let app = router::build_for_test(state());
     let (status, json) = json_req(app, "GET", "/api/system/info", None).await;
@@ -153,11 +178,24 @@ async fn system_info_lists_bots_and_workers_from_redis() {
 
     let bots = json["bots"].as_array().unwrap();
     let workers = json["workers"].as_array().unwrap();
-    assert!(bots.iter().any(|b| b["name"].as_str().unwrap() == bot_name && b["online"] == true));
-    assert!(workers.iter().any(|w| w["name"].as_str().unwrap() == worker_name && w["online"] == false));
+    assert!(bots
+        .iter()
+        .any(|b| b["name"].as_str().unwrap() == bot_name && b["online"] == true));
+    assert!(workers
+        .iter()
+        .any(|w| w["name"].as_str().unwrap() == worker_name && w["online"] == false));
 
     // Cleanup
-    let _: () = conn.srem::<_, _, ()>("bots:known", &bot_name).await.unwrap();
-    let _: () = conn.srem::<_, _, ()>("bots:known", &worker_name).await.unwrap();
-    let _: () = conn.del::<_, ()>(format!("bot:online:{bot_name}")).await.unwrap();
+    let _: () = conn
+        .srem::<_, _, ()>("bots:known", &bot_name)
+        .await
+        .unwrap();
+    let _: () = conn
+        .srem::<_, _, ()>("bots:known", &worker_name)
+        .await
+        .unwrap();
+    let _: () = conn
+        .del::<_, ()>(format!("bot:online:{bot_name}"))
+        .await
+        .unwrap();
 }

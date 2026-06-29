@@ -51,37 +51,116 @@ impl ExecuteExportUseCase for ExportService {
         match job_type {
             "infractions" => {
                 let rows = self.repo.fetch_infractions(guild_id, max_rows).await?;
-                serialize_rows(&rows, format, |r: &InfractionExport| vec![
-                    r.id.to_string(), r.channel_id.clone(), r.user_id.clone(), r.username.clone(),
-                    r.message_id.clone(), r.content.clone(), format!("{:.3}", r.score), r.action.clone(),
-                    r.reason.clone(), r.duration.map(|d| d.to_string()).unwrap_or_default(), r.created_at.to_rfc3339(),
-                ], &["id","channel_id","user_id","username","message_id","content","score","action","reason","duration_secs","created_at"])
+                serialize_rows(
+                    &rows,
+                    format,
+                    |r: &InfractionExport| {
+                        vec![
+                            r.id.to_string(),
+                            r.channel_id.clone(),
+                            r.user_id.clone(),
+                            r.username.clone(),
+                            r.message_id.clone(),
+                            r.content.clone(),
+                            format!("{:.3}", r.score),
+                            r.action.clone(),
+                            r.reason.clone(),
+                            r.duration.map(|d| d.to_string()).unwrap_or_default(),
+                            r.created_at.to_rfc3339(),
+                        ]
+                    },
+                    &[
+                        "id",
+                        "channel_id",
+                        "user_id",
+                        "username",
+                        "message_id",
+                        "content",
+                        "score",
+                        "action",
+                        "reason",
+                        "duration_secs",
+                        "created_at",
+                    ],
+                )
             }
             "audit_logs" => {
                 let rows = self.repo.fetch_audit_logs(guild_id, max_rows).await?;
-                serialize_rows(&rows, format, |r: &AuditLogExport| vec![
-                    r.id.to_string(), r.event_type.clone(),
-                    r.actor_id.clone().unwrap_or_default(), r.actor_name.clone().unwrap_or_default(),
-                    r.target_id.clone().unwrap_or_default(), r.target_name.clone().unwrap_or_default(),
-                    r.channel_id.clone().unwrap_or_default(), r.channel_name.clone().unwrap_or_default(),
-                    r.created_at.to_rfc3339(),
-                ], &["id","event_type","actor_id","actor_name","target_id","target_name","channel_id","channel_name","created_at"])
+                serialize_rows(
+                    &rows,
+                    format,
+                    |r: &AuditLogExport| {
+                        vec![
+                            r.id.to_string(),
+                            r.event_type.clone(),
+                            r.actor_id.clone().unwrap_or_default(),
+                            r.actor_name.clone().unwrap_or_default(),
+                            r.target_id.clone().unwrap_or_default(),
+                            r.target_name.clone().unwrap_or_default(),
+                            r.channel_id.clone().unwrap_or_default(),
+                            r.channel_name.clone().unwrap_or_default(),
+                            r.created_at.to_rfc3339(),
+                        ]
+                    },
+                    &[
+                        "id",
+                        "event_type",
+                        "actor_id",
+                        "actor_name",
+                        "target_id",
+                        "target_name",
+                        "channel_id",
+                        "channel_name",
+                        "created_at",
+                    ],
+                )
             }
             "moderation_actions" => {
-                let rows = self.repo.fetch_moderation_actions(guild_id, max_rows).await?;
-                serialize_rows(&rows, format, |r: &ModerationActionExport| vec![
-                    r.id.to_string(), r.moderator_id.clone(), r.moderator_name.clone(),
-                    r.target_id.clone(), r.target_name.clone(), r.action_type.clone(),
-                    r.reason.clone(), r.duration.map(|d| d.to_string()).unwrap_or_default(), r.created_at.to_rfc3339(),
-                ], &["id","moderator_id","moderator_name","target_id","target_name","action_type","reason","duration_secs","created_at"])
+                let rows = self
+                    .repo
+                    .fetch_moderation_actions(guild_id, max_rows)
+                    .await?;
+                serialize_rows(
+                    &rows,
+                    format,
+                    |r: &ModerationActionExport| {
+                        vec![
+                            r.id.to_string(),
+                            r.moderator_id.clone(),
+                            r.moderator_name.clone(),
+                            r.target_id.clone(),
+                            r.target_name.clone(),
+                            r.action_type.clone(),
+                            r.reason.clone(),
+                            r.duration.map(|d| d.to_string()).unwrap_or_default(),
+                            r.created_at.to_rfc3339(),
+                        ]
+                    },
+                    &[
+                        "id",
+                        "moderator_id",
+                        "moderator_name",
+                        "target_id",
+                        "target_name",
+                        "action_type",
+                        "reason",
+                        "duration_secs",
+                        "created_at",
+                    ],
+                )
             }
-            other => Err(DomainError::ValidationError(format!("job_type inconnu: {other}"))),
+            other => Err(DomainError::ValidationError(format!(
+                "job_type inconnu: {other}"
+            ))),
         }
     }
 }
 
 fn serialize_rows<T, F>(
-    rows: &[T], format: &str, to_csv_row: F, headers: &[&str],
+    rows: &[T],
+    format: &str,
+    to_csv_row: F,
+    headers: &[&str],
 ) -> Result<ExportResult, DomainError>
 where
     T: serde::Serialize,
@@ -92,18 +171,31 @@ where
         "json" => serde_json::to_string(rows)
             .map_err(|e| DomainError::Internal(format!("json serialize: {e}")))?,
         "csv" => to_csv(rows, headers, to_csv_row),
-        other => return Err(DomainError::ValidationError(format!("format inconnu: {other}"))),
+        other => {
+            return Err(DomainError::ValidationError(format!(
+                "format inconnu: {other}"
+            )))
+        }
     };
-    Ok(ExportResult { data, row_count: count })
+    Ok(ExportResult {
+        data,
+        row_count: count,
+    })
 }
 
 fn to_csv<T, F>(rows: &[T], headers: &[&str], to_row: F) -> String
-where F: Fn(&T) -> Vec<String> {
+where
+    F: Fn(&T) -> Vec<String>,
+{
     let mut out = String::new();
     out.push_str(&headers.join(","));
     out.push('\n');
     for row in rows {
-        let line = to_row(row).iter().map(|c| csv_escape(c)).collect::<Vec<_>>().join(",");
+        let line = to_row(row)
+            .iter()
+            .map(|c| csv_escape(c))
+            .collect::<Vec<_>>()
+            .join(",");
         out.push_str(&line);
         out.push('\n');
     }
@@ -117,7 +209,6 @@ fn csv_escape(field: &str) -> String {
         field.to_string()
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/export_service.rs"]

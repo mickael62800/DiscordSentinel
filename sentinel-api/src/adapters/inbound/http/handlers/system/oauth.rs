@@ -65,7 +65,13 @@ fn redirect_to_with_cookie(location: &str, cookie: &str) -> Response {
     let mut headers = HeaderMap::new();
     let loc = match header::HeaderValue::from_str(location) {
         Ok(v) => v,
-        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "Invalid redirect location").into_response(),
+        Err(_) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Invalid redirect location",
+            )
+                .into_response()
+        }
     };
     headers.insert(header::LOCATION, loc);
     if let Ok(c) = header::HeaderValue::from_str(cookie) {
@@ -80,9 +86,7 @@ const SESSION_MAX_AGE_SECS: i64 = 30 * 24 * 3600;
 /// Cookie de session opaque : httpOnly (invisible au JS), Secure, SameSite=Lax
 /// (first-party : front et API derriere le meme reverse proxy en prod).
 fn build_session_cookie(id: &str, max_age: i64) -> String {
-    format!(
-        "{SESSION_COOKIE}={id}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}"
-    )
+    format!("{SESSION_COOKIE}={id}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age={max_age}")
 }
 
 fn clear_session_cookie() -> String {
@@ -95,12 +99,20 @@ fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
     raw.split(';').find_map(|kv| {
         let kv = kv.trim();
         let (k, v) = kv.split_once('=')?;
-        if k.trim() == name { Some(v.trim().to_string()) } else { None }
+        if k.trim() == name {
+            Some(v.trim().to_string())
+        } else {
+            None
+        }
     })
 }
 
 fn front_error_redirect(front_url: &str, reason: &str) -> Response {
-    let target = format!("{}/login?error={}", front_url.trim_end_matches('/'), percent_encode(reason));
+    let target = format!(
+        "{}/login?error={}",
+        front_url.trim_end_matches('/'),
+        percent_encode(reason)
+    );
     redirect_to(&target)
 }
 
@@ -110,7 +122,9 @@ pub async fn authorize(State(state): State<AppState>) -> Response {
         || state.discord_oauth_client_secret.is_empty()
         || state.discord_oauth_redirect_uri.is_empty()
     {
-        tracing::error!("OAuth Discord non configure (DISCORD_CLIENT_ID/SECRET/REDIRECT_URI manquants)");
+        tracing::error!(
+            "OAuth Discord non configure (DISCORD_CLIENT_ID/SECRET/REDIRECT_URI manquants)"
+        );
         return (
             StatusCode::SERVICE_UNAVAILABLE,
             "OAuth Discord non configure cote serveur",
@@ -271,7 +285,10 @@ pub async fn callback(
     // 3. Recuperer l'identite du user via /users/@me.
     let user_resp = match client
         .get(DISCORD_USER_URL)
-        .header(header::AUTHORIZATION, format!("Bearer {}", token.access_token))
+        .header(
+            header::AUTHORIZATION,
+            format!("Bearer {}", token.access_token),
+        )
         .send()
         .await
     {
@@ -356,7 +373,10 @@ pub async fn callback(
         .execute(&state.pg_pool)
         .await;
         match res {
-            Ok(_) => Some(build_session_cookie(&session_id.to_string(), SESSION_MAX_AGE_SECS)),
+            Ok(_) => Some(build_session_cookie(
+                &session_id.to_string(),
+                SESSION_MAX_AGE_SECS,
+            )),
             Err(e) => {
                 tracing::warn!(error = %e, "Echec creation session web (refresh) -- login sans persistance");
                 None
@@ -378,11 +398,7 @@ pub async fn callback(
         percent_encode(me.global_name.as_deref().unwrap_or("")),
         percent_encode(me.avatar.as_deref().unwrap_or("")),
     );
-    let target = format!(
-        "{}/auth/callback#{}",
-        front.trim_end_matches('/'),
-        fragment
-    );
+    let target = format!("{}/auth/callback#{}", front.trim_end_matches('/'), fragment);
 
     match session_cookie {
         Some(c) => redirect_to_with_cookie(&target, &c),
@@ -421,10 +437,7 @@ fn unauthorized_clear_cookie() -> Response {
 /// `POST /auth/refresh` — ré-émet un token d'accès Discord à partir du cookie
 /// de session (refresh token côté serveur). Permet de rester connecté après
 /// fermeture du navigateur sans re-validation interactive.
-pub async fn refresh(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Response {
     let sid = match cookie_value(&headers, SESSION_COOKIE) {
         Some(s) if !s.is_empty() => s,
         _ => return unauthorized_clear_cookie(),
@@ -443,7 +456,9 @@ pub async fn refresh(
     .await
     .unwrap_or(None);
 
-    let Some(s) = row else { return unauthorized_clear_cookie() };
+    let Some(s) = row else {
+        return unauthorized_clear_cookie();
+    };
 
     // Token encore valide (marge 60s) -> on le renvoie tel quel.
     let now = chrono::Utc::now();
@@ -481,7 +496,9 @@ pub async fn refresh(
         Ok(r) => {
             tracing::warn!(status = %r.status(), "Refresh Discord refuse -> session invalidee");
             let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")
-                .bind(session_id).execute(&state.pg_pool).await;
+                .bind(session_id)
+                .execute(&state.pg_pool)
+                .await;
             return unauthorized_clear_cookie();
         }
         Err(e) => {
@@ -523,10 +540,7 @@ pub async fn refresh(
 }
 
 /// `POST /auth/logout` — supprime la session serveur + efface le cookie.
-pub async fn logout(
-    State(state): State<AppState>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     if let Some(sid) = cookie_value(&headers, SESSION_COOKIE) {
         if let Ok(session_id) = uuid::Uuid::parse_str(&sid) {
             let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")

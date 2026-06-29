@@ -1,6 +1,6 @@
 use serenity::builder::{
-    CreateActionRow, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateSelectMenu, CreateSelectMenuKind, CreateSelectMenuOption,
+    CreateActionRow, CreateInteractionResponse, CreateInteractionResponseMessage, CreateSelectMenu,
+    CreateSelectMenuKind, CreateSelectMenuOption,
 };
 use serenity::model::application::ComponentInteraction;
 use serenity::model::id::{ChannelId, UserId};
@@ -35,7 +35,8 @@ async fn handle_transfer_menu(ctx: &Context, component: &ComponentInteraction) {
     let members = get_voice_members(ctx, guild_id, voice_channel_id, Some(owner_id)).await;
 
     if members.is_empty() {
-        super::respond_ephemeral(ctx, component, "Aucun membre disponible pour le transfert.").await;
+        super::respond_ephemeral(ctx, component, "Aucun membre disponible pour le transfert.")
+            .await;
         return;
     }
 
@@ -44,11 +45,8 @@ async fn handle_transfer_menu(ctx: &Context, component: &ComponentInteraction) {
         .map(|(id, name)| CreateSelectMenuOption::new(name, id.get().to_string()))
         .collect();
 
-    let select = CreateSelectMenu::new(
-        "select_transfer",
-        CreateSelectMenuKind::String { options },
-    )
-    .placeholder("Choisissez le nouveau proprietaire");
+    let select = CreateSelectMenu::new("select_transfer", CreateSelectMenuKind::String { options })
+        .placeholder("Choisissez le nouveau proprietaire");
 
     let row = CreateActionRow::SelectMenu(select);
 
@@ -67,10 +65,16 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
     super::defer_ephemeral(ctx, component).await;
     let text_channel_id = component.channel_id;
 
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await
+    {
         vc
     } else {
-        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Impossible de trouver le salon vocal associe.",
+        )
+        .await;
         return;
     };
 
@@ -91,7 +95,12 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
 
     let old_owner_id = component.user.id;
     if ch.owner_id != old_owner_id.get().to_string() {
-        super::respond_followup_ephemeral(ctx, component, "Seul le proprietaire peut transferer le salon.").await;
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut transferer le salon.",
+        )
+        .await;
         return;
     }
 
@@ -100,7 +109,8 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
             match values.first() {
                 Some(v) => v.clone(),
                 None => {
-                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.").await;
+                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.")
+                        .await;
                     return;
                 }
             }
@@ -144,9 +154,11 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         {
             error!(error = %e, "Erreur API transfer ownership -- abort");
             super::respond_followup_ephemeral(
-                ctx, component,
+                ctx,
+                component,
                 "Echec du transfert cote serveur. Aucune modification appliquee.",
-            ).await;
+            )
+            .await;
             return;
         }
 
@@ -215,9 +227,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
     super::respond_followup_ephemeral(
         ctx,
         component,
-        &format!(
-            "La propriete du salon a ete transferee a <@{new_owner_id}>."
-        ),
+        &format!("La propriete du salon a ete transferee a <@{new_owner_id}>."),
     )
     .await;
 

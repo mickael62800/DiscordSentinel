@@ -1,6 +1,6 @@
 use super::*;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use chrono::Utc;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use uuid::Uuid;
 
 #[test]
@@ -55,6 +55,7 @@ fn from_security_event_maps_all_fields() {
 fn query_params_optional() {
     let p: SecurityQueryParams = serde_json::from_str("{}").unwrap();
     assert!(p.guild_id.is_none());
-    let p: SecurityQueryParams = serde_json::from_value(serde_json::json!({"guild_id": "g"})).unwrap();
+    let p: SecurityQueryParams =
+        serde_json::from_value(serde_json::json!({"guild_id": "g"})).unwrap();
     assert_eq!(p.guild_id.as_deref(), Some("g"));
 }

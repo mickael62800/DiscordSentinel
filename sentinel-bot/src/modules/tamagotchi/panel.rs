@@ -68,7 +68,12 @@ async fn ensure_owner(ctx: &Context, component: &ComponentInteraction) -> bool {
     match channel_owner_id(ctx, component.channel_id).await {
         Some(owner) if owner == component.user.id.get() => true,
         Some(_) => {
-            reply_ephemeral(ctx, component, "Ce n'est pas ton compagnon — ouvre le tien via le panneau.").await;
+            reply_ephemeral(
+                ctx,
+                component,
+                "Ce n'est pas ton compagnon — ouvre le tien via le panneau.",
+            )
+            .await;
             false
         }
         // Pas de topic exploitable : on n'autorise pas (fail-closed).
@@ -107,18 +112,38 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     };
 
     // Categorie configurable.
-    let cfg = api.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default();
-    let category_id = cfg.get("tama_category_id").and_then(|v| v.parse::<u64>().ok());
+    let cfg = api
+        .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let category_id = cfg
+        .get("tama_category_id")
+        .and_then(|v| v.parse::<u64>().ok());
 
     let everyone = RoleId::new(guild_id.get());
-    let name = format!("tama-{}", component.user.name.chars().take(15).collect::<String>().to_lowercase());
+    let name = format!(
+        "tama-{}",
+        component
+            .user
+            .name
+            .chars()
+            .take(15)
+            .collect::<String>()
+            .to_lowercase()
+    );
     let mut builder = CreateChannel::new(&name)
         .kind(ChannelType::Text)
         .topic(format!("[tama:{}]", user_id))
         .permissions(vec![
-            PermissionOverwrite { allow: Permissions::empty(), deny: Permissions::VIEW_CHANNEL, kind: PermissionOverwriteType::Role(everyone) },
             PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: PermissionOverwriteType::Role(everyone),
+            },
+            PermissionOverwrite {
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(user_id),
             },
@@ -131,7 +156,12 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Echec creation salon tamagotchi");
-            let _ = component.edit_response(&ctx.http, EditInteractionResponse::new().content("Erreur lors de la creation du salon.")).await;
+            let _ = component
+                .edit_response(
+                    &ctx.http,
+                    EditInteractionResponse::new().content("Erreur lors de la creation du salon."),
+                )
+                .await;
             return;
         }
     };
@@ -164,7 +194,10 @@ pub async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     }
 
     let _ = component
-        .edit_response(&ctx.http, EditInteractionResponse::new().content(format!("Ton salon : <#{}>", channel.id)))
+        .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(format!("Ton salon : <#{}>", channel.id)),
+        )
         .await;
 }
 
@@ -174,17 +207,37 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let species = component.data.custom_id.strip_prefix(PICK_PREFIX).unwrap_or("").to_string();
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let species = component
+        .data
+        .custom_id
+        .strip_prefix(PICK_PREFIX)
+        .unwrap_or("")
+        .to_string();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
 
     match tama
-        .create_pet(&guild_id, &component.user.id.to_string(), &component.user.name, &species)
+        .create_pet(
+            &guild_id,
+            &component.user.id.to_string(),
+            &component.user.name,
+            &species,
+        )
         .await
     {
         Ok(pet) => {
-            let resp = update_from_card(&api, &guild_id, &component.user.id.to_string(), &pet).await;
+            let resp =
+                update_from_card(&api, &guild_id, &component.user.id.to_string(), &pet).await;
             let _ = component
                 .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
                 .await;
@@ -201,7 +254,12 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
         }
         Err(e) => {
             warn!(error = %e, "Echec creation pet");
-            reply_ephemeral(ctx, component, "Impossible de creer le compagnon (en as-tu deja un ?).").await;
+            reply_ephemeral(
+                ctx,
+                component,
+                "Impossible de creer le compagnon (en as-tu deja un ?).",
+            )
+            .await;
         }
     }
 }
@@ -212,19 +270,39 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let action = component.data.custom_id.strip_prefix(ACT_PREFIX).unwrap_or("").to_string();
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let action = component
+        .data
+        .custom_id
+        .strip_prefix(ACT_PREFIX)
+        .unwrap_or("")
+        .to_string();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
     let user_id = component.user.id.to_string();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
 
     let pet = match fetch_pet(&tama, &guild_id, &user_id).await {
         Some(p) => p,
-        None => { reply_ephemeral(ctx, component, "Tu n'as pas de compagnon ici.").await; return; }
+        None => {
+            reply_ephemeral(ctx, component, "Tu n'as pas de compagnon ici.").await;
+            return;
+        }
     };
     let pet_id = pet.id.clone();
 
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     let xp = BaseApiClient::config_u64(&cfg, "xp_per_action", 5) as i64;
     let args = match action.as_str() {
         "feed" => CareArgs {
@@ -305,13 +383,33 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let stat = component.data.custom_id.strip_prefix(TRAIN_PREFIX).unwrap_or("").to_string();
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let stat = component
+        .data
+        .custom_id
+        .strip_prefix(TRAIN_PREFIX)
+        .unwrap_or("")
+        .to_string();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
     let user_id = component.user.id.to_string();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
-    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await { Some(p) => p.id, None => return };
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
+    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await {
+        Some(p) => p.id,
+        None => return,
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     let args = TrainArgs {
         stat,
         energy_cost: BaseApiClient::config_u64(&cfg, "train_energy_cost", 25) as i32,
@@ -322,9 +420,14 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
     match tama.train(&pet_id, args).await {
         Ok(p) => {
             let resp = update_from_card(&api, &guild_id, &user_id, &p).await;
-            let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp)).await;
+            let _ = component
+                .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(resp))
+                .await;
         }
-        Err(e) => { warn!(error = %e, "Echec entrainement"); reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await; }
+        Err(e) => {
+            warn!(error = %e, "Echec entrainement");
+            reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await;
+        }
     }
 }
 
@@ -332,16 +435,41 @@ pub async fn handle_shop_open(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d);
     let buttons = vec![
-        CreateButton::new(format!("{BUY_PREFIX}croquettes")).label(format!("Croquettes ({}c)", price("shop_croquettes_price", 15))).style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{BUY_PREFIX}repas")).label(format!("Repas ({}c)", price("shop_repas_price", 40))).style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{BUY_PREFIX}boisson")).label(format!("Boisson ({}c)", price("shop_boisson_price", 25))).style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{BUY_PREFIX}jouet")).label(format!("Jouet ({}c)", price("shop_jouet_price", 20))).style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{BUY_PREFIX}potion")).label(format!("Potion soin ({}c)", price("shop_potion_price", 100))).style(ButtonStyle::Success),
+        CreateButton::new(format!("{BUY_PREFIX}croquettes"))
+            .label(format!(
+                "Croquettes ({}c)",
+                price("shop_croquettes_price", 15)
+            ))
+            .style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}repas"))
+            .label(format!("Repas ({}c)", price("shop_repas_price", 40)))
+            .style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}boisson"))
+            .label(format!("Boisson ({}c)", price("shop_boisson_price", 25)))
+            .style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}jouet"))
+            .label(format!("Jouet ({}c)", price("shop_jouet_price", 20)))
+            .style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BUY_PREFIX}potion"))
+            .label(format!(
+                "Potion soin ({}c)",
+                price("shop_potion_price", 100)
+            ))
+            .style(ButtonStyle::Success),
     ];
     let _ = component
         .create_response(
@@ -360,22 +488,70 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let item = component.data.custom_id.strip_prefix(BUY_PREFIX).unwrap_or("").to_string();
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let item = component
+        .data
+        .custom_id
+        .strip_prefix(BUY_PREFIX)
+        .unwrap_or("")
+        .to_string();
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
     let user_id = component.user.id.to_string();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
-    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await { Some(p) => p.id, None => return };
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
+    let pet_id = match fetch_pet(&tama, &guild_id, &user_id).await {
+        Some(p) => p.id,
+        None => return,
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
 
     // Effets hardcodes, prix configurables.
     let (cost, hunger, happiness, energy, cure, label) = match item.as_str() {
-        "croquettes" => (price("shop_croquettes_price", 15), 25, 0, 0, false, "Croquettes"),
-        "repas" => (price("shop_repas_price", 40), 60, 0, 0, false, "Repas premium"),
-        "boisson" => (price("shop_boisson_price", 25), 0, 0, 40, false, "Boisson energisante"),
+        "croquettes" => (
+            price("shop_croquettes_price", 15),
+            25,
+            0,
+            0,
+            false,
+            "Croquettes",
+        ),
+        "repas" => (
+            price("shop_repas_price", 40),
+            60,
+            0,
+            0,
+            false,
+            "Repas premium",
+        ),
+        "boisson" => (
+            price("shop_boisson_price", 25),
+            0,
+            0,
+            40,
+            false,
+            "Boisson energisante",
+        ),
         "jouet" => (price("shop_jouet_price", 20), 0, 35, 0, false, "Jouet"),
-        "potion" => (price("shop_potion_price", 100), 10, 10, 10, true, "Potion de soin"),
+        "potion" => (
+            price("shop_potion_price", 100),
+            10,
+            10,
+            10,
+            true,
+            "Potion de soin",
+        ),
         _ => return,
     };
     let args = CareArgs {
@@ -390,7 +566,10 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     };
     match tama.care(&pet_id, args).await {
         Ok(_) => reply_ephemeral(ctx, component, &format!("✅ {label} achete et utilise !")).await,
-        Err(e) => { warn!(error = %e, item, "Echec achat"); reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await; }
+        Err(e) => {
+            warn!(error = %e, item, "Echec achat");
+            reply_ephemeral(ctx, component, &format!("\u{26a0}\u{fe0f} {e}")).await;
+        }
     }
 }
 
@@ -398,8 +577,13 @@ pub async fn handle_visit_open(ctx: &Context, component: &ComponentInteraction) 
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let menu = CreateSelectMenu::new(VISIT_SELECT_ID, CreateSelectMenuKind::User { default_users: None })
-        .placeholder("Choisis un joueur a visiter");
+    let menu = CreateSelectMenu::new(
+        VISIT_SELECT_ID,
+        CreateSelectMenuKind::User {
+            default_users: None,
+        },
+    )
+    .placeholder("Choisis un joueur a visiter");
     let _ = component
         .create_response(
             &ctx.http,
@@ -423,11 +607,26 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
         }
         _ => None,
     };
-    let target = match target { Some(t) => t, None => return };
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let target = match target {
+        Some(t) => t,
+        None => return,
+    };
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
 
     let args = VisitArgs {
         guild_id: guild_id.clone(),
@@ -445,7 +644,10 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
             reply_ephemeral(
                 ctx,
                 component,
-                &format!("👋 Tu as rendu visite a **{}** ! Son compagnon gagne +{} XP et +{} coins.", r.target_name, r.xp_reward, r.coins_reward),
+                &format!(
+                    "👋 Tu as rendu visite a **{}** ! Son compagnon gagne +{} XP et +{} coins.",
+                    r.target_name, r.xp_reward, r.coins_reward
+                ),
             )
             .await;
         }
@@ -460,8 +662,13 @@ pub async fn handle_combat_open(ctx: &Context, component: &ComponentInteraction)
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let menu = CreateSelectMenu::new(COMBAT_SELECT_ID, CreateSelectMenuKind::User { default_users: None })
-        .placeholder("Choisis un adversaire");
+    let menu = CreateSelectMenu::new(
+        COMBAT_SELECT_ID,
+        CreateSelectMenuKind::User {
+            default_users: None,
+        },
+    )
+    .placeholder("Choisis un adversaire");
     let _ = component
         .create_response(
             &ctx.http,
@@ -480,14 +687,31 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
         return;
     }
     let target = match &component.data.kind {
-        serenity::model::application::ComponentInteractionDataKind::UserSelect { values } => values.first().copied(),
+        serenity::model::application::ComponentInteractionDataKind::UserSelect { values } => {
+            values.first().copied()
+        }
         _ => None,
     };
-    let target = match target { Some(t) => t, None => return };
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match get_api(ctx).await { Some(a) => a, None => return };
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
-    let cfg = api.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await.unwrap_or_default();
+    let target = match target {
+        Some(t) => t,
+        None => return,
+    };
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let api = match get_api(ctx).await {
+        Some(a) => a,
+        None => return,
+    };
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
+    let cfg = api
+        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
     let n = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
 
     // Niveau de l'attaquant AVANT le combat (pour detecter une evolution apres).
@@ -512,20 +736,30 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
 
     match tama.combat(args).await {
         Ok(r) => {
-            let issue = if r.attacker_won { "🏆 **Victoire !**" } else { "💀 **Défaite...**" };
+            let issue = if r.attacker_won {
+                "🏆 **Victoire !**"
+            } else {
+                "💀 **Défaite...**"
+            };
             let sign = if r.attacker_elo_delta >= 0 { "+" } else { "" };
             reply_ephemeral(
                 ctx,
                 component,
                 &format!(
                     "{issue} contre **{}**\nPuissance : {} vs {}\nELO : {} ({sign}{})",
-                    r.defender_name, r.attacker_power, r.defender_power, r.attacker_new_elo, r.attacker_elo_delta
+                    r.defender_name,
+                    r.attacker_power,
+                    r.defender_power,
+                    r.attacker_new_elo,
+                    r.attacker_elo_delta
                 ),
             )
             .await;
 
             // Le combat (gagne OU perdu) donne de l'XP -> possible evolution.
-            if let (Some(old), Some(p2)) = (before_level, fetch_pet(&tama, &guild_id, &user_id).await) {
+            if let (Some(old), Some(p2)) =
+                (before_level, fetch_pet(&tama, &guild_id, &user_id).await)
+            {
                 if super::card_render::stage_from_level(old)
                     != super::card_render::stage_from_level(p2.level)
                 {
@@ -554,13 +788,22 @@ pub async fn handle_history(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
-    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let tama = match get_tama(ctx).await { Some(t) => t, None => return };
+    let guild_id = component
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    let tama = match get_tama(ctx).await {
+        Some(t) => t,
+        None => return,
+    };
     let pet = fetch_pet(&tama, &guild_id, &component.user.id.to_string()).await;
     let text = match pet {
-        Some(p) if !p.events.is_empty() => {
-            p.events.iter().map(|e| format!("• {e}")).collect::<Vec<_>>().join("\n")
-        }
+        Some(p) if !p.events.is_empty() => p
+            .events
+            .iter()
+            .map(|e| format!("• {e}"))
+            .collect::<Vec<_>>()
+            .join("\n"),
         _ => "Aucune action recente.".to_string(),
     };
     reply_ephemeral(ctx, component, &text).await;
@@ -587,7 +830,11 @@ fn bar(value: i32) -> String {
 }
 
 fn species_display(key: &str) -> &'static str {
-    SPECIES.iter().find(|(k, _)| *k == key).map(|(_, d)| *d).unwrap_or("Compagnon")
+    SPECIES
+        .iter()
+        .find(|(k, _)| *k == key)
+        .map(|(_, d)| *d)
+        .unwrap_or("Compagnon")
 }
 
 pub(super) fn card_embed(p: &PetDto) -> CreateEmbed {
@@ -604,8 +851,16 @@ pub(super) fn card_embed(p: &PetDto) -> CreateEmbed {
         .field("🍗 Faim", bar(p.hunger), true)
         .field("😊 Bonheur", bar(p.happiness), true)
         .field("⚡ Energie", bar(p.energy), true)
-        .field("Combat", format!("FORCE {} · VITALITE {} · AGILITE {}", p.str_, p.vit, p.agi), false)
-        .field("ELO", format!("{} ({}V/{}D)", p.elo, p.wins, p.losses), true)
+        .field(
+            "Combat",
+            format!("FORCE {} · VITALITE {} · AGILITE {}", p.str_, p.vit, p.agi),
+            false,
+        )
+        .field(
+            "ELO",
+            format!("{} ({}V/{}D)", p.elo, p.wins, p.losses),
+            true,
+        )
         .footer(CreateEmbedFooter::new("Tamagotchi"));
     if let Some(last) = p.events.first() {
         e = e.field("Derniere action", last, false);
@@ -616,22 +871,56 @@ pub(super) fn card_embed(p: &PetDto) -> CreateEmbed {
 pub(super) fn care_buttons() -> Vec<CreateActionRow> {
     vec![
         CreateActionRow::Buttons(vec![
-            CreateButton::new(format!("{ACT_PREFIX}feed")).label("Nourrir").emoji('🍗').style(ButtonStyle::Primary),
-            CreateButton::new(format!("{ACT_PREFIX}play")).label("Jouer").emoji('🎲').style(ButtonStyle::Primary),
-            CreateButton::new(format!("{ACT_PREFIX}sleep")).label("Dormir").emoji('💤').style(ButtonStyle::Secondary),
-            CreateButton::new(format!("{ACT_PREFIX}cuddle")).label("Caliner").emoji('🤗').style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{ACT_PREFIX}feed"))
+                .label("Nourrir")
+                .emoji('🍗')
+                .style(ButtonStyle::Primary),
+            CreateButton::new(format!("{ACT_PREFIX}play"))
+                .label("Jouer")
+                .emoji('🎲')
+                .style(ButtonStyle::Primary),
+            CreateButton::new(format!("{ACT_PREFIX}sleep"))
+                .label("Dormir")
+                .emoji('💤')
+                .style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{ACT_PREFIX}cuddle"))
+                .label("Caliner")
+                .emoji('🤗')
+                .style(ButtonStyle::Secondary),
         ]),
         CreateActionRow::Buttons(vec![
-            CreateButton::new(format!("{TRAIN_PREFIX}str")).label("Force").emoji('💪').style(ButtonStyle::Secondary),
-            CreateButton::new(format!("{TRAIN_PREFIX}vit")).label("Vitalite").emoji('🛡').style(ButtonStyle::Secondary),
-            CreateButton::new(format!("{TRAIN_PREFIX}agi")).label("Agilite").emoji('🏃').style(ButtonStyle::Secondary),
-            CreateButton::new(SHOP_OPEN_ID).label("Boutique").emoji('🛒').style(ButtonStyle::Primary),
+            CreateButton::new(format!("{TRAIN_PREFIX}str"))
+                .label("Force")
+                .emoji('💪')
+                .style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{TRAIN_PREFIX}vit"))
+                .label("Vitalite")
+                .emoji('🛡')
+                .style(ButtonStyle::Secondary),
+            CreateButton::new(format!("{TRAIN_PREFIX}agi"))
+                .label("Agilite")
+                .emoji('🏃')
+                .style(ButtonStyle::Secondary),
+            CreateButton::new(SHOP_OPEN_ID)
+                .label("Boutique")
+                .emoji('🛒')
+                .style(ButtonStyle::Primary),
         ]),
         CreateActionRow::Buttons(vec![
-            CreateButton::new(VISIT_OPEN_ID).label("Visiter").emoji('👋').style(ButtonStyle::Primary),
-            CreateButton::new(COMBAT_OPEN_ID).label("Combat").emoji('⚔').style(ButtonStyle::Danger),
-            CreateButton::new(HIST_ID).label("Historique").style(ButtonStyle::Secondary),
-            CreateButton::new(CLOSE_ID).label("Fermer salon").style(ButtonStyle::Danger),
+            CreateButton::new(VISIT_OPEN_ID)
+                .label("Visiter")
+                .emoji('👋')
+                .style(ButtonStyle::Primary),
+            CreateButton::new(COMBAT_OPEN_ID)
+                .label("Combat")
+                .emoji('⚔')
+                .style(ButtonStyle::Danger),
+            CreateButton::new(HIST_ID)
+                .label("Historique")
+                .style(ButtonStyle::Secondary),
+            CreateButton::new(CLOSE_ID)
+                .label("Fermer salon")
+                .style(ButtonStyle::Danger),
         ]),
     ]
 }
@@ -651,13 +940,19 @@ fn species_color(key: &str) -> &'static str {
 
 fn age_days(born_at_rfc3339: &str) -> i64 {
     chrono::DateTime::parse_from_rfc3339(born_at_rfc3339)
-        .map(|d| (chrono::Utc::now() - d.with_timezone(&chrono::Utc)).num_days().max(0))
+        .map(|d| {
+            (chrono::Utc::now() - d.with_timezone(&chrono::Utc))
+                .num_days()
+                .max(0)
+        })
         .unwrap_or(0)
 }
 
 async fn fetch_coins(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> i64 {
     #[derive(serde::Deserialize)]
-    struct W { coins: i64 }
+    struct W {
+        coins: i64,
+    }
     api.get_json::<W>(&format!("/api/wallet/{guild_id}/{owner_id}"))
         .await
         .map(|w| w.coins)
@@ -665,7 +960,12 @@ async fn fetch_coins(api: &BaseApiClient, guild_id: &str, owner_id: &str) -> i64
 }
 
 /// Construit les donnees + rend le PNG de la carte (None si rendu echoue).
-pub(super) async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> Option<Vec<u8>> {
+pub(super) async fn render_card(
+    api: &BaseApiClient,
+    guild_id: &str,
+    owner_id: &str,
+    p: &PetDto,
+) -> Option<Vec<u8>> {
     let data = CardData {
         name: p.name.clone(),
         species_label: species_display(&p.species).to_string(),
@@ -691,23 +991,45 @@ pub(super) async fn render_card(api: &BaseApiClient, guild_id: &str, owner_id: &
     render_card_png(&data)
 }
 
-async fn card_message(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> CreateMessage {
+async fn card_message(
+    api: &BaseApiClient,
+    guild_id: &str,
+    owner_id: &str,
+    p: &PetDto,
+) -> CreateMessage {
     match render_card(api, guild_id, owner_id, p).await {
         Some(png) => CreateMessage::new()
-            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .embed(
+                CreateEmbed::new()
+                    .image("attachment://card.png")
+                    .color(0x232838),
+            )
             .add_file(CreateAttachment::bytes(png, "card.png"))
             .components(care_buttons()),
-        None => CreateMessage::new().embed(card_embed(p)).components(care_buttons()),
+        None => CreateMessage::new()
+            .embed(card_embed(p))
+            .components(care_buttons()),
     }
 }
 
-async fn update_from_card(api: &BaseApiClient, guild_id: &str, owner_id: &str, p: &PetDto) -> CreateInteractionResponseMessage {
+async fn update_from_card(
+    api: &BaseApiClient,
+    guild_id: &str,
+    owner_id: &str,
+    p: &PetDto,
+) -> CreateInteractionResponseMessage {
     match render_card(api, guild_id, owner_id, p).await {
         Some(png) => CreateInteractionResponseMessage::new()
-            .embed(CreateEmbed::new().image("attachment://card.png").color(0x232838))
+            .embed(
+                CreateEmbed::new()
+                    .image("attachment://card.png")
+                    .color(0x232838),
+            )
             .add_file(CreateAttachment::bytes(png, "card.png"))
             .components(care_buttons()),
-        None => CreateInteractionResponseMessage::new().embed(card_embed(p)).components(care_buttons()),
+        None => CreateInteractionResponseMessage::new()
+            .embed(card_embed(p))
+            .components(care_buttons()),
     }
 }
 
@@ -718,13 +1040,18 @@ fn species_choice_message() -> CreateMessage {
         .color(0xf1c40f);
     let buttons: Vec<CreateButton> = SPECIES
         .iter()
-        .map(|(k, d)| CreateButton::new(format!("{PICK_PREFIX}{k}")).label(*d).style(ButtonStyle::Success))
+        .map(|(k, d)| {
+            CreateButton::new(format!("{PICK_PREFIX}{k}"))
+                .label(*d)
+                .style(ButtonStyle::Success)
+        })
         .collect();
     // 6 boutons -> 2 rangees de 3.
     let (r1, r2) = buttons.split_at(3);
-    CreateMessage::new()
-        .embed(embed)
-        .components(vec![CreateActionRow::Buttons(r1.to_vec()), CreateActionRow::Buttons(r2.to_vec())])
+    CreateMessage::new().embed(embed).components(vec![
+        CreateActionRow::Buttons(r1.to_vec()),
+        CreateActionRow::Buttons(r2.to_vec()),
+    ])
 }
 
 async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, text: &str) {
@@ -732,7 +1059,9 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, text: 
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().content(text).ephemeral(true),
+                CreateInteractionResponseMessage::new()
+                    .content(text)
+                    .ephemeral(true),
             ),
         )
         .await;
@@ -747,7 +1076,8 @@ async fn persist_card_location(
     channel_id: u64,
     message_id: u64,
 ) {
-    tama.set_card_location(guild_id, owner_id, channel_id, message_id).await;
+    tama.set_card_location(guild_id, owner_id, channel_id, message_id)
+        .await;
 }
 
 async fn fetch_pet(tama: &TamaApi, guild_id: &str, owner_id: &str) -> Option<PetDto> {

@@ -84,11 +84,20 @@ pub struct RenderedEmbed {
 
 #[async_trait]
 pub trait ManageAnnouncementsUseCase: Send + Sync {
-    async fn create(&self, cmd: CreateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError>;
-    async fn update(&self, cmd: UpdateAnnouncementCommand) -> Result<ScheduledAnnouncement, DomainError>;
+    async fn create(
+        &self,
+        cmd: CreateAnnouncementCommand,
+    ) -> Result<ScheduledAnnouncement, DomainError>;
+    async fn update(
+        &self,
+        cmd: UpdateAnnouncementCommand,
+    ) -> Result<ScheduledAnnouncement, DomainError>;
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
     async fn get(&self, id: Uuid) -> Result<ScheduledAnnouncement, DomainError>;
-    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<ScheduledAnnouncement>, DomainError>;
+    async fn list_by_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<ScheduledAnnouncement>, DomainError>;
     async fn toggle(&self, id: Uuid, enabled: bool) -> Result<bool, DomainError>;
 
     /// Pour les workers : recupere les annonces dues + cree un run pending +
@@ -110,7 +119,11 @@ pub trait ManageAnnouncementsUseCase: Send + Sync {
     /// Aperçu : retourne le rendu sans poster ni creer de run.
     async fn preview(&self, id: Uuid) -> Result<RenderedAnnouncement, DomainError>;
 
-    async fn list_runs(&self, announcement_id: Uuid, limit: i64) -> Result<Vec<AnnouncementRun>, DomainError>;
+    async fn list_runs(
+        &self,
+        announcement_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<AnnouncementRun>, DomainError>;
 
     /// Enregistre un clic sur un bouton (appele par le bot apres
     /// interaction Discord).

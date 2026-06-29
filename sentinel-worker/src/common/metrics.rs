@@ -78,14 +78,10 @@ pub fn spawn_tokio_runtime_sampler() {
             tokio::time::sleep(Duration::from_secs(interval_secs)).await;
 
             if let Some(snapshot) = intervals.next() {
-                metrics::gauge!("tokio_workers_count")
-                    .set(snapshot.workers_count as f64);
-                metrics::gauge!("tokio_live_tasks_count")
-                    .set(snapshot.live_tasks_count as f64);
-                metrics::gauge!("tokio_global_queue_depth")
-                    .set(snapshot.global_queue_depth as f64);
-                metrics::gauge!("tokio_total_park_count")
-                    .set(snapshot.total_park_count as f64);
+                metrics::gauge!("tokio_workers_count").set(snapshot.workers_count as f64);
+                metrics::gauge!("tokio_live_tasks_count").set(snapshot.live_tasks_count as f64);
+                metrics::gauge!("tokio_global_queue_depth").set(snapshot.global_queue_depth as f64);
+                metrics::gauge!("tokio_total_park_count").set(snapshot.total_park_count as f64);
                 metrics::gauge!("tokio_max_busy_duration_seconds")
                     .set(snapshot.max_busy_duration.as_secs_f64());
 

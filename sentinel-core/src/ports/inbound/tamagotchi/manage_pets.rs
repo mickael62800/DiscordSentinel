@@ -105,7 +105,11 @@ pub struct TrainCommand {
 #[async_trait]
 pub trait ManagePetsUseCase: Send + Sync {
     async fn create(&self, cmd: CreatePetCommand) -> Result<Pet, DomainError>;
-    async fn get_by_owner(&self, guild_id: &str, owner_id: &str) -> Result<Option<Pet>, DomainError>;
+    async fn get_by_owner(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Option<Pet>, DomainError>;
     /// Liste tous les compagnons d'une guild (vivants et morts), pour la page
     /// d'administration web (vue des dresseurs + evolution).
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Pet>, DomainError>;
@@ -127,7 +131,8 @@ pub trait ManagePetsUseCase: Send + Sync {
 
     /// Compagnons vivants a faire decroitre (job worker, via l'API), pagine
     /// par curseur `id` croissant (`after_id = None` pour la 1re page).
-    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError>;
+    async fn list_alive(&self, limit: i64, after_id: Option<Uuid>)
+        -> Result<Vec<Pet>, DomainError>;
     /// Applique un tick de cycle de vie (decroissance + maladie/mort) avec
     /// la config de la guild. Retourne l'evenement notable.
     async fn tick(&self, pet_id: Uuid, cfg: TickConfig) -> Result<TickOutcome, DomainError>;
@@ -141,5 +146,6 @@ pub trait ManagePetsUseCase: Send + Sync {
         message_id: &str,
     ) -> Result<(), DomainError>;
     /// Compagnons vivants ayant une carte a rafraichir (tache horaire du bot).
-    async fn list_cards(&self, limit: i64, after_id: Option<Uuid>) -> Result<Vec<Pet>, DomainError>;
+    async fn list_cards(&self, limit: i64, after_id: Option<Uuid>)
+        -> Result<Vec<Pet>, DomainError>;
 }

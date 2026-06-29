@@ -1,9 +1,9 @@
 //! Handlers joueurs : CRUD, progression (XP/level/stats), stats de combat,
 //! coins et HP. Tous délèguent à `state.coude_players_uc`.
 
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Query;
 use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
@@ -27,8 +27,8 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::coude::player::CombatStat;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 /// Helper local : gate Moderator+ pour les mutations coude. Pass-through si
@@ -67,7 +67,9 @@ pub async fn get_random_players(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<RandomPlayersQuery>,
 ) -> Result<Json<Vec<FullPlayerDto>>, ApiError> {
-    let count = params.count.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_OPPONENT_COUNT);
+    let count = params
+        .count
+        .unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_OPPONENT_COUNT);
     let players = state
         .coude_players_uc
         .random_active(&guild_id, count)
@@ -106,7 +108,13 @@ pub async fn update_player_class(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateClassDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour update_player_class").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour update_player_class",
+    )
+    .await?;
     state
         .coude_players_uc
         .update_class(&guild_id, &user_id, &dto.class)
@@ -138,7 +146,13 @@ pub async fn spend_stat_point(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<SpendStatDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour spend_stat_point").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour spend_stat_point",
+    )
+    .await?;
     let stat = CombatStat::parse(&dto.stat).ok_or_else(|| {
         ApiError::from(DomainError::ValidationError(
             "Stat invalide, doit etre 'atk' ou 'def'".into(),
@@ -162,9 +176,13 @@ pub async fn reset_stats(
     Json(dto): Json<ResetStatsDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state, &rbac, &guild_id, "db.reset.coude_stats",
+        &state,
+        &rbac,
+        &guild_id,
+        "db.reset.coude_stats",
         "role insuffisant pour reset_stats",
-    ).await?;
+    )
+    .await?;
     let player = state
         .coude_players_uc
         .reset_stats(&guild_id, &user_id, dto.cost)
@@ -181,7 +199,13 @@ pub async fn record_win(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordWinDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour record_win").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_win",
+    )
+    .await?;
     state
         .coude_players_uc
         .record_win(&guild_id, &user_id, dto.earned, dto.stolen)
@@ -196,7 +220,13 @@ pub async fn record_loss(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordLossDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour record_loss").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_loss",
+    )
+    .await?;
     state
         .coude_players_uc
         .record_loss(&guild_id, &user_id, dto.lost)
@@ -211,7 +241,13 @@ pub async fn record_draw(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<RecordDrawDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour record_draw").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_draw",
+    )
+    .await?;
     state
         .coude_players_uc
         .record_draw(&guild_id, &user_id, dto.lost)
@@ -225,7 +261,13 @@ pub async fn increment_cowardice(
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour increment_cowardice").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour increment_cowardice",
+    )
+    .await?;
     let count = state
         .coude_players_uc
         .increment_cowardice(&guild_id, &user_id)
@@ -239,7 +281,13 @@ pub async fn increment_chaos(
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour increment_chaos").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour increment_chaos",
+    )
+    .await?;
     state
         .coude_players_uc
         .increment_chaos(&guild_id, &user_id)
@@ -260,7 +308,13 @@ pub async fn adjust_coins(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AdjustCoinsDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour adjust_coins").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour adjust_coins",
+    )
+    .await?;
     let delta = dto.amount;
     if delta == 0 {
         return Ok(StatusCode::NO_CONTENT);
@@ -268,12 +322,24 @@ pub async fn adjust_coins(
     if delta > 0 {
         state
             .wallet_uc
-            .credit(&guild_id, &user_id, delta, "coude_adjust", "Ajustement manuel")
+            .credit(
+                &guild_id,
+                &user_id,
+                delta,
+                "coude_adjust",
+                "Ajustement manuel",
+            )
             .await?;
     } else {
         state
             .wallet_uc
-            .debit(&guild_id, &user_id, -delta, "coude_adjust", "Ajustement manuel")
+            .debit(
+                &guild_id,
+                &user_id,
+                -delta,
+                "coude_adjust",
+                "Ajustement manuel",
+            )
             .await?;
     }
     Ok(StatusCode::NO_CONTENT)
@@ -292,7 +358,13 @@ pub async fn record_coins_earned(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour record_coins_earned").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_coins_earned",
+    )
+    .await?;
     if dto.amount <= 0 {
         return Err(ApiError::from(DomainError::ValidationError(
             "Le montant doit etre positif".into(),
@@ -321,7 +393,13 @@ pub async fn record_coins_lost(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate(&state, &rbac, &guild_id, "moderator+ requis pour record_coins_lost").await?;
+    gate(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_coins_lost",
+    )
+    .await?;
     if dto.amount <= 0 {
         return Err(ApiError::from(DomainError::ValidationError(
             "Le montant doit etre positif".into(),
@@ -330,7 +408,9 @@ pub async fn record_coins_lost(
     // Clamp au solde reel pour preserver le comportement legacy.
     // Regle metier : `domain/entities/wallet.rs::clamp_debit_to_balance`.
     let balance = state.wallet_uc.get_balance(&guild_id, &user_id).await?;
-    let actual = sentinel_core::domain::entities::casino::wallet::clamp_debit_to_balance(dto.amount, balance);
+    let actual = sentinel_core::domain::entities::casino::wallet::clamp_debit_to_balance(
+        dto.amount, balance,
+    );
     if actual > 0 {
         state
             .wallet_uc
@@ -371,6 +451,9 @@ pub async fn repos(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     gate(&state, &rbac, &guild_id, "moderator+ requis pour repos").await?;
-    state.coude_players_uc.full_heal(&guild_id, &user_id).await?;
+    state
+        .coude_players_uc
+        .full_heal(&guild_id, &user_id)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }

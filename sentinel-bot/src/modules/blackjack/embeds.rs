@@ -132,8 +132,12 @@ pub fn build_game_embed(
                 )
             }
             "player_win" | "dealer_bust" => {
-                let msg = format_flavor(flavor)
-                    .unwrap_or_else(|| format!("{} gagne {} contre {} !", game.username, game.player_score, game.dealer_score));
+                let msg = format_flavor(flavor).unwrap_or_else(|| {
+                    format!(
+                        "{} gagne {} contre {} !",
+                        game.username, game.player_score, game.dealer_score
+                    )
+                });
                 (
                     "\u{1f389} VICTOIRE !".to_string(),
                     format!("{}\n\n**+{} coins !**", msg, game.payout),
@@ -151,8 +155,12 @@ pub fn build_game_embed(
                 )
             }
             "dealer_win" => {
-                let msg = format_flavor(flavor)
-                    .unwrap_or_else(|| format!("Le croupier gagne {} contre {} de {}.", game.dealer_score, game.player_score, game.username));
+                let msg = format_flavor(flavor).unwrap_or_else(|| {
+                    format!(
+                        "Le croupier gagne {} contre {} de {}.",
+                        game.dealer_score, game.player_score, game.username
+                    )
+                });
                 let lost = if game.doubled { game.bet * 2 } else { game.bet };
                 (
                     "\u{1f624} DEFAITE".to_string(),
@@ -195,7 +203,9 @@ pub fn build_game_embed(
             false,
         )
         .color(color)
-        .footer(CreateEmbedFooter::new(crate::shared::branding::BLACKJACK_TAGLINE))
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::BLACKJACK_TAGLINE,
+        ))
         .timestamp(serenity::model::Timestamp::now());
 
     if game.doubled {

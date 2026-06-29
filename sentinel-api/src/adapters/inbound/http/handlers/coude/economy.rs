@@ -1,23 +1,23 @@
 //! Handlers économie : transferts inter-joueurs, vol, casino et compteurs
 //! quotidiens. Délèguent à `state.coude_economy_uc`.
 
-use axum::extract::State;
-use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use axum::http::StatusCode;
-use axum::Extension;
-use axum::Json;
-use serde::Deserialize;
-use serde::Serialize;
 use super::dto::GainDto;
 use super::dto::LostDto;
 use super::dto::StealDto;
 use super::dto::TransferCoinsDto;
 use super::taunts::TauntEventDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use axum::extract::State;
+use axum::http::StatusCode;
+use axum::Extension;
+use axum::Json;
 use sentinel_core::domain::enums::system::role::Role;
+use serde::Deserialize;
+use serde::Serialize;
 
 /// Phase 7 B — Helper local pour gater les mutations coude.
 /// Pass-through si rbac absent (= appel bot interne sans X-Discord-Token).
@@ -48,7 +48,13 @@ pub async fn transfer_coins(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<TransferCoinsDto>,
 ) -> Result<Json<TransferCoinsResponse>, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour un transfert coude").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour un transfert coude",
+    )
+    .await?;
     let taunts = state
         .coude_economy_uc
         .transfer(&guild_id, &dto.from_id, &dto.to_id, dto.amount)
@@ -75,7 +81,13 @@ pub async fn record_steal(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<StealDto>,
 ) -> Result<Json<StealResponse>, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour record_steal").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour record_steal",
+    )
+    .await?;
     let outcome = state
         .coude_economy_uc
         .steal(&guild_id, &dto.thief_id, &dto.victim_id, dto.amount)
@@ -107,7 +119,13 @@ pub async fn steal_fail_penalty(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<StealFailPenaltyDto>,
 ) -> Result<Json<StealFailPenaltyResponse>, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour steal_fail_penalty").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour steal_fail_penalty",
+    )
+    .await?;
     let (lost, taunts) = state
         .coude_economy_uc
         .steal_fail_penalty(&guild_id, &dto.thief_id, dto.amount)
@@ -127,7 +145,13 @@ pub async fn record_casino_win(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<GainDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-win").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour casino-win",
+    )
+    .await?;
     state
         .coude_economy_uc
         .record_casino_win(&guild_id, &user_id, dto.gain)
@@ -142,7 +166,13 @@ pub async fn record_casino_loss(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<LostDto>,
 ) -> Result<StatusCode, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-loss").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour casino-loss",
+    )
+    .await?;
     state
         .coude_economy_uc
         .record_casino_loss(&guild_id, &user_id, dto.lost)
@@ -156,7 +186,13 @@ pub async fn record_casino_faillite(
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_coude_mutation(&state, &rbac, &guild_id, "moderator+ requis pour casino-faillite").await?;
+    gate_coude_mutation(
+        &state,
+        &rbac,
+        &guild_id,
+        "moderator+ requis pour casino-faillite",
+    )
+    .await?;
     let total_lost = state
         .coude_economy_uc
         .record_casino_faillite(&guild_id, &user_id)

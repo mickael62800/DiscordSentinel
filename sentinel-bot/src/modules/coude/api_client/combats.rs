@@ -10,8 +10,8 @@
 //! - Cooldowns genereriques (check / set) utilises par les commandes
 //!   avec cooldown fonctionnel (ex. /voler).
 
-use sentinel_proto::coude::v1 as proto_coude;
 use crate::shared::grpc_client::GrpcCallError;
+use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{
     grpc_err_to_string, proto_combat_to_dto, taunt_event_from_proto, ApiClient, Combat,
@@ -50,9 +50,7 @@ impl ApiClient {
     }
 
     pub async fn get_combat(&self, id: &str) -> Result<Option<Combat>, String> {
-        let req = proto_coude::GetCombatRequest {
-            id: id.to_string(),
-        };
+        let req = proto_coude::GetCombatRequest { id: id.to_string() };
         let mut client = self.grpc.coude_combats();
         let result = self
             .grpc
@@ -78,7 +76,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.get_pending_for_attacker(req).await.map(|r| r.into_inner())
+                client
+                    .get_pending_for_attacker(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -98,7 +99,10 @@ impl ApiClient {
         let r = self
             .grpc
             .guarded(|| async move {
-                client.get_pending_for_defender(req).await.map(|r| r.into_inner())
+                client
+                    .get_pending_for_defender(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -137,14 +141,14 @@ impl ApiClient {
     /// progression, matchmaking). Appele une fois au boot du bot, cache en
     /// memoire dans la TypeMap. Le bot ne contient plus aucune donnee
     /// metier en dur — tout vient de l'API.
-    pub async fn get_catalog(&self) -> Result<crate::modules::coude::catalog::CatalogCache, String> {
+    pub async fn get_catalog(
+        &self,
+    ) -> Result<crate::modules::coude::catalog::CatalogCache, String> {
         let req = proto_coude::Empty {};
         let mut client = self.grpc.coude_social();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.get_catalog(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_catalog(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(crate::modules::coude::catalog::CatalogCache {
@@ -215,19 +219,14 @@ impl ApiClient {
     /// Phase 7 : resolution instantanee d'un combat (surprise / bloodbath /
     /// defense via item). L'API applique toute la logique metier et retourne
     /// un embed pret a poster.
-    pub async fn resolve_combat_now(
-        &self,
-        combat_id: &str,
-    ) -> Result<ResolvedCombatEmbed, String> {
+    pub async fn resolve_combat_now(&self, combat_id: &str) -> Result<ResolvedCombatEmbed, String> {
         let req = proto_coude::ResolveCombatNowRequest {
             combat_id: combat_id.to_string(),
         };
         let mut client = self.grpc.coude_combats();
         let resp = self
             .grpc
-            .guarded(|| async move {
-                client.resolve_combat_now(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.resolve_combat_now(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(ResolvedCombatEmbed {
@@ -243,13 +242,17 @@ impl ApiClient {
                     inline: f.inline,
                 })
                 .collect(),
-            taunt_events: resp.taunt_events.into_iter().map(taunt_event_from_proto).collect(),
-            vendetta_humiliation: resp.vendetta_humiliation.map(|h| {
-                super::VendettaHumiliation {
+            taunt_events: resp
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_from_proto)
+                .collect(),
+            vendetta_humiliation: resp
+                .vendetta_humiliation
+                .map(|h| super::VendettaHumiliation {
                     target_user_id: h.target_user_id,
                     challenger_user_id: h.challenger_user_id,
-                }
-            }),
+                }),
         })
     }
 
@@ -261,18 +264,14 @@ impl ApiClient {
         let mut client = self.grpc.coude_combats();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.set_betting(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.set_betting(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.transitioned)
     }
 
     pub async fn expire_combat(&self, id: &str) -> Result<(), String> {
-        let req = proto_coude::ExpireCombatRequest {
-            id: id.to_string(),
-        };
+        let req = proto_coude::ExpireCombatRequest { id: id.to_string() };
         let mut client = self.grpc.coude_combats();
         self.grpc
             .guarded(|| async move { client.expire(req).await.map(|_| ()) })
@@ -285,9 +284,7 @@ impl ApiClient {
     /// cette methode evite de detruire un combat qui vient de passer en
     /// `betting` (accepte concurremment par le defenseur).
     pub async fn cancel_combat(&self, id: &str) -> Result<(), String> {
-        let req = proto_coude::CancelCombatRequest {
-            id: id.to_string(),
-        };
+        let req = proto_coude::CancelCombatRequest { id: id.to_string() };
         let mut client = self.grpc.coude_combats();
         self.grpc
             .guarded(|| async move { client.cancel(req).await.map(|_| ()) })
@@ -295,11 +292,7 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    pub async fn set_defender_special(
-        &self,
-        id: &str,
-        item_key: &str,
-    ) -> Result<(), String> {
+    pub async fn set_defender_special(&self, id: &str, item_key: &str) -> Result<(), String> {
         let req = proto_coude::SetDefenderSpecialRequest {
             id: id.to_string(),
             item_key: item_key.to_string(),
@@ -317,7 +310,10 @@ impl ApiClient {
         let list = self
             .grpc
             .guarded(|| async move {
-                client.list_expired_pending(req).await.map(|r| r.into_inner())
+                client
+                    .list_expired_pending(req)
+                    .await
+                    .map(|r| r.into_inner())
             })
             .await
             .map_err(grpc_err_to_string)?;
@@ -337,9 +333,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_social();
         let r = self
             .grpc
-            .guarded(|| async move {
-                client.check_cooldown(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.check_cooldown(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.available_at)

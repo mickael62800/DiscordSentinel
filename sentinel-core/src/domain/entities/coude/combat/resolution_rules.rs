@@ -283,7 +283,10 @@ mod tests {
         // (assurance inefficace). Maintenant il paie 50.
         let ins = make_insurance(false);
         let adj = apply_insurance_to_loss(1000, 100, Some(&ins), "broke_user");
-        assert_eq!(adj.actual_loss, 50, "l'assurance doit proteger meme les joueurs fauches");
+        assert_eq!(
+            adj.actual_loss, 50,
+            "l'assurance doit proteger meme les joueurs fauches"
+        );
     }
 
     // ── compute_combat_xp ──
@@ -362,17 +365,17 @@ mod tests {
 
     #[test]
     fn format_bet_payouts_empty_returns_none() {
-        let plan = BetResolutionPlan { payouts: vec![], fighter_bonus: None };
+        let plan = BetResolutionPlan {
+            payouts: vec![],
+            fighter_bonus: None,
+        };
         assert!(format_bet_payout_lines(&plan, Some("w"), Some("l")).is_none());
     }
 
     #[test]
     fn format_bet_payouts_win_lines() {
         let plan = BetResolutionPlan {
-            payouts: vec![
-                payout("Alice", 100, 250, true),
-                payout("Bob", 50, 0, false),
-            ],
+            payouts: vec![payout("Alice", 100, 250, true), payout("Bob", 50, 0, false)],
             fighter_bonus: None,
         };
         let out = format_bet_payout_lines(&plan, Some("w"), Some("l")).unwrap();
@@ -404,8 +407,10 @@ mod tests {
         let plan = BetResolutionPlan {
             payouts: vec![payout("A", 10, 20, true)],
             fighter_bonus: Some(CoudeFighterBetBonus {
-                winner_id: "w".into(), winner_bonus: 1000,
-                loser_id: "l".into(), loser_bonus: 500,
+                winner_id: "w".into(),
+                winner_bonus: 1000,
+                loser_id: "l".into(),
+                loser_bonus: 500,
                 total_pot: 5000,
             }),
         };
@@ -413,7 +418,7 @@ mod tests {
         assert!(out.contains("Pot des paris"));
         assert!(out.contains("5000"));
         assert!(out.contains("1000")); // winner bonus
-        assert!(out.contains("500"));  // loser bonus
+        assert!(out.contains("500")); // loser bonus
         assert!(out.contains("<@w>"));
         assert!(out.contains("<@l>"));
     }
@@ -424,8 +429,10 @@ mod tests {
         let plan = BetResolutionPlan {
             payouts: vec![payout("A", 10, 0, false)],
             fighter_bonus: Some(CoudeFighterBetBonus {
-                winner_id: "w".into(), winner_bonus: 1000,
-                loser_id: "l".into(), loser_bonus: 500,
+                winner_id: "w".into(),
+                winner_bonus: 1000,
+                loser_id: "l".into(),
+                loser_bonus: 500,
                 total_pot: 5000,
             }),
         };

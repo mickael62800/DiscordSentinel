@@ -107,7 +107,10 @@ pub async fn record_served(
     Json(body): Json<ServedBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_component_role(&state, &rbac, &guild_id, RBAC_KEY, "acces refuse").await?;
-    state.rotation_uc.record_served(&guild_id, &body.user_id).await?;
+    state
+        .rotation_uc
+        .record_served(&guild_id, &body.user_id)
+        .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
@@ -128,7 +131,10 @@ pub async fn history(
     Ok(Json(
         entries
             .into_iter()
-            .map(|e| ServedEntryDto { user_id: e.user_id, served_at: e.served_at.to_rfc3339() })
+            .map(|e| ServedEntryDto {
+                user_id: e.user_id,
+                served_at: e.served_at.to_rfc3339(),
+            })
             .collect(),
     ))
 }

@@ -11,22 +11,22 @@ use tracing::info;
 
 use crate::domain::entities::coude::social::clamp_leaderboard_limit;
 use crate::domain::entities::coude::social::daily_chaos_amount;
-use crate::domain::entities::coude::social::Season;
-use crate::domain::entities::coude::social::Event;
-use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::DAILY_CHAOS_MAX;
 use crate::domain::entities::coude::social::DEFAULT_CHAOS_PERCENT;
 use crate::domain::entities::coude::social::MIN_COINS_ELIGIBLE;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 // DAILY_CHAOS_MAX / DEFAULT_CHAOS_PERCENT / MIN_COINS_ELIGIBLE vivent
 // dans domain/entities/coude_social.rs (regles metier reutilisables).
 
@@ -46,7 +46,13 @@ impl ManageCoudeSocialService {
         bot_config_repo: Arc<dyn BotConfigRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
     ) -> Self {
-        Self { repo, player_repo, economy_repo, bot_config_repo, wallet_uc }
+        Self {
+            repo,
+            player_repo,
+            economy_repo,
+            bot_config_repo,
+            wallet_uc,
+        }
     }
 }
 
@@ -107,7 +113,10 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         }
 
         // 2. Lire le % depuis la config guild (default 20%).
-        let configs = self.bot_config_repo.get_config(guild_id, "coude-bot").await?;
+        let configs = self
+            .bot_config_repo
+            .get_config(guild_id, "coude-bot")
+            .await?;
         let chaos_percent = configs
             .iter()
             .find(|c| c.config_key == "daily_chaos_percent")
@@ -145,10 +154,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         //    victime + jackpot winner auto-detectes, log atomique dans
         //    wallet_transactions). Le `amount` est deja clamp par le
         //    calcul 20% d'un solde > MIN_COINS_ELIGIBLE.
-        let description = format!(
-            "Daily chaos ({} -> {})",
-            victim.user_id, winner.user_id
-        );
+        let description = format!("Daily chaos ({} -> {})", victim.user_id, winner.user_id);
         let taunts = self
             .wallet_uc
             .transfer(

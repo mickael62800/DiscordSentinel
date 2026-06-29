@@ -50,7 +50,11 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                 // Premier check : on enregistre l'etat sans alerter
                 previous_online = current_online;
                 first_run = false;
-                info!(online = previous_online.len(), total = known.len(), "Etat initial des services");
+                info!(
+                    online = previous_online.len(),
+                    total = known.len(),
+                    "Etat initial des services"
+                );
                 continue;
             }
 
@@ -60,15 +64,15 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                     let label = service_label(name);
                     warn!(service = %name, label = label, "Service hors ligne");
 
-                    let mut req = http
-                        .post(format!("{}/api/logs", config.api_url))
-                        .json(&serde_json::json!({
+                    let mut req = http.post(format!("{}/api/logs", config.api_url)).json(
+                        &serde_json::json!({
                             "level": "error",
                             "bot": "sentinel-worker",
                             "server": "",
                             "message": format!("{} hors ligne : {}", label, name),
                             "category": "worker",
-                        }));
+                        }),
+                    );
                     if !config.api_key.is_empty() {
                         req = req.bearer_auth(&config.api_key);
                     }
@@ -99,15 +103,15 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                     let label = service_label(name);
                     info!(service = %name, label = label, "Service en ligne");
 
-                    let mut req = http
-                        .post(format!("{}/api/logs", config.api_url))
-                        .json(&serde_json::json!({
+                    let mut req = http.post(format!("{}/api/logs", config.api_url)).json(
+                        &serde_json::json!({
                             "level": "info",
                             "bot": "sentinel-worker",
                             "server": "",
                             "message": format!("{} en ligne : {}", label, name),
                             "category": "worker",
-                        }));
+                        }),
+                    );
                     if !config.api_key.is_empty() {
                         req = req.bearer_auth(&config.api_key);
                     }
@@ -139,7 +143,11 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
 
 /// Retourne le label d'un service (Bot ou Worker).
 fn service_label(name: &str) -> &'static str {
-    if name.contains("worker") { "Worker" } else { "Bot" }
+    if name.contains("worker") {
+        "Worker"
+    } else {
+        "Bot"
+    }
 }
 
 #[cfg(test)]

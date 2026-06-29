@@ -56,17 +56,31 @@ pub struct JackpotPoolResponse {
     pub current_pool: i64,
 }
 
-pub async fn spin(client: &BaseApiClient, guild_id: &str, req: &SpinRequest) -> Result<SpinResponse, String> {
-    client.post_json(&format!("/api/slot/{guild_id}/spin"), req).await
+pub async fn spin(
+    client: &BaseApiClient,
+    guild_id: &str,
+    req: &SpinRequest,
+) -> Result<SpinResponse, String> {
+    client
+        .post_json(&format!("/api/slot/{guild_id}/spin"), req)
+        .await
 }
 
-pub async fn daily(client: &BaseApiClient, guild_id: &str, req: &DailyRequest) -> Result<SpinResponse, String> {
-    client.post_json(&format!("/api/slot/{guild_id}/daily"), req).await
+pub async fn daily(
+    client: &BaseApiClient,
+    guild_id: &str,
+    req: &DailyRequest,
+) -> Result<SpinResponse, String> {
+    client
+        .post_json(&format!("/api/slot/{guild_id}/daily"), req)
+        .await
 }
 
 #[allow(dead_code)]
 pub async fn jackpot_pool(client: &BaseApiClient, guild_id: &str) -> Result<i64, String> {
-    let r: JackpotPoolResponse = client.get_json(&format!("/api/slot/{guild_id}/jackpot")).await?;
+    let r: JackpotPoolResponse = client
+        .get_json(&format!("/api/slot/{guild_id}/jackpot"))
+        .await?;
     Ok(r.current_pool)
 }
 

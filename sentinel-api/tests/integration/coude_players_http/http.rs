@@ -16,29 +16,44 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::domain::entities::coude::player::CombatStat;
-use sentinel_core::domain::entities::coude::player::Player;
-use sentinel_core::domain::entities::coude::taunt::TauntEvent;
-use sentinel_core::domain::entities::coude::player::XpProgress;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_api::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use sentinel_api::ports::inbound::casino::manage_wallet::WalletMutation;
 use sentinel_api::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use sentinel_core::domain::entities::coude::player::CombatStat;
+use sentinel_core::domain::entities::coude::player::Player;
+use sentinel_core::domain::entities::coude::player::XpProgress;
+use sentinel_core::domain::entities::coude::taunt::TauntEvent;
+use sentinel_core::domain::errors::DomainError;
 
 fn sample_player(guild: &str, user: &str) -> Player {
     Player {
-        guild_id: guild.into(), user_id: user.into(), username: "Alice".into(),
+        guild_id: guild.into(),
+        user_id: user.into(),
+        username: "Alice".into(),
         coins: 500,
-        total_wins: 2, total_losses: 1, total_draws: 0,
-        total_earned: 200, total_lost: 50, total_stolen: 10,
-        cowardice_count: 0, chaos_events: 0,
-        casino_wins: 0, casino_losses: 0,
-        level: 3, xp: 120, stat_points: 1,
-        atk: 5, def: 5,
-        class: None, title: None, class_changed_at: None,
-        hp_current: 80, hp_max: 100,
-        hp_last_regen: None, repos_last_used: None,
+        total_wins: 2,
+        total_losses: 1,
+        total_draws: 0,
+        total_earned: 200,
+        total_lost: 50,
+        total_stolen: 10,
+        cowardice_count: 0,
+        chaos_events: 0,
+        casino_wins: 0,
+        casino_losses: 0,
+        level: 3,
+        xp: 120,
+        stat_points: 1,
+        atk: 5,
+        def: 5,
+        class: None,
+        title: None,
+        class_changed_at: None,
+        hp_current: 80,
+        hp_max: 100,
+        hp_last_regen: None,
+        repos_last_used: None,
         season: 1,
         created_at: Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
         updated_at: Utc.with_ymd_and_hms(2026, 1, 2, 0, 0, 0).unwrap(),
@@ -84,25 +99,49 @@ impl ManageCoudePlayersUseCase for MockPlayers {
     }
     async fn random_active(&self, g: &str, count: i64) -> Result<Vec<Player>, DomainError> {
         *self.random_count_received.lock().unwrap() = count;
-        Ok((0..count).map(|i| sample_player(g, &format!("u{i}"))).collect())
+        Ok((0..count)
+            .map(|i| sample_player(g, &format!("u{i}")))
+            .collect())
     }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
         Ok(self.guild_ids.lock().unwrap().clone())
     }
     async fn update_class(&self, g: &str, u: &str, c: &str) -> Result<(), DomainError> {
-        self.class_updates.lock().unwrap().push((g.into(), u.into(), c.into()));
+        self.class_updates
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), c.into()));
         Ok(())
     }
     async fn add_xp(&self, g: &str, u: &str, amt: i64) -> Result<XpProgress, DomainError> {
-        self.xp_added.lock().unwrap().push((g.into(), u.into(), amt));
-        Ok(XpProgress { new_xp: 170, new_level: 4, leveled_up: true, stat_points_gained: 1 })
+        self.xp_added
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), amt));
+        Ok(XpProgress {
+            new_xp: 170,
+            new_level: 4,
+            leveled_up: true,
+            stat_points_gained: 1,
+        })
     }
-    async fn spend_stat_point(&self, g: &str, u: &str, s: CombatStat) -> Result<Player, DomainError> {
-        self.stat_spends.lock().unwrap().push((g.into(), u.into(), s));
+    async fn spend_stat_point(
+        &self,
+        g: &str,
+        u: &str,
+        s: CombatStat,
+    ) -> Result<Player, DomainError> {
+        self.stat_spends
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), s));
         Ok(sample_player(g, u))
     }
     async fn reset_stats(&self, g: &str, u: &str, cost: i64) -> Result<Player, DomainError> {
-        self.reset_stats.lock().unwrap().push((g.into(), u.into(), cost));
+        self.reset_stats
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), cost));
         Ok(sample_player(g, u))
     }
     async fn record_win(&self, g: &str, u: &str, e: i64, s: i64) -> Result<(), DomainError> {
@@ -134,7 +173,10 @@ impl ManageCoudePlayersUseCase for MockPlayers {
         Ok(())
     }
     async fn update_hp(&self, g: &str, u: &str, c: i32, m: i32) -> Result<(), DomainError> {
-        self.hp_updates.lock().unwrap().push((g.into(), u.into(), c, m));
+        self.hp_updates
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), c, m));
         Ok(())
     }
     async fn full_heal(&self, g: &str, u: &str) -> Result<(), DomainError> {
@@ -155,46 +197,115 @@ struct MockWallet {
 
 #[async_trait]
 impl ManageWalletUseCase for MockWallet {
-    async fn credit(&self, g: &str, u: &str, a: i64, src: &str, _: &str) -> Result<WalletMutation, DomainError> {
-        self.credits.lock().unwrap().push((g.into(), u.into(), a, src.into()));
-        Ok(WalletMutation { new_balance: a, previous_balance: 0, triggered_taunts: vec![] })
+    async fn credit(
+        &self,
+        g: &str,
+        u: &str,
+        a: i64,
+        src: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        self.credits
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), a, src.into()));
+        Ok(WalletMutation {
+            new_balance: a,
+            previous_balance: 0,
+            triggered_taunts: vec![],
+        })
     }
-    async fn debit(&self, g: &str, u: &str, a: i64, src: &str, _: &str) -> Result<WalletMutation, DomainError> {
-        self.debits.lock().unwrap().push((g.into(), u.into(), a, src.into()));
-        Ok(WalletMutation { new_balance: 0, previous_balance: a, triggered_taunts: vec![] })
+    async fn debit(
+        &self,
+        g: &str,
+        u: &str,
+        a: i64,
+        src: &str,
+        _: &str,
+    ) -> Result<WalletMutation, DomainError> {
+        self.debits
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), a, src.into()));
+        Ok(WalletMutation {
+            new_balance: 0,
+            previous_balance: a,
+            triggered_taunts: vec![],
+        })
     }
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str)
-        -> Result<Vec<TauntEvent>, DomainError> { Ok(vec![]) }
+    async fn transfer(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<TauntEvent>, DomainError> {
+        Ok(vec![])
+    }
     async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.balance_to_return.lock().unwrap())
     }
-    async fn credit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str)
-        -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn debit_tx(&self, _: &mut dyn sentinel_core::ports::uow::DbTx, _: &str, _: &str, _: i64, _: &str, _: &str)
-        -> Result<TxWalletMutation, DomainError> { unimplemented!() }
-    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    async fn credit_tx(
+        &self,
+        _: &mut dyn sentinel_core::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn debit_tx(
+        &self,
+        _: &mut dyn sentinel_core::ports::uow::DbTx,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<TxWalletMutation, DomainError> {
+        unimplemented!()
+    }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> {
+        vec![]
+    }
 }
 
-fn state_with(p: Arc<MockPlayers>, w: Arc<MockWallet>) -> sentinel_api::adapters::inbound::http::state::AppState {
+fn state_with(
+    p: Arc<MockPlayers>,
+    w: Arc<MockWallet>,
+) -> sentinel_api::adapters::inbound::http::state::AppState {
     let mut s = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
     s.coude_players_uc = p;
     s.wallet_uc = w;
     s
 }
 
-async fn req_json(app: axum::Router, method: &str, uri: &str, body: Option<serde_json::Value>)
-    -> (StatusCode, serde_json::Value)
-{
+async fn req_json(
+    app: axum::Router,
+    method: &str,
+    uri: &str,
+    body: Option<serde_json::Value>,
+) -> (StatusCode, serde_json::Value) {
     let mut b = Request::builder().method(method).uri(uri);
     let body_payload = match body {
-        Some(v) => { b = b.header("content-type", "application/json"); Body::from(serde_json::to_string(&v).unwrap()) }
+        Some(v) => {
+            b = b.header("content-type", "application/json");
+            Body::from(serde_json::to_string(&v).unwrap())
+        }
         None => Body::empty(),
     };
     let req = b.body(body_payload).unwrap();
     let resp = app.oneshot(req).await.unwrap();
     let s = resp.status();
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
-    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
+    (
+        s,
+        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
+    )
 }
 
 // ── Listing ──
@@ -244,10 +355,19 @@ async fn get_or_create_player_forwards_payload() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "user_id": "111", "username": "Bob" });
-    let (s, j) = req_json(app, "POST", "/api/coude/999/players/get-or-create", Some(body)).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/get-or-create",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["user_id"], "111");
-    assert_eq!(p.created.lock().unwrap()[0], ("999".into(), "111".into(), "Bob".into()));
+    assert_eq!(
+        p.created.lock().unwrap()[0],
+        ("999".into(), "111".into(), "Bob".into())
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -298,7 +418,13 @@ async fn spend_stat_atk_accepted() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "stat": "atk" });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/spend-stat", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/spend-stat",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(p.stat_spends.lock().unwrap()[0].2, CombatStat::Atk);
 }
@@ -308,7 +434,13 @@ async fn spend_stat_def_accepted() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "stat": "def" });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/spend-stat", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/spend-stat",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(p.stat_spends.lock().unwrap()[0].2, CombatStat::Def);
 }
@@ -318,7 +450,13 @@ async fn spend_stat_invalid_returns_422() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p, Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "stat": "luck" });
-    let (s, j) = req_json(app, "POST", "/api/coude/999/players/111/spend-stat", Some(body)).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/spend-stat",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(j["error"].as_str().unwrap().contains("atk"));
 }
@@ -328,7 +466,13 @@ async fn reset_stats_forwards_cost() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "cost": 300 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/reset-stats", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/reset-stats",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(p.reset_stats.lock().unwrap()[0].2, 300);
 }
@@ -340,9 +484,18 @@ async fn record_win_forwards_earned_and_stolen() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "earned": 100, "stolen": 50 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/record-win", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/record-win",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(p.wins.lock().unwrap()[0], ("999".into(), "111".into(), 100, 50));
+    assert_eq!(
+        p.wins.lock().unwrap()[0],
+        ("999".into(), "111".into(), 100, 50)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -350,7 +503,13 @@ async fn record_loss_forwards() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "lost": 25 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/record-loss", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/record-loss",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(p.losses.lock().unwrap()[0].2, 25);
 }
@@ -360,7 +519,13 @@ async fn record_draw_forwards() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let body = serde_json::json!({ "lost": 10 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/record-draw", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/record-draw",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(p.draws.lock().unwrap()[0].2, 10);
 }
@@ -370,7 +535,13 @@ async fn increment_cowardice_returns_new_count() {
     let p = Arc::new(MockPlayers::default());
     *p.cowardice_return.lock().unwrap() = 4;
     let app = router::build_for_test(state_with(p, Arc::new(MockWallet::default())));
-    let (s, j) = req_json(app, "POST", "/api/coude/999/players/111/increment-cowardice", None).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/increment-cowardice",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::OK);
     assert_eq!(j["cowardice_count"], 4);
 }
@@ -379,7 +550,13 @@ async fn increment_cowardice_returns_new_count() {
 async fn increment_chaos_204() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/increment-chaos", None).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/increment-chaos",
+        None,
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(p.chaos.lock().unwrap().len(), 1);
 }
@@ -406,7 +583,10 @@ async fn adjust_coins_positive_credits_wallet() {
     let (s, _) = req_json(app, "PATCH", "/api/coude/players/999/111/coins", Some(body)).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     let credits = w.credits.lock().unwrap();
-    assert_eq!(credits[0], ("999".into(), "111".into(), 100, "coude_adjust".into()));
+    assert_eq!(
+        credits[0],
+        ("999".into(), "111".into(), 100, "coude_adjust".into())
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -420,9 +600,18 @@ async fn adjust_coins_negative_debits_wallet_with_abs_value() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn coins_earned_rejects_zero_or_negative() {
-    let app = router::build_for_test(state_with(Arc::new(MockPlayers::default()), Arc::new(MockWallet::default())));
+    let app = router::build_for_test(state_with(
+        Arc::new(MockPlayers::default()),
+        Arc::new(MockWallet::default()),
+    ));
     let body = serde_json::json!({ "amount": 0 });
-    let (s, j) = req_json(app, "POST", "/api/coude/999/players/111/coins-earned", Some(body)).await;
+    let (s, j) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/coins-earned",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(j["error"].as_str().unwrap().contains("positif"));
 }
@@ -433,7 +622,13 @@ async fn coins_earned_credits_wallet_and_updates_stats() {
     let w = Arc::new(MockWallet::default());
     let app = router::build_for_test(state_with(p.clone(), w.clone()));
     let body = serde_json::json!({ "amount": 200 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/coins-earned", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/coins-earned",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert_eq!(w.credits.lock().unwrap()[0].3, "coude_earn");
     assert_eq!(p.earned.lock().unwrap()[0].2, 200);
@@ -441,9 +636,18 @@ async fn coins_earned_credits_wallet_and_updates_stats() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn coins_lost_rejects_negative() {
-    let app = router::build_for_test(state_with(Arc::new(MockPlayers::default()), Arc::new(MockWallet::default())));
+    let app = router::build_for_test(state_with(
+        Arc::new(MockPlayers::default()),
+        Arc::new(MockWallet::default()),
+    ));
     let body = serde_json::json!({ "amount": -5 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/coins-lost", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/coins-lost",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
@@ -454,7 +658,13 @@ async fn coins_lost_clamps_to_balance_when_amount_exceeds() {
     *w.balance_to_return.lock().unwrap() = 30;
     let app = router::build_for_test(state_with(p.clone(), w.clone()));
     let body = serde_json::json!({ "amount": 100 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/coins-lost", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/coins-lost",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     // clamp_debit_to_balance(100, 30) = 30
     assert_eq!(w.debits.lock().unwrap()[0].2, 30);
@@ -468,7 +678,13 @@ async fn coins_lost_zero_balance_skips_debit_but_records_stat_zero() {
     *w.balance_to_return.lock().unwrap() = 0;
     let app = router::build_for_test(state_with(p.clone(), w.clone()));
     let body = serde_json::json!({ "amount": 50 });
-    let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/coins-lost", Some(body)).await;
+    let (s, _) = req_json(
+        app,
+        "POST",
+        "/api/coude/999/players/111/coins-lost",
+        Some(body),
+    )
+    .await;
     assert_eq!(s, StatusCode::NO_CONTENT);
     assert!(w.debits.lock().unwrap().is_empty());
     assert_eq!(p.lost.lock().unwrap()[0].2, 0);
@@ -483,7 +699,10 @@ async fn update_hp_forwards_current_and_max() {
     let body = serde_json::json!({ "hp_current": 50, "hp_max": 100 });
     let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/hp", Some(body)).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(p.hp_updates.lock().unwrap()[0], ("999".into(), "111".into(), 50, 100));
+    assert_eq!(
+        p.hp_updates.lock().unwrap()[0],
+        ("999".into(), "111".into(), 50, 100)
+    );
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -492,5 +711,8 @@ async fn repos_triggers_full_heal() {
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
     let (s, _) = req_json(app, "POST", "/api/coude/999/players/111/repos", None).await;
     assert_eq!(s, StatusCode::NO_CONTENT);
-    assert_eq!(p.full_heals.lock().unwrap()[0], ("999".into(), "111".into()));
+    assert_eq!(
+        p.full_heals.lock().unwrap()[0],
+        ("999".into(), "111".into())
+    );
 }
