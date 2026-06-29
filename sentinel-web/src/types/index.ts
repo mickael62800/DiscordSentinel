@@ -527,16 +527,45 @@ export interface Member {
   left_at?: string | null;
 }
 
+/**
+ * Une infraction recente telle que serialisee par le backend
+ * (`get_member_summary` -> infractions.recent). Cf.
+ * sentinel-core manage_members_service.rs.
+ */
+export interface MemberInfractionRecent {
+  id: string;
+  created_at: string;
+  reason: string;
+  /** Score automod (null si non applicable). */
+  score: number | null;
+  /** Libelle d'action ("warn", "ban", "détection: spam"...). */
+  action: string;
+  /** Contenu original du message analyse (null si indisponible). */
+  content: string | null;
+}
+
+/**
+ * Une action de moderation recente (`get_member_summary` -> moderation.actions).
+ */
+export interface MemberModerationAction {
+  action_type: string;
+  reason: string;
+  moderator_name: string;
+  created_at: string;
+  /** Duree en secondes (mute/ban temporaire), null sinon. */
+  duration: number | null;
+}
+
 export interface MemberInfractions {
   total: number;
-  recent: Record<string, unknown>[];
+  recent: MemberInfractionRecent[];
 }
 
 export interface MemberModeration {
   total_warns: number;
   total_mutes: number;
   total_bans: number;
-  actions: Record<string, unknown>[];
+  actions: MemberModerationAction[];
 }
 
 export interface MemberStats {

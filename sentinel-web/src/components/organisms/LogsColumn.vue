@@ -90,25 +90,25 @@ async function handleClear() {
     <ul v-else class="log-list">
       <li
         v-for="(log, i) in visible"
-        :key="(log as Record<string, unknown>).id as string ?? i"
-        :class="['log-item', `lvl-${(log as Record<string, unknown>).level}`]"
-        @click="toggle((log as Record<string, unknown>).id as string ?? i)"
+        :key="log.id ?? i"
+        :class="['log-item', `lvl-${log.level}`]"
+        @click="toggle(log.id ?? i)"
       >
         <div class="log-line1">
           <AppBadge
-            :label="String((log as Record<string, unknown>).level)"
-            :variant="levelVariant(String((log as Record<string, unknown>).level))"
+            :label="log.level"
+            :variant="levelVariant(log.level)"
           />
-          <span class="log-source">{{ (log as Record<string, unknown>).bot ?? "—" }}</span>
-          <span class="log-time">{{ fmt(String((log as Record<string, unknown>).timestamp)) }}</span>
+          <span class="log-source">{{ log.bot ?? "—" }}</span>
+          <span class="log-time">{{ fmt(log.timestamp) }}</span>
         </div>
-        <div class="log-msg">{{ (log as Record<string, unknown>).message }}</div>
+        <div class="log-msg">{{ log.message }}</div>
         <pre
-          v-if="expandedId === ((log as Record<string, unknown>).id ?? i)
-                && (log as Record<string, unknown>).details
-                && Object.keys((log as Record<string, unknown>).details as object ?? {}).length > 0"
+          v-if="expandedId === (log.id ?? i)
+                && log.details
+                && Object.keys(log.details).length > 0"
           class="log-details"
-        >{{ JSON.stringify((log as Record<string, unknown>).details, null, 2) }}</pre>
+        >{{ JSON.stringify(log.details, null, 2) }}</pre>
       </li>
     </ul>
 

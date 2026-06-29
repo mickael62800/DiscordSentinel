@@ -7,7 +7,7 @@ import { usePagination } from "../../composables/usePagination";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
 import { levelVariant } from "../../utils/variants";
-import type { TableColumn } from "../../types";
+import type { LogEntry, TableColumn } from "../../types";
 import FilterBar from "../molecules/FilterBar.vue";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
@@ -46,8 +46,8 @@ const hasTypeColumn = computed(() => props.columns.some((c) => c.key === "type")
 
 /** Derive un type d'event depuis details (event_type / kind) ou depuis le
  *  message via mots-cles. Retourne "general" en dernier recours. */
-function inferType(log: Record<string, unknown>): string {
-  const details = (log.details ?? {}) as Record<string, unknown>;
+function inferType(log: LogEntry): string {
+  const details = log.details ?? {};
   const fromDetails = (details.event_type ?? details.kind ?? details.event) as string | undefined;
   if (fromDetails && typeof fromDetails === "string" && fromDetails.trim()) return fromDetails;
 
@@ -76,7 +76,7 @@ const filterType = ref<string>("all");
 /** Liste des types presents pour peupler le dropdown du filtre. */
 const types = computed<string[]>(() => {
   const set = new Set<string>();
-  for (const log of filteredLogs.value as unknown as Record<string, unknown>[]) {
+  for (const log of filteredLogs.value) {
     set.add(inferType(log));
   }
   return Array.from(set).sort();
@@ -85,9 +85,7 @@ const types = computed<string[]>(() => {
 /** Logs filtres aussi sur le type quand le filtre est actif. */
 const filteredAndTyped = computed(() => {
   if (filterType.value === "all") return filteredLogs.value;
-  return (filteredLogs.value as unknown as Record<string, unknown>[]).filter(
-    (log) => inferType(log) === filterType.value,
-  );
+  return filteredLogs.value.filter((log) => inferType(log) === filterType.value);
 });
 
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLogs } = usePagination(filteredAndTyped, 50);
@@ -178,7 +176,7 @@ async function handleClear() {
         <AppBadge :label="String(value)" :variant="levelVariant(String(value))" />
       </template>
       <template v-if="hasTypeColumn" #cell-type="{ row }">
-        <AppBadge :label="inferType(row as Record<string, unknown>)" variant="info" />
+        <AppBadge :label="inferType(row as unknown as LogEntry)" variant="info" />
       </template>
       <template v-if="hasDetailsColumn" #cell-details="{ value }">
         <slot name="details" :value="value">

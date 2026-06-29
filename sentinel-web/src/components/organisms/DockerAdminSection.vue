@@ -40,9 +40,9 @@ async function refreshTab() {
     else if (tab.value === "volumes") volumes.value = await dockerService.listVolumes();
     else if (tab.value === "networks") networks.value = await dockerService.listNetworks();
     else if (tab.value === "prune") overview.value = await dockerService.getOverview();
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error(e);
-    showError(`Erreur Docker : ${e?.message ?? e}`);
+    showError(`Erreur Docker : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -71,6 +71,14 @@ onMounted(() => {
 onUnmounted(stopPoll);
 
 // ── Helpers ──
+/** Extrait un message d'erreur lisible depuis une valeur `unknown` (catch). */
+function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null && "message" in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return String(e);
+}
 function fmtBytes(b: number | null | undefined): string {
   if (!b || b < 0) return "—";
   const u = ["B", "KB", "MB", "GB", "TB"];
@@ -116,8 +124,8 @@ async function startCt(c: DockerContainer) {
     await dockerService.startContainer(c.id);
     success(`Conteneur ${cleanName(c.names[0] ?? "")} démarré.`);
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur start : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur start : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -129,8 +137,8 @@ async function stopCt(c: DockerContainer) {
     await dockerService.stopContainer(c.id);
     success("Conteneur arrêté.");
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur stop : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur stop : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -141,8 +149,8 @@ async function restartCt(c: DockerContainer) {
     await dockerService.restartContainer(c.id);
     success("Conteneur redémarré.");
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur restart : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur restart : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -155,8 +163,8 @@ async function removeCt(c: DockerContainer) {
     await dockerService.removeContainer(c.id, force, false);
     success("Conteneur supprimé.");
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur delete : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur delete : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -173,8 +181,8 @@ async function fetchLogs() {
   try {
     const r = await dockerService.containerLogs(logsContainer.value.id, logsTail.value, true);
     logsContent.value = r.logs;
-  } catch (e: any) {
-    showError(`Erreur logs : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur logs : ${errMsg(e)}`);
   } finally {
     logsLoading.value = false;
   }
@@ -193,8 +201,8 @@ async function removeImg(img: DockerImage) {
     await dockerService.removeImage(img.id, false);
     success("Image supprimée.");
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -206,8 +214,8 @@ async function removeVol(v: DockerVolume) {
     await dockerService.removeVolume(v.name, false);
     success("Volume supprimé.");
     await refreshTab();
-  } catch (e: any) {
-    showError(`Erreur : ${e?.message ?? e}`);
+  } catch (e: unknown) {
+    showError(`Erreur : ${errMsg(e)}`);
   } finally {
     busy.value = false;
   }
@@ -221,7 +229,7 @@ async function pruneContainers() {
     const r = await dockerService.pruneContainers();
     success(`${r.deleted.length} conteneurs supprimés · ${fmtBytes(r.space_reclaimed_bytes)} libérés.`);
     await refreshTab();
-  } catch (e: any) { showError(`Erreur : ${e?.message ?? e}`); } finally { busy.value = false; }
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
 async function pruneImages(all: boolean) {
   const msg = all ? "Supprimer toutes les images non utilisées ?" : "Supprimer les images dangling ?";
@@ -231,7 +239,7 @@ async function pruneImages(all: boolean) {
     const r = await dockerService.pruneImages(all);
     success(`${r.deleted.length} images supprimées · ${fmtBytes(r.space_reclaimed_bytes)} libérés.`);
     await refreshTab();
-  } catch (e: any) { showError(`Erreur : ${e?.message ?? e}`); } finally { busy.value = false; }
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
 async function pruneVolumes() {
   if (!(await doConfirm("⚠️ Supprimer tous les volumes orphelins ? Données potentiellement perdues."))) return;
@@ -240,7 +248,7 @@ async function pruneVolumes() {
     const r = await dockerService.pruneVolumes();
     success(`${r.deleted.length} volumes supprimés · ${fmtBytes(r.space_reclaimed_bytes)} libérés.`);
     await refreshTab();
-  } catch (e: any) { showError(`Erreur : ${e?.message ?? e}`); } finally { busy.value = false; }
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
 async function pruneNetworks() {
   if (!(await doConfirm("Supprimer les réseaux non utilisés ?"))) return;
@@ -249,7 +257,7 @@ async function pruneNetworks() {
     const r = await dockerService.pruneNetworks();
     success(`${r.deleted.length} réseaux supprimés.`);
     await refreshTab();
-  } catch (e: any) { showError(`Erreur : ${e?.message ?? e}`); } finally { busy.value = false; }
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
 async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   let msg = "Nettoyage système complet : conteneurs arrêtés + images";
@@ -263,7 +271,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
     const r = await dockerService.pruneSystem({ volumes: includeVolumes, allImages });
     success(`Nettoyage : ${fmtBytes(r.total_space_reclaimed_bytes)} libérés.`);
     await refreshTab();
-  } catch (e: any) { showError(`Erreur : ${e?.message ?? e}`); } finally { busy.value = false; }
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
 </script>
 

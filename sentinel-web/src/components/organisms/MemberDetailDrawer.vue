@@ -145,8 +145,8 @@ function formatDuration(seconds: number): string {
   return `${m}m`;
 }
 
-function rolesCount(roles: unknown): number {
-  return Array.isArray(roles) ? roles.length : 0;
+function rolesCount(roles: string[]): number {
+  return roles.length;
 }
 
 // ── Activity timeline ────────────────
@@ -549,8 +549,8 @@ function discordProfileUrl(userId: string): string {
           <h3>Infractions recentes</h3>
           <div v-for="(inf, i) in selectedMember.infractions.recent" :key="i" class="detail-row">
             <div class="detail-row-header">
-              <span class="detail-date">{{ formatDate(inf.created_at as string) }}</span>
-              <AppBadge :label="String(inf.action)" variant="danger" />
+              <span class="detail-date">{{ formatDate(inf.created_at) }}</span>
+              <AppBadge :label="inf.action" variant="danger" />
             </div>
             <div class="detail-row-body">{{ inf.reason }}</div>
           </div>
