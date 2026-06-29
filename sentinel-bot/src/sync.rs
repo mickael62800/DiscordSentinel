@@ -16,14 +16,8 @@ use crate::shared::api_client::BaseApiClient;
 /// Conventions de `kind` partagees avec le domain API
 /// (sentinel-api/src/domain/entities/discord_action_message.rs::kinds).
 pub mod kinds {
-    #[allow(dead_code)]
-    pub const BAN_PROPOSAL: &str = "ban_proposal";
     pub const TICKET: &str = "ticket";
-    #[allow(dead_code)]
-    pub const ROLES_PANEL: &str = "roles_panel";
     pub const COMBAT_CHALLENGE: &str = "combat_challenge";
-    #[allow(dead_code)]
-    pub const REVIEW_REQUEST: &str = "review_request";
     pub const AUTOMOD_REVIEW: &str = "automod_review";
     pub const BLACKJACK_TABLE: &str = "blackjack_table";
 }

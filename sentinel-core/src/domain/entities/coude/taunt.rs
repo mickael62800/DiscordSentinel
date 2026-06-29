@@ -21,7 +21,6 @@
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;
 use rand::seq::SliceRandom;
-use rand::Rng;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
@@ -542,10 +541,6 @@ pub fn build_taunt_event_deterministic(
         streak_value: new_streak,
     })
 }
-
-// Helper pour eviter `#[allow(dead_code)]` sur Rng — garde l'import used.
-#[inline]
-fn _keep_rng_used<R: Rng>(_: &mut R) {}
 
 #[cfg(test)]
 #[path = "tests/taunt.rs"]

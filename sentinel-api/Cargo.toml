@@ -39,7 +39,6 @@ tokio-metrics = { version = "0.4", default-features = false, features = ["rt"] }
 # AI / Inference ONNX
 ort = "2.0.0-rc.12"
 ndarray = "0.17"
-image = { version = "0.25", default-features = false, features = ["jpeg", "png", "gif", "webp", "bmp"] }
 base64 = "0.22"
 tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
 
@@ -57,7 +56,6 @@ sentinel-core = { workspace = true }
 # Utils
 uuid = { workspace = true }
 chrono = { workspace = true }
-thiserror = { workspace = true }
 async-trait = { workspace = true }
 dotenvy = { workspace = true }
 futures-util = { workspace = true }

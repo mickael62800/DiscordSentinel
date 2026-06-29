@@ -4,7 +4,6 @@ use tracing::debug;
 use tracing::error;
 /// Client pour enqueue des jobs dans la queue Redis du worker
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct JobClient {
     redis: redis::Client,
     queue_key: String,

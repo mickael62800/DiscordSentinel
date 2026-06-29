@@ -149,7 +149,6 @@ pub async fn rbac_middleware(
 ///     // ... logique admin-only
 /// }
 /// ```
-#[allow(dead_code)]
 pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode> {
     match ctx.role {
         Some(role) if role.satisfies(required) => Ok(()),
@@ -171,7 +170,6 @@ pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode>
 /// Bootstrap : definir `SUPERADMIN_USER_IDS=123,456,789` au deploiement.
 /// Si la liste est vide (pas configuree), TOUS les appels sont refuses par
 /// securite — c'est volontaire : mieux vaut bloquer que laisser passer.
-#[allow(dead_code)]
 pub fn require_superadmin(state: &AppState, ctx: &RoleContext) -> Result<(), StatusCode> {
     if state
         .superadmin_user_ids
@@ -202,7 +200,6 @@ pub fn require_superadmin(state: &AppState, ctx: &RoleContext) -> Result<(), Sta
 /// Note : si la row `api_user_guilds` n'existe pas pour ce (user, guild),
 /// on retombe sur `Role::Viewer` (principe du moindre privilege) — identique
 /// au comportement du middleware.
-#[allow(dead_code)]
 pub async fn require_role_for_guild(
     state: &AppState,
     ctx: &RoleContext,
@@ -252,7 +249,6 @@ pub async fn require_role_for_guild(
 /// - `rbac` absent → pass-through (appel bot/internal non gated)
 /// - `rbac` présent et `role.satisfies(required)` → `Ok(())`
 /// - Sinon → `Err(ApiError(DomainError::Forbidden(...)))`
-#[allow(dead_code)]
 pub fn check_role(
     rbac: &Option<axum::Extension<RoleContext>>,
     required: Role,
@@ -285,7 +281,6 @@ pub fn check_role(
 /// - `FORBIDDEN` (role insuffisant) -> `DomainError::Forbidden` = HTTP 403
 /// - `SERVICE_UNAVAILABLE` (erreur DB, fail-closed) -> `DomainError::Internal`
 ///   = HTTP 500 (le handler remonte l'erreur au caller, qui retry)
-#[allow(dead_code)]
 pub async fn check_role_for_guild(
     state: &AppState,
     rbac: &Option<axum::Extension<RoleContext>>,

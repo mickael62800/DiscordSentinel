@@ -308,13 +308,6 @@ fn nickname_suffix_for_threshold_based_with_invalid_threshold_returns_empty() {
 }
 
 #[test]
-fn keep_rng_used_is_callable() {
-    // Couvre la fn helper `_keep_rng_used` (marker no-op pour l'import Rng).
-    let mut rng = rand::thread_rng();
-    _keep_rng_used(&mut rng);
-}
-
-#[test]
 fn streak_kind_as_str_all_variants() {
     // Couvre les branches non touchees de StreakKind::as_str.
     assert_eq!(StreakKind::Win.as_str(), "win");

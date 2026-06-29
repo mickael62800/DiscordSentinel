@@ -214,26 +214,6 @@ pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_du
     }
 }
 
-/// Ajoute un evenement custom a la carte.
-#[allow(dead_code)]
-pub async fn session_event(ctx: &Context, voice_channel_id: ChannelId, text: &str) {
-    let mut card_clone = {
-        let data = ctx.data.read().await;
-        let cards = match data.get::<SessionCardKey>() {
-            Some(c) => c,
-            None => return,
-        };
-        let mut entry = match cards.get_mut(&voice_channel_id) {
-            Some(e) => e,
-            None => return,
-        };
-        entry.add_event(text.to_string());
-        entry.clone()
-    };
-    card_clone.update(ctx).await;
-    sync_message_id(ctx, voice_channel_id, &card_clone).await;
-}
-
 // ── Helpers ──
 
 pub async fn get_channel_name(ctx: &Context, channel_id: ChannelId) -> String {
@@ -247,7 +227,6 @@ pub async fn get_channel_name(ctx: &Context, channel_id: ChannelId) -> String {
 }
 
 // Legacy stub -- still called by afk_sweep
-#[allow(dead_code)]
 pub async fn log_afk_move(
     _ctx: &Context,
     _user_id: u64,

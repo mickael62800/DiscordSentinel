@@ -402,11 +402,6 @@ impl Config {
         BaseApiClient::config_u64(&self.raw, "prestige_unlock_level", 25) as i32
     }
 
-    /// Niveau requis pour debloquer l'ultimate de classe (default 10).
-    pub fn ultimate_unlock_level(&self) -> i32 {
-        BaseApiClient::config_u64(&self.raw, "ultimate_unlock_level", 10) as i32
-    }
-
     /// Cout d'un prank "fausse alerte braquage" (default 100).
     pub fn prank_braquage_cost(&self) -> i64 {
         BaseApiClient::config_u64(&self.raw, "prank_braquage_cost", 100) as i64
@@ -420,16 +415,6 @@ impl Config {
     /// Cout d'un prank "faux appel DM" (default 50).
     pub fn prank_appel_cost(&self) -> i64 {
         BaseApiClient::config_u64(&self.raw, "prank_appel_cost", 50) as i64
-    }
-
-    /// Cout par membre pour creer une coalition (default 500).
-    pub fn coalition_cost_per_member(&self) -> i64 {
-        BaseApiClient::config_u64(&self.raw, "coalition_cost_per_member", 500) as i64
-    }
-
-    /// Contribution minimum a une prime collective (default 50).
-    pub fn contribute_prime_min(&self) -> i64 {
-        BaseApiClient::config_u64(&self.raw, "contribute_prime_min", 50) as i64
     }
 
     /// Coins minimum sur la cible pour /voler (default 10).

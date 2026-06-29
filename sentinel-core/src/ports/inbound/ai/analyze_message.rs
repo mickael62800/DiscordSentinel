@@ -14,7 +14,6 @@ pub struct ContextMessageEntry {
     pub content: String,
 }
 
-#[allow(dead_code)]
 pub struct AnalyzeMessageCommand {
     pub guild_id: GuildId,
     pub channel_id: ChannelId,

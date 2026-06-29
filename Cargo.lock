@@ -3162,7 +3162,6 @@ dependencies = [
  "dotenvy",
  "futures-util",
  "http-body-util",
- "image",
  "metrics",
  "metrics-exporter-prometheus",
  "ndarray",
@@ -3179,7 +3178,6 @@ dependencies = [
  "subtle",
  "sysinfo",
  "tar",
- "thiserror 2.0.18",
  "tikv-jemallocator",
  "tokenizers",
  "tokio",
@@ -3249,9 +3247,7 @@ name = "sentinel-gateway"
 version = "0.1.0"
 dependencies = [
  "axum",
- "dashmap 6.1.0",
  "dotenvy",
- "futures-util",
  "redis",
  "reqwest",
  "serde",
@@ -3262,7 +3258,6 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

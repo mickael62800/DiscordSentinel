@@ -7,7 +7,6 @@ use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 
-#[allow(dead_code)]
 pub struct AnalyzeImageCommand {
     pub guild_id: GuildId,
     pub channel_id: ChannelId,

@@ -4,7 +4,6 @@ use crate::domain::entities::system::guild::Guild;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-#[allow(dead_code)]
 pub trait GuildRepository: Send + Sync {
     async fn upsert(&self, guild: &Guild) -> Result<(), DomainError>;
     async fn find_all(&self) -> Result<Vec<Guild>, DomainError>;

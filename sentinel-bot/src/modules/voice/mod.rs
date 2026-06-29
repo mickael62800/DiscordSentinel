@@ -15,7 +15,7 @@ pub mod tasks;
 use std::sync::Arc;
 
 use dashmap::DashMap;
-use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};
+use serenity::all::{ComponentInteraction, Context, CreateCommand};
 use serenity::model::application::ModalInteraction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
@@ -82,11 +82,6 @@ impl TypeMapKey for SessionCardKey {
 
 pub fn register_commands() -> Vec<CreateCommand> {
     vec![]
-}
-
-#[allow(dead_code)]
-pub async fn handle_command(_ctx: &Context, _command: &CommandInteraction) {
-    // Voice-bot n'a pas de commandes slash — tout est via composants.
 }
 
 // ── Component interactions ──

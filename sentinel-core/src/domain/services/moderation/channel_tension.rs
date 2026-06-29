@@ -14,7 +14,6 @@ use std::sync::Mutex;
 /// Entry dans le buffer glissant : score IA + auteur + message_id pour
 /// pouvoir agir sur le dernier speaker si un seuil est franchi.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct TensionEntry {
     pub score: f64,
     pub user_id: UserId,

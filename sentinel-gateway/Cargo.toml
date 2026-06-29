@@ -29,9 +29,6 @@ tracing-subscriber = { workspace = true }
 
 # Utils
 dotenvy = { workspace = true }
-futures-util = { workspace = true }
-uuid = { workspace = true }
-dashmap = { workspace = true }
 
 # Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
 # pas supporte sur MSVC Windows). Gain typique : -15 % RAM residente sur les
