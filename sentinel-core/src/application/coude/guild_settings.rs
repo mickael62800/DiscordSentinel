@@ -11,9 +11,23 @@
 use std::collections::HashMap;
 
 use crate::domain::entities::coude::balance::BalanceParams;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const BOT_NAME: &str = "coude-bot";
+
+/// Collecte les entrees `bot_guild_config` en paires `(config_key, config_value)`.
+///
+/// Generique sur le conteneur cible (`FromIterator`) pour servir aussi bien
+/// les appelants qui veulent un `HashMap<String, String>` que ceux qui veulent
+/// un `Vec<(String, String)>`. Centralise un pattern duplique dans plusieurs
+/// services qui lisent la config bot par guild.
+pub fn config_map<B: FromIterator<(String, String)>>(entries: Vec<BotGuildConfig>) -> B {
+    entries
+        .into_iter()
+        .map(|e| (e.config_key, e.config_value))
+        .collect()
+}
 
 /// Charge les `BalanceParams` d'une guild depuis le `BotConfigRepository`.
 ///
@@ -24,16 +38,10 @@ const BOT_NAME: &str = "coude-bot";
 /// le repo est down — les services qui ont besoin d'un comportement
 /// strict doivent gerer les erreurs avant d'appeler.
 pub async fn load_balance_params(repo: &dyn BotConfigRepository, guild_id: &str) -> BalanceParams {
-    match repo.get_config(guild_id, BOT_NAME).await {
-        Ok(entries) => {
-            let map: HashMap<String, String> = entries
-                .into_iter()
-                .map(|e| (e.config_key, e.config_value))
-                .collect();
-            BalanceParams::from_config(&map)
-        }
-        Err(_) => BalanceParams::default(),
-    }
+    // Reutilise le meme chargement que `GuildSettings::load` : sur erreur repo
+    // on obtient une map vide, et `from_config(&empty)` == `default()` (chaque
+    // champ retombe sur son default), donc le comportement est identique.
+    BalanceParams::from_config(&GuildSettings::load(repo, guild_id).await.raw)
 }
 
 #[derive(Debug, Default, Clone)]
@@ -45,10 +53,7 @@ impl GuildSettings {
     pub async fn load(repo: &dyn BotConfigRepository, guild_id: &str) -> Self {
         match repo.get_config(guild_id, BOT_NAME).await {
             Ok(entries) => Self {
-                raw: entries
-                    .into_iter()
-                    .map(|e| (e.config_key, e.config_value))
-                    .collect(),
+                raw: config_map(entries),
             },
             Err(_) => Self::default(),
         }

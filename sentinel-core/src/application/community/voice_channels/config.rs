@@ -14,10 +14,8 @@ impl ManageVoiceChannelsService {
             .bot_config_repo
             .get_config(guild_id, "voice-bot")
             .await?;
-        let pairs: Vec<(String, String)> = entries
-            .into_iter()
-            .map(|e| (e.config_key, e.config_value))
-            .collect();
+        let pairs: Vec<(String, String)> =
+            crate::application::coude::guild_settings::config_map(entries);
         Ok(VoiceChannelConfig::from_kv_pairs(&pairs))
     }
 }

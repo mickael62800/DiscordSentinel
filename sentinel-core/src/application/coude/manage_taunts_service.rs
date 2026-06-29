@@ -161,10 +161,7 @@ impl ManageCoudeTauntsService {
             .get_config(guild_id, ECO_BOT_NAME)
             .await
         {
-            Ok(entries) => entries
-                .into_iter()
-                .map(|e| (e.config_key, e.config_value))
-                .collect(),
+            Ok(entries) => crate::application::coude::guild_settings::config_map(entries),
             Err(e) => {
                 warn!(error = %e, guild_id, "taunts: echec lecture bot_guild_config — defaults");
                 HashMap::new()
