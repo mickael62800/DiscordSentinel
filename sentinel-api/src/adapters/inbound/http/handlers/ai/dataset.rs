@@ -20,7 +20,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -66,7 +65,6 @@ pub async fn list_messages(
     Query(q): Query<ListMessagesQuery>,
 ) -> Result<Json<ListMessagesResponse>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     let limit = q.limit.unwrap_or(200).clamp(1, 1000);
     let offset = q.offset.unwrap_or(0).max(0);
@@ -182,7 +180,6 @@ pub async fn bulk_delete(
     Json(body): Json<BulkDeleteDto>,
 ) -> Result<Json<BulkDeleteResponse>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| forbid(s, "owner+ requis"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     if body.ids.is_empty() {
         return Ok(Json(BulkDeleteResponse { deleted: 0 }));

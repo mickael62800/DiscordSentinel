@@ -18,7 +18,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -47,8 +46,6 @@ pub async fn list_visibility(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<VisibilityEntryDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-
     let rows = sqlx::query_as::<_, (String, String, bool)>(
         "SELECT component_key, role, visible \
          FROM rbac_component_visibility \
@@ -81,7 +78,6 @@ pub async fn upsert_visibility(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner)
         .map_err(|s| forbid(s, "owner+ requis pour modifier la visibilite"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     let valid_roles = ["viewer", "moderator", "admin", "owner"];
     for e in &body.entries {

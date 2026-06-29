@@ -177,8 +177,6 @@ pub async fn list_invitations(
     Extension(ctx): Extension<RoleContext>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<InvitationDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-
     // Owner+ ou superadmin
     let is_super = state
         .superadmin_user_ids

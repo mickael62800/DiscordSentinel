@@ -14,7 +14,6 @@ use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildU
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::validation;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Extension;
@@ -76,8 +75,6 @@ pub async fn grant_role(
     Json(dto): Json<GrantRoleDto>,
 ) -> Result<Json<UserRoleDto>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour grant"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     let role = parse_role(&dto.role)?;
     let display_name = sentinel_core::domain::entities::system::rbac::truncate_display_name(
@@ -141,8 +138,6 @@ pub async fn update_role(
     Json(dto): Json<UpdateRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour update"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     // Regle metier : anti-lockout du dernier owner-caller.
     if sentinel_core::domain::entities::system::rbac::is_owner_self_demotion(
@@ -193,8 +188,6 @@ pub async fn revoke_role(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour revoke"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-    validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     // Garde-fou : verifier que ce n'est pas le dernier owner
     let (total_owners,): (i64,) = sqlx::query_as(
@@ -256,7 +249,6 @@ pub async fn list_guild_users(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GuildUserEntryDto>>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| status_to_err(s, "admin+ requis pour lister"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -312,8 +304,6 @@ pub async fn get_my_role(
     rbac: Option<axum::Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<MyRoleDto>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
-
     // Si pas de RoleContext (middleware n'a pas pu resoudre = pas auth), 401.
     let Some(axum::Extension(ctx)) = rbac else {
         return Err(ApiError(

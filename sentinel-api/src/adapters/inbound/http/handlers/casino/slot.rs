@@ -142,7 +142,6 @@ pub async fn spin(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SpinDto>,
 ) -> Result<Json<SpinResponseDto>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = SpinCommand {
@@ -175,7 +174,6 @@ pub async fn daily(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<DailyDto>,
 ) -> Result<Json<SpinResponseDto>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = SpinCommand {
@@ -205,7 +203,6 @@ pub async fn get_jackpot(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<JackpotPoolDto>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let pool = state.slot_uc.get_jackpot_pool(&guild_id).await?;
     Ok(Json(JackpotPoolDto { current_pool: pool }))
 }
@@ -216,7 +213,6 @@ pub async fn recent_spins(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<SlotSpinDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let limit = normalize_limit(params.limit, 20, 200);
     let spins = state.slot_uc.recent_spins(&guild_id, limit).await?;
     Ok(Json(spins.into_iter().map(SlotSpinDto::from).collect()))
@@ -228,7 +224,6 @@ pub async fn leaderboard(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<SlotTopWinnerDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let days = params.days.unwrap_or(7).clamp(1, 365);
     let limit = normalize_limit(params.limit, 10, 100);
     let winners = state.slot_uc.top_winners(&guild_id, days, limit).await?;

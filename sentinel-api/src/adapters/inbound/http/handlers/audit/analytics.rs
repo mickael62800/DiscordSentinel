@@ -135,49 +135,46 @@ pub async fn get_top_infractors(
     State(state): State<AppState>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<TopInfractorDto>>, ApiError> {
+    // Charge la config analytics du guild une seule fois : deux cles
+    // (top_users_count, low_activity_filter) sont lues ci-dessous.
+    let analytics_cfg = if let Some(gid) = params.guild_id.as_deref() {
+        state
+            .bot_config_repo
+            .get_config(gid, "analytics")
+            .await
+            .ok()
+    } else {
+        None
+    };
+
     let effective_limit = match params.limit {
         Some(_) => params.limit(),
         None => {
             // Pas de limit explicite : tente la cle top_users_count du guild.
-            if let Some(gid) = params.guild_id.as_deref() {
-                if let Ok(cfgs) = state.bot_config_repo.get_config(gid, "analytics").await {
-                    if let Some(v) = cfgs
-                        .iter()
+            analytics_cfg
+                .as_ref()
+                .and_then(|cfgs| {
+                    cfgs.iter()
                         .find(|c| c.config_key == "top_users_count")
                         .and_then(|c| c.config_value.parse::<i64>().ok())
-                    {
-                        v.clamp(1, 100)
-                    } else {
-                        params.limit()
-                    }
-                } else {
-                    params.limit()
-                }
-            } else {
-                params.limit()
-            }
+                })
+                .map(|v| v.clamp(1, 100))
+                .unwrap_or_else(|| params.limit())
         }
     };
 
     // Filtre minimum d'infractions (configurable via analytics.low_activity_filter).
     // 0 = pas de filtre (defaut). Permet aux admins de masquer les users avec
     // 1-2 infractions ponctuelles pour voir le "vrai" top.
-    let min_total = if let Some(gid) = params.guild_id.as_deref() {
-        state
-            .bot_config_repo
-            .get_config(gid, "analytics")
-            .await
-            .ok()
-            .and_then(|cfgs| {
-                cfgs.into_iter()
-                    .find(|c| c.config_key == "low_activity_filter")
-                    .and_then(|c| c.config_value.parse::<i64>().ok())
-            })
-            .unwrap_or(0)
-            .max(0)
-    } else {
-        0
-    };
+    let min_total = analytics_cfg
+        .as_ref()
+        .and_then(|cfgs| {
+            cfgs.iter()
+                .find(|c| c.config_key == "low_activity_filter")
+                .and_then(|c| c.config_value.parse::<i64>().ok())
+        })
+        .unwrap_or(0)
+        .max(0);
 
     let key = cache_key(
         "infractors",

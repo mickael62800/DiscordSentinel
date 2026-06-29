@@ -113,7 +113,6 @@ pub async fn spin(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<WheelSpinDto>,
 ) -> Result<Json<WheelSpinResponseDto>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = WheelSpinCommand {
@@ -143,7 +142,6 @@ pub async fn recent(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LimitQuery>,
 ) -> Result<Json<Vec<WheelSpinLogDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let limit = normalize_limit(params.limit, 20, 200);
     let spins = state.wheel_uc.recent_spins(&guild_id, limit).await?;
     Ok(Json(spins.into_iter().map(WheelSpinLogDto::from).collect()))
@@ -154,7 +152,6 @@ pub async fn leaderboard(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<WheelTopWinnerDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     let days = params.days.unwrap_or(7).clamp(1, 365);
     let limit = normalize_limit(params.limit, 10, 100);
     let winners = state.wheel_uc.top_winners(&guild_id, days, limit).await?;

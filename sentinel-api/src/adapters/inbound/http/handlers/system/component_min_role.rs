@@ -56,7 +56,6 @@ pub async fn list_min_roles(
 ) -> Result<Json<Vec<GateInfoDto>>, ApiError> {
     require_role(&ctx, Role::Admin)
         .map_err(|s| forbid(s, "admin+ requis pour lister les gates"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     let overrides: Vec<(String, String)> = sqlx::query_as(
         "SELECT component_key, min_role FROM rbac_component_min_role \
@@ -100,7 +99,6 @@ pub async fn upsert_min_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner)
         .map_err(|s| forbid(s, "owner+ requis pour modifier la config RBAC"))?;
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
     if Role::from_str(&dto.min_role).is_none() {
         return Err(ApiError(DomainError::ValidationError(format!(

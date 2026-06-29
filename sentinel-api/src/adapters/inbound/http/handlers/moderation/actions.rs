@@ -618,7 +618,6 @@ pub async fn list_pending_reviews(
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(
         &rbac,
         Role::Moderator,
@@ -713,7 +712,6 @@ pub async fn get_modstats(
     Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>,
     ApiError,
 > {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(
         &rbac,
         Role::Moderator,
@@ -752,7 +750,6 @@ pub async fn get_modstats_trend(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
-    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(
         &rbac,
         Role::Moderator,
