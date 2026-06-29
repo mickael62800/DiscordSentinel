@@ -3,10 +3,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::{reply_api_err, require_guild_id};
-
-use crate::modules::coude::load_guild_config;
-use crate::modules::coude::GameApiKey;
+use crate::shared::discord_helpers::reply_api_err;
 
 use crate::modules::coude::guild_config::Config;
 
@@ -39,21 +36,18 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else {
+    let Some((guild_id, config, api)) = crate::modules::coude::command_prelude::coude_prelude(
+        ctx,
+        command,
+        |c| c.channel_profil(),
+        false,
+    )
+    .await
+    else {
         return;
     };
 
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
-        .await
-    {
-        return;
-    }
-
     let user_id = command.user.id.to_string();
-
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
 
     let player = match api
         .get_or_create_player(&guild_id, &user_id, &command.user.name)

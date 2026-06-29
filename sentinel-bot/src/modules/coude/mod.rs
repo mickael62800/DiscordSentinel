@@ -9,6 +9,7 @@ pub mod achievements;
 pub mod api_client;
 pub mod catalog;
 pub mod channel_check;
+pub mod command_prelude;
 pub mod commands;
 pub mod daily_chaos_events;
 pub mod guild_config;

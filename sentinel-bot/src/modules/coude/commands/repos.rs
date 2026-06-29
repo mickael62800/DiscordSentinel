@@ -1,32 +1,24 @@
 use serenity::all::{CommandInteraction, Context, CreateCommand, CreateEmbed, CreateEmbedFooter};
 
-use crate::shared::discord_helpers::{
-    reply_api_err, reply_embed, reply_ephemeral, require_guild_id,
-};
-
-use crate::modules::coude::load_guild_config;
-use crate::modules::coude::GameApiKey;
+use crate::shared::discord_helpers::{reply_api_err, reply_embed, reply_ephemeral};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("repos").description("Repose-toi pour recuperer tous tes HP (cooldown 12h)")
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else {
+    let Some((guild_id, config, api)) = crate::modules::coude::command_prelude::coude_prelude(
+        ctx,
+        command,
+        |c| c.channel_profil(),
+        false,
+    )
+    .await
+    else {
         return;
     };
 
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
-        .await
-    {
-        return;
-    }
-
     let user_id = command.user.id.to_string();
-
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
 
     let player = match api
         .get_or_create_player(&guild_id, &user_id, &command.user.name)

@@ -10,10 +10,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
-
-use crate::modules::coude::load_guild_config;
-use crate::modules::coude::GameApiKey;
+use crate::shared::discord_helpers::reply_ephemeral;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("coude-amical")
@@ -25,25 +22,16 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else {
+    let Some((guild_id, _config, api)) = crate::modules::coude::command_prelude::coude_prelude(
+        ctx,
+        command,
+        |c| c.channel_combats(),
+        true,
+    )
+    .await
+    else {
         return;
     };
-
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_combats())
-        .await
-    {
-        return;
-    }
-    if !config.enabled() {
-        reply_ephemeral(
-            ctx,
-            command,
-            "Le jeu Coup de Coude est desactive sur ce serveur.",
-        )
-        .await;
-        return;
-    }
 
     let target_id = command
         .data
@@ -83,9 +71,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if !crate::modules::coude::interaction_helper::defer_response(ctx, command).await {
         return;
     }
-
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
 
     let resp = match api
         .resolve_friendly_duel(

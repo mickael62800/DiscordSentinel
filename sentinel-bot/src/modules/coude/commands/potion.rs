@@ -11,11 +11,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::shared::discord_helpers::require_guild_id;
-
 use crate::modules::coude::catalog::CatalogCacheKey;
-use crate::modules::coude::load_guild_config;
-use crate::modules::coude::GameApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("potion")
@@ -33,16 +29,16 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some(guild_id) = require_guild_id(ctx, command).await else {
+    let Some((guild_id, _config, api)) = crate::modules::coude::command_prelude::coude_prelude(
+        ctx,
+        command,
+        |c| c.channel_profil(),
+        false,
+    )
+    .await
+    else {
         return;
     };
-
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil())
-        .await
-    {
-        return;
-    }
 
     // Defer immediat : on enchaine 3 appels API (get_player, has_item,
     // use_item, update_hp). Sans defer, Discord coupe l'interaction
@@ -82,9 +78,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let user_id = command.user.id.to_string();
 
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
-    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
+    let catalog = {
+        let data = ctx.data.read().await;
+        data.get::<CatalogCacheKey>().unwrap().clone()
+    };
 
     if !catalog.is_potion(&potion_key) {
         followup_info(ctx, command, "Cet objet n'est pas une potion utilisable.").await;

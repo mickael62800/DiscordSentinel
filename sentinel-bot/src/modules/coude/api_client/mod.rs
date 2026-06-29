@@ -409,6 +409,7 @@ struct CowardiceResponse {
 // ── API Client ──
 // ══════════════════════════════════════════════════════════════════════
 
+#[derive(Clone)]
 pub struct ApiClient {
     pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
