@@ -271,31 +271,27 @@ fn next_weekly(day_of_week: u8, hour: u8, minute: u8, after: DateTime<Utc>) -> D
 
 fn next_monthly(day_of_month: u8, hour: u8, minute: u8, after: DateTime<Utc>) -> DateTime<Utc> {
     // Construit le candidat dans le mois courant. Si le mois a moins de
-    // jours (ex 31 fevrier), on clampe au dernier jour du mois.
+    // jours que `day_of_month` (ex 31 fevrier), on clampe au dernier jour
+    // du mois courant (28/29) plutot que de sauter au mois suivant.
     let year = after.year();
     let month = after.month();
 
-    if let Some(candidate) = at_year_month_day_hour_minute(year, month, day_of_month, hour, minute)
-    {
+    let day = day_of_month.min(last_day_of_month(year, month));
+    if let Some(candidate) = at_year_month_day_hour_minute(year, month, day, hour, minute) {
         if candidate > after {
             return candidate;
         }
     }
 
-    // Sinon : mois suivant.
+    // Sinon : mois suivant, avec le meme clamp au dernier jour du mois.
     let (next_year, next_month) = if month == 12 {
         (year + 1, 1)
     } else {
         (year, month + 1)
     };
-    at_year_month_day_hour_minute(next_year, next_month, day_of_month, hour, minute)
-        // Si meme le mois suivant n'a pas ce jour, on clampe au dernier jour
-        // (rare : `day_of_month=31` en fevrier suivant -> 28/29).
-        .unwrap_or_else(|| {
-            let last_day = last_day_of_month(next_year, next_month);
-            at_year_month_day_hour_minute(next_year, next_month, last_day, hour, minute)
-                .expect("last_day toujours valide")
-        })
+    let next_day = day_of_month.min(last_day_of_month(next_year, next_month));
+    at_year_month_day_hour_minute(next_year, next_month, next_day, hour, minute)
+        .expect("jour clampe au dernier jour du mois toujours valide")
 }
 
 fn at_hour_minute(date: NaiveDate, hour: u8, minute: u8) -> DateTime<Utc> {

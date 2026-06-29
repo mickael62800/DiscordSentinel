@@ -17,9 +17,10 @@ fn channels_cache_ttl_is_10_minutes() {
 }
 
 #[test]
-fn reset_tables_has_eight_entries() {
-    // Regle metier : reset_member touche exactement 8 tables.
-    assert_eq!(MEMBER_RESET_TABLES.len(), 8);
+fn reset_tables_has_nine_entries() {
+    // Regle metier : reset_member touche exactement 9 tables (6 moderation/
+    // surveillance + activity_log + user_stats + voice_sessions).
+    assert_eq!(MEMBER_RESET_TABLES.len(), 9);
 }
 
 #[test]
