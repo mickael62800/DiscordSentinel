@@ -37,13 +37,23 @@ use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::coude::heist_repository::HeistRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Clé du verrou de cooldown atomique pour le braquage (table
+/// `coude_cooldowns` via `SocialRepository`). Réutilise l'infra anti-TOCTOU
+/// de tout-ou-rien : `try_claim_cooldown` garantit qu'un seul `/braquage`
+/// concurrent remporte le claim, les autres échouent AVANT toute mutation
+/// caisse/wallet (anti double-drain + double-gain #2).
+const HEIST_COOLDOWN_KEY: &str = "heist";
+
 pub struct ManageCoudeHeistService {
     heist_repo: Arc<dyn HeistRepository>,
     cashbox_repo: Arc<dyn CashboxRepository>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     wallet_repo: Arc<dyn WalletRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    social_repo: Arc<dyn SocialRepository>,
     player_repo: Option<Arc<dyn PlayerRepository>>,
 }
 
@@ -54,6 +64,7 @@ impl ManageCoudeHeistService {
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         wallet_repo: Arc<dyn WalletRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
+        social_repo: Arc<dyn SocialRepository>,
     ) -> Self {
         Self {
             heist_repo,
@@ -61,6 +72,7 @@ impl ManageCoudeHeistService {
             inventory_uc,
             wallet_repo,
             bot_config_repo,
+            social_repo,
             player_repo: None,
         }
     }
@@ -190,6 +202,78 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             ));
         }
 
+        // 3.b CLAIM ATOMIQUE du cooldown hebdo AVANT toute mutation
+        //     caisse/wallet (fix #2 — anti double-drain + double-gain). Deux
+        //     `/braquage` concurrents passent tous deux les checks read-only
+        //     ci-dessus (prison, cooldown via last_attempt, caisse non vide),
+        //     mais un seul remporte ce claim ; l'autre échoue ici sans toucher
+        //     à l'argent. Le TTL = fenêtre de cooldown effective, cohérent avec
+        //     `record_attempt` (qui reste la source de vérité persistante lue
+        //     par `get_cooldown_status`).
+        let base_cooldown_days = params_early.heist_cooldown_days.max(1) as i64;
+        let effective_days = self
+            .effective_cooldown_days(guild_id, user_id, base_cooldown_days)
+            .await;
+        let ttl_secs = effective_days.saturating_mul(86_400).max(1);
+        let claimed = self
+            .social_repo
+            .try_claim_cooldown(guild_id, user_id, HEIST_COOLDOWN_KEY, ttl_secs)
+            .await?;
+        if !claimed {
+            return Err(DomainError::Forbidden(format!(
+                "Cooldown {} jours non ecoule.",
+                effective_days
+            )));
+        }
+
+        // À partir d'ici le verrou est posé : tout échec de la section protégée
+        // libère le claim (best-effort) pour ne pas pénaliser un braquage qui
+        // n'a rien payé (mirror tout-ou-rien : release-on-failure).
+        let result = self
+            .run_heist_locked(guild_id, user_id, cashbox.balance, &params_early)
+            .await;
+        if result.is_err() {
+            if let Err(e) = self
+                .social_repo
+                .clear_cooldown(guild_id, user_id, HEIST_COOLDOWN_KEY)
+                .await
+            {
+                tracing::warn!(
+                    error = %e,
+                    guild_id,
+                    user_id,
+                    "Echec liberation cooldown heist apres echec mutation"
+                );
+            }
+        }
+        result
+    }
+}
+
+impl ManageCoudeHeistService {
+    /// Section du braquage exécutée APRÈS l'obtention du verrou de cooldown
+    /// atomique. Toute erreur ici déclenche la libération du claim côté
+    /// `attempt_heist`. `cashbox_total_before` est le solde caisse lu lors du
+    /// check read-only (avant claim), exposé tel quel dans `HeistOutcome`.
+    ///
+    /// # Atomicité caisse ↔ wallet
+    ///
+    /// `cashbox.withdraw` + `wallet.credit` restent deux transactions
+    /// distinctes (le `CashboxRepository` n'expose pas de withdraw in-tx et
+    /// `WalletRepository.credit` n'est pas tx-aware sur le même pool). Le claim
+    /// atomique élimine la **duplication** (double-drain / double-gain), qui
+    /// était le bug de mint/double-spend. Le résidu — withdraw OK puis credit
+    /// KO ⇒ coins retirés de la caisse mais non crédités — est *déflationniste*
+    /// (jamais de mint), borné par l'ordre withdraw→credit et rattrapé par le
+    /// CHECK `coins >= 0`. Une vraie UoW (DbTx partagé withdraw+credit_tx) est
+    /// la suite propre mais hors scope conservateur ici.
+    async fn run_heist_locked(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cashbox_total_before: i64,
+        params_early: &BalanceParams,
+    ) -> Result<HeistOutcome, DomainError> {
         // 4. Lister les outils de braquage actifs dans l'inventaire.
         //    Chaque tool key present (quantity > 0) compte une fois.
         let inventory = self.inventory_uc.list_inventory(guild_id, user_id).await?;
@@ -313,7 +397,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
         Ok(HeistOutcome {
             success,
             chance_percent: chance,
-            cashbox_total_before: cashbox.balance,
+            cashbox_total_before,
             amount_stolen,
             tools_consumed: tools_to_consume,
             prison_released_at,

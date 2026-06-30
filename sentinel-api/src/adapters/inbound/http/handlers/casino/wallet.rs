@@ -9,6 +9,7 @@ use tracing::info;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
@@ -17,6 +18,7 @@ use sentinel_core::domain::entities::casino::wallet::validate_transfer_distinct_
 use sentinel_core::domain::entities::casino::wallet::Wallet;
 use sentinel_core::domain::entities::casino::wallet::WalletTransaction;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 // ── DTOs ──
@@ -43,6 +45,29 @@ pub struct LimitQuery {
     pub limit: Option<i64>,
 }
 
+// ── RBAC ──
+
+/// Gate les endpoints "raw-mint" du wallet (credit/debit/transfer/reset).
+///
+/// Ces endpoints mutent directement `user_wallets` en faisant confiance au
+/// `user_id` fourni dans le path/body — sans gate ils permettent a n'importe
+/// quel caller desktop de frapper ou detruire des coins arbitrairement.
+///
+/// Semantique (mirror `gate_coude_mutation`) :
+/// - rbac absent → pass-through (appel bot/internal qui credite/debite
+///   legitimement via le gameplay, pas de `RoleContext`).
+/// - rbac present → exige `Admin+` sur la guild cible (resolue depuis le
+///   path ou le body selon le handler). Superadmin bypass gere par
+///   `check_role_for_guild`.
+async fn gate_wallet_admin(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    guild_id: &str,
+    label: &'static str,
+) -> Result<(), ApiError> {
+    check_role_for_guild(state, rbac, guild_id, Role::Admin, label).await
+}
+
 // ── Handlers ──
 
 /// GET /api/wallet/{guild_id}/{user_id}
@@ -57,9 +82,17 @@ pub async fn get_wallet(
 /// POST /api/wallet/{guild_id}/{user_id}/credit
 pub async fn credit(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
+    gate_wallet_admin(
+        &state,
+        &rbac,
+        &guild_id,
+        "admin+ requis pour crediter un wallet",
+    )
+    .await?;
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
@@ -92,9 +125,17 @@ pub async fn credit(
 /// POST /api/wallet/{guild_id}/{user_id}/debit
 pub async fn debit(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
+    gate_wallet_admin(
+        &state,
+        &rbac,
+        &guild_id,
+        "admin+ requis pour debiter un wallet",
+    )
+    .await?;
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
@@ -127,9 +168,23 @@ pub async fn debit(
 /// POST /api/wallet/transfer
 pub async fn transfer(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<TransferDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    // Endpoint admin "move coins" : le `from_user_id` est fourni dans le body,
+    // donc un caller desktop pourrait deplacer les coins de N'IMPORTE quel
+    // user. On exige Admin+ sur la guild cible (pas un self-transfer derive du
+    // principal — c'est un outil d'administration, cf. le transfert gameplay
+    // user-to-user qui vit sur /api/coude/{guild}/transfer). Bot interne sans
+    // RoleContext passe (gameplay legitime).
+    gate_wallet_admin(
+        &state,
+        &rbac,
+        dto.guild_id.as_str(),
+        "admin+ requis pour un transfert wallet",
+    )
+    .await?;
     validation::validate_discord_id("from_user_id", &dto.from_user_id).map_err(ApiError)?;
     validation::validate_discord_id("to_user_id", &dto.to_user_id).map_err(ApiError)?;
     validate_positive_amount(dto.amount)
@@ -215,9 +270,17 @@ pub struct ResetWalletDto {
 /// POST /api/wallet/{guild_id}/{user_id}/reset — reset individuel.
 pub async fn reset_wallet(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<Wallet>, ApiError> {
+    gate_wallet_admin(
+        &state,
+        &rbac,
+        &guild_id,
+        "admin+ requis pour reset un wallet",
+    )
+    .await?;
     let (wallet, new_balance) = state
         .wallet_uc
         .reset_wallet(&guild_id, &user_id, dto.new_balance)

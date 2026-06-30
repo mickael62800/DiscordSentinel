@@ -364,6 +364,83 @@ impl BotConfigRepository for MockBotConfig {
     }
 }
 
+// ── MockSocialRepo (verrou de cooldown atomique #2) ──
+
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::Season;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
+
+#[derive(Default)]
+struct MockSocialRepo {
+    /// `true` ⇒ un cooldown actif existe déjà : `try_claim_cooldown` perd.
+    cooldown_active: Mutex<bool>,
+    claim_calls: Mutex<usize>,
+    clear_calls: Mutex<usize>,
+}
+
+#[async_trait]
+impl SocialRepository for MockSocialRepo {
+    async fn get_cooldown(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<chrono::DateTime<Utc>>, DomainError> {
+        Ok(None)
+    }
+    async fn set_cooldown(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn try_claim_cooldown(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<bool, DomainError> {
+        *self.claim_calls.lock().unwrap() += 1;
+        let mut active = self.cooldown_active.lock().unwrap();
+        if *active {
+            return Ok(false);
+        }
+        *active = true;
+        Ok(true)
+    }
+    async fn clear_cooldown(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        *self.clear_calls.lock().unwrap() += 1;
+        *self.cooldown_active.lock().unwrap() = false;
+        Ok(())
+    }
+    async fn leaderboard(
+        &self,
+        _: &str,
+        _: LeaderboardCategory,
+        _: i64,
+    ) -> Result<Vec<LeaderboardEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> {
+        Ok(vec![])
+    }
+    async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn count_daily_chaos_today(&self, _: &str) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+    async fn get_or_bootstrap_current_season(&self, _: &str) -> Result<Season, DomainError> {
+        Ok(Season {
+            season_number: 1,
+            started_at: Utc::now(),
+            ends_at: Utc::now(),
+            days_remaining: 30,
+        })
+    }
+}
+
 // ── Helper builder ──
 
 fn build_service(
@@ -373,7 +450,25 @@ fn build_service(
     wallet: Arc<MockWalletRepo>,
     bot_config: Arc<MockBotConfig>,
 ) -> ManageCoudeHeistService {
-    ManageCoudeHeistService::new(heist, cashbox, inventory, wallet, bot_config)
+    build_service_with_social(
+        heist,
+        cashbox,
+        inventory,
+        wallet,
+        bot_config,
+        Arc::new(MockSocialRepo::default()),
+    )
+}
+
+fn build_service_with_social(
+    heist: Arc<MockHeistRepo>,
+    cashbox: Arc<MockCashboxRepo>,
+    inventory: Arc<MockInventoryUc>,
+    wallet: Arc<MockWalletRepo>,
+    bot_config: Arc<MockBotConfig>,
+    social: Arc<MockSocialRepo>,
+) -> ManageCoudeHeistService {
+    ManageCoudeHeistService::new(heist, cashbox, inventory, wallet, bot_config, social)
 }
 
 fn default_service_parts() -> (
@@ -562,13 +657,15 @@ async fn attempt_heist_failure_sends_to_prison() {
     // determinisme, mais on peut verifier la coherence : si outcome.success
     // est false, alors send_to_prison a ete appele.
     let (h, c, i, w, b) = default_service_parts();
-    let svc = build_service(h.clone(), c, i, w, b);
+    let social = Arc::new(MockSocialRepo::default());
+    let svc = build_service_with_social(h.clone(), c, i, w, b, social.clone());
 
     // On loop jusqu'a avoir un echec (chance de base faible → typiquement
     // 1-3 iterations). On reset entre chaque pour bypass le cooldown.
     let mut saw_failure = false;
     for _ in 0..50 {
         *h.last_attempt.lock().unwrap() = None;
+        *social.cooldown_active.lock().unwrap() = false;
         h.record_calls.lock().unwrap().clear();
         h.prison_calls.lock().unwrap().clear();
         let out = svc.attempt_heist("g", "u").await.unwrap();
@@ -600,11 +697,13 @@ async fn attempt_heist_success_withdraws_and_credits() {
             quantity: 10,
         });
     }
-    let svc = build_service(h.clone(), c.clone(), i, w.clone(), b);
+    let social = Arc::new(MockSocialRepo::default());
+    let svc = build_service_with_social(h.clone(), c.clone(), i, w.clone(), b, social.clone());
 
     let mut saw_success = false;
     for _ in 0..50 {
         *h.last_attempt.lock().unwrap() = None;
+        *social.cooldown_active.lock().unwrap() = false;
         *c.balance.lock().unwrap() = 1_000_000;
         h.record_calls.lock().unwrap().clear();
         c.withdraw_calls.lock().unwrap().clear();
@@ -628,6 +727,40 @@ async fn attempt_heist_success_withdraws_and_credits() {
         saw_success,
         "devrait voir au moins un succes en 50 iterations avec tous les outils"
     );
+}
+
+#[tokio::test]
+async fn attempt_heist_second_concurrent_claim_aborts_without_money() {
+    // #2 — Deux braquages passent les checks read-only mais un cooldown actif
+    // (claim déjà posé) bloque le second AVANT toute mutation caisse/wallet.
+    let (h, c, i, w, b) = default_service_parts();
+    let social = Arc::new(MockSocialRepo::default());
+    // Simule un claim déjà détenu par un appel concurrent.
+    *social.cooldown_active.lock().unwrap() = true;
+    *c.balance.lock().unwrap() = 1_000_000;
+
+    let svc = build_service_with_social(h, c.clone(), i, w.clone(), b, social.clone());
+    let err = svc
+        .attempt_heist("g", "u")
+        .await
+        .expect_err("le claim perdu doit abort");
+    assert!(matches!(err, DomainError::Forbidden(_)));
+    // Aucune mutation argent : pas de withdraw, pas de credit.
+    assert!(c.withdraw_calls.lock().unwrap().is_empty());
+    assert!(w.credit_calls.lock().unwrap().is_empty());
+    // Le claim perdu ne doit PAS déclencher de release (rien à libérer).
+    assert_eq!(*social.clear_calls.lock().unwrap(), 0);
+}
+
+#[tokio::test]
+async fn attempt_heist_claims_cooldown_before_resolving() {
+    // Un braquage réussi doit avoir posé le claim atomique exactement une fois.
+    let (h, c, i, w, b) = default_service_parts();
+    let social = Arc::new(MockSocialRepo::default());
+    *c.balance.lock().unwrap() = 1_000_000;
+    let svc = build_service_with_social(h, c, i, w, b, social.clone());
+    let _ = svc.attempt_heist("g", "u").await.unwrap();
+    assert_eq!(*social.claim_calls.lock().unwrap(), 1);
 }
 
 #[tokio::test]

@@ -226,9 +226,15 @@ impl BlackjackService {
         self.ensure_playing(&game)?;
 
         self.dealer_play(&mut game);
-        let taunt_events = self.resolve_game(&mut game).await?;
+        // Résolution PURE (status/payout en mémoire, pas de crédit).
+        self.apply_resolution(&mut game);
 
+        // Compare-and-set : seul l'appel qui flippe `playing -> terminé`
+        // gagne. Un `stand` concurrent reçoit Conflict ICI et ne crédite
+        // jamais (anti double-payout #4). Le crédit vient APRÈS l'update.
         self.repo.update(&game).await?;
+        let taunt_events = self.credit_payout(&game).await?;
+
         let wallet_balance = self
             .wallet_uc
             .get_balance(&game.guild_id, &game.user_id)
@@ -252,21 +258,23 @@ impl BlackjackService {
             ));
         }
 
-        let mut taunt_events: Vec<TauntEvent> = Vec::new();
+        // Mise supplémentaire à débiter (= mise initiale, avant doublement).
+        let extra_bet = game.bet;
 
-        // Débiter la mise supplémentaire via wallet_uc.
-        let debit_mut = self
+        // Pré-check best-effort du solde : évite de consommer la partie sur un
+        // solde insuffisant. Le débit réel post-CAS reste la garantie dure
+        // (validation wallet_uc.debit + CHECK coins>=0 en DB).
+        let balance = self
             .wallet_uc
-            .debit(
-                &game.guild_id,
-                &game.user_id,
-                game.bet,
-                "blackjack",
-                "Double down blackjack",
-            )
+            .get_balance(&game.guild_id, &game.user_id)
             .await?;
-        taunt_events.extend(debit_mut.triggered_taunts);
+        if balance < extra_bet {
+            return Err(DomainError::ValidationError(
+                "Solde insuffisant pour doubler.".into(),
+            ));
+        }
 
+        // Construire l'état final EN MÉMOIRE — aucune mutation wallet ici.
         game.bet = game.bet.saturating_mul(2);
         game.doubled = true;
 
@@ -284,13 +292,34 @@ impl BlackjackService {
             game.finished_at = Some(Utc::now());
             game.dealer_score = calculate_score(&game.dealer_hand);
         } else {
-            // Le dealer joue
+            // Le dealer joue, puis résolution PURE (pas de crédit).
             self.dealer_play(&mut game);
-            let resolve_taunts = self.resolve_game(&mut game).await?;
-            taunt_events.extend(resolve_taunts);
+            self.apply_resolution(&mut game);
         }
 
+        // Compare-and-set : claim de la transition `playing -> terminé` AVANT
+        // toute mutation wallet. Un double_down concurrent reçoit Conflict ICI
+        // et ne débite/crédite jamais (anti double-débit + double-payout #4).
         self.repo.update(&game).await?;
+
+        // Transition remportée : débiter la mise supplémentaire PUIS créditer
+        // le payout. La partie ne peut plus repasser 'playing', donc aucun
+        // autre appel ne rejouera ces mutations.
+        let mut taunt_events: Vec<TauntEvent> = Vec::new();
+        let debit_mut = self
+            .wallet_uc
+            .debit(
+                &game.guild_id,
+                &game.user_id,
+                extra_bet,
+                "blackjack",
+                "Double down blackjack",
+            )
+            .await?;
+        taunt_events.extend(debit_mut.triggered_taunts);
+        let credit_taunts = self.credit_payout(&game).await?;
+        taunt_events.extend(credit_taunts);
+
         let wallet_balance = self
             .wallet_uc
             .get_balance(&game.guild_id, &game.user_id)
@@ -364,8 +393,11 @@ impl BlackjackService {
     }
 
     /// Résout la partie après que le dealer ait joué : détermine le statut
-    /// et crédite le wallet via wallet_uc. Retourne les TauntEvent eventuels.
-    async fn resolve_game(&self, game: &mut BlackjackGame) -> Result<Vec<TauntEvent>, DomainError> {
+    /// et le payout **en mémoire uniquement** (règle pure, AUCUNE mutation
+    /// wallet). Le crédit est fait séparément par `credit_payout`, APRÈS que
+    /// la transition d'état ait été remportée (compare-and-set repo.update),
+    /// pour éviter le double-payout sur deux actions concurrentes (#4).
+    fn apply_resolution(&self, game: &mut BlackjackGame) {
         game.finished_at = Some(Utc::now());
 
         if game.dealer_score > 21 {
@@ -382,29 +414,35 @@ impl BlackjackService {
             game.status = "push".to_string();
             game.payout = game.bet;
         }
+    }
 
-        // Créditer le wallet si gain ou push (via wallet_uc -> jackpot auto).
-        if game.payout > 0 {
-            let description = match game.status.as_str() {
-                "dealer_bust" => "Victoire blackjack (dealer bust)",
-                "player_win" => "Victoire blackjack",
-                "push" => "Égalité blackjack (mise remboursée)",
-                _ => "Gain blackjack",
-            };
-            let credit_mut = self
-                .wallet_uc
-                .credit(
-                    &game.guild_id,
-                    &game.user_id,
-                    game.payout,
-                    "blackjack",
-                    description,
-                )
-                .await?;
-            return Ok(credit_mut.triggered_taunts);
+    /// Crédite le wallet pour un payout déjà calculé et déjà persisté (le
+    /// `repo.update` guardé a réussi, donc CET appel est le seul à avoir
+    /// remporté la transition `playing -> terminé`). À n'appeler QU'APRÈS un
+    /// `repo.update` réussi : si l'update retourne Conflict (0 rows), un autre
+    /// appel concurrent a déjà résolu la partie et crédité — ne PAS recréditer.
+    async fn credit_payout(&self, game: &BlackjackGame) -> Result<Vec<TauntEvent>, DomainError> {
+        if game.payout <= 0 {
+            return Ok(vec![]);
         }
-
-        Ok(vec![])
+        let description = match game.status.as_str() {
+            "dealer_bust" => "Victoire blackjack (dealer bust)",
+            "player_win" => "Victoire blackjack",
+            "push" => "Égalité blackjack (mise remboursée)",
+            "player_blackjack" => "Blackjack ! Gain x2.5",
+            _ => "Gain blackjack",
+        };
+        let credit_mut = self
+            .wallet_uc
+            .credit(
+                &game.guild_id,
+                &game.user_id,
+                game.payout,
+                "blackjack",
+                description,
+            )
+            .await?;
+        Ok(credit_mut.triggered_taunts)
     }
 }
 

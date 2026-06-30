@@ -557,6 +557,7 @@ pub async fn build_app_state(
             coude_inventory_uc.clone(),
             wallet_repo.clone(),
             bot_config_repo.clone(),
+            coude_social_repo.clone(),
         )
         .with_player_repo(coude_player_repo.clone()),
     );

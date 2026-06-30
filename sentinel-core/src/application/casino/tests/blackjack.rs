@@ -300,6 +300,152 @@ async fn start_game_bubbles_insufficient_funds_error() {
     }
 }
 
+// ── #4 : la transition d'état (compare-and-set) précède le crédit ──
+
+use crate::domain::entities::casino::blackjack::Card;
+
+fn card(rank: &str) -> Card {
+    Card {
+        rank: rank.into(),
+        suit: "spades".into(),
+    }
+}
+
+/// Repo stateful qui simule le guard SQL `WHERE status='playing'` : `update`
+/// ne réussit que si la partie stockée est encore en cours, sinon Conflict.
+/// Reproduit fidèlement le compare-and-set du `PgBlackjackRepository`.
+struct StatefulBjRepo {
+    game: Mutex<BlackjackGame>,
+}
+#[async_trait]
+impl BlackjackRepository for StatefulBjRepo {
+    async fn create(&self, _: &BlackjackGame) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_active(&self, _: &str, _: &str) -> Result<Option<BlackjackGame>, DomainError> {
+        Ok(None)
+    }
+    async fn update(&self, game: &BlackjackGame) -> Result<(), DomainError> {
+        let mut stored = self.game.lock().unwrap();
+        if stored.status != "playing" {
+            return Err(DomainError::Conflict(
+                "Partie deja terminee ou action concurrente".into(),
+            ));
+        }
+        *stored = game.clone();
+        Ok(())
+    }
+    async fn get_by_id(&self, _: Uuid) -> Result<Option<BlackjackGame>, DomainError> {
+        Ok(Some(self.game.lock().unwrap().clone()))
+    }
+    async fn list_by_guild(
+        &self,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<Vec<BlackjackGame>, DomainError> {
+        Ok(vec![])
+    }
+    async fn cancel_game(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+fn winning_playing_game() -> BlackjackGame {
+    // Joueur 20, croupier 17, deck vide -> à `stand`, le croupier reste,
+    // player_win, payout = bet*2 > 0 (donc un crédit est attendu).
+    BlackjackGame {
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "x".into(),
+        bet: 50,
+        player_hand: vec![card("King"), card("Queen")],
+        dealer_hand: vec![card("10"), card("7")],
+        deck: vec![],
+        status: "playing".into(),
+        player_score: 20,
+        dealer_score: 17,
+        doubled: false,
+        payout: 0,
+        created_at: Utc::now(),
+        finished_at: None,
+    }
+}
+
+fn build_svc_with_repo(
+    repo: Arc<StatefulBjRepo>,
+    wallet_uc: Arc<MockWalletUc>,
+) -> BlackjackService {
+    BlackjackService::new(repo, Arc::new(FakeWalletRepo), wallet_uc)
+}
+
+#[tokio::test]
+async fn stand_resubmitted_on_resolved_game_does_not_recredit() {
+    let repo = Arc::new(StatefulBjRepo {
+        game: Mutex::new(winning_playing_game()),
+    });
+    let mock = Arc::new(MockWalletUc {
+        debit_taunts: vec![],
+        credit_taunts: vec![],
+        debit_should_fail: false,
+        calls: Mutex::new(vec![]),
+    });
+    let svc = build_svc_with_repo(repo.clone(), mock.clone());
+    let id = repo.game.lock().unwrap().id;
+
+    // 1er stand : remporte la transition, crédite une fois.
+    svc.stand(id).await.expect("1er stand ok");
+    // 2e stand (rejeu) : la partie n'est plus 'playing' -> Conflict, AUCUN
+    // crédit supplémentaire.
+    let err = svc.stand(id).await.expect_err("2e stand doit Conflict");
+    assert!(matches!(err, DomainError::Conflict(_)));
+
+    let credits = mock
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|c| *c == "credit")
+        .count();
+    assert_eq!(
+        credits, 1,
+        "le payout ne doit etre credite qu'une seule fois"
+    );
+}
+
+#[tokio::test]
+async fn concurrent_stands_pay_once() {
+    let repo = Arc::new(StatefulBjRepo {
+        game: Mutex::new(winning_playing_game()),
+    });
+    let mock = Arc::new(MockWalletUc {
+        debit_taunts: vec![],
+        credit_taunts: vec![],
+        debit_should_fail: false,
+        calls: Mutex::new(vec![]),
+    });
+    let svc = Arc::new(build_svc_with_repo(repo.clone(), mock.clone()));
+    let id = repo.game.lock().unwrap().id;
+
+    // Deux stands "concurrents" : un seul remporte le compare-and-set.
+    let s1 = svc.clone();
+    let s2 = svc.clone();
+    let (r1, r2) = tokio::join!(async move { s1.stand(id).await }, async move {
+        s2.stand(id).await
+    },);
+
+    let ok = [r1.is_ok(), r2.is_ok()].iter().filter(|x| **x).count();
+    assert_eq!(ok, 1, "un seul stand doit réussir");
+    let credits = mock
+        .calls
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|c| *c == "credit")
+        .count();
+    assert_eq!(credits, 1, "un seul crédit malgré deux stands concurrents");
+}
+
 #[tokio::test]
 async fn start_game_validates_min_max_bet_before_debit() {
     let mock = Arc::new(MockWalletUc {
