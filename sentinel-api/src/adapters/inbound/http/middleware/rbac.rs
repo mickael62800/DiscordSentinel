@@ -368,6 +368,24 @@ pub(crate) async fn lookup_role(
     user_id: &str,
     guild_id: &str,
 ) -> Result<Role, String> {
+    Ok(lookup_role_row(state, user_id, guild_id)
+        .await?
+        .unwrap_or(Role::Viewer))
+}
+
+/// Variante de `lookup_role` qui distingue l'ABSENCE de row (`None`) du
+/// fallback `Viewer`. Indispensable pour les endpoints dont le `guild_id`
+/// n'est PAS dans le path (donc `guild_auth_middleware` n'a pas valide
+/// l'appartenance) : un `None` signifie que le caller n'a AUCUN role sur la
+/// guild => on doit refuser (403) plutot que lui donner un acces Viewer
+/// implicite a une guild dont il n'est pas membre (cross-guild deanon).
+///
+/// Fail-safe : l'`Err` reste reserve aux VRAIES erreurs DB.
+pub(crate) async fn lookup_role_row(
+    state: &AppState,
+    user_id: &str,
+    guild_id: &str,
+) -> Result<Option<Role>, String> {
     let row: Option<(String,)> = sqlx::query_as(
         "SELECT role FROM api_user_guilds \
          WHERE discord_user_id = $1 AND guild_id = $2",
@@ -379,12 +397,10 @@ pub(crate) async fn lookup_role(
     .map_err(|e| format!("lookup role: {e}"))?;
 
     match row {
-        Some((role_str,)) => {
-            Role::from_str(&role_str).ok_or_else(|| format!("role DB invalide: {role_str}"))
-        }
-        // Fallback : si pas de row mais user dans la guild (guild_auth l'a deja valide),
-        // on lui donne viewer par defaut. Principe du moindre privilege.
-        None => Ok(Role::Viewer),
+        Some((role_str,)) => Role::from_str(&role_str)
+            .map(Some)
+            .ok_or_else(|| format!("role DB invalide: {role_str}")),
+        None => Ok(None),
     }
 }
 

@@ -473,6 +473,16 @@ impl ConfessionRepository for PgConfessionRepository {
         Ok(rows.into_iter().map(ConfessionReport::from).collect())
     }
 
+    async fn get_report(&self, id: Uuid) -> Result<Option<ConfessionReport>, DomainError> {
+        let q = format!("{} WHERE id = $1", SELECT_REPORT);
+        let row = sqlx::query_as::<_, ReportRow>(&q)
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(row.map(ConfessionReport::from))
+    }
+
     async fn resolve_report(
         &self,
         id: Uuid,

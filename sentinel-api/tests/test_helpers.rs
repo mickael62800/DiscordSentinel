@@ -634,11 +634,17 @@ impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessi
     > {
         unimplemented!()
     }
+    async fn get_reply_parent_guild(&self, _: uuid::Uuid) -> Result<String, DomainError> {
+        unimplemented!()
+    }
     async fn create_report(
         &self,
         _: sentinel_api::ports::inbound::community::manage_confessions::CreateReportCommand,
     ) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReport, DomainError>
     {
+        unimplemented!()
+    }
+    async fn get_report_guild(&self, _: uuid::Uuid) -> Result<String, DomainError> {
         unimplemented!()
     }
     async fn list_reports(

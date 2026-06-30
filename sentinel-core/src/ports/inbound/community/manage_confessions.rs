@@ -87,6 +87,10 @@ pub trait ManageConfessionsUseCase: Send + Sync {
     ) -> Result<ConfessionReply, DomainError>;
     async fn list_replies(&self, confession_id: Uuid) -> Result<Vec<ConfessionReply>, DomainError>;
 
+    /// Resout le `guild_id` de la confession parente d'une reply. Sert au
+    /// gating RBAC web (le path `/replies/{id}` n'a pas de guild_id).
+    async fn get_reply_parent_guild(&self, reply_id: Uuid) -> Result<String, DomainError>;
+
     // ── Reports ────────────────────────────────────────────────────────
 
     async fn create_report(
@@ -99,6 +103,9 @@ pub trait ManageConfessionsUseCase: Send + Sync {
         status: Option<ReportStatus>,
         limit: i64,
     ) -> Result<Vec<ConfessionReport>, DomainError>;
+    /// Resout le `guild_id` d'un signalement. Sert au gating RBAC web (le path
+    /// `/reports/{id}/resolve` n'a pas de guild_id).
+    async fn get_report_guild(&self, report_id: Uuid) -> Result<String, DomainError>;
     async fn resolve_report(
         &self,
         id: Uuid,

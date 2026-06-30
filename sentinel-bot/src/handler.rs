@@ -517,7 +517,9 @@ impl EventHandler for Handler {
                         | "template" | "transcript" | "export" | "massmute" | "massban" => {
                             modules::moderation::handle_command(&ctx, &command).await
                         }
-                        "ticket" | "ticket-admin" => modules::tickets::handle_command(&ctx, &command).await,
+                        "ticket" | "ticket-admin" => {
+                            modules::tickets::handle_command(&ctx, &command).await
+                        }
                         "confess" | "confess-admin" => {
                             modules::confessions::handle_command(&ctx, &command).await
                         }

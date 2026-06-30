@@ -80,7 +80,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
                 CreateCommandOption::new(
                     CommandOptionType::SubCommand,
                     "reveal",
-                    "Revele l'auteur d'une confession (owner only)",
+                    "Revele l'auteur d'une confession (gestion du serveur requise)",
                 )
                 .add_sub_option(
                     CreateCommandOption::new(
@@ -200,7 +200,9 @@ async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
                     "max_per_day": 20,
                     "min_chars": 5,
                     "max_chars": 2000,
-                    "automod_enabled": true,
+                    // C1 : `automod_enabled` retire du payload (aucun filtre de
+                    // mots n'existe). Le champ DTO reste optionnel pour
+                    // back-compat ; on ne le surface plus depuis le bot.
                     "banned_user_ids": Vec::<String>::new(),
                 });
                 let _: Result<serde_json::Value, _> =

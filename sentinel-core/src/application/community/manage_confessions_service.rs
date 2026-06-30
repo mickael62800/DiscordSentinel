@@ -266,6 +266,20 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         self.repo.list_replies(confession_id).await
     }
 
+    async fn get_reply_parent_guild(&self, reply_id: Uuid) -> Result<String, DomainError> {
+        let reply = self
+            .repo
+            .get_reply(reply_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!("Reply {} introuvable", reply_id)))?;
+        let conf = self
+            .repo
+            .get_confession(reply.confession_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("Confession parente introuvable".into()))?;
+        Ok(conf.guild_id)
+    }
+
     async fn create_report(
         &self,
         cmd: CreateReportCommand,
@@ -301,6 +315,14 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
         limit: i64,
     ) -> Result<Vec<ConfessionReport>, DomainError> {
         self.repo.list_reports(guild_id, status, limit).await
+    }
+
+    async fn get_report_guild(&self, report_id: Uuid) -> Result<String, DomainError> {
+        let report =
+            self.repo.get_report(report_id).await?.ok_or_else(|| {
+                DomainError::NotFound(format!("Report {} introuvable", report_id))
+            })?;
+        Ok(report.guild_id)
     }
 
     async fn resolve_report(

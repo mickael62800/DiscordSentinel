@@ -75,6 +75,10 @@ pub struct SaveConfigDto {
     pub max_per_day: i32,
     pub min_chars: i32,
     pub max_chars: i32,
+    /// C1 : flag mort (aucun filtre de mots n'existe). Conserve pour
+    /// back-compat mais plus surface ; `#[serde(default)]` => le bot peut
+    /// l'omettre du body.
+    #[serde(default)]
     pub automod_enabled: bool,
     #[serde(default)]
     pub banned_user_ids: Vec<String>,

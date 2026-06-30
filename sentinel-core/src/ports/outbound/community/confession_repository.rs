@@ -63,6 +63,7 @@ pub trait ConfessionRepository: Send + Sync {
     // ── Reports ────────────────────────────────────────────────────────
 
     async fn create_report(&self, r: &ConfessionReport) -> Result<(), DomainError>;
+    async fn get_report(&self, id: Uuid) -> Result<Option<ConfessionReport>, DomainError>;
     async fn list_reports(
         &self,
         guild_id: &str,
