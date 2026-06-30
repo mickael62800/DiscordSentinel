@@ -500,7 +500,11 @@ pub fn start(
         let redis = redis_client.clone();
         spawn_periodic(
             "resolve_tournament",
-            21_600, // 6h fixe (comme l'ancien scheduler)
+            // Tick horaire : le job n'agit que dans la fenetre dimanche >= 23h
+            // UTC (gate dans resolve_tournament::run). Un intervalle <= 1h
+            // garantit qu'un tick tombe toujours dans l'heure 23h, peu importe
+            // l'heure de demarrage du worker. Idempotent via UNIQUE(guild,week).
+            3_600,
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),

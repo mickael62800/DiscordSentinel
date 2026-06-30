@@ -403,7 +403,10 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     }
 
     if ticket_id != "???" {
-        let new_topic = format!("[ticket:{}] {} — {}", ticket_id, type_label, author.name);
+        let new_topic = format!(
+            "[ticket:{}] [author:{}] {} — {}",
+            ticket_id, author.id, type_label, author.name
+        );
         if let Err(e) = channel
             .edit(&ctx.http, EditChannel::new().topic(&new_topic))
             .await

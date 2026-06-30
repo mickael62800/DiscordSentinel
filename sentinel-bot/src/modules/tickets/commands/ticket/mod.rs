@@ -56,7 +56,15 @@ fn register_admin() -> CreateCommand {
 
 /// Dispatch la slash command vers la bonne sous-commande.
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let sub = &command.data.options[0];
+    let sub = match command.data.options.first() {
+        Some(sub) => sub,
+        None => {
+            if let Err(e) = reply(ctx, command, "Sous-commande manquante.").await {
+                error!(error = %e, "Erreur commande ticket");
+            }
+            return;
+        }
+    };
     let top = command.data.name.as_str();
     let result = match (top, sub.name.as_str()) {
         ("ticket", "close") => handle_close(ctx, command).await,
@@ -134,7 +142,13 @@ async fn handle_close(ctx: &Context, command: &CommandInteraction) -> Result<(),
                 .and_then(|c| c.guild())
                 .and_then(|c| c.topic)
                 .unwrap_or_default();
-            let is_author = topic.contains(&command.user.id.to_string());
+            // Les tickets recents stockent l'id de l'auteur via le marqueur
+            // `[author:<id>]`. On le compare en priorite ; a defaut (tickets
+            // crees avant l'ajout du marqueur), on retombe sur l'ancien
+            // comportement (recherche de l'id en sous-chaine).
+            let author_marker = format!("[author:{}]", command.user.id);
+            let is_author =
+                topic.contains(&author_marker) || topic.contains(&command.user.id.to_string());
             if !is_author {
                 return reply(
                     ctx,

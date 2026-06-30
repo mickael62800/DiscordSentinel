@@ -25,19 +25,41 @@ pub(super) async fn handle_approve(ctx: &Context, component: &ComponentInteracti
     };
 
     if let Some(guild_id) = component.guild_id {
-        if let Ok(member) = guild_id.member(&ctx.http, component.user.id).await {
-            #[allow(deprecated)]
-            if let Ok(perms) = member.permissions(&ctx.cache) {
-                if !perms.moderate_members() {
-                    let response = CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .content("Tu n'as pas la permission d'approuver des actions.")
-                            .ephemeral(true),
-                    );
-                    let _ = component.create_response(&ctx.http, response).await;
-                    return;
-                }
+        // Fail-closed : si le membre ou ses permissions ne peuvent pas etre
+        // resolus (cache miss), on refuse au lieu de laisser passer.
+        let member = match guild_id.member(&ctx.http, component.user.id).await {
+            Ok(m) => m,
+            Err(_) => {
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Permissions indisponibles, reessaie.")
+                        .ephemeral(true),
+                );
+                let _ = component.create_response(&ctx.http, response).await;
+                return;
             }
+        };
+        #[allow(deprecated)]
+        let perms = match member.permissions(&ctx.cache) {
+            Ok(p) => p,
+            Err(_) => {
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Permissions indisponibles, reessaie.")
+                        .ephemeral(true),
+                );
+                let _ = component.create_response(&ctx.http, response).await;
+                return;
+            }
+        };
+        if !perms.moderate_members() {
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Tu n'as pas la permission d'approuver des actions.")
+                    .ephemeral(true),
+            );
+            let _ = component.create_response(&ctx.http, response).await;
+            return;
         }
     }
 
@@ -101,6 +123,17 @@ pub(super) async fn handle_approve(ctx: &Context, component: &ComponentInteracti
         }
         Err(e) => {
             error!(error = %e, "Erreur execution action approuvee");
+            // Le log a echoue : on remet l'action en attente pour permettre
+            // une nouvelle tentative, et on previent le moderateur.
+            pending_actions.insert(pending_id.clone(), pending);
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Echec de l'execution de l'action, reessaie.")
+                    .ephemeral(true),
+            );
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send approve failure response");
+            }
         }
     }
 }

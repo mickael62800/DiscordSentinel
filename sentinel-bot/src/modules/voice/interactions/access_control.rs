@@ -57,90 +57,110 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    let target_id = selected_users[0];
+    let mut invited: Vec<UserId> = Vec::new();
+    let mut failed: Vec<UserId> = Vec::new();
 
-    let overwrite = serenity::model::channel::PermissionOverwrite {
-        allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
-        deny: Permissions::empty(),
-        kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
-    };
-    if let Err(e) = voice_channel_id
-        .create_permission(&ctx.http, overwrite)
-        .await
-    {
-        error!(error = %e, "Erreur permission invite");
-        super::respond_followup_ephemeral(ctx, component, "❌ Impossible d'inviter ce membre (le bot manque peut-etre la permission de gerer ce salon).").await;
-        return;
-    }
+    for target_id in &selected_users {
+        let target_id = *target_id;
 
-    if let Some(ref text_id_str) = ch.text_channel_id {
-        if let Ok(text_id) = text_id_str.parse::<u64>() {
-            let text_overwrite = serenity::model::channel::PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL
-                    | Permissions::SEND_MESSAGES
-                    | Permissions::READ_MESSAGE_HISTORY,
-                deny: Permissions::empty(),
-                kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
-            };
-            if let Err(e) = ChannelId::new(text_id)
-                .create_permission(&ctx.http, text_overwrite)
-                .await
-            {
-                tracing::warn!(error = %e, "failed to grant invite permission on text channel");
-            }
-        }
-    }
-
-    if let Some(ref members_id_str) = ch.members_channel_id {
-        if let Ok(members_id) = members_id_str.parse::<u64>() {
-            let members_overwrite = serenity::model::channel::PermissionOverwrite {
-                allow: Permissions::VIEW_CHANNEL
-                    | Permissions::SEND_MESSAGES
-                    | Permissions::READ_MESSAGE_HISTORY,
-                deny: Permissions::empty(),
-                kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
-            };
-            if let Err(e) = ChannelId::new(members_id)
-                .create_permission(&ctx.http, members_overwrite)
-                .await
-            {
-                tracing::warn!(error = %e, "failed to grant invite permission on members channel");
-            }
-        }
-    }
-
-    let target_name = target_id
-        .to_user(&ctx.http)
-        .await
-        .map(|u| u.name.clone())
-        .unwrap_or_else(|_| target_id.get().to_string());
-
-    let request = AddWhitelistRequest {
-        guild_id: guild_id.get().to_string(),
-        owner_id: ch.owner_id.clone(),
-        target_id: target_id.get().to_string(),
-        target_name: target_name.clone(),
-    };
-
-    {
-        let data = ctx.data.read().await;
-        let Some(api) = ApiClient::from_data(&data) else {
-            error!("ApiClient ou GrpcClient manquants dans TypeMap");
-            return;
+        let overwrite = serenity::model::channel::PermissionOverwrite {
+            allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+            deny: Permissions::empty(),
+            kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
         };
-        if let Err(e) = api.add_to_whitelist(&request).await {
-            warn!(error = %e, "Erreur API whitelist");
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
+            error!(error = %e, target = %target_id, "Erreur permission invite");
+            failed.push(target_id);
+            continue;
         }
+
+        if let Some(ref text_id_str) = ch.text_channel_id {
+            if let Ok(text_id) = text_id_str.parse::<u64>() {
+                let text_overwrite = serenity::model::channel::PermissionOverwrite {
+                    allow: Permissions::VIEW_CHANNEL
+                        | Permissions::SEND_MESSAGES
+                        | Permissions::READ_MESSAGE_HISTORY,
+                    deny: Permissions::empty(),
+                    kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
+                };
+                if let Err(e) = ChannelId::new(text_id)
+                    .create_permission(&ctx.http, text_overwrite)
+                    .await
+                {
+                    tracing::warn!(error = %e, "failed to grant invite permission on text channel");
+                }
+            }
+        }
+
+        if let Some(ref members_id_str) = ch.members_channel_id {
+            if let Ok(members_id) = members_id_str.parse::<u64>() {
+                let members_overwrite = serenity::model::channel::PermissionOverwrite {
+                    allow: Permissions::VIEW_CHANNEL
+                        | Permissions::SEND_MESSAGES
+                        | Permissions::READ_MESSAGE_HISTORY,
+                    deny: Permissions::empty(),
+                    kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
+                };
+                if let Err(e) = ChannelId::new(members_id)
+                    .create_permission(&ctx.http, members_overwrite)
+                    .await
+                {
+                    tracing::warn!(error = %e, "failed to grant invite permission on members channel");
+                }
+            }
+        }
+
+        let target_name = target_id
+            .to_user(&ctx.http)
+            .await
+            .map(|u| u.name.clone())
+            .unwrap_or_else(|_| target_id.get().to_string());
+
+        let request = AddWhitelistRequest {
+            guild_id: guild_id.get().to_string(),
+            owner_id: ch.owner_id.clone(),
+            target_id: target_id.get().to_string(),
+            target_name: target_name.clone(),
+        };
+
+        {
+            let data = ctx.data.read().await;
+            let Some(api) = ApiClient::from_data(&data) else {
+                error!("ApiClient ou GrpcClient manquants dans TypeMap");
+                return;
+            };
+            if let Err(e) = api.add_to_whitelist(&request).await {
+                warn!(error = %e, "Erreur API whitelist");
+            }
+        }
+
+        invited.push(target_id);
+        info!(voice = %voice_channel_id, target = %target_id, "Utilisateur invite");
     }
 
-    super::respond_followup_ephemeral(
-        ctx,
-        component,
-        &format!("<@{target_id}> a ete invite dans le salon."),
-    )
-    .await;
+    let mut message = if invited.is_empty() {
+        "❌ Aucun membre n'a pu etre invite (le bot manque peut-etre la permission de gerer ce salon).".to_string()
+    } else {
+        let mentions = invited
+            .iter()
+            .map(|id| format!("<@{id}>"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("{mentions} a ete invite dans le salon.")
+    };
+    if !failed.is_empty() && !invited.is_empty() {
+        let mentions = failed
+            .iter()
+            .map(|id| format!("<@{id}>"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        message.push_str(&format!("\n⚠️ Echec pour : {mentions}."));
+    }
 
-    info!(voice = %voice_channel_id, target = %target_id, "Utilisateur invite");
+    super::respond_followup_ephemeral(ctx, component, &message).await;
 }
 
 // ── Kick ──

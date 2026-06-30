@@ -176,7 +176,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let mut buttons = Vec::new();
 
     for (i, w) in warns.iter().enumerate() {
-        let date = &w.created_at[..10];
+        let date = &w.created_at[..10.min(w.created_at.len())];
         let gravity = w.gravity.as_deref().unwrap_or("?");
         let reason_short: String = w.reason.chars().take(50).collect();
 
@@ -268,7 +268,7 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
                 .title("✅ Avertissement retire")
                 .description(format!(
                     "Warn `{}` supprime par **{}**.",
-                    &action_id[..8],
+                    &action_id[..8.min(action_id.len())],
                     component.user.name
                 ))
                 .color(0x2ecc71);

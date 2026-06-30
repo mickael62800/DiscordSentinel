@@ -51,8 +51,8 @@ pub async fn is_staff_member(
 }
 
 pub fn get_sub_options(command: &CommandInteraction) -> &[CommandDataOption] {
-    match &command.data.options[0].value {
-        CommandDataOptionValue::SubCommand(opts) => opts,
+    match command.data.options.first().map(|o| &o.value) {
+        Some(CommandDataOptionValue::SubCommand(opts)) => opts,
         _ => &[],
     }
 }
