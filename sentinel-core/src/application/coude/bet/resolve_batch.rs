@@ -200,37 +200,19 @@ impl ResolveBettingBatchService {
                 .ok();
 
             // Explosion : les 2 joueurs perdent explosion_loss chacun.
-            // BUG critique fix : les erreurs etaient warn-only, masquant des
-            // pertes/credits manques. On passe en error! avec event_type=
-            // "combat.wallet_inconsistency" pour visibilite dans Logs systeme.
+            // BUG critique fix (atomicite) : les deux debits sont appliques dans
+            // la MEME transaction via debit_pair_atomic — soit les deux sont
+            // commits, soit aucun. Avant, deux debits independants pouvaient
+            // detruire des pieces de maniere asymetrique si le second echouait.
+            // Chaque debit est clampe au solde (pas d'echec si insuffisant).
+            // error! avec event_type="combat.wallet_inconsistency" pour visibilite.
             if explosion_loss > 0 {
                 let desc = format!("Explosion combat {}", combat.id);
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(
+                    .debit_pair_atomic(
                         &combat.guild_id,
                         &combat.attacker_id,
-                        explosion_loss,
-                        "coude_combat_explosion",
-                        &desc,
-                    )
-                    .await
-                {
-                    tracing::error!(
-                        event_type = "combat.wallet_inconsistency",
-                        combat_id = %combat.id,
-                        guild_id = %combat.guild_id,
-                        user_id = %combat.attacker_id,
-                        op = "debit_explosion_attacker",
-                        amount = explosion_loss,
-                        error = %e,
-                        "Echec debit attacker explosion : combat marque resolu mais joueur n'a pas perdu de pieces"
-                    );
-                }
-                if let Err(e) = self
-                    .wallet_repo
-                    .debit(
-                        &combat.guild_id,
                         &combat.defender_id,
                         explosion_loss,
                         "coude_combat_explosion",
@@ -242,11 +224,12 @@ impl ResolveBettingBatchService {
                         event_type = "combat.wallet_inconsistency",
                         combat_id = %combat.id,
                         guild_id = %combat.guild_id,
-                        user_id = %combat.defender_id,
-                        op = "debit_explosion_defender",
+                        attacker_id = %combat.attacker_id,
+                        defender_id = %combat.defender_id,
+                        op = "debit_explosion_pair",
                         amount = explosion_loss,
                         error = %e,
-                        "Echec debit defender explosion : combat marque resolu mais joueur n'a pas perdu de pieces"
+                        "Echec debit explosion atomique : combat marque resolu mais aucun joueur n'a perdu de pieces"
                     );
                 }
                 // Migration #3 wallet : on utilise record_draw (counter-only

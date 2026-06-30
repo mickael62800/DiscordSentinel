@@ -65,13 +65,16 @@ pub trait SlotRepository: Send + Sync {
     ) -> Result<bool, DomainError>;
 
     /// Marque le daily bonus comme claim (insere dans slot_daily_claims).
-    /// ON CONFLICT DO NOTHING : idempotent.
+    /// ON CONFLICT DO NOTHING. Retourne `true` si la row a ete inseree (premiere
+    /// reclamation du jour), `false` si elle existait deja. Ce booleen sert de
+    /// claim atomique : seule la PREMIERE tx concurrente obtient `true` et peut
+    /// crediter le bonus gratuit, evitant un double credit.
     async fn mark_daily_claimed_in_tx(
         &self,
         tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<(), DomainError>;
+    ) -> Result<bool, DomainError>;
 
     /// Liste les N derniers spins d une guild (tous joueurs confondus).
     async fn recent_spins(&self, guild_id: &str, limit: i64) -> Result<Vec<SlotSpin>, DomainError>;

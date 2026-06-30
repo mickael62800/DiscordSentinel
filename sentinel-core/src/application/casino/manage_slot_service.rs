@@ -183,6 +183,23 @@ impl ManageSlotService {
 
         let mut taunt_mutations = Vec::new();
 
+        // 0. Claim atomique du daily AVANT tout credit. ON CONFLICT DO NOTHING :
+        //    seule la premiere tx concurrente du jour obtient `true` et continue
+        //    vers le credit du bonus gratuit. Une tx perdante recoit `false`,
+        //    abandonne (rollback implicite au drop) et ne credite RIEN. Le check
+        //    `has_claimed_daily_today` en amont reste un fast-path non-atomique.
+        if cmd.is_daily {
+            let claimed = self
+                .repo
+                .mark_daily_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
+                .await?;
+            if !claimed {
+                return Err(DomainError::ValidationError(
+                    "Daily bonus deja reclame aujourd hui".into(),
+                ));
+            }
+        }
+
         // 1. Debit la mise (sauf daily bonus) en utilisant wallet_uc dans la tx.
         if !cmd.is_daily && mise > 0 {
             let dm = self
@@ -276,12 +293,8 @@ impl ManageSlotService {
         };
         self.repo.log_spin_in_tx(&mut *tx, &spin).await?;
 
-        // 7. Mark daily claimed si applicable.
-        if cmd.is_daily {
-            self.repo
-                .mark_daily_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
-                .await?;
-        }
+        // Note : le mark daily est effectue en etape 0 (claim atomique) pour
+        // garantir l'unicite du credit gratuit sous concurrence.
 
         self.uow.commit(tx).await?;
 

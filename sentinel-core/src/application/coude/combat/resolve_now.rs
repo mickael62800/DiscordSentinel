@@ -612,23 +612,14 @@ impl ResolveCombatNowService {
             // les deux perdent X coins" ne correspondait a rien en BDD.
             let desc = format!("Explosion combat {}", combat.id);
             let loss = result.coins_lost_by_loser;
+            // Fix #5 (atomicite) : les deux debits explosion dans la MEME tx via
+            // debit_pair_atomic — soit les deux s'appliquent, soit aucun (plus de
+            // destruction asymetrique si le second echoue). Clamp au solde.
             if let Err(e) = self
                 .wallet_repo
-                .debit(
+                .debit_pair_atomic(
                     &combat.guild_id,
                     &combat.attacker_id,
-                    loss,
-                    "coude_combat_explosion",
-                    &desc,
-                )
-                .await
-            {
-                tracing::error!(error = %e, attacker = %combat.attacker_id, %loss, "Echec debit explosion attaquant — desync embed/wallet");
-            }
-            if let Err(e) = self
-                .wallet_repo
-                .debit(
-                    &combat.guild_id,
                     &combat.defender_id,
                     loss,
                     "coude_combat_explosion",
@@ -636,7 +627,7 @@ impl ResolveCombatNowService {
                 )
                 .await
             {
-                tracing::error!(error = %e, defender = %combat.defender_id, %loss, "Echec debit explosion defenseur — desync embed/wallet");
+                tracing::error!(error = %e, attacker = %combat.attacker_id, defender = %combat.defender_id, %loss, "Echec debit explosion atomique — desync embed/wallet");
             }
             if let Err(e) = self
                 .players_uc
@@ -661,23 +652,13 @@ impl ResolveCombatNowService {
             // depuis la migration #3 wallet).
             let desc = format!("Accident debile combat {}", combat.id);
             if combat.mise > 0 {
+                // Fix #5 (atomicite) : les deux penalites accident dans la MEME
+                // tx via debit_pair_atomic (all-or-nothing, clamp au solde).
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(
+                    .debit_pair_atomic(
                         &combat.guild_id,
                         &combat.attacker_id,
-                        combat.mise,
-                        "coude_combat_draw",
-                        &desc,
-                    )
-                    .await
-                {
-                    tracing::error!(error = %e, "Echec debit accident attaquant — desync embed/wallet");
-                }
-                if let Err(e) = self
-                    .wallet_repo
-                    .debit(
-                        &combat.guild_id,
                         &combat.defender_id,
                         combat.mise,
                         "coude_combat_draw",
@@ -685,7 +666,7 @@ impl ResolveCombatNowService {
                     )
                     .await
                 {
-                    tracing::error!(error = %e, "Echec debit accident defenseur — desync embed/wallet");
+                    tracing::error!(error = %e, "Echec debit accident atomique — desync embed/wallet");
                 }
             }
             let _ = self

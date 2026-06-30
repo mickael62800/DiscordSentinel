@@ -82,7 +82,7 @@ impl SlotRepository for MockSlotRepo {
         _: &mut dyn crate::ports::uow::DbTx,
         _: &str,
         _: &str,
-    ) -> Result<(), DomainError> {
+    ) -> Result<bool, DomainError> {
         unimplemented!()
     }
     async fn recent_spins(&self, _: &str, _: i64) -> Result<Vec<SlotSpin>, DomainError> {

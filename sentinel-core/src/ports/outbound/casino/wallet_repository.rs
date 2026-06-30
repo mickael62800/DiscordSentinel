@@ -57,6 +57,23 @@ pub trait WalletRepository: Send + Sync {
         source: &str,
         description: &str,
     ) -> Result<(), DomainError>;
+    /// Debite deux joueurs dans la MEME transaction Postgres (cas explosion /
+    /// egalite ou les deux combattants perdent `amount` chacun). Atomique :
+    /// soit les deux debits sont commits, soit aucun — plus de destruction de
+    /// pieces asymetrique si le second debit echoue. Chaque debit est clampe au
+    /// solde via `GREATEST(coins - amount, 0)` (coherent avec pay_combat_atomic) ;
+    /// un solde insuffisant n'echoue pas. Ne fail pas si un wallet n'existe pas
+    /// (le combat est deja resolu en domain). Log les wallet_transactions.
+    async fn debit_pair_atomic(
+        &self,
+        guild_id: &str,
+        user_a: &str,
+        user_b: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(), DomainError>;
+
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError>;
     async fn get_transactions(
         &self,

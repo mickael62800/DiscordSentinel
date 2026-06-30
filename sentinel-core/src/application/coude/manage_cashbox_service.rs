@@ -174,6 +174,13 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
             .record_redistribution(guild_id, total, winners.clone())
             .await?;
 
+        // Fix #7 (anti-destruction) : la caisse a deja ete videe atomiquement
+        // (claim_all_for_redistribution). Si un credit gagnant echoue, ses coins
+        // seraient perdus a jamais. On accumule les montants non distribues et
+        // on les re-depose dans la caisse en fin de boucle (compensation) afin
+        // qu'ils restent dans l'economie pour le prochain cycle — aucune
+        // destruction nette.
+        let mut undistributed: i64 = 0;
         for (user_id, _username, amount_won) in &winners {
             let desc = format!("Redistribution hebdomadaire caisse coude #{redistribution_id}");
             if let Err(e) = self
@@ -187,7 +194,22 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
                 )
                 .await
             {
-                warn!(error = %e, user_id, amount_won, "Echec credit redistribution");
+                warn!(error = %e, user_id, amount_won, "Echec credit redistribution : montant re-depose dans la caisse");
+                undistributed += *amount_won;
+            }
+        }
+
+        // Re-banque le reliquat non distribue pour ne pas detruire de coins.
+        if undistributed > 0 {
+            if let Err(e) = self
+                .repo
+                .deposit(guild_id, undistributed, CashboxSource::ShopPurchase)
+                .await
+            {
+                warn!(
+                    error = %e, guild_id, undistributed,
+                    "Echec re-depot du reliquat non distribue : coins potentiellement perdus"
+                );
             }
         }
 

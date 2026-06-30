@@ -275,6 +275,9 @@ struct MockWalletRepo {
     wallets: Mutex<std::collections::HashMap<String, i64>>,
     credit_calls: Mutex<Vec<(String, String, i64, String)>>,
     debit_calls: Mutex<Vec<(String, String, i64, String)>>,
+    // (guild, user_a, user_b, amount, source) : un seul appel atomique pour les
+    // deux debits explosion (cf. fix #5 atomicite).
+    debit_pair_calls: Mutex<Vec<(String, String, String, i64, String)>>,
 }
 
 impl MockWalletRepo {
@@ -380,6 +383,24 @@ impl WalletRepository for MockWalletRepo {
         _: &str,
         _: &str,
     ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn debit_pair_atomic(
+        &self,
+        g: &str,
+        a: &str,
+        b: &str,
+        amount: i64,
+        source: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        self.debit_pair_calls.lock().unwrap().push((
+            g.into(),
+            a.into(),
+            b.into(),
+            amount,
+            source.into(),
+        ));
         Ok(())
     }
     async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
@@ -1051,6 +1072,44 @@ async fn resolve_batch_with_low_hp_defender() {
     wallet_repo.set_balance("g", "atk", 10_000);
     wallet_repo.set_balance("g", "def", 10_000);
     svc.resolve_batch().await.unwrap();
+}
+
+#[tokio::test]
+async fn resolve_batch_explosion_debits_both_players_atomically() {
+    // Fix #5 : les deux pertes explosion passent par UN SEUL appel atomique
+    // (debit_pair_atomic) et jamais par les debits per-user independants. On
+    // execute beaucoup de combats explosion pour declencher au moins un draw
+    // (engine RNG), puis on verifie l'invariant d'atomicite sur tout draw.
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service();
+    for i in 0..200 {
+        let a = format!("ea{i}");
+        let d = format!("ed{i}");
+        let mut combat = make_combat(&a, &d, 200);
+        combat.defender_special = Some("explosion".into());
+        combat_repo.due.lock().unwrap().push(combat);
+        player_repo.insert(make_player(&a, 10, 100));
+        player_repo.insert(make_player(&d, 10, 100));
+        wallet_repo.set_balance("g", &a, 10_000);
+        wallet_repo.set_balance("g", &d, 10_000);
+    }
+    svc.resolve_batch().await.unwrap();
+
+    // Aucun debit explosion ne doit emprunter le chemin per-user legacy.
+    let legacy = wallet_repo.debit_calls.lock().unwrap();
+    assert!(
+        !legacy
+            .iter()
+            .any(|(_, _, _, src)| src == "coude_combat_explosion"),
+        "les pertes explosion ne doivent plus utiliser debit() per-user"
+    );
+
+    // Chaque appel pair couvre deux joueurs distincts en une seule operation.
+    let pairs = wallet_repo.debit_pair_calls.lock().unwrap();
+    for (_, a, b, amount, src) in pairs.iter() {
+        assert_ne!(a, b, "le pair atomique doit viser deux joueurs distincts");
+        assert!(*amount > 0);
+        assert_eq!(src, "coude_combat_explosion");
+    }
 }
 
 // Builder avec config custom des mocks inventory/social

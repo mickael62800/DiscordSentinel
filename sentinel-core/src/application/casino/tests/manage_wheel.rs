@@ -45,7 +45,7 @@ impl WheelRepository for MockWheelRepo {
         _: &mut dyn crate::ports::uow::DbTx,
         _: &str,
         _: &str,
-    ) -> Result<(), DomainError> {
+    ) -> Result<bool, DomainError> {
         unimplemented!()
     }
     async fn recent_spins(&self, _g: &str, _l: i64) -> Result<Vec<WheelSpin>, DomainError> {

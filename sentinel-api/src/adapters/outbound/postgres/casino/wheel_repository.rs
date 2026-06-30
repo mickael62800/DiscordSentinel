@@ -63,9 +63,9 @@ impl WheelRepository for PgWheelRepository {
         tx: &mut dyn DbTx,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<(), DomainError> {
+    ) -> Result<bool, DomainError> {
         let tx = as_pg(tx);
-        sqlx::query(
+        let res = sqlx::query(
             "INSERT INTO wheel_daily_claims (guild_id, user_id, day)
              VALUES ($1, $2, CURRENT_DATE)
              ON CONFLICT (guild_id, user_id, day) DO NOTHING",
@@ -75,7 +75,7 @@ impl WheelRepository for PgWheelRepository {
         .execute(&mut **tx)
         .await
         .map_err(pg_err)?;
-        Ok(())
+        Ok(res.rows_affected() > 0)
     }
 
     async fn recent_spins(

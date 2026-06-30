@@ -162,6 +162,17 @@ impl WalletRepository for MockWalletRepo {
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn debit_pair_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
         let wallets = self.wallets.lock().unwrap();
         let mut matching: Vec<Wallet> = wallets

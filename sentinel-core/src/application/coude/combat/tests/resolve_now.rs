@@ -469,6 +469,27 @@ impl WalletRepository for MockWalletRepo {
         }
         Ok(())
     }
+    async fn debit_pair_atomic(
+        &self,
+        g: &str,
+        a: &str,
+        b: &str,
+        amount: i64,
+        source: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        if amount > 0 {
+            self.debit_calls
+                .lock()
+                .unwrap()
+                .push((g.into(), a.into(), amount, source.into()));
+            self.debit_calls
+                .lock()
+                .unwrap()
+                .push((g.into(), b.into(), amount, source.into()));
+        }
+        Ok(())
+    }
     async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
         Ok(vec![])
     }

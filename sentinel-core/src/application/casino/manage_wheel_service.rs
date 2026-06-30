@@ -99,6 +99,21 @@ impl ManageWheelUseCase for ManageWheelService {
 
         let mut taunt_mutations = Vec::new();
 
+        // Claim atomique du tirage du jour AVANT tout credit. ON CONFLICT DO
+        // NOTHING : seule la premiere tx concurrente obtient `true` et continue
+        // vers le payout. Une tx perdante recoit `false`, abandonne (rollback
+        // implicite au drop) et ne paie RIEN. Le `has_claimed_today` en amont
+        // reste un fast-path non-atomique.
+        let claimed = self
+            .repo
+            .mark_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
+            .await?;
+        if !claimed {
+            return Err(DomainError::ValidationError(
+                "Tu as deja tire la Roue du Destin aujourd hui.".into(),
+            ));
+        }
+
         // Wallet : credit ou debit selon le signe du payout.
         if payout > 0 {
             let m = self
@@ -149,10 +164,7 @@ impl ManageWheelUseCase for ManageWheelService {
         };
         self.repo.log_spin_in_tx(&mut *tx, &spin).await?;
 
-        // Mark daily.
-        self.repo
-            .mark_claimed_in_tx(&mut *tx, &cmd.guild_id, &cmd.user_id)
-            .await?;
+        // Note : le mark daily est effectue en tete de tx (claim atomique).
 
         self.uow.commit(tx).await?;
 

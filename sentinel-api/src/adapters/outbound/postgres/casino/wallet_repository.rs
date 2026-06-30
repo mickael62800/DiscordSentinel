@@ -439,6 +439,66 @@ impl WalletRepository for PgWalletRepository {
         Ok(())
     }
 
+    async fn debit_pair_atomic(
+        &self,
+        guild_id: &str,
+        user_a: &str,
+        user_b: &str,
+        amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(), DomainError> {
+        if amount <= 0 {
+            return Ok(());
+        }
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(pg_ctx("debit_pair begin tx"))?;
+
+        for user_id in [user_a, user_b] {
+            // Clamp au solde (GREATEST) : pas d'echec si solde insuffisant,
+            // coherent avec pay_combat_atomic. Ne fail pas si le wallet n'existe
+            // pas (combat deja resolu).
+            let after = sqlx::query_scalar::<_, i64>(
+                "UPDATE user_wallets SET coins = GREATEST(coins - $1, 0), total_spent = total_spent + LEAST($1, coins), updated_at = NOW() \
+                 WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
+            )
+            .bind(amount)
+            .bind(guild_id)
+            .bind(user_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(pg_ctx("debit_pair update"))?;
+
+            if let Some(balance_after) = after {
+                sqlx::query(
+                    "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
+                )
+                .bind(Uuid::new_v4())
+                .bind(guild_id)
+                .bind(user_id)
+                .bind(-amount)
+                .bind(balance_after)
+                .bind(source)
+                .bind(description)
+                .execute(&mut *tx)
+                .await
+                .map_err(pg_ctx("debit_pair insert tx"))?;
+            }
+        }
+
+        tx.commit().await.map_err(pg_ctx("debit_pair commit"))?;
+
+        info!(
+            guild_id,
+            user_a, user_b, amount, source, "Wallet debit pair atomic"
+        );
+        Ok(())
+    }
+
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
         // Phase 2 A.2 — Lit depuis la vue materialisee `mv_wallet_leaderboard`
         // refreshee toutes les 5 min par le cache-worker. Le rang est precalcule

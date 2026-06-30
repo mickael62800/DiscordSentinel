@@ -1053,6 +1053,17 @@ impl WalletRepository for StubWalletRepo {
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn debit_pair_atomic(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> {
         unimplemented!()
     }
