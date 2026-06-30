@@ -28,6 +28,7 @@ struct TicketRow {
     author_name: String,
     assigned_to: Option<String>,
     server: String,
+    guild_id: Option<String>,
     category: String,
     ticket_type: String,
     channel_id: Option<String>,
@@ -49,6 +50,7 @@ impl From<TicketRow> for Ticket {
             author_name: row.author_name,
             assigned_to: row.assigned_to,
             server: row.server,
+            guild_id: row.guild_id,
             category: row.category,
             ticket_type: row.ticket_type,
             channel_id: row.channel_id,
@@ -98,7 +100,7 @@ impl TicketRepository for PgTicketRepository {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             r#"
             SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
-                   t.assigned_to, t.server, t.category, t.ticket_type,
+                   t.assigned_to, t.server, t.guild_id, t.category, t.ticket_type,
                    t.channel_id, t.voice_channel_id, t.invited_user_id,
                    t.created_at, t.updated_at,
                    COUNT(tm.id) AS messages_count
@@ -129,7 +131,7 @@ impl TicketRepository for PgTicketRepository {
         qb.push(
             r#"
             GROUP BY t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
-                     t.assigned_to, t.server, t.category, t.ticket_type,
+                     t.assigned_to, t.server, t.guild_id, t.category, t.ticket_type,
                      t.channel_id, t.voice_channel_id, t.invited_user_id,
                      t.created_at, t.updated_at
             ORDER BY t.updated_at DESC
@@ -152,7 +154,7 @@ impl TicketRepository for PgTicketRepository {
         let row = sqlx::query_as::<_, TicketRow>(
             r#"
             SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
-                   t.assigned_to, t.server, t.category, t.ticket_type,
+                   t.assigned_to, t.server, t.guild_id, t.category, t.ticket_type,
                    t.channel_id, t.voice_channel_id, t.invited_user_id,
                    t.created_at, t.updated_at,
                    COUNT(tm.id) AS messages_count
@@ -160,7 +162,7 @@ impl TicketRepository for PgTicketRepository {
             LEFT JOIN ticket_messages tm ON tm.ticket_id = t.id
             WHERE t.id = $1
             GROUP BY t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
-                     t.assigned_to, t.server, t.category, t.ticket_type,
+                     t.assigned_to, t.server, t.guild_id, t.category, t.ticket_type,
                      t.channel_id, t.voice_channel_id, t.invited_user_id,
                      t.created_at, t.updated_at
             "#,
@@ -176,8 +178,8 @@ impl TicketRepository for PgTicketRepository {
     async fn save(&self, ticket: &Ticket) -> Result<(), DomainError> {
         sqlx::query(
             r#"
-            INSERT INTO tickets (id, title, status, priority, author_id, author_name, assigned_to, server, category, ticket_type, channel_id, voice_channel_id, invited_user_id, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+            INSERT INTO tickets (id, title, status, priority, author_id, author_name, assigned_to, server, guild_id, category, ticket_type, channel_id, voice_channel_id, invited_user_id, created_at, updated_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             "#,
         )
         .bind(ticket.id)
@@ -188,6 +190,7 @@ impl TicketRepository for PgTicketRepository {
         .bind(&ticket.author_name)
         .bind(&ticket.assigned_to)
         .bind(&ticket.server)
+        .bind(&ticket.guild_id)
         .bind(&ticket.category)
         .bind(&ticket.ticket_type)
         .bind(ticket.channel_id.as_deref())

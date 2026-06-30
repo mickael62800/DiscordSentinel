@@ -147,6 +147,7 @@ fn make_create_cmd() -> CreateTicketCommand {
         author_id: "123".to_string(),
         author_name: "testuser".to_string(),
         server: "TestServer".to_string(),
+        guild_id: Some("123456789012345678".to_string()),
         category: "question".to_string(),
         ticket_type: "question".to_string(),
         channel_id: Some("999".to_string()),

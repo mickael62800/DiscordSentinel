@@ -42,6 +42,8 @@ message CreateTicketRequest {
   string category = 6;
   string ticket_type = 7;
   optional string channel_id = 8;
+  // Snowflake de la guild Discord (le bot le connait via ctx.guild_id).
+  optional string guild_id = 9;
 }
 
 message ReplyTicketRequest {
@@ -103,6 +105,7 @@ message Ticket {
   string created_at = 14;
   string updated_at = 15;
   uint32 messages_count = 16;
+  optional string guild_id = 17;
 }
 
 message TicketMessage {

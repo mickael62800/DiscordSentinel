@@ -33,6 +33,7 @@ fn sample(title: &str) -> Ticket {
         author_name: "Alice".into(),
         assigned_to: None,
         server: fresh_id(),
+        guild_id: Some(fresh_id()),
         category: "support".into(),
         ticket_type: "standard".into(),
         channel_id: None,

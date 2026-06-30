@@ -17,6 +17,7 @@ fn sample_ticket() -> Ticket {
         author_name: "Joe".into(),
         assigned_to: Some("mod1".into()),
         server: "main".into(),
+        guild_id: Some("123456789012345678".into()),
         category: "bug".into(),
         ticket_type: "support".into(),
         channel_id: Some("c1".into()),
@@ -263,6 +264,7 @@ async fn create_ticket_delegates_command() {
             category: "bug".into(),
             ticket_type: "support".into(),
             channel_id: Some("c".into()),
+            guild_id: Some("123456789012345678".into()),
         }))
         .await
         .unwrap();

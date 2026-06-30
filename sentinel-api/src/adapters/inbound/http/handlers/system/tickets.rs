@@ -18,6 +18,8 @@ use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::lookup_role;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
@@ -28,8 +30,85 @@ use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
 use sentinel_core::domain::errors::DomainError;
+
+/// S1 — Autorisation web pour un endpoint mono-ticket (lecture ou mutation).
+///
+/// - **Appel bot / interne** (pas de `RoleContext`, Bearer api_key de confiance) :
+///   retourne `Ok(None)` -> comportement inchange, le bot est de confiance et
+///   agit de toute facon via gRPC.
+/// - **Appel web** (`RoleContext` present via `X-Discord-Token`) : on resout le
+///   `guild_id` du ticket et on exige Moderator+ sur CETTE guild. Un superadmin
+///   bypass la gate. Si le ticket est legacy (guild_id NULL), l'acces web est
+///   REFUSE (403) -> fail-closed (mieux vaut refuser que fuiter cross-guild).
+///
+/// Retourne `Ok(Some((guild_id, role_effectif)))` pour un web autorise (le role
+/// sert a deriver l'identite cote `reply_ticket`, anti-impersonation S4).
+async fn require_ticket_web(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    id: &str,
+) -> Result<Option<(String, Role)>, ApiError> {
+    let Some(Extension(ctx)) = rbac.as_ref() else {
+        return Ok(None);
+    };
+    let is_superadmin = state
+        .superadmin_user_ids
+        .iter()
+        .any(|sid| sid == &ctx.discord_user_id);
+
+    let detail = state.tickets_uc.get_ticket_detail(id).await?;
+    let Some(gid) = detail.ticket.guild_id else {
+        // Ticket legacy sans guild_id : acces web refuse (le bot gRPC y accede).
+        if is_superadmin {
+            return Ok(Some((String::new(), Role::Owner)));
+        }
+        return Err(ApiError(DomainError::Forbidden(
+            "ticket sans guild (legacy) : acces web refuse".into(),
+        )));
+    };
+
+    let role = if is_superadmin {
+        Role::Owner
+    } else {
+        lookup_role(state, &ctx.discord_user_id, &gid)
+            .await
+            .map_err(|e| {
+                ApiError(DomainError::Internal(format!(
+                    "RBAC lookup role (ticket) : {e}"
+                )))
+            })?
+    };
+    if !role.satisfies(Role::Moderator) {
+        return Err(ApiError(DomainError::Forbidden(
+            "moderator+ requis pour ce ticket".into(),
+        )));
+    }
+    Ok(Some((gid, role)))
+}
+
+/// Ensemble des guilds ou le caller est Moderator+ (pour scoper `list_tickets`).
+/// Lit `api_user_guilds` (format de role stocke en minuscules : viewer/moderator/
+/// admin/owner).
+async fn moderated_guilds(
+    state: &AppState,
+    user_id: &str,
+) -> Result<std::collections::HashSet<String>, ApiError> {
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT guild_id, role FROM api_user_guilds WHERE discord_user_id = $1")
+            .bind(user_id)
+            .fetch_all(&state.pg_pool)
+            .await
+            .map_err(sqlx_internal("moderated_guilds"))?;
+    Ok(rows
+        .into_iter()
+        .filter(|(_, r)| Role::from_str(r).is_some_and(|role| role.satisfies(Role::Moderator)))
+        .map(|(g, _)| g)
+        .collect())
+}
+
 pub async fn list_tickets(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
     // Validation
@@ -49,25 +128,74 @@ pub async fn list_tickets(
             offset,
         )
         .await?;
+
+    // S1 — scope web : on ne retourne que les tickets des guilds ou le caller
+    // est Moderator+. Les tickets legacy (guild_id NULL) sont exclus du web.
+    // Le chemin bot/interne (pas de RoleContext) n'est PAS filtre.
+    let tickets = match rbac.as_ref() {
+        None => tickets,
+        Some(Extension(ctx)) => {
+            if state
+                .superadmin_user_ids
+                .iter()
+                .any(|sid| sid == &ctx.discord_user_id)
+            {
+                tickets
+            } else {
+                let allowed = moderated_guilds(&state, &ctx.discord_user_id).await?;
+                tickets
+                    .into_iter()
+                    .filter(|t| t.guild_id.as_ref().is_some_and(|g| allowed.contains(g)))
+                    .collect()
+            }
+        }
+    };
     Ok(map_to_dtos(tickets))
 }
 
 pub async fn get_ticket_detail(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TicketDetailDto>, ApiError> {
+    require_ticket_web(&state, &rbac, &id).await?;
     let detail = state.tickets_uc.get_ticket_detail(&id).await?;
     Ok(single_dto(detail))
 }
 
 pub async fn create_ticket(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateTicketDto>,
 ) -> Result<Json<TicketResponseDto>, ApiError> {
     // Validation
     validation::validate_title(&dto.title).map_err(ApiError)?;
 
-    let command = dto.into();
+    let mut command: crate::ports::inbound::system::manage_tickets::CreateTicketCommand =
+        dto.into();
+
+    // S1/S4 — chemin web : la creation HTTP exige Moderator+ sur la guild cible,
+    // et l'auteur est DERIVE du principal authentifie (on n'autorise pas un
+    // `author_id` arbitraire dans le body -> anti-impersonation). Le chemin
+    // bot/interne (gRPC, qui pose legitimement author = l'utilisateur Discord)
+    // reste inchange.
+    if let Some(Extension(ctx)) = rbac.as_ref() {
+        let Some(gid) = command.guild_id.clone() else {
+            return Err(ApiError(DomainError::Forbidden(
+                "guild_id requis pour creer un ticket via le web".into(),
+            )));
+        };
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour creer un ticket",
+        )
+        .await?;
+        command.author_id = ctx.discord_user_id.clone();
+    }
+
     let ticket = state.tickets_uc.create_ticket(command).await?;
 
     state.broadcaster.broadcast(
@@ -86,17 +214,41 @@ pub async fn create_ticket(
 pub async fn reply_ticket(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ReplyDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let author_name = dto.author_name.clone();
+    // S1 autorisation + S4 identite. Web : on derive `author_name`/`author_role`
+    // du principal REEL (le body est ignore pour ces champs) -> impossible de
+    // se faire passer pour un "admin" via un JSON forge. Bot/interne : on garde
+    // les valeurs du body (vraies perms Discord).
+    let (author_name, author_role) = match require_ticket_web(&state, &rbac, &id).await? {
+        None => (dto.author_name, dto.author_role),
+        Some((_gid, role)) => {
+            // RoleContext garanti present sur ce chemin.
+            let principal = rbac
+                .as_ref()
+                .map(|Extension(c)| c.discord_user_id.clone())
+                .unwrap_or_default();
+            let derived_role = if role >= Role::Admin {
+                "admin"
+            } else if role >= Role::Moderator {
+                "moderator"
+            } else {
+                "user"
+            };
+            (principal, derived_role.to_string())
+        }
+    };
+
+    let broadcast_name = author_name.clone();
 
     state
         .tickets_uc
         .reply_ticket(ReplyTicketCommand {
             ticket_id: id.clone(),
             content: dto.content,
-            author_name: dto.author_name,
-            author_role: dto.author_role,
+            author_name,
+            author_role,
         })
         .await?;
 
@@ -104,7 +256,7 @@ pub async fn reply_ticket(
         "ticket_message",
         serde_json::json!({
             "ticket_id": &id,
-            "author_name": &author_name,
+            "author_name": &broadcast_name,
         }),
     );
 
@@ -114,7 +266,9 @@ pub async fn reply_ticket(
 pub async fn close_ticket(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    require_ticket_web(&state, &rbac, &id).await?;
     state.tickets_uc.close_ticket(&id).await?;
 
     // Phase 2 sync : enrichi avec `action_id` (= ticket_id parse en UUID)
@@ -136,8 +290,10 @@ pub async fn close_ticket(
 pub async fn assign_ticket(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AssignDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    require_ticket_web(&state, &rbac, &id).await?;
     let assignee = dto.assignee;
     state
         .tickets_uc
@@ -161,8 +317,10 @@ pub async fn assign_ticket(
 pub async fn update_status(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<UpdateStatusDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    require_ticket_web(&state, &rbac, &id).await?;
     let status = match TicketStatus::from_str(&dto.status) {
         Some(s) => s,
         None => {
@@ -192,8 +350,10 @@ pub async fn update_status(
 pub async fn update_ticket_channel(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<UpdateTicketChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    require_ticket_web(&state, &rbac, &id).await?;
     state
         .tickets_uc
         .update_ticket_channel(UpdateTicketChannelCommand {

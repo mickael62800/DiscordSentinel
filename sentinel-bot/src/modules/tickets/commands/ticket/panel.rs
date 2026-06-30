@@ -380,6 +380,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         author_id: author.id.to_string(),
         author_name: author.name.clone(),
         server: guild_name,
+        guild_id: Some(guild_id.to_string()),
         category: ticket_type.clone(),
         ticket_type: ticket_type.clone(),
         channel_id: Some(channel.id.to_string()),

@@ -23,6 +23,10 @@ pub struct CreateTicketDto {
     pub author_id: String,
     pub author_name: String,
     pub server: String,
+    /// Snowflake de la guild. Optionnel pour compat ascendante, mais REQUIS
+    /// pour les appels web (gate Moderator+ scoped par guild cote handler).
+    #[serde(default)]
+    pub guild_id: Option<String>,
     #[serde(default)]
     pub category: String,
     #[serde(default = "default_ticket_type")]
@@ -81,6 +85,7 @@ pub struct TicketResponseDto {
     pub author_name: String,
     pub assigned_to: Option<String>,
     pub server: String,
+    pub guild_id: Option<String>,
     pub category: String,
     pub ticket_type: String,
     pub channel_id: Option<String>,
@@ -115,6 +120,7 @@ impl From<CreateTicketDto> for CreateTicketCommand {
             author_id: dto.author_id,
             author_name: dto.author_name,
             server: dto.server,
+            guild_id: dto.guild_id,
             category: dto.category,
             ticket_type: dto.ticket_type,
             channel_id: dto.channel_id,
@@ -133,6 +139,7 @@ impl From<Ticket> for TicketResponseDto {
             author_name: t.author_name,
             assigned_to: t.assigned_to,
             server: t.server,
+            guild_id: t.guild_id,
             category: t.category,
             ticket_type: t.ticket_type,
             channel_id: t.channel_id,

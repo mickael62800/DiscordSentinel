@@ -121,6 +121,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
             author_name: cmd.author_name,
             assigned_to: None,
             server: cmd.server,
+            guild_id: cmd.guild_id,
             category: cmd.category,
             ticket_type: cmd.ticket_type,
             channel_id: cmd.channel_id,

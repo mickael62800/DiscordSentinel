@@ -14,6 +14,10 @@ pub struct Ticket {
     pub author_name: String,
     pub assigned_to: Option<String>,
     pub server: String,
+    /// Snowflake de la guild Discord proprietaire du ticket. `None` pour les
+    /// lignes legacy d'avant la migration 296 (backfill non resolu) : l'acces
+    /// web a ces tickets est refuse (fail-closed), seul le bot (gRPC) y accede.
+    pub guild_id: Option<String>,
     pub category: String,
     pub ticket_type: String,
     pub channel_id: Option<String>,

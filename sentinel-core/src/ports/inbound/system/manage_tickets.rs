@@ -10,6 +10,8 @@ pub struct CreateTicketCommand {
     pub author_id: String,
     pub author_name: String,
     pub server: String,
+    /// Snowflake de la guild Discord (passe par le bot via gRPC, ou par le web).
+    pub guild_id: Option<String>,
     pub category: String,
     pub ticket_type: String,
     pub channel_id: Option<String>,
