@@ -158,6 +158,7 @@ pub struct WorkerConfig {
     // ── Moderation ──
     pub ban_cleanup_interval_secs: u64,
     pub send_reminders_interval_secs: u64,
+    pub age_unban_interval_secs: u64,
 
     // ── Coude ──
     pub combat_expiry_check_secs: u64,
@@ -299,6 +300,8 @@ impl WorkerConfig {
                 "SEND_REMINDERS_INTERVAL",
                 DEFAULT_SEND_REMINDERS_SECS,
             ),
+            // Auto-deban verification d'age : cadence mensuelle (30 j) par defaut.
+            age_unban_interval_secs: load_env("AGE_UNBAN_INTERVAL", 30 * 24 * 60 * 60),
 
             // coude
             combat_expiry_check_secs: load_env(

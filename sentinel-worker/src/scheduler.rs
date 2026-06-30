@@ -475,6 +475,23 @@ pub fn start(
             },
         );
     }
+    // Auto-deban verification d'age (cadence mensuelle) : leve les bans
+    // age_verification_bans echus -> event age_ban_lift consomme par le bot.
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "age_unban",
+            config.age_unban_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "welcome-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move { domains::moderation::age_unban::run(&pool, &redis).await })
+            },
+        );
+    }
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : coude (6 jobs : combats, paris, hp_regen, tournament,
