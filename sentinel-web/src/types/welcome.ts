@@ -35,6 +35,13 @@ export interface WelcomeConfig {
   rules_role_id: string | null;
   rules_button_label: string;
 
+  // Verification d'age au reglement.
+  age_check_enabled: boolean;
+  age_minimum: number;
+  unverified_role_id: string | null;
+  age_modal_question: string;
+  age_ban_message: string;
+
   counter_enabled: boolean;
   counter_channel_id: string | null;
   counter_format: string;

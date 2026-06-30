@@ -5,6 +5,7 @@ import { useWelcome } from "@/composables/useWelcome";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppToggle from "@/components/atoms/AppToggle.vue";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
+import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
 
@@ -35,6 +36,11 @@ const draft = reactive({
   rules_message: "",
   rules_role_id: "",
   rules_button_label: "",
+  age_check_enabled: false,
+  age_minimum: 20,
+  unverified_role_id: "",
+  age_modal_question: "",
+  age_ban_message: "",
   // Counter
   counter_enabled: false,
   counter_channel_id: "",
@@ -81,6 +87,11 @@ watch(
     draft.rules_message = c.rules_message;
     draft.rules_role_id = c.rules_role_id ?? "";
     draft.rules_button_label = c.rules_button_label;
+    draft.age_check_enabled = c.age_check_enabled;
+    draft.age_minimum = c.age_minimum;
+    draft.unverified_role_id = c.unverified_role_id ?? "";
+    draft.age_modal_question = c.age_modal_question;
+    draft.age_ban_message = c.age_ban_message;
     draft.counter_enabled = c.counter_enabled;
     draft.counter_channel_id = c.counter_channel_id ?? "";
     draft.counter_format = c.counter_format;
@@ -130,6 +141,11 @@ async function onSave() {
     rules_message: draft.rules_message,
     rules_role_id: draft.rules_role_id || null,
     rules_button_label: draft.rules_button_label,
+    age_check_enabled: draft.age_check_enabled,
+    age_minimum: draft.age_minimum,
+    unverified_role_id: draft.unverified_role_id || null,
+    age_modal_question: draft.age_modal_question,
+    age_ban_message: draft.age_ban_message,
     counter_enabled: draft.counter_enabled,
     counter_channel_id: draft.counter_channel_id || null,
     counter_format: draft.counter_format,
@@ -229,6 +245,34 @@ async function onSave() {
         <label class="full">Message
           <AppTextarea v-model="draft.rules_message" :rows="6" />
         </label>
+
+        <!-- Vérification d'âge -->
+        <label class="full toggle-row">
+          <span>Vérification d'âge au règlement</span>
+          <AppToggle v-model="draft.age_check_enabled" />
+        </label>
+        <p class="hint full">
+          À l'arrivée, le membre reçoit le rôle « Membre temporaire » (qui ne voit
+          que le règlement). En cliquant sur « J'accepte », un formulaire lui demande
+          son âge. S'il a moins de l'âge minimum, il est banni jusqu'à l'atteindre
+          ((âge min − âge) ans). Sinon il obtient le rôle Membre.
+          Placeholders du message de ban : <code>{min}</code>, <code>{annees}</code>.
+        </p>
+        <template v-if="draft.age_check_enabled">
+          <label>Âge minimum requis
+            <AppInput v-model.number="draft.age_minimum" type="number" :min="13" :max="99" />
+          </label>
+          <label>Rôle « Membre temporaire » (à l'arrivée)
+            <RoleSelect v-model="draft.unverified_role_id" :guild-id="guildIdFilter ?? null" />
+          </label>
+          <label class="full">Question du formulaire
+            <AppInput v-model="draft.age_modal_question" placeholder="Quel âge as-tu ? (en chiffres)" />
+          </label>
+          <label class="full">Message de bannissement
+            <AppTextarea v-model="draft.age_ban_message" :rows="3" placeholder="Tu dois avoir au moins {min} ans. Reviens dans {annees} an(s)." />
+          </label>
+        </template>
+
         <div class="full">
           <button type="button" class="publish-btn" :disabled="!draft.rules_enabled || !draft.rules_channel_id" @click="publishRules">
             📢 Publier le règlement
