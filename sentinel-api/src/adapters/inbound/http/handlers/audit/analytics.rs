@@ -1,12 +1,16 @@
 use axum::extract::Query;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 use redis::AsyncCommands;
 use tracing::warn;
 
 use crate::adapters::inbound::http::dto::audit::analytics::*;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::enums::system::role::Role;
 
 /// TTL du cache analytics (5 minutes).
 const ANALYTICS_CACHE_TTL: u64 = 300;
@@ -248,6 +252,7 @@ pub struct ResetAnalyticsResponse {
 
 pub async fn reset_analytics(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<ResetAnalyticsResponse>, ApiError> {
     let guild_id = params.guild_id.as_deref().ok_or_else(|| {
@@ -255,6 +260,17 @@ pub async fn reset_analytics(
             "guild_id requis".into(),
         ))
     })?;
+
+    // Guild fourni en query -> check_role_for_guild (lookup explicite, bypass
+    // superadmin, pass-through si pas de RoleContext = appel interne).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        guild_id,
+        Role::Admin,
+        "admin+ requis pour reinitialiser les analytics",
+    )
+    .await?;
 
     let deleted_rows = state.analytics_repo.reset_activity(guild_id).await?;
 

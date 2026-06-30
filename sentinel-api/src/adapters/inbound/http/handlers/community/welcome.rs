@@ -1,11 +1,14 @@
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::enums::system::role::Role;
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -149,9 +152,18 @@ pub async fn get_config(
 /// PUT /api/welcome/{guild_id}
 pub async fn save_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveWelcomeConfigDto>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier la config de bienvenue",
+    )
+    .await?;
     let saved = state
         .welcome_config_uc
         .save_patch(&guild_id, dto_to_patch(dto))
@@ -164,8 +176,17 @@ pub async fn save_config(
 /// d'acceptation) dans le salon configure, via la stream d'events Redis.
 pub async fn publish_rules(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "admin+ requis pour publier le reglement",
+    )
+    .await?;
     // Garde-fou : refuse si la validation du reglement n'est pas activee /
     // configuree (sinon le bot echouerait silencieusement cote consumer).
     let config = state.welcome_config_uc.get(&guild_id).await?;

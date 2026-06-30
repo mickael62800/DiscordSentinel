@@ -60,9 +60,11 @@ pub async fn list_roles(
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role(&rbac, Role::Admin, "admin+ requis pour creer un role")?;
     let result = state
         .discord_api
         .create_role(
@@ -78,9 +80,11 @@ pub async fn create_role(
 /// PATCH /api/discord-roles/{guild_id}/{role_id} — Modifier un role Discord
 pub async fn edit_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, role_id)): Path<(String, String)>,
     Json(body): Json<EditRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role(&rbac, Role::Admin, "admin+ requis pour modifier un role")?;
     let result = state
         .discord_api
         .edit_role(

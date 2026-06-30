@@ -14,10 +14,13 @@ use crate::adapters::inbound::http::dto::community::announcements::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
+use axum::Extension;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 const ANNOUNCEMENTS_BOT: &str = "announcements";
@@ -90,8 +93,17 @@ async fn try_post_log_embed(
 
 pub async fn create_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour creer une annonce",
+    )
+    .await?;
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
 
@@ -120,9 +132,12 @@ pub async fn create_announcement(
             .and_then(parse_hex_color),
     };
 
-    // TODO RBAC : verifier que l'auteur est admin+ pour cette guild via
-    // require_role(...) si on extrait le RoleContext de la request.
-    let created_by = "web".to_string();
+    // L'auteur enregistre est le user web authentifie (RoleContext). Appel
+    // bot/interne (sans RoleContext) : fallback "web".
+    let created_by = rbac
+        .as_ref()
+        .map(|Extension(ctx)| ctx.discord_user_id.clone())
+        .unwrap_or_else(|| "web".to_string());
 
     let guild_id_for_log = dto.guild_id.clone();
     let cmd = CreateAnnouncementCommand {
@@ -170,9 +185,22 @@ pub async fn create_announcement(
 
 pub async fn update_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
+    if rbac.is_some() {
+        if let Ok(existing) = state.announcements_uc.get(id).await {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &existing.guild_id,
+                Role::Admin,
+                "admin+ requis pour modifier une annonce",
+            )
+            .await?;
+        }
+    }
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
     let cmd = UpdateAnnouncementCommand {
@@ -204,8 +232,21 @@ pub async fn update_announcement(
 
 pub async fn delete_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, ApiError> {
+    if rbac.is_some() {
+        if let Ok(existing) = state.announcements_uc.get(id).await {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &existing.guild_id,
+                Role::Admin,
+                "admin+ requis pour supprimer une annonce",
+            )
+            .await?;
+        }
+    }
     state.announcements_uc.delete(id).await?;
     Ok(Json(()))
 }
@@ -228,9 +269,22 @@ pub async fn list_announcements(
 
 pub async fn toggle_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ToggleAnnouncementDto>,
 ) -> Result<Json<bool>, ApiError> {
+    if rbac.is_some() {
+        if let Ok(existing) = state.announcements_uc.get(id).await {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &existing.guild_id,
+                Role::Admin,
+                "admin+ requis pour activer/desactiver une annonce",
+            )
+            .await?;
+        }
+    }
     let new_state = state.announcements_uc.toggle(id, dto.enabled).await?;
     Ok(Json(new_state))
 }

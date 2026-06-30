@@ -61,8 +61,20 @@ pub struct AddWatchDto {
 /// POST /api/watched-users — ajouter un utilisateur en surveillance manuelle
 pub async fn add_watched_user(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddWatchDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Meme role que le retrait (remove_watched_user). Guild fourni dans le
+    // body -> check_role_for_guild (lookup explicite, bypass superadmin,
+    // pass-through si pas de RoleContext = appel bot).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        dto.guild_id.as_str(),
+        Role::Moderator,
+        "moderator+ requis pour ajouter un watched user",
+    )
+    .await?;
     state
         .watched_users_uc
         .add_manual_watch(&dto.guild_id, &dto.user_id, &dto.username, &dto.reason)

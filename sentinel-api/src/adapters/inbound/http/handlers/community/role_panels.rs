@@ -16,8 +16,17 @@ use sentinel_core::domain::errors::DomainError;
 
 pub async fn create_panel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateRolePanelDto>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour creer un panel",
+    )
+    .await?;
     let detail = state.role_panels_uc.create_panel(dto.into()).await?;
     Ok(single_dto(detail))
 }
@@ -90,8 +99,17 @@ pub async fn list_auto_roles(
 
 pub async fn add_auto_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateAutoRoleDto>,
 ) -> Result<Json<AutoRoleDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour ajouter un auto-role",
+    )
+    .await?;
     let role = state.role_panels_uc.add_auto_role(dto.into()).await?;
     Ok(single_dto(role))
 }

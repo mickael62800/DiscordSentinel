@@ -10,11 +10,14 @@ use crate::adapters::inbound::http::dto::community::confessions::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_confessions::{
     CreateConfessionCommand, CreateReplyCommand, CreateReportCommand,
 };
+use axum::Extension;
 use sentinel_core::domain::entities::community::confession::{ConfessionConfig, ReportStatus};
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 #[derive(serde::Deserialize)]
@@ -88,9 +91,24 @@ pub async fn edit_confession(
 
 pub async fn delete_confession(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<DeleteConfessionDto>,
 ) -> Result<Json<ConfessionDto>, ApiError> {
+    // Gate RBAC web (moderator+) : on resout la guild via la confession.
+    // Appel bot (pas de RoleContext) = pass-through.
+    if rbac.is_some() {
+        if let Ok(existing) = state.confessions_uc.get(id).await {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &existing.guild_id,
+                Role::Moderator,
+                "moderator+ requis pour supprimer une confession",
+            )
+            .await?;
+        }
+    }
     let c = state
         .confessions_uc
         .delete(id, dto.deleted_by, dto.reason)
@@ -268,8 +286,17 @@ pub async fn get_config(
 
 pub async fn save_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<SaveConfigDto>,
 ) -> Result<Json<ConfigDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier la config des confessions",
+    )
+    .await?;
     let cfg = ConfessionConfig {
         guild_id: dto.guild_id,
         enabled: dto.enabled,

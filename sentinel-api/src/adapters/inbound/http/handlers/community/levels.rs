@@ -15,11 +15,14 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::ResetTarget;
 use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
+use axum::Extension;
 use sentinel_core::domain::entities::community::level::XpSource;
+use sentinel_core::domain::enums::system::role::Role;
 
 pub async fn get_config(
     State(state): State<AppState>,
@@ -31,8 +34,17 @@ pub async fn get_config(
 
 pub async fn save_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<SaveLevelConfigDto>,
 ) -> Result<Json<LevelConfigDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier la config des niveaux",
+    )
+    .await?;
     let config = state.levels_uc.save_config(dto.into()).await?;
     Ok(single_dto(config))
 }
@@ -104,8 +116,17 @@ pub async fn get_leaderboard(
 
 pub async fn set_user_xp(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<SetUserXpDto>,
 ) -> Result<Json<UserLevelDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier l'XP d'un membre",
+    )
+    .await?;
     let guild_id = dto.guild_id.clone();
     let user_id = dto.user_id.clone();
     let user = state
@@ -131,8 +152,17 @@ pub async fn set_user_xp(
 
 pub async fn reset_user_xp(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ResetUserXpDto>,
 ) -> Result<Json<UserLevelDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour reinitialiser l'XP d'un membre",
+    )
+    .await?;
     let target = match dto.target.as_str() {
         "text" => ResetTarget::Text,
         "voice" => ResetTarget::Voice,
