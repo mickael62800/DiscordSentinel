@@ -557,51 +557,21 @@ pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(),
     Ok(())
 }
 
-/// Attribue le(s) role(s) configure(s) apres validation du reglement (CSV
-/// d'IDs). Retourne le nombre de roles reellement poses, ou `Err` si la
-/// fonctionnalite est desactivee / mal configuree (a logger par l'appelant).
-/// Partage par le bouton du bot ET le filtrage d'adhesion natif de Discord.
-async fn assign_rules_roles(
+/// Attribue les role(s) (CSV d'IDs) a un membre. Fonction pure : la config
+/// est deja lue par l'appelant. Retourne le nombre de roles poses.
+async fn assign_roles_csv(
     ctx: &Context,
     guild_id: GuildId,
     user_id: serenity::model::id::UserId,
-) -> Result<usize, String> {
-    let (base, grpc) = {
-        let data = ctx.data.read().await;
-        let base = data
-            .get::<ApiClientKey>()
-            .map(Arc::clone)
-            .ok_or("api client absent")?;
-        let grpc = data
-            .get::<crate::shared::grpc_client::GrpcClientKey>()
-            .map(Arc::clone)
-            .ok_or("grpc client absent")?;
-        (base, grpc)
-    };
-
-    let api = WelcomeApiClient::new(base, grpc);
-    let config = api
-        .get_config(&guild_id.to_string())
-        .await
-        .map_err(|e| format!("lecture config welcome: {e}"))?;
-
-    if !config.rules_enabled {
-        return Err("validation du reglement desactivee".into());
-    }
-
-    // Liste de roles (CSV d'IDs) : un ancien reglage a role unique reste un
-    // CSV a 1 element -> retro-compatible.
-    let role_ids: Vec<RoleId> = config
-        .rules_role_id
-        .as_deref()
+    role_csv: Option<&str>,
+) -> usize {
+    // CSV d'IDs : un ancien reglage a role unique reste un CSV a 1 element.
+    let role_ids: Vec<RoleId> = role_csv
         .unwrap_or("")
         .split(',')
         .filter_map(|s| s.trim().parse::<u64>().ok())
         .map(RoleId::new)
         .collect();
-    if role_ids.is_empty() {
-        return Err("aucun role configure".into());
-    }
 
     let mut assigned = 0usize;
     for role_id in &role_ids {
@@ -614,17 +584,32 @@ async fn assign_rules_roles(
             Err(e) => warn!(error = %e, role = %role_id, "Echec assignation role reglement"),
         }
     }
-    Ok(assigned)
+    assigned
 }
 
 /// Fin du filtrage d'adhesion Discord (membership screening) : `pending`
-/// passe de true a false. On attribue alors le(s) role(s) du reglement.
+/// passe de true a false. On attribue alors le(s) role(s) du reglement —
+/// SAUF si la verification d'age est active (le role Membre ne doit etre
+/// donne qu'apres saisie d'un age suffisant, via le bouton + formulaire).
 pub async fn on_screening_complete(
     ctx: &Context,
     guild_id: GuildId,
     user_id: serenity::model::id::UserId,
 ) {
-    match assign_rules_roles(ctx, guild_id, user_id).await {
+    let config = match load_welcome_config(ctx, guild_id).await {
+        Some(c) => c,
+        None => return,
+    };
+    if !config.rules_enabled {
+        return;
+    }
+    // Verif d'age active : on NE donne PAS le role ici (le membre doit passer
+    // par le formulaire d'age). Il garde son role "Membre temporaire".
+    if config.age_check_enabled {
+        return;
+    }
+    let n = assign_roles_csv(ctx, guild_id, user_id, config.rules_role_id.as_deref()).await;
+    match Ok::<usize, String>(n) {
         Ok(n) if n > 0 => {
             info!(user = %user_id, guild = %guild_id, roles = n, "Roles reglement attribues (filtrage Discord)")
         }
@@ -644,39 +629,49 @@ async fn handle_rules_accept(
         None => return,
     };
 
-    // Si la verification d'age est activee, on ouvre un formulaire qui demande
-    // l'age au lieu d'attribuer directement le role Membre. L'attribution (ou
-    // le ban) se fait au submit du modal (`handle_age_modal`).
-    if let Some(question) = age_check_question(ctx, guild_id).await {
-        open_age_modal(ctx, component, &question).await;
-        return;
-    }
-
-    let assigned = match assign_rules_roles(ctx, guild_id, component.user.id).await {
-        Ok(n) => n,
-        Err(_) => return,
+    // UNE seule lecture de config (eviter le timeout 3s de l'interaction :
+    // un Modal doit etre la 1re reponse, donc on doit decider avant de
+    // repondre, mais sans enchainer plusieurs appels gRPC).
+    let config = match load_welcome_config(ctx, guild_id).await {
+        Some(c) => c,
+        None => return,
     };
-
-    if assigned == 0 {
-        let resp = CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content("Erreur lors de l'assignation des roles.")
-                .ephemeral(true),
-        );
-        let _ = component.create_response(&ctx.http, resp).await;
+    if !config.rules_enabled {
         return;
     }
 
+    // Verification d'age activee -> ouvrir le formulaire (au lieu d'attribuer
+    // directement le role). L'attribution (ou le ban) se fait au submit.
+    if config.age_check_enabled {
+        let q = config.age_modal_question.trim();
+        let q = if q.is_empty() {
+            "Quel age as-tu ? (en chiffres)".to_string()
+        } else {
+            q.to_string()
+        };
+        open_age_modal(ctx, component, &q).await;
+        return;
+    }
+
+    // Flux classique : attribuer le(s) role(s) depuis la config deja lue.
+    let assigned =
+        assign_roles_csv(ctx, guild_id, component.user.id, config.rules_role_id.as_deref()).await;
+
+    let content = if assigned == 0 {
+        "Erreur lors de l'assignation des roles (aucun role configure ?)."
+    } else {
+        "Reglement accepte ! Bienvenue sur le serveur."
+    };
     let resp = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
-            .content("Reglement accepte ! Bienvenue sur le serveur.")
+            .content(content)
             .ephemeral(true),
     );
     if let Err(e) = component.create_response(&ctx.http, resp).await {
         warn!(error = %e, "Echec reponse acceptation reglement");
     }
 
-    info!(user = %component.user.name, guild = %guild_id, "Reglement accepte");
+    info!(user = %component.user.name, guild = %guild_id, assigned, "Reglement accepte");
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -700,22 +695,6 @@ async fn load_welcome_config(
         .get_config(&guild_id.to_string())
         .await
         .ok()
-}
-
-/// Retourne la question du formulaire d'age si la verification est activee
-/// et le reglement actif, sinon `None` (flux classique).
-async fn age_check_question(ctx: &Context, guild_id: GuildId) -> Option<String> {
-    let config = load_welcome_config(ctx, guild_id).await?;
-    if config.rules_enabled && config.age_check_enabled {
-        let q = config.age_modal_question.trim();
-        Some(if q.is_empty() {
-            "Quel age as-tu ? (en chiffres)".to_string()
-        } else {
-            q.to_string()
-        })
-    } else {
-        None
-    }
 }
 
 /// Ouvre le formulaire de saisie d'age.
@@ -788,28 +767,34 @@ pub async fn handle_age_modal(
         }
     };
 
-    // Age suffisant -> retire le role temporaire, donne le role Membre.
+    // Age suffisant -> donne le role Membre PUIS retire le role temporaire.
+    // Ordre important : on ajoute Membre avant de retirer le temporaire pour
+    // qu'il n'y ait jamais d'instant ou le membre n'a aucun role d'acces.
     if age >= config.age_minimum {
+        let assigned =
+            assign_roles_csv(ctx, guild_id, user_id, config.rules_role_id.as_deref()).await;
+
         if let Some(role) = config
             .unverified_role_id
             .as_deref()
             .and_then(|s| s.parse::<u64>().ok())
             .map(RoleId::new)
         {
-            let _ = ctx
+            if let Err(e) = ctx
                 .http
                 .remove_member_role(guild_id, user_id, role, Some("Age verifie"))
-                .await;
+                .await
+            {
+                warn!(error = %e, role = %role, "Echec retrait role Membre temporaire");
+            }
         }
-        match assign_rules_roles(ctx, guild_id, user_id).await {
-            Ok(n) if n > 0 => {
-                reply_modal(ctx, modal, "Bienvenue sur le serveur ! Acces accorde.").await;
-                info!(user = %modal.user.name, guild = %guild_id, age, "Age verifie -> Membre");
-            }
-            _ => {
-                reply_modal(ctx, modal, "Acces accorde, mais aucun role Membre n'est configure.")
-                    .await;
-            }
+
+        if assigned > 0 {
+            reply_modal(ctx, modal, "Bienvenue sur le serveur ! Acces accorde.").await;
+            info!(user = %modal.user.name, guild = %guild_id, age, "Age verifie -> Membre");
+        } else {
+            reply_modal(ctx, modal, "Acces accorde, mais aucun role Membre n'est configure.").await;
+            warn!(guild = %guild_id, "Age verifie mais aucun role Membre (rules_role_id) configure");
         }
         return;
     }
