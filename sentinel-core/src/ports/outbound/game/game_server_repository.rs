@@ -43,6 +43,13 @@ pub trait GameServerRepository: Send + Sync {
 
     async fn update_player_activity(&self, id: Uuid, player_count: i32) -> Result<(), DomainError>;
 
+    /// Enregistre une tentative de redemarrage auto : incremente
+    /// `restart_attempts` et pose `last_restart_at = NOW()`. Sert au backoff.
+    async fn record_restart_attempt(&self, id: Uuid) -> Result<(), DomainError>;
+
+    /// Remet `restart_attempts` a 0 (serveur recupere). No-op si deja a 0.
+    async fn reset_restart_attempts(&self, id: Uuid) -> Result<(), DomainError>;
+
     /// Soft-delete (status = deleted, deleted_at = NOW()).
     async fn soft_delete(&self, id: Uuid) -> Result<(), DomainError>;
 

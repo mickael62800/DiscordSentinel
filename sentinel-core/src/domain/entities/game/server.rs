@@ -91,6 +91,46 @@ pub struct GameServer {
     pub updated_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub stopped_at: Option<DateTime<Utc>>,
+    /// Nombre de redemarrages auto consecutifs apres crash (remis a 0 a la
+    /// recuperation). Borne par `MAX_RESTART_ATTEMPTS`.
+    pub restart_attempts: i32,
+    /// Timestamp du dernier redemarrage auto tente (pour le backoff).
+    pub last_restart_at: Option<DateTime<Utc>>,
+}
+
+/// Nombre maximal de redemarrages auto consecutifs avant abandon (-> Error).
+/// Borne stricte : empeche tout crash loop.
+pub const MAX_RESTART_ATTEMPTS: i32 = 5;
+
+/// Delai de backoff (secondes) avant le prochain redemarrage auto, en
+/// fonction du nombre de tentatives deja effectuees. Exponentiel
+/// `30 * 2^attempts`, plafonne a 1h. Pure / overflow-safe.
+pub fn restart_backoff_secs(attempts: i32) -> i64 {
+    const BASE: i64 = 30;
+    const CAP: i64 = 3600;
+    if attempts <= 0 {
+        return BASE;
+    }
+    // 2^attempts overflow-safe : checked_shl renvoie None si shift trop grand.
+    let factor = 1i64.checked_shl(attempts as u32).unwrap_or(i64::MAX);
+    BASE.saturating_mul(factor).min(CAP)
+}
+
+/// Decision PURE : faut-il auto-redemarrer un serveur crashe ? `true` si on
+/// est sous le plafond de tentatives ET (jamais redemarre OU le cooldown de
+/// backoff est ecoule). Aucune IO -> testable unitairement.
+pub fn should_auto_restart(
+    attempts: i32,
+    last_restart_at: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> bool {
+    if attempts >= MAX_RESTART_ATTEMPTS {
+        return false;
+    }
+    match last_restart_at {
+        None => true,
+        Some(last) => now >= last + chrono::Duration::seconds(restart_backoff_secs(attempts)),
+    }
 }
 
 impl GameServer {
@@ -167,6 +207,61 @@ mod tests {
         ] {
             assert!(!st.can_stop(), "{st:?} ne devrait pas permettre stop");
         }
+    }
+
+    #[test]
+    fn backoff_is_exponential_and_capped() {
+        assert_eq!(restart_backoff_secs(0), 30);
+        assert_eq!(restart_backoff_secs(1), 60);
+        assert_eq!(restart_backoff_secs(2), 120);
+        assert_eq!(restart_backoff_secs(3), 240);
+        // Plafond a 1h, jamais d'overflow meme pour de grandes valeurs.
+        assert_eq!(restart_backoff_secs(20), 3600);
+        assert_eq!(restart_backoff_secs(1000), 3600);
+        assert_eq!(restart_backoff_secs(-1), 30);
+    }
+
+    #[test]
+    fn should_restart_first_attempt_no_history() {
+        let now = Utc::now();
+        // Jamais redemarre -> autorise immediatement.
+        assert!(should_auto_restart(0, None, now));
+    }
+
+    #[test]
+    fn should_restart_when_cooldown_elapsed() {
+        let now = Utc::now();
+        // 2 tentatives -> backoff 120s ; dernier restart il y a 200s -> ok.
+        let last = now - chrono::Duration::seconds(200);
+        assert!(should_auto_restart(2, Some(last), now));
+    }
+
+    #[test]
+    fn should_not_restart_within_cooldown() {
+        let now = Utc::now();
+        // 2 tentatives -> backoff 120s ; dernier restart il y a 30s -> non.
+        let last = now - chrono::Duration::seconds(30);
+        assert!(!should_auto_restart(2, Some(last), now));
+    }
+
+    #[test]
+    fn should_not_restart_when_cap_reached() {
+        let now = Utc::now();
+        let long_ago = now - chrono::Duration::days(1);
+        assert!(!should_auto_restart(
+            MAX_RESTART_ATTEMPTS,
+            Some(long_ago),
+            now
+        ));
+        assert!(!should_auto_restart(MAX_RESTART_ATTEMPTS + 3, None, now));
+    }
+
+    #[test]
+    fn should_restart_exactly_at_cooldown_boundary() {
+        let now = Utc::now();
+        // attempts=1 -> backoff 60s ; pile a la frontiere -> autorise (>=).
+        let last = now - chrono::Duration::seconds(60);
+        assert!(should_auto_restart(1, Some(last), now));
     }
 
     #[test]

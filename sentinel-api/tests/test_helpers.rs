@@ -2834,6 +2834,12 @@ impl sentinel_core::ports::outbound::game::game_server_repository::GameServerRep
     async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> {
         unimplemented!()
     }
+    async fn record_restart_attempt(&self, _: Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn reset_restart_attempts(&self, _: Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
     async fn soft_delete(&self, _: Uuid) -> Result<(), DomainError> {
         unimplemented!()
     }

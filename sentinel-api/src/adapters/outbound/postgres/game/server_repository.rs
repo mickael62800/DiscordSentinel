@@ -43,6 +43,8 @@ struct ServerRow {
     updated_at: DateTime<Utc>,
     started_at: Option<DateTime<Utc>>,
     stopped_at: Option<DateTime<Utc>>,
+    restart_attempts: i32,
+    last_restart_at: Option<DateTime<Utc>>,
 }
 
 impl TryFrom<ServerRow> for GameServer {
@@ -74,6 +76,8 @@ impl TryFrom<ServerRow> for GameServer {
             updated_at: r.updated_at,
             started_at: r.started_at,
             stopped_at: r.stopped_at,
+            restart_attempts: r.restart_attempts,
+            last_restart_at: r.last_restart_at,
         })
     }
 }
@@ -81,7 +85,8 @@ impl TryFrom<ServerRow> for GameServer {
 const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id, container_name, \
      host_port, rcon_port, rcon_password, volume_name, allocated_memory_mb, \
      owner_user_id, idle_shutdown_days, last_active_at, last_player_count, \
-     last_error, created_at, updated_at, started_at, stopped_at";
+     last_error, created_at, updated_at, started_at, stopped_at, \
+     restart_attempts, last_restart_at";
 
 #[async_trait]
 impl GameServerRepository for PgGameServerRepository {
@@ -297,6 +302,32 @@ impl GameServerRepository for PgGameServerRepository {
         .execute(&self.pool)
         .await
         .map_err(pg_ctx("update_player_activity"))?;
+        Ok(())
+    }
+
+    async fn record_restart_attempt(&self, id: Uuid) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE game_servers \
+             SET restart_attempts = restart_attempts + 1, last_restart_at = NOW(), updated_at = NOW() \
+             WHERE id = $1 AND deleted_at IS NULL",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("record_restart_attempt"))?;
+        Ok(())
+    }
+
+    async fn reset_restart_attempts(&self, id: Uuid) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE game_servers \
+             SET restart_attempts = 0, updated_at = NOW() \
+             WHERE id = $1 AND restart_attempts <> 0 AND deleted_at IS NULL",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("reset_restart_attempts"))?;
         Ok(())
     }
 

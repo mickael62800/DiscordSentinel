@@ -11,7 +11,9 @@ use uuid::Uuid;
 
 use crate::application::game::config_loader::load_game_portal_config;
 use crate::domain::entities::game::audit::GameAuditAction;
-use crate::domain::entities::game::server::GameServerStatus;
+use crate::domain::entities::game::server::{
+    should_auto_restart, GameServerStatus, MAX_RESTART_ATTEMPTS,
+};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::game::container_runtime::{ContainerRuntime, ContainerState};
 use crate::ports::outbound::game::game_audit_repository::GameAuditRepository;
@@ -118,6 +120,16 @@ pub async fn run_health_check(ctx: &JobContext) -> Result<JobReport, DomainError
                 errors += 1;
             }
         }
+        // Observation saine (RCON repond) : si le serveur avait des
+        // tentatives de redemarrage en cours, on remet le compteur a 0 pour
+        // qu'un futur crash reparte d'un backoff propre. Cheap : seulement si
+        // restart_attempts > 0.
+        if server.restart_attempts > 0 {
+            if let Err(e) = ctx.server_repo.reset_restart_attempts(server.id).await {
+                warn!(error = %e, server_id = %server.id, "reset_restart_attempts");
+            }
+        }
+
         details.insert(server.id.to_string(), serde_json::json!(count));
     }
 
@@ -286,6 +298,114 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
             .await;
     }
 
+    // Helper local : gere le crash d'un serveur dont l'etat DESIRE est Running
+    // (status Running) mais dont le container a exited. Tente un auto-restart
+    // borne + backoff, ou abandonne (Error) une fois le plafond atteint.
+    // Retourne `true` si une action "erreur/abandon" a ete comptee.
+    async fn handle_running_crash(
+        ctx: &JobContext,
+        s: &crate::domain::entities::game::server::GameServer,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> bool {
+        // Plafond atteint : on abandonne definitivement (pas de crash loop).
+        if s.restart_attempts >= MAX_RESTART_ATTEMPTS {
+            warn!(
+                server_id = %s.id,
+                attempts = s.restart_attempts,
+                "max restart attempts reached, marque error"
+            );
+            let _ = ctx
+                .server_repo
+                .update_status(
+                    s.id,
+                    GameServerStatus::Error,
+                    Some("crash : plafond de redemarrages atteint (reconciler)"),
+                )
+                .await;
+            let _ = ctx.session_repo.close_all_active(s.id).await;
+            mark_crashed(ctx, s).await;
+            return true;
+        }
+
+        // Sous le plafond mais cooldown de backoff non ecoule : on ne fait
+        // RIEN ce tick (le serveur reste Running et sera re-evalue au prochain
+        // passage, une fois le backoff ecoule). Evite de marteler le restart.
+        if !should_auto_restart(s.restart_attempts, s.last_restart_at, now) {
+            info!(
+                server_id = %s.id,
+                attempts = s.restart_attempts,
+                "crash detecte, backoff en cours, attente avant redemarrage"
+            );
+            return false;
+        }
+
+        // On peut redemarrer. Il faut un container_id a relancer ; sans lui on
+        // ne peut pas auto-restart -> abandon (Error).
+        let Some(cid) = s.container_id.clone() else {
+            warn!(server_id = %s.id, "crash sans container_id, impossible de redemarrer");
+            let _ = ctx
+                .server_repo
+                .update_status(
+                    s.id,
+                    GameServerStatus::Error,
+                    Some("crash : pas de container_id pour redemarrer (reconciler)"),
+                )
+                .await;
+            let _ = ctx.session_repo.close_all_active(s.id).await;
+            mark_crashed(ctx, s).await;
+            return true;
+        };
+
+        // Comptabilise la tentative AVANT le start (pose last_restart_at -> le
+        // backoff s'applique meme si le start echoue : pas de boucle serree).
+        if let Err(e) = ctx.server_repo.record_restart_attempt(s.id).await {
+            warn!(error = %e, server_id = %s.id, "record_restart_attempt");
+        }
+        let attempt = s.restart_attempts + 1;
+        info!(
+            server_id = %s.id,
+            attempt,
+            max = MAX_RESTART_ATTEMPTS,
+            "crash detecte, auto-restart du container"
+        );
+        let _ = ctx.session_repo.close_all_active(s.id).await;
+
+        match ctx.container_runtime.start_container(&cid).await {
+            Ok(()) => {
+                let _ = ctx
+                    .server_repo
+                    .update_runtime(
+                        s.id,
+                        GameServerRuntimeUpdate {
+                            status: Some(GameServerStatus::Starting),
+                            clear_last_error: true,
+                            started_at_now: true,
+                            ..Default::default()
+                        },
+                    )
+                    .await;
+                let _ = ctx
+                    .audit_repo
+                    .log(
+                        &s.guild_id,
+                        Some(s.id),
+                        None,
+                        GameAuditAction::AutoRestart,
+                        serde_json::json!({ "attempt": attempt, "max": MAX_RESTART_ATTEMPTS }),
+                    )
+                    .await;
+                false
+            }
+            Err(e) => {
+                // Echec du start : on laisse le serveur en Running ; le backoff
+                // (last_restart_at vient d'etre pose) gate la prochaine
+                // tentative au prochain tick, toujours borne par le plafond.
+                warn!(error = %e, server_id = %s.id, attempt, "auto-restart start_container echoue");
+                true
+            }
+        }
+    }
+
     // 1. DB -> Docker : reconcilie chaque serveur actif avec son container.
     for s in &active_servers {
         let dc = docker_by_id.get(&s.id.to_string());
@@ -342,17 +462,22 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                 let exited = matches!(c.state, ContainerState::Exited | ContainerState::Dead);
                 let running = c.state == ContainerState::Running;
                 match s.status {
-                    // Running mais container mort -> stoppe proprement.
+                    // Running mais container mort -> crash. L'etat DESIRE est
+                    // Running (l'utilisateur ne l'a pas stoppe) : on tente un
+                    // auto-restart borne + backoff plutot que de juste stopper.
                     GameServerStatus::Running if exited => {
-                        let _ = ctx
-                            .server_repo
-                            .update_status(
-                                s.id,
-                                GameServerStatus::Stopped,
-                                Some("container exited (reconciler)"),
-                            )
-                            .await;
-                        let _ = ctx.session_repo.close_all_active(s.id).await;
+                        if handle_running_crash(ctx, s, now).await {
+                            errors += 1;
+                        }
+                    }
+                    // Running et container running : observation saine. Si des
+                    // tentatives de redemarrage etaient en cours, on les remet
+                    // a 0 (cheap : seulement si restart_attempts > 0). Couvre
+                    // les serveurs sans RCON, non vus par run_health_check.
+                    GameServerStatus::Running if running && s.restart_attempts > 0 => {
+                        if let Err(e) = ctx.server_repo.reset_restart_attempts(s.id).await {
+                            warn!(error = %e, server_id = %s.id, "reset_restart_attempts");
+                        }
                     }
                     // Starting bloque : on resout selon l'etat reel.
                     GameServerStatus::Starting if stuck && running => {
