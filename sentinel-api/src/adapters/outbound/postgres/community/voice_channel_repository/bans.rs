@@ -10,6 +10,8 @@ use sentinel_core::domain::errors::DomainError;
 struct BanRow {
     id: Uuid,
     voice_channel_id: Uuid,
+    guild_id: String,
+    owner_id: String,
     user_id: String,
     user_name: String,
     banned_by: String,
@@ -23,6 +25,8 @@ impl From<BanRow> for VoiceChannelBan {
         Self {
             id: row.id,
             voice_channel_id: row.voice_channel_id,
+            guild_id: row.guild_id.into(),
+            owner_id: row.owner_id,
             user_id: row.user_id.into(),
             user_name: row.user_name,
             banned_by: row.banned_by,
@@ -35,11 +39,16 @@ impl From<BanRow> for VoiceChannelBan {
 
 #[async_trait]
 impl VoiceBanStore for super::PgVoiceChannelRepository {
-    async fn find_bans(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError> {
+    async fn find_bans_for_owner(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelBan>, DomainError> {
         let rows = sqlx::query_as::<_, BanRow>(
-            "SELECT * FROM voice_channel_bans WHERE voice_channel_id = $1 ORDER BY created_at DESC",
+            "SELECT * FROM voice_channel_bans WHERE guild_id = $1 AND owner_id = $2 ORDER BY created_at DESC",
         )
-        .bind(voice_channel_id)
+        .bind(guild_id)
+        .bind(owner_id)
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;
@@ -49,13 +58,15 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
 
     async fn find_active_ban(
         &self,
-        voice_channel_id: Uuid,
+        guild_id: &str,
+        owner_id: &str,
         user_id: &str,
     ) -> Result<Option<VoiceChannelBan>, DomainError> {
         let row = sqlx::query_as::<_, BanRow>(
-            "SELECT * FROM voice_channel_bans WHERE voice_channel_id = $1 AND user_id = $2 AND (expires_at IS NULL OR expires_at > NOW())",
+            "SELECT * FROM voice_channel_bans WHERE guild_id = $1 AND owner_id = $2 AND user_id = $3 AND (expires_at IS NULL OR expires_at > NOW())",
         )
-        .bind(voice_channel_id)
+        .bind(guild_id)
+        .bind(owner_id)
         .bind(user_id)
         .fetch_optional(&self.pool)
         .await
@@ -67,9 +78,11 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
     async fn save_ban(&self, ban: &VoiceChannelBan) -> Result<(), DomainError> {
         sqlx::query(
             r#"
-            INSERT INTO voice_channel_bans (id, voice_channel_id, user_id, user_name, banned_by, reason, expires_at, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            ON CONFLICT (voice_channel_id, user_id) DO UPDATE SET
+            INSERT INTO voice_channel_bans (id, voice_channel_id, guild_id, owner_id, user_id, user_name, banned_by, reason, expires_at, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            ON CONFLICT (guild_id, owner_id, user_id) DO UPDATE SET
+                voice_channel_id = EXCLUDED.voice_channel_id,
+                user_name = EXCLUDED.user_name,
                 banned_by = EXCLUDED.banned_by,
                 reason = EXCLUDED.reason,
                 expires_at = EXCLUDED.expires_at,
@@ -78,6 +91,8 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         )
         .bind(ban.id)
         .bind(ban.voice_channel_id)
+        .bind(ban.guild_id.as_str())
+        .bind(ban.owner_id.as_str())
         .bind(ban.user_id.as_str())
         .bind(&ban.user_name)
         .bind(&ban.banned_by)
@@ -91,13 +106,21 @@ impl VoiceBanStore for super::PgVoiceChannelRepository {
         Ok(())
     }
 
-    async fn remove_ban(&self, voice_channel_id: Uuid, user_id: &str) -> Result<(), DomainError> {
-        sqlx::query("DELETE FROM voice_channel_bans WHERE voice_channel_id = $1 AND user_id = $2")
-            .bind(voice_channel_id)
-            .bind(user_id)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
+    async fn remove_ban(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM voice_channel_bans WHERE guild_id = $1 AND owner_id = $2 AND user_id = $3",
+        )
+        .bind(guild_id)
+        .bind(owner_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
 
         Ok(())
     }

@@ -196,6 +196,41 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         Ok(Response::new(proto::Empty {}))
     }
 
+    async fn is_banned(
+        &self,
+        request: Request<proto::IsBannedRequest>,
+    ) -> Result<Response<proto::IsBannedResponse>, Status> {
+        let req = request.into_inner();
+        let banned = match self.uc.is_banned(&req.channel_id, &req.user_id).await {
+            Ok(b) => b,
+            // Salon inconnu cote DB : on ne bloque pas (pas de ban connu).
+            Err(DomainError::NotFound(_)) => false,
+            Err(e) => return Err(domain_to_status(e)),
+        };
+        Ok(Response::new(proto::IsBannedResponse { banned }))
+    }
+
+    async fn list_owner_bans(
+        &self,
+        request: Request<proto::ListOwnerBansRequest>,
+    ) -> Result<Response<proto::OwnerBanList>, Status> {
+        let req = request.into_inner();
+        let bans = self
+            .uc
+            .list_owner_bans(&req.guild_id, &req.owner_id)
+            .await
+            .map_err(domain_to_status)?
+            .into_iter()
+            .map(|b| proto::OwnerBan {
+                user_id: b.user_id.into(),
+                user_name: b.user_name,
+                reason: b.reason,
+                expires_at: b.expires_at.map(|t| t.to_rfc3339()),
+            })
+            .collect();
+        Ok(Response::new(proto::OwnerBanList { bans }))
+    }
+
     async fn get_voice_config(
         &self,
         request: Request<proto::GetVoiceConfigRequest>,

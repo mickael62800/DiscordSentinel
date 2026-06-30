@@ -206,7 +206,38 @@ pub(super) async fn create_temp_channel(
         }
     }
 
-    info!(channel = %voice_name, kind = %kind, whitelist = whitelist.len(), "Salon vocal temporaire cree");
+    // Bans persistants (issue #2) : un ban est memorise par (guild, owner,
+    // banned_user) et doit etre re-applique a chaque recreation du salon de ce
+    // proprietaire, sinon le banni n'a qu'a attendre la recreation pour revenir.
+    // On pose un overwrite deny VIEW_CHANNEL|CONNECT par utilisateur banni.
+    // Tolerant aux erreurs (rate-limit Discord) : on log et on continue.
+    let owner_bans = {
+        let data = ctx.data.read().await;
+        if let Some(api) = ApiClient::from_data(&data) {
+            api.list_owner_bans(&guild_id.to_string(), &user_id.get().to_string())
+                .await
+        } else {
+            Vec::new()
+        }
+    };
+    for ban in &owner_bans {
+        let Ok(banned) = ban.user_id.parse::<u64>() else {
+            continue;
+        };
+        let overwrite = PermissionOverwrite {
+            allow: Permissions::empty(),
+            deny: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
+            kind: PermissionOverwriteType::Member(UserId::new(banned)),
+        };
+        if let Err(e) = voice_channel_id
+            .create_permission(&ctx.http, overwrite)
+            .await
+        {
+            warn!(error = %e, banned = %banned, "failed to re-apply ban overwrite");
+        }
+    }
+
+    info!(channel = %voice_name, kind = %kind, whitelist = whitelist.len(), bans = owner_bans.len(), "Salon vocal temporaire cree");
 
     // Stocker les mappings locaux AVANT le move.
     {

@@ -159,6 +159,13 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError>;
     async fn unban_from_channel(&self, channel_id: &str, user_id: &str) -> Result<(), DomainError>;
     async fn is_banned(&self, channel_id: &str, user_id: &str) -> Result<bool, DomainError>;
+    /// Bans memorises pour un proprietaire (guild + owner). Utilise pour
+    /// re-appliquer les bans a la recreation d'un salon temporaire.
+    async fn list_owner_bans(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<crate::domain::entities::community::voice_channel::VoiceChannelBan>, DomainError>;
 
     // Invite Links
     async fn create_invite_link(

@@ -95,6 +95,15 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
                 || game_creator_id == Some(channel_id);
             if !is_creator {
                 if is_temp_channel(ctx, channel_id).await {
+                    // Bans persistants (issue #2) : filet de securite au cas ou
+                    // l'overwrite deny n'aurait pas encore propage (ou si le user
+                    // a rejoint l'instant juste apres la recreation). Si l'API
+                    // confirme un ban actif pour le proprietaire du salon, on
+                    // deconnecte immediatement. Fail-open : aucune action si l'API
+                    // est indisponible (is_banned renvoie false).
+                    if enforce_ban_on_join(ctx, guild_id, channel_id, user_id).await {
+                        return;
+                    }
                     // Temporaire : carte deja creee a la creation du salon.
                     embeds::session_member_joined(ctx, channel_id, &user_label).await;
                 } else if observed_channels.contains(&channel_id) {
@@ -176,6 +185,41 @@ fn parse_observed_channels(raw: Option<&String>) -> Vec<ChannelId> {
         .filter(|id| *id > 0)
         .map(ChannelId::new)
         .collect()
+}
+
+/// Filet de securite join-time pour les bans persistants (issue #2).
+/// Verifie aupres de l'API si `user_id` est banni pour le proprietaire du salon
+/// `channel_id` ; si oui, le deconnecte du vocal. Retourne `true` si le membre
+/// a ete (ou aurait du etre) banni, afin que l'appelant court-circuite le
+/// logging de join. Fail-open : `false` si l'API est indisponible.
+async fn enforce_ban_on_join(
+    ctx: &Context,
+    guild_id: GuildId,
+    channel_id: ChannelId,
+    user_id: UserId,
+) -> bool {
+    if user_id.get() == 0 {
+        return false;
+    }
+    let banned = {
+        let data = ctx.data.read().await;
+        match crate::modules::voice::api_client::ApiClient::from_data(&data) {
+            Some(api) => {
+                api.is_banned(&channel_id.get().to_string(), &user_id.get().to_string())
+                    .await
+            }
+            None => false,
+        }
+    };
+    if !banned {
+        return false;
+    }
+    if let Err(e) = guild_id.disconnect_member(&ctx.http, user_id).await {
+        tracing::warn!(error = %e, user = %user_id, channel = %channel_id, "failed to disconnect banned member on join");
+    } else {
+        tracing::info!(user = %user_id, channel = %channel_id, "Membre banni deconnecte a la connexion (ban persistant)");
+    }
+    true
 }
 
 /// `true` si le salon est un vocal temporaire suivi (present dans la map

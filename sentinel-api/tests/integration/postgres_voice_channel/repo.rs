@@ -237,6 +237,8 @@ async fn ban_save_find_and_remove() {
     let ban = VoiceChannelBan {
         id: Uuid::new_v4(),
         voice_channel_id: vc.id,
+        guild_id: vc.guild_id.clone(),
+        owner_id: vc.owner_id.clone(),
         user_id: "trouble".into(),
         user_name: "Trouble".into(),
         banned_by: "mod".into(),
@@ -246,17 +248,22 @@ async fn ban_save_find_and_remove() {
     };
     repo.save_ban(&ban).await.unwrap();
     let found = repo
-        .find_active_ban(vc.id, "trouble")
+        .find_active_ban(vc.guild_id.as_str(), &vc.owner_id, "trouble")
         .await
         .unwrap()
         .unwrap();
     assert_eq!(found.user_id.as_str(), "trouble");
-    let all = repo.find_bans(vc.id).await.unwrap();
+    let all = repo
+        .find_bans_for_owner(vc.guild_id.as_str(), &vc.owner_id)
+        .await
+        .unwrap();
     assert_eq!(all.len(), 1);
 
-    repo.remove_ban(vc.id, "trouble").await.unwrap();
+    repo.remove_ban(vc.guild_id.as_str(), &vc.owner_id, "trouble")
+        .await
+        .unwrap();
     assert!(repo
-        .find_active_ban(vc.id, "trouble")
+        .find_active_ban(vc.guild_id.as_str(), &vc.owner_id, "trouble")
         .await
         .unwrap()
         .is_none());
@@ -270,6 +277,8 @@ async fn find_active_ban_excludes_expired() {
     let expired = VoiceChannelBan {
         id: Uuid::new_v4(),
         voice_channel_id: vc.id,
+        guild_id: vc.guild_id.clone(),
+        owner_id: vc.owner_id.clone(),
         user_id: "u1".into(),
         user_name: "U".into(),
         banned_by: "mod".into(),
@@ -278,7 +287,11 @@ async fn find_active_ban_excludes_expired() {
         created_at: Utc::now() - Duration::hours(2),
     };
     repo.save_ban(&expired).await.unwrap();
-    assert!(repo.find_active_ban(vc.id, "u1").await.unwrap().is_none());
+    assert!(repo
+        .find_active_ban(vc.guild_id.as_str(), &vc.owner_id, "u1")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

@@ -55,7 +55,12 @@ pub struct VoiceChannelWhitelistEntry {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannelBan {
     pub id: Uuid,
+    /// Reference historique vers l'instance du salon au moment du ban. Peut
+    /// pointer vers un salon supprime : la cle logique est desormais
+    /// (guild_id, owner_id, user_id).
     pub voice_channel_id: Uuid,
+    pub guild_id: GuildId,
+    pub owner_id: String,
     pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,

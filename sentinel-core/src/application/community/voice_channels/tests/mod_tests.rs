@@ -480,12 +480,17 @@ impl VoicePresetStore for MockVoiceRepo {
 
 #[async_trait]
 impl VoiceBanStore for MockVoiceRepo {
-    async fn find_bans(&self, _: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError> {
+    async fn find_bans_for_owner(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<VoiceChannelBan>, DomainError> {
         Ok(vec![])
     }
     async fn find_active_ban(
         &self,
-        _: Uuid,
+        _: &str,
+        _: &str,
         _: &str,
     ) -> Result<Option<VoiceChannelBan>, DomainError> {
         Ok(None)
@@ -493,7 +498,7 @@ impl VoiceBanStore for MockVoiceRepo {
     async fn save_ban(&self, _: &VoiceChannelBan) -> Result<(), DomainError> {
         Ok(())
     }
-    async fn remove_ban(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+    async fn remove_ban(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
         Ok(())
     }
     async fn cleanup_expired_bans(&self) -> Result<u64, DomainError> {

@@ -98,6 +98,13 @@ pub struct WhitelistEntryResponse {
     pub target_name: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct OwnerBanResponse {
+    pub user_id: String,
+    pub user_name: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct BanFromChannelRequest {
     pub user_id: String,
@@ -377,6 +384,40 @@ impl ApiClient {
             duration_secs: request.duration_secs,
         };
         crate::grpc_call!(@unit self.grpc, voice_channels, ban_from_channel, req)
+    }
+
+    /// Verifie si un user est banni pour le proprietaire du salon (join-time).
+    /// Tolerant aux erreurs : en cas d'echec gRPC on renvoie `false` (fail-open)
+    /// pour ne jamais deconnecter a tort sur une indisponibilite API.
+    pub async fn is_banned(&self, channel_id: &str, user_id: &str) -> bool {
+        let req = proto::IsBannedRequest {
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        match crate::grpc_call!(@raw self.grpc, voice_channels, is_banned, req) {
+            Ok(resp) => resp.banned,
+            Err(_) => false,
+        }
+    }
+
+    /// Liste les bans memorises pour ce proprietaire (re-application a la
+    /// recreation du salon). Tolerant aux erreurs : liste vide si echec.
+    pub async fn list_owner_bans(&self, guild_id: &str, owner_id: &str) -> Vec<OwnerBanResponse> {
+        let req = proto::ListOwnerBansRequest {
+            guild_id: guild_id.to_string(),
+            owner_id: owner_id.to_string(),
+        };
+        match crate::grpc_call!(@raw self.grpc, voice_channels, list_owner_bans, req) {
+            Ok(list) => list
+                .bans
+                .into_iter()
+                .map(|b| OwnerBanResponse {
+                    user_id: b.user_id,
+                    user_name: b.user_name,
+                })
+                .collect(),
+            Err(_) => Vec::new(),
+        }
     }
 
     // ── Moderation log (reuse ModerationService.LogAction) ──

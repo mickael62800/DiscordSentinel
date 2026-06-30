@@ -1044,6 +1044,16 @@ impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
     async fn is_banned(&self, _: &str, user_id: &str) -> Result<bool, DomainError> {
         Ok(user_id == "banned_user")
     }
+    async fn list_owner_bans(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
 
     // Toutes les autres methodes ne sont pas appelees dans nos tests.
     async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError> {

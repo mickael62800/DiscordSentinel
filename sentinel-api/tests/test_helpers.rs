@@ -3625,6 +3625,16 @@ impl ManageVoiceChannelsUseCase for StubVoiceChannels {
     async fn is_banned(&self, _: &str, _: &str) -> Result<bool, DomainError> {
         unimplemented!()
     }
+    async fn list_owner_bans(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan>,
+        DomainError,
+    > {
+        unimplemented!()
+    }
     async fn create_invite_link(
         &self,
         _: CreateInviteLinkCommand,

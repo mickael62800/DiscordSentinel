@@ -250,6 +250,15 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.is_banned_impl(channel_id, user_id).await
     }
 
+    async fn list_owner_bans(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<crate::domain::entities::community::voice_channel::VoiceChannelBan>, DomainError>
+    {
+        self.list_owner_bans_impl(guild_id, owner_id).await
+    }
+
     // ── Invite Links ──
 
     async fn create_invite_link(

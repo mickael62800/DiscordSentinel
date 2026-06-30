@@ -45,7 +45,10 @@ impl ManageVoiceChannelsService {
         cached_json(&self.cache, &cache_key, CHANNEL_DETAIL_TTL, || async {
             let channel = self.resolve_channel(channel_id).await?;
             let co_admins = self.repo.find_co_admins(channel.id).await?;
-            let bans = self.repo.find_bans(channel.id).await?;
+            let bans = self
+                .repo
+                .find_bans_for_owner(channel.guild_id.as_str(), &channel.owner_id)
+                .await?;
             let invite_links = self.repo.find_invite_links(channel.id).await?;
             Ok(VoiceChannelDetail {
                 channel,

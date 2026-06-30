@@ -258,6 +258,9 @@ impl ManageVoiceChannelsUseCase for MockVoiceUc {
     async fn is_banned(&self, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(false)
     }
+    async fn list_owner_bans(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelBan>, DomainError> {
+        Ok(vec![])
+    }
     async fn create_invite_link(
         &self,
         _: CreateInviteLinkCommand,
@@ -433,6 +436,8 @@ async fn get_channel_found_returns_detail_with_co_admins() {
     let _ = VoiceChannelBan {
         id: Uuid::new_v4(),
         voice_channel_id: Uuid::new_v4(),
+        guild_id: String::new().into(),
+        owner_id: String::new(),
         user_id: String::new().into(),
         user_name: String::new(),
         banned_by: String::new(),

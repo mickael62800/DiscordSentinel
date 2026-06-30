@@ -96,16 +96,31 @@ pub trait VoicePresetStore: Send + Sync {
 }
 
 /// Gestion des bannissements de salon vocal.
+///
+/// Les bans sont cles par (guild_id, owner_id, user_id) — comme la whitelist —
+/// afin de survivre a la suppression/recreation du salon temporaire (issue #2).
 #[async_trait]
 pub trait VoiceBanStore: Send + Sync {
-    async fn find_bans(&self, voice_channel_id: Uuid) -> Result<Vec<VoiceChannelBan>, DomainError>;
+    /// Tous les bans memorises pour ce proprietaire dans cette guild (actifs
+    /// ou expires), tries du plus recent au plus ancien.
+    async fn find_bans_for_owner(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelBan>, DomainError>;
     async fn find_active_ban(
         &self,
-        voice_channel_id: Uuid,
+        guild_id: &str,
+        owner_id: &str,
         user_id: &str,
     ) -> Result<Option<VoiceChannelBan>, DomainError>;
     async fn save_ban(&self, ban: &VoiceChannelBan) -> Result<(), DomainError>;
-    async fn remove_ban(&self, voice_channel_id: Uuid, user_id: &str) -> Result<(), DomainError>;
+    async fn remove_ban(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError>;
     async fn cleanup_expired_bans(&self) -> Result<u64, DomainError>;
 }
 

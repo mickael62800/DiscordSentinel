@@ -16,6 +16,10 @@ service VoiceChannelsService {
   rpc AddCoAdmin(AddCoAdminRequest) returns (Empty);
   rpc AddToWhitelist(AddToWhitelistRequest) returns (Empty);
   rpc BanFromChannel(BanFromChannelRequest) returns (Empty);
+  // Verifie si un user est banni pour le proprietaire du salon (join-time check).
+  rpc IsBanned(IsBannedRequest) returns (IsBannedResponse);
+  // Bans memorises pour un proprietaire : re-application a la recreation.
+  rpc ListOwnerBans(ListOwnerBansRequest) returns (OwnerBanList);
   rpc GetVoiceConfig(GetVoiceConfigRequest) returns (VoiceConfig);
   rpc ListThemes(ListThemesRequest) returns (ThemeList);
   // Presets par proprietaire (sauvegarde des parametres) + lecture whitelist.
@@ -111,6 +115,32 @@ message BanFromChannelRequest {
   string banned_by = 4;
   optional string reason = 5;
   optional int64 duration_secs = 6;
+}
+
+message IsBannedRequest {
+  string channel_id = 1;
+  string user_id = 2;
+}
+
+message IsBannedResponse {
+  bool banned = 1;
+}
+
+message ListOwnerBansRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+}
+
+message OwnerBan {
+  string user_id = 1;
+  string user_name = 2;
+  optional string reason = 3;
+  // RFC3339, absent si ban permanent.
+  optional string expires_at = 4;
+}
+
+message OwnerBanList {
+  repeated OwnerBan bans = 1;
 }
 
 message VoiceChannel {

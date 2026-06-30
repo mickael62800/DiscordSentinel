@@ -81,6 +81,8 @@ impl ManageVoiceChannelsService {
         let ban = VoiceChannelBan {
             id: Uuid::new_v4(),
             voice_channel_id: channel.id,
+            guild_id: channel.guild_id.clone(),
+            owner_id: channel.owner_id.clone(),
             user_id: cmd.user_id,
             user_name: cmd.user_name,
             banned_by: cmd.banned_by,
@@ -101,7 +103,9 @@ impl ManageVoiceChannelsService {
         user_id: &str,
     ) -> Result<(), DomainError> {
         let channel = self.resolve_channel(channel_id).await?;
-        self.repo.remove_ban(channel.id, user_id).await?;
+        self.repo
+            .remove_ban(channel.guild_id.as_str(), &channel.owner_id, user_id)
+            .await?;
         self.invalidate_cache(&channel.guild_id, channel_id).await;
         Ok(())
     }
@@ -112,7 +116,20 @@ impl ManageVoiceChannelsService {
         user_id: &str,
     ) -> Result<bool, DomainError> {
         let channel = self.resolve_channel(channel_id).await?;
-        let ban = self.repo.find_active_ban(channel.id, user_id).await?;
+        let ban = self
+            .repo
+            .find_active_ban(channel.guild_id.as_str(), &channel.owner_id, user_id)
+            .await?;
         Ok(ban.is_some())
+    }
+
+    /// Bans memorises pour un proprietaire (guild + owner), utilises pour
+    /// re-appliquer les overwrites a la recreation d'un salon temporaire.
+    pub(super) async fn list_owner_bans_impl(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<Vec<VoiceChannelBan>, DomainError> {
+        self.repo.find_bans_for_owner(guild_id, owner_id).await
     }
 }

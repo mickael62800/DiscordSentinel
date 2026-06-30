@@ -380,6 +380,8 @@ fn ban_to_dto_preserves_fields() {
     let b = VoiceChannelBan {
         id: Uuid::new_v4(),
         voice_channel_id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        owner_id: "owner".into(),
         user_id: "bad".into(),
         user_name: "BadGuy".into(),
         banned_by: "mod".into(),
@@ -398,6 +400,8 @@ fn ban_permanent_to_dto_preserves_none_expires() {
     let b = VoiceChannelBan {
         id: Uuid::new_v4(),
         voice_channel_id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        owner_id: "owner".into(),
         user_id: "u".into(),
         user_name: "U".into(),
         banned_by: "m".into(),
