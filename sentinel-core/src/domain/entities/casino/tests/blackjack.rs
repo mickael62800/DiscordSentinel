@@ -291,6 +291,35 @@ fn game_over_rejects_in_progress_statuses() {
 }
 
 #[test]
+fn natural_outcome_double_21_is_push() {
+    assert_eq!(natural_deal_outcome(21, 21), NaturalDealOutcome::Push);
+}
+
+#[test]
+fn natural_outcome_player_21_only_is_blackjack() {
+    assert_eq!(
+        natural_deal_outcome(21, 20),
+        NaturalDealOutcome::PlayerBlackjack
+    );
+    assert_eq!(
+        natural_deal_outcome(21, 17),
+        NaturalDealOutcome::PlayerBlackjack
+    );
+}
+
+#[test]
+fn natural_outcome_no_player_21_keeps_playing() {
+    assert_eq!(
+        natural_deal_outcome(20, 21),
+        NaturalDealOutcome::KeepPlaying
+    );
+    assert_eq!(
+        natural_deal_outcome(18, 18),
+        NaturalDealOutcome::KeepPlaying
+    );
+}
+
+#[test]
 fn shoe_has_six_decks_of_standard_52() {
     assert_eq!(BLACKJACK_SHOE_DECKS, 6);
     assert_eq!(BLACKJACK_SHOE_TOTAL_CARDS, 312);

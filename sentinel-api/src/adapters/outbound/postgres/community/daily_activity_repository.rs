@@ -65,7 +65,7 @@ impl DailyActivityRepository for PgDailyActivityRepository {
                WHERE guild_id = $1 AND day >= CURRENT_DATE - $2::integer
                ORDER BY day ASC"#
         } else {
-            r#"SELECT id, '' as guild_id, day,
+            r#"SELECT '00000000-0000-0000-0000-000000000000'::uuid as id, '' as guild_id, day,
                       SUM(messages)::bigint as messages,
                       SUM(voice_minutes)::bigint as voice_minutes,
                       SUM(active_members)::integer as active_members,
@@ -77,7 +77,7 @@ impl DailyActivityRepository for PgDailyActivityRepository {
                       SUM(bans)::integer as bans
                FROM daily_activity
                WHERE day >= CURRENT_DATE - $1::integer
-               GROUP BY id, day
+               GROUP BY day
                ORDER BY day ASC"#
         };
 

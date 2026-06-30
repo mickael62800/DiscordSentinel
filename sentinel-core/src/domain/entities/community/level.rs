@@ -71,11 +71,16 @@ pub fn xp_for_level(level: i32) -> i64 {
     (5.0 * l.powi(2) + 50.0 * l + 100.0) as i64
 }
 
+/// Plafond de niveau pour le systeme d'XP communautaire. Borne le calcul
+/// pour eviter une boucle non bornee / un overflow i64 sur des XP absurdes.
+/// Volontairement tres genereux : aucun joueur reel ne l'atteindra.
+pub const MAX_LEVEL: i32 = 10_000;
+
 /// Calcule le niveau a partir du XP total.
 pub fn level_from_xp(xp: i64) -> i32 {
     let mut level = 0;
     let mut total_needed: i64 = 0;
-    loop {
+    while level < MAX_LEVEL {
         let next = xp_for_level(level + 1);
         if total_needed + next > xp {
             break;

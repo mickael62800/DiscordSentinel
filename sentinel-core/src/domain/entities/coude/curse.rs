@@ -224,8 +224,13 @@ pub fn pick_curse_by_index(rand_index: usize) -> CurseKind {
 }
 
 /// Cout pour lever une malediction (paye par la cible a l auteur).
-pub const fn lift_cost(_kind: CurseKind) -> i64 {
-    CURSE_COST_COINS * CURSE_LIFT_MULTIPLIER
+///
+/// Indexe sur le cout de lancement specifique a la malediction
+/// (`cost_coins`) multiplie par `CURSE_LIFT_MULTIPLIER`. Lever une
+/// malediction couteuse (ex. Empoisonner) coute donc plus cher qu'une
+/// classique.
+pub fn lift_cost(kind: CurseKind) -> i64 {
+    kind.cost_coins() * CURSE_LIFT_MULTIPLIER
 }
 
 /// Applique l effet "Peau de banane" a un jet de d20.

@@ -38,6 +38,13 @@ fn pick_by_index_wraps_modulo() {
 fn lift_cost_is_double_cast_cost() {
     assert_eq!(lift_cost(CurseKind::Banana), CURSE_COST_COINS * 2);
     assert_eq!(lift_cost(CurseKind::Chicken), 600);
+    // Le cout de levee suit le cout de lancement specifique a la kind.
+    assert_eq!(
+        lift_cost(CurseKind::Empoisonner),
+        CurseKind::Empoisonner.cost_coins() * CURSE_LIFT_MULTIPLIER
+    );
+    assert_eq!(lift_cost(CurseKind::FausseAssurance), 500 * 2);
+    assert_eq!(lift_cost(CurseKind::Pancarte), 150 * 2);
 }
 
 #[test]

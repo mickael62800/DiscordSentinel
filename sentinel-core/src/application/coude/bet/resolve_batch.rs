@@ -306,8 +306,32 @@ impl ResolveBettingBatchService {
         }
 
         // ── Winner path ──
-        let winner_id = result.winner_id.clone().unwrap();
-        let loser_id = result.loser_id.clone().unwrap();
+        // Garde-fou : si pour une raison quelconque le resultat n'expose pas
+        // de vainqueur/perdant clairs (devrait etre couvert par le chemin
+        // egalite plus haut), on traite le combat comme une egalite sans transfert
+        // plutot que de paniquer sur un unwrap.
+        let (Some(winner_id), Some(loser_id)) = (result.winner_id.clone(), result.loser_id.clone())
+        else {
+            warn!(
+                combat_id = %combat.id,
+                "Combat sans vainqueur/perdant hors chemin egalite : traite comme no-op"
+            );
+            if let Err(e) = self.bets_uc.refund(combat.id).await {
+                warn!(error = %e, combat_id = %combat.id, "Echec refund paris (winner/loser absent)");
+            }
+            return Ok(ResolvedBettingCombatOutput {
+                combat_id: combat.id.to_string(),
+                guild_id: combat.guild_id.clone(),
+                channel_id: combat.channel_id.clone(),
+                message_id: combat.message_id.clone(),
+                result_message: result.message,
+                winner_id: None,
+                loser_id: None,
+                coins_transferred: 0,
+                is_draw: true,
+                taunt_events: vec![],
+            });
+        };
 
         // Cap sur solde reel du perdant (plus de coins ex-nihilo).
         let loser_wallet = self

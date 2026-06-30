@@ -51,6 +51,20 @@ fn stars_clamp_at_max() {
 }
 
 #[test]
+fn gain_multiplier_negative_max_count_does_not_panic() {
+    // Une config corrompue avec max_count negatif ne doit pas paniquer
+    // (i32::clamp panique si min > max). On retombe sur le neutre.
+    assert_eq!(
+        prestige_gain_multiplier_with_params(3, PRESTIGE_GAIN_BONUS_PCT, -1),
+        1.0
+    );
+    assert_eq!(
+        prestige_gain_multiplier_with_params(0, PRESTIGE_GAIN_BONUS_PCT, -10),
+        1.0
+    );
+}
+
+#[test]
 fn constants_match_spec() {
     assert_eq!(PRESTIGE_UNLOCK_LEVEL, 25);
     assert_eq!(PRESTIGE_MAX_COUNT, 5);

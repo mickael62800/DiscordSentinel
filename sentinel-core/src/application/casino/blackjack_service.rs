@@ -5,7 +5,9 @@ use uuid::Uuid;
 
 use crate::domain::entities::casino::blackjack::calculate_score;
 use crate::domain::entities::casino::blackjack::create_deck;
+use crate::domain::entities::casino::blackjack::natural_deal_outcome;
 use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::casino::blackjack::NaturalDealOutcome;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
@@ -120,28 +122,35 @@ impl BlackjackService {
         let player_score = calculate_score(&player_hand);
         let dealer_score = calculate_score(&dealer_hand);
 
-        // Vérifier le blackjack naturel
-        let (status, payout, finished_at) = if player_score == 21 {
-            // Blackjack naturel du joueur. On `.round()` au lieu de
-            // tronquer : pour bet=51 avec payout=1.5, le calcul donne
-            // 127.5 -> 128 (fair) au lieu de 127 (perte de 0.5 coin).
-            let payout = (bet as f64 * (1.0 + blackjack_payout)).round() as i64;
-            ("player_blackjack".to_string(), payout, Some(Utc::now()))
-        } else {
-            ("playing".to_string(), 0, None)
+        // Vérifier le blackjack naturel (règle pure dans le domaine).
+        let (status, payout, finished_at) = match natural_deal_outcome(player_score, dealer_score) {
+            NaturalDealOutcome::Push => {
+                // Double blackjack naturel (joueur ET croupier) : égalité.
+                // La mise a déjà été débitée plus haut, on la rembourse à
+                // l'identique -> gain net nul.
+                ("push".to_string(), bet, Some(Utc::now()))
+            }
+            NaturalDealOutcome::PlayerBlackjack => {
+                // Blackjack naturel du joueur. On `.round()` au lieu de
+                // tronquer : pour bet=51 avec payout=1.5, le calcul donne
+                // 127.5 -> 128 (fair) au lieu de 127 (perte de 0.5 coin).
+                let payout = (bet as f64 * (1.0 + blackjack_payout)).round() as i64;
+                ("player_blackjack".to_string(), payout, Some(Utc::now()))
+            }
+            NaturalDealOutcome::KeepPlaying => ("playing".to_string(), 0, None),
         };
 
-        // Si blackjack, créditer le gain via wallet_uc (jackpot auto-detecte).
-        if status == "player_blackjack" && payout > 0 {
+        // Si blackjack ou push, créditer le gain/remboursement via wallet_uc
+        // (jackpot auto-detecte).
+        if (status == "player_blackjack" || status == "push") && payout > 0 {
+            let reason = if status == "push" {
+                "Égalité blackjack (mise remboursée)"
+            } else {
+                "Blackjack ! Gain x2.5"
+            };
             let credit_mut = self
                 .wallet_uc
-                .credit(
-                    &guild_id,
-                    &user_id,
-                    payout,
-                    "blackjack",
-                    "Blackjack ! Gain x2.5",
-                )
+                .credit(&guild_id, &user_id, payout, "blackjack", reason)
                 .await?;
             taunt_events.extend(credit_mut.triggered_taunts);
         }

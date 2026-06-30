@@ -85,6 +85,33 @@ pub fn is_blackjack_game_over(status: &str) -> bool {
     BLACKJACK_FINAL_STATUSES.contains(&status)
 }
 
+/// Resultat possible d'une main a la distribution initiale (avant toute
+/// action du joueur), en fonction des scores naturels.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NaturalDealOutcome {
+    /// Aucun blackjack naturel cote joueur : la partie continue.
+    KeepPlaying,
+    /// Joueur ET croupier ont un 21 naturel : egalite (push). La mise est
+    /// remboursee a l'identique (gain net nul).
+    Push,
+    /// Blackjack naturel du joueur (le croupier n'a pas 21) : paiement majore.
+    PlayerBlackjack,
+}
+
+/// Determine l'issue d'une main des la distribution.
+///
+/// Regle metier : un 21 naturel du joueur paie le blackjack, SAUF si le
+/// croupier a egalement un 21 naturel, auquel cas c'est une egalite (push).
+pub fn natural_deal_outcome(player_score: i32, dealer_score: i32) -> NaturalDealOutcome {
+    if player_score == 21 && dealer_score == 21 {
+        NaturalDealOutcome::Push
+    } else if player_score == 21 {
+        NaturalDealOutcome::PlayerBlackjack
+    } else {
+        NaturalDealOutcome::KeepPlaying
+    }
+}
+
 /// Nombre de decks dans un shoe de blackjack multiplayer. Regle standard
 /// casino (6 decks = 312 cartes) : ratisse le cardcount pour diluer les
 /// avantages statistiques et eviter les sessions trop longues.

@@ -35,6 +35,9 @@ pub fn prestige_gain_multiplier_with_params(
     bonus_pct: f64,
     max_count: i32,
 ) -> f64 {
+    // Garde-fou : une config negative (`max_count < 0`) ferait paniquer
+    // `i32::clamp` (min > max). On borne max_count a >= 0.
+    let max_count = max_count.max(0);
     let count = prestige_count.clamp(0, max_count);
     1.0 + (count as f64 * bonus_pct)
 }
