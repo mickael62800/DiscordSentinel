@@ -121,6 +121,10 @@ async fn announce_level_up(
     level: i32,
     kind: &str,        // "texte" | "vocal"
     title_emoji: &str, // emoji du title
+    // Salon declencheur (message). Utilise en fallback quand aucun salon
+    // d'annonce n'est configure (le schema promet "poste dans le salon
+    // courant"). None pour le vocal : pas de salon courant.
+    current_channel_id: Option<ChannelId>,
 ) {
     let max_level = BaseApiClient::config_u64(guild_config, "max_level", 0) as i32;
     if max_level > 0 && level > max_level {
@@ -146,8 +150,12 @@ async fn announce_level_up(
     let announce_enabled =
         BaseApiClient::config_bool(guild_config, "levelup_announce_enabled", true);
     if announce_enabled {
-        if let Some(ch_id) = level_channel::resolve_level_up_channel(guild_config) {
-            let target = ChannelId::new(ch_id);
+        // Salon configure, sinon fallback sur le salon courant (cf. schema :
+        // "Si vide, l'annonce est postee dans le salon courant").
+        let target = level_channel::resolve_level_up_channel(guild_config)
+            .map(ChannelId::new)
+            .or(current_channel_id);
+        if let Some(target) = target {
             if let Err(e) = target
                 .send_message(&ctx.http, CreateMessage::new().embed(embed.clone()))
                 .await
@@ -492,6 +500,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                     result.user.level_text,
                     "texte",
                     "\u{1f4dd}",
+                    Some(msg.channel_id),
                 )
                 .await;
             }
@@ -676,6 +685,7 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                             result.user.level_voice,
                                             "vocal",
                                             "\u{1f3a4}",
+                                            None,
                                         )
                                         .await;
                                     }
