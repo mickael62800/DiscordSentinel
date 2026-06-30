@@ -61,6 +61,26 @@ async fn gate_by_channel_id(
     }
     Ok(())
 }
+
+/// Ensemble des guilds ou le caller est Moderator+ (pour scoper les endpoints
+/// guild-less comme `list_all_channels`). Lit `api_user_guilds` (role stocke en
+/// minuscules). Mirroir du helper homonyme de `tickets.rs`.
+async fn moderated_guilds(
+    state: &AppState,
+    user_id: &str,
+) -> Result<std::collections::HashSet<String>, ApiError> {
+    let rows: Vec<(String, String)> =
+        sqlx::query_as("SELECT guild_id, role FROM api_user_guilds WHERE discord_user_id = $1")
+            .bind(user_id)
+            .fetch_all(&state.pg_pool)
+            .await
+            .map_err(sqlx_internal("moderated_guilds (voice)"))?;
+    Ok(rows
+        .into_iter()
+        .filter(|(_, r)| Role::from_str(r).is_some_and(|role| role.satisfies(Role::Moderator)))
+        .map(|(g, _)| g)
+        .collect())
+}
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
@@ -109,12 +129,37 @@ pub struct PaginationQuery {
 
 pub async fn list_all_channels(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit =
         crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
     let channels = state.voice_channels_uc.list_all_channels().await?;
+
+    // Endpoint guild-less : on scope au web. Le chemin bot/interne (pas de
+    // RoleContext) n'est PAS filtre. Un superadmin voit tout ; sinon on ne
+    // retourne que les salons des guilds ou le caller est Moderator+ (mirroir
+    // de `list_tickets`).
+    let channels = match rbac.as_ref() {
+        None => channels,
+        Some(Extension(ctx)) => {
+            if state
+                .superadmin_user_ids
+                .iter()
+                .any(|sid| sid == &ctx.discord_user_id)
+            {
+                channels
+            } else {
+                let allowed = moderated_guilds(&state, &ctx.discord_user_id).await?;
+                channels
+                    .into_iter()
+                    .filter(|c| allowed.contains(c.guild_id.as_str()))
+                    .collect()
+            }
+        }
+    };
+
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
     Ok(map_to_dtos(page))
 }
@@ -231,9 +276,18 @@ pub async fn purge_history(
 /// Timeline d'un salon vocal : join/leave/move + create/update/close.
 pub async fn list_channel_events(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour consulter les evenements d'un voice channel",
+    )
+    .await?;
     let limit = params.limit.unwrap_or(200).clamp(1, 1000);
     let rows: Vec<(
         uuid::Uuid,
@@ -295,8 +349,17 @@ pub async fn list_channel_events(
 
 pub async fn get_channel_detail(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour consulter un voice channel",
+    )
+    .await?;
     let detail = state
         .voice_channels_uc
         .get_channel_detail(&channel_id)
@@ -588,8 +651,17 @@ pub async fn remove_co_admin(
 
 pub async fn get_whitelist(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ pour consulter la whitelist voice",
+    )
+    .await?;
     let entries = state
         .voice_channels_uc
         .get_whitelist(&guild_id, &owner_id)
@@ -711,8 +783,17 @@ pub async fn check_ban(
 
 pub async fn list_invite_links(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<Vec<InviteLinkResponseDto>>, ApiError> {
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour lister les invites d'un voice channel",
+    )
+    .await?;
     let links = state
         .voice_channels_uc
         .list_invite_links(&channel_id)
@@ -722,9 +803,18 @@ pub async fn list_invite_links(
 
 pub async fn create_invite_link(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<CreateInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
+    gate_by_channel_id(
+        &state,
+        &rbac,
+        &channel_id,
+        Role::Moderator,
+        "moderator+ pour creer un invite voice",
+    )
+    .await?;
     let cmd = CreateInviteLinkCommand {
         channel_id: channel_id.clone().into(),
         created_by: dto.created_by,
@@ -749,12 +839,24 @@ pub async fn create_invite_link(
 
 pub async fn use_invite_link(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(code): Path<String>,
     Json(dto): Json<UseInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
+    // Action self-service : un utilisateur consomme SON propre code.
+    // Pour un appel WEB (RoleContext present), l'identite a whitelister est
+    // DERIVEE du principal authentifie -> on IGNORE tout `user_id` fourni dans
+    // le body (anti-forgery : un caller ne peut whitelister que lui-meme).
+    // Pour le chemin bot/interne (RoleContext absent, gRPC/Bearer de confiance),
+    // on conserve le `user_id` du body (le bot passe le vrai redeemer).
+    let user_id = match rbac.as_ref() {
+        Some(Extension(ctx)) => ctx.discord_user_id.clone().into(),
+        None => dto.user_id.clone(),
+    };
+
     let cmd = UseInviteLinkCommand {
         code: code.clone(),
-        user_id: dto.user_id.clone(),
+        user_id: user_id.clone(),
         user_name: dto.user_name,
     };
 
@@ -765,7 +867,7 @@ pub async fn use_invite_link(
         serde_json::json!({
             "channel_id": &link.channel_id,
             "code": &code,
-            "user_id": &dto.user_id,
+            "user_id": &user_id,
         }),
     );
 
