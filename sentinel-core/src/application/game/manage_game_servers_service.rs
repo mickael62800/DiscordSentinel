@@ -193,6 +193,8 @@ impl ManageGameServersService {
                 host_port,
                 container_port: template.container_port,
                 protocol: proto,
+                // Port jeu : exposé sur toutes les interfaces.
+                host_ip: "0.0.0.0".to_string(),
             });
         }
         if template.supports_rcon && cfg.rcon_enabled {
@@ -202,6 +204,9 @@ impl ManageGameServersService {
                     host_port: rcon_host_port,
                     container_port: 25575,
                     protocol: PortProtocol::Tcp,
+                    // RCON = console admin : bind uniquement sur loopback,
+                    // l'app s'y connecte via 127.0.0.1. JAMAIS exposé.
+                    host_ip: "127.0.0.1".to_string(),
                 });
             }
         }
@@ -285,6 +290,42 @@ impl ManageGameServersService {
         env
     }
 
+    /// Libere best-effort une liste de ports (kind, port) dans le pool.
+    /// Utilise sur les chemins d'echec de `start`.
+    async fn release_ports(&self, ports: &[(PortKind, u16)]) {
+        for (kind, port) in ports {
+            if let Err(e) = self.port_allocator.release(*kind, *port).await {
+                warn!(error = %e, port = *port, "release port apres echec start a echoue");
+            }
+        }
+    }
+
+    /// Nettoyage commun d'un echec de `start` AVANT que le container soit
+    /// demarre : libere les ports alloues dans cet appel, retire le volume
+    /// fraichement cree (best-effort), puis bascule le serveur en Error.
+    async fn fail_start_cleanup(
+        &self,
+        id: Uuid,
+        newly_allocated: &[(PortKind, u16)],
+        removable_volume: Option<&str>,
+        stage: &str,
+        err: &DomainError,
+    ) -> Result<(), DomainError> {
+        self.release_ports(newly_allocated).await;
+        if let Some(vol) = removable_volume {
+            if let Err(e) = self.container_runtime.remove_volume(vol).await {
+                warn!(error = %e, volume = %vol, "cleanup volume apres echec start a echoue");
+            }
+        }
+        self.server_repo
+            .update_status(
+                id,
+                GameServerStatus::Error,
+                Some(&format!("{stage}: {err}")),
+            )
+            .await
+    }
+
     async fn audit(
         &self,
         guild_id: &str,
@@ -312,6 +353,16 @@ impl ManageGameServersUseCase for ManageGameServersService {
         let memory = cmd
             .allocated_memory_mb
             .unwrap_or(template.default_memory_mb);
+
+        // Validation des configs initiales (keys + values vs schema template)
+        // AVANT toute ecriture DB.
+        for (k, v) in &cmd.initial_config {
+            crate::domain::entities::game::config::validate_config_key(k)
+                .map_err(DomainError::ValidationError)?;
+            template
+                .validate_config_value(k, v)
+                .map_err(DomainError::ValidationError)?;
+        }
 
         // 1. Creation DB en statut `created` (pas encore de container).
         let new = NewGameServer {
@@ -446,73 +497,123 @@ impl ManageGameServersUseCase for ManageGameServersService {
         // volume + container).
         let mut server = server;
         if server.container_id.is_none() {
-            // Allocation ports.
-            let game_port = self
-                .port_allocator
-                .allocate(
-                    PortKind::Game,
-                    cfg.port_range_start,
-                    cfg.port_range_end,
-                    &server.id.to_string(),
-                )
-                .await?;
+            // On REUTILISE les ports/volume deja persistes (retry d'un start
+            // precedent en Error) au lieu d'en reallouer — sinon les anciennes
+            // cles Redis fuient (TTL 7j) et le range s'epuise. On ne (re)alloue
+            // que ce qui n'est pas encore attribue. `newly_allocated` trace les
+            // ports alloues DANS cet appel pour les liberer si la suite echoue.
+            let preexisting_volume = server.volume_name.is_some();
+            let mut newly_allocated: Vec<(PortKind, u16)> = Vec::new();
+
+            let game_port = match server.host_port {
+                Some(p) => p,
+                None => {
+                    let p = self
+                        .port_allocator
+                        .allocate(
+                            PortKind::Game,
+                            cfg.port_range_start,
+                            cfg.port_range_end,
+                            &server.id.to_string(),
+                        )
+                        .await?;
+                    newly_allocated.push((PortKind::Game, p));
+                    p
+                }
+            };
+
             let rcon_port = if template.supports_rcon && cfg.rcon_enabled {
-                Some(
-                    self.port_allocator
+                match server.rcon_port {
+                    Some(p) => Some(p),
+                    None => match self
+                        .port_allocator
                         .allocate(
                             PortKind::Rcon,
                             cfg.rcon_port_range_start,
                             cfg.rcon_port_range_end,
                             &server.id.to_string(),
                         )
-                        .await?,
-                )
-            } else {
-                None
-            };
-            let rcon_password = if rcon_port.is_some() {
-                Some(generate_rcon_password())
-            } else {
-                None
-            };
-            let volume_name = if cfg.auto_create_world_volume {
-                Some(GameServer::docker_volume_name(server.id))
-            } else {
-                None
-            };
-            let container_name = GameServer::docker_container_name(server.id);
-
-            // Maj DB avec les ressources allouees AVANT toute call Docker
-            // (en cas de crash, le reconciler peut nettoyer).
-            self.server_repo
-                .update_runtime(
-                    id,
-                    GameServerRuntimeUpdate {
-                        host_port: Some(game_port),
-                        rcon_port,
-                        rcon_password: rcon_password.clone(),
-                        volume_name: volume_name.clone(),
-                        container_name: Some(container_name.clone()),
-                        ..Default::default()
+                        .await
+                    {
+                        Ok(p) => {
+                            newly_allocated.push((PortKind::Rcon, p));
+                            Some(p)
+                        }
+                        Err(e) => {
+                            // Libere le game_port fraichement alloue avant de sortir.
+                            self.release_ports(&newly_allocated).await;
+                            return Err(e);
+                        }
                     },
-                )
-                .await?;
+                }
+            } else {
+                server.rcon_port
+            };
+
+            // Reutilise le password existant si on reutilise un rcon_port,
+            // sinon en genere un nouveau.
+            let rcon_password = match (&server.rcon_password, rcon_port) {
+                (Some(p), Some(_)) => Some(p.clone()),
+                (None, Some(_)) => Some(generate_rcon_password()),
+                _ => None,
+            };
+
+            let volume_name = server.volume_name.clone().or_else(|| {
+                if cfg.auto_create_world_volume {
+                    Some(GameServer::docker_volume_name(server.id))
+                } else {
+                    None
+                }
+            });
+            let container_name = server
+                .container_name
+                .clone()
+                .unwrap_or_else(|| GameServer::docker_container_name(server.id));
+
             server.host_port = Some(game_port);
             server.rcon_port = rcon_port;
-            server.rcon_password = rcon_password;
+            server.rcon_password = rcon_password.clone();
             server.volume_name = volume_name.clone();
-            server.container_name = Some(container_name);
+            server.container_name = Some(container_name.clone());
 
-            // Pre-requis Docker
-            self.container_runtime
+            // Pre-requis Docker. En cas d'echec : on libere les ports alloues
+            // DANS cet appel et on retire le volume si on vient de le creer,
+            // puis status Error. Rien n'est encore persiste en DB -> pas de
+            // ressource orpheline cote DB.
+            if let Err(e) = self
+                .container_runtime
                 .ensure_network(&cfg.docker_network_name)
-                .await?;
-            if let Some(vol) = &server.volume_name {
-                self.container_runtime.ensure_volume(vol).await?;
+                .await
+            {
+                self.fail_start_cleanup(id, &newly_allocated, None, "ensure_network", &e)
+                    .await?;
+                return Err(e);
             }
-            self.container_runtime
+            let mut volume_created = false;
+            if let Some(vol) = &server.volume_name {
+                if let Err(e) = self.container_runtime.ensure_volume(vol).await {
+                    self.fail_start_cleanup(id, &newly_allocated, None, "ensure_volume", &e)
+                        .await?;
+                    return Err(e);
+                }
+                volume_created = !preexisting_volume;
+            }
+            // Volume retirable au cleanup uniquement si cree dans cet appel
+            // (jamais un volume preexistant : il contient le monde du joueur).
+            let removable_volume = if volume_created {
+                server.volume_name.as_deref()
+            } else {
+                None
+            };
+            if let Err(e) = self
+                .container_runtime
                 .pull_image_if_missing(&template.image)
-                .await?;
+                .await
+            {
+                self.fail_start_cleanup(id, &newly_allocated, removable_volume, "pull_image", &e)
+                    .await?;
+                return Err(e);
+            }
 
             // Build spec + create
             let overrides = self.config_repo.get_all(id).await?;
@@ -520,21 +621,30 @@ impl ManageGameServersUseCase for ManageGameServersService {
             let cid = match self.container_runtime.create_container(&spec).await {
                 Ok(cid) => cid,
                 Err(e) => {
-                    self.server_repo
-                        .update_status(
-                            id,
-                            GameServerStatus::Error,
-                            Some(&format!("create_container: {e}")),
-                        )
-                        .await?;
+                    self.fail_start_cleanup(
+                        id,
+                        &newly_allocated,
+                        removable_volume,
+                        "create_container",
+                        &e,
+                    )
+                    .await?;
                     return Err(e);
                 }
             };
+            // Succes create : on persiste TOUTES les ressources ensemble
+            // (ports, volume, rcon, container). Avant ce point rien n'est
+            // ecrit, donc un echec laisse la DB propre.
             self.server_repo
                 .update_runtime(
                     id,
                     GameServerRuntimeUpdate {
                         container_id: Some(cid.clone()),
+                        host_port: Some(game_port),
+                        rcon_port,
+                        rcon_password: rcon_password.clone(),
+                        volume_name: volume_name.clone(),
+                        container_name: Some(container_name.clone()),
                         ..Default::default()
                     },
                 )
@@ -666,8 +776,16 @@ impl ManageGameServersUseCase for ManageGameServersService {
         // mais on prefere passer par notre logique (audit + transitions).
         self.stop(id, actor_user_id).await?;
         self.start(id, actor_user_id).await?;
+        // Resout le guild_id reel depuis la ligne serveur (comme les autres
+        // operations) plutot qu'un placeholder.
+        let guild_id = self
+            .server_repo
+            .find_by_id(id)
+            .await?
+            .map(|s| s.guild_id)
+            .unwrap_or_default();
         self.audit(
-            "?",
+            &guild_id,
             Some(id),
             Some(actor_user_id),
             GameAuditAction::Restart,
@@ -713,9 +831,17 @@ impl ManageGameServersUseCase for ManageGameServersService {
             .await?
             .ok_or_else(|| DomainError::NotFound(format!("game_server {id} introuvable")))?;
         // Validation des keys (SCREAMING_SNAKE_CASE) + values dans les bornes
-        // declarees par le template.
-        for k in entries.keys() {
+        // declarees par le template (min/max, options, max_length).
+        let template = self
+            .template_repo
+            .find_by_id(server.template_id)
+            .await?
+            .ok_or_else(|| DomainError::Internal("template du serveur introuvable".into()))?;
+        for (k, v) in &entries {
             crate::domain::entities::game::config::validate_config_key(k)
+                .map_err(DomainError::ValidationError)?;
+            template
+                .validate_config_value(k, v)
                 .map_err(DomainError::ValidationError)?;
         }
         self.config_repo

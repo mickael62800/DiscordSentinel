@@ -128,4 +128,153 @@ impl GameTemplate {
     pub fn find_field(&self, key: &str) -> Option<&ConfigField> {
         self.config_schema.iter().find(|f| f.key == key)
     }
+
+    /// Valide une valeur (string brute, telle que stockee) contre la
+    /// definition de champ du template : bornes numeriques (min/max),
+    /// options autorisees (enum), et longueur max (text). Une key absente
+    /// du schema est acceptee (la validation de key reste a l'appelant).
+    pub fn validate_config_value(&self, key: &str, value: &str) -> Result<(), String> {
+        let field = match self.find_field(key) {
+            Some(f) => f,
+            None => return Ok(()),
+        };
+        match field.field_type {
+            ConfigFieldType::Number => {
+                let num: f64 = value
+                    .trim()
+                    .parse()
+                    .map_err(|_| format!("'{key}': valeur numerique attendue, recu '{value}'"))?;
+                if let Some(min) = field.min {
+                    if num < min {
+                        return Err(format!("'{key}': {num} < min {min}"));
+                    }
+                }
+                if let Some(max) = field.max {
+                    if num > max {
+                        return Err(format!("'{key}': {num} > max {max}"));
+                    }
+                }
+            }
+            ConfigFieldType::Enum => {
+                if let Some(opts) = &field.options {
+                    if !opts.iter().any(|o| o == value) {
+                        return Err(format!(
+                            "'{key}': valeur '{value}' non autorisee (options: {})",
+                            opts.join(", ")
+                        ));
+                    }
+                }
+            }
+            ConfigFieldType::Boolean => {
+                if !matches!(value, "true" | "false") {
+                    return Err(format!(
+                        "'{key}': booleen attendu ('true'/'false'), recu '{value}'"
+                    ));
+                }
+            }
+            ConfigFieldType::Text => {
+                if let Some(max_len) = field.max_length {
+                    if value.chars().count() > max_len as usize {
+                        return Err(format!(
+                            "'{key}': longueur {} > max {max_len}",
+                            value.chars().count()
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tmpl(fields: Vec<ConfigField>) -> GameTemplate {
+        GameTemplate {
+            id: Uuid::nil(),
+            slug: "t".into(),
+            name: "t".into(),
+            description: None,
+            image: "img".into(),
+            category: None,
+            icon: None,
+            accent_color: None,
+            cover_image_url: None,
+            container_port: 25565,
+            port_protocol: PortProtocol::Tcp,
+            volume_path: "/data".into(),
+            run_as_root: false,
+            default_memory_mb: 1024,
+            min_memory_mb: 512,
+            max_memory_mb: 4096,
+            default_env: serde_json::json!({}),
+            config_schema: fields,
+            supports_rcon: true,
+            supports_mods: false,
+            idle_shutdown_days: 7,
+            init_files: vec![],
+            command: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn field(key: &str, ty: ConfigFieldType) -> ConfigField {
+        ConfigField {
+            key: key.into(),
+            label: key.into(),
+            field_type: ty,
+            default: None,
+            options: None,
+            min: None,
+            max: None,
+            max_length: None,
+        }
+    }
+
+    #[test]
+    fn unknown_key_is_accepted() {
+        let t = tmpl(vec![]);
+        assert!(t.validate_config_value("WHATEVER", "x").is_ok());
+    }
+
+    #[test]
+    fn number_within_bounds_passes_and_out_of_range_rejected() {
+        let mut f = field("MAX_PLAYERS", ConfigFieldType::Number);
+        f.min = Some(1.0);
+        f.max = Some(20.0);
+        let t = tmpl(vec![f]);
+        assert!(t.validate_config_value("MAX_PLAYERS", "10").is_ok());
+        assert!(t.validate_config_value("MAX_PLAYERS", "0").is_err());
+        assert!(t.validate_config_value("MAX_PLAYERS", "21").is_err());
+        assert!(t.validate_config_value("MAX_PLAYERS", "abc").is_err());
+    }
+
+    #[test]
+    fn enum_option_validated() {
+        let mut f = field("DIFFICULTY", ConfigFieldType::Enum);
+        f.options = Some(vec!["easy".into(), "hard".into()]);
+        let t = tmpl(vec![f]);
+        assert!(t.validate_config_value("DIFFICULTY", "easy").is_ok());
+        assert!(t.validate_config_value("DIFFICULTY", "extreme").is_err());
+    }
+
+    #[test]
+    fn text_max_length_enforced() {
+        let mut f = field("MOTD", ConfigFieldType::Text);
+        f.max_length = Some(5);
+        let t = tmpl(vec![f]);
+        assert!(t.validate_config_value("MOTD", "hello").is_ok());
+        assert!(t.validate_config_value("MOTD", "helloo").is_err());
+    }
+
+    #[test]
+    fn boolean_validated() {
+        let t = tmpl(vec![field("PVP", ConfigFieldType::Boolean)]);
+        assert!(t.validate_config_value("PVP", "true").is_ok());
+        assert!(t.validate_config_value("PVP", "false").is_ok());
+        assert!(t.validate_config_value("PVP", "yes").is_err());
+    }
 }

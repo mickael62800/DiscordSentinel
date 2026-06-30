@@ -19,8 +19,8 @@ use bollard::container::{
 };
 use bollard::image::{CreateImageOptions, ListImagesOptions};
 use bollard::models::{
-    HostConfig, Mount, MountTypeEnum, PortBinding, RestartPolicy as BollardRestartPolicy,
-    RestartPolicyNameEnum,
+    HostConfig, Mount, MountTypeEnum, PortBinding, ResourcesUlimits,
+    RestartPolicy as BollardRestartPolicy, RestartPolicyNameEnum,
 };
 use bollard::network::CreateNetworkOptions;
 use bollard::volume::CreateVolumeOptions;
@@ -37,6 +37,15 @@ use sentinel_core::domain::errors::DomainError;
 
 const SENTINEL_LABEL_KEY: &str = "sentinel.managed";
 const SENTINEL_LABEL_VALUE: &str = "game-portal";
+
+/// Plafond CPU par container : 2 vCPU (en nano-CPUs, unite Docker).
+/// Empeche un container de monopoliser l'host. Constante (le template
+/// n'expose pas de champ CPU dedie).
+const CONTAINER_NANO_CPUS: i64 = 2_000_000_000;
+/// Plafond du nombre de processus/threads (anti fork-bomb).
+const CONTAINER_PIDS_LIMIT: i64 = 512;
+/// Plafond du nombre de file descriptors ouverts (nofile).
+const CONTAINER_NOFILE_LIMIT: i64 = 4096;
 
 /// Construit le client Docker (socket par defaut). Singleton via Arc.
 pub fn make_docker_client() -> Result<Arc<Docker>, DomainError> {
@@ -181,7 +190,9 @@ impl ContainerRuntime for DockerContainerRuntime {
             port_bindings.insert(
                 key,
                 Some(vec![PortBinding {
-                    host_ip: Some("0.0.0.0".to_string()),
+                    // Bind IP par mapping : 0.0.0.0 pour les ports jeu,
+                    // 127.0.0.1 pour RCON (cf. PortMapping::host_ip).
+                    host_ip: Some(pm.host_ip.clone()),
                     host_port: Some(pm.host_port.to_string()),
                 }]),
             );
@@ -216,6 +227,15 @@ impl ContainerRuntime for DockerContainerRuntime {
             memory: Some(spec.memory_bytes as i64),
             // Hard memory limit : si le container depasse, OOM-killed (proteger l'host).
             memory_swap: Some(spec.memory_bytes as i64),
+            // Plafonds CPU / PIDs / fichiers ouverts : protegent l'host
+            // contre l'epuisement de ressources par un container.
+            nano_cpus: Some(CONTAINER_NANO_CPUS),
+            pids_limit: Some(CONTAINER_PIDS_LIMIT),
+            ulimits: Some(vec![ResourcesUlimits {
+                name: Some("nofile".to_string()),
+                soft: Some(CONTAINER_NOFILE_LIMIT),
+                hard: Some(CONTAINER_NOFILE_LIMIT),
+            }]),
             network_mode: Some(spec.network.clone()),
             restart_policy: Some(into_bollard_restart(spec.restart_policy)),
             // Securite : pas de privileged, pas de cap_add, pas de pid host.
@@ -277,6 +297,14 @@ impl ContainerRuntime for DockerContainerRuntime {
         if rel_path.is_empty() || rel_path.ends_with('/') {
             return Err(DomainError::Internal(format!(
                 "upload_file: path invalide '{path}'"
+            )));
+        }
+        // Anti path-traversal : le path est rendu depuis un template avec des
+        // env vars controlables par l'utilisateur. On rejette tout segment
+        // `..` qui permettrait d'ecrire hors de l'arborescence visee.
+        if rel_path.split('/').any(|seg| seg == "..") {
+            return Err(DomainError::Internal(format!(
+                "upload_file: path traversal interdit '{path}'"
             )));
         }
 

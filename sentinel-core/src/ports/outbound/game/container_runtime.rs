@@ -47,6 +47,10 @@ pub struct PortMapping {
     pub host_port: u16,
     pub container_port: u16,
     pub protocol: PortProtocol,
+    /// Adresse host sur laquelle binder le port. "0.0.0.0" pour un port
+    /// jeu (exposé au reseau), "127.0.0.1" pour un port d'admin (RCON) qui
+    /// ne doit etre joignable que depuis l'app locale.
+    pub host_ip: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
