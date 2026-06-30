@@ -37,14 +37,21 @@ impl ManageRemindersUseCase for ManageRemindersService {
             DEFAULT_REMIND_BEFORE_SECS
         };
 
-        // Ne pas créer de rappel si la durée est trop courte (< remind_before)
-        if cmd.duration_secs <= remind_before {
-            return Err(DomainError::ValidationError(
-                "Duree de la sanction trop courte pour un rappel".into(),
-            ));
-        }
-
+        // BUG #1/#2 : on cree TOUJOURS la ligne de rappel pour une sanction
+        // temporaire — c'est elle qui porte `expires_at` et alimente le job
+        // d'auto-unban (colonne `unban_status`, geree par le worker).
+        //
+        // Le DM "early" au moderateur (status 'pending', consomme par
+        // send_reminders) n'a de sens que si la duree depasse `remind_before` ;
+        // sinon le rappel serait deja en retard a la creation. Dans ce cas on
+        // marque la ligne 'skipped' pour ne PAS envoyer de DM, mais l'unban a
+        // l'expiration reste assure (chemin independant).
         let remind_at = expires_at - Duration::seconds(remind_before as i64);
+        let status = if cmd.duration_secs <= remind_before {
+            "skipped"
+        } else {
+            "pending"
+        };
 
         let reminder = SanctionReminder {
             id: Uuid::new_v4(),
@@ -58,7 +65,7 @@ impl ManageRemindersUseCase for ManageRemindersService {
             action_id: cmd.action_id,
             remind_at,
             expires_at,
-            status: "pending".into(),
+            status: status.into(),
             created_at: now,
         };
 

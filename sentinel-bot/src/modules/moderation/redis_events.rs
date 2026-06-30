@@ -19,6 +19,7 @@ pub(super) async fn handle_redis_moderation_event(ctx: &Context, payload: &str) 
     match event_type {
         "moderation_action" => handle_moderation_action_log(ctx, data).await,
         "sanction_expiry_reminder" => handle_sanction_expiry_reminder(ctx, data).await,
+        "sanction_expired_unban" => handle_sanction_expired_unban(ctx, data).await,
         "appeal_sla_escalated" => handle_appeal_sla_escalated(ctx, data).await,
         _ => {}
     }
@@ -213,6 +214,80 @@ async fn handle_sanction_expiry_reminder(ctx: &Context, data: &serde_json::Value
             moderator_id,
             target_name, action_type, minutes_left, "DM rappel expiration envoye"
         );
+    }
+}
+
+/// BUG #1/#2 — Auto-unban d'un ban temporaire arrive a expiration.
+///
+/// Emis par le worker `expire_temp_bans` (fire-once via `unban_status='done'`).
+/// On appelle `guild_id.unban(...)` en best-effort : le ban peut avoir deja ete
+/// leve manuellement (on log alors l'echec sans bruit). Un embed est poste dans
+/// le salon de logs moderation pour tracer la levee automatique.
+async fn handle_sanction_expired_unban(ctx: &Context, data: &serde_json::Value) {
+    let guild_id_str = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
+    let target_id = data.get("target_id").and_then(|v| v.as_str()).unwrap_or("");
+    let target_name = data
+        .get("target_name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(target_id);
+
+    let (Ok(gid), Ok(uid)) = (guild_id_str.parse::<u64>(), target_id.parse::<u64>()) else {
+        warn!(
+            guild_id = guild_id_str,
+            target_id, "sanction_expired_unban: id invalide"
+        );
+        return;
+    };
+
+    let guild_id = serenity::model::id::GuildId::new(gid);
+    let user_id = UserId::new(uid);
+
+    match guild_id.unban(&ctx.http, user_id).await {
+        Ok(()) => {
+            info!(
+                guild_id = guild_id_str,
+                target_id, "Ban temporaire expire -> unban Discord applique"
+            );
+        }
+        Err(e) => {
+            // Best-effort : ban deja leve manuellement, user jamais banni, etc.
+            warn!(
+                error = %e,
+                guild_id = guild_id_str,
+                target_id,
+                "sanction_expired_unban: unban Discord echoue (ban deja leve ?)"
+            );
+        }
+    }
+
+    let Some(log_channel) = crate::shared::discord_helpers::get_log_channel(
+        ctx,
+        guild_id_str,
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await
+    else {
+        return;
+    };
+
+    let embed = CreateEmbed::new()
+        .title("\u{1f513} Ban temporaire expire — debannissement automatique")
+        .color(0x2ecc71)
+        .field(
+            "\u{1f464} Utilisateur",
+            format!("<@{}> (`{}`)", target_id, target_name),
+            true,
+        )
+        .footer(CreateEmbedFooter::new(
+            "Levee automatique emise par le worker d'expiration",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    if let Err(e) = log_channel
+        .send_message(&ctx.http, CreateMessage::new().embed(embed))
+        .await
+    {
+        warn!(error = %e, "sanction_expired_unban: log send failed");
     }
 }
 

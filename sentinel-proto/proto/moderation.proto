@@ -28,6 +28,10 @@ message LogActionRequest {
   optional string gravity = 9;
   // Duree en secondes (None = permanent)
   optional uint64 duration = 10;
+  // Si true : journalise l'action SANS incrementer de strike. Utilise pour
+  // les sanctions d'escalade auto (declenchees par un strike deja compte) afin
+  // d'eviter une boucle de double-strike.
+  bool skip_strike = 11;
 }
 
 message GetHistoryRequest {

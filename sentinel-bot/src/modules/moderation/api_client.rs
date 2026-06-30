@@ -135,6 +135,24 @@ impl ApiClient {
         &self,
         action: &ModerationAction,
     ) -> Result<ModerationActionResponse, String> {
+        self.log_action_inner(action, false).await
+    }
+
+    /// Variante d'escalade auto : journalise l'action SANS rejouer de strike.
+    /// Le strike declencheur a deja ete compte par le `/warn` d'origine, donc
+    /// re-striker ici creerait une boucle d'escalade (double-strike).
+    pub async fn log_action_no_strike(
+        &self,
+        action: &ModerationAction,
+    ) -> Result<ModerationActionResponse, String> {
+        self.log_action_inner(action, true).await
+    }
+
+    async fn log_action_inner(
+        &self,
+        action: &ModerationAction,
+        skip_strike: bool,
+    ) -> Result<ModerationActionResponse, String> {
         let req = proto_mod::LogActionRequest {
             guild_id: action.guild_id.clone(),
             channel_id: action.channel_id.clone(),
@@ -146,6 +164,7 @@ impl ApiClient {
             reason: action.reason.clone(),
             gravity: action.gravity.clone(),
             duration: action.duration,
+            skip_strike,
         };
         let resp = crate::grpc_call!(self.grpc, moderation, log_action, req)?;
         Ok(ModerationActionResponse {

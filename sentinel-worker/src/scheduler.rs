@@ -454,6 +454,27 @@ pub fn start(
             },
         );
     }
+    // BUG #1/#2 — Auto-unban des bans temporaires a l'expiration. Chemin
+    // d'enforcement reel (le DM "early" ne leve aucun ban). Independant de
+    // send_reminders : couvre aussi les bans courts. Meme granularite que les
+    // rappels (intervalle send_reminders).
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "expire_temp_bans",
+            config.send_reminders_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "moderation-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(
+                    async move { domains::moderation::expire_temp_bans::run(&pool, &redis).await },
+                )
+            },
+        );
+    }
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : coude (6 jobs : combats, paris, hp_regen, tournament,

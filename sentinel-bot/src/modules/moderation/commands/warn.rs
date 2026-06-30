@@ -255,6 +255,28 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                             .timestamp(serenity::model::Timestamp::now())
                             .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                             super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
+
+                            // BUG #3 — journaliser l'action d'escalade (sans
+                            // rejouer de strike : le strike declencheur est deja
+                            // compte). Le mute Discord auto-expire -> pas d'unban.
+                            let esc_log = ModerationAction {
+                                guild_id: guild_id.to_string(),
+                                channel_id: command.channel_id.to_string(),
+                                moderator_id: command.user.id.to_string(),
+                                moderator_name: command.user.name.clone(),
+                                target_id: target.id.to_string(),
+                                target_name: target.name.clone(),
+                                action_type: "mute_temp".to_string(),
+                                reason: format!(
+                                    "Escalade auto: {} strikes",
+                                    resp.strikes_count.unwrap_or(0)
+                                ),
+                                gravity: None,
+                                duration: Some(secs),
+                            };
+                            if let Err(e) = api.log_action_no_strike(&esc_log).await {
+                                warn!(error = %e, "Echec journalisation escalation mute");
+                            }
                         }
                     }
                     "ban" => {
@@ -273,11 +295,41 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         .timestamp(serenity::model::Timestamp::now())
                         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                         super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
-                        if let Err(e) = guild_id
+                        match guild_id
                             .ban_with_reason(&ctx.http, target.id, 1, reason)
                             .await
                         {
-                            warn!(error = %e, "Escalation ban echouee");
+                            Err(e) => {
+                                warn!(error = %e, "Escalation ban echouee");
+                            }
+                            Ok(()) => {
+                                // BUG #3 — journaliser l'action d'escalade sans
+                                // rejouer de strike. Si l'escalade definit une
+                                // duree, c'est un ban_temp : le record d'expiration
+                                // ainsi cree declenchera l'auto-unban (BUG #1).
+                                let (action_type, duration) = match resp.escalation_duration {
+                                    Some(secs) => ("ban_temp".to_string(), Some(secs)),
+                                    None => ("ban_permanent".to_string(), None),
+                                };
+                                let esc_log = ModerationAction {
+                                    guild_id: guild_id.to_string(),
+                                    channel_id: command.channel_id.to_string(),
+                                    moderator_id: command.user.id.to_string(),
+                                    moderator_name: command.user.name.clone(),
+                                    target_id: target.id.to_string(),
+                                    target_name: target.name.clone(),
+                                    action_type,
+                                    reason: format!(
+                                        "Escalade auto: {} strikes",
+                                        resp.strikes_count.unwrap_or(0)
+                                    ),
+                                    gravity: None,
+                                    duration,
+                                };
+                                if let Err(e) = api.log_action_no_strike(&esc_log).await {
+                                    warn!(error = %e, "Echec journalisation escalation ban");
+                                }
+                            }
                         }
                     }
                     _ => {}

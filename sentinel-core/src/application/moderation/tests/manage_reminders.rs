@@ -115,11 +115,22 @@ async fn create_reminder_success() {
 }
 
 #[tokio::test]
-async fn create_reminder_too_short_duration_rejected() {
+async fn create_reminder_short_duration_is_skipped_not_rejected() {
+    // BUG #1/#2 : un ban court (<= remind_before) doit quand meme creer une
+    // ligne (pour l'auto-unban a l'expiration), mais sans DM "early" : status
+    // 'skipped' (donc absent des pending) tout en restant persiste.
     let svc = build_service();
-    // 30min duration, 1h remind_before → impossible
-    let result = svc.create_reminder(make_cmd(1800, 3600)).await;
-    assert!(result.is_err());
+    // 30min duration, 1h remind_before → pas de DM, mais ligne creee.
+    let r = svc.create_reminder(make_cmd(1800, 3600)).await.unwrap();
+    assert_eq!(r.status, "skipped");
+
+    // 'skipped' n'apparait pas dans les rappels a envoyer.
+    let pending = svc.get_pending_reminders().await.unwrap();
+    assert!(pending.iter().all(|p| p.id != r.id));
+
+    // mais la ligne est bien persistee (visible par guild).
+    let by_guild = svc.list_by_guild("g1").await.unwrap();
+    assert!(by_guild.iter().any(|p| p.id == r.id));
 }
 
 #[tokio::test]

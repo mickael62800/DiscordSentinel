@@ -198,8 +198,67 @@ impl ManageModerationUseCase for MockModerationUc {
     }
 }
 
+/// Mock no-op du use case rappels : create_reminder renvoie un reminder factice.
+#[derive(Default)]
+struct MockRemindersUc;
+
+#[async_trait]
+impl ManageRemindersUseCase for MockRemindersUc {
+    async fn create_reminder(
+        &self,
+        cmd: CreateReminderCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder,
+        DomainError,
+    > {
+        Ok(
+            sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder {
+                id: Uuid::new_v4(),
+                guild_id: cmd.guild_id,
+                moderator_id: cmd.moderator_id,
+                moderator_name: cmd.moderator_name,
+                target_id: cmd.target_id,
+                target_name: cmd.target_name,
+                action_type: cmd.action_type,
+                reason: cmd.reason,
+                action_id: cmd.action_id,
+                remind_at: ts(),
+                expires_at: ts(),
+                status: "pending".into(),
+                created_at: ts(),
+            },
+        )
+    }
+    async fn get_pending_reminders(
+        &self,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder>,
+        DomainError,
+    >{
+        Ok(vec![])
+    }
+    async fn mark_sent(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn cancel_for_action(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_by_guild(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder>,
+        DomainError,
+    >{
+        Ok(vec![])
+    }
+}
+
 fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
-    ModerationGrpc { moderation_uc: uc }
+    ModerationGrpc {
+        moderation_uc: uc,
+        reminders_uc: Arc::new(MockRemindersUc),
+    }
 }
 
 fn make_log_request(action: &str) -> Request<proto::LogActionRequest> {
@@ -214,6 +273,7 @@ fn make_log_request(action: &str) -> Request<proto::LogActionRequest> {
         reason: "r".into(),
         gravity: None,
         duration: None,
+        skip_strike: false,
     })
 }
 

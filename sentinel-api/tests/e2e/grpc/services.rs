@@ -571,10 +571,51 @@ impl ManageModerationUseCase for MockModerationUc {
     }
 }
 
+struct MockRemindersUc;
+
+#[async_trait]
+impl sentinel_api::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase
+    for MockRemindersUc
+{
+    async fn create_reminder(
+        &self,
+        _: sentinel_api::ports::inbound::moderation::manage_reminders::CreateReminderCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn get_pending_reminders(
+        &self,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder>,
+        DomainError,
+    >{
+        Ok(vec![])
+    }
+    async fn mark_sent(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn cancel_for_action(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_by_guild(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder>,
+        DomainError,
+    >{
+        Ok(vec![])
+    }
+}
+
 #[tokio::test]
 async fn moderation_log_action_and_get_history() {
     let svc = ModerationServiceServer::new(ModerationGrpc {
         moderation_uc: Arc::new(MockModerationUc),
+        reminders_uc: Arc::new(MockRemindersUc),
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = ModerationServiceClient::connect(Endpoint::from_shared(url).unwrap())
@@ -593,6 +634,7 @@ async fn moderation_log_action_and_get_history() {
             reason: "spam".into(),
             gravity: None,
             duration: None,
+            skip_strike: false,
         })
         .await
         .unwrap()

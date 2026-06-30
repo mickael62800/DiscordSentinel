@@ -437,6 +437,7 @@ impl ApiClient {
             reason: request.reason.clone(),
             gravity: None,
             duration: request.duration.map(|d| d as u64),
+            skip_strike: false,
         };
         crate::grpc_call!(@unit self.grpc, moderation, log_action, req)
     }
