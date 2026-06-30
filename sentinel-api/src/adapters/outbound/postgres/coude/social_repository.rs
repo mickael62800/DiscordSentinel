@@ -111,6 +111,54 @@ impl SocialRepository for PgSocialRepository {
         Ok(())
     }
 
+    async fn try_claim_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        key: &str,
+        ttl_secs: i64,
+    ) -> Result<bool, DomainError> {
+        // Claim atomique anti-TOCTOU. Insert-if-absent ; si une ligne existe
+        // deja mais que son cooldown est EXPIRE (expires_at <= NOW()), on la
+        // rafraichit (le claim est gagne). Si le cooldown est encore ACTIF, le
+        // WHERE bloque l'update -> 0 ligne affectee -> claim perdu. Le tout en
+        // une seule instruction => deux appels concurrents : un seul gagne.
+        let result = sqlx::query(
+            r#"INSERT INTO coude_cooldowns (guild_id, user_id, action, expires_at)
+               VALUES ($1, $2, $3, NOW() + make_interval(secs => $4::double precision))
+               ON CONFLICT (guild_id, user_id, action)
+               DO UPDATE SET expires_at = NOW() + make_interval(secs => $4::double precision)
+               WHERE coude_cooldowns.expires_at <= NOW()"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(key)
+        .bind(ttl_secs as f64)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn clear_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        key: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"DELETE FROM coude_cooldowns
+               WHERE guild_id = $1 AND user_id = $2 AND action = $3"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(key)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
     // ── Leaderboard ──
 
     async fn leaderboard(

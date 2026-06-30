@@ -63,18 +63,8 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
             username,
         } = cmd;
 
-        // 1. Cooldown weekly. Si actif -> RateLimited (mappe 429).
-        if let Some(expires_at) = self
-            .social_repo
-            .get_cooldown(&guild_id, &user_id, TOUT_OU_RIEN_COOLDOWN_KEY)
-            .await?
-        {
-            return Err(DomainError::RateLimited(format!(
-                "Tout-ou-rien deja joue cette semaine (jusqu'a {expires_at})"
-            )));
-        }
-
-        // 2. Lecture solde.
+        // 1. Lecture solde EN PREMIER (read-only) : un joueur au solde
+        //    insuffisant ne doit PAS etre verrouille pour la semaine.
         let player = self
             .player_repo
             .get_or_create(&guild_id, &user_id, &username)
@@ -87,6 +77,24 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
         }
         let initial_coins = player.coins;
 
+        // 2. Claim atomique du cooldown weekly (fix TOCTOU). Pose le verrou
+        //    AVANT toute mutation wallet : deux plays concurrents -> un seul
+        //    gagne le claim, l'autre recoit RateLimited. Plus de double payout.
+        let claimed = self
+            .social_repo
+            .try_claim_cooldown(
+                &guild_id,
+                &user_id,
+                TOUT_OU_RIEN_COOLDOWN_KEY,
+                TOUT_OU_RIEN_COOLDOWN_SECS,
+            )
+            .await?;
+        if !claimed {
+            return Err(DomainError::RateLimited(
+                "Tout-ou-rien deja joue cette semaine".to_string(),
+            ));
+        }
+
         // 3. Tirage RNG (scope ferme avant tout await).
         let outcome = resolve_outcome(Self::roll());
 
@@ -94,43 +102,49 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
         let delta = coin_delta(initial_coins, outcome);
 
         // 5. Mutation wallet via use case unifie (faillite/jackpot detectes).
-        match outcome {
-            ToutOuRienOutcome::Win if delta > 0 => {
-                self.wallet_uc
-                    .credit(
-                        &guild_id,
-                        &user_id,
-                        delta,
-                        "tout_ou_rien_win",
-                        "TOUT-OU-RIEN — victoire",
-                    )
-                    .await?;
+        //    En cas d'echec : on RELACHE le claim (best-effort) pour ne pas
+        //    verrouiller le joueur une semaine sur un play qui n'a rien paye.
+        let mutation = match outcome {
+            ToutOuRienOutcome::Win if delta > 0 => self
+                .wallet_uc
+                .credit(
+                    &guild_id,
+                    &user_id,
+                    delta,
+                    "tout_ou_rien_win",
+                    "TOUT-OU-RIEN — victoire",
+                )
+                .await
+                .map(|_| ()),
+            ToutOuRienOutcome::Lose if delta < 0 => self
+                .wallet_uc
+                .debit(
+                    &guild_id,
+                    &user_id,
+                    -delta,
+                    "tout_ou_rien_lose",
+                    "TOUT-OU-RIEN — defaite",
+                )
+                .await
+                .map(|_| ()),
+            _ => Ok(()),
+        };
+        if let Err(e) = mutation {
+            if let Err(clear_err) = self
+                .social_repo
+                .clear_cooldown(&guild_id, &user_id, TOUT_OU_RIEN_COOLDOWN_KEY)
+                .await
+            {
+                tracing::warn!(
+                    error = %clear_err,
+                    user_id = %user_id,
+                    "Echec liberation cooldown tout-ou-rien apres echec mutation wallet"
+                );
             }
-            ToutOuRienOutcome::Lose if delta < 0 => {
-                self.wallet_uc
-                    .debit(
-                        &guild_id,
-                        &user_id,
-                        -delta,
-                        "tout_ou_rien_lose",
-                        "TOUT-OU-RIEN — defaite",
-                    )
-                    .await?;
-            }
-            _ => {}
+            return Err(e);
         }
 
-        // 6. Cooldown apres mutation reussie : double-clic genere un seul payout.
-        self.social_repo
-            .set_cooldown(
-                &guild_id,
-                &user_id,
-                TOUT_OU_RIEN_COOLDOWN_KEY,
-                TOUT_OU_RIEN_COOLDOWN_SECS,
-            )
-            .await?;
-
-        // 7. Memorial des clodos (audit). Best-effort : on log mais on
+        // 6. Memorial des clodos (audit). Best-effort : on log mais on
         //    n'echoue pas la commande si l'insert log foire.
         let log_outcome = match outcome {
             ToutOuRienOutcome::Win => ToutOuRienLogOutcome::Won,

@@ -403,41 +403,23 @@ impl ResolveBettingBatchService {
             .ok();
 
         // Transferts wallet
-        // BUG critique fix : warn! -> error! avec event_type clair pour
-        // detecter les incoherences (winner sans coins / loser non debite).
+        // BUG critique fix (atomicite) : credit winner + debit loser dans la
+        // MEME tx Postgres via pay_combat_atomic (identique a resolve_now).
+        // Evite la creation/destruction de pieces si une seule des deux
+        // operations reussit. error! (et non warn!) avec event_type clair
+        // pour detecter les desyncs wallet.
         let combat_desc = format!("Combat {winner_id} vs {loser_id}");
-        if coins_transferred > 0 {
+        let mut payout_ok = true;
+        if coins_transferred > 0 || actual_loss > 0 {
             if let Err(e) = self
                 .wallet_repo
-                .credit(
+                .pay_combat_atomic(
                     &combat.guild_id,
                     &winner_id,
                     coins_transferred,
-                    "coude_combat_win",
-                    &combat_desc,
-                )
-                .await
-            {
-                tracing::error!(
-                    event_type = "combat.wallet_inconsistency",
-                    combat_id = %combat.id,
-                    guild_id = %combat.guild_id,
-                    user_id = %winner_id,
-                    op = "credit_winner",
-                    amount = coins_transferred,
-                    error = %e,
-                    "Echec credit winner : combat marque gagne mais le winner n'a pas recu ses pieces"
-                );
-            }
-        }
-        if actual_loss > 0 {
-            if let Err(e) = self
-                .wallet_repo
-                .debit(
-                    &combat.guild_id,
                     &loser_id,
                     actual_loss,
-                    "coude_combat_loss",
+                    "coude_combat",
                     &combat_desc,
                 )
                 .await
@@ -446,34 +428,40 @@ impl ResolveBettingBatchService {
                     event_type = "combat.wallet_inconsistency",
                     combat_id = %combat.id,
                     guild_id = %combat.guild_id,
-                    user_id = %loser_id,
-                    op = "debit_loser",
-                    amount = actual_loss,
+                    winner_id = %winner_id,
+                    loser_id = %loser_id,
+                    op = "pay_combat_atomic",
+                    coins_transferred,
+                    actual_loss,
                     error = %e,
-                    "Echec debit loser : combat marque perdu mais le loser n'a pas perdu de pieces"
+                    "Echec payout combat atomique : combat marque resolu mais l'argent n'a pas bouge — stats non enregistrees pour preserver la coherence"
                 );
+                payout_ok = false;
             }
         }
 
-        // Stats (wins/losses via record_*)
-        if let Err(e) = self
-            .player_repo
-            .record_win(
-                &combat.guild_id,
-                &winner_id,
-                coins_transferred,
-                result.stolen_bonus,
-            )
-            .await
-        {
-            warn!(error = %e, "Echec record_win");
-        }
-        if let Err(e) = self
-            .player_repo
-            .record_loss(&combat.guild_id, &loser_id, actual_loss)
-            .await
-        {
-            warn!(error = %e, "Echec record_loss");
+        // Stats (wins/losses via record_*) : seulement si le payout a reussi,
+        // pour eviter un total_won/total_lost incoherent vs wallet.
+        if payout_ok {
+            if let Err(e) = self
+                .player_repo
+                .record_win(
+                    &combat.guild_id,
+                    &winner_id,
+                    coins_transferred,
+                    result.stolen_bonus,
+                )
+                .await
+            {
+                warn!(error = %e, "Echec record_win");
+            }
+            if let Err(e) = self
+                .player_repo
+                .record_loss(&combat.guild_id, &loser_id, actual_loss)
+                .await
+            {
+                warn!(error = %e, "Echec record_loss");
+            }
         }
 
         // Vol chaos bonus (cap sur solde restant du perdant).
@@ -488,36 +476,19 @@ impl ResolveBettingBatchService {
             let vol_capped = result.vol_coins.min(available);
             if vol_capped > 0 {
                 let vol_desc = format!("Vol chaos combat {}", combat.id);
-                // BUG critique fix : `let _` -> tracing::error! pour visibilite.
+                // BUG critique fix (atomicite) : le vol chaos est un transfert
+                // winner-credit + loser-debit -> on l'execute via
+                // pay_combat_atomic (une seule tx) pour ne plus risquer de
+                // debiter la victime sans crediter le winner (ou inversement).
                 if let Err(e) = self
                     .wallet_repo
-                    .debit(
-                        &combat.guild_id,
-                        &loser_id,
-                        vol_capped,
-                        "coude_combat_vol_victim",
-                        &vol_desc,
-                    )
-                    .await
-                {
-                    tracing::error!(
-                        event_type = "combat.wallet_inconsistency",
-                        combat_id = %combat.id,
-                        guild_id = %combat.guild_id,
-                        user_id = %loser_id,
-                        op = "vol_chaos_debit_victim",
-                        amount = vol_capped,
-                        error = %e,
-                        "Echec debit victime vol chaos : le winner sera quand meme credite"
-                    );
-                }
-                if let Err(e) = self
-                    .wallet_repo
-                    .credit(
+                    .pay_combat_atomic(
                         &combat.guild_id,
                         &winner_id,
                         vol_capped,
-                        "coude_combat_vol_bonus",
+                        &loser_id,
+                        vol_capped,
+                        "coude_combat_vol",
                         &vol_desc,
                     )
                     .await
@@ -526,11 +497,12 @@ impl ResolveBettingBatchService {
                         event_type = "combat.wallet_inconsistency",
                         combat_id = %combat.id,
                         guild_id = %combat.guild_id,
-                        user_id = %winner_id,
-                        op = "vol_chaos_credit_winner",
+                        winner_id = %winner_id,
+                        loser_id = %loser_id,
+                        op = "vol_chaos_pay_combat_atomic",
                         amount = vol_capped,
                         error = %e,
-                        "Echec credit winner vol chaos : la victime peut avoir ete debitee sans contrepartie"
+                        "Echec vol chaos atomique : transfert annule (ni debit victime ni credit winner)"
                     );
                 }
             }

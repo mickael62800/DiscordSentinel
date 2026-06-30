@@ -161,7 +161,10 @@ impl PlayerRepository for MockPlayerRepo {
 
 struct MockSocialRepo {
     cooldown: Mutex<Option<DateTime<Utc>>>,
+    // Enregistre les claims REUSSIS (cooldown effectivement pose).
     set_calls: Mutex<Vec<(String, String, String, i64)>>,
+    // Enregistre les liberations de claim (clear_cooldown).
+    clear_calls: Mutex<Vec<(String, String, String)>>,
 }
 
 #[async_trait]
@@ -179,6 +182,31 @@ impl SocialRepository for MockSocialRepo {
             .lock()
             .unwrap()
             .push((g.into(), u.into(), a.into(), d));
+        Ok(())
+    }
+    async fn try_claim_cooldown(
+        &self,
+        g: &str,
+        u: &str,
+        key: &str,
+        ttl: i64,
+    ) -> Result<bool, DomainError> {
+        // Claim perdu si un cooldown actif existe deja.
+        if self.cooldown.lock().unwrap().is_some() {
+            return Ok(false);
+        }
+        // Claim gagne : on enregistre la pose effective du cooldown.
+        self.set_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), key.into(), ttl));
+        Ok(true)
+    }
+    async fn clear_cooldown(&self, g: &str, u: &str, key: &str) -> Result<(), DomainError> {
+        self.clear_calls
+            .lock()
+            .unwrap()
+            .push((g.into(), u.into(), key.into()));
         Ok(())
     }
     async fn leaderboard(
@@ -345,6 +373,7 @@ fn build(coins: i64, cooldown: Option<DateTime<Utc>>) -> Harness {
     let social = Arc::new(MockSocialRepo {
         cooldown: Mutex::new(cooldown),
         set_calls: Mutex::new(vec![]),
+        clear_calls: Mutex::new(vec![]),
     });
     let log = Arc::new(MockLogRepo {
         records: Mutex::new(vec![]),

@@ -63,6 +63,18 @@ impl SocialRepository for MockSocialRepo {
             .push((g.into(), u.into(), a.into(), d));
         Ok(())
     }
+    async fn try_claim_cooldown(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn clear_cooldown(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn leaderboard(
         &self,
         _: &str,

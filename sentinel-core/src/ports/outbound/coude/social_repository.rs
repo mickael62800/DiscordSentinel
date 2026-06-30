@@ -32,6 +32,29 @@ pub trait SocialRepository: Send + Sync {
         duration_secs: i64,
     ) -> Result<(), DomainError>;
 
+    /// Pose atomiquement un cooldown SEULEMENT s'il n'en existe pas deja un
+    /// actif (insert-if-absent). Retourne `true` si CET appel a cree le
+    /// cooldown (claim gagne), `false` si un cooldown actif existait deja.
+    ///
+    /// Sert de verrou anti-TOCTOU : deux appels concurrents -> un seul
+    /// obtient `true`. `ttl_secs` calcule l'expiration comme `set_cooldown`.
+    async fn try_claim_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        key: &str,
+        ttl_secs: i64,
+    ) -> Result<bool, DomainError>;
+
+    /// Libere un claim pose par `try_claim_cooldown` (DELETE de la ligne).
+    /// Utilise pour relacher le verrou si l'operation protegee echoue.
+    async fn clear_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        key: &str,
+    ) -> Result<(), DomainError>;
+
     // ── Leaderboard ──
 
     async fn leaderboard(
