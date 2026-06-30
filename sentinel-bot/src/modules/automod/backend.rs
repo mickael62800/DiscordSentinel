@@ -552,7 +552,7 @@ pub(super) async fn analyze_message_images(
     ctx: &Context,
     msg: &Message,
     mute_duration_secs: u64,
-    _log_channel_id: u64,
+    log_channel_id: u64,
     colors: &EmbedColors,
 ) {
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
@@ -640,16 +640,16 @@ pub(super) async fn analyze_message_images(
     let http_client = base.client();
     let api_url = base.base_url().to_string();
 
+    // Fail-safe S3 : si la vision ne peut PAS analyser une image (job non
+    // soumis ou resultat absent), on ne laisse pas passer l'image en silence —
+    // on poste UNE carte de revue manuelle (au plus une par message).
+    let mut vision_unavailable_flagged = false;
+
     for url in &image_urls {
-        // 1. Telecharger l'image depuis Discord (CDN externe).
-        let bytes = match http_client.get(url).send().await {
-            Ok(resp) if resp.status().is_success() => match resp.bytes().await {
-                Ok(b) => b.to_vec(),
-                Err(e) => {
-                    warn!(error = %e, url, "Echec lecture bytes image");
-                    continue;
-                }
-            },
+        // 1. Telecharger l'image depuis Discord (CDN externe) avec un plafond
+        //    de taille applique AVANT de tout charger en memoire.
+        let mut resp = match http_client.get(url).send().await {
+            Ok(resp) if resp.status().is_success() => resp,
             Ok(resp) => {
                 warn!(status = %resp.status(), url, "Image download non-success");
                 continue;
@@ -660,13 +660,50 @@ pub(super) async fn analyze_message_images(
             }
         };
 
-        if bytes.len() > max_image_bytes {
+        // 1a. Plafond pre-download : si l'en-tete Content-Length depasse la
+        //     limite, on n'ouvre meme pas le corps.
+        if let Some(len) = resp.content_length() {
+            if len as usize > max_image_bytes {
+                debug!(
+                    size_bytes = len,
+                    max_bytes = max_image_bytes,
+                    url,
+                    "Image > vision_max_image_size_mb (Content-Length), skip sans download"
+                );
+                continue;
+            }
+        }
+
+        // 1b. Lecture bornee chunk par chunk : on s'arrete des qu'on depasse la
+        //     limite (cas Content-Length absent ou mensonger).
+        let mut bytes: Vec<u8> = Vec::new();
+        let mut overflow = false;
+        let mut read_error = false;
+        loop {
+            match resp.chunk().await {
+                Ok(Some(chunk)) => {
+                    if bytes.len() + chunk.len() > max_image_bytes {
+                        overflow = true;
+                        break;
+                    }
+                    bytes.extend_from_slice(&chunk);
+                }
+                Ok(None) => break,
+                Err(e) => {
+                    warn!(error = %e, url, "Echec lecture bytes image");
+                    read_error = true;
+                    break;
+                }
+            }
+        }
+        if overflow {
             debug!(
-                size_bytes = bytes.len(),
                 max_bytes = max_image_bytes,
-                url,
-                "Image > vision_max_image_size_mb, skip"
+                url, "Image > vision_max_image_size_mb (lecture bornee), skip"
             );
+            continue;
+        }
+        if read_error || bytes.is_empty() {
             continue;
         }
 
@@ -714,6 +751,11 @@ pub(super) async fn analyze_message_images(
 
         let Some(job_id) = job_id else {
             warn!("Job AI image abandonne apres {queue_max_retries} retries");
+            // Fail-safe : vision indisponible -> carte de revue manuelle.
+            if !vision_unavailable_flagged && log_channel_id != 0 {
+                post_vision_unavailable_card(ctx, msg, log_channel_id, colors).await;
+                vision_unavailable_flagged = true;
+            }
             continue;
         };
 
@@ -723,6 +765,11 @@ pub(super) async fn analyze_message_images(
 
         let Some(result_json) = result else {
             debug!(job_id, "Pas de resultat AI dans le delai (image)");
+            // Fail-safe : pas de resultat vision -> carte de revue manuelle.
+            if !vision_unavailable_flagged && log_channel_id != 0 {
+                post_vision_unavailable_card(ctx, msg, log_channel_id, colors).await;
+                vision_unavailable_flagged = true;
+            }
             continue;
         };
 
@@ -784,6 +831,36 @@ pub(super) async fn analyze_message_images(
         }
         break;
     }
+}
+
+/// Fail-safe vision (S3) : poste une carte de revue manuelle quand une image
+/// n'a PAS pu etre analysee (job non soumis ou resultat absent). Carte de revue
+/// seule — AUCUNE sanction auto (`already_sanctioned = false`).
+async fn post_vision_unavailable_card(
+    ctx: &Context,
+    msg: &Message,
+    log_channel_id: u64,
+    colors: &EmbedColors,
+) {
+    let flags = detectors::DetectionFlags {
+        spam: false,
+        insult: false,
+        link: false,
+        phishing: false,
+    };
+    send_review_card(
+        ctx,
+        msg,
+        &Action::Warn,
+        "Image non analysée (vision indisponible) — revue manuelle",
+        0.0,
+        &flags,
+        log_channel_id,
+        colors,
+        None,
+        false,
+    )
+    .await;
 }
 
 /// Encode bytes en base64.

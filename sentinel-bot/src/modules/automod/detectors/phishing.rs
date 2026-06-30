@@ -83,9 +83,12 @@ pub fn detect(content: &str, extra_whitelist: &[String]) -> bool {
 
         if !extra_whitelist.is_empty() {
             let url_lower = url.to_lowercase();
+            // Match sur l'HÔTE (exact ou sous-domaine), pas un `contains` brut :
+            // sinon `evil-mycompany.com.attacker.net` passerait la whitelist.
+            let host = super::link::extract_host(&url_lower);
             if extra_whitelist
                 .iter()
-                .any(|d| url_lower.contains(d.as_str()))
+                .any(|d| super::link::host_matches(host, d))
             {
                 continue;
             }
@@ -235,6 +238,22 @@ mod tests {
         // Un domaine qui ressemble à un pattern phishing mais est dans la whitelist
         let wl = vec!["mycompany-login-verify.com".to_string()];
         assert!(!detect("https://mycompany-login-verify.com/auth", &wl));
+    }
+
+    #[test]
+    fn extra_whitelist_substring_in_query_not_allowed() {
+        // URL de phishing (`discord-gift.ru`) dont la query CONTIENT le domaine
+        // whitelisté `discord.com`. L'ancien `contains` la blanchissait à tort ;
+        // le match sur l'hôte la maintient flaguée.
+        let wl = vec!["discord.com".to_string()];
+        assert!(detect("https://discord-gift.ru/free?ref=discord.com", &wl));
+    }
+
+    #[test]
+    fn extra_whitelist_exact_host_still_allowed() {
+        // L'hôte exact whitelisté reste autorisé (non-régression).
+        let wl = vec!["free-nitro-generator.com".to_string()];
+        assert!(!detect("https://free-nitro-generator.com/claim", &wl));
     }
 
     #[test]
