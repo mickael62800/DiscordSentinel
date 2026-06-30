@@ -335,9 +335,13 @@ pub async fn execute_mute(
         duration: duration_secs,
     };
 
-    if let Err(e) = api.log_action(&action).await {
-        error!(error = %e, "Erreur log mute");
-    }
+    let action_id = match api.log_action(&action).await {
+        Ok(resp) => Some(resp.id),
+        Err(e) => {
+            error!(error = %e, "Erreur log mute");
+            None
+        }
+    };
 
     info!(target = %target.name, duration = %duration_label, "Mute applique");
 
@@ -352,10 +356,17 @@ pub async fn execute_mute(
             .field("Duree", duration_label, true)
             .field("Raison", reason, false);
 
-        if let Err(e) = dm
-            .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
-            .await
-        {
+        let mut dm_msg = CreateMessage::new().embed(dm_embed);
+        // Bouton d'appel (si l'action a bien ete journalisee) : guild_id +
+        // action_id embarques dans le custom_id pour router vers le bon serveur.
+        if let Some(ref aid) = action_id {
+            dm_msg = dm_msg.components(vec![super::appeal::build_appeal_button(
+                &guild_id.to_string(),
+                aid,
+            )]);
+        }
+
+        if let Err(e) = dm.send_message(&ctx.http, dm_msg).await {
             warn!(error = %e, "Failed to send mute DM to user");
         }
     }

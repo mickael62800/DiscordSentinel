@@ -230,6 +230,11 @@ impl ApiClient {
     }
 
     /// Reset tous les strikes actifs d'un utilisateur.
+    ///
+    /// NOTE : reset GLOBAL (efface aussi les strikes automod). N'est plus
+    /// appele par `/unwarn all` (qui supprime warn par warn pour preserver les
+    /// strikes automod), mais conserve pour un eventuel reset administratif.
+    #[allow(dead_code)]
     pub async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
         let req = self.base.client().delete(format!(
             "{}/api/strikes/{}/{}",

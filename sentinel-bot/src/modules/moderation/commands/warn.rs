@@ -171,8 +171,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Gravite", gravity, true)
                 .field("Raison", reason, false);
 
+                // Bouton d'appel : guild_id + action_id embarques dans le
+                // custom_id pour router l'appel vers le bon serveur.
+                let appeal_row =
+                    super::appeal::build_appeal_button(&guild_id.to_string(), &resp.id);
+
                 if let Err(e) = dm
-                    .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
+                    .send_message(
+                        &ctx.http,
+                        CreateMessage::new()
+                            .embed(dm_embed)
+                            .components(vec![appeal_row]),
+                    )
                     .await
                 {
                     warn!(error = %e, "Failed to send warn DM to user");

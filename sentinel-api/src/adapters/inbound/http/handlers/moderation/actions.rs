@@ -26,6 +26,22 @@ use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::enums::system::role::Role;
 
+/// S1/S4 — Resout l'identite moderateur a journaliser.
+///
+/// Web (RoleContext present, token Discord verifie) -> identite authentifiee,
+/// les valeurs eventuellement fournies dans le body sont ignorees. Interne
+/// (pas de RoleContext : gRPC/Bearer/desktop) -> valeurs par defaut fournies.
+fn resolve_web_moderator(
+    rbac: &Option<Extension<RoleContext>>,
+    default_id: &str,
+    default_name: &str,
+) -> (String, String) {
+    match rbac {
+        Some(Extension(ctx)) => (ctx.discord_user_id.clone(), ctx.discord_user_id.clone()),
+        None => (default_id.to_string(), default_name.to_string()),
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
     pub guild_id: Option<String>,
@@ -37,8 +53,19 @@ pub struct BansQuery {
 pub async fn log_action(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
-    Json(dto): Json<LogActionDto>,
+    Json(mut dto): Json<LogActionDto>,
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
+    // S1/S4 — Liaison de l'identite moderateur au principal authentifie.
+    // Pour un appelant WEB (RoleContext present via token Discord) on derive
+    // `moderator_id`/`moderator_name` de l'identite verifiee et on IGNORE les
+    // valeurs du body (anti-usurpation). Pour le bot/interne (gRPC/Bearer, pas
+    // de RoleContext) on conserve les valeurs du body : le bot transmet le vrai
+    // moderateur. NB : le bot passe par gRPC, ce handler HTTP est web-only.
+    if let Some(Extension(ctx)) = &rbac {
+        dto.moderator_id = ctx.discord_user_id.clone();
+        dto.moderator_name = ctx.discord_user_id.clone();
+    }
+
     // Validation
     validation::validate_moderation_action(
         &dto.guild_id,
@@ -201,11 +228,15 @@ pub async fn execute_ban(
 
     let reason = dto.reason.clone();
 
+    // S1/S4 — identite moderateur : derivee du principal authentifie pour le
+    // web (RoleContext), sinon valeurs desktop par defaut (appel interne).
+    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "desktop", "Desktop App");
+
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
-        moderator_id: "desktop".into(),
-        moderator_name: "Desktop App".into(),
+        moderator_id: moderator_id.clone(),
+        moderator_name: moderator_name.clone(),
         target_id: dto.user_id.clone().into(),
         target_name: dto.user_id.clone().into(),
         action_type: "ban_permanent".into(),
@@ -221,7 +252,7 @@ pub async fn execute_ban(
             "action_type": "ban_permanent",
             "target_id": &dto.user_id,
             "target_name": &dto.user_id,
-            "moderator_name": "Desktop App",
+            "moderator_name": &moderator_name,
             "guild_id": &dto.guild_id,
             "reason": &reason,
         }),
@@ -236,7 +267,7 @@ pub async fn execute_ban(
                 "action_id": action_id,
                 "guild_id": &dto.guild_id,
                 "target_id": &dto.user_id,
-                "actor": { "user_id": "desktop", "source": "web" },
+                "actor": { "user_id": &moderator_id, "source": "web" },
                 "reason": &reason,
             }),
         );
@@ -290,11 +321,15 @@ pub async fn execute_mute(
     let target_name = dto
         .target_name
         .unwrap_or_else(|| dto.user_id.clone().into());
+
+    // S1/S4 — identite moderateur derivee du principal authentifie (web).
+    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "web-panel", "Web Admin");
+
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
-        moderator_id: "web-panel".into(),
-        moderator_name: "Web Admin".into(),
+        moderator_id,
+        moderator_name: moderator_name.clone(),
         target_id: dto.user_id.clone().into(),
         target_name: target_name.clone(),
         action_type: "mute".into(),
@@ -310,7 +345,7 @@ pub async fn execute_mute(
             "action_type": "mute",
             "target_id": &dto.user_id,
             "target_name": &target_name,
-            "moderator_name": "Web Admin",
+            "moderator_name": &moderator_name,
             "guild_id": &dto.guild_id,
             "reason": &dto.reason,
             "duration": duration,
@@ -353,11 +388,14 @@ pub async fn execute_unban(
     let target_id = dto.user_id.clone();
     let guild_id = dto.guild_id.clone();
 
+    // S1/S4 — identite moderateur derivee du principal authentifie (web).
+    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "desktop", "Desktop App");
+
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id,
         channel_id: String::new().into(),
-        moderator_id: "desktop".into(),
-        moderator_name: "Desktop App".into(),
+        moderator_id,
+        moderator_name: moderator_name.clone(),
         target_id: target_id.clone().into(),
         target_name: target_id.clone().into(),
         action_type: "unban".into(),
@@ -376,7 +414,7 @@ pub async fn execute_unban(
         serde_json::json!({
             "action_type": "unban",
             "target_id": &target_id,
-            "moderator_name": "Desktop App",
+            "moderator_name": &moderator_name,
             "guild_id": &guild_id,
         }),
     );

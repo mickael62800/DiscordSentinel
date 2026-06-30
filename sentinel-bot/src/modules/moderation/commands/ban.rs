@@ -298,17 +298,11 @@ pub async fn execute_ban(
         .map(|g| g.name)
         .unwrap_or_else(|_| "le serveur".into());
 
-    if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
-        let dm_embed = critical_embed(format!("🔨 Ban ({duration_label}) sur **{guild_name}**"))
-            .field("Raison", reason, false);
-
-        if let Err(e) = dm
-            .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
-            .await
-        {
-            warn!(error = %e, "Failed to send ban DM to user");
-        }
-    }
+    // Ouvre le canal DM AVANT le ban (le bot partage encore un serveur avec la
+    // cible). L'envoi du message est differe apres la journalisation pour
+    // embarquer l'action_id reel dans le bouton d'appel ; un canal DM deja
+    // ouvert reste joignable meme apres le ban.
+    let dm_channel = target.create_dm_channel(&ctx.http).await.ok();
 
     if let Err(e) = guild_id
         .ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason)
@@ -347,8 +341,28 @@ pub async fn execute_ban(
         duration: duration_secs,
     };
 
-    if let Err(e) = api.log_action(&action).await {
-        error!(error = %e, "Erreur log ban");
+    let action_id = match api.log_action(&action).await {
+        Ok(resp) => Some(resp.id),
+        Err(e) => {
+            error!(error = %e, "Erreur log ban");
+            None
+        }
+    };
+
+    // DM differe (canal ouvert avant le ban) avec bouton d'appel.
+    if let Some(dm) = dm_channel {
+        let dm_embed = critical_embed(format!("🔨 Ban ({duration_label}) sur **{guild_name}**"))
+            .field("Raison", reason, false);
+        let mut dm_msg = CreateMessage::new().embed(dm_embed);
+        if let Some(ref aid) = action_id {
+            dm_msg = dm_msg.components(vec![super::appeal::build_appeal_button(
+                &guild_id.to_string(),
+                aid,
+            )]);
+        }
+        if let Err(e) = dm.send_message(&ctx.http, dm_msg).await {
+            warn!(error = %e, "Failed to send ban DM to user");
+        }
     }
 
     info!(target = %target.name, duration = %duration_label, "Ban applique");

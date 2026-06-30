@@ -120,6 +120,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let mut failed = 0u32;
 
         for w in &warns {
+            // `delete_action` retire AUSSI le strike lie a ce warn (via
+            // infraction_id = action.id) cote API. On ne fait donc PAS d'appel
+            // `reset_strikes` global : celui-ci effacerait aussi les strikes
+            // d'origine automod (source != "moderator"), ce qui sur-supprimerait
+            // et fausserait l'escalation. En supprimant warn par warn, seuls les
+            // strikes manuels lies sont retires, les strikes automod restent.
             match api.delete_action(&w.id).await {
                 Ok(true) => success += 1,
                 Ok(false) => failed += 1,
@@ -130,15 +136,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
         }
 
-        if let Err(e) = api.reset_strikes(&guild_id, &target_id.to_string()).await {
-            warn!(error = %e, "Echec reset_strikes apres unwarn all");
-        }
-
         info!(
             moderator = %command.user.name,
             target = %target_id,
             success, failed, total,
-            "/unwarn all execute + strikes reset"
+            "/unwarn all execute (strikes manuels lies retires, automod preserves)"
         );
 
         let summary_embed = serenity::builder::CreateEmbed::new()

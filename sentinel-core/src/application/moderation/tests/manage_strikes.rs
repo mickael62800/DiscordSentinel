@@ -218,6 +218,55 @@ async fn add_strike_no_escalation_when_disabled() {
 // Tests — reset_strikes
 // ══════════════════════════════════════════════════════════
 
+/// MOD #5 — `/unwarn` (single + all) s'appuie sur `delete_strike_by_infraction_id`
+/// (appele cote API dans `delete_action`) pour retirer UNIQUEMENT le strike lie
+/// au warn supprime. Les strikes d'une autre origine (ex. automod, non lies a ce
+/// warn) doivent rester intacts — sinon l'escalation serait faussee et le `all`
+/// sur-supprimerait.
+#[tokio::test]
+async fn delete_strike_by_infraction_id_removes_only_linked_strike() {
+    let repo = Arc::new(InMemoryStrikeRepo::new());
+    let warn_action = Uuid::new_v4();
+
+    // Strike manuel lie au warn.
+    repo.save_strike(&UserStrike {
+        id: Uuid::new_v4(),
+        guild_id: "g1".into(),
+        user_id: "u1".into(),
+        reason: "warn".into(),
+        source: "moderator".into(),
+        infraction_id: Some(warn_action),
+        expires_at: None,
+        created_at: Utc::now(),
+    })
+    .await
+    .unwrap();
+
+    // Strike automod, NON lie a ce warn.
+    repo.save_strike(&UserStrike {
+        id: Uuid::new_v4(),
+        guild_id: "g1".into(),
+        user_id: "u1".into(),
+        reason: "automod".into(),
+        source: "automod".into(),
+        infraction_id: None,
+        expires_at: None,
+        created_at: Utc::now(),
+    })
+    .await
+    .unwrap();
+
+    let removed = repo
+        .delete_strike_by_infraction_id(warn_action)
+        .await
+        .unwrap();
+    assert_eq!(removed, 1, "seul le strike lie au warn doit etre retire");
+
+    let remaining = repo.find_active_strikes("g1", "u1", 3600).await.unwrap();
+    assert_eq!(remaining.len(), 1, "le strike automod doit subsister");
+    assert_eq!(remaining[0].source, "automod");
+}
+
 #[tokio::test]
 async fn reset_strikes_clears_all() {
     let svc = build_service();
