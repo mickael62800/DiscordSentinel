@@ -28,22 +28,35 @@ impl InteractionCooldown {
         let k = (user_id, key.to_string());
         let now = Instant::now();
 
-        if let Some(entry) = self.map.get(&k) {
-            let elapsed = entry.value().elapsed().as_secs();
-            if elapsed < cooldown_secs {
-                return Some(cooldown_secs - elapsed);
-            }
-        }
-
         // Cleanup inline : si la map devient grosse, retirer les entrees
         // dont le cooldown maximal (60s suffisent pour tous les cas) est
-        // deja expire. Evite un leak long-terme.
+        // deja expire. Evite un leak long-terme. Fait AVANT le `entry`
+        // ci-dessous : `retain` verrouille tous les shards, l'appeler
+        // pendant qu'on tient le lock d'une entry risquerait un deadlock.
         if self.map.len() > 1000 {
             self.map.retain(|_, ts| ts.elapsed().as_secs() < 60);
         }
 
-        self.map.insert(k, now);
-        None
+        // Atomicite : check-then-set en une seule operation verrouillee via
+        // l'API `entry` de DashMap. Le shard de la cle reste verrouille entre
+        // la lecture du timestamp et l'ecriture, donc deux interactions
+        // concurrentes sur la meme cle ne peuvent plus passer toutes les deux
+        // (TOCTOU corrige).
+        use dashmap::mapref::entry::Entry;
+        match self.map.entry(k) {
+            Entry::Occupied(mut e) => {
+                let elapsed = e.get().elapsed().as_secs();
+                if elapsed < cooldown_secs {
+                    return Some(cooldown_secs - elapsed);
+                }
+                e.insert(now);
+                None
+            }
+            Entry::Vacant(e) => {
+                e.insert(now);
+                None
+            }
+        }
     }
 }
 

@@ -85,10 +85,16 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                 COALESCE(inf.total_bans, 0) AS total_bans,
                 inf.last_incident_at AS last_incident_at,
                 COALESCE((
+                    -- Phase 4 : `security_events` n'est plus ecrite (save() est
+                    -- un no-op). Les events vivent dans `audit_logs`
+                    -- (event_type 'security_%'), les user_ids dans
+                    -- details->'user_ids' (meme shape que la lecture de
+                    -- PgSecurityEventRepository::find_by_guild).
                     SELECT COUNT(*)::bigint
-                    FROM security_events se,
-                         jsonb_array_elements_text(se.user_ids) AS u(user_id)
-                    WHERE se.guild_id = mw.guild_id AND u.user_id = mw.user_id
+                    FROM audit_logs se,
+                         jsonb_array_elements_text(se.details->'user_ids') AS u(user_id)
+                    WHERE se.event_type LIKE 'security_%'
+                      AND se.guild_id = mw.guild_id AND u.user_id = mw.user_id
                 ), 0) AS security_events_count,
                 mw.created_at AS first_seen_at
             FROM manual_watched_users mw

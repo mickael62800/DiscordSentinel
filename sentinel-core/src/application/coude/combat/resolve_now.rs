@@ -445,6 +445,18 @@ impl ResolveCombatNowService {
             }
         }
 
+        // Vol chaos (`result.vol_coins`) : NON cable en resolution instantanee,
+        // contrairement au batch (cf. resolve_batch.rs : transfert winner-credit
+        // + loser-debit via pay_combat_atomic, cape au solde). En mode instant on
+        // ne fait DELIBEREMENT aucun transfert ici : cabler un mouvement d'argent
+        // est une decision de game-design qui revient au proprietaire, pas un
+        // simple bugfix. Le message "coins voles en bonus" / "Vol a la Tire" reste
+        // produit par le moteur (combat.rs, garde par vol_coins_total > 0) : il
+        // peut donc s'afficher sans transfert correspondant en mode instant —
+        // ecart connu a trancher comme feature (transferer en instant comme batch,
+        // OU masquer la ligne en instant). Voir aussi apply_mythic_effects qui
+        // force result.vol_coins = 0 sur les branches mythiques.
+
         // Primes : si le perdant en a, le gagnant les recupere
         let winner_name = if winner_id == combat.attacker_id.as_str() {
             &combat.attacker_name

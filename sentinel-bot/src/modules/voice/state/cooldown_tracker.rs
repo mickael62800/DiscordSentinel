@@ -28,26 +28,40 @@ impl CooldownTracker {
         self.cooldown_secs.load(Ordering::Relaxed)
     }
 
-    /// Verifie le cooldown. Retourne Some(remaining_secs) si en cooldown, None si OK.
-    pub fn check(&self, user_id: UserId) -> Option<u64> {
+    /// Verifie ET pose le cooldown de maniere atomique. Retourne
+    /// `Some(remaining_secs)` si l'utilisateur est encore en cooldown (rien
+    /// n'est ecrit), `None` si l'action est autorisee (le timestamp est alors
+    /// enregistre).
+    ///
+    /// A privilegier sur `check` + `set` separes : ces deux appels formaient un
+    /// TOCTOU ou deux evenements concurrents du meme user pouvaient tous deux
+    /// passer le `check` avant le premier `set`. Ici le shard de la cle reste
+    /// verrouille entre lecture et ecriture via l'API `entry` de DashMap.
+    pub fn check_and_set(&self, user_id: UserId) -> Option<u64> {
         let cd = self.cooldown();
-        if let Some(entry) = self.map.get(&user_id) {
-            let elapsed = entry.value().elapsed().as_secs();
-            if elapsed < cd {
-                return Some(cd - elapsed);
-            }
-        }
-        self.map.remove(&user_id);
-        None
-    }
+        let now = Instant::now();
 
-    /// Enregistre le timestamp de creation.
-    pub fn set(&self, user_id: UserId) {
-        let cd = self.cooldown();
+        // Cleanup inline avant le `entry` (retain verrouille tous les shards,
+        // l'appeler en tenant le lock d'une entry risquerait un deadlock).
         if self.map.len() > 500 {
             self.map.retain(|_, ts| ts.elapsed().as_secs() < cd);
         }
-        self.map.insert(user_id, Instant::now());
+
+        use dashmap::mapref::entry::Entry;
+        match self.map.entry(user_id) {
+            Entry::Occupied(mut e) => {
+                let elapsed = e.get().elapsed().as_secs();
+                if elapsed < cd {
+                    return Some(cd - elapsed);
+                }
+                e.insert(now);
+                None
+            }
+            Entry::Vacant(e) => {
+                e.insert(now);
+                None
+            }
+        }
     }
 }
 
@@ -62,14 +76,16 @@ mod tests {
     #[test]
     fn test_no_cooldown_initially() {
         let tracker = CooldownTracker::new();
-        assert!(tracker.check(uid(1)).is_none());
+        assert!(tracker.check_and_set(uid(1)).is_none());
     }
 
     #[test]
     fn test_cooldown_after_set() {
         let tracker = CooldownTracker::new();
-        tracker.set(uid(1));
-        let remaining = tracker.check(uid(1));
+        // 1er appel : autorise + pose le timestamp.
+        assert!(tracker.check_and_set(uid(1)).is_none());
+        // 2e appel immediat : encore en cooldown.
+        let remaining = tracker.check_and_set(uid(1));
         assert!(remaining.is_some());
         assert!(remaining.unwrap() <= DEFAULT_COOLDOWN_SECS);
     }
@@ -77,8 +93,9 @@ mod tests {
     #[test]
     fn test_different_users_independent() {
         let tracker = CooldownTracker::new();
-        tracker.set(uid(1));
-        assert!(tracker.check(uid(1)).is_some());
-        assert!(tracker.check(uid(2)).is_none());
+        assert!(tracker.check_and_set(uid(1)).is_none());
+        // Meme user : bloque. Autre user : autorise.
+        assert!(tracker.check_and_set(uid(1)).is_some());
+        assert!(tracker.check_and_set(uid(2)).is_none());
     }
 }

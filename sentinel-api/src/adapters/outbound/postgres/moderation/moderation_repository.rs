@@ -305,12 +305,19 @@ impl ModerationRepository for PgModerationRepository {
     }
 
     async fn action_guild_id(&self, action_id: Uuid) -> Result<Option<String>, DomainError> {
-        let row: Option<(String,)> =
-            sqlx::query_as("SELECT guild_id FROM moderation_actions WHERE id = $1")
-                .bind(action_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(pg_ctx("fetch action guild_id"))?;
+        // Phase 4 : `moderation_actions` n'est plus ecrite (save() est un
+        // no-op). Lookup dans `audit_logs` (event_type 'mod_%') ou l'action_id
+        // est stocke dans details->>'action_id' — identique a delete_action /
+        // find_action_for_reversal.
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM audit_logs \
+             WHERE event_type LIKE 'mod_%' AND details->>'action_id' = $1 \
+             LIMIT 1",
+        )
+        .bind(action_id.to_string())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_ctx("fetch action guild_id"))?;
         Ok(row.map(|(g,)| g))
     }
 

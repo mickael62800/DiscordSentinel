@@ -37,11 +37,10 @@ pub(super) async fn create_temp_channel(
     {
         let data = ctx.data.read().await;
         if let Some(cooldowns) = data.get::<CooldownTrackerKey>() {
-            if let Some(remaining) = cooldowns.check(user_id) {
+            if let Some(remaining) = cooldowns.check_and_set(user_id) {
                 tracing::info!(user = %user_id, remaining = remaining, "Cooldown actif, creation ignoree");
                 return;
             }
-            cooldowns.set(user_id);
         }
     }
 
