@@ -8,8 +8,10 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
@@ -17,17 +19,21 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
+use crate::adapters::inbound::http::middleware::rbac::lookup_role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
+use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::SuggestedAction;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 use super::dto::AutomodReviewDto;
@@ -325,6 +331,7 @@ async fn log_review_sanction(
 pub async fn resolve_review(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<ResolveReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -333,21 +340,22 @@ pub async fn resolve_review(
         Some("discord") => "discord",
         _ => "web",
     };
-    // Faits du demandeur seulement pour la finalisation Discord (la source
-    // "web" est autorisee par guild_auth en amont -> requester None).
-    let requester = if source == "discord" {
-        Some(
-            sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
-                is_admin: body.is_admin,
-                has_moderate_members: body.has_moderate_members,
-                has_manage_messages: body.has_manage_messages,
-                has_mod_role: body.has_mod_role,
-                has_admin_role: body.has_admin_role,
-            },
-        )
+    // Chemin bot/Discord (de confiance) : les faits du body sont les vraies
+    // permissions gateway, utilisees seulement pour la finalisation Discord.
+    let body_facts = if source == "discord" {
+        Some(ModeratorFacts {
+            is_admin: body.is_admin,
+            has_moderate_members: body.has_moderate_members,
+            has_manage_messages: body.has_manage_messages,
+            has_mod_role: body.has_mod_role,
+            has_admin_role: body.has_admin_role,
+        })
     } else {
         None
     };
+    // Chemin web (RoleContext present) : on IGNORE le body et on derive les
+    // faits du role REEL -> `can_finalize_review` exige desormais un vrai Admin.
+    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .resolve(ResolveAutomodReviewCommand {
@@ -434,11 +442,75 @@ fn discord_facts_or_none(
     }
 }
 
+/// Derive des `ModeratorFacts` a partir du role applicatif REEL du principal.
+/// La hierarchie : Viewer(0) < Moderator(1) < Admin(2) < Owner(3).
+/// - `is_admin` / `has_admin_role` (=> `can_finalize_review`) : Admin ou plus.
+/// - `has_mod_role` / `has_moderate_members` / `has_manage_messages`
+///   (=> `is_moderator`, donc le vote) : Moderator ou plus.
+fn facts_from_role(role: Role) -> ModeratorFacts {
+    let is_admin = role >= Role::Admin;
+    let is_mod = role >= Role::Moderator;
+    ModeratorFacts {
+        is_admin,
+        has_admin_role: is_admin,
+        has_mod_role: is_mod,
+        has_moderate_members: is_mod,
+        has_manage_messages: is_mod,
+    }
+}
+
+/// Determine les `ModeratorFacts` effectifs pour un handler de review sensible.
+///
+/// - **Appel bot / interne** (pas de `RoleContext`, Bearer api_key de confiance) :
+///   on garde les faits fournis par le body (`body_facts`), le bot passe les
+///   vraies permissions gateway Discord.
+/// - **Appel web** (`RoleContext` present via `X-Discord-Token`) : on IGNORE le
+///   body et on derive les faits du role REEL du principal authentifie sur la
+///   guild de la review (trust-boundary S1). Cela fait que les regles domaine
+///   (`can_finalize_review` exige Admin, `is_moderator` exige Moderator)
+///   s'appliquent au vrai role, pas a un `is_admin:true` forge dans le JSON.
+///
+/// Fail-closed : une erreur DB sur le lookup de role remonte un 500 (le
+/// handler/caller retry) plutot que de degrader silencieusement les privileges.
+async fn effective_facts(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    review_id: Uuid,
+    body_facts: Option<ModeratorFacts>,
+) -> Result<Option<ModeratorFacts>, ApiError> {
+    let Some(Extension(ctx)) = rbac else {
+        // Chemin de confiance (bot/interne) : comportement inchange.
+        return Ok(body_facts);
+    };
+
+    // Chemin web : on a besoin de la guild de la review pour resoudre le role.
+    let review = state
+        .automod_reviews_uc
+        .get(review_id)
+        .await?
+        .ok_or_else(|| {
+            ApiError::from(DomainError::NotFound(format!(
+                "review {review_id} introuvable"
+            )))
+        })?;
+
+    let role = lookup_role(state, &ctx.discord_user_id, review.guild_id.as_str())
+        .await
+        .map_err(|e| {
+            ApiError::from(DomainError::Internal(format!(
+                "RBAC lookup role (review automod) : {e}"
+            )))
+        })?;
+
+    Ok(Some(facts_from_role(role)))
+}
+
 /// POST /api/automod/reviews/{review_id}/ignore
 /// Clore immediatement le dossier en "ignore" (tout moderateur).
 pub async fn ignore_review(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<CloseIgnoreBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
@@ -447,7 +519,7 @@ pub async fn ignore_review(
         Some("discord") => "discord",
         _ => "web",
     };
-    let requester = discord_facts_or_none(
+    let body_facts = discord_facts_or_none(
         source,
         body.is_admin,
         body.has_moderate_members,
@@ -455,6 +527,8 @@ pub async fn ignore_review(
         body.has_mod_role,
         body.has_admin_role,
     );
+    // Web : faits derives du role reel ; bot : faits du body (cf. effective_facts).
+    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .close_ignored(CloseIgnoredCommand {
@@ -505,6 +579,7 @@ pub struct ReopenBody {
 pub async fn reopen_review(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<ReopenBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
@@ -513,7 +588,7 @@ pub async fn reopen_review(
         Some("discord") => "discord",
         _ => "web",
     };
-    let requester = discord_facts_or_none(
+    let body_facts = discord_facts_or_none(
         source,
         body.is_admin,
         body.has_moderate_members,
@@ -521,6 +596,8 @@ pub async fn reopen_review(
         body.has_mod_role,
         body.has_admin_role,
     );
+    // Web : faits derives du role reel ; bot : faits du body (cf. effective_facts).
+    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .reopen(ReopenReviewCommand {
@@ -567,9 +644,22 @@ pub struct CastVoteBody {
 pub async fn vote_review(
     State(state): State<AppState>,
     Path(review_id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<CastVoteBody>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
+    // Bot (de confiance) : faits gateway du body. Web : faits du role REEL
+    // (le body est ignore) -> `is_moderator` exige un vrai Moderator+.
+    let body_facts = ModeratorFacts {
+        is_admin: body.is_admin,
+        has_moderate_members: body.has_moderate_members,
+        has_manage_messages: body.has_manage_messages,
+        has_mod_role: body.has_mod_role,
+        has_admin_role: false,
+    };
+    let requester = effective_facts(&state, &rbac, id, Some(body_facts))
+        .await?
+        .unwrap_or_default();
     let votes = state
         .automod_reviews_uc
         .cast_vote(
@@ -578,14 +668,7 @@ pub async fn vote_review(
                 voter_id: body.voter_id.clone(),
                 voter_name: body.voter_name.clone(),
                 vote_action: body.vote_action.clone(),
-                requester:
-                    sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts {
-                        is_admin: body.is_admin,
-                        has_moderate_members: body.has_moderate_members,
-                        has_manage_messages: body.has_manage_messages,
-                        has_mod_role: body.has_mod_role,
-                        has_admin_role: false,
-                    },
+                requester,
             },
         )
         .await?;

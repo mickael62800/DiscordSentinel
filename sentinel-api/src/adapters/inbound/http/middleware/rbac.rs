@@ -355,7 +355,19 @@ async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<St
     Ok(user.id)
 }
 
-async fn lookup_role(state: &AppState, user_id: &str, guild_id: &str) -> Result<Role, String> {
+/// Lookup du role applicatif d'un user sur une guild (table `api_user_guilds`).
+///
+/// Expose `pub(crate)` pour que les handlers sensibles (ex. review automod)
+/// derivent les privileges du principal AUTHENTIFIE au lieu de faire confiance
+/// a des booleens fournis dans le body (trust-boundary).
+///
+/// Fail-safe : une row absente retombe sur `Role::Viewer` (moindre privilege) ;
+/// l'`Err` est reserve aux VRAIES erreurs DB (que le handler mappe en 503).
+pub(crate) async fn lookup_role(
+    state: &AppState,
+    user_id: &str,
+    guild_id: &str,
+) -> Result<Role, String> {
     let row: Option<(String,)> = sqlx::query_as(
         "SELECT role FROM api_user_guilds \
          WHERE discord_user_id = $1 AND guild_id = $2",
