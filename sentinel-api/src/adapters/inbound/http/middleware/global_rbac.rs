@@ -135,9 +135,12 @@ fn route_roles() -> &'static HashMap<(&'static str, &'static str), Role> {
 
         // ── Automod reviews (contenu de moderation) ──────────────────────
         m.insert(("POST", "/api/automod/reviews"), Role::Moderator);
+        // Finalisation = application d'une sanction de membre : reserve aux
+        // Admins, comme la finalisation Discord (regle can_finalize_review).
+        // Le vote/ignore/discussion restent ouverts aux Moderateurs.
         m.insert(
             ("POST", "/api/automod/reviews/{review_id}/resolve"),
-            Role::Moderator,
+            Role::Admin,
         );
         m.insert(
             ("POST", "/api/automod/reviews/{review_id}/ignore"),

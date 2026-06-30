@@ -88,21 +88,27 @@ pub(super) async fn post_auto_mute_notice(
 /// qui porte l'info). Retourne une note a afficher sur la carte, ou `None` si la
 /// guild est absente. Utilise pour raid / phishing / pub Discord / gros flood,
 /// y compris quand `human_only` est actif (la decision finale reste humaine).
+/// Retourne `(note, sanction_logged)` : `note` = texte à afficher sur la carte
+/// (`None` si pas de guild), `sanction_logged` = `true` si une sanction de
+/// membre a effectivement été journalisée (mute réussi) — sert à éviter le
+/// double comptage de strike lors de la finalisation de la carte (cf. C1).
 pub(super) async fn apply_auto_protect(
     ctx: &Context,
     msg: &Message,
     mute_duration_secs: u64,
     reason: &str,
     notify_member: bool,
-) -> Option<String> {
-    let guild_id = msg.guild_id?;
+) -> (Option<String>, bool) {
+    let Some(guild_id) = msg.guild_id else {
+        return (None, false);
+    };
     const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
     let safe = mute_duration_secs.clamp(60, MAX_MUTE_SECS);
 
-    let now_secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()?
-        .as_secs() as i64;
+    let now_secs = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(d) => d.as_secs() as i64,
+        Err(_) => return (None, false),
+    };
     let mut mute_ok = false;
     if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(now_secs + safe as i64) {
         let timeout = serenity::model::Timestamp::from(dt);
@@ -171,11 +177,14 @@ pub(super) async fn apply_auto_protect(
     }
 
     let mins = safe / 60;
-    Some(if mute_ok {
+    let note = if mute_ok {
         format!("Mute {mins} min + suppression appliques automatiquement (mesure reversible, tracee). Le membre a ete informe de son droit d'appel (/appeal). A valider/ajuster ci-dessous.")
     } else {
         "Message supprime automatiquement (mute echoue : verifier MODERATE_MEMBERS). A valider/ajuster ci-dessous.".to_string()
-    })
+    };
+    // `sanction_logged = mute_ok` : la sanction n'est journalisée que si le mute
+    // a réussi (cf. bloc `if mute_ok` ci-dessus).
+    (Some(note), mute_ok)
 }
 
 /// Envoie le message au backend pour analyse et execute l'action.
@@ -302,7 +311,7 @@ pub(super) async fn send_to_backend(
 
             // Cas SEVERE (phishing / pub Discord) : protection auto reversible
             // immediate (mute + suppression + trace + DM appel), meme en human_only.
-            let auto_note = if response.severe {
+            let (auto_note, auto_sanctioned) = if response.severe {
                 apply_auto_protect(
                     ctx,
                     msg,
@@ -312,7 +321,7 @@ pub(super) async fn send_to_backend(
                 )
                 .await
             } else {
-                None
+                (None, false)
             };
 
             // Lien non autorise HORS image : suppression auto + tracabilite.
@@ -345,6 +354,7 @@ pub(super) async fn send_to_backend(
                         log_channel_id,
                         colors,
                         auto_note,
+                        auto_sanctioned,
                     )
                     .await;
                 }

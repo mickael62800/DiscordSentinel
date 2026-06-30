@@ -361,7 +361,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                     Err(_) => Err("Inference text timeout (5s)".to_string()),
                 };
                 match inference_result {
-                    Ok(Some((ia_score, _ia_flags, ia_reason))) => {
+                    Ok(Some((ia_score, ia_flags, ia_reason))) => {
                         // Attenuer le score IA si du contexte conversationnel est disponible
                         // (reduit les faux positifs sur les blagues entre amis, etc.)
                         let ia_score = if has_context && context_dampening < 1.0 {
@@ -388,8 +388,17 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                             "Scoring combine bot + IA text"
                         );
 
-                        // Recalculer l'action avec le score combine
-                        let (t_warn, t_delete, t_mute, t_ban) = resolve_thresholds(&rules);
+                        // Recalculer l'action avec le score combine. Les seuils
+                        // sont resolus per-flag-type sur les flags reellement
+                        // declenches (flags bot + flags IA), pas un minimum
+                        // global sur des regles sans rapport.
+                        let mut fired = cmd.flags.active_flags();
+                        for f in &ia_flags {
+                            if !fired.contains(f) {
+                                fired.push(f.clone());
+                            }
+                        }
+                        let (t_warn, t_delete, t_mute, t_ban) = resolve_thresholds(&rules, &fired);
 
                         let (action, duration) = if combined_score >= t_ban {
                             (Action::Ban, None)
@@ -402,6 +411,16 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                         } else {
                             (Action::None, None)
                         };
+
+                        // C5 — borne anti first-message auto-ban (cf.
+                        // `cap_ia_induced_ban`).
+                        let (action, duration) = cap_ia_induced_ban(
+                            action,
+                            duration,
+                            result.score,
+                            t_ban,
+                            mute_duration_secs,
+                        );
 
                         // Combiner les raisons
                         let reason = if result.reason.is_empty() {
@@ -643,45 +662,30 @@ fn build_contextual_content(
     }
 }
 
-/// Seuils par defaut (replique du ScoringService pour le scoring combine).
-const DEFAULT_THRESHOLD_WARN: f64 = 2.0;
-const DEFAULT_THRESHOLD_DELETE: f64 = 4.0;
-const DEFAULT_THRESHOLD_MUTE: f64 = 6.0;
-const DEFAULT_THRESHOLD_BAN: f64 = 9.0;
-
-fn resolve_thresholds(
-    rules: &[crate::domain::entities::system::rule::Rule],
-) -> (f64, f64, f64, f64) {
-    let enabled: Vec<_> = rules.iter().filter(|r| r.enabled).collect();
-
-    if enabled.is_empty() {
-        return (
-            DEFAULT_THRESHOLD_WARN,
-            DEFAULT_THRESHOLD_DELETE,
-            DEFAULT_THRESHOLD_MUTE,
-            DEFAULT_THRESHOLD_BAN,
-        );
+/// C5 — empêche qu'une détection IA fasse, à elle seule, basculer un message en
+/// Ban AUTOMATIQUE. Le score combiné `bot + IA` peut, sur un premier message,
+/// dépasser le seuil de ban sans aucune escalade. Si l'action calculée est Ban
+/// alors que le score BOT seul n'atteignait pas le seuil de ban, on plafonne
+/// l'action à Mute (le Ban reste atteignable via l'escalade de strikes ou une
+/// décision humaine sur la carte de review). Le Ban auto déclenché par le seul
+/// score bot (≥ seuil) est préservé (comportement historique).
+pub(crate) fn cap_ia_induced_ban(
+    action: Action,
+    duration: Option<u64>,
+    bot_score: f64,
+    t_ban: f64,
+    mute_duration_secs: u64,
+) -> (Action, Option<u64>) {
+    if matches!(action, Action::Ban) && bot_score < t_ban {
+        (Action::Mute, Some(mute_duration_secs))
+    } else {
+        (action, duration)
     }
-
-    let warn = enabled
-        .iter()
-        .map(|r| r.threshold_warn)
-        .fold(f64::MAX, f64::min);
-    let delete = enabled
-        .iter()
-        .map(|r| r.threshold_delete)
-        .fold(f64::MAX, f64::min);
-    let mute = enabled
-        .iter()
-        .map(|r| r.threshold_mute)
-        .fold(f64::MAX, f64::min);
-    let ban = enabled
-        .iter()
-        .map(|r| r.threshold_ban)
-        .fold(f64::MAX, f64::min);
-
-    (warn, delete, mute, ban)
 }
+
+// `resolve_thresholds` est désormais la fonction canonique du `ScoringService`
+// (résolution per-flag-type). On la réexporte pour les tests de ce module.
+use crate::domain::services::moderation::scoring_service::resolve_thresholds;
 
 #[cfg(test)]
 #[path = "tests/analyze_message_service.rs"]

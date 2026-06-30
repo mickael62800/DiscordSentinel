@@ -229,7 +229,7 @@ fn cls(label: &str, confidence: f32) -> InferenceClassification {
 
 #[test]
 fn test_resolve_thresholds_defaults() {
-    let (w, d, m, b) = resolve_thresholds(&[]);
+    let (w, d, m, b) = resolve_thresholds(&[], &[]);
     assert_eq!(w, 2.0);
     assert_eq!(d, 4.0);
     assert_eq!(m, 6.0);
@@ -239,7 +239,7 @@ fn test_resolve_thresholds_defaults() {
 #[test]
 fn test_resolve_thresholds_with_rules() {
     let rules = vec![make_rule(FlagType::Spam, 3.0)];
-    let (w, d, m, b) = resolve_thresholds(&rules);
+    let (w, d, m, b) = resolve_thresholds(&rules, &[FlagType::Spam]);
     assert_eq!(w, 2.0);
     assert_eq!(d, 4.0);
     assert_eq!(m, 6.0);
@@ -251,7 +251,7 @@ fn test_resolve_thresholds_ignores_disabled() {
     let mut rule = make_rule(FlagType::Spam, 3.0);
     rule.threshold_warn = 0.5;
     rule.enabled = false;
-    let (w, _, _, _) = resolve_thresholds(&[rule]);
+    let (w, _, _, _) = resolve_thresholds(&[rule], &[FlagType::Spam]);
     assert_eq!(w, 2.0);
 }
 
@@ -265,7 +265,7 @@ fn test_resolve_thresholds_takes_minimum() {
     r2.threshold_warn = 3.0;
     r2.threshold_ban = 10.0;
 
-    let (w, _, _, b) = resolve_thresholds(&[r1, r2]);
+    let (w, _, _, b) = resolve_thresholds(&[r1, r2], &[FlagType::Spam, FlagType::Insult]);
     assert_eq!(w, 1.5);
     assert_eq!(b, 7.0);
 }
@@ -655,7 +655,7 @@ fn anger_only_triggers_warn() {
     // anger: weight=3.0, confidence=0.8 → score=2.4 >= warn(2.0) mais < delete(4.0)
     let classifications = vec![cls("anger", 0.80)];
     let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (t_warn, t_delete, _, _) = resolve_thresholds(&[]);
+    let (t_warn, t_delete, _, _) = resolve_thresholds(&[], &[]);
     assert!(score >= t_warn);
     assert!(score < t_delete);
 }
@@ -665,7 +665,7 @@ fn rage_triggers_delete_or_mute() {
     // rage: weight=6.0, confidence=0.85 → score=5.1 >= delete(4.0) mais < mute(6.0)
     let classifications = vec![cls("rage", 0.85)];
     let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, t_delete, t_mute, _) = resolve_thresholds(&[]);
+    let (_, t_delete, t_mute, _) = resolve_thresholds(&[], &[]);
     assert!(score >= t_delete);
     assert!(score < t_mute);
 }
@@ -675,7 +675,7 @@ fn threat_high_confidence_triggers_mute() {
     // threat: weight=8.0, confidence=0.90 → score=7.2 >= mute(6.0) mais < ban(9.0)
     let classifications = vec![cls("threat", 0.90)];
     let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, _, t_mute, t_ban) = resolve_thresholds(&[]);
+    let (_, _, t_mute, t_ban) = resolve_thresholds(&[], &[]);
     assert!(score >= t_mute);
     assert!(score < t_ban);
 }
@@ -685,8 +685,35 @@ fn rage_plus_threat_triggers_ban() {
     // rage:6.0*0.8=4.8 + threat:8.0*0.8=6.4 → 11.2 >= ban(9.0)
     let classifications = vec![cls("rage", 0.80), cls("threat", 0.80)];
     let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, _, _, t_ban) = resolve_thresholds(&[]);
+    let (_, _, _, t_ban) = resolve_thresholds(&[], &[]);
     assert!(score >= t_ban);
+}
+
+// ── C5 : cap anti first-message auto-ban ──
+
+#[test]
+fn ia_induced_ban_is_capped_to_mute() {
+    // Score bot seul (3.0) < seuil ban (9.0), action combinée = Ban -> Mute.
+    let (action, duration) = cap_ia_induced_ban(Action::Ban, None, 3.0, 9.0, 600);
+    assert_eq!(action, Action::Mute);
+    assert_eq!(duration, Some(600));
+}
+
+#[test]
+fn bot_only_ban_is_preserved() {
+    // Score bot seul (10.0) >= seuil ban : le Ban auto bot-seul est conservé.
+    let (action, duration) = cap_ia_induced_ban(Action::Ban, None, 10.0, 9.0, 600);
+    assert_eq!(action, Action::Ban);
+    assert_eq!(duration, None);
+}
+
+#[test]
+fn non_ban_actions_are_untouched() {
+    let (action, duration) = cap_ia_induced_ban(Action::Mute, Some(300), 1.0, 9.0, 600);
+    assert_eq!(action, Action::Mute);
+    assert_eq!(duration, Some(300));
+    let (action, _) = cap_ia_induced_ban(Action::Warn, None, 1.0, 9.0, 600);
+    assert_eq!(action, Action::Warn);
 }
 
 #[test]
@@ -694,7 +721,7 @@ fn anger_low_confidence_below_warn() {
     // anger: weight=3.0, confidence=0.55 → score=1.65 < warn(2.0)
     let classifications = vec![cls("anger", 0.55)];
     let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (t_warn, _, _, _) = resolve_thresholds(&[]);
+    let (t_warn, _, _, _) = resolve_thresholds(&[], &[]);
     assert!(score < t_warn);
 }
 

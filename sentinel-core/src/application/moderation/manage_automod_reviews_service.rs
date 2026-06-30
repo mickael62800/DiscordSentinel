@@ -35,6 +35,26 @@ impl ManageAutomodReviewsService {
     pub fn new(repo: Arc<dyn AutomodReviewRepository>) -> Self {
         Self { repo }
     }
+
+    /// Conflit d'interet : refuse qu'un acteur agisse (vote / finalisation /
+    /// cloture) sur une detection qui le vise lui-meme (`actor_id` ==
+    /// `review.user_id`). No-op si la review est introuvable (le repo renverra
+    /// l'erreur appropriee plus loin).
+    async fn reject_self_action(
+        &self,
+        review_id: Uuid,
+        actor_id: &str,
+        verb: &str,
+    ) -> Result<(), DomainError> {
+        if let Some(review) = self.repo.get(review_id).await? {
+            if review.user_id.as_str() == actor_id {
+                return Err(DomainError::ValidationError(format!(
+                    "Tu ne peux pas {verb} ta propre detection."
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -105,6 +125,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             ));
         }
         crate::application::validation::validate_non_empty(&cmd.resolved_by_id, "resolved_by_id")?;
+        // Conflit d'interet : l'utilisateur flagge ne peut pas finaliser sa
+        // propre detection.
+        self.reject_self_action(cmd.review_id, &cmd.resolved_by_id, "finaliser")
+            .await?;
         // Regle d'acces (domaine) : finalisation Discord reservee aux admins.
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -132,6 +156,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             ));
         }
         crate::application::validation::validate_non_empty(&cmd.actor_id, "actor_id")?;
+        // Conflit d'interet : l'utilisateur flagge ne peut pas clore sa propre
+        // detection.
+        self.reject_self_action(cmd.review_id, &cmd.actor_id, "clore")
+            .await?;
         // Regle d'acces (domaine) : tout moderateur peut clore (source discord).
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -173,6 +201,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             )));
         }
         crate::application::validation::validate_non_empty(&cmd.voter_id, "voter_id")?;
+        // Conflit d'interet : l'utilisateur flagge ne peut pas voter sur sa
+        // propre detection.
+        self.reject_self_action(cmd.review_id, &cmd.voter_id, "voter sur")
+            .await?;
         self.repo
             .upsert_vote(
                 cmd.review_id,
@@ -300,3 +332,7 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         self.repo.list_discussion_messages(review_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_automod_reviews.rs"]
+mod tests;

@@ -35,6 +35,9 @@ pub(crate) async fn post_vote_card(
     discussion_enabled: bool,
     detail_url: Option<String>,
     auto_note: Option<String>,
+    // `true` si l'auto-protection a déjà journalisé une sanction (anti
+    // double-strike à la finalisation, cf. C1).
+    already_sanctioned: bool,
 ) {
     if matches!(suggested_action, Action::None) {
         return;
@@ -76,6 +79,7 @@ pub(crate) async fn post_vote_card(
         "voting_deadline": deadline.to_rfc3339(),
         "aggregate": aggregate,
         "aggregate_window_minutes": aggregate_window_minutes,
+        "already_sanctioned": already_sanctioned,
     });
 
     let resp = match api

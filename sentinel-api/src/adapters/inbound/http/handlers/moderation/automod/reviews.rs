@@ -122,6 +122,11 @@ pub struct CreateReviewBody {
     /// Fenetre d'inactivite (minutes) au-dela de laquelle on n'agrege plus dans
     /// une carte existante. Default 60 ; 0 = pas de limite.
     pub aggregate_window_minutes: Option<i64>,
+    /// `true` si l'auto-protection sévère a DÉJÀ journalisé une sanction de
+    /// membre pour cet incident (mute auto). La finalisation de la carte NE
+    /// re-journalise alors PAS la sanction (anti double-strike, cf. C1).
+    #[serde(default)]
+    pub already_sanctioned: bool,
 }
 
 /// POST /api/automod/reviews
@@ -159,6 +164,7 @@ pub async fn create_review(
                     .as_deref()
                     .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                     .map(|d| d.with_timezone(&chrono::Utc)),
+                sanction_logged: body.already_sanctioned,
             },
             body.aggregate.unwrap_or(false),
             body.aggregate_window_minutes.unwrap_or(60),
@@ -222,6 +228,20 @@ async fn log_review_sanction(
     use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 
     if !matches!(applied_action, "prevention" | "warn" | "mute" | "ban") {
+        return;
+    }
+
+    // C1 — anti double-strike : si l'auto-protection sévère a déjà journalisé
+    // une sanction pour cet incident (mute auto AVANT la carte), la finalisation
+    // ne doit PAS re-journaliser -> sinon un incident = deux strikes.
+    if review.sanction_logged {
+        metrics::counter!("automod_sanction_log_total", "result" => "skipped_already_logged")
+            .increment(1);
+        tracing::info!(
+            review_id = %review.id,
+            action = %applied_action,
+            "Sanction déjà journalisée par l'auto-protection : finalisation non re-journalisée (anti double-strike)"
+        );
         return;
     }
 

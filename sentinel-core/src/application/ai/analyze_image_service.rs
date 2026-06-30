@@ -310,7 +310,10 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
 
         // Seuils depuis les rules (configurables per-guild), pas hardcodes.
         let (t_warn, t_delete, t_mute, t_ban) =
-            crate::domain::services::moderation::scoring_service::resolve_thresholds(&rules);
+            crate::domain::services::moderation::scoring_service::resolve_thresholds(
+                &rules,
+                &detected_labels,
+            );
         let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)
         } else if total_score >= t_mute {

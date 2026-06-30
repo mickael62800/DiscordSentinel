@@ -64,6 +64,8 @@ struct Row {
     cumulative_score: f64,
     #[sqlx(default)]
     incidents: serde_json::Value,
+    #[sqlx(default)]
+    sanction_logged: bool,
 }
 
 impl From<Row> for AutomodReview {
@@ -98,6 +100,7 @@ impl From<Row> for AutomodReview {
             } else {
                 r.incidents
             },
+            sanction_logged: r.sanction_logged,
         }
     }
 }
@@ -176,8 +179,8 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             "INSERT INTO automod_reviews \
                 (guild_id, channel_id, message_id, user_id, user_name, content_preview, \
                  suggested_action, score, reason, flags, status, voting_deadline, \
-                 incident_count, cumulative_score, incidents) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$14) \
+                 incident_count, cumulative_score, incidents, sanction_logged) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,1,$13,$14,$15) \
              RETURNING *",
         )
         .bind(r.guild_id.as_str())
@@ -194,6 +197,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .bind(r.voting_deadline)
         .bind(r.score)
         .bind(&incidents)
+        .bind(r.sanction_logged)
         .fetch_one(&self.pool)
         .await
         .map_err(pg_err)?;
@@ -266,6 +270,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                         incidents = $1, incident_count = $2, cumulative_score = $3, \
                         score = $4, suggested_action = $5, reason = $6, voting_deadline = $7, \
                         content_preview = $9, channel_id = $10, message_id = $11, \
+                        sanction_logged = sanction_logged OR $12, \
                         last_incident_at = NOW() \
                      WHERE id = $8 AND status = 'voting' \
                      RETURNING *",
@@ -281,6 +286,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 .bind(&r.content_preview)
                 .bind(r.channel_id.as_str())
                 .bind(r.message_id.as_str())
+                .bind(r.sanction_logged)
                 .fetch_one(&mut *tx)
                 .await
                 .map_err(pg_err)?;
@@ -318,6 +324,7 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
             .bind(r.voting_deadline)
             .bind(r.score)
             .bind(&incidents)
+            .bind(r.sanction_logged)
             .fetch_one(&mut *tx)
             .await
             .map_err(pg_err)?;

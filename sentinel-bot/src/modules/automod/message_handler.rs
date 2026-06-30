@@ -159,6 +159,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                     log_channel_id,
                     &colors,
                     None,
+                    false,
                 )
                 .await;
             } else if human_only {
@@ -268,7 +269,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 tracker.remove(&(msg.channel_id, msg.author.id));
             }
 
-            let auto_note = if severe {
+            let (auto_note, auto_sanctioned) = if severe {
                 super::backend::apply_auto_protect(
                     ctx,
                     msg,
@@ -278,7 +279,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 )
                 .await
             } else {
-                None
+                (None, false)
             };
 
             let flood_review = BaseApiClient::config_bool(&config, "flood_review_mode", true);
@@ -306,6 +307,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                     log_channel_id,
                     &colors,
                     auto_note,
+                    auto_sanctioned,
                 )
                 .await;
             } else if severe {
@@ -393,6 +395,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 log_channel_id,
                 &colors,
                 None,
+                false,
             )
             .await;
         } else {

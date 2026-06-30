@@ -153,6 +153,10 @@ pub struct AutomodReview {
     /// Liste JSON des incidents agreges
     /// (`[{message_id, channel_id, content_preview, score, reason, suggested_action, at}]`).
     pub incidents: serde_json::Value,
+    /// `true` si une sanction de membre a déjà été journalisée pour cet incident
+    /// (auto-protection sévère). La finalisation de la carte NE re-journalise
+    /// PAS la sanction dans ce cas (anti double-strike, cf. C1).
+    pub sanction_logged: bool,
 }
 
 // ── Vote des moderateurs ──────────────────────────────────────────────
@@ -351,4 +355,9 @@ pub struct NewAutomodReview {
     /// Si Some, la review naît en mode VOTE (statut 'voting') avec cette
     /// echeance. Si None, comportement historique (statut 'pending').
     pub voting_deadline: Option<DateTime<Utc>>,
+    /// `true` si une sanction de membre a DÉJÀ été journalisée pour cet incident
+    /// (ex. l'auto-protection sévère a mute + tracé la sanction AVANT de poster
+    /// la carte). Évite le double comptage de strike lors de la finalisation
+    /// de la carte (cf. C1). Défaut `false`.
+    pub sanction_logged: bool,
 }

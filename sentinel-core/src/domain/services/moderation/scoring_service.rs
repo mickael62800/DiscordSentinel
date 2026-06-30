@@ -79,8 +79,10 @@ impl ScoringService {
             triggered.push(flag.as_str());
         }
 
-        // Déterminer les seuils (prendre ceux de la première règle trouvée, sinon défaut)
-        let (t_warn, t_delete, t_mute, t_ban) = resolve_thresholds(rules);
+        // Déterminer les seuils à partir des SEULES règles dont le flag a été
+        // déclenché (per-flag-type) : une règle stricte sur une catégorie sans
+        // rapport (ex. liens) ne doit pas abaisser le seuil d'une autre (ex. insulte).
+        let (t_warn, t_delete, t_mute, t_ban) = resolve_thresholds(rules, &active);
 
         // Déterminer l'action (du plus sévère au moins sévère)
         let (action, duration) = if total_score >= t_ban {
@@ -125,12 +127,25 @@ fn default_weight(flag: &FlagType) -> f64 {
     }
 }
 
-/// Résout les seuils depuis les règles. Si plusieurs règles existent,
-/// on prend les seuils les plus bas (les plus strictes) pour chaque niveau.
-pub fn resolve_thresholds(rules: &[Rule]) -> (f64, f64, f64, f64) {
-    let enabled: Vec<&Rule> = rules.iter().filter(|r| r.enabled).collect();
+/// Résout les seuils depuis les règles, en ne considérant QUE les règles dont
+/// le `flag_type` figure parmi les flags réellement déclenchés (`fired`).
+///
+/// Motivation (correctness) : le score somme les poids des flags déclenchés ;
+/// les seuils doivent donc venir des mêmes catégories. Avant, on prenait le
+/// minimum des seuils sur TOUTES les règles activées, si bien qu'une règle très
+/// stricte (seuil bas) sur une catégorie sans rapport abaissait le seuil de
+/// toutes les autres détections. On restreint désormais aux règles pertinentes.
+///
+/// Comportement : parmi les règles activées dont le flag est déclenché, on
+/// prend le seuil le plus bas (le plus strict) à chaque niveau. Si aucune règle
+/// ne correspond aux flags déclenchés, on retombe sur les seuils par défaut.
+pub fn resolve_thresholds(rules: &[Rule], fired: &[FlagType]) -> (f64, f64, f64, f64) {
+    let relevant: Vec<&Rule> = rules
+        .iter()
+        .filter(|r| r.enabled && fired.contains(&r.flag_type))
+        .collect();
 
-    if enabled.is_empty() {
+    if relevant.is_empty() {
         return (
             DEFAULT_THRESHOLD_WARN,
             DEFAULT_THRESHOLD_DELETE,
@@ -139,19 +154,19 @@ pub fn resolve_thresholds(rules: &[Rule]) -> (f64, f64, f64, f64) {
         );
     }
 
-    let warn = enabled
+    let warn = relevant
         .iter()
         .map(|r| r.threshold_warn)
         .fold(f64::MAX, f64::min);
-    let delete = enabled
+    let delete = relevant
         .iter()
         .map(|r| r.threshold_delete)
         .fold(f64::MAX, f64::min);
-    let mute = enabled
+    let mute = relevant
         .iter()
         .map(|r| r.threshold_mute)
         .fold(f64::MAX, f64::min);
-    let ban = enabled
+    let ban = relevant
         .iter()
         .map(|r| r.threshold_ban)
         .fold(f64::MAX, f64::min);

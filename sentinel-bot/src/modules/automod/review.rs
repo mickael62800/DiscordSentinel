@@ -29,6 +29,10 @@ pub(super) async fn send_review_card(
     // Note d'action automatique deja appliquee (mute/suppression) a afficher
     // sur la carte. `None` = aucune action auto.
     auto_note: Option<String>,
+    // `true` si l'auto-protection a DÉJÀ journalisé une sanction de membre pour
+    // cet incident -> la finalisation de la carte ne la re-journalisera pas
+    // (anti double-strike, cf. C1).
+    already_sanctioned: bool,
 ) {
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
@@ -76,6 +80,7 @@ pub(super) async fn send_review_card(
                     discussion_enabled,
                     detail_url,
                     auto_note,
+                    already_sanctioned,
                 )
                 .await;
                 return;
@@ -208,6 +213,7 @@ pub(super) async fn send_review_card(
         score,
         reason,
         flags,
+        already_sanctioned,
     )
     .await;
 
@@ -288,6 +294,7 @@ async fn create_review_in_api(
     score: f64,
     reason: &str,
     flags: &detectors::DetectionFlags,
+    already_sanctioned: bool,
 ) -> Option<String> {
     let suggested_str = match suggested_action {
         Action::Warn => "warn",
@@ -315,6 +322,7 @@ async fn create_review_in_api(
         score: f64,
         reason: &'a str,
         flags: serde_json::Value,
+        already_sanctioned: bool,
     }
     #[derive(serde::Deserialize)]
     struct CreateResp {
@@ -337,6 +345,7 @@ async fn create_review_in_api(
             "link": flags.link,
             "phishing": flags.phishing,
         }),
+        already_sanctioned,
     };
 
     let resp: Result<CreateResp, _> = api.post_json("/api/automod/reviews", &body).await;
