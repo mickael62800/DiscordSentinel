@@ -22,6 +22,12 @@ pub struct WelcomeConfigData {
     pub rules_message: String,
     pub rules_role_id: Option<String>,
     pub rules_button_label: String,
+    // Verification d'age au reglement.
+    pub age_check_enabled: bool,
+    pub age_minimum: i32,
+    pub unverified_role_id: Option<String>,
+    pub age_modal_question: String,
+    pub age_ban_message: String,
     pub counter_enabled: bool,
     pub counter_channel_id: Option<String>,
     pub counter_format: String,

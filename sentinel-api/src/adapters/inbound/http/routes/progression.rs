@@ -181,6 +181,16 @@ fn confession_inner() -> Router<AppState> {
         )
 }
 
+fn age_ban_inner() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::community::age_bans::create_age_ban))
+        .route("/due", get(handlers::community::age_bans::list_due_age_bans))
+        .route(
+            "/{id}/lift",
+            post(handlers::community::age_bans::lift_age_ban),
+        )
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .nest("/api/levels", level_inner())
@@ -188,4 +198,5 @@ pub fn routes() -> Router<AppState> {
         .nest("/api/confessions", confession_inner())
         .nest("/api/role-panels", role_panel_inner())
         .nest("/api/auto-roles", auto_role_inner())
+        .nest("/api/age-bans", age_ban_inner())
 }

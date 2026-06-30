@@ -95,6 +95,21 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         if let Some(v) = patch.rules_button_label {
             current.rules_button_label = v;
         }
+        if let Some(v) = patch.age_check_enabled {
+            current.age_check_enabled = v;
+        }
+        if let Some(v) = patch.age_minimum {
+            current.age_minimum = v;
+        }
+        if let Some(v) = patch.unverified_role_id {
+            current.unverified_role_id = Some(v);
+        }
+        if let Some(v) = patch.age_modal_question {
+            current.age_modal_question = v;
+        }
+        if let Some(v) = patch.age_ban_message {
+            current.age_ban_message = v;
+        }
         if let Some(v) = patch.counter_enabled {
             current.counter_enabled = v;
         }

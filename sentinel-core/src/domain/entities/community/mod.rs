@@ -1,3 +1,4 @@
+pub mod age_ban;
 pub mod announcement;
 pub mod confession;
 pub mod daily_activity;

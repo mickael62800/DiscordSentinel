@@ -60,6 +60,15 @@ impl From<Row> for WelcomeConfigData {
             rules_message: r.rules_message,
             rules_role_id: r.rules_role_id,
             rules_button_label: r.rules_button_label,
+            // Verification d'age : Row legacy ne porte pas ces colonnes,
+            // defaults ici (lecture reelle via overlay_with_bot_config).
+            age_check_enabled: false,
+            age_minimum: 20,
+            unverified_role_id: None,
+            age_modal_question: "Quel age as-tu ? (en chiffres)".into(),
+            age_ban_message:
+                "Tu dois avoir au moins {min} ans pour rejoindre ce serveur. Tu pourras revenir dans {annees} an(s)."
+                    .into(),
             counter_enabled: r.counter_enabled,
             counter_channel_id: r.counter_channel_id,
             counter_format: r.counter_format,
@@ -107,6 +116,13 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         rules_message: "Lis les regles et clique sur le bouton pour acceder au serveur.".into(),
         rules_role_id: None,
         rules_button_label: "J'accepte les regles".into(),
+        age_check_enabled: false,
+        age_minimum: 20,
+        unverified_role_id: None,
+        age_modal_question: "Quel age as-tu ? (en chiffres)".into(),
+        age_ban_message:
+            "Tu dois avoir au moins {min} ans pour rejoindre ce serveur. Tu pourras revenir dans {annees} an(s)."
+                .into(),
         counter_enabled: false,
         counter_channel_id: None,
         counter_format: "Membres : {count}".into(),
@@ -187,6 +203,25 @@ fn overlay_with_bot_config(
             "rules_button_label" => {
                 if !v.is_empty() {
                     d.rules_button_label = v;
+                }
+            }
+            "age_check_enabled" => d.age_check_enabled = parse_bool(&v, d.age_check_enabled),
+            "age_minimum" => {
+                if let Ok(n) = v.parse::<i32>() {
+                    d.age_minimum = n;
+                }
+            }
+            "unverified_role_id" => {
+                d.unverified_role_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "age_modal_question" => {
+                if !v.is_empty() {
+                    d.age_modal_question = v;
+                }
+            }
+            "age_ban_message" => {
+                if !v.is_empty() {
+                    d.age_ban_message = v;
                 }
             }
             "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
@@ -358,6 +393,11 @@ pub(super) fn build_welcome_config_kvs(d: &WelcomeConfigData) -> Vec<(&'static s
         ("rules_message", d.rules_message.clone()),
         ("rules_role_id", opt(&d.rules_role_id)),
         ("rules_button_label", d.rules_button_label.clone()),
+        ("age_check_enabled", b(d.age_check_enabled)),
+        ("age_minimum", d.age_minimum.to_string()),
+        ("unverified_role_id", opt(&d.unverified_role_id)),
+        ("age_modal_question", d.age_modal_question.clone()),
+        ("age_ban_message", d.age_ban_message.clone()),
         ("counter_enabled", b(d.counter_enabled)),
         ("counter_channel_id", opt(&d.counter_channel_id)),
         ("counter_format", d.counter_format.clone()),

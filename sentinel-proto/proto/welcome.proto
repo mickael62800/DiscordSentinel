@@ -30,6 +30,12 @@ message WelcomeConfig {
   string rules_message = 13;
   optional string rules_role_id = 14;
   string rules_button_label = 15;
+  // Verification d'age au reglement.
+  bool age_check_enabled = 38;
+  int32 age_minimum = 39;
+  optional string unverified_role_id = 40;
+  string age_modal_question = 41;
+  string age_ban_message = 42;
   bool counter_enabled = 16;
   optional string counter_channel_id = 17;
   string counter_format = 18;

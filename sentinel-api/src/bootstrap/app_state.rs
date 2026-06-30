@@ -115,6 +115,11 @@ pub async fn build_app_state(
     let moderation_repo = Arc::new(PgModerationRepository::new(pg_pool.clone()));
     let stats_repo = Arc::new(PgStatsRepository::new(pg_pool.clone()));
     let voice_channel_repo = Arc::new(PgVoiceChannelRepository::new(pg_pool.clone()));
+    let age_ban_repo = Arc::new(
+        crate::adapters::outbound::postgres::community::age_ban_repository::PgAgeBanRepository::new(
+            pg_pool.clone(),
+        ),
+    );
     let bot_config_repo = Arc::new(PgBotConfigRepository::new(pg_pool.clone()));
     let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
     // Phase 5C — Batch writes : BatchedPgLogRepository bufferise les inserts et
@@ -812,6 +817,7 @@ pub async fn build_app_state(
         members_uc,
         analytics_repo,
         daily_activity_repo,
+        age_ban_repo,
         log_repo,
         guild_repo,
         bot_config_repo,
