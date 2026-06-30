@@ -697,6 +697,17 @@ async fn load_welcome_config(
         .ok()
 }
 
+/// Indique si la verification d'age est active (et le reglement actif) sur
+/// cette guild. Utilise par d'autres modules (ex. community auto-roles) pour
+/// suspendre l'attribution automatique de roles tant que le membre n'a pas
+/// passe la verification.
+pub async fn age_check_active(ctx: &Context, guild_id: GuildId) -> bool {
+    match load_welcome_config(ctx, guild_id).await {
+        Some(c) => c.rules_enabled && c.age_check_enabled,
+        None => false,
+    }
+}
+
 /// Ouvre le formulaire de saisie d'age.
 async fn open_age_modal(
     ctx: &Context,
@@ -750,6 +761,22 @@ pub async fn handle_age_modal(
         None => return,
     };
     let user_id = modal.user.id;
+
+    // ACK immediat : les operations suivantes (lecture config gRPC,
+    // ajout/retrait de roles, ban) peuvent depasser les 3s d'une interaction.
+    // On differe, puis on repond via followup (reply_modal).
+    if let Err(e) = modal
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec defer modale age");
+        return;
+    }
 
     let config = match load_welcome_config(ctx, guild_id).await {
         Some(c) => c,
@@ -845,12 +872,12 @@ async fn reply_modal(
     modal: &serenity::model::application::ModalInteraction,
     content: &str,
 ) {
-    let resp = CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new()
-            .content(content)
-            .ephemeral(true),
-    );
-    if let Err(e) = modal.create_response(&ctx.http, resp).await {
+    // L'interaction a deja ete differee (Defer) au debut de handle_age_modal :
+    // on repond donc via un followup, pas un create_response.
+    let followup = serenity::builder::CreateInteractionResponseFollowup::new()
+        .content(content)
+        .ephemeral(true);
+    if let Err(e) = modal.create_followup(&ctx.http, followup).await {
         warn!(error = %e, "Echec reponse modale age");
     }
 }

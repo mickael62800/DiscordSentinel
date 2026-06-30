@@ -51,6 +51,11 @@ pub fn handles_modal(custom_id: &str) -> bool {
     custom_id == handler::AGE_MODAL_ID
 }
 
+/// Verification d'age active sur la guild ? (pour suspendre les auto-roles).
+pub async fn age_check_active(ctx: &Context, guild_id: GuildId) -> bool {
+    handler::age_check_active(ctx, guild_id).await
+}
+
 pub async fn on_modal(ctx: &Context, modal: &serenity::model::application::ModalInteraction) {
     handler::handle_age_modal(ctx, modal).await;
 }

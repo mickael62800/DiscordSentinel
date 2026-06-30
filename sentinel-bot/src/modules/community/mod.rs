@@ -116,6 +116,15 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
 /// Auto-roles quand un nouveau membre rejoint.
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
     let guild_id = new_member.guild_id;
+
+    // Si la verification d'age (module welcome) est active, on NE pose AUCUN
+    // auto-role a l'arrivee : le membre ne doit obtenir ses roles qu'apres
+    // avoir saisi un age suffisant via le formulaire du reglement. Sinon le
+    // role Membre configure en auto-role court-circuiterait la verification.
+    if crate::modules::welcome::age_check_active(ctx, guild_id).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = match data.get::<RolesApiKey>() {
         Some(a) => a,
