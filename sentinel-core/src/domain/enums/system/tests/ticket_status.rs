@@ -32,3 +32,34 @@ fn display_trait() {
 fn valid_values_count() {
     assert_eq!(TicketStatus::VALID_VALUES.len(), 3);
 }
+
+#[test]
+fn can_transition_closing_always_allowed() {
+    use TicketStatus::*;
+    assert!(TicketStatus::can_transition(Open, Closed));
+    assert!(TicketStatus::can_transition(Pending, Closed));
+    assert!(TicketStatus::can_transition(Closed, Closed));
+}
+
+#[test]
+fn can_transition_closed_cannot_reopen_via_pending() {
+    use TicketStatus::*;
+    // Une reponse (open/pending) ne doit pas reouvrir un ticket ferme.
+    assert!(!TicketStatus::can_transition(Closed, Pending));
+}
+
+#[test]
+fn can_transition_closed_reopen_to_open_allowed() {
+    use TicketStatus::*;
+    // Reouverture explicite autorisee.
+    assert!(TicketStatus::can_transition(Closed, Open));
+}
+
+#[test]
+fn can_transition_open_pending_free() {
+    use TicketStatus::*;
+    assert!(TicketStatus::can_transition(Open, Pending));
+    assert!(TicketStatus::can_transition(Pending, Open));
+    assert!(TicketStatus::can_transition(Open, Open));
+    assert!(TicketStatus::can_transition(Pending, Pending));
+}

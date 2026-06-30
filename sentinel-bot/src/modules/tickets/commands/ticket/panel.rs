@@ -15,6 +15,42 @@ use crate::modules::tickets::api_client::{ApiClient, CreateTicketRequest};
 
 use super::constants::*;
 
+use once_cell::sync::Lazy;
+use std::collections::HashSet;
+use std::sync::Mutex;
+
+/// Garde anti double-submit : empeche deux soumissions concurrentes du modal
+/// pour le meme couple (guild, user) de creer deux tickets/salons (race
+/// check-then-create lors d'un double-clic). La limite `max_open_per_user`
+/// reste geree separement (et garde son defaut illimite).
+static OPEN_IN_PROGRESS: Lazy<Mutex<HashSet<(u64, u64)>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// Verrou RAII (guild, user) : libere automatiquement a la fin du scope, y
+/// compris sur les `return` precoces et en cas d'erreur.
+struct OpenGuard {
+    key: (u64, u64),
+}
+
+impl OpenGuard {
+    /// Tente d'acquerir le verrou. Retourne `None` si une ouverture est deja
+    /// en cours pour ce couple (guild, user).
+    fn try_acquire(guild: u64, user: u64) -> Option<Self> {
+        let mut set = OPEN_IN_PROGRESS.lock().unwrap();
+        if set.insert((guild, user)) {
+            Some(Self { key: (guild, user) })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for OpenGuard {
+    fn drop(&mut self) {
+        OPEN_IN_PROGRESS.lock().unwrap().remove(&self.key);
+    }
+}
+
 /// Construit le message du panel de creation de ticket (reutilisable)
 pub fn build_panel_message() -> CreateMessage {
     let button = CreateButton::new(PANEL_BUTTON_ID)
@@ -166,6 +202,26 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     {
         warn!(error = %e, "Failed to defer modal response");
     }
+
+    // Anti double-submit : un second submit concurrent du meme (guild, user)
+    // est rejete tant que le premier n'a pas termine. Le verrou est libere
+    // automatiquement (RAII) a la sortie de la fonction.
+    let _open_guard = match OpenGuard::try_acquire(guild_id.get(), author.id.get()) {
+        Some(g) => g,
+        None => {
+            if let Err(e) = modal
+                .edit_response(
+                    &ctx.http,
+                    serenity::builder::EditInteractionResponse::new()
+                        .content("Une ouverture de ticket est deja en cours. Merci de patienter."),
+                )
+                .await
+            {
+                warn!(error = %e, "Failed to send double-submit response");
+            }
+            return;
+        }
+    };
 
     // Rate limiting : verifier max_open_per_user
     {
@@ -352,6 +408,17 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Impossible de creer le salon ticket");
+            if let Err(edit) = modal
+                .edit_response(
+                    &ctx.http,
+                    serenity::builder::EditInteractionResponse::new().content(
+                        "Echec de l'ouverture du ticket (creation du salon). Merci de reessayer.",
+                    ),
+                )
+                .await
+            {
+                warn!(error = %edit, "Failed to send channel-create failure response");
+            }
             return;
         }
     };
@@ -390,30 +457,74 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         Ok(t) => t.id.clone(),
         Err(e) => {
             error!(error = %e, "Erreur creation ticket API");
-            "???".to_string()
+            // Compensation : la ligne DB n'existe pas, on supprime le salon
+            // orphelin pour eviter un salon prive sans mapping `[ticket:]`
+            // (messages jamais mirrores, close incapable de le retrouver).
+            if let Err(del) = channel.id.delete(&ctx.http).await {
+                warn!(error = %del, channel = %channel.id, "Echec suppression salon orphelin apres echec API");
+            }
+            if let Err(edit) = modal
+                .edit_response(
+                    &ctx.http,
+                    serenity::builder::EditInteractionResponse::new().content(
+                        "Echec de l'ouverture du ticket (erreur serveur). Merci de reessayer.",
+                    ),
+                )
+                .await
+            {
+                warn!(error = %edit, "Failed to send API-create failure response");
+            }
+            return;
         }
     };
 
     // Enregistrer la creation dans le SLA tracker
-    if ticket_id != "???" {
+    {
         let data = ctx.data.read().await;
         if let Some(sla) = data.get::<crate::modules::tickets::SlaTrackerKey>() {
             sla.record_creation(&ticket_id);
         }
-        drop(data);
     }
 
-    if ticket_id != "???" {
-        let new_topic = format!(
-            "[ticket:{}] [author:{}] {} — {}",
-            ticket_id, author.id, type_label, author.name
-        );
-        if let Err(e) = channel
+    // Topic critique : sans le marqueur `[ticket:UUID]`, le salon est
+    // inutilisable (pas de mirroring des messages, close incapable de mapper).
+    // On reessaie une fois ; si l'edit echoue toujours, on rollback (supprime
+    // le salon + ferme le ticket cote DB) plutot que de laisser un ticket
+    // inutilisable.
+    let new_topic = format!(
+        "[ticket:{}] [author:{}] {} — {}",
+        ticket_id, author.id, type_label, author.name
+    );
+    let mut topic_ok = channel
+        .edit(&ctx.http, EditChannel::new().topic(&new_topic))
+        .await
+        .is_ok();
+    if !topic_ok {
+        topic_ok = channel
             .edit(&ctx.http, EditChannel::new().topic(&new_topic))
             .await
-        {
-            warn!(error = %e, "Impossible de mettre a jour le topic du salon ticket");
+            .is_ok();
+    }
+    if !topic_ok {
+        error!(channel = %channel.id, ticket_id = %ticket_id, "Echec critique edit topic ticket : salon inutilisable, rollback");
+        if let Err(e) = channel.id.delete(&ctx.http).await {
+            warn!(error = %e, channel = %channel.id, "Echec suppression salon apres echec topic");
         }
+        if let Err(e) = api.close_ticket(&ticket_id).await {
+            warn!(error = %e, ticket_id = %ticket_id, "Echec fermeture ticket apres echec topic");
+        }
+        if let Err(edit) = modal
+            .edit_response(
+                &ctx.http,
+                serenity::builder::EditInteractionResponse::new().content(
+                    "Echec de l'ouverture du ticket (configuration du salon). Merci de reessayer.",
+                ),
+            )
+            .await
+        {
+            warn!(error = %edit, "Failed to send topic-edit failure response");
+        }
+        return;
     }
 
     let staff_line = if is_admin_only {

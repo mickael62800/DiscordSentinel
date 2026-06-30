@@ -259,6 +259,68 @@ async fn test_reply_ticket_sets_pending() {
 }
 
 #[tokio::test]
+async fn test_reply_ticket_on_closed_is_rejected_and_does_not_reopen() {
+    let (service, repo) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    let id = ticket.id.to_string();
+
+    // Ferme le ticket.
+    service.close_ticket(&id).await.unwrap();
+
+    // Une reponse sur un ticket ferme doit etre rejetee (Conflict) et NE PAS
+    // reouvrir le ticket.
+    let err = service
+        .reply_ticket(ReplyTicketCommand {
+            ticket_id: id.clone(),
+            content: "late message".to_string(),
+            author_name: "user".to_string(),
+            author_role: "user".to_string(),
+        })
+        .await
+        .unwrap_err();
+    assert!(matches!(err, DomainError::Conflict(_)));
+
+    // Le statut reste "closed", aucun message enregistre.
+    let (_, status) = repo.last_status.lock().unwrap().clone().unwrap();
+    assert_eq!(status, "closed");
+    assert_eq!(repo.messages.lock().unwrap().len(), 0);
+}
+
+#[tokio::test]
+async fn test_update_status_closed_to_pending_rejected() {
+    let (service, _repo) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    let id = ticket.id.to_string();
+    service.close_ticket(&id).await.unwrap();
+
+    let err = service.update_status(&id, "pending").await.unwrap_err();
+    assert!(matches!(err, DomainError::Conflict(_)));
+}
+
+#[tokio::test]
+async fn test_update_status_closed_to_open_allowed() {
+    let (service, repo) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    let id = ticket.id.to_string();
+    service.close_ticket(&id).await.unwrap();
+
+    // Reouverture explicite autorisee.
+    service.update_status(&id, "open").await.unwrap();
+    let (_, status) = repo.last_status.lock().unwrap().clone().unwrap();
+    assert_eq!(status, "open");
+}
+
+#[tokio::test]
+async fn test_update_status_invalid_value_rejected() {
+    let (service, _repo) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    let id = ticket.id.to_string();
+
+    let err = service.update_status(&id, "bogus").await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
 async fn test_assign_ticket() {
     let (service, repo) = make_service();
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();

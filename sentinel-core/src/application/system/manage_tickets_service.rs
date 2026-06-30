@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::domain::entities::system::ticket::Ticket;
 use crate::domain::entities::system::ticket::TicketDetail;
 use crate::domain::entities::system::ticket::TicketMessage;
+use crate::domain::enums::system::ticket_status::TicketStatus;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
@@ -143,6 +144,23 @@ impl ManageTicketsUseCase for ManageTicketsService {
             DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id))
         })?;
 
+        // Lit le statut courant : une reponse ne doit JAMAIS reouvrir un
+        // ticket ferme (reopen silencieux). Le bot mirroir les messages tapes
+        // dans le salon ; un message tardif sur un ticket ferme est rejete
+        // (le bot ignore l'erreur Conflict).
+        let ticket = self
+            .ticket_repo
+            .find_by_id(ticket_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!("Ticket {ticket_id}")))?;
+
+        let current = TicketStatus::from_str(&ticket.status).unwrap_or(TicketStatus::Open);
+        if current == TicketStatus::Closed {
+            return Err(DomainError::Conflict(
+                "ticket ferme : la reponse ne peut pas reouvrir le ticket".to_string(),
+            ));
+        }
+
         let message = TicketMessage {
             id: Uuid::new_v4(),
             ticket_id,
@@ -153,8 +171,11 @@ impl ManageTicketsUseCase for ManageTicketsService {
         };
 
         self.ticket_repo.save_message(&message).await?;
-        if let Err(e) = self.ticket_repo.update_status(ticket_id, "pending").await {
-            warn!(error = %e, ticket_id = %ticket_id, "Echec update status ticket vers pending");
+        // Transition open/pending -> pending (autorisee tant que non ferme).
+        if TicketStatus::can_transition(current, TicketStatus::Pending) {
+            if let Err(e) = self.ticket_repo.update_status(ticket_id, "pending").await {
+                warn!(error = %e, ticket_id = %ticket_id, "Echec update status ticket vers pending");
+            }
         }
         self.invalidate_tickets_cache().await;
 
@@ -176,6 +197,28 @@ impl ManageTicketsUseCase for ManageTicketsService {
         let uuid = id
             .parse::<Uuid>()
             .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {id}")))?;
+
+        let target = TicketStatus::from_str(status).ok_or_else(|| {
+            DomainError::ValidationError(format!(
+                "Statut invalide : {status} (valides : {})",
+                TicketStatus::VALID_VALUES.join(", ")
+            ))
+        })?;
+
+        // Valide la transition d'etat : empeche une reouverture illegale
+        // (closed -> pending). closed -> open reste possible (reouverture
+        // explicite).
+        let ticket = self
+            .ticket_repo
+            .find_by_id(uuid)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!("Ticket {uuid}")))?;
+        let current = TicketStatus::from_str(&ticket.status).unwrap_or(TicketStatus::Open);
+        if !TicketStatus::can_transition(current, target) {
+            return Err(DomainError::Conflict(format!(
+                "Transition de statut interdite : {current} -> {target}"
+            )));
+        }
 
         self.ticket_repo.update_status(uuid, status).await?;
         self.invalidate_tickets_cache().await;
