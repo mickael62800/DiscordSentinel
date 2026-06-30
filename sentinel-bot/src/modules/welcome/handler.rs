@@ -17,6 +17,11 @@ use super::api_client::WelcomeApiClient;
 use super::template;
 
 pub const RULES_ACCEPT_ID: &str = "sentinel_rules_accept";
+/// custom_id du modal de saisie d'age (ouvert au clic sur "J'accepte" quand
+/// la verification d'age est activee).
+pub const AGE_MODAL_ID: &str = "sentinel_age_modal";
+/// custom_id du champ de saisie de l'age dans le modal.
+pub const AGE_INPUT_ID: &str = "age";
 
 /// Appele quand un nouveau membre rejoint.
 /// Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur le
@@ -205,6 +210,27 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
             return;
         }
     };
+
+    // ── Verification d'age : role "Membre temporaire" a l'arrivee ──
+    // Si active, le nouveau membre recoit le role d'attente (qui ne voit que
+    // le reglement) ; il obtiendra le role Membre apres avoir saisi un age
+    // suffisant via le formulaire du reglement.
+    if config.age_check_enabled {
+        if let Some(role) = config
+            .unverified_role_id
+            .as_deref()
+            .and_then(|s| s.parse::<u64>().ok())
+            .map(RoleId::new)
+        {
+            if let Err(e) = ctx
+                .http
+                .add_member_role(guild_id, user_id, role, Some("Verification d'age en attente"))
+                .await
+            {
+                warn!(error = %e, role = %role, "Echec attribution role Membre temporaire");
+            }
+        }
+    }
 
     let guild_name = guild_id
         .to_partial_guild(&ctx.http)
@@ -618,6 +644,14 @@ async fn handle_rules_accept(
         None => return,
     };
 
+    // Si la verification d'age est activee, on ouvre un formulaire qui demande
+    // l'age au lieu d'attribuer directement le role Membre. L'attribution (ou
+    // le ban) se fait au submit du modal (`handle_age_modal`).
+    if let Some(question) = age_check_question(ctx, guild_id).await {
+        open_age_modal(ctx, component, &question).await;
+        return;
+    }
+
     let assigned = match assign_rules_roles(ctx, guild_id, component.user.id).await {
         Ok(n) => n,
         Err(_) => return,
@@ -643,4 +677,205 @@ async fn handle_rules_accept(
     }
 
     info!(user = %component.user.name, guild = %guild_id, "Reglement accepte");
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Verification d'age au reglement.
+// ─────────────────────────────────────────────────────────────────────────
+
+/// Lit la config welcome d'une guild (helper factorise).
+async fn load_welcome_config(
+    ctx: &Context,
+    guild_id: GuildId,
+) -> Option<super::api_client::WelcomeConfig> {
+    let (base, grpc) = {
+        let data = ctx.data.read().await;
+        let base = data.get::<ApiClientKey>().map(Arc::clone)?;
+        let grpc = data
+            .get::<crate::shared::grpc_client::GrpcClientKey>()
+            .map(Arc::clone)?;
+        (base, grpc)
+    };
+    WelcomeApiClient::new(base, grpc)
+        .get_config(&guild_id.to_string())
+        .await
+        .ok()
+}
+
+/// Retourne la question du formulaire d'age si la verification est activee
+/// et le reglement actif, sinon `None` (flux classique).
+async fn age_check_question(ctx: &Context, guild_id: GuildId) -> Option<String> {
+    let config = load_welcome_config(ctx, guild_id).await?;
+    if config.rules_enabled && config.age_check_enabled {
+        let q = config.age_modal_question.trim();
+        Some(if q.is_empty() {
+            "Quel age as-tu ? (en chiffres)".to_string()
+        } else {
+            q.to_string()
+        })
+    } else {
+        None
+    }
+}
+
+/// Ouvre le formulaire de saisie d'age.
+async fn open_age_modal(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+    question: &str,
+) {
+    use serenity::builder::{CreateActionRow, CreateInputText, CreateModal};
+    use serenity::model::application::InputTextStyle;
+
+    let label: String = question.chars().take(45).collect();
+    let modal = CreateModal::new(AGE_MODAL_ID, "Verification").components(vec![
+        CreateActionRow::InputText(
+            CreateInputText::new(InputTextStyle::Short, label, AGE_INPUT_ID)
+                .min_length(1)
+                .max_length(3)
+                .required(true),
+        ),
+    ]);
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Modal(modal))
+        .await
+    {
+        warn!(error = %e, "Echec ouverture modale age");
+    }
+}
+
+fn extract_modal_input(
+    modal: &serenity::model::application::ModalInteraction,
+    field_id: &str,
+) -> Option<String> {
+    for row in &modal.data.components {
+        for c in &row.components {
+            if let serenity::all::ActionRowComponent::InputText(it) = c {
+                if it.custom_id == field_id {
+                    return it.value.clone();
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Submit du formulaire d'age : age suffisant -> role Membre ; sinon ban
+/// temporaire jusqu'aux `age_minimum` ans.
+pub async fn handle_age_modal(
+    ctx: &Context,
+    modal: &serenity::model::application::ModalInteraction,
+) {
+    let guild_id = match modal.guild_id {
+        Some(g) => g,
+        None => return,
+    };
+    let user_id = modal.user.id;
+
+    let config = match load_welcome_config(ctx, guild_id).await {
+        Some(c) => c,
+        None => return,
+    };
+
+    // Parse de l'age saisi.
+    let raw = extract_modal_input(modal, AGE_INPUT_ID).unwrap_or_default();
+    let age: Option<i32> = raw.trim().parse::<i32>().ok().filter(|a| (5..=120).contains(a));
+    let age = match age {
+        Some(a) => a,
+        None => {
+            reply_modal(ctx, modal, "Age invalide. Recommence en saisissant un nombre.").await;
+            return;
+        }
+    };
+
+    // Age suffisant -> retire le role temporaire, donne le role Membre.
+    if age >= config.age_minimum {
+        if let Some(role) = config
+            .unverified_role_id
+            .as_deref()
+            .and_then(|s| s.parse::<u64>().ok())
+            .map(RoleId::new)
+        {
+            let _ = ctx
+                .http
+                .remove_member_role(guild_id, user_id, role, Some("Age verifie"))
+                .await;
+        }
+        match assign_rules_roles(ctx, guild_id, user_id).await {
+            Ok(n) if n > 0 => {
+                reply_modal(ctx, modal, "Bienvenue sur le serveur ! Acces accorde.").await;
+                info!(user = %modal.user.name, guild = %guild_id, age, "Age verifie -> Membre");
+            }
+            _ => {
+                reply_modal(ctx, modal, "Acces accorde, mais aucun role Membre n'est configure.")
+                    .await;
+            }
+        }
+        return;
+    }
+
+    // Age insuffisant -> ban temporaire jusqu'aux age_minimum ans.
+    let years = (config.age_minimum - age).max(1);
+    let unban_at = chrono::Utc::now() + chrono::Duration::days(i64::from(years) * 365);
+    let message = config
+        .age_ban_message
+        .replace("{min}", &config.age_minimum.to_string())
+        .replace("{annees}", &years.to_string());
+
+    // On repond AVANT le ban (l'interaction serait perdue sinon).
+    reply_modal(ctx, modal, &message).await;
+
+    let reason = format!("Verification d'age : {age} ans (<{}).", config.age_minimum);
+    if let Err(e) = guild_id
+        .ban_with_reason(&ctx.http, user_id, 0, &reason)
+        .await
+    {
+        warn!(error = %e, user = %user_id, "Echec ban verification d'age");
+        return;
+    }
+
+    // Enregistre le ban (source de verite du deban automatique par le worker).
+    if let Some(base) = {
+        let data = ctx.data.read().await;
+        data.get::<ApiClientKey>().map(Arc::clone)
+    } {
+        let body = serde_json::json!({
+            "guild_id": guild_id.to_string(),
+            "user_id": user_id.to_string(),
+            "declared_age": age,
+            "unban_at": unban_at.to_rfc3339(),
+        });
+        let res: Result<serde_json::Value, String> =
+            base.post_json("/api/age-bans", &body).await;
+        if let Err(e) = res {
+            warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
+        }
+    }
+
+    info!(user = %modal.user.name, guild = %guild_id, age, years, "Age insuffisant -> ban temporaire");
+}
+
+async fn reply_modal(
+    ctx: &Context,
+    modal: &serenity::model::application::ModalInteraction,
+    content: &str,
+) {
+    let resp = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .content(content)
+            .ephemeral(true),
+    );
+    if let Err(e) = modal.create_response(&ctx.http, resp).await {
+        warn!(error = %e, "Echec reponse modale age");
+    }
+}
+
+/// Debannit un membre dont le ban d'age est arrive a echeance (event
+/// `age_ban_lift` emis par le worker).
+pub async fn lift_age_ban(ctx: &Context, guild_id: GuildId, user_id: u64) {
+    let uid = serenity::model::id::UserId::new(user_id);
+    match guild_id.unban(&ctx.http, uid).await {
+        Ok(_) => info!(guild = %guild_id, user = user_id, "Ban d'age leve (deban)"),
+        Err(e) => warn!(error = %e, guild = %guild_id, user = user_id, "Echec deban age"),
+    }
 }

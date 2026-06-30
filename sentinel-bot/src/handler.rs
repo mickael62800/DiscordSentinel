@@ -617,6 +617,8 @@ impl EventHandler for Handler {
                     modules::tickets::on_modal(&ctx, &modal).await;
                 } else if modules::confessions::handles_modal(mcid) {
                     modules::confessions::on_modal(&ctx, &modal).await;
+                } else if modules::welcome::handles_modal(mcid) {
+                    modules::welcome::on_modal(&ctx, &modal).await;
                 }
             }
             Interaction::Autocomplete(autocomplete) => {

@@ -47,6 +47,14 @@ pub fn handles_component(custom_id: &str) -> bool {
     custom_id == handler::RULES_ACCEPT_ID
 }
 
+pub fn handles_modal(custom_id: &str) -> bool {
+    custom_id == handler::AGE_MODAL_ID
+}
+
+pub async fn on_modal(ctx: &Context, modal: &serenity::model::application::ModalInteraction) {
+    handler::handle_age_modal(ctx, modal).await;
+}
+
 /// Spawn le consumer durable (Redis stream). Appele une fois au `ready`.
 /// Ecoute `welcome_rules_publish` (bouton "Publier le reglement" du dashboard)
 /// et poste le panneau de reglement avec le bouton d'acceptation.
@@ -70,17 +78,32 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         Ok(v) => v,
         Err(_) => return,
     };
-    if envelope.get("event").and_then(|v| v.as_str()) != Some("welcome_rules_publish") {
-        return;
-    }
-    let guild_id = envelope
-        .get("data")
+    let event = envelope.get("event").and_then(|v| v.as_str());
+    let data = envelope.get("data");
+    let guild_id = data
         .and_then(|d| d.get("guild_id"))
         .and_then(|v| v.as_str())
         .and_then(|s| s.parse::<u64>().ok());
-    if let Some(g) = guild_id {
-        if let Err(e) = handler::publish_rules_panel(ctx, GuildId::new(g)).await {
-            tracing::warn!(error = %e, guild = g, "Echec publication panneau reglement");
+
+    match event {
+        Some("welcome_rules_publish") => {
+            if let Some(g) = guild_id {
+                if let Err(e) = handler::publish_rules_panel(ctx, GuildId::new(g)).await {
+                    tracing::warn!(error = %e, guild = g, "Echec publication panneau reglement");
+                }
+            }
         }
+        // Deban d'un membre dont le ban de verification d'age est echu
+        // (emis par le worker age_unban).
+        Some("age_ban_lift") => {
+            let user_id = data
+                .and_then(|d| d.get("user_id"))
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<u64>().ok());
+            if let (Some(g), Some(u)) = (guild_id, user_id) {
+                handler::lift_age_ban(ctx, GuildId::new(g), u).await;
+            }
+        }
+        _ => {}
     }
 }
