@@ -25,9 +25,21 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_transfer_menu(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, _ch)) = super::require_admin(ctx, component).await else {
+    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
         return;
     };
+
+    // OWNER-ONLY : le transfert d'ownership reste reserve au proprietaire,
+    // meme si require_admin autorise desormais les co-admins.
+    if !super::is_owner(&ch, component.user.id.get()) {
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut transferer le salon.",
+        )
+        .await;
+        return;
+    }
 
     let guild_id = component.guild_id.unwrap_or_default();
     let owner_id = component.user.id;

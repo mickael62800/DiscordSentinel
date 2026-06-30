@@ -82,17 +82,47 @@ pub async fn require_admin(
         }
     };
 
-    if ch.owner_id != user_id.get().to_string() {
+    if !is_owner_or_co_admin(ctx, &ch, user_id.get()).await {
         respond_ephemeral(
             ctx,
             component,
-            "Seul le proprietaire du salon peut effectuer cette action.",
+            "Seul le proprietaire ou un co-admin du salon peut effectuer cette action.",
         )
         .await;
         return None;
     }
 
     Some((voice_channel_id, ch))
+}
+
+/// `true` si `user_id` est le proprietaire OU un co-admin du salon `ch`.
+///
+/// Les co-admins sont autorises pour les actions PARTAGEES du panneau
+/// (hide/lock/limit/rename/status/kick/ban/queue/invite). Les actions
+/// strictement OWNER-ONLY (transfert d'ownership, gestion des co-admins)
+/// re-verifient l'ownership via [`is_owner`] dans leur handler dedie.
+///
+/// Les co-admins ne sont fetchs qu'une seule fois (un seul appel API) et
+/// uniquement si l'utilisateur n'est pas deja le proprietaire.
+async fn is_owner_or_co_admin(ctx: &Context, ch: &VoiceChannelResponse, user_id: u64) -> bool {
+    if ch.owner_id == user_id.to_string() {
+        return true;
+    }
+    let data = ctx.data.read().await;
+    let Some(api) = ApiClient::from_data(&data) else {
+        return false;
+    };
+    api.get_channel_co_admins(&ch.channel_id)
+        .await
+        .map(|ids| ids.iter().any(|id| *id == user_id.to_string()))
+        .unwrap_or(false)
+}
+
+/// `true` si `user_id` est strictement le proprietaire du salon. A utiliser
+/// pour les actions OWNER-ONLY (transfert d'ownership, gestion des co-admins)
+/// qui ne doivent PAS etre accessibles aux co-admins.
+pub fn is_owner(ch: &VoiceChannelResponse, user_id: u64) -> bool {
+    ch.owner_id == user_id.to_string()
 }
 
 /// Send an ephemeral response to a component interaction.
@@ -198,11 +228,11 @@ pub async fn require_admin_deferred(
         }
     };
 
-    if ch.owner_id != user_id.get().to_string() {
+    if !is_owner_or_co_admin(ctx, &ch, user_id.get()).await {
         respond_followup_ephemeral(
             ctx,
             component,
-            "Seul le proprietaire du salon peut effectuer cette action.",
+            "Seul le proprietaire ou un co-admin du salon peut effectuer cette action.",
         )
         .await;
         return None;

@@ -455,17 +455,25 @@ async fn check_queue_join(
         None => return,
     };
 
-    let text_channel_id = parent
+    // Cible de post des boutons accept/refuse : le salon texte dedie si le
+    // salon en a un (legacy), sinon le chat integre du vocal parent lui-meme
+    // (le voice channel id est une cible de message valide sur Discord moderne).
+    // Sans ce fallback, les salons crees apres la refonte (text_channel_id =
+    // None) n'affichaient JAMAIS les boutons et un user en file ne pouvait pas
+    // etre admis. Le voice channel parent est connu de VoiceOwnerMapKey, donc le
+    // handler accept/refuse (require_admin via component.channel_id) le resout.
+    let post_target = parent
         .text_channel_id
         .as_ref()
         .and_then(|id| id.parse::<u64>().ok())
+        .or_else(|| parent.channel_id.parse::<u64>().ok())
         .map(ChannelId::new);
 
     let owner_id = parent.owner_id.clone();
 
     drop(data);
 
-    if let Some(text_id) = text_channel_id {
+    if let Some(text_id) = post_target {
         let accept_id = format!("queue_accept_{}", user_id.get());
         let refuse_id = format!("queue_refuse_{}", user_id.get());
 

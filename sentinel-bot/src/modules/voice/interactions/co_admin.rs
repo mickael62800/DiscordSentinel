@@ -24,9 +24,21 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_coadmin_menu(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, _ch)) = super::require_admin(ctx, component).await else {
+    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
         return;
     };
+
+    // OWNER-ONLY : la gestion des co-admins reste reservee au proprietaire,
+    // meme si require_admin autorise desormais les co-admins.
+    if !super::is_owner(&ch, component.user.id.get()) {
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Seul le proprietaire peut gerer les co-admins.",
+        )
+        .await;
+        return;
+    }
 
     let guild_id = component.guild_id.unwrap_or_default();
     let owner_id = component.user.id;

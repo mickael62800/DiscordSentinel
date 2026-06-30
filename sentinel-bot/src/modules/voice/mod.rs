@@ -194,6 +194,7 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
 
     let mut reloaded = 0usize;
     let mut ghosts_closed = 0usize;
+    let mut empties_reclaimed = 0usize;
 
     for guild in &ready.guilds {
         let guild_id_str = guild.id.to_string();
@@ -225,6 +226,46 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
                 continue;
             }
 
+            // Salon temporaire toujours present dans Discord mais qui s'est vide
+            // pendant que le bot etait hors-ligne : `check_and_delete_empty` ne se
+            // declenche que sur un leave live, donc ces salons ne seraient jamais
+            // nettoyes. On les reclame ici. On ne touche QUE les salons suivis
+            // (presents en DB = temporaires) ; les creator hubs ne sont jamais en
+            // DB. L'emptiness est determinee via les voice states du cache : si le
+            // guild n'est pas encore en cache (voice states non charges), on
+            // s'abstient (best-effort) pour ne pas supprimer un salon non vide.
+            let member_count = ctx.cache.guild(guild.id).map(|g| {
+                g.voice_states
+                    .values()
+                    .filter(|vs| vs.channel_id == Some(voice_cid))
+                    .count()
+            });
+            if member_count == Some(0) {
+                // Supprimer la file d'attente associee (salons `game`) si presente.
+                if let Some(queue_id) = ch
+                    .queue_channel_id
+                    .as_deref()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .map(ChannelId::new)
+                {
+                    if let Err(e) = queue_id.delete(&ctx.http).await {
+                        warn!(error = %e, channel = %queue_id, "reconcile: echec suppression queue vide");
+                    }
+                }
+                if let Err(e) = api.delete_channel(&ch.channel_id).await {
+                    warn!(error = %e, channel_id = %ch.channel_id, "reconcile: echec close_channel vide");
+                }
+                if let Err(e) = voice_cid.delete(&ctx.http).await {
+                    warn!(error = %e, channel = %voice_cid, "reconcile: echec suppression salon vide");
+                } else {
+                    empties_reclaimed += 1;
+                }
+                if let Some(ref map) = voice_owner {
+                    map.remove(&voice_cid);
+                }
+                continue;
+            }
+
             if let Some(ref map) = voice_owner {
                 if let Ok(owner_id) = ch.owner_id.parse::<u64>() {
                     map.insert(voice_cid, UserId::new(owner_id));
@@ -241,7 +282,10 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
         }
     }
 
-    info!(reloaded, ghosts_closed, "reconcile_voice_channels termine");
+    info!(
+        reloaded,
+        ghosts_closed, empties_reclaimed, "reconcile_voice_channels termine"
+    );
 }
 
 /// Initialise les TypeMapKeys voice dans `data`. Appele depuis main.rs.
