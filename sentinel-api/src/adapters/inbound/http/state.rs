@@ -154,6 +154,10 @@ pub struct AppState {
     pub container_monitor: Option<std::sync::Arc<tokio::sync::RwLock<crate::adapters::outbound::system::container_monitor::ContainerMonitorState>>>,
     /// Rate limiter dynamique : tracking req/IP en memoire pour ban auto.
     pub rate_limiter: Option<std::sync::Arc<crate::adapters::outbound::system::rate_limiter::RateLimiter>>,
+    /// Feature flag — active le `global_rbac_gate` (gate RBAC global
+    /// fail-closed sur les mutations web). Default `false` = no-op.
+    /// Voir `middleware/global_rbac.rs`.
+    pub rbac_global_gate: bool,
 }
 
 impl AppState {

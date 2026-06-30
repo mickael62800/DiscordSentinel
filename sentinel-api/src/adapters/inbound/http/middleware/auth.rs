@@ -6,11 +6,28 @@ use subtle::ConstantTimeEq;
 
 use crate::adapters::inbound::http::state::AppState;
 
+/// Marqueur du type d'authentification, insere en extension de requete par
+/// `auth_middleware` quand une `API_KEY` est configuree. Permet aux
+/// middlewares en aval (notamment `global_rbac_gate`) de distinguer un appel
+/// de service interne de confiance (bot/workers) d'un appel utilisateur web,
+/// SANS dependre de la presence d'un `RoleContext`.
+///
+/// Note : en dev mode (`api_key` vide), aucun `AuthKind` n'est insere — le
+/// gate global traite ce cas separement (pass-through).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthKind {
+    /// Authentifie via `Authorization: Bearer <api_key>` (bot/workers internes,
+    /// de confiance — acces complet).
+    Internal,
+    /// Authentifie via `X-Discord-Token` (utilisateur web apres OAuth).
+    Web,
+}
+
 /// Middleware d'authentification par Bearer token.
 /// Passe si aucune clé API n'est configurée (dev mode — log un warning).
 pub async fn auth_middleware(
     axum::extract::State(state): axum::extract::State<AppState>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
     // Pas de clé configurée → tout passe (dev mode uniquement, REQUIRE_API_KEY=false)
@@ -29,6 +46,8 @@ pub async fn auth_middleware(
             // Comparaison constant-time : empeche un attaquant de deviner la cle
             // caractere par caractere via la latence de reponse (timing attack).
             if token.as_bytes().ct_eq(state.api_key.as_bytes()).into() {
+                // Service interne de confiance : tag Internal pour le gate global.
+                request.extensions_mut().insert(AuthKind::Internal);
                 return Ok(next.run(request).await);
             }
             return Err(StatusCode::UNAUTHORIZED);
@@ -46,6 +65,8 @@ pub async fn auth_middleware(
         .and_then(|v| v.to_str().ok())
         .filter(|s| !s.is_empty());
     if discord_token.is_some() {
+        // Utilisateur web : tag Web pour le gate global (gating fail-closed).
+        request.extensions_mut().insert(AuthKind::Web);
         return Ok(next.run(request).await);
     }
 

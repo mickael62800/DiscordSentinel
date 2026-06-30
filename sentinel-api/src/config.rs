@@ -28,6 +28,10 @@ pub struct AppConfig {
     /// URL de base du front web (ou rediriger apres callback OAuth).
     /// Ex: `http://192.168.1.15:5180`.
     pub web_front_url: String,
+    /// Feature flag — active le `global_rbac_gate` (gate RBAC global
+    /// fail-closed sur les mutations web). Default `false` (no-op). Voir
+    /// `middleware/global_rbac.rs`. A valider en staging avant activation prod.
+    pub rbac_global_gate: bool,
 }
 
 impl AppConfig {
@@ -90,6 +94,11 @@ impl AppConfig {
             discord_oauth_client_secret: std::env::var("DISCORD_CLIENT_SECRET").unwrap_or_default(),
             discord_oauth_redirect_uri: std::env::var("DISCORD_REDIRECT_URI").unwrap_or_default(),
             web_front_url: std::env::var("WEB_FRONT_URL").unwrap_or_default(),
+            // Default OFF : tant que la var n'est pas explicitement "true"/"1",
+            // le gate global est un no-op (zero changement de comportement).
+            rbac_global_gate: std::env::var("RBAC_GLOBAL_GATE")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
         }
     }
 

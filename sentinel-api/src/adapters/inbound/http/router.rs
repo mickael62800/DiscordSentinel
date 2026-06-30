@@ -187,6 +187,15 @@ pub fn build(
         .merge(heavy_routes)
         // Toutes les routes de domaine protegees
         .merge(protected_domain_routes())
+        // Gate RBAC GLOBAL fail-closed (feature-flag RBAC_GLOBAL_GATE, default
+        // OFF = no-op). Doit tourner APRES rbac (RoleContext) + whitelist et au
+        // plus pres du handler : on l'ajoute en premier route_layer pour qu'il
+        // soit le plus interne. Si OFF, pass-through total. Voir
+        // middleware/global_rbac.rs (a valider en staging avant activation).
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::adapters::inbound::http::middleware::global_rbac::global_rbac_gate,
+        ))
         // Defense en profondeur : rejette tout user Discord non whitelist
         // (pas dans api_user_guilds, pas superadmin) sur tous les endpoints
         // proteges sauf check-access et redeem-invitation. Bloque la fuite

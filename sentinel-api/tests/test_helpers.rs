@@ -3189,6 +3189,7 @@ fn base_state() -> AppState {
         web_front_url: String::new(),
         container_monitor: None,
         rate_limiter: None,
+        rbac_global_gate: false,
     }
 }
 
