@@ -68,19 +68,60 @@ fn parse_csv(s: Option<&str>, default: &str) -> Vec<String> {
         .collect()
 }
 
+/// Plus petit port non privilegie. En dessous (0-1023) les ports sont
+/// reserves (root) et ne doivent jamais etre exposes par un container jeu.
+const MIN_UNPRIVILEGED_PORT: u16 = 1024;
+
+/// Valide/clamp un range de ports configure par l'admin :
+///  - `start` est plancher a 1024 (jamais de port privilegie expose) ;
+///  - `end` est ramene a `start` s'il est plus petit (range coherent).
+/// Emet un warn a chaque correction. Point unique de validation des ranges.
+fn sanitize_port_range(kind: &str, start: u16, end: u16) -> (u16, u16) {
+    let mut s = start;
+    let mut e = end;
+    if s < MIN_UNPRIVILEGED_PORT {
+        tracing::warn!(
+            kind,
+            configured_start = start,
+            "port_range_start < 1024 (privilegie) : clamp a 1024"
+        );
+        s = MIN_UNPRIVILEGED_PORT;
+    }
+    if e < s {
+        tracing::warn!(
+            kind,
+            start = s,
+            configured_end = end,
+            "port_range_end < start : clamp a start (range mono-port)"
+        );
+        e = s;
+    }
+    (s, e)
+}
+
 pub async fn load_game_portal_config(
     bot_config: &Arc<dyn BotConfigRepository>,
     guild_id: &str,
 ) -> Result<GamePortalConfig, DomainError> {
     let entries = bot_config.get_config(guild_id, "game-portal").await?;
+    let (port_range_start, port_range_end) = sanitize_port_range(
+        "game",
+        parse_u16(find(&entries, "port_range_start"), 25500),
+        parse_u16(find(&entries, "port_range_end"), 25599),
+    );
+    let (rcon_port_range_start, rcon_port_range_end) = sanitize_port_range(
+        "rcon",
+        parse_u16(find(&entries, "rcon_port_range_start"), 25700),
+        parse_u16(find(&entries, "rcon_port_range_end"), 25799),
+    );
     Ok(GamePortalConfig {
         enabled: parse_bool(find(&entries, "enabled"), true),
         max_servers_per_guild: parse_i32(find(&entries, "max_servers_per_guild"), 5),
         max_memory_total_mb: parse_i32(find(&entries, "max_memory_total_mb"), 8192),
-        port_range_start: parse_u16(find(&entries, "port_range_start"), 25500),
-        port_range_end: parse_u16(find(&entries, "port_range_end"), 25599),
-        rcon_port_range_start: parse_u16(find(&entries, "rcon_port_range_start"), 25700),
-        rcon_port_range_end: parse_u16(find(&entries, "rcon_port_range_end"), 25799),
+        port_range_start,
+        port_range_end,
+        rcon_port_range_start,
+        rcon_port_range_end,
         allowed_templates: parse_csv(
             find(&entries, "allowed_templates"),
             "minecraft-vanilla,valheim,terraria,factorio,palworld,ark,7dtd",
@@ -95,4 +136,37 @@ pub async fn load_game_portal_config(
         auto_remove_unused_images: parse_bool(find(&entries, "auto_remove_unused_images"), true),
         unused_image_grace_days: parse_i32(find(&entries, "unused_image_grace_days"), 7),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sanitize_clamps_privileged_start() {
+        // start 80 -> 1024 ; end 2000 reste au-dessus -> conserve.
+        let (s, e) = sanitize_port_range("game", 80, 2000);
+        assert_eq!(s, MIN_UNPRIVILEGED_PORT);
+        assert_eq!(e, 2000);
+    }
+
+    #[test]
+    fn sanitize_clamps_end_below_start() {
+        // start privilegie ramene a 1024, end (500) < start -> ramene a 1024.
+        let (s, e) = sanitize_port_range("rcon", 100, 500);
+        assert_eq!(s, MIN_UNPRIVILEGED_PORT);
+        assert_eq!(e, MIN_UNPRIVILEGED_PORT);
+    }
+
+    #[test]
+    fn sanitize_keeps_valid_defaults() {
+        assert_eq!(sanitize_port_range("game", 25500, 25599), (25500, 25599));
+        assert_eq!(sanitize_port_range("rcon", 25700, 25799), (25700, 25799));
+    }
+
+    #[test]
+    fn sanitize_end_below_start_in_valid_range() {
+        // les deux >= 1024 mais end < start -> end ramene a start.
+        assert_eq!(sanitize_port_range("game", 26000, 25000), (26000, 26000));
+    }
 }

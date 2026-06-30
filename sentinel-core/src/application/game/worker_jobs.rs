@@ -25,6 +25,11 @@ use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const RCON_HOST: &str = "127.0.0.1";
 
+/// Au-dela de ce delai dans un etat transitoire (Starting/Stopping) sans
+/// progression coherente cote container, le reconciler force la resolution
+/// (Error ou etat reel du container). Evite les serveurs bloques a vie.
+const STUCK_TRANSITION_THRESHOLD_MINUTES: i64 = 10;
+
 /// Bag d'adapters pour les jobs (evite des signatures kilometriques).
 pub struct JobContext {
     pub server_repo: Arc<dyn GameServerRepository>,
@@ -166,6 +171,17 @@ pub async fn run_idle_shutdown(ctx: &JobContext) -> Result<JobReport, DomainErro
         if days <= 0 {
             continue;
         }
+        // Garde-fou : on ne coupe JAMAIS un serveur pour lequel on n'a pas de
+        // signal de presence fiable. last_player_count / last_active_at ne
+        // sont alimentes que via RCON (job health_check). Pour un serveur sans
+        // RCON (config off, ou pas de port/password alloue) le compteur reste
+        // a 0 alors qu'il peut etre plein -> l'arreter serait une coupure a
+        // tort. Mieux vaut le laisser tourner que de tuer un serveur peuple.
+        let has_player_signal =
+            cfg.rcon_enabled && server.rcon_port.is_some() && server.rcon_password.is_some();
+        if !has_player_signal {
+            continue;
+        }
         let cutoff = now - chrono::Duration::days(days as i64);
         let last = server.last_active_at.unwrap_or(server.created_at);
         if last >= cutoff {
@@ -238,6 +254,7 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
 
     let mut details = serde_json::Map::new();
     let mut errors = 0usize;
+    let now = chrono::Utc::now();
 
     // Index containers par sentinel.server_id label.
     let docker_by_id: std::collections::HashMap<String, &_> = docker_containers
@@ -249,15 +266,36 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
         })
         .collect();
 
-    // 1. DB -> Docker : serveurs marques running mais container disparu/dead.
+    // Helper local : libere les ports d'un serveur + log un crash audit.
+    async fn mark_crashed(ctx: &JobContext, s: &crate::domain::entities::game::server::GameServer) {
+        if let Some(p) = s.host_port {
+            let _ = ctx.port_allocator.release(PortKind::Game, p).await;
+        }
+        if let Some(p) = s.rcon_port {
+            let _ = ctx.port_allocator.release(PortKind::Rcon, p).await;
+        }
+        let _ = ctx
+            .audit_repo
+            .log(
+                &s.guild_id,
+                Some(s.id),
+                None,
+                GameAuditAction::CrashDetected,
+                serde_json::json!({}),
+            )
+            .await;
+    }
+
+    // 1. DB -> Docker : reconcilie chaque serveur actif avec son container.
     for s in &active_servers {
         let dc = docker_by_id.get(&s.id.to_string());
+        // Serveur coince dans un etat transitoire depuis trop longtemps ?
+        let stuck =
+            (now - s.updated_at) > chrono::Duration::minutes(STUCK_TRANSITION_THRESHOLD_MINUTES);
         match dc {
-            None => {
-                if matches!(
-                    s.status,
-                    GameServerStatus::Running | GameServerStatus::Starting
-                ) {
+            None => match s.status {
+                // Container disparu alors qu'on le croyait up -> crash.
+                GameServerStatus::Running => {
                     warn!(server_id = %s.id, "container disparu, marque error");
                     let _ = ctx
                         .server_repo
@@ -267,55 +305,128 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                             Some("container disparu (reconciler)"),
                         )
                         .await;
-                    if let Some(p) = s.host_port {
-                        let _ = ctx.port_allocator.release(PortKind::Game, p).await;
-                    }
-                    if let Some(p) = s.rcon_port {
-                        let _ = ctx.port_allocator.release(PortKind::Rcon, p).await;
-                    }
-                    let _ = ctx
-                        .audit_repo
-                        .log(
-                            &s.guild_id,
-                            Some(s.id),
-                            None,
-                            GameAuditAction::CrashDetected,
-                            serde_json::json!({}),
-                        )
-                        .await;
+                    mark_crashed(ctx, s).await;
                     errors += 1;
                 }
-            }
-            Some(c) => {
-                // Container present, verifions qu'il est dans le bon etat.
-                if matches!(c.state, ContainerState::Exited | ContainerState::Dead)
-                    && s.status == GameServerStatus::Running
-                {
+                // Starting sans container : NORMAL en plein milieu d'un start
+                // (flow persist-after-create). On ne tranche qu'au-dela du
+                // seuil pour ne pas tuer un demarrage en cours.
+                GameServerStatus::Starting if stuck => {
+                    warn!(server_id = %s.id, "starting bloque sans container, marque error");
+                    let _ = ctx
+                        .server_repo
+                        .update_status(
+                            s.id,
+                            GameServerStatus::Error,
+                            Some("starting bloque (reconciler)"),
+                        )
+                        .await;
+                    mark_crashed(ctx, s).await;
+                    errors += 1;
+                }
+                // Stopping sans container : l'arret a abouti, on finalise.
+                GameServerStatus::Stopping => {
                     let _ = ctx
                         .server_repo
                         .update_status(
                             s.id,
                             GameServerStatus::Stopped,
-                            Some("container exited (reconciler)"),
+                            Some("container absent au stop (reconciler)"),
                         )
                         .await;
                     let _ = ctx.session_repo.close_all_active(s.id).await;
+                }
+                _ => {}
+            },
+            Some(c) => {
+                let exited = matches!(c.state, ContainerState::Exited | ContainerState::Dead);
+                let running = c.state == ContainerState::Running;
+                match s.status {
+                    // Running mais container mort -> stoppe proprement.
+                    GameServerStatus::Running if exited => {
+                        let _ = ctx
+                            .server_repo
+                            .update_status(
+                                s.id,
+                                GameServerStatus::Stopped,
+                                Some("container exited (reconciler)"),
+                            )
+                            .await;
+                        let _ = ctx.session_repo.close_all_active(s.id).await;
+                    }
+                    // Starting bloque : on resout selon l'etat reel.
+                    GameServerStatus::Starting if stuck && running => {
+                        let _ = ctx
+                            .server_repo
+                            .update_status(s.id, GameServerStatus::Running, None)
+                            .await;
+                    }
+                    GameServerStatus::Starting if stuck && exited => {
+                        let _ = ctx
+                            .server_repo
+                            .update_status(
+                                s.id,
+                                GameServerStatus::Error,
+                                Some("starting bloque, container exited (reconciler)"),
+                            )
+                            .await;
+                        errors += 1;
+                    }
+                    // Stopping bloque : Stopped si le container est mort,
+                    // Running s'il tourne encore (le stop n'a pas pris).
+                    GameServerStatus::Stopping if stuck && exited => {
+                        let _ = ctx
+                            .server_repo
+                            .update_status(
+                                s.id,
+                                GameServerStatus::Stopped,
+                                Some("stopping bloque, container exited (reconciler)"),
+                            )
+                            .await;
+                        let _ = ctx.session_repo.close_all_active(s.id).await;
+                    }
+                    GameServerStatus::Stopping if stuck && running => {
+                        let _ = ctx
+                            .server_repo
+                            .update_status(s.id, GameServerStatus::Running, None)
+                            .await;
+                    }
+                    _ => {}
                 }
             }
         }
     }
 
-    // 2. Docker -> DB : containers managed sans ligne game_servers (orphelins).
-    let known_ids: std::collections::HashSet<String> =
-        active_servers.iter().map(|s| s.id.to_string()).collect();
+    // 2. Docker -> DB : containers managed sans ligne game_servers vivante
+    // (orphelins) -> on les SUPPRIME best-effort. Un container dont le
+    // server_id ne resout vers aucune ligne non-deletee (find_by_id filtre
+    // deleted_at IS NULL) est soit un reliquat d'un delete dont le remove a
+    // echoue, soit un container etranger : dans les deux cas on le retire.
+    // On NE TOUCHE PAS aux containers qui mappent vers un serveur vivant
+    // (meme stopped : sa ligne existe encore et find_by_id la retourne).
     let mut orphans = 0usize;
     for c in &docker_containers {
-        if let Some(sid) = c.labels.get("sentinel.server_id") {
-            if !known_ids.contains(sid) {
-                warn!(container_id = %c.container_id, server_id = %sid, "orphelin Docker");
-                orphans += 1;
-            }
+        let Some(sid) = c.labels.get("sentinel.server_id") else {
+            continue;
+        };
+        let is_live = match Uuid::parse_str(sid) {
+            Ok(uid) => ctx.server_repo.find_by_id(uid).await?.is_some(),
+            // Label illisible -> on considere comme orphelin.
+            Err(_) => false,
+        };
+        if is_live {
+            continue;
         }
+        warn!(container_id = %c.container_id, server_id = %sid, "orphelin Docker, suppression");
+        if let Err(e) = ctx
+            .container_runtime
+            .remove_container(&c.container_id)
+            .await
+        {
+            warn!(error = %e, container_id = %c.container_id, "remove orphelin echoue");
+            errors += 1;
+        }
+        orphans += 1;
     }
     details.insert("orphans".into(), serde_json::json!(orphans));
     details.insert("active_db".into(), serde_json::json!(active_servers.len()));

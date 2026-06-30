@@ -19,7 +19,7 @@ use bollard::container::{
 };
 use bollard::image::{CreateImageOptions, ListImagesOptions};
 use bollard::models::{
-    HostConfig, Mount, MountTypeEnum, PortBinding, ResourcesUlimits,
+    HostConfig, HostConfigLogConfig, Mount, MountTypeEnum, PortBinding, ResourcesUlimits,
     RestartPolicy as BollardRestartPolicy, RestartPolicyNameEnum,
 };
 use bollard::network::CreateNetworkOptions;
@@ -237,6 +237,17 @@ impl ContainerRuntime for DockerContainerRuntime {
                 hard: Some(CONTAINER_NOFILE_LIMIT),
             }]),
             network_mode: Some(spec.network.clone()),
+            // Rotation des logs : driver json-file plafonne a 3 fichiers de
+            // 10 Mo. Sans ca, un container bavard peut remplir le disque host.
+            // (La taille du volume monde reste une limite Docker non couverte
+            // ici : pas de quota de volume cote daemon — a gerer hors app.)
+            log_config: Some(HostConfigLogConfig {
+                typ: Some("json-file".to_string()),
+                config: Some(HashMap::from([
+                    ("max-size".to_string(), "10m".to_string()),
+                    ("max-file".to_string(), "3".to_string()),
+                ])),
+            }),
             restart_policy: Some(into_bollard_restart(spec.restart_policy)),
             // Securite : pas de privileged, pas de cap_add, pas de pid host.
             privileged: Some(false),

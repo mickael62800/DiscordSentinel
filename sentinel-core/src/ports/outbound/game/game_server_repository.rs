@@ -27,6 +27,20 @@ pub trait GameServerRepository: Send + Sync {
         last_error: Option<&str>,
     ) -> Result<(), DomainError>;
 
+    /// Transition de statut ATOMIQUE conditionnelle. Passe le serveur de
+    /// l'un des etats `from` vers `to` en une seule requete
+    /// (`UPDATE ... WHERE id = $1 AND status = ANY(from)`). Retourne `true`
+    /// si la ligne a bien ete mise a jour (claim reussi), `false` si le
+    /// statut courant n'etait dans aucun des `from` (quelqu'un d'autre a
+    /// deja pris la transition / etat incompatible). Sert de verrou contre
+    /// les start/stop concurrents.
+    async fn try_transition_status(
+        &self,
+        id: Uuid,
+        from: &[GameServerStatus],
+        to: GameServerStatus,
+    ) -> Result<bool, DomainError>;
+
     async fn update_player_activity(&self, id: Uuid, player_count: i32) -> Result<(), DomainError>;
 
     /// Soft-delete (status = deleted, deleted_at = NOW()).

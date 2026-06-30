@@ -130,3 +130,57 @@ pub fn validate_server_name(name: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_start_only_from_terminal_states() {
+        for st in [
+            GameServerStatus::Created,
+            GameServerStatus::Stopped,
+            GameServerStatus::Error,
+        ] {
+            assert!(st.can_start(), "{st:?} devrait permettre start");
+        }
+        for st in [
+            GameServerStatus::Starting,
+            GameServerStatus::Running,
+            GameServerStatus::Stopping,
+            GameServerStatus::Deleted,
+        ] {
+            assert!(!st.can_start(), "{st:?} ne devrait pas permettre start");
+        }
+    }
+
+    #[test]
+    fn can_stop_only_from_active_up_states() {
+        assert!(GameServerStatus::Running.can_stop());
+        assert!(GameServerStatus::Starting.can_stop());
+        for st in [
+            GameServerStatus::Created,
+            GameServerStatus::Stopped,
+            GameServerStatus::Error,
+            GameServerStatus::Stopping,
+            GameServerStatus::Deleted,
+        ] {
+            assert!(!st.can_stop(), "{st:?} ne devrait pas permettre stop");
+        }
+    }
+
+    #[test]
+    fn status_str_roundtrip() {
+        for st in [
+            GameServerStatus::Created,
+            GameServerStatus::Starting,
+            GameServerStatus::Running,
+            GameServerStatus::Stopping,
+            GameServerStatus::Stopped,
+            GameServerStatus::Error,
+            GameServerStatus::Deleted,
+        ] {
+            assert_eq!(GameServerStatus::from_str(st.as_str()), Some(st));
+        }
+    }
+}

@@ -2823,6 +2823,14 @@ impl sentinel_core::ports::outbound::game::game_server_repository::GameServerRep
     ) -> Result<(), DomainError> {
         unimplemented!()
     }
+    async fn try_transition_status(
+        &self,
+        _: Uuid,
+        _: &[sentinel_core::domain::entities::game::server::GameServerStatus],
+        _: sentinel_core::domain::entities::game::server::GameServerStatus,
+    ) -> Result<bool, DomainError> {
+        unimplemented!()
+    }
     async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> {
         unimplemented!()
     }

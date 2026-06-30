@@ -488,10 +488,27 @@ impl ManageGameServersUseCase for ManageGameServersService {
             .await?
             .ok_or_else(|| DomainError::Internal("template du serveur introuvable".into()))?;
 
-        // Marque starting tout de suite (etat transient).
-        self.server_repo
-            .update_status(id, GameServerStatus::Starting, None)
+        // Claim ATOMIQUE de la transition : passe Created/Stopped/Error ->
+        // Starting en une seule requete. Si false, un autre start/stop est
+        // deja en cours (le can_start ci-dessus n'est qu'un garde-fou cheap,
+        // ce claim est le vrai verrou anti-concurrence).
+        let claimed = self
+            .server_repo
+            .try_transition_status(
+                id,
+                &[
+                    GameServerStatus::Created,
+                    GameServerStatus::Stopped,
+                    GameServerStatus::Error,
+                ],
+                GameServerStatus::Starting,
+            )
             .await?;
+        if !claimed {
+            return Err(DomainError::Conflict(
+                "operation deja en cours sur ce serveur (start)".into(),
+            ));
+        }
 
         // Si pas de container_id encore -> create complete (alloue ports +
         // volume + container).
@@ -730,9 +747,20 @@ impl ManageGameServersUseCase for ManageGameServersService {
                 server.status
             )));
         }
-        self.server_repo
-            .update_status(id, GameServerStatus::Stopping, None)
+        // Claim atomique Running/Starting -> Stopping (verrou anti-concurrence).
+        let claimed = self
+            .server_repo
+            .try_transition_status(
+                id,
+                &[GameServerStatus::Running, GameServerStatus::Starting],
+                GameServerStatus::Stopping,
+            )
             .await?;
+        if !claimed {
+            return Err(DomainError::Conflict(
+                "operation deja en cours sur ce serveur (stop)".into(),
+            ));
+        }
 
         if let Some(cid) = &server.container_id {
             if let Err(e) = self

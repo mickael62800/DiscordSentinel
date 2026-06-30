@@ -262,6 +262,27 @@ impl GameServerRepository for PgGameServerRepository {
         Ok(())
     }
 
+    async fn try_transition_status(
+        &self,
+        id: Uuid,
+        from: &[GameServerStatus],
+        to: GameServerStatus,
+    ) -> Result<bool, DomainError> {
+        let from_strs: Vec<&str> = from.iter().map(|s| s.as_str()).collect();
+        let res = sqlx::query(
+            "UPDATE game_servers \
+             SET status = $2, updated_at = NOW() \
+             WHERE id = $1 AND status = ANY($3) AND deleted_at IS NULL",
+        )
+        .bind(id)
+        .bind(to.as_str())
+        .bind(&from_strs)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("try_transition_status"))?;
+        Ok(res.rows_affected() == 1)
+    }
+
     async fn update_player_activity(&self, id: Uuid, player_count: i32) -> Result<(), DomainError> {
         // last_active_at est mis a jour seulement si player_count > 0.
         sqlx::query(
