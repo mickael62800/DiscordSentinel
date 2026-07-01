@@ -298,6 +298,8 @@ impl EventHandler for Handler {
         }
         if let Some(member) = new_member {
             modules::security::on_member_update(&ctx, &member).await;
+            // Prefixe emoji staff : recompute le pseudo au changement de role.
+            modules::progression::nickname::on_member_update(&ctx, &member).await;
         }
     }
 
