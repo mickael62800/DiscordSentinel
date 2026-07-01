@@ -976,6 +976,17 @@ pub(super) async fn render_card(
     owner_id: &str,
     p: &PetDto,
 ) -> Option<Vec<u8>> {
+    // Seuils visuels du sprite (fatigue / mecontentement), reglables par
+    // serveur (`tamagotchi-bot`). Clamp [0, 100] a la lecture.
+    let sprite_cfg = api
+        .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let sprite_tired_energy_threshold =
+        BaseApiClient::config_u64(&sprite_cfg, "sprite_tired_energy_threshold", 25).min(100) as i32;
+    let sprite_unhappy_stat_threshold =
+        BaseApiClient::config_u64(&sprite_cfg, "sprite_unhappy_stat_threshold", 25).min(100) as i32;
+
     let data = CardData {
         name: p.name.clone(),
         species_label: species_display(&p.species).to_string(),
@@ -997,6 +1008,8 @@ pub(super) async fn render_card(
         status: p.status.clone(),
         species_color: species_color(&p.species).to_string(),
         species_slug: p.species.clone(),
+        sprite_tired_energy_threshold,
+        sprite_unhappy_stat_threshold,
     };
     render_card_png(&data)
 }

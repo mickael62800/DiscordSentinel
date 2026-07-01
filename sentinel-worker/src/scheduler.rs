@@ -351,15 +351,23 @@ pub fn start(
     // Domaine : export (drain export_jobs)
     // Porte de l'ancien export-worker.
     // ─────────────────────────────────────────────────────────────
-    spawn_periodic(
-        "drain_export_jobs",
-        config.export_scan_interval_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "export",
-        |pool| Box::pin(async move { domains::export::drain_export_jobs::run(&pool).await }),
-    );
+    {
+        let max_rows = config.max_rows_per_export;
+        let export_timeout = config.export_processing_timeout_secs;
+        spawn_periodic(
+            "drain_export_jobs",
+            config.export_scan_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "export",
+            move |pool| {
+                Box::pin(async move {
+                    domains::export::drain_export_jobs::run(&pool, max_rows, export_timeout).await
+                })
+            },
+        );
+    }
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : discord_audit_sync (poll Discord audit-logs API)
@@ -391,6 +399,7 @@ pub fn start(
         let redis = redis_client.clone();
         let api = api_url.clone();
         let timeout = config.ai_job_timeout_secs;
+        let batch_size = config.ai_batch_size;
         spawn_periodic(
             "drain_ai_jobs",
             config.ai_poll_interval_secs,
@@ -402,7 +411,7 @@ pub fn start(
                 let redis = redis.clone();
                 let api = api.clone();
                 Box::pin(async move {
-                    domains::ai::drain_ai_jobs::run(&pool, &redis, &api, timeout).await
+                    domains::ai::drain_ai_jobs::run(&pool, &redis, &api, timeout, batch_size).await
                 })
             },
         );
@@ -413,7 +422,11 @@ pub fn start(
     // Porte de l'ancien announcement-worker. Structure custom (boucle
     // alignee sur HH:00:00 UTC).
     // ─────────────────────────────────────────────────────────────
-    domains::announcements::publish_due::start(api_url.clone(), redis_client.clone());
+    domains::announcements::publish_due::start(
+        api_url.clone(),
+        redis_client.clone(),
+        config.announcement_publish_interval_secs,
+    );
     spawn_periodic(
         "announcements_retention_cleanup",
         config.announcements_retention_check_secs,
@@ -610,13 +623,15 @@ pub fn start(
         let pool = pool.clone();
         let api = api_url.clone();
         let token = config.discord_bot_token.clone();
+        let min_delay = config.daily_chaos_min_delay_secs;
+        let max_delay = config.daily_chaos_max_delay_secs;
         let mut rx = shutdown.clone();
         tokio::spawn(async move {
             use rand::Rng;
             loop {
                 let delay_secs = {
                     let mut rng = rand::thread_rng();
-                    rng.gen_range(7200..=21600)
+                    rng.gen_range(min_delay..=max_delay)
                 };
                 info!(
                     delay_secs,

@@ -145,6 +145,44 @@ fn inverted_heist_gain_pair_falls_back_to_defaults() {
 }
 
 #[test]
+fn gameplay_low_keys_parse_and_apply() {
+    let cfg = CoudeEconomyConfig::from_config(&map(&[
+        ("daily_chaos_max_events", "8"),
+        ("min_coins_eligible", "25"),
+        ("flavor_line_probability", "0.5"),
+        ("honor_debt_threshold", "5"),
+        ("underdog_level_gap", "4"),
+    ]));
+    assert_eq!(cfg.daily_chaos_max_events, 8);
+    assert_eq!(cfg.min_coins_eligible, 25);
+    assert_eq!(cfg.flavor_line_probability, 0.5);
+    assert_eq!(cfg.honor_debt_threshold, 5);
+    assert_eq!(cfg.underdog_level_gap, 4);
+}
+
+#[test]
+fn gameplay_low_guards_apply() {
+    let d = CoudeEconomyConfig::default();
+    let cfg = CoudeEconomyConfig::from_config(&map(&[
+        ("daily_chaos_max_events", "-3"),
+        ("min_coins_eligible", "-10"),
+        ("flavor_line_probability", "5.0"),
+        ("honor_debt_threshold", "-1"),
+        ("underdog_level_gap", "-2"),
+    ]));
+    // Compteurs / seuils >= 0.
+    assert_eq!(cfg.daily_chaos_max_events, 0);
+    assert_eq!(cfg.min_coins_eligible, 0);
+    assert_eq!(cfg.honor_debt_threshold, 0);
+    assert_eq!(cfg.underdog_level_gap, 0);
+    // Probabilite bornee [0, 1].
+    assert_eq!(cfg.flavor_line_probability, 1.0);
+    // NaN / malforme -> defaut.
+    let cfg2 = CoudeEconomyConfig::from_config(&map(&[("flavor_line_probability", "abc")]));
+    assert_eq!(cfg2.flavor_line_probability, d.flavor_line_probability);
+}
+
+#[test]
 fn inverted_heist_base_over_max_falls_back() {
     let d = CoudeEconomyConfig::default();
     let cfg = CoudeEconomyConfig::from_config(&map(&[

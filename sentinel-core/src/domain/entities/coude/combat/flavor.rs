@@ -39,14 +39,17 @@ pub const FLAVOR_LINES: &[&str] = &[
 /// Choisit aleatoirement une ligne du catalogue et substitue les noms.
 /// Retourne None si la probabilite n est pas atteinte (rng tirage > seuil).
 ///
-/// `proba_roll` doit etre dans [0, 1).
+/// `proba_roll` doit etre dans [0, 1). `threshold` est la probabilite
+/// configuree (0..1) qu une ligne soit injectee — passee en donnee pour
+/// garder le domaine pur (cf. `CoudeEconomyConfig::flavor_line_probability`).
 pub fn pick_flavor_line(
     rng: &mut impl Rng,
     proba_roll: f64,
+    threshold: f64,
     attacker_name: &str,
     defender_name: &str,
 ) -> Option<String> {
-    if proba_roll >= FLAVOR_LINE_PROBABILITY {
+    if proba_roll >= threshold {
         return None;
     }
     let idx = rng.gen_range(0..FLAVOR_LINES.len());

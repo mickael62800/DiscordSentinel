@@ -295,14 +295,10 @@ pub async fn resolve_combat_internal_ex(
     ResolveOutcome::Resolved(embed)
 }
 
-/// Seuil de mise au-dessus duquel on anime le combat round par round
-/// (cf. COUPE_AMELIORATIONS 2.6). En dessous, on poste le resultat
-/// directement pour ne pas ralentir les petits combats.
-pub const ANIMATED_COMBAT_MISE_THRESHOLD: i64 = 500;
-
 /// Poste un embed de combat avec ou sans animation selon la mise.
-/// Pour les grosses mises (>= seuil), affiche d abord 3 phases
-/// "buildup" avec 2s de pause chacune avant le resultat final.
+/// Pour les grosses mises (>= `threshold`), affiche d abord 3 phases
+/// "buildup" avec 2s de pause chacune avant le resultat final. `threshold`
+/// est lu depuis la config guild (`animated_combat_mise_threshold`).
 ///
 /// Best-effort : si une etape d edit foire, on log et on continue. Le
 /// resultat final est toujours poste si possible.
@@ -311,8 +307,9 @@ pub async fn post_combat_embed_animated(
     channel: ChannelId,
     final_embed: CreateEmbed,
     mise: i64,
+    threshold: i64,
 ) {
-    if mise < ANIMATED_COMBAT_MISE_THRESHOLD {
+    if mise < threshold {
         if let Err(e) = channel
             .send_message(&ctx.http, CreateMessage::new().embed(final_embed))
             .await

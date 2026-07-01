@@ -5,22 +5,32 @@ use rand::SeedableRng;
 #[test]
 fn returns_none_when_proba_above_threshold() {
     let mut rng = StdRng::seed_from_u64(0);
-    assert!(pick_flavor_line(&mut rng, 0.20, "A", "B").is_none());
-    assert!(pick_flavor_line(&mut rng, 0.99, "A", "B").is_none());
+    assert!(pick_flavor_line(&mut rng, 0.20, FLAVOR_LINE_PROBABILITY, "A", "B").is_none());
+    assert!(pick_flavor_line(&mut rng, 0.99, FLAVOR_LINE_PROBABILITY, "A", "B").is_none());
 }
 
 #[test]
 fn returns_some_when_proba_below_threshold() {
     let mut rng = StdRng::seed_from_u64(0);
-    assert!(pick_flavor_line(&mut rng, 0.0, "A", "B").is_some());
-    assert!(pick_flavor_line(&mut rng, 0.19, "A", "B").is_some());
+    assert!(pick_flavor_line(&mut rng, 0.0, FLAVOR_LINE_PROBABILITY, "A", "B").is_some());
+    assert!(pick_flavor_line(&mut rng, 0.19, FLAVOR_LINE_PROBABILITY, "A", "B").is_some());
+}
+
+#[test]
+fn custom_threshold_widens_or_narrows_window() {
+    let mut rng = StdRng::seed_from_u64(0);
+    // Seuil eleve : un roll a 0.5 passe desormais.
+    assert!(pick_flavor_line(&mut rng, 0.5, 0.9, "A", "B").is_some());
+    // Seuil a 0 : jamais de flavor.
+    assert!(pick_flavor_line(&mut rng, 0.0, 0.0, "A", "B").is_none());
 }
 
 #[test]
 fn substitutes_attacker_name() {
     let mut rng = StdRng::seed_from_u64(0);
     for _ in 0..50 {
-        if let Some(line) = pick_flavor_line(&mut rng, 0.0, "Alice", "Bob") {
+        if let Some(line) = pick_flavor_line(&mut rng, 0.0, FLAVOR_LINE_PROBABILITY, "Alice", "Bob")
+        {
             assert!(!line.contains("{atk}"));
             assert!(!line.contains("{def}"));
             // Si le template original mentionnait {atk}, "Alice" doit y etre.
@@ -57,7 +67,7 @@ fn distribution_picks_different_lines() {
     let mut rng = StdRng::seed_from_u64(42);
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     for _ in 0..500 {
-        if let Some(line) = pick_flavor_line(&mut rng, 0.0, "A", "B") {
+        if let Some(line) = pick_flavor_line(&mut rng, 0.0, FLAVOR_LINE_PROBABILITY, "A", "B") {
             seen.insert(line);
         }
     }

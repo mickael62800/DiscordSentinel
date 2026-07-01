@@ -36,6 +36,14 @@ pub struct CardData {
     pub species_color: String,
     /// Slug de l'espece (ex. "loup") pour choisir le sprite d'evolution.
     pub species_slug: String,
+    /// Seuil d'energie (<=) sous lequel le sprite affiche l'etat fatigue.
+    /// Reglable par serveur (`sprite_tired_energy_threshold`, defaut 25),
+    /// clampe [0, 100] a la construction.
+    pub sprite_tired_energy_threshold: i32,
+    /// Seuil de faim/bonheur (<=) sous lequel le sprite affiche l'etat
+    /// affame/mecontent (`sprite_unhappy_stat_threshold`, defaut 25),
+    /// clampe [0, 100] a la construction.
+    pub sprite_unhappy_stat_threshold: i32,
 }
 
 static FONTDB: OnceCell<Arc<usvg::fontdb::Database>> = OnceCell::new();
@@ -108,14 +116,21 @@ fn stage_letter(level: i32) -> &'static str {
 
 /// Lettre d'etat (3e segment) : a=affame, c=content, m=malade, z=dodo (fatigue).
 /// Priorite : malade > dodo > affame > content.
-fn state_letter(status: &str, hunger: i32, happiness: i32, energy: i32) -> &'static str {
+fn state_letter(
+    status: &str,
+    hunger: i32,
+    happiness: i32,
+    energy: i32,
+    tired_energy_threshold: i32,
+    unhappy_stat_threshold: i32,
+) -> &'static str {
     if status == "sick" {
         return "m";
     }
-    if energy <= 25 {
+    if energy <= tired_energy_threshold {
         return "z";
     }
-    if hunger <= 25 || happiness <= 25 {
+    if hunger <= unhappy_stat_threshold || happiness <= unhappy_stat_threshold {
         return "a";
     }
     "c"
@@ -131,7 +146,14 @@ fn sprite_filename(d: &CardData) -> String {
         "{}_{}_{}",
         species_letter(&d.species_slug),
         stage_letter(d.level),
-        state_letter(&d.status, d.hunger, d.happiness, d.energy),
+        state_letter(
+            &d.status,
+            d.hunger,
+            d.happiness,
+            d.energy,
+            d.sprite_tired_energy_threshold,
+            d.sprite_unhappy_stat_threshold,
+        ),
     )
 }
 

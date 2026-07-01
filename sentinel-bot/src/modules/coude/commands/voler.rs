@@ -15,11 +15,6 @@ use crate::modules::coude::GameApiKey;
 
 pub const STEAL_DEFEND_PREFIX: &str = "steal_defend:";
 
-/// Malus applique au roll du defenseur quand il est AFK (n'a pas clique
-/// sur le bouton "Se defendre !"). Represente le fait qu'il ne reagit
-/// pas a l'alerte.
-const AFK_DEFENDER_MALUS: i32 = 8;
-
 /// Verifie si la cible a une protection anti-vol active (Phase 9 Part B).
 ///
 /// Depuis le refactor en abonnements temps-base, ce check est delegue a
@@ -325,7 +320,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 /// Resout une tentative de vol. Centralise la logique pour les deux
 /// chemins (clic "Se defendre" ou timeout AFK).
 ///
-/// - `afk = true` → malus de `AFK_DEFENDER_MALUS` sur le roll du
+/// - `afk = true` → malus de `afk_defender_malus` sur le roll du
 ///   defenseur, plage de coins voles 10-15% (moins que le defendu actif).
 /// - `afk = false` → roll normal, plage 15-25%.
 ///
@@ -341,6 +336,7 @@ pub(crate) async fn resolve_steal_attempt(
     target_player: &crate::modules::coude::api_client::Player,
     afk: bool,
     failure_penalty_pct: u64,
+    afk_defender_malus: i32,
 ) -> (
     CreateEmbed,
     Vec<crate::modules::coude::api_client::TauntEvent>,
@@ -372,7 +368,7 @@ pub(crate) async fn resolve_steal_attempt(
 
     let mut target_bonus = target_player.def / 10;
     if afk {
-        target_bonus -= AFK_DEFENDER_MALUS;
+        target_bonus -= afk_defender_malus;
     }
     let thief_total = thief_roll + thief_bonus;
     let target_total = target_roll + target_bonus;
@@ -395,9 +391,9 @@ pub(crate) async fn resolve_steal_attempt(
         thief_detail,
         target_total,
         target_roll,
-        target_bonus + if afk { AFK_DEFENDER_MALUS } else { 0 },
+        target_bonus + if afk { afk_defender_malus } else { 0 },
         if afk {
-            format!(" - AFK: {}", AFK_DEFENDER_MALUS)
+            format!(" - AFK: {}", afk_defender_malus)
         } else {
             String::new()
         },
@@ -695,6 +691,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
 
     let config = load_guild_config(ctx, guild_id).await;
     let failure_penalty_pct = config.steal_failure_penalty_pct();
+    let afk_defender_malus = config.afk_defender_malus();
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
@@ -751,6 +748,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         &target_player,
         false, // defense active
         failure_penalty_pct,
+        afk_defender_malus,
     )
     .await;
 

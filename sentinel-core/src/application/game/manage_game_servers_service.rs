@@ -41,8 +41,6 @@ use crate::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 use crate::ports::outbound::game::rcon_client::{RconClient, RconConnectionParams};
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
-const STOP_TIMEOUT_SECS: u32 = 30;
-
 /// Substitue `{{KEY}}` (avec spaces tolerees) par `env[KEY]`. Si la cle
 /// n'existe pas, le placeholder est remplace par une chaine vide (comme
 /// Docker compose pour les env unset). Volontairement minimaliste : pas
@@ -429,9 +427,10 @@ impl ManageGameServersUseCase for ManageGameServersService {
         // Stop si actif (best-effort).
         if let Some(cid) = &server.container_id {
             if server.status.is_active() {
+                let cfg = load_game_portal_config(&self.bot_config, &server.guild_id).await?;
                 if let Err(e) = self
                     .container_runtime
-                    .stop_container(cid, STOP_TIMEOUT_SECS)
+                    .stop_container(cid, cfg.stop_timeout_secs)
                     .await
                 {
                     warn!(error = %e, "stop avant delete a echoue");
@@ -747,6 +746,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
                 server.status
             )));
         }
+        let cfg = load_game_portal_config(&self.bot_config, &server.guild_id).await?;
         // Claim atomique Running/Starting -> Stopping (verrou anti-concurrence).
         let claimed = self
             .server_repo
@@ -765,7 +765,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
         if let Some(cid) = &server.container_id {
             if let Err(e) = self
                 .container_runtime
-                .stop_container(cid, STOP_TIMEOUT_SECS)
+                .stop_container(cid, cfg.stop_timeout_secs)
                 .await
             {
                 error!(error = %e, "stop_container failed");
@@ -832,7 +832,10 @@ impl ManageGameServersUseCase for ManageGameServersService {
         let cid = server.container_id.ok_or_else(|| {
             DomainError::Conflict("container_id non defini (jamais demarre)".into())
         })?;
-        self.container_runtime.logs(&cid, lines.min(1000)).await
+        let cfg = load_game_portal_config(&self.bot_config, &server.guild_id).await?;
+        self.container_runtime
+            .logs(&cid, lines.min(cfg.max_log_lines))
+            .await
     }
 
     async fn get_stats(&self, id: Uuid) -> Result<ContainerStats, DomainError> {

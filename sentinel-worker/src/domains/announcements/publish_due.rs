@@ -48,7 +48,7 @@ struct RenderedAnnouncement {
 
 /// Spawn la boucle d'annonces : aligne sur HH:00:00 UTC, puis tick
 /// toutes les heures. Ne bloque pas l'appelant.
-pub fn start(api_url: String, redis_client: redis::Client) {
+pub fn start(api_url: String, redis_client: redis::Client, publish_interval_secs: u64) {
     tokio::spawn(async move {
         let api_key = std::env::var("API_KEY").unwrap_or_default();
 
@@ -70,7 +70,7 @@ pub fn start(api_url: String, redis_client: redis::Client) {
             }
         };
 
-        let mut interval = tokio::time::interval(Duration::from_secs(3600));
+        let mut interval = tokio::time::interval(Duration::from_secs(publish_interval_secs));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
         loop {

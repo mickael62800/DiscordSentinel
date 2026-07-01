@@ -27,11 +27,16 @@ pub async fn increment_refusal(
         .coude_refusal_count_repo
         .increment(&guild_id, &requester_id, &refuser_id)
         .await?;
-    use sentinel_core::domain::entities::coude::refusal_count::HONOR_DEBT_THRESHOLD;
+    // Seuil de dette d honneur reglable par serveur (coude-bot).
+    let econ = sentinel_core::application::coude::guild_settings::load_economy_config(
+        state.bot_config_repo.as_ref(),
+        &guild_id,
+    )
+    .await;
     Ok(Json(RefusalCountDto {
         count,
         last_refused_at: Some(Utc::now()),
-        honor_debt_owed: count >= HONOR_DEBT_THRESHOLD,
+        honor_debt_owed: count >= econ.honor_debt_threshold,
     }))
 }
 
@@ -44,15 +49,20 @@ pub async fn get_refusal(
         .coude_refusal_count_repo
         .get(&guild_id, &requester_id, &refuser_id)
         .await?;
-    use sentinel_core::domain::entities::coude::refusal_count::HONOR_DEBT_THRESHOLD;
     let (count, ts) = match r {
         Some(rc) => (rc.count, Some(rc.last_refused_at)),
         None => (0, None),
     };
+    // Seuil de dette d honneur reglable par serveur (coude-bot).
+    let econ = sentinel_core::application::coude::guild_settings::load_economy_config(
+        state.bot_config_repo.as_ref(),
+        &guild_id,
+    )
+    .await;
     Ok(Json(RefusalCountDto {
         count,
         last_refused_at: ts,
-        honor_debt_owed: count >= HONOR_DEBT_THRESHOLD,
+        honor_debt_owed: count >= econ.honor_debt_threshold,
     }))
 }
 

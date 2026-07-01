@@ -15,9 +15,11 @@
 
 use std::collections::HashMap;
 
+use crate::domain::entities::coude::combat::flavor::FLAVOR_LINE_PROBABILITY;
 use crate::domain::entities::coude::combat::resolution_rules::COMBAT_XP_LOSER;
 use crate::domain::entities::coude::combat::resolution_rules::COMBAT_XP_WINNER_BASE;
 use crate::domain::entities::coude::combat::resolution_rules::COMBAT_XP_WINNER_UNDERDOG;
+use crate::domain::entities::coude::combat::resolution_rules::UNDERDOG_LEVEL_GAP;
 use crate::domain::entities::coude::curse::CURSE_COST_COINS;
 use crate::domain::entities::coude::curse::CURSE_LIFT_MULTIPLIER;
 use crate::domain::entities::coude::curse::FAUSSE_ASSURANCE_FEE_COINS;
@@ -26,6 +28,9 @@ use crate::domain::entities::coude::heist::HEIST_BASE_SUCCESS_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MAX_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MIN_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_MAX_SUCCESS_PERCENT;
+use crate::domain::entities::coude::refusal_count::HONOR_DEBT_THRESHOLD;
+use crate::domain::entities::coude::social::DAILY_CHAOS_MAX;
+use crate::domain::entities::coude::social::MIN_COINS_ELIGIBLE;
 use crate::domain::entities::coude::tournament::TOURNAMENT_PRIZE_POOL_PERCENT;
 use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_LOSS_KEEP_PCT;
 use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_WIN_MULTIPLIER;
@@ -67,6 +72,17 @@ pub struct CoudeEconomyConfig {
     pub fausse_assurance_fee_coins: i64,
     // Tournoi (% de la cashbox constituant le prize pool).
     pub tournament_prize_pool_pct: i64,
+    // ── Gameplay LOW (réglages d'ambiance / seuils non-monétaires) ──
+    /// Cap journalier d'événements daily chaos par guild.
+    pub daily_chaos_max_events: i64,
+    /// Solde minimum pour qu'un joueur soit éligible au tirage chaos.
+    pub min_coins_eligible: i64,
+    /// Probabilité (0..1) qu'une ligne de flavor soit injectée par round.
+    pub flavor_line_probability: f64,
+    /// Nombre de refus au-delà duquel la dette d'honneur est due.
+    pub honor_debt_threshold: i32,
+    /// Écart de niveaux minimum pour activer le bonus Giant Killer.
+    pub underdog_level_gap: i32,
 }
 
 impl Default for CoudeEconomyConfig {
@@ -91,6 +107,11 @@ impl Default for CoudeEconomyConfig {
             leaky_wallet_fee_coins: LEAKY_WALLET_FEE_COINS,
             fausse_assurance_fee_coins: FAUSSE_ASSURANCE_FEE_COINS,
             tournament_prize_pool_pct: TOURNAMENT_PRIZE_POOL_PERCENT,
+            daily_chaos_max_events: DAILY_CHAOS_MAX,
+            min_coins_eligible: MIN_COINS_ELIGIBLE,
+            flavor_line_probability: FLAVOR_LINE_PROBABILITY,
+            honor_debt_threshold: HONOR_DEBT_THRESHOLD,
+            underdog_level_gap: UNDERDOG_LEVEL_GAP,
         }
     }
 }
@@ -155,6 +176,19 @@ impl CoudeEconomyConfig {
                 "tournament_prize_pool_pct",
                 d.tournament_prize_pool_pct,
             ),
+            daily_chaos_max_events: parse_i64(
+                cfg,
+                "daily_chaos_max_events",
+                d.daily_chaos_max_events,
+            ),
+            min_coins_eligible: parse_i64(cfg, "min_coins_eligible", d.min_coins_eligible),
+            flavor_line_probability: parse_f64(
+                cfg,
+                "flavor_line_probability",
+                d.flavor_line_probability,
+            ),
+            honor_debt_threshold: parse_i32(cfg, "honor_debt_threshold", d.honor_debt_threshold),
+            underdog_level_gap: parse_i32(cfg, "underdog_level_gap", d.underdog_level_gap),
         };
         raw.sanitize()
     }
@@ -226,6 +260,17 @@ impl CoudeEconomyConfig {
             self.heist_max_success_pct = d.heist_max_success_pct;
         }
 
+        // ── Gameplay LOW ──
+        // Compteurs / coins >= 0 (0 = feature desactivee, ex. cap chaos 0).
+        self.daily_chaos_max_events = self.daily_chaos_max_events.max(0);
+        self.min_coins_eligible = self.min_coins_eligible.max(0);
+        // Seuils de niveaux / refus >= 0.
+        self.honor_debt_threshold = self.honor_debt_threshold.max(0);
+        self.underdog_level_gap = self.underdog_level_gap.max(0);
+        // Probabilite bornee [0, 1], NaN -> defaut.
+        self.flavor_line_probability =
+            clamp_unit(self.flavor_line_probability, d.flavor_line_probability);
+
         self
     }
 }
@@ -241,6 +286,12 @@ fn clamp_unit(v: f64, default: f64) -> f64 {
 fn parse_i64(cfg: &HashMap<String, String>, key: &str, default: i64) -> i64 {
     cfg.get(key)
         .and_then(|v| v.trim().parse::<i64>().ok())
+        .unwrap_or(default)
+}
+
+fn parse_i32(cfg: &HashMap<String, String>, key: &str, default: i32) -> i32 {
+    cfg.get(key)
+        .and_then(|v| v.trim().parse::<i32>().ok())
         .unwrap_or(default)
 }
 

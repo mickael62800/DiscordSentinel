@@ -14,8 +14,22 @@ use crate::shared::heartbeat::ApiClientKey;
 const DISCORD_BULK_DELETE_MAX_AGE_SECS: i64 = 14 * 24 * 60 * 60;
 /// Taille de batch pour bulk_delete Discord (max 100 par appel API Discord).
 const DISCORD_BULK_DELETE_BATCH: usize = 100;
-/// Delai entre suppressions individuelles (rate limit Discord).
+/// Delai entre suppressions individuelles (rate limit Discord), defaut.
 const DISCORD_DELETE_RATE_LIMIT_MS: u64 = 300;
+/// Plancher de securite : ne jamais descendre sous ~100ms pour respecter les
+/// rate limits Discord, meme si l operateur configure une valeur plus basse.
+const DISCORD_DELETE_RATE_LIMIT_FLOOR_MS: u64 = 100;
+
+/// Delai (ms) entre suppressions individuelles, surchargable via
+/// `PURGE_DELETE_RATE_LIMIT_MS` (bot-level). Plancher a
+/// `DISCORD_DELETE_RATE_LIMIT_FLOOR_MS` pour ne pas se faire rate-limiter.
+fn purge_delete_rate_limit_ms() -> u64 {
+    std::env::var("PURGE_DELETE_RATE_LIMIT_MS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(DISCORD_DELETE_RATE_LIMIT_MS)
+        .max(DISCORD_DELETE_RATE_LIMIT_FLOOR_MS)
+}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("purge")
@@ -386,7 +400,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         } else {
                             deleted += 1;
                         }
-                        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS))
+                        tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms()))
                             .await;
                     }
                 }
@@ -403,7 +417,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             deleted += 1;
         }
         // Rate limit
-        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
+        tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms())).await;
     }
 
     // Reponse embed
@@ -524,7 +538,7 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
                             } else {
                                 deleted += 1;
                             }
-                            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS))
+                            tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms()))
                                 .await;
                         }
                     }
@@ -539,7 +553,7 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
             } else {
                 deleted += 1;
             }
-            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
+            tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms())).await;
         }
 
         if deleted == before {

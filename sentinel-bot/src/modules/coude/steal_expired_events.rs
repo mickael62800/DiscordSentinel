@@ -110,6 +110,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     // donc le bouton ne fera plus rien (bot le check via mark_steal_defended).
     let config = load_guild_config(ctx, guild_id).await;
     let failure_penalty_pct = config.steal_failure_penalty_pct();
+    let afk_defender_malus = config.afk_defender_malus();
 
     let bot_data = ctx.data.read().await;
     let api = match bot_data.get::<GameApiKey>() {
@@ -152,6 +153,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         &target_player,
         true, // AFK
         failure_penalty_pct,
+        afk_defender_malus,
     )
     .await;
 

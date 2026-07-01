@@ -105,31 +105,45 @@ pub struct GameServer {
 /// est absente. Borne stricte : empeche tout crash loop.
 pub const DEFAULT_MAX_RESTART_ATTEMPTS: i32 = 3;
 
+/// Base PAR DEFAUT du backoff (secondes). Aligne sur le default du schema
+/// game-portal `restart_backoff_base_secs`. Fallback quand la config est
+/// absente.
+pub const DEFAULT_RESTART_BACKOFF_BASE_SECS: i64 = 30;
+
+/// Plafond PAR DEFAUT du backoff (secondes = 1h). Aligne sur le default du
+/// schema game-portal `restart_backoff_cap_secs`. Fallback quand la config
+/// est absente.
+pub const DEFAULT_RESTART_BACKOFF_CAP_SECS: i64 = 3600;
+
 /// Delai de backoff (secondes) avant le prochain redemarrage auto, en
 /// fonction du nombre de tentatives deja effectuees. Exponentiel
-/// `30 * 2^attempts`, plafonne a 1h. Pure / overflow-safe.
-pub fn restart_backoff_secs(attempts: i32) -> i64 {
-    const BASE: i64 = 30;
-    const CAP: i64 = 3600;
+/// `base * 2^attempts`, plafonne a `cap`. `base` et `cap` sont fournis par la
+/// couche application (config per-guild) pour garder cette fonction pure /
+/// testable unitairement. Pure / overflow-safe.
+pub fn restart_backoff_secs(attempts: i32, base_secs: i64, cap_secs: i64) -> i64 {
     if attempts <= 0 {
-        return BASE;
+        return base_secs.min(cap_secs);
     }
     // 2^attempts overflow-safe : checked_shl renvoie None si shift trop grand.
     let factor = 1i64.checked_shl(attempts as u32).unwrap_or(i64::MAX);
-    BASE.saturating_mul(factor).min(CAP)
+    base_secs.saturating_mul(factor).min(cap_secs)
 }
 
 /// Decision PURE : faut-il auto-redemarrer un serveur crashe ? `true` si
 /// l'auto-restart est active ET on est sous le plafond de tentatives ET
 /// (jamais redemarre OU le cooldown de backoff est ecoule). `max_attempts` et
-/// `auto_restart_on_crash` sont fournis par la couche application (config
-/// per-guild) pour garder cette fonction pure / testable unitairement.
+/// `auto_restart_on_crash` ainsi que les parametres de backoff (`base`/`cap`)
+/// sont fournis par la couche application (config per-guild) pour garder cette
+/// fonction pure / testable unitairement.
+#[allow(clippy::too_many_arguments)]
 pub fn should_auto_restart(
     auto_restart_on_crash: bool,
     attempts: i32,
     max_attempts: i32,
     last_restart_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
+    backoff_base_secs: i64,
+    backoff_cap_secs: i64,
 ) -> bool {
     if !auto_restart_on_crash {
         return false;
@@ -139,7 +153,14 @@ pub fn should_auto_restart(
     }
     match last_restart_at {
         None => true,
-        Some(last) => now >= last + chrono::Duration::seconds(restart_backoff_secs(attempts)),
+        Some(last) => {
+            now >= last
+                + chrono::Duration::seconds(restart_backoff_secs(
+                    attempts,
+                    backoff_base_secs,
+                    backoff_cap_secs,
+                ))
+        }
     }
 }
 
@@ -221,14 +242,27 @@ mod tests {
 
     #[test]
     fn backoff_is_exponential_and_capped() {
-        assert_eq!(restart_backoff_secs(0), 30);
-        assert_eq!(restart_backoff_secs(1), 60);
-        assert_eq!(restart_backoff_secs(2), 120);
-        assert_eq!(restart_backoff_secs(3), 240);
+        const B: i64 = DEFAULT_RESTART_BACKOFF_BASE_SECS;
+        const C: i64 = DEFAULT_RESTART_BACKOFF_CAP_SECS;
+        assert_eq!(restart_backoff_secs(0, B, C), 30);
+        assert_eq!(restart_backoff_secs(1, B, C), 60);
+        assert_eq!(restart_backoff_secs(2, B, C), 120);
+        assert_eq!(restart_backoff_secs(3, B, C), 240);
         // Plafond a 1h, jamais d'overflow meme pour de grandes valeurs.
-        assert_eq!(restart_backoff_secs(20), 3600);
-        assert_eq!(restart_backoff_secs(1000), 3600);
-        assert_eq!(restart_backoff_secs(-1), 30);
+        assert_eq!(restart_backoff_secs(20, B, C), 3600);
+        assert_eq!(restart_backoff_secs(1000, B, C), 3600);
+        assert_eq!(restart_backoff_secs(-1, B, C), 30);
+    }
+
+    #[test]
+    fn backoff_respects_custom_base_and_cap() {
+        // base 10s, cap 100s : 10, 20, 40, 80, puis plafonne a 100.
+        assert_eq!(restart_backoff_secs(0, 10, 100), 10);
+        assert_eq!(restart_backoff_secs(1, 10, 100), 20);
+        assert_eq!(restart_backoff_secs(3, 10, 100), 80);
+        assert_eq!(restart_backoff_secs(4, 10, 100), 100);
+        // base > cap : borne des attempts=0.
+        assert_eq!(restart_backoff_secs(0, 200, 100), 100);
     }
 
     #[test]
@@ -240,7 +274,9 @@ mod tests {
             0,
             DEFAULT_MAX_RESTART_ATTEMPTS,
             None,
-            now
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
         ));
     }
 
@@ -249,7 +285,15 @@ mod tests {
         let now = Utc::now();
         // 2 tentatives -> backoff 120s ; dernier restart il y a 200s -> ok.
         let last = now - chrono::Duration::seconds(200);
-        assert!(should_auto_restart(true, 2, 5, Some(last), now));
+        assert!(should_auto_restart(
+            true,
+            2,
+            5,
+            Some(last),
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
+        ));
     }
 
     #[test]
@@ -257,7 +301,15 @@ mod tests {
         let now = Utc::now();
         // 2 tentatives -> backoff 120s ; dernier restart il y a 30s -> non.
         let last = now - chrono::Duration::seconds(30);
-        assert!(!should_auto_restart(true, 2, 5, Some(last), now));
+        assert!(!should_auto_restart(
+            true,
+            2,
+            5,
+            Some(last),
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
+        ));
     }
 
     #[test]
@@ -270,7 +322,9 @@ mod tests {
             0,
             DEFAULT_MAX_RESTART_ATTEMPTS,
             None,
-            now
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
         ));
     }
 
@@ -283,14 +337,18 @@ mod tests {
             DEFAULT_MAX_RESTART_ATTEMPTS,
             DEFAULT_MAX_RESTART_ATTEMPTS,
             Some(long_ago),
-            now
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
         ));
         assert!(!should_auto_restart(
             true,
             DEFAULT_MAX_RESTART_ATTEMPTS + 3,
             DEFAULT_MAX_RESTART_ATTEMPTS,
             None,
-            now
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
         ));
     }
 
@@ -299,7 +357,15 @@ mod tests {
         let now = Utc::now();
         // attempts=1 -> backoff 60s ; pile a la frontiere -> autorise (>=).
         let last = now - chrono::Duration::seconds(60);
-        assert!(should_auto_restart(true, 1, 5, Some(last), now));
+        assert!(should_auto_restart(
+            true,
+            1,
+            5,
+            Some(last),
+            now,
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
+        ));
     }
 
     #[test]

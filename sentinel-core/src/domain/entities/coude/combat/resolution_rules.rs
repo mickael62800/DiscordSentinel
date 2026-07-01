@@ -103,7 +103,7 @@ pub fn compute_combat_xp(
     cfg: &CoudeEconomyConfig,
 ) -> CombatXpAwards {
     let level_gap = (attacker_level - defender_level).abs();
-    let winner_is_underdog = level_gap >= UNDERDOG_LEVEL_GAP && is_giant_killer;
+    let winner_is_underdog = level_gap >= cfg.underdog_level_gap && is_giant_killer;
     let winner_xp = if winner_is_underdog {
         cfg.combat_xp_winner_underdog
     } else {

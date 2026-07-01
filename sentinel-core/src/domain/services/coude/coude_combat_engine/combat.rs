@@ -315,6 +315,10 @@ pub struct CombatCurses {
     /// sont appliques AVANT ceux de l attaquant ; si l attaquant meurt
     /// avant d avoir pu frapper, ses degats sont annules.
     pub defender_riposte_first_round: bool,
+    /// Probabilite (0..1) qu une ligne de flavor soit injectee par round.
+    /// None = defaut historique (`FLAVOR_LINE_PROBABILITY` = 0.20). Reglable
+    /// par serveur via `CoudeEconomyConfig::flavor_line_probability`.
+    pub flavor_line_probability: Option<f64>,
 }
 
 pub fn resolve_combat(
@@ -812,8 +816,14 @@ pub fn resolve_combat_with_curses(
         // ~20% par round, aucune incidence mecanique, juste de l ambiance.
         {
             use crate::domain::entities::coude::combat::flavor::pick_flavor_line;
+            use crate::domain::entities::coude::combat::flavor::FLAVOR_LINE_PROBABILITY;
             let proba: f64 = rng.gen_range(0.0..1.0);
-            if let Some(line) = pick_flavor_line(&mut rng, proba, &atk_name, &def_name) {
+            let flavor_threshold = curses
+                .flavor_line_probability
+                .unwrap_or(FLAVOR_LINE_PROBABILITY);
+            if let Some(line) =
+                pick_flavor_line(&mut rng, proba, flavor_threshold, &atk_name, &def_name)
+            {
                 round_msg.push_str(&format!("\n_\u{1f3ad} {}_\n", line));
             }
         }

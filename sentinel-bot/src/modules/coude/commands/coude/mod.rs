@@ -837,6 +837,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                     component.channel_id,
                     embed,
                     combat.mise,
+                    config.animated_combat_mise_threshold(),
                 )
                 .await;
                 edit_component_message(ctx, component, "\u{2705} Defi surprise resolu !").await;
@@ -891,6 +892,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                     component.channel_id,
                     embed,
                     combat.mise,
+                    config.animated_combat_mise_threshold(),
                 )
                 .await;
                 edit_component_message(ctx, component, "\u{2705} Defi Bloodbath resolu !").await;

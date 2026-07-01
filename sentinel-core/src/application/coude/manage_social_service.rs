@@ -17,9 +17,7 @@ use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::entities::coude::social::Season;
-use crate::domain::entities::coude::social::DAILY_CHAOS_MAX;
 use crate::domain::entities::coude::social::DEFAULT_CHAOS_PERCENT;
-use crate::domain::entities::coude::social::MIN_COINS_ELIGIBLE;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
@@ -106,17 +104,29 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         &self,
         guild_id: &str,
     ) -> Result<Option<DailyChaosOutcome>, DomainError> {
-        // 1. Cap journalier.
-        let today_count = self.repo.count_daily_chaos_today(guild_id).await?;
-        if today_count >= DAILY_CHAOS_MAX {
-            return Ok(None);
-        }
-
-        // 2. Lire le % depuis la config guild (default 20%).
+        // Config guild : le domaine reste PUR, on lit la config une fois et
+        // on construit `CoudeEconomyConfig` (cap chaos + solde min eligible
+        // reglables par serveur, fallback defaut historique).
         let configs = self
             .bot_config_repo
             .get_config(guild_id, "coude-bot")
             .await?;
+        let econ = {
+            use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
+            let map: std::collections::HashMap<String, String> = configs
+                .iter()
+                .map(|c| (c.config_key.clone(), c.config_value.clone()))
+                .collect();
+            CoudeEconomyConfig::from_config(&map)
+        };
+
+        // 1. Cap journalier (reglable par serveur).
+        let today_count = self.repo.count_daily_chaos_today(guild_id).await?;
+        if today_count >= econ.daily_chaos_max_events {
+            return Ok(None);
+        }
+
+        // 2. Lire le % depuis la config guild (default 20%).
         let chaos_percent = configs
             .iter()
             .find(|c| c.config_key == "daily_chaos_percent")
@@ -137,7 +147,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         // 3. Tirer 2 joueurs aleatoires avec assez de coins.
         let players = self
             .player_repo
-            .random_active(guild_id, 2, MIN_COINS_ELIGIBLE)
+            .random_active(guild_id, 2, econ.min_coins_eligible)
             .await?;
         if players.len() < 2 {
             return Ok(None); // Pas assez de joueurs eligibles.

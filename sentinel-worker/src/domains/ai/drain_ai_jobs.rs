@@ -3,7 +3,6 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-const BATCH_SIZE: i32 = 5;
 const REDIS_RESULT_TTL_SECS: u64 = 600;
 
 #[derive(sqlx::FromRow)]
@@ -32,6 +31,7 @@ pub async fn run(
     redis: &redis::Client,
     api_url: &str,
     job_timeout_secs: u64,
+    batch_size: i32,
 ) -> Result<(), String> {
     // 1. Reset des jobs zombies (processing trop longtemps)
     let resurrected = sqlx::query(
@@ -60,7 +60,7 @@ pub async fn run(
          ) \
          RETURNING id, guild_id, job_type, input_payload, retries, max_retries",
     )
-    .bind(BATCH_SIZE as i64)
+    .bind(batch_size as i64)
     .fetch_all(pool)
     .await
     .map_err(|e| format!("claim batch: {e}"))?;

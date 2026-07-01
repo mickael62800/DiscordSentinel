@@ -1172,6 +1172,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             chaos_multiplier: season_chaos_multiplier,
             tank_def_bonus_pct: season_tank_def_bonus,
             defender_riposte_first_round,
+            // Flavor lines : probabilite reglable par serveur (domaine pur,
+            // valeur passee en donnee via CombatCurses).
+            flavor_line_probability: Some(settings.economy_config().flavor_line_probability),
         };
 
         // Sabotage "Graisser les armes" (cf. COUPE_AMELIORATIONS 5.2) :

@@ -14,13 +14,13 @@ fn honor_debt_owed_below_threshold() {
         count: 0,
         last_refused_at: Utc::now(),
     };
-    assert!(!r.honor_debt_owed());
+    assert!(!r.honor_debt_owed(HONOR_DEBT_THRESHOLD));
 
     let r2 = RefusalCount {
         count: 2,
         ..r.clone()
     };
-    assert!(!r2.honor_debt_owed());
+    assert!(!r2.honor_debt_owed(HONOR_DEBT_THRESHOLD));
 }
 
 #[test]
@@ -32,10 +32,13 @@ fn honor_debt_owed_at_or_above_threshold() {
         count: 3,
         last_refused_at: Utc::now(),
     };
-    assert!(r.honor_debt_owed());
+    assert!(r.honor_debt_owed(HONOR_DEBT_THRESHOLD));
     let r2 = RefusalCount {
         count: 5,
         ..r.clone()
     };
-    assert!(r2.honor_debt_owed());
+    assert!(r2.honor_debt_owed(HONOR_DEBT_THRESHOLD));
+
+    // Seuil configurable : un seuil plus haut n est pas encore atteint.
+    assert!(!r.honor_debt_owed(4));
 }

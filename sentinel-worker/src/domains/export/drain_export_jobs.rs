@@ -19,8 +19,6 @@ use uuid::Uuid;
 use sentinel_proto::export::v1::export_service_client::ExportServiceClient;
 use sentinel_proto::export::v1::ExecuteExportRequest;
 
-use super::{MAX_ROWS_PER_EXPORT, PROCESSING_TIMEOUT_SECS};
-
 #[derive(Debug, sqlx::FromRow)]
 struct ClaimedJob {
     id: Uuid,
@@ -32,14 +30,18 @@ struct ClaimedJob {
     max_retries: i32,
 }
 
-pub async fn run(pool: &PgPool) -> Result<(), String> {
+pub async fn run(
+    pool: &PgPool,
+    max_rows_per_export: i64,
+    processing_timeout_secs: i64,
+) -> Result<(), String> {
     // 1. Reset les jobs zombies
     let reset = sqlx::query(
         "UPDATE export_jobs SET status = 'pending', started_at = NULL \
          WHERE status = 'processing' \
            AND started_at < NOW() - make_interval(secs => $1)",
     )
-    .bind(PROCESSING_TIMEOUT_SECS)
+    .bind(processing_timeout_secs)
     .execute(pool)
     .await
     .map_err(|e| format!("reset zombies: {e}"))?;
@@ -92,7 +94,14 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     }
 
     // 3. Appel gRPC a l'API pour executer l'export (zero logique metier ici).
-    let result = call_export_api(&job.guild_id, &job.job_type, &job.format, &job.filters).await;
+    let result = call_export_api(
+        &job.guild_id,
+        &job.job_type,
+        &job.format,
+        &job.filters,
+        max_rows_per_export,
+    )
+    .await;
 
     // 4. Persister le resultat
     match result {
@@ -145,6 +154,7 @@ async fn call_export_api(
     job_type: &str,
     format: &str,
     filters: &serde_json::Value,
+    max_rows: i64,
 ) -> Result<(String, usize), String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
@@ -158,7 +168,7 @@ async fn call_export_api(
         job_type: job_type.to_string(),
         format: format.to_string(),
         filters_json: filters.to_string(),
-        max_rows: MAX_ROWS_PER_EXPORT,
+        max_rows,
     });
     if let Ok(v) = format!("Bearer {api_key}").parse::<MetadataValue<_>>() {
         req.metadata_mut().insert("authorization", v);

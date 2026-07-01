@@ -24,11 +24,6 @@ use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const RCON_HOST: &str = "127.0.0.1";
 
-/// Au-dela de ce delai dans un etat transitoire (Starting/Stopping) sans
-/// progression coherente cote container, le reconciler force la resolution
-/// (Error ou etat reel du container). Evite les serveurs bloques a vie.
-const STUCK_TRANSITION_THRESHOLD_MINUTES: i64 = 10;
-
 /// Bag d'adapters pour les jobs (evite des signatures kilometriques).
 pub struct JobContext {
     pub server_repo: Arc<dyn GameServerRepository>,
@@ -305,6 +300,8 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
         now: chrono::DateTime<chrono::Utc>,
         max_attempts: i32,
         auto_restart_on_crash: bool,
+        backoff_base_secs: i64,
+        backoff_cap_secs: i64,
     ) -> bool {
         // Auto-restart desactive OU plafond atteint : on abandonne
         // definitivement (pas de crash loop, ou respect de la config).
@@ -338,6 +335,8 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
             max_attempts,
             s.last_restart_at,
             now,
+            backoff_base_secs,
+            backoff_cap_secs,
         ) {
             info!(
                 server_id = %s.id,
@@ -416,10 +415,13 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
 
     // 1. DB -> Docker : reconcilie chaque serveur actif avec son container.
     for s in &active_servers {
+        // Config per-guild : seuil "stuck" + parametres d'auto-restart. Chargee
+        // une fois par serveur et reutilisee ci-dessous (stuck + crash).
+        let cfg = load_game_portal_config(&ctx.bot_config, &s.guild_id).await?;
         let dc = docker_by_id.get(&s.id.to_string());
         // Serveur coince dans un etat transitoire depuis trop longtemps ?
-        let stuck =
-            (now - s.updated_at) > chrono::Duration::minutes(STUCK_TRANSITION_THRESHOLD_MINUTES);
+        let stuck = (now - s.updated_at)
+            > chrono::Duration::minutes(cfg.stuck_transition_threshold_minutes);
         match dc {
             None => match s.status {
                 // Container disparu alors qu'on le croyait up -> crash.
@@ -474,13 +476,14 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                     // Running (l'utilisateur ne l'a pas stoppe) : on tente un
                     // auto-restart borne + backoff plutot que de juste stopper.
                     GameServerStatus::Running if exited => {
-                        let cfg = load_game_portal_config(&ctx.bot_config, &s.guild_id).await?;
                         if handle_running_crash(
                             ctx,
                             s,
                             now,
                             cfg.max_auto_restart_attempts,
                             cfg.auto_restart_on_crash,
+                            cfg.restart_backoff_base_secs,
+                            cfg.restart_backoff_cap_secs,
                         )
                         .await
                         {

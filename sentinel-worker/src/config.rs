@@ -58,6 +58,10 @@ const DEFAULT_APPEAL_SLA_SCAN_SECS: u64 = 120;
 
 // ── Defauts export ──
 const DEFAULT_EXPORT_SCAN_SECS: u64 = 5;
+/// Nombre max de lignes par export (garde-fou memoire).
+const DEFAULT_MAX_ROWS_PER_EXPORT: i64 = 50_000;
+/// Timeout au-dela duquel un export 'processing' est considere zombie.
+const DEFAULT_EXPORT_PROCESSING_TIMEOUT_SECS: i64 = 300;
 
 // ── Defauts discord_audit_sync ──
 const DEFAULT_AUDIT_SYNC_SECS: u64 = 300;
@@ -65,6 +69,12 @@ const DEFAULT_AUDIT_SYNC_SECS: u64 = 300;
 // ── Defauts ai ──
 const DEFAULT_AI_POLL_SECS: u64 = 2;
 const DEFAULT_AI_JOB_TIMEOUT_SECS: u64 = 2 * SECS_PER_MINUTE;
+/// Taille du batch de jobs IA claimes par tick (garde 1..100).
+const DEFAULT_AI_BATCH_SIZE: i32 = 5;
+
+// ── Defauts announcements ──
+/// Cadence de publication des annonces dues (alignee HH:00 par defaut).
+const DEFAULT_ANNOUNCEMENT_PUBLISH_INTERVAL_SECS: u64 = 3600;
 
 // ── Defauts moderation ──
 const DEFAULT_BAN_CLEANUP_MINUTES: u64 = 1;
@@ -79,6 +89,9 @@ const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
 // Phase 5 — Vol /voler : tick frequent (5s) car la fenetre de defense
 // est de 60s, donc une latence max de 65s pour la resolution AFK.
 const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
+// Daily-chaos "Roue du Destin" : delai aleatoire entre min et max (2-6h).
+const DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS: u64 = 7200;
+const DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS: u64 = 21600;
 
 // Phase 5 — Tickets close inactifs : tick 30 min (meme cadence que
 // l'ancienne boucle bot).
@@ -174,6 +187,8 @@ pub struct WorkerConfig {
 
     // ── Export ──
     pub export_scan_interval_secs: u64,
+    pub max_rows_per_export: i64,
+    pub export_processing_timeout_secs: i64,
 
     // ── Discord audit sync ──
     pub audit_sync_interval_secs: u64,
@@ -182,6 +197,10 @@ pub struct WorkerConfig {
     // ── AI ──
     pub ai_poll_interval_secs: u64,
     pub ai_job_timeout_secs: u64,
+    pub ai_batch_size: i32,
+
+    // ── Announcements ──
+    pub announcement_publish_interval_secs: u64,
 
     // ── Moderation ──
     pub ban_cleanup_interval_secs: u64,
@@ -195,6 +214,8 @@ pub struct WorkerConfig {
     pub cashbox_tick_secs: u64,
     pub cashbox_min_days: u64,
     pub steal_expiry_check_secs: u64,
+    pub daily_chaos_min_delay_secs: u64,
+    pub daily_chaos_max_delay_secs: u64,
 
     // ── Tickets ──
     pub tickets_close_inactive_secs: u64,
@@ -328,6 +349,11 @@ impl WorkerConfig {
 
             // export
             export_scan_interval_secs: load_env("EXPORT_SCAN_INTERVAL", DEFAULT_EXPORT_SCAN_SECS),
+            max_rows_per_export: load_env("MAX_ROWS_PER_EXPORT", DEFAULT_MAX_ROWS_PER_EXPORT),
+            export_processing_timeout_secs: load_env(
+                "EXPORT_PROCESSING_TIMEOUT_SECS",
+                DEFAULT_EXPORT_PROCESSING_TIMEOUT_SECS,
+            ),
 
             // discord_audit_sync
             audit_sync_interval_secs: load_env("AUDIT_SYNC_INTERVAL", DEFAULT_AUDIT_SYNC_SECS),
@@ -338,6 +364,13 @@ impl WorkerConfig {
             // ai
             ai_poll_interval_secs: load_env("AI_POLL_INTERVAL", DEFAULT_AI_POLL_SECS),
             ai_job_timeout_secs: load_env("AI_JOB_TIMEOUT", DEFAULT_AI_JOB_TIMEOUT_SECS),
+            ai_batch_size: load_env::<i32>("AI_BATCH_SIZE", DEFAULT_AI_BATCH_SIZE).clamp(1, 100),
+
+            // announcements
+            announcement_publish_interval_secs: load_env(
+                "ANNOUNCEMENT_PUBLISH_INTERVAL_SECS",
+                DEFAULT_ANNOUNCEMENT_PUBLISH_INTERVAL_SECS,
+            ),
 
             // moderation
             ban_cleanup_interval_secs: load_env::<u64>(
@@ -365,6 +398,14 @@ impl WorkerConfig {
             steal_expiry_check_secs: load_env(
                 "STEAL_EXPIRY_CHECK_SECS",
                 DEFAULT_STEAL_EXPIRY_CHECK_SECS,
+            ),
+            daily_chaos_min_delay_secs: load_env(
+                "DAILY_CHAOS_MIN_DELAY_SECS",
+                DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS,
+            ),
+            daily_chaos_max_delay_secs: load_env(
+                "DAILY_CHAOS_MAX_DELAY_SECS",
+                DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS,
             ),
 
             // tickets
@@ -599,6 +640,22 @@ impl WorkerConfig {
             "EXPORT_SCAN_INTERVAL",
             DEFAULT_EXPORT_SCAN_SECS,
         );
+        // Borne saine : 1..10_000_000 lignes (evite un cap 0 ou absurde).
+        let max_rows: i64 = config_or_env(
+            db,
+            "max_rows_per_export",
+            "MAX_ROWS_PER_EXPORT",
+            DEFAULT_MAX_ROWS_PER_EXPORT,
+        );
+        self.max_rows_per_export = max_rows.clamp(1, 10_000_000);
+        // Borne saine : 30..86400s.
+        let export_timeout: i64 = config_or_env(
+            db,
+            "export_processing_timeout_secs",
+            "EXPORT_PROCESSING_TIMEOUT_SECS",
+            DEFAULT_EXPORT_PROCESSING_TIMEOUT_SECS,
+        );
+        self.export_processing_timeout_secs = export_timeout.clamp(30, 86_400);
 
         // discord_audit_sync
         self.audit_sync_interval_secs = config_or_env(
@@ -620,6 +677,18 @@ impl WorkerConfig {
             "ai_job_timeout",
             "AI_JOB_TIMEOUT",
             DEFAULT_AI_JOB_TIMEOUT_SECS,
+        );
+        // Borne saine : 1..100 jobs par batch.
+        let ai_batch: i32 =
+            config_or_env(db, "ai_batch_size", "AI_BATCH_SIZE", DEFAULT_AI_BATCH_SIZE);
+        self.ai_batch_size = ai_batch.clamp(1, 100);
+
+        // announcements
+        self.announcement_publish_interval_secs = config_or_env(
+            db,
+            "announcement_publish_interval_secs",
+            "ANNOUNCEMENT_PUBLISH_INTERVAL_SECS",
+            DEFAULT_ANNOUNCEMENT_PUBLISH_INTERVAL_SECS,
         );
 
         // moderation
@@ -674,6 +743,23 @@ impl WorkerConfig {
             "STEAL_EXPIRY_CHECK_SECS",
             DEFAULT_STEAL_EXPIRY_CHECK_SECS,
         );
+        // daily_chaos : delai aleatoire, garde min <= max.
+        self.daily_chaos_min_delay_secs = config_or_env(
+            db,
+            "daily_chaos_min_delay_secs",
+            "DAILY_CHAOS_MIN_DELAY_SECS",
+            DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS,
+        );
+        self.daily_chaos_max_delay_secs = config_or_env(
+            db,
+            "daily_chaos_max_delay_secs",
+            "DAILY_CHAOS_MAX_DELAY_SECS",
+            DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS,
+        );
+        // Garantit un range gen_range valide (min..=max non vide).
+        if self.daily_chaos_max_delay_secs < self.daily_chaos_min_delay_secs {
+            self.daily_chaos_max_delay_secs = self.daily_chaos_min_delay_secs;
+        }
 
         // tickets
         self.tickets_close_inactive_secs = config_or_env(

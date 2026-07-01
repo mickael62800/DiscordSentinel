@@ -278,12 +278,25 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
+/// Intervalle (secondes) entre deux verifications de rotation admin.
+/// Boucle globale (pas par-guild) -> surchargable via l env
+/// `ROTATION_CHECK_INTERVAL_SECS`. Defaut 600 (10 min). Plancher 1s pour
+/// eviter une boucle serree en cas de valeur nulle/malformee.
+fn rotation_check_interval_secs() -> u64 {
+    std::env::var("ROTATION_CHECK_INTERVAL_SECS")
+        .ok()
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .unwrap_or(600)
+        .max(1)
+}
+
 pub fn spawn_background_tasks(ctx: &Context) {
     let ctx = ctx.clone();
     tokio::spawn(async move {
+        let interval = rotation_check_interval_secs();
         loop {
-            // Verifie toutes les 10 min : debut de periode / timeout.
-            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+            // Verifie periodiquement : debut de periode / timeout.
+            tokio::time::sleep(std::time::Duration::from_secs(interval)).await;
             let guilds = ctx.cache.guilds();
             for gid in guilds {
                 tick(&ctx, gid).await;

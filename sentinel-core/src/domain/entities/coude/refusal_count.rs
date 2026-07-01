@@ -16,8 +16,12 @@ pub struct RefusalCount {
 }
 
 impl RefusalCount {
-    pub fn honor_debt_owed(&self) -> bool {
-        self.count >= HONOR_DEBT_THRESHOLD
+    /// Dette d honneur due si le compteur atteint le `threshold` configure.
+    /// Le seuil est passe en donnee (domaine pur) — cf.
+    /// `CoudeEconomyConfig::honor_debt_threshold`. Le defaut historique
+    /// reste `HONOR_DEBT_THRESHOLD`.
+    pub fn honor_debt_owed(&self, threshold: i32) -> bool {
+        self.count >= threshold
     }
 }
 

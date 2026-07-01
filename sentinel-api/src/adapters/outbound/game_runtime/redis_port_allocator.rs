@@ -2,7 +2,7 @@
 //!
 //! Strategie : pour chaque port du range, une cle Redis `game:port:{kind}:{port}`
 //! contenant l'owner_key (server_id). Allocation = SETNX avec TTL long
-//! (24h, refresh si besoin). Liberation = DEL.
+//! (7 jours par defaut, refresh sur usage). Liberation = DEL.
 
 use async_trait::async_trait;
 use redis::AsyncCommands;
@@ -11,15 +11,25 @@ use redis::Client;
 use crate::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 use sentinel_core::domain::errors::DomainError;
 
-const KEY_TTL_SECS: u64 = 60 * 60 * 24 * 7; // 7j (refresh sur usage)
+/// TTL PAR DEFAUT d'une reservation de port (secondes = 7 jours). Global /
+/// infra : la reservation est un simple garde-fou anti-collision au niveau
+/// runtime, sans semantique per-guild. Surchargeable via l'env
+/// `GAME_PORTAL_PORT_RESERVATION_TTL_SECS`.
+const DEFAULT_KEY_TTL_SECS: u64 = 60 * 60 * 24 * 7; // 7j (refresh sur usage)
 
 pub struct RedisPortAllocator {
     client: Client,
+    ttl_secs: u64,
 }
 
 impl RedisPortAllocator {
     pub fn new(client: Client) -> Self {
-        Self { client }
+        let ttl_secs = std::env::var("GAME_PORTAL_PORT_RESERVATION_TTL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .filter(|&v| v > 0)
+            .unwrap_or(DEFAULT_KEY_TTL_SECS);
+        Self { client, ttl_secs }
     }
 
     fn key(kind: PortKind, port: u16) -> String {
@@ -59,7 +69,7 @@ impl PortAllocator for RedisPortAllocator {
                 .arg(owner_key)
                 .arg("NX")
                 .arg("EX")
-                .arg(KEY_TTL_SECS)
+                .arg(self.ttl_secs)
                 .query_async(&mut conn)
                 .await
                 .map_err(|e| DomainError::Internal(format!("redis SET NX: {e}")))?;

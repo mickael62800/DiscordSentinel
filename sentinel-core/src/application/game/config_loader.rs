@@ -6,7 +6,10 @@
 
 use std::sync::Arc;
 
-use crate::domain::entities::game::server::DEFAULT_MAX_RESTART_ATTEMPTS;
+use crate::domain::entities::game::server::{
+    DEFAULT_MAX_RESTART_ATTEMPTS, DEFAULT_RESTART_BACKOFF_BASE_SECS,
+    DEFAULT_RESTART_BACKOFF_CAP_SECS,
+};
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -38,6 +41,18 @@ pub struct GamePortalConfig {
     pub auto_restart_on_crash: bool,
     /// Nombre max de redemarrages auto consecutifs avant abandon (-> Error).
     pub max_auto_restart_attempts: i32,
+    /// Base (secondes) du backoff exponentiel entre deux redemarrages auto.
+    pub restart_backoff_base_secs: i64,
+    /// Plafond (secondes) du backoff exponentiel entre deux redemarrages auto.
+    pub restart_backoff_cap_secs: i64,
+    /// Delai (minutes) au-dela duquel un serveur coince dans un etat
+    /// transitoire (Starting/Stopping) est resolu de force par le reconciler.
+    pub stuck_transition_threshold_minutes: i64,
+    /// Delai de grace (secondes) laisse a un container pour s'arreter proprement
+    /// avant kill (docker stop -t).
+    pub stop_timeout_secs: u32,
+    /// Nombre max de lignes de logs recuperables en une requete (borne dure).
+    pub max_log_lines: u32,
 }
 
 fn find<'a>(items: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
@@ -64,6 +79,10 @@ fn parse_u16(s: Option<&str>, default: u16) -> u16 {
 }
 
 fn parse_u32(s: Option<&str>, default: u32) -> u32 {
+    s.and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
+fn parse_i64(s: Option<&str>, default: i64) -> i64 {
     s.and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
@@ -152,6 +171,25 @@ pub async fn load_game_portal_config(
             find(&entries, "max_auto_restart_attempts"),
             DEFAULT_MAX_RESTART_ATTEMPTS,
         ),
+        restart_backoff_base_secs: parse_i64(
+            find(&entries, "restart_backoff_base_secs"),
+            DEFAULT_RESTART_BACKOFF_BASE_SECS,
+        )
+        .max(1),
+        restart_backoff_cap_secs: parse_i64(
+            find(&entries, "restart_backoff_cap_secs"),
+            DEFAULT_RESTART_BACKOFF_CAP_SECS,
+        )
+        .max(1),
+        stuck_transition_threshold_minutes: parse_i64(
+            find(&entries, "stuck_transition_threshold_minutes"),
+            10,
+        )
+        .max(1),
+        stop_timeout_secs: parse_u32(find(&entries, "stop_timeout_secs"), 30),
+        // Borne dure : jamais plus de 5000 lignes en une requete (protege la
+        // memoire / le payload, meme si l'admin configure une valeur absurde).
+        max_log_lines: parse_u32(find(&entries, "max_log_lines"), 1000).min(5000),
     })
 }
 

@@ -354,6 +354,17 @@ impl Config {
         BaseApiClient::config_u64(&self.raw, "steal_failure_penalty_pct", 20)
     }
 
+    /// Malus applique au roll du defenseur AFK lors d un vol (default 8).
+    pub fn afk_defender_malus(&self) -> i32 {
+        BaseApiClient::config_u64(&self.raw, "afk_defender_malus", 8) as i32
+    }
+
+    /// Seuil de mise (coins) au-dessus duquel un combat est anime round par
+    /// round cote bot (default 500). En dessous, resultat poste directement.
+    pub fn animated_combat_mise_threshold(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "animated_combat_mise_threshold", 500) as i64
+    }
+
     /// % outils consommes si braquage reussit.
     pub fn braquage_tools_consumed_success_pct(&self) -> u64 {
         BaseApiClient::config_u64(&self.raw, "braquage_tools_consumed_success_pct", 50)
