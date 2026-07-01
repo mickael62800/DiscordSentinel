@@ -224,7 +224,12 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
         {
             if let Err(e) = ctx
                 .http
-                .add_member_role(guild_id, user_id, role, Some("Verification d'age en attente"))
+                .add_member_role(
+                    guild_id,
+                    user_id,
+                    role,
+                    Some("Verification d'age en attente"),
+                )
                 .await
             {
                 warn!(error = %e, role = %role, "Echec attribution role Membre temporaire");
@@ -654,8 +659,13 @@ async fn handle_rules_accept(
     }
 
     // Flux classique : attribuer le(s) role(s) depuis la config deja lue.
-    let assigned =
-        assign_roles_csv(ctx, guild_id, component.user.id, config.rules_role_id.as_deref()).await;
+    let assigned = assign_roles_csv(
+        ctx,
+        guild_id,
+        component.user.id,
+        config.rules_role_id.as_deref(),
+    )
+    .await;
 
     let content = if assigned == 0 {
         "Erreur lors de l'assignation des roles (aucun role configure ?)."
@@ -785,11 +795,20 @@ pub async fn handle_age_modal(
 
     // Parse de l'age saisi.
     let raw = extract_modal_input(modal, AGE_INPUT_ID).unwrap_or_default();
-    let age: Option<i32> = raw.trim().parse::<i32>().ok().filter(|a| (5..=120).contains(a));
+    let age: Option<i32> = raw
+        .trim()
+        .parse::<i32>()
+        .ok()
+        .filter(|a| (5..=120).contains(a));
     let age = match age {
         Some(a) => a,
         None => {
-            reply_modal(ctx, modal, "Age invalide. Recommence en saisissant un nombre.").await;
+            reply_modal(
+                ctx,
+                modal,
+                "Age invalide. Recommence en saisissant un nombre.",
+            )
+            .await;
             return;
         }
     };
@@ -820,7 +839,12 @@ pub async fn handle_age_modal(
             reply_modal(ctx, modal, "Bienvenue sur le serveur ! Acces accorde.").await;
             info!(user = %modal.user.name, guild = %guild_id, age, "Age verifie -> Membre");
         } else {
-            reply_modal(ctx, modal, "Acces accorde, mais aucun role Membre n'est configure.").await;
+            reply_modal(
+                ctx,
+                modal,
+                "Acces accorde, mais aucun role Membre n'est configure.",
+            )
+            .await;
             warn!(guild = %guild_id, "Age verifie mais aucun role Membre (rules_role_id) configure");
         }
         return;
@@ -857,8 +881,7 @@ pub async fn handle_age_modal(
             "declared_age": age,
             "unban_at": unban_at.to_rfc3339(),
         });
-        let res: Result<serde_json::Value, String> =
-            base.post_json("/api/age-bans", &body).await;
+        let res: Result<serde_json::Value, String> = base.post_json("/api/age-bans", &body).await;
         if let Err(e) = res {
             warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
         }

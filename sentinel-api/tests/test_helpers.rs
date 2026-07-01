@@ -1967,6 +1967,11 @@ impl WelcomeConfigRepository for StubWelcomeConfigRepo {
             rules_message: String::new(),
             rules_role_id: None,
             rules_button_label: String::new(),
+            age_check_enabled: false,
+            age_minimum: 0,
+            unverified_role_id: None,
+            age_modal_question: String::new(),
+            age_ban_message: String::new(),
             counter_enabled: false,
             counter_channel_id: None,
             counter_format: String::new(),
@@ -3120,6 +3125,11 @@ fn base_state() -> AppState {
         strikes_uc: Arc::new(StubStrikes),
         analytics_repo: Arc::new(StubAnalyticsRepo),
         daily_activity_repo: Arc::new(StubDailyActivityRepo),
+        age_ban_repo: Arc::new(
+            sentinel_api::adapters::outbound::postgres::community::age_ban_repository::PgAgeBanRepository::new(
+                pg_pool.clone(),
+            ),
+        ),
         log_repo: Arc::new(StubLogRepo),
         guild_repo: Arc::new(StubGuildRepo),
         bot_config_repo: Arc::new(StubBotConfigRepo),

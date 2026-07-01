@@ -184,7 +184,10 @@ fn confession_inner() -> Router<AppState> {
 fn age_ban_inner() -> Router<AppState> {
     Router::new()
         .route("/", post(handlers::community::age_bans::create_age_ban))
-        .route("/due", get(handlers::community::age_bans::list_due_age_bans))
+        .route(
+            "/due",
+            get(handlers::community::age_bans::list_due_age_bans),
+        )
         .route(
             "/{id}/lift",
             post(handlers::community::age_bans::lift_age_ban),
