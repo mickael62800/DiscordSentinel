@@ -138,6 +138,36 @@ pub(crate) async fn handle_finalize_button(
     )
     .await;
 
+    // BUG #4 : card de sanction pour les decisions humaines du vote (warn/mute/ban),
+    // au meme titre que les sanctions manuelles et l'auto-mute automod. Best-effort.
+    if let (Some(gid), Some(kind)) = (
+        component.guild_id,
+        super::super::review::sanction_kind_for(&decided),
+    ) {
+        if let Ok(uid) = review.user_id.parse::<u64>() {
+            let duration_label = if decided == "mute" {
+                Some(format!("{}min", mute_secs / 60))
+            } else {
+                None
+            };
+            crate::shared::discord_helpers::post_sanction_card(
+                ctx,
+                &gid.to_string(),
+                kind,
+                uid,
+                Some(&review.user_name),
+                &component.user.name,
+                if review.reason.is_empty() {
+                    "Decision validee par les moderateurs"
+                } else {
+                    review.reason.as_str()
+                },
+                duration_label.as_deref(),
+            )
+            .await;
+        }
+    }
+
     // Notice membre (cohérence de ton avec les autres chemins) : on informe le
     // membre en DM de la sanction validée + droit d'appel. Best-effort.
     if matches!(decided.as_str(), "prevention" | "warn" | "mute" | "ban") {

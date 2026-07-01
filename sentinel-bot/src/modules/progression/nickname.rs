@@ -361,6 +361,16 @@ pub async fn on_member_update(ctx: &Context, member: &Member) {
     apply_prefixes(ctx, guild_id, user_id, level).await;
 }
 
+/// Declencheur (re)join (guild_member_addition) : un membre qui rejoint en
+/// portant deja son role staff doit voir son emoji applique des l'arrivee (sans
+/// attendre un level-up ou un changement de role ulterieur). Meme logique que
+/// `on_member_update` : garde `staff_prefix_enabled`, best-effort, owner ignore,
+/// niveau recupere via l'API avec fallback sur le `[NN]` deja present. Ne touche
+/// que le pseudo, comme le chemin role-change — ne concurrence pas le welcome.
+pub async fn on_member_add(ctx: &Context, member: &Member) {
+    on_member_update(ctx, member).await;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

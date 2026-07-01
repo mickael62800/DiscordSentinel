@@ -65,7 +65,7 @@ impl Config {
     // ── Coins ──
 
     pub fn starting_coins(&self) -> i64 {
-        BaseApiClient::config_u64(&self.raw, "starting_coins", 200) as i64
+        BaseApiClient::config_u64(&self.raw, "starting_coins", 100) as i64
     }
 
     pub fn min_bet(&self) -> i64 {

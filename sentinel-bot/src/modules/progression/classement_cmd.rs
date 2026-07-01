@@ -12,7 +12,7 @@
 use serenity::all::{
     ChannelId, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
     CreateCommand, CreateCommandOption, CreateEmbed, CreateInteractionResponseFollowup,
-    CreateMessage, Permissions,
+    CreateMessage, Permissions, Timestamp,
 };
 use tracing::warn;
 
@@ -204,6 +204,9 @@ fn build_ranking_embed(r: &ForceRankingResponse) -> CreateEmbed {
         .field("\u{1f4dd} Top Texte", build_block(&r.text), false)
         .field("\u{1f399}\u{fe0f} Top Vocal", build_block(&r.voice), false)
         .field("\u{1f3c5} Top Global", build_block(&r.global), false)
+        // Aligne sur l'embed du job auto (meme timestamp) pour eviter toute
+        // derive cosmetique entre les deux rendus.
+        .timestamp(Timestamp::now())
 }
 
 async fn defer_ephemeral(ctx: &Context, command: &CommandInteraction) -> bool {

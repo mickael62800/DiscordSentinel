@@ -522,3 +522,55 @@ pub async fn post_sanction_card(
         warn!(error = %e, guild_id = %guild_id, "Echec envoi card de sanction");
     }
 }
+
+/// Poste une SEULE card recapitulative pour une sanction de masse (massmute /
+/// massban) au lieu d'une card par membre (decision proprietaire, BUG #4).
+/// Embed 2 lignes : "🔨 Massban — N membres · par @actor · raison". Best-effort :
+/// no-op si le salon `sanctions_log_channel_id` n'est pas configure.
+pub async fn post_sanction_summary_card(
+    ctx: &Context,
+    guild_id: &str,
+    action: SanctionKind,
+    count: u32,
+    actor: &str,
+    reason: &str,
+) {
+    let Some(channel) = get_channel_from_config(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+        "sanctions_log_channel_id",
+    )
+    .await
+    else {
+        return;
+    };
+
+    let line1 = format!(
+        "{} Mass{} — {} membres",
+        action.emoji(),
+        action.label(),
+        count
+    );
+
+    const MAX_REASON: usize = 120;
+    let reason_trimmed = reason.trim();
+    let reason_short = if reason_trimmed.chars().count() > MAX_REASON {
+        let truncated: String = reason_trimmed.chars().take(MAX_REASON).collect();
+        format!("{truncated}…")
+    } else {
+        reason_trimmed.to_string()
+    };
+    let line2 = format!("Par {actor} · Raison : {reason_short}");
+
+    let embed = CreateEmbed::new()
+        .description(format!("{line1}\n{line2}"))
+        .colour(action.color());
+
+    if let Err(e) = channel
+        .send_message(&ctx.http, CreateMessage::new().embed(embed))
+        .await
+    {
+        warn!(error = %e, guild_id = %guild_id, "Echec envoi card de sanction de masse");
+    }
+}

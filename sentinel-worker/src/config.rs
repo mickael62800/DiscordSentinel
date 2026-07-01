@@ -640,14 +640,15 @@ impl WorkerConfig {
             "EXPORT_SCAN_INTERVAL",
             DEFAULT_EXPORT_SCAN_SECS,
         );
-        // Borne saine : 1..10_000_000 lignes (evite un cap 0 ou absurde).
+        // Borne saine : 1..50_000 lignes (plafond coherent avec le clamp de
+        // l'export-service cote sentinel-core ; evite un cap 0 ou absurde).
         let max_rows: i64 = config_or_env(
             db,
             "max_rows_per_export",
             "MAX_ROWS_PER_EXPORT",
             DEFAULT_MAX_ROWS_PER_EXPORT,
         );
-        self.max_rows_per_export = max_rows.clamp(1, 10_000_000);
+        self.max_rows_per_export = max_rows.clamp(1, 50_000);
         // Borne saine : 30..86400s.
         let export_timeout: i64 = config_or_env(
             db,

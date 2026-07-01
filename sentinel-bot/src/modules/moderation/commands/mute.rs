@@ -135,7 +135,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     )
     .await;
     let default_mute_duration_secs =
-        BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
+        BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 3600);
     let max_mute_duration_secs =
         BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
 

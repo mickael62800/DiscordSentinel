@@ -25,6 +25,12 @@ const MAX_LOOKBACK_DAYS: i64 = 365;
 const MIN_LOOKBACK_DAYS: i64 = 1;
 const MAX_MIN_PRECEDENTS: u32 = 100;
 
+/// Defauts appliques quand le parametre est absent (0 = non renseigne, cas des
+/// clients gRPC dont le proto met 0 par defaut). Alignes sur les defauts du
+/// handler HTTP pour que tout client obtienne la meme fenetre intentionnelle.
+const DEFAULT_LOOKBACK_DAYS: i64 = 90;
+const DEFAULT_MIN_PRECEDENTS: u32 = 3;
+
 pub struct ManageModerationCopilotService {
     strikes_uc: Arc<dyn ManageStrikesUseCase>,
     repo: Arc<dyn ModerationCopilotRepository>,
@@ -51,6 +57,19 @@ impl ModerationCopilotUseCase for ManageModerationCopilotService {
         crate::application::validation::validate_guild_id(guild_id)?;
         crate::application::validation::validate_non_empty(user_id, "user_id")?;
 
+        // 0 = parametre non renseigne (defaut proto gRPC) -> applique le defaut
+        // intentionnel AVANT de clamper, sinon un appel gRPC nu tomberait sur
+        // 1/1 au lieu de 90/3.
+        let lookback_days = if lookback_days == 0 {
+            DEFAULT_LOOKBACK_DAYS
+        } else {
+            lookback_days
+        };
+        let min_precedents = if min_precedents == 0 {
+            DEFAULT_MIN_PRECEDENTS
+        } else {
+            min_precedents
+        };
         let lookback_days = lookback_days.clamp(MIN_LOOKBACK_DAYS, MAX_LOOKBACK_DAYS);
         let min_precedents = min_precedents.clamp(1, MAX_MIN_PRECEDENTS);
         let since = Utc::now() - Duration::days(lookback_days);

@@ -21,7 +21,7 @@ use super::{FloodTrackerKey, ProcessedMessagesKey, SlowmodeTrackerKey};
 /// Defaults si l'API ne repond pas
 const DEFAULT_FLOOD_MAX_MESSAGES: u64 = 5;
 const DEFAULT_FLOOD_WINDOW_SECS: u64 = 10;
-const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
+const DEFAULT_MUTE_DURATION_SECS: u64 = 3600;
 
 /// Main automod message handler. Called from the sentinel handler's message event.
 /// Analyzes messages for spam, insults, links, phishing, flood, caps, etc.

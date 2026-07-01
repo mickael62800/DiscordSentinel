@@ -248,6 +248,17 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 
     super::log_to_channel(ctx, &guild_id.to_string(), embed).await;
 
+    // BUG #4 : une seule card recapitulative (pas une par membre).
+    crate::shared::discord_helpers::post_sanction_summary_card(
+        ctx,
+        &guild_id.to_string(),
+        crate::shared::discord_helpers::SanctionKind::Mute,
+        success,
+        &command.user.name,
+        reason,
+    )
+    .await;
+
     info!(
         moderator = %command.user.name,
         success, failures,
@@ -437,6 +448,17 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
     }
 
     super::log_to_channel(ctx, &guild_id.to_string(), embed).await;
+
+    // BUG #4 : une seule card recapitulative (pas une par membre).
+    crate::shared::discord_helpers::post_sanction_summary_card(
+        ctx,
+        &guild_id.to_string(),
+        crate::shared::discord_helpers::SanctionKind::Ban,
+        success,
+        &command.user.name,
+        reason,
+    )
+    .await;
 
     info!(
         moderator = %command.user.name,

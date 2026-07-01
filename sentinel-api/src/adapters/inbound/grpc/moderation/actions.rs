@@ -88,12 +88,47 @@ impl ModerationService for ModerationGrpc {
             pa
         };
 
-        // Auto-creation du rappel/enregistrement d'expiration pour TOUTE sanction
-        // temporaire (ban_temp / mute_temp), quel que soit le chemin (bot gRPC).
-        // C'est ce qui alimente le job worker d'auto-unban a l'expiration.
-        if sentinel_core::domain::enums::moderation::moderation_action_type::ModerationActionType::is_temporary_str(&action_type) {
+        // BUG #1 : un unban (quel que soit le chemin — bot `/unban`, client, HTTP)
+        // doit annuler les rappels d'auto-unban encore actifs pour cet utilisateur,
+        // sinon le worker leverait un ban plus recent applique entre-temps. On
+        // centralise ici pour couvrir le bot `/unban` qui journalise directement.
+        // Best-effort : un echec ne bloque pas l'action (deja appliquee cote Discord).
+        if action_type == "unban" {
+            match self
+                .reminders_uc
+                .cancel_for_target(
+                    proto_action.guild_id.as_str(),
+                    proto_action.target_id.as_str(),
+                )
+                .await
+            {
+                Ok(n) if n > 0 => tracing::info!(
+                    guild_id = %proto_action.guild_id,
+                    target_id = %proto_action.target_id,
+                    cancelled = n,
+                    "Rappels d'auto-unban annules suite a un unban (gRPC)"
+                ),
+                Ok(_) => {}
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    guild_id = %proto_action.guild_id,
+                    target_id = %proto_action.target_id,
+                    "Echec annulation des rappels d'auto-unban lors de l'unban (gRPC)"
+                ),
+            }
+        }
+
+        // BUG #8 : creation du rappel d'expiration UNIQUEMENT pour les bans
+        // temporaires. Les mutes temporaires (`mute_temp`, y compris l'escalade)
+        // expirent seuls via le timeout Discord : leur creer un rappel produirait
+        // un DM "1h avant" qui se declenche pour rien. Seul `ban_temp` alimente le
+        // job worker d'auto-unban a l'expiration.
+        if action_type == "ban_temp" {
             if let Some(dur) = duration {
-                let action_uuid = proto_action.id.parse().unwrap_or_else(|_| uuid::Uuid::nil());
+                let action_uuid = proto_action
+                    .id
+                    .parse()
+                    .unwrap_or_else(|_| uuid::Uuid::nil());
                 if let Err(e) = self
                     .reminders_uc
                     .create_reminder(CreateReminderCommand {

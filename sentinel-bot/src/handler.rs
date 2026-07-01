@@ -244,6 +244,9 @@ impl EventHandler for Handler {
         modules::progression::assign_default_role(&ctx, &new_member).await;
         modules::community::on_member_add(&ctx, &new_member).await;
         modules::security::on_member_add(&ctx, &new_member).await;
+        // Prefixe emoji staff : applique l'emoji des le (re)join si le membre
+        // porte deja un role staff (guarde par staff_prefix_enabled, best-effort).
+        modules::progression::nickname::on_member_add(&ctx, &new_member).await;
         // Lifecycle : clear left_at + reset joined_at cote API. Le user
         // peut rejouer (wallet repart de zero, gere cote serveur).
         let guild_id = new_member.guild_id.to_string();

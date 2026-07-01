@@ -198,9 +198,13 @@ impl ManageModerationUseCase for MockModerationUc {
     }
 }
 
-/// Mock no-op du use case rappels : create_reminder renvoie un reminder factice.
+/// Mock du use case rappels : create_reminder renvoie un reminder factice et
+/// enregistre les action_type recus ; cancel_for_target enregistre les cibles.
 #[derive(Default)]
-struct MockRemindersUc;
+struct MockRemindersUc {
+    created: Mutex<Vec<String>>,
+    cancelled_targets: Mutex<Vec<(String, String)>>,
+}
 
 #[async_trait]
 impl ManageRemindersUseCase for MockRemindersUc {
@@ -211,6 +215,7 @@ impl ManageRemindersUseCase for MockRemindersUc {
         sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder,
         DomainError,
     > {
+        self.created.lock().unwrap().push(cmd.action_type.clone());
         Ok(
             sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder {
                 id: Uuid::new_v4(),
@@ -242,6 +247,13 @@ impl ManageRemindersUseCase for MockRemindersUc {
     }
     async fn cancel_for_action(&self, _: Uuid) -> Result<(), DomainError> {
         Ok(())
+    }
+    async fn cancel_for_target(&self, guild_id: &str, target_id: &str) -> Result<u64, DomainError> {
+        self.cancelled_targets
+            .lock()
+            .unwrap()
+            .push((guild_id.into(), target_id.into()));
+        Ok(1)
     }
     async fn list_by_guild(
         &self,
@@ -304,7 +316,15 @@ impl ModerationCopilotUseCase for MockCopilotUc {
 fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
     ModerationGrpc {
         moderation_uc: uc,
-        reminders_uc: Arc::new(MockRemindersUc),
+        reminders_uc: Arc::new(MockRemindersUc::default()),
+        moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
+    }
+}
+
+fn grpc_with_reminders(uc: Arc<MockModerationUc>, rem: Arc<MockRemindersUc>) -> ModerationGrpc {
+    ModerationGrpc {
+        moderation_uc: uc,
+        reminders_uc: rem,
         moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
@@ -323,6 +343,64 @@ fn make_log_request(action: &str) -> Request<proto::LogActionRequest> {
         duration: None,
         skip_strike: false,
     })
+}
+
+fn make_log_request_dur(action: &str, duration: Option<u64>) -> Request<proto::LogActionRequest> {
+    let mut r = make_log_request(action);
+    r.get_mut().duration = duration;
+    r
+}
+
+// BUG #8 : seul ban_temp cree un rappel d'expiration ; mute_temp expire seul via
+// le timeout Discord et ne doit PAS generer de rappel.
+#[tokio::test]
+async fn log_action_ban_temp_creates_reminder() {
+    let uc = Arc::new(MockModerationUc::default());
+    let rem = Arc::new(MockRemindersUc::default());
+    let g = grpc_with_reminders(uc, rem.clone());
+    let _ = g
+        .log_action(make_log_request_dur("ban_temp", Some(3600)))
+        .await
+        .unwrap();
+    assert_eq!(rem.created.lock().unwrap().as_slice(), ["ban_temp"]);
+}
+
+#[tokio::test]
+async fn log_action_mute_temp_creates_no_reminder() {
+    let uc = Arc::new(MockModerationUc::default());
+    let rem = Arc::new(MockRemindersUc::default());
+    let g = grpc_with_reminders(uc, rem.clone());
+    let _ = g
+        .log_action(make_log_request_dur("mute_temp", Some(3600)))
+        .await
+        .unwrap();
+    assert!(rem.created.lock().unwrap().is_empty());
+}
+
+// BUG #1 : un unban annule les rappels d'auto-unban pour la cible ; un ban ne
+// declenche aucune annulation.
+#[tokio::test]
+async fn log_action_unban_cancels_target_reminders() {
+    let uc = Arc::new(MockModerationUc::default());
+    let rem = Arc::new(MockRemindersUc::default());
+    let g = grpc_with_reminders(uc, rem.clone());
+    let _ = g.log_action(make_log_request("unban")).await.unwrap();
+    assert_eq!(
+        rem.cancelled_targets.lock().unwrap().as_slice(),
+        [("g".to_string(), "t".to_string())]
+    );
+}
+
+#[tokio::test]
+async fn log_action_ban_does_not_cancel_target_reminders() {
+    let uc = Arc::new(MockModerationUc::default());
+    let rem = Arc::new(MockRemindersUc::default());
+    let g = grpc_with_reminders(uc, rem.clone());
+    let _ = g
+        .log_action(make_log_request_dur("ban_permanent", None))
+        .await
+        .unwrap();
+    assert!(rem.cancelled_targets.lock().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -388,7 +466,7 @@ async fn get_member_context_maps_domain_to_proto() {
     let copilot = Arc::new(MockCopilotUc::default());
     let g = ModerationGrpc {
         moderation_uc: Arc::new(MockModerationUc::default()),
-        reminders_uc: Arc::new(MockRemindersUc),
+        reminders_uc: Arc::new(MockRemindersUc::default()),
         moderation_copilot_uc: copilot.clone(),
     };
     let resp = g

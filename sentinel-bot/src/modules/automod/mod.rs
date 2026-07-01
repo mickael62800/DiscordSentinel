@@ -312,7 +312,7 @@ pub fn spawn_background_tasks(ctx: &Context) {
 const AM_PREFIX: &str = "am_";
 
 /// Valeur par defaut utilisee par le review handler quand la config guild est absente.
-const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
+const DEFAULT_MUTE_DURATION_SECS: u64 = 3600;
 
 /// Main automod message handler. Called from the sentinel handler's message event.
 pub async fn on_message(ctx: &Context, msg: &Message) {

@@ -196,27 +196,36 @@ async fn sans_categorie_dominante_pas_d_agregation() {
 }
 
 #[tokio::test]
-async fn clamp_lookback_et_min_precedents() {
+async fn params_zero_appliquent_les_defauts_90_3() {
+    // BUG #6 : 0 = parametre non renseigne (defaut proto gRPC) -> le service
+    // applique les defauts intentionnels (lookback 90 / min_precedents 3) AVANT
+    // clamp, comme le handler HTTP. Sans ce traitement, un appel gRPC nu
+    // tomberait sur min_precedents=1 (clamp) et suivrait la jurisprudence des
+    // 1 seul precedent.
     let strikes = Arc::new(MockStrikesUc {
         active: 0,
-        thresholds: vec![],
+        thresholds: vec![threshold(1, "warn")],
     });
     let repo = Arc::new(MockCopilotRepo {
         dominant: Some("spam".into()),
+        // 2 precedents : < 3 (defaut) mais > 1 (l'ancien clamp errone).
         distribution: PrecedentDistribution {
             flag_category: "spam".into(),
-            counts_by_action: vec![("warn".into(), 1)],
-            total: 1,
+            counts_by_action: vec![("mute".into(), 2)],
+            total: 2,
         },
         aggregate_calls: Mutex::new(vec![]),
     });
     let svc = ManageModerationCopilotService::new(strikes, repo);
 
-    // lookback_days=0 clamp a 1 (pas de panic), min_precedents=0 clamp a 1.
+    // lookback_days=0 et min_precedents=0 -> defauts 90 / 3 (pas de panic).
     let ctx = svc
         .get_member_context("123456789012345678", "u", 0, 0)
         .await
         .unwrap();
-    // 1 precedent >= min clamp(1) => Precedent.
-    assert_eq!(ctx.suggestion.basis, SuggestionBasis::Precedent);
+    // min_precedents=3 (defaut) > 2 precedents => la jurisprudence n'est PAS
+    // suivie : escalade seule (next=1 -> warn). Si 0 avait ete clampe a 1, le
+    // basis serait Precedent -> ce test le detecterait.
+    assert_eq!(ctx.suggestion.basis, SuggestionBasis::Escalation);
+    assert_eq!(ctx.suggestion.action, Some(AppliedAction::Warn));
 }

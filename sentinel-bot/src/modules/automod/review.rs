@@ -13,6 +13,21 @@ use super::config::{build_embed_colors, EmbedColors};
 use super::detectors;
 use super::{AM_PREFIX, DEFAULT_MUTE_DURATION_SECS};
 
+/// Mappe un type d'action automod (warn/mute/ban) vers la `SanctionKind` de la
+/// card de sanction. `None` pour les actions sans card (delete/prevention/ignore).
+/// Partage par la review 1-clic et la finalisation de vote (BUG #4).
+pub(crate) fn sanction_kind_for(
+    action_type: &str,
+) -> Option<crate::shared::discord_helpers::SanctionKind> {
+    use crate::shared::discord_helpers::SanctionKind;
+    match action_type {
+        "warn" => Some(SanctionKind::Warn),
+        "mute" => Some(SanctionKind::Mute),
+        "ban" => Some(SanctionKind::Ban),
+        _ => None,
+    }
+}
+
 /// Envoie une carte de review dans le salon de logs au lieu d'appliquer
 /// l'action directement. Les moderateurs cliquent sur un bouton pour
 /// valider ou ajuster la severite.
@@ -734,6 +749,28 @@ pub(super) async fn handle_review_button(
             },
         )
         .await;
+
+        // BUG #4 : card de sanction pour la review 1-clic (warn/mute/ban), au meme
+        // titre que les sanctions manuelles et l'auto-mute automod. Best-effort.
+        if let (Some(kind), Ok(uid)) = (sanction_kind_for(action_type), user_id_str.parse::<u64>())
+        {
+            let duration_label = if action == Action::Mute {
+                Some(format!("{}min", mute_duration_secs / 60))
+            } else {
+                None
+            };
+            crate::shared::discord_helpers::post_sanction_card(
+                ctx,
+                &guild_id,
+                kind,
+                uid,
+                None,
+                moderator_name,
+                "Sanction validee par un moderateur (AutoMod review)",
+                duration_label.as_deref(),
+            )
+            .await;
+        }
     }
 
     // 1-clic : si un salon de discussion a ete ouvert pour cette infraction, on

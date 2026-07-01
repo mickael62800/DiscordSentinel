@@ -32,11 +32,13 @@ pub(super) async fn get_or_create(
     .await
     .map_err(pg_err)?;
 
-    // 2. Auto-creer le wallet partage si absent (starting_coins = 200).
+    // 2. Auto-creer le wallet partage si absent. Defaut canonique = 100
+    // (aligne sur `DEFAULT_STARTING_COINS` / `resolve_starting_coins`, meme env
+    // `WALLET_STARTING_COINS`) pour ne pas offrir 200 ici et 100 ailleurs.
     let starting_coins: i64 = std::env::var("WALLET_STARTING_COINS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(200);
+        .unwrap_or(100);
     sqlx::query(
         r#"INSERT INTO user_wallets (id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at)
            VALUES (gen_random_uuid(), $1, $2, $3, $4, $4, 0, NOW(), NOW())
