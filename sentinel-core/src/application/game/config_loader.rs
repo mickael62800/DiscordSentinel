@@ -6,6 +6,7 @@
 
 use std::sync::Arc;
 
+use crate::domain::entities::game::server::DEFAULT_MAX_RESTART_ATTEMPTS;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -31,6 +32,12 @@ pub struct GamePortalConfig {
     pub auto_remove_unused_images: bool,
     /// Nombre de jours sans aucun serveur actif avant suppression de l'image.
     pub unused_image_grace_days: i32,
+    /// Timeout (secondes) d'une requete RCON avant abandon.
+    pub rcon_timeout_secs: u32,
+    /// Redemarrage auto des containers crashes (backoff exponentiel).
+    pub auto_restart_on_crash: bool,
+    /// Nombre max de redemarrages auto consecutifs avant abandon (-> Error).
+    pub max_auto_restart_attempts: i32,
 }
 
 fn find<'a>(items: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
@@ -53,6 +60,10 @@ fn parse_i32(s: Option<&str>, default: i32) -> i32 {
 }
 
 fn parse_u16(s: Option<&str>, default: u16) -> u16 {
+    s.and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
+fn parse_u32(s: Option<&str>, default: u32) -> u32 {
     s.and_then(|v| v.parse().ok()).unwrap_or(default)
 }
 
@@ -135,6 +146,12 @@ pub async fn load_game_portal_config(
         log_channel_id: find(&entries, "log_channel_id").map(String::from),
         auto_remove_unused_images: parse_bool(find(&entries, "auto_remove_unused_images"), true),
         unused_image_grace_days: parse_i32(find(&entries, "unused_image_grace_days"), 7),
+        rcon_timeout_secs: parse_u32(find(&entries, "rcon_timeout_secs"), 5),
+        auto_restart_on_crash: parse_bool(find(&entries, "auto_restart_on_crash"), true),
+        max_auto_restart_attempts: parse_i32(
+            find(&entries, "max_auto_restart_attempts"),
+            DEFAULT_MAX_RESTART_ATTEMPTS,
+        ),
     })
 }
 

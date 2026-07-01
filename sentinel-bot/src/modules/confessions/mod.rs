@@ -146,11 +146,12 @@ fn confess_admin_allowed(command: &CommandInteraction) -> bool {
 }
 
 async fn open_submit_modal(ctx: &Context, command: &CommandInteraction) {
+    let ui = load_ui_config(ctx, command.guild_id).await;
     let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme").components(vec![
         CreateActionRow::InputText(
             CreateInputText::new(InputTextStyle::Paragraph, "Ton message", "content")
-                .min_length(1)
-                .max_length(2000)
+                .min_length(ui.min_chars)
+                .max_length(ui.max_chars)
                 .required(true),
         ),
     ]);
@@ -372,11 +373,12 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn open_submit_modal_from_component(ctx: &Context, component: &ComponentInteraction) {
+    let ui = load_ui_config(ctx, component.guild_id).await;
     let modal = CreateModal::new(CID_SUBMIT_MODAL, "Confession anonyme").components(vec![
         CreateActionRow::InputText(
             CreateInputText::new(InputTextStyle::Paragraph, "Ton message", "content")
-                .min_length(1)
-                .max_length(2000)
+                .min_length(ui.min_chars)
+                .max_length(ui.max_chars)
                 .required(true),
         ),
     ]);
@@ -387,14 +389,15 @@ async fn open_submit_modal_from_component(ctx: &Context, component: &ComponentIn
 }
 
 async fn open_reply_modal(ctx: &Context, component: &ComponentInteraction, conf_id: &str) {
+    let ui = load_ui_config(ctx, component.guild_id).await;
     let modal = CreateModal::new(
         format!("{}{}", CID_REPLY_MODAL_PREFIX, conf_id),
         "Reponse anonyme",
     )
     .components(vec![CreateActionRow::InputText(
         CreateInputText::new(InputTextStyle::Paragraph, "Ta reponse", "content")
-            .min_length(1)
-            .max_length(2000)
+            .min_length(ui.min_chars)
+            .max_length(ui.max_chars)
             .required(true),
     )]);
     let resp = CreateInteractionResponse::Modal(modal);
@@ -494,13 +497,14 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     };
 
     // 3. Poste l'embed sur Discord
+    let embed_color = load_ui_config(ctx, modal.guild_id).await.embed_color;
     let embed = CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(format!(
             "Confession anonyme (#{})",
             public_number
         )))
         .description(&content)
-        .color(0xff5e5e);
+        .color(embed_color);
     let row = CreateActionRow::Buttons(vec![
         CreateButton::new(format!("{}{}", CID_REPLY_BUTTON_PREFIX, id))
             .label("Répondre")
@@ -660,13 +664,14 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
         Ok(c) => ChannelId::new(c),
         Err(_) => return,
     };
+    let embed_color = load_ui_config(ctx, modal.guild_id).await.embed_color;
     let embed = CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(format!(
             "Réponse anonyme (#{})",
             public_number
         )))
         .description(&content)
-        .color(0xff5e5e);
+        .color(embed_color);
     let posted = ch
         .send_message(&ctx.http, CreateMessage::new().embed(embed))
         .await;
@@ -722,6 +727,65 @@ fn extract_input(modal: &ModalInteraction, field_id: &str) -> Option<String> {
 async fn api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
     let data = ctx.data.read().await;
     data.get::<ApiClientKey>().cloned()
+}
+
+/// Reglages d'affichage des confessions lus depuis la config guild
+/// (`bot_guild_config` du module `confessions`, editables via le dashboard).
+struct ConfessUiConfig {
+    /// min_length du champ de la modale (>= 1, <= max_chars).
+    min_chars: u16,
+    /// max_length du champ de la modale (<= 4000, borne modale Discord).
+    max_chars: u16,
+    /// Couleur de l'embed des confessions/reponses.
+    embed_color: u32,
+}
+
+impl Default for ConfessUiConfig {
+    fn default() -> Self {
+        Self {
+            min_chars: 5,
+            max_chars: 2000,
+            embed_color: 0xff5e5e,
+        }
+    }
+}
+
+/// Parse une couleur hex ("#ff5e5e" ou "ff5e5e") en u32 RGB. `None` si invalide.
+fn parse_hex_color(s: &str) -> Option<u32> {
+    let h = s.trim().trim_start_matches('#');
+    if h.len() != 6 {
+        return None;
+    }
+    u32::from_str_radix(h, 16).ok()
+}
+
+/// Charge les reglages d'affichage depuis la config guild `confessions` via le
+/// meme mecanisme `get_guild_config_for` que les autres modules. Fallback sur
+/// les defauts (min 5 / max 2000 / #ff5e5e) si config absente ou invalide.
+/// Les bornes de longueur sont clampees au max modal Discord (4000) et
+/// `min_chars` est borne a `max_chars`.
+async fn load_ui_config(ctx: &Context, guild_id: Option<GuildId>) -> ConfessUiConfig {
+    let mut cfg = ConfessUiConfig::default();
+    let (Some(api), Some(gid)) = (api_client(ctx).await, guild_id) else {
+        return cfg;
+    };
+    let Ok(entries) = api
+        .get_guild_config_for(&gid.to_string(), MODULE_BOT_NAME)
+        .await
+    else {
+        return cfg;
+    };
+    let max = BaseApiClient::config_u64(&entries, "max_chars", 2000).clamp(1, 4000);
+    let min = BaseApiClient::config_u64(&entries, "min_chars", 5).clamp(1, max);
+    cfg.max_chars = max as u16;
+    cfg.min_chars = min as u16;
+    if let Some(c) = entries
+        .get("default_embed_color_hex")
+        .and_then(|v| parse_hex_color(v))
+    {
+        cfg.embed_color = c;
+    }
+    cfg
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {

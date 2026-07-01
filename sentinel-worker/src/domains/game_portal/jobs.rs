@@ -29,8 +29,17 @@ struct JobReport {
     details: serde_json::Value,
 }
 
+/// Intervalles (secondes) des 4 jobs periodiques game-portal, resolus depuis
+/// la config worker (defaults / env / DB via `WorkerConfig`).
+pub struct GamePortalIntervals {
+    pub health_check_secs: u64,
+    pub idle_shutdown_secs: u64,
+    pub reconciler_secs: u64,
+    pub image_cleanup_secs: u64,
+}
+
 /// Spawn les 4 tasks paralleles. Ne bloque pas l'appelant.
-pub fn start(api_url: String) {
+pub fn start(api_url: String, intervals: GamePortalIntervals) {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
     let http = match reqwest::Client::builder()
@@ -49,28 +58,28 @@ pub fn start(api_url: String) {
         api_url.clone(),
         api_key.clone(),
         "health-check",
-        Duration::from_secs(30),
+        Duration::from_secs(intervals.health_check_secs),
     );
     spawn_job(
         http.clone(),
         api_url.clone(),
         api_key.clone(),
         "idle-shutdown",
-        Duration::from_secs(3600),
+        Duration::from_secs(intervals.idle_shutdown_secs),
     );
     spawn_job(
         http.clone(),
         api_url.clone(),
         api_key.clone(),
         "reconcile",
-        Duration::from_secs(3600),
+        Duration::from_secs(intervals.reconciler_secs),
     );
     spawn_job(
         http,
         api_url,
         api_key,
         "image-cleanup",
-        Duration::from_secs(86400),
+        Duration::from_secs(intervals.image_cleanup_secs),
     );
 }
 

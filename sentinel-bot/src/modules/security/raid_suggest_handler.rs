@@ -166,6 +166,11 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
         // "already active" evite les doublons).
         {
             let data = ctx.data.read().await;
+            // Durees de vie persistees : refletent la config security (env),
+            // identiques a celles utilisees par les boucles de revert locales.
+            let env_config = data.get::<super::SecurityConfigKey>();
+            let lockdown_duration = env_config.map(|c| c.lockdown_duration_secs).unwrap_or(600);
+            let slowmode_duration = env_config.map(|c| c.slowmode_duration_secs).unwrap_or(300);
             if lockdown {
                 if let Some(mgr) = data.get::<LockdownKey>() {
                     if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
@@ -175,12 +180,13 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                             error!(error = %e, "Impossible d'activer le lockdown (confirmation)");
                         }
                     }
-                    mgr.activate(ctx, guild_id).await;
+                    mgr.activate(ctx, guild_id, lockdown_duration).await;
                 }
             }
             if slowmode_secs > 0 {
                 if let Some(mgr) = data.get::<SlowmodeKey>() {
-                    mgr.activate(ctx, guild_id, slowmode_secs as u16).await;
+                    mgr.activate(ctx, guild_id, slowmode_secs as u16, slowmode_duration)
+                        .await;
                 }
             }
         }

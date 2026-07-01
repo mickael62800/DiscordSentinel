@@ -92,15 +92,18 @@ pub struct GameServer {
     pub started_at: Option<DateTime<Utc>>,
     pub stopped_at: Option<DateTime<Utc>>,
     /// Nombre de redemarrages auto consecutifs apres crash (remis a 0 a la
-    /// recuperation). Borne par `MAX_RESTART_ATTEMPTS`.
+    /// recuperation). Borne par la config `max_auto_restart_attempts`.
     pub restart_attempts: i32,
     /// Timestamp du dernier redemarrage auto tente (pour le backoff).
     pub last_restart_at: Option<DateTime<Utc>>,
 }
 
-/// Nombre maximal de redemarrages auto consecutifs avant abandon (-> Error).
-/// Borne stricte : empeche tout crash loop.
-pub const MAX_RESTART_ATTEMPTS: i32 = 5;
+/// Nombre maximal PAR DEFAUT de redemarrages auto consecutifs avant abandon
+/// (-> Error). Aligne sur le default du schema game-portal affiche au
+/// dashboard (`max_auto_restart_attempts`). La valeur effective est
+/// configurable par guild ; ce const n'est que le fallback quand la config
+/// est absente. Borne stricte : empeche tout crash loop.
+pub const DEFAULT_MAX_RESTART_ATTEMPTS: i32 = 3;
 
 /// Delai de backoff (secondes) avant le prochain redemarrage auto, en
 /// fonction du nombre de tentatives deja effectuees. Exponentiel
@@ -116,15 +119,22 @@ pub fn restart_backoff_secs(attempts: i32) -> i64 {
     BASE.saturating_mul(factor).min(CAP)
 }
 
-/// Decision PURE : faut-il auto-redemarrer un serveur crashe ? `true` si on
-/// est sous le plafond de tentatives ET (jamais redemarre OU le cooldown de
-/// backoff est ecoule). Aucune IO -> testable unitairement.
+/// Decision PURE : faut-il auto-redemarrer un serveur crashe ? `true` si
+/// l'auto-restart est active ET on est sous le plafond de tentatives ET
+/// (jamais redemarre OU le cooldown de backoff est ecoule). `max_attempts` et
+/// `auto_restart_on_crash` sont fournis par la couche application (config
+/// per-guild) pour garder cette fonction pure / testable unitairement.
 pub fn should_auto_restart(
+    auto_restart_on_crash: bool,
     attempts: i32,
+    max_attempts: i32,
     last_restart_at: Option<DateTime<Utc>>,
     now: DateTime<Utc>,
 ) -> bool {
-    if attempts >= MAX_RESTART_ATTEMPTS {
+    if !auto_restart_on_crash {
+        return false;
+    }
+    if attempts >= max_attempts {
         return false;
     }
     match last_restart_at {
@@ -225,7 +235,13 @@ mod tests {
     fn should_restart_first_attempt_no_history() {
         let now = Utc::now();
         // Jamais redemarre -> autorise immediatement.
-        assert!(should_auto_restart(0, None, now));
+        assert!(should_auto_restart(
+            true,
+            0,
+            DEFAULT_MAX_RESTART_ATTEMPTS,
+            None,
+            now
+        ));
     }
 
     #[test]
@@ -233,7 +249,7 @@ mod tests {
         let now = Utc::now();
         // 2 tentatives -> backoff 120s ; dernier restart il y a 200s -> ok.
         let last = now - chrono::Duration::seconds(200);
-        assert!(should_auto_restart(2, Some(last), now));
+        assert!(should_auto_restart(true, 2, 5, Some(last), now));
     }
 
     #[test]
@@ -241,7 +257,21 @@ mod tests {
         let now = Utc::now();
         // 2 tentatives -> backoff 120s ; dernier restart il y a 30s -> non.
         let last = now - chrono::Duration::seconds(30);
-        assert!(!should_auto_restart(2, Some(last), now));
+        assert!(!should_auto_restart(true, 2, 5, Some(last), now));
+    }
+
+    #[test]
+    fn should_not_restart_when_disabled() {
+        let now = Utc::now();
+        // auto_restart_on_crash = false -> jamais de redemarrage, meme si
+        // toutes les autres conditions sont favorables.
+        assert!(!should_auto_restart(
+            false,
+            0,
+            DEFAULT_MAX_RESTART_ATTEMPTS,
+            None,
+            now
+        ));
     }
 
     #[test]
@@ -249,11 +279,19 @@ mod tests {
         let now = Utc::now();
         let long_ago = now - chrono::Duration::days(1);
         assert!(!should_auto_restart(
-            MAX_RESTART_ATTEMPTS,
+            true,
+            DEFAULT_MAX_RESTART_ATTEMPTS,
+            DEFAULT_MAX_RESTART_ATTEMPTS,
             Some(long_ago),
             now
         ));
-        assert!(!should_auto_restart(MAX_RESTART_ATTEMPTS + 3, None, now));
+        assert!(!should_auto_restart(
+            true,
+            DEFAULT_MAX_RESTART_ATTEMPTS + 3,
+            DEFAULT_MAX_RESTART_ATTEMPTS,
+            None,
+            now
+        ));
     }
 
     #[test]
@@ -261,7 +299,7 @@ mod tests {
         let now = Utc::now();
         // attempts=1 -> backoff 60s ; pile a la frontiere -> autorise (>=).
         let last = now - chrono::Duration::seconds(60);
-        assert!(should_auto_restart(1, Some(last), now));
+        assert!(should_auto_restart(true, 1, 5, Some(last), now));
     }
 
     #[test]

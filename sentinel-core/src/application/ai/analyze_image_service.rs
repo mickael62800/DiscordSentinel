@@ -150,6 +150,14 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             }
         };
         let vcfg = parse_vision_config(&automod_entries);
+        // Duree de mute configurable (defaut 600s). Cle `mute_duration_secs`
+        // de la config automod-bot, identique au chemin texte/flood. Le clamp
+        // 60s..28j est applique cote bot (cf. `apply_auto_protect`).
+        let mute_duration_secs: u64 = automod_entries
+            .iter()
+            .find(|e| e.config_key == "mute_duration_secs")
+            .and_then(|e| e.config_value.parse::<u64>().ok())
+            .unwrap_or(600);
         // Override par salon si configure : channel_id -> threshold.
         let vision_threshold = vcfg
             .per_channel_threshold
@@ -317,7 +325,7 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)
         } else if total_score >= t_mute {
-            (Action::Mute, Some(600))
+            (Action::Mute, Some(mute_duration_secs))
         } else if total_score >= t_delete {
             (Action::Delete, None)
         } else if total_score >= t_warn {

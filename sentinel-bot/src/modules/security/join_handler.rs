@@ -324,12 +324,19 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
                         error!(error = %e, "Impossible d'activer le lockdown");
                     }
                 }
-                lockdown.activate(ctx, guild_id).await;
+                lockdown
+                    .activate(ctx, guild_id, env_config.lockdown_duration_secs)
+                    .await;
             }
 
             if decision.slowmode_secs > 0 {
                 slowmode
-                    .activate(ctx, guild_id, decision.slowmode_secs as u16)
+                    .activate(
+                        ctx,
+                        guild_id,
+                        decision.slowmode_secs as u16,
+                        env_config.slowmode_duration_secs,
+                    )
                     .await;
             }
         }

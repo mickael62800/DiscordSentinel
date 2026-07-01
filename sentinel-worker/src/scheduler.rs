@@ -422,7 +422,15 @@ pub fn start(
     // Domaine : game_portal (4 jobs HTTP-triggered en parallele)
     // Porte de l'ancien game-portal-worker.
     // ─────────────────────────────────────────────────────────────
-    domains::game_portal::jobs::start(api_url.clone());
+    domains::game_portal::jobs::start(
+        api_url.clone(),
+        domains::game_portal::jobs::GamePortalIntervals {
+            health_check_secs: config.game_health_check_interval_secs,
+            idle_shutdown_secs: config.game_idle_shutdown_check_interval_secs,
+            reconciler_secs: config.game_reconciler_interval_secs,
+            image_cleanup_secs: config.game_image_cleanup_interval_secs,
+        },
+    );
 
     // ─────────────────────────────────────────────────────────────
     // Domaine : moderation (conduit, bans, propositions, rappels)

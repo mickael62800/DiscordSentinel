@@ -5,15 +5,12 @@
 //! et les ports outbound pour ne pas dupliquer la logique.
 
 use std::sync::Arc;
-use std::time::Duration;
 use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::application::game::config_loader::load_game_portal_config;
 use crate::domain::entities::game::audit::GameAuditAction;
-use crate::domain::entities::game::server::{
-    should_auto_restart, GameServerStatus, MAX_RESTART_ATTEMPTS,
-};
+use crate::domain::entities::game::server::{should_auto_restart, GameServerStatus};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::game::container_runtime::{ContainerRuntime, ContainerState};
 use crate::ports::outbound::game::game_audit_repository::GameAuditRepository;
@@ -80,7 +77,7 @@ pub async fn run_health_check(ctx: &JobContext) -> Result<JobReport, DomainError
             host: RCON_HOST.to_string(),
             port,
             password: pwd,
-            timeout_secs: 5,
+            timeout_secs: cfg.rcon_timeout_secs,
         };
         let resp = match ctx.rcon_client.execute(&params, "list").await {
             Ok(r) => r,
@@ -306,21 +303,26 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
         ctx: &JobContext,
         s: &crate::domain::entities::game::server::GameServer,
         now: chrono::DateTime<chrono::Utc>,
+        max_attempts: i32,
+        auto_restart_on_crash: bool,
     ) -> bool {
-        // Plafond atteint : on abandonne definitivement (pas de crash loop).
-        if s.restart_attempts >= MAX_RESTART_ATTEMPTS {
+        // Auto-restart desactive OU plafond atteint : on abandonne
+        // definitivement (pas de crash loop, ou respect de la config).
+        if !auto_restart_on_crash || s.restart_attempts >= max_attempts {
+            let reason = if !auto_restart_on_crash {
+                "crash : auto-restart desactive (reconciler)"
+            } else {
+                "crash : plafond de redemarrages atteint (reconciler)"
+            };
             warn!(
                 server_id = %s.id,
                 attempts = s.restart_attempts,
-                "max restart attempts reached, marque error"
+                auto_restart_on_crash,
+                "crash non redemarre, marque error"
             );
             let _ = ctx
                 .server_repo
-                .update_status(
-                    s.id,
-                    GameServerStatus::Error,
-                    Some("crash : plafond de redemarrages atteint (reconciler)"),
-                )
+                .update_status(s.id, GameServerStatus::Error, Some(reason))
                 .await;
             let _ = ctx.session_repo.close_all_active(s.id).await;
             mark_crashed(ctx, s).await;
@@ -330,7 +332,13 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
         // Sous le plafond mais cooldown de backoff non ecoule : on ne fait
         // RIEN ce tick (le serveur reste Running et sera re-evalue au prochain
         // passage, une fois le backoff ecoule). Evite de marteler le restart.
-        if !should_auto_restart(s.restart_attempts, s.last_restart_at, now) {
+        if !should_auto_restart(
+            auto_restart_on_crash,
+            s.restart_attempts,
+            max_attempts,
+            s.last_restart_at,
+            now,
+        ) {
             info!(
                 server_id = %s.id,
                 attempts = s.restart_attempts,
@@ -365,7 +373,7 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
         info!(
             server_id = %s.id,
             attempt,
-            max = MAX_RESTART_ATTEMPTS,
+            max = max_attempts,
             "crash detecte, auto-restart du container"
         );
         let _ = ctx.session_repo.close_all_active(s.id).await;
@@ -391,7 +399,7 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                         Some(s.id),
                         None,
                         GameAuditAction::AutoRestart,
-                        serde_json::json!({ "attempt": attempt, "max": MAX_RESTART_ATTEMPTS }),
+                        serde_json::json!({ "attempt": attempt, "max": max_attempts }),
                     )
                     .await;
                 false
@@ -466,7 +474,16 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                     // Running (l'utilisateur ne l'a pas stoppe) : on tente un
                     // auto-restart borne + backoff plutot que de juste stopper.
                     GameServerStatus::Running if exited => {
-                        if handle_running_crash(ctx, s, now).await {
+                        let cfg = load_game_portal_config(&ctx.bot_config, &s.guild_id).await?;
+                        if handle_running_crash(
+                            ctx,
+                            s,
+                            now,
+                            cfg.max_auto_restart_attempts,
+                            cfg.auto_restart_on_crash,
+                        )
+                        .await
+                        {
                             errors += 1;
                         }
                     }
@@ -659,19 +676,4 @@ pub async fn run_image_cleanup(ctx: &JobContext) -> Result<JobReport, DomainErro
         errors,
         details: serde_json::Value::Object(details),
     })
-}
-
-// Re-export pour le timer du worker.
-#[allow(dead_code)]
-pub fn default_intervals() -> (Duration, Duration, Duration) {
-    (
-        Duration::from_secs(30),
-        Duration::from_secs(3600),
-        Duration::from_secs(3600),
-    )
-}
-
-#[allow(dead_code)]
-pub fn unused_uuid() -> Uuid {
-    Uuid::nil()
 }

@@ -305,9 +305,15 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let text_threshold = ia_cfg.text_threshold;
         let context_dampening = ia_cfg.context_dampening;
         let context_format = ia_cfg.context_format.clone();
-        // Duree de mute configurable (defaut 600s = 10 min).
-        // Pas dans la config IA, lu depuis scoring ou defaut.
-        let mute_duration_secs: u64 = 600;
+        // Duree de mute configurable (defaut 600s = 10 min). Cle `mute_duration_secs`
+        // de la config automod-bot, la meme que celle lue sur le chemin flood
+        // (`evaluate_flood`) et non-IA. Le clamp 60s..28j est applique cote bot
+        // (cf. `apply_auto_protect`).
+        let mute_duration_secs: u64 = automod_entries
+            .iter()
+            .find(|e| e.config_key == "mute_duration_secs")
+            .and_then(|e| e.config_value.parse::<u64>().ok())
+            .unwrap_or(600);
 
         debug!(
             has_inference = self.inference.is_some(),

@@ -23,7 +23,19 @@ impl SlowmodeManager {
     }
 
     /// Active le slowmode sur tous les salons texte d'un serveur.
-    pub async fn activate(&self, ctx: &Context, guild_id: GuildId, slowmode_secs: u16) {
+    ///
+    /// `slowmode_secs` : rate-limit applique cote Discord (delai entre messages).
+    /// `persist_duration_secs` : duree de vie persistee cote API pour que le
+    /// worker `expire_slowmode` sache quand restaurer. Doit refleter la duree
+    /// utilisee par la boucle de revert locale (`SecurityConfig.slowmode_duration_secs`,
+    /// reglable via l'env `SLOWMODE_DURATION_SECS`, defaut 300).
+    pub async fn activate(
+        &self,
+        ctx: &Context,
+        guild_id: GuildId,
+        slowmode_secs: u16,
+        persist_duration_secs: u64,
+    ) {
         if self.active.contains_key(&guild_id) {
             return; // Deja actif
         }
@@ -76,7 +88,7 @@ impl SlowmodeManager {
             let body = serde_json::json!({
                 "guild_id": guild_id.to_string(),
                 "previous_states": states_json,
-                "duration_secs": 300,
+                "duration_secs": persist_duration_secs,
             });
             base.post_fire_and_forget("/api/security/slowmode", &body)
                 .await;

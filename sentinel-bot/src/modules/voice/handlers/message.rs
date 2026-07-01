@@ -5,6 +5,21 @@ use tracing::{error, info};
 use super::api_client::{ApiClient, LogModerationActionRequest};
 use super::{FloodTrackerKey, VoiceOwnerMapKey};
 
+/// Formate une duree en secondes vers un texte FR lisible
+/// (ex: 30 -> "30 secondes", 90 -> "1 minute 30 secondes").
+fn format_fr_duration(secs: i64) -> String {
+    if secs < 60 {
+        return format!("{secs} seconde{}", if secs.abs() > 1 { "s" } else { "" });
+    }
+    let mins = secs / 60;
+    let rem = secs % 60;
+    let mut out = format!("{mins} minute{}", if mins > 1 { "s" } else { "" });
+    if rem > 0 {
+        out.push_str(&format!(" {rem} seconde{}", if rem > 1 { "s" } else { "" }));
+    }
+    out
+}
+
 pub async fn handle_message(ctx: &Context, msg: &Message) {
     if msg.author.bot {
         return;
@@ -63,11 +78,12 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
         }
     }
 
-    // Informer dans le salon
+    // Informer dans le salon (duree configuree, formatee en FR).
+    let mute_human = format_fr_duration(mute_secs);
     if let Err(e) = channel_id
         .say(
             &ctx.http,
-            format!("<@{user_id}> a ete **mute 30 secondes** (anti-flood)."),
+            format!("<@{user_id}> a ete **mute {mute_human}** (anti-flood)."),
         )
         .await
     {
@@ -86,7 +102,7 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
             target_name: msg.author.name.clone(),
             action_type: "mute".to_string(),
             reason: "Anti-flood: 5+ messages en 5 secondes".to_string(),
-            duration: Some(30),
+            duration: Some(mute_secs),
         };
 
         if let Err(e) = api.log_moderation_action(&request).await {

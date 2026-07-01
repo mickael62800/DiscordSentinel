@@ -71,7 +71,12 @@ impl LockdownManager {
     }
 
     /// Active le lockdown sur tous les salons texte d'un serveur.
-    pub async fn activate(&self, ctx: &Context, guild_id: GuildId) {
+    ///
+    /// `persist_duration_secs` : duree de vie persistee cote API pour que le
+    /// worker `expire_lockdown` sache quand restaurer. Doit refleter la duree
+    /// utilisee par la boucle de revert locale (`SecurityConfig.lockdown_duration_secs`,
+    /// reglable via l'env `LOCKDOWN_DURATION_SECS`, defaut 600).
+    pub async fn activate(&self, ctx: &Context, guild_id: GuildId, persist_duration_secs: u64) {
         if self.active.contains_key(&guild_id) {
             return; // Deja actif
         }
@@ -137,7 +142,7 @@ impl LockdownManager {
             let body = serde_json::json!({
                 "guild_id": guild_id.to_string(),
                 "saved_states": saved_states_json,
-                "duration_secs": 600,
+                "duration_secs": persist_duration_secs,
             });
             base.post_fire_and_forget("/api/security/lockdown", &body)
                 .await;
