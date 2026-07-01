@@ -155,6 +155,18 @@ pub(super) async fn apply_auto_protect(
             Some(safe),
         )
         .await;
+
+        crate::shared::discord_helpers::post_sanction_card(
+            ctx,
+            &guild_id.to_string(),
+            crate::shared::discord_helpers::SanctionKind::Mute,
+            msg.author.id.get(),
+            Some(&msg.author.name),
+            "Automod",
+            reason,
+            Some(&format!("{}min", safe / 60)),
+        )
+        .await;
     }
 
     // Notification DSA au membre : motif + droit d'appel (best-effort, le DM

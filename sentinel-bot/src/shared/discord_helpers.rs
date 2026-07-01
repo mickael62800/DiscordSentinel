@@ -1,9 +1,9 @@
 /// Helpers Discord partages entre les bots.
 /// Evite la duplication des reply_text, reply_ephemeral, etc.
 use serenity::all::{
-    ChannelId, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
+    ChannelId, Colour, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
-    ModalInteraction,
+    CreateMessage, ModalInteraction,
 };
 use tracing::warn;
 
@@ -393,16 +393,132 @@ pub fn option_user(
         })
 }
 
+/// Lit un `ChannelId` depuis une cle arbitraire de la config guild du module.
+/// Retourne `None` si la cle est absente, vide, ou ne parse pas en id > 0.
+pub async fn get_channel_from_config(
+    ctx: &Context,
+    guild_id: &str,
+    module_bot_name: &str,
+    key: &str,
+) -> Option<ChannelId> {
+    let config = guild_config_or_default(ctx, guild_id, module_bot_name).await;
+    config
+        .get(key)
+        .and_then(|v| v.trim().parse::<u64>().ok())
+        .filter(|id| *id > 0)
+        .map(ChannelId::new)
+}
+
 /// Lit le `log_channel_id` dans la config guild du module donne.
 pub async fn get_log_channel(
     ctx: &Context,
     guild_id: &str,
     module_bot_name: &str,
 ) -> Option<ChannelId> {
-    let config = guild_config_or_default(ctx, guild_id, module_bot_name).await;
-    config
-        .get("log_channel_id")
-        .and_then(|v| v.parse::<u64>().ok())
-        .filter(|id| *id > 0)
-        .map(ChannelId::new)
+    get_channel_from_config(ctx, guild_id, module_bot_name, "log_channel_id").await
+}
+
+/// Type de sanction pour la "card" compacte postee dans le salon dedie.
+/// Chaque variante porte son libelle, son emoji et sa couleur de barre laterale.
+#[derive(Debug, Clone, Copy)]
+pub enum SanctionKind {
+    Warn,
+    Mute,
+    Ban,
+    // Aucune commande /kick n'existe encore ; variante prevue pour le jour ou
+    // elle sera ajoutee (la card la supporte deja).
+    #[allow(dead_code)]
+    Kick,
+}
+
+impl SanctionKind {
+    pub fn label(self) -> &'static str {
+        match self {
+            SanctionKind::Warn => "Warn",
+            SanctionKind::Mute => "Mute",
+            SanctionKind::Ban => "Ban",
+            SanctionKind::Kick => "Kick",
+        }
+    }
+
+    pub fn emoji(self) -> &'static str {
+        match self {
+            SanctionKind::Warn => "⚠️",
+            SanctionKind::Mute => "🔇",
+            SanctionKind::Ban => "🔨",
+            SanctionKind::Kick => "👢",
+        }
+    }
+
+    pub fn color(self) -> Colour {
+        match self {
+            SanctionKind::Warn => Colour::new(0xF1C40F), // jaune
+            SanctionKind::Mute => Colour::new(0xE67E22), // orange
+            SanctionKind::Ban => Colour::new(0xE74C3C),  // rouge
+            SanctionKind::Kick => Colour::new(0xD35400), // orange fonce
+        }
+    }
+}
+
+/// Poste une "card de sanction" compacte (embed 2 lignes, colore) dans le salon
+/// `sanctions_log_channel_id` du **moderation-bot**. Best-effort : si le salon
+/// n'est pas configure -> no-op ; si l'envoi echoue -> `warn!`, jamais de panic,
+/// jamais de blocage de la sanction. Pas de fallback sur `log_channel_id`.
+#[allow(clippy::too_many_arguments)]
+pub async fn post_sanction_card(
+    ctx: &Context,
+    guild_id: &str,
+    action: SanctionKind,
+    target_id: u64,
+    target_tag: Option<&str>,
+    actor: &str,
+    reason: &str,
+    duration: Option<&str>,
+) {
+    let Some(channel) = get_channel_from_config(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+        "sanctions_log_channel_id",
+    )
+    .await
+    else {
+        return;
+    };
+
+    // Ligne 1 : emoji + action + mention + id brut (+ tag optionnel, garde 1 ligne).
+    let tag_suffix = target_tag.map(|t| format!(" — {t}")).unwrap_or_default();
+    let line1 = format!(
+        "{} {} appliqué — <@{}> (`{}`){}",
+        action.emoji(),
+        action.label(),
+        target_id,
+        target_id,
+        tag_suffix
+    );
+
+    // Ligne 2 : acteur + raison (tronquee ~120 chars) + duree optionnelle.
+    const MAX_REASON: usize = 120;
+    let reason_trimmed = reason.trim();
+    let reason_short = if reason_trimmed.chars().count() > MAX_REASON {
+        let truncated: String = reason_trimmed.chars().take(MAX_REASON).collect();
+        format!("{truncated}…")
+    } else {
+        reason_trimmed.to_string()
+    };
+    let mut line2 = format!("Par {actor} · Raison : {reason_short}");
+    if let Some(d) = duration {
+        line2.push_str(&format!(" · Durée : {d}"));
+    }
+
+    let embed = CreateEmbed::new()
+        .description(format!("{line1}\n{line2}"))
+        .colour(action.color());
+
+    if let Err(e) = channel
+        .send_message(&ctx.http, CreateMessage::new().embed(embed))
+        .await
+    {
+        warn!(error = %e, guild_id = %guild_id, "Echec envoi card de sanction");
+    }
 }

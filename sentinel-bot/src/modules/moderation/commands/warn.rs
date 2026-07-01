@@ -227,6 +227,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
             super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
 
+            crate::shared::discord_helpers::post_sanction_card(
+                ctx,
+                &guild_id.to_string(),
+                crate::shared::discord_helpers::SanctionKind::Warn,
+                target.id.get(),
+                Some(&target.name),
+                &command.user.name,
+                reason,
+                None,
+            )
+            .await;
+
             if let Some(ref esc_action) = resp.escalation_action {
                 let mut member = match guild_id.member(&ctx.http, target.id).await {
                     Ok(m) => m,
@@ -265,6 +277,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                             .timestamp(serenity::model::Timestamp::now())
                             .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                             super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
+
+                            crate::shared::discord_helpers::post_sanction_card(
+                                ctx,
+                                &guild_id.to_string(),
+                                crate::shared::discord_helpers::SanctionKind::Mute,
+                                target.id.get(),
+                                Some(&target.name),
+                                "Escalade auto",
+                                &format!(
+                                    "Escalade auto: {} strikes",
+                                    resp.strikes_count.unwrap_or(0)
+                                ),
+                                Some(&format!("{}min", secs / 60)),
+                            )
+                            .await;
 
                             // BUG #3 — journaliser l'action d'escalade (sans
                             // rejouer de strike : le strike declencheur est deja
@@ -313,6 +340,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                                 warn!(error = %e, "Escalation ban echouee");
                             }
                             Ok(()) => {
+                                let esc_duration_label = resp
+                                    .escalation_duration
+                                    .map(|secs| format!("{}h", secs / 3600));
+                                crate::shared::discord_helpers::post_sanction_card(
+                                    ctx,
+                                    &guild_id.to_string(),
+                                    crate::shared::discord_helpers::SanctionKind::Ban,
+                                    target.id.get(),
+                                    Some(&target.name),
+                                    "Escalade auto",
+                                    &format!(
+                                        "Escalade auto: {} strikes",
+                                        resp.strikes_count.unwrap_or(0)
+                                    ),
+                                    esc_duration_label.as_deref().or(Some("permanent")),
+                                )
+                                .await;
+
                                 // BUG #3 — journaliser l'action d'escalade sans
                                 // rejouer de strike. Si l'escalade definit une
                                 // duree, c'est un ban_temp : le record d'expiration

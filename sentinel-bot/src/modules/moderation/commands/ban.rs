@@ -397,6 +397,18 @@ pub async fn execute_ban(
     }
 
     super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
+
+    crate::shared::discord_helpers::post_sanction_card(
+        ctx,
+        &guild_id.to_string(),
+        crate::shared::discord_helpers::SanctionKind::Ban,
+        target.id.get(),
+        Some(&target.name),
+        &moderator_name,
+        reason,
+        Some(duration_label),
+    )
+    .await;
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {

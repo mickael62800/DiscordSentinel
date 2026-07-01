@@ -401,6 +401,18 @@ pub async fn execute_mute(
     }
 
     super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
+
+    crate::shared::discord_helpers::post_sanction_card(
+        ctx,
+        &guild_id.to_string(),
+        crate::shared::discord_helpers::SanctionKind::Mute,
+        target.id.get(),
+        Some(&target.name),
+        &moderator_name,
+        reason,
+        Some(duration_label),
+    )
+    .await;
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
