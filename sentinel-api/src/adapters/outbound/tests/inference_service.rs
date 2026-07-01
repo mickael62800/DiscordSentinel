@@ -390,8 +390,12 @@ fn real_pipeline_neutral_message_no_flags() {
         return;
     };
     let cls = classify(&service, &tokenizer, "Salut, on fait une partie ce soir ?");
-    let result =
-        crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.5);
+    let result = crate::application::ai::analyze_message_service::score_classifications(
+        &cls,
+        &[],
+        0.5,
+        &sentinel_core::domain::services::moderation::scoring_service::ScoringConfig::default(),
+    );
     assert!(result.is_none());
 }
 
@@ -405,8 +409,12 @@ fn real_pipeline_neutral_no_flags_even_low_threshold() {
         &tokenizer,
         "Bonjour tout le monde, bonne journee !",
     );
-    let result =
-        crate::application::ai::analyze_message_service::score_classifications(&cls, &[], 0.1);
+    let result = crate::application::ai::analyze_message_service::score_classifications(
+        &cls,
+        &[],
+        0.1,
+        &sentinel_core::domain::services::moderation::scoring_service::ScoringConfig::default(),
+    );
     if let Some((score, _, _)) = result {
         assert!(score < 5.0);
     }

@@ -158,6 +158,12 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             .find(|e| e.config_key == "mute_duration_secs")
             .and_then(|e| e.config_value.parse::<u64>().ok())
             .unwrap_or(600);
+        // Modele de scoring (poids par flag + seuils) editable par serveur.
+        // Meme source que le chemin texte : `parse_scoring_config`. Defaut =
+        // constantes historiques -> comportement inchange tant que non
+        // reconfigure.
+        let scoring_config =
+            crate::application::ai::analyze_message_service::parse_scoring_config(&automod_entries);
         // Override par salon si configure : channel_id -> threshold.
         let vision_threshold = vcfg
             .per_channel_threshold
@@ -306,21 +312,19 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
                 .find(|r| r.flag_type == *flag_type && r.enabled);
             let weight = match rule {
                 Some(r) => r.weight,
-                None => match flag_type {
-                    FlagType::Nsfw => 8.0,
-                    FlagType::Illicit => 9.0,
-                    _ => 5.0,
-                },
+                None => scoring_config.weight_for(flag_type),
             };
             total_score += weight;
             triggered.push(flag_type.as_str());
         }
 
-        // Seuils depuis les rules (configurables per-guild), pas hardcodes.
+        // Seuils : baseline editable par serveur (ScoringConfig) + regles DB
+        // per-flag-type prioritaires (comme le chemin texte).
         let (t_warn, t_delete, t_mute, t_ban) =
             crate::domain::services::moderation::scoring_service::resolve_thresholds(
                 &rules,
                 &detected_labels,
+                &scoring_config,
             );
         let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)

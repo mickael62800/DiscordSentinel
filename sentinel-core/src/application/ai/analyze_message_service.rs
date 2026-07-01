@@ -14,6 +14,7 @@ use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use crate::domain::services::moderation::channel_tension::ChannelTensionBuffer;
 use crate::domain::services::moderation::channel_tension::TensionAction;
 use crate::domain::services::moderation::channel_tension::TensionEntry;
+use crate::domain::services::moderation::scoring_service::ScoringConfig;
 use crate::domain::services::moderation::scoring_service::ScoringService;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
@@ -133,6 +134,68 @@ pub(crate) fn parse_ia_config_from_bot_config(
             }
             _ => {}
         }
+    }
+    cfg
+}
+
+/// Construit le `ScoringConfig` (poids par flag + seuils d'action) depuis la
+/// config `automod-bot`. Chaque clé retombe sur le défaut historique
+/// (`ScoringConfig::default()`) si absente/malformée. Source UNIQUE des poids
+/// et seuils de baseline — remplace les copies inline dupliquées qui existaient
+/// dans les chemins texte et image. Les valeurs sont naturelles (ex. "7"),
+/// tolère "7" comme "7.0", et sont bornées à >= 0.
+pub(crate) fn parse_scoring_config(
+    entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
+) -> ScoringConfig {
+    let mut cfg = ScoringConfig::default();
+    let get = |key: &str| -> Option<f64> {
+        entries
+            .iter()
+            .find(|e| e.config_key == key)
+            .and_then(|e| e.config_value.parse::<f64>().ok())
+            .filter(|n| *n >= 0.0)
+    };
+    if let Some(v) = get("score_weight_spam") {
+        cfg.weight_spam = v;
+    }
+    if let Some(v) = get("score_weight_insult") {
+        cfg.weight_insult = v;
+    }
+    if let Some(v) = get("score_weight_link") {
+        cfg.weight_link = v;
+    }
+    if let Some(v) = get("score_weight_phishing") {
+        cfg.weight_phishing = v;
+    }
+    if let Some(v) = get("score_weight_nsfw") {
+        cfg.weight_nsfw = v;
+    }
+    if let Some(v) = get("score_weight_illicit") {
+        cfg.weight_illicit = v;
+    }
+    if let Some(v) = get("score_weight_anger") {
+        cfg.weight_anger = v;
+    }
+    if let Some(v) = get("score_weight_rage") {
+        cfg.weight_rage = v;
+    }
+    if let Some(v) = get("score_weight_threat") {
+        cfg.weight_threat = v;
+    }
+    if let Some(v) = get("score_weight_harassment") {
+        cfg.weight_harassment = v;
+    }
+    if let Some(v) = get("score_threshold_warn") {
+        cfg.threshold_warn = v;
+    }
+    if let Some(v) = get("score_threshold_delete") {
+        cfg.threshold_delete = v;
+    }
+    if let Some(v) = get("score_threshold_mute") {
+        cfg.threshold_mute = v;
+    }
+    if let Some(v) = get("score_threshold_ban") {
+        cfg.threshold_ban = v;
     }
     cfg
 }
@@ -279,16 +342,10 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             }
         };
 
-        // 2. Scoring basique (flags bot : spam, insult, link, phishing)
-        let mut result = ScoringService::score(&cmd.flags, &rules);
-        // Score IA individuel de CE message (0.0 si pas d'inference ou non
-        // toxique). Alimente le buffer "tension de salon" apres l'inference.
-        let mut ia_score_individual: f64 = 0.0;
-
-        // 3. Inference text IA (sentiment : anger, rage, threat, harassment)
-        // Charger la config automod-bot (fusionnee avec l'ancien `ia_config`
+        // 2. Charger la config automod-bot (fusionnee avec l'ancien `ia_config`
         // par la migration 146). On recupere toutes les cles une fois pour
-        // partager la lecture avec le bloc "tension de salon" plus bas.
+        // partager la lecture avec le scoring, l'inference IA et le bloc
+        // "tension de salon" plus bas.
         let automod_entries = match self
             .bot_config_repo
             .get_config(&cmd.guild_id, "automod-bot")
@@ -314,6 +371,23 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             .find(|e| e.config_key == "mute_duration_secs")
             .and_then(|e| e.config_value.parse::<u64>().ok())
             .unwrap_or(600);
+        // Modele de scoring (poids par flag + seuils d'action) editable par
+        // serveur. Defaut = constantes historiques -> comportement inchange tant
+        // que non reconfigure. Source UNIQUE des poids/seuils de baseline.
+        let scoring_config = parse_scoring_config(&automod_entries);
+
+        // 3. Scoring basique (flags bot : spam, insult, link, phishing)
+        let mut result = ScoringService::score_with_config(
+            &cmd.flags,
+            &rules,
+            &scoring_config,
+            mute_duration_secs,
+        );
+        // Score IA individuel de CE message (0.0 si pas d'inference ou non
+        // toxique). Alimente le buffer "tension de salon" apres l'inference.
+        let mut ia_score_individual: f64 = 0.0;
+
+        // 4. Inference text IA (sentiment : anger, rage, threat, harassment)
 
         debug!(
             has_inference = self.inference.is_some(),
@@ -356,6 +430,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                                 &classifications,
                                 &rules,
                                 text_threshold,
+                                &scoring_config,
                             ))
                         }
                     }),
@@ -404,7 +479,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                                 fired.push(f.clone());
                             }
                         }
-                        let (t_warn, t_delete, t_mute, t_ban) = resolve_thresholds(&rules, &fired);
+                        let (t_warn, t_delete, t_mute, t_ban) =
+                            resolve_thresholds(&rules, &fired, &scoring_config);
 
                         let (action, duration) = if combined_score >= t_ban {
                             (Action::Ban, None)
@@ -581,6 +657,7 @@ pub fn score_classifications(
     classifications: &[crate::ports::outbound::ai::inference_service::InferenceClassification],
     rules: &[crate::domain::entities::system::rule::Rule],
     threshold: f32,
+    scoring_config: &ScoringConfig,
 ) -> Option<(f64, Vec<FlagType>, String)> {
     let mut detected: Vec<(FlagType, f32)> = Vec::new();
 
@@ -617,13 +694,7 @@ pub fn score_classifications(
             .find(|r| r.flag_type == *flag_type && r.enabled);
         let base_weight = match rule {
             Some(r) => r.weight,
-            None => match flag_type {
-                FlagType::Anger => 3.0,
-                FlagType::Rage => 6.0,
-                FlagType::Threat => 8.0,
-                FlagType::Harassment => 7.0,
-                _ => 5.0,
-            },
+            None => scoring_config.weight_for(flag_type),
         };
         let weighted = base_weight * (*confidence as f64);
         ia_score += weighted;

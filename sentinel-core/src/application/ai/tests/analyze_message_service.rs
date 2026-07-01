@@ -229,7 +229,7 @@ fn cls(label: &str, confidence: f32) -> InferenceClassification {
 
 #[test]
 fn test_resolve_thresholds_defaults() {
-    let (w, d, m, b) = resolve_thresholds(&[], &[]);
+    let (w, d, m, b) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert_eq!(w, 2.0);
     assert_eq!(d, 4.0);
     assert_eq!(m, 6.0);
@@ -239,7 +239,7 @@ fn test_resolve_thresholds_defaults() {
 #[test]
 fn test_resolve_thresholds_with_rules() {
     let rules = vec![make_rule(FlagType::Spam, 3.0)];
-    let (w, d, m, b) = resolve_thresholds(&rules, &[FlagType::Spam]);
+    let (w, d, m, b) = resolve_thresholds(&rules, &[FlagType::Spam], &ScoringConfig::default());
     assert_eq!(w, 2.0);
     assert_eq!(d, 4.0);
     assert_eq!(m, 6.0);
@@ -251,7 +251,7 @@ fn test_resolve_thresholds_ignores_disabled() {
     let mut rule = make_rule(FlagType::Spam, 3.0);
     rule.threshold_warn = 0.5;
     rule.enabled = false;
-    let (w, _, _, _) = resolve_thresholds(&[rule], &[FlagType::Spam]);
+    let (w, _, _, _) = resolve_thresholds(&[rule], &[FlagType::Spam], &ScoringConfig::default());
     assert_eq!(w, 2.0);
 }
 
@@ -265,7 +265,11 @@ fn test_resolve_thresholds_takes_minimum() {
     r2.threshold_warn = 3.0;
     r2.threshold_ban = 10.0;
 
-    let (w, _, _, b) = resolve_thresholds(&[r1, r2], &[FlagType::Spam, FlagType::Insult]);
+    let (w, _, _, b) = resolve_thresholds(
+        &[r1, r2],
+        &[FlagType::Spam, FlagType::Insult],
+        &ScoringConfig::default(),
+    );
     assert_eq!(w, 1.5);
     assert_eq!(b, 7.0);
 }
@@ -410,7 +414,7 @@ fn neutral_message_returns_none() {
         cls("threat", 0.01),
         cls("harassment", 0.01),
     ];
-    assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    assert!(score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).is_none());
 }
 
 #[test]
@@ -422,12 +426,12 @@ fn all_below_threshold_returns_none() {
         cls("threat", 0.10),
         cls("harassment", 0.05),
     ];
-    assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    assert!(score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).is_none());
 }
 
 #[test]
 fn empty_classifications_returns_none() {
-    assert!(score_classifications(&[], &[], 0.5).is_none());
+    assert!(score_classifications(&[], &[], 0.5, &ScoringConfig::default()).is_none());
 }
 
 // ── Détection anger ──
@@ -441,7 +445,7 @@ fn anger_above_threshold_detected() {
         cls("threat", 0.03),
         cls("harassment", 0.02),
     ];
-    let result = score_classifications(&classifications, &[], 0.5);
+    let result = score_classifications(&classifications, &[], 0.5, &ScoringConfig::default());
     assert!(result.is_some());
 
     let (score, flags, reason) = result.unwrap();
@@ -463,7 +467,8 @@ fn rage_above_threshold_detected() {
         cls("threat", 0.03),
         cls("harassment", 0.02),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Rage]);
     // rage weight=6.0, confidence=0.8 → 4.8
     assert!((score - 4.8).abs() < 0.01);
@@ -480,7 +485,8 @@ fn threat_above_threshold_detected() {
         cls("threat", 0.85),
         cls("harassment", 0.05),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Threat]);
     // threat weight=8.0, confidence=0.85 → 6.8
     assert!((score - 6.8).abs() < 0.01);
@@ -497,7 +503,8 @@ fn harassment_above_threshold_detected() {
         cls("threat", 0.05),
         cls("harassment", 0.80),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Harassment]);
     // harassment weight=7.0, confidence=0.8 → 5.6
     assert!((score - 5.6).abs() < 0.01);
@@ -514,7 +521,8 @@ fn anger_plus_rage_combined_score() {
         cls("threat", 0.03),
         cls("harassment", 0.02),
     ];
-    let (score, flags, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, reason) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags.len(), 2);
     assert!(flags.contains(&FlagType::Anger));
     assert!(flags.contains(&FlagType::Rage));
@@ -533,7 +541,8 @@ fn all_toxic_flags_combined() {
         cls("threat", 0.80),
         cls("harassment", 0.90),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags.len(), 4);
     // anger:3*0.6=1.8 + rage:6*0.7=4.2 + threat:8*0.8=6.4 + harassment:7*0.9=6.3 = 18.7
     assert!((score - 18.7).abs() < 0.01);
@@ -545,7 +554,8 @@ fn all_toxic_flags_combined() {
 fn strict_threshold_filters_out_low_confidence() {
     let classifications = vec![cls("anger", 0.70), cls("rage", 0.85)];
     // Seuil strict = 0.8 → anger(0.7) rejeté, rage(0.85) accepté
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.8).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.8, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Rage]);
     // rage: 6.0 * 0.85 = 5.1
     assert!((score - 5.1).abs() < 0.01);
@@ -555,13 +565,15 @@ fn strict_threshold_filters_out_low_confidence() {
 fn very_strict_threshold_rejects_all() {
     let classifications = vec![cls("anger", 0.70), cls("rage", 0.80), cls("threat", 0.85)];
     // Seuil = 0.95 → tout rejeté
-    assert!(score_classifications(&classifications, &[], 0.95).is_none());
+    assert!(
+        score_classifications(&classifications, &[], 0.95, &ScoringConfig::default()).is_none()
+    );
 }
 
 #[test]
 fn zero_threshold_accepts_everything() {
     let classifications = vec![cls("anger", 0.01), cls("rage", 0.01)];
-    let result = score_classifications(&classifications, &[], 0.0);
+    let result = score_classifications(&classifications, &[], 0.0, &ScoringConfig::default());
     assert!(result.is_some());
     assert_eq!(result.unwrap().1.len(), 2);
 }
@@ -570,14 +582,14 @@ fn zero_threshold_accepts_everything() {
 fn exact_threshold_boundary_accepted() {
     let classifications = vec![cls("anger", 0.50)];
     // confidence == threshold → accepté (>=)
-    let result = score_classifications(&classifications, &[], 0.5);
+    let result = score_classifications(&classifications, &[], 0.5, &ScoringConfig::default());
     assert!(result.is_some());
 }
 
 #[test]
 fn just_below_threshold_rejected() {
     let classifications = vec![cls("anger", 0.499)];
-    assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    assert!(score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).is_none());
 }
 
 // ── Règles custom ──
@@ -586,7 +598,8 @@ fn just_below_threshold_rejected() {
 fn custom_rule_overrides_default_weight() {
     let classifications = vec![cls("anger", 0.80)];
     let rules = vec![make_rule(FlagType::Anger, 10.0)];
-    let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+    let (score, _, _) =
+        score_classifications(&classifications, &rules, 0.5, &ScoringConfig::default()).unwrap();
     // custom weight=10.0, confidence=0.8 → 8.0 (vs 2.4 par défaut)
     assert!((score - 8.0).abs() < 0.01);
 }
@@ -596,7 +609,8 @@ fn disabled_rule_uses_default_weight() {
     let classifications = vec![cls("anger", 0.80)];
     let mut rule = make_rule(FlagType::Anger, 10.0);
     rule.enabled = false;
-    let (score, _, _) = score_classifications(&classifications, &[rule], 0.5).unwrap();
+    let (score, _, _) =
+        score_classifications(&classifications, &[rule], 0.5, &ScoringConfig::default()).unwrap();
     // rule disabled → default weight=3.0, confidence=0.8 → 2.4
     assert!((score - 2.4).abs() < 0.01);
 }
@@ -605,7 +619,8 @@ fn disabled_rule_uses_default_weight() {
 fn custom_rule_for_different_flag_no_effect() {
     let classifications = vec![cls("anger", 0.80)];
     let rules = vec![make_rule(FlagType::Rage, 15.0)];
-    let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+    let (score, _, _) =
+        score_classifications(&classifications, &rules, 0.5, &ScoringConfig::default()).unwrap();
     // rule est pour Rage, pas Anger → default anger weight=3.0
     assert!((score - 2.4).abs() < 0.01);
 }
@@ -617,7 +632,8 @@ fn multiple_custom_rules_applied() {
         make_rule(FlagType::Anger, 5.0),
         make_rule(FlagType::Threat, 12.0),
     ];
-    let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+    let (score, _, _) =
+        score_classifications(&classifications, &rules, 0.5, &ScoringConfig::default()).unwrap();
     // anger: 5.0*0.6=3.0 + threat: 12.0*0.7=8.4 → 11.4
     assert!((score - 11.4).abs() < 0.01);
 }
@@ -627,7 +643,7 @@ fn multiple_custom_rules_applied() {
 #[test]
 fn unknown_labels_ignored() {
     let classifications = vec![cls("neutral", 0.90), cls("joy", 0.80), cls("sadness", 0.70)];
-    assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    assert!(score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).is_none());
 }
 
 // ── Format de la raison ──
@@ -635,14 +651,16 @@ fn unknown_labels_ignored() {
 #[test]
 fn reason_format_single_flag() {
     let classifications = vec![cls("threat", 0.90)];
-    let (_, _, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (_, _, reason) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(reason, "IA sentiment : threat(90%)");
 }
 
 #[test]
 fn reason_format_multiple_flags() {
     let classifications = vec![cls("anger", 0.70), cls("harassment", 0.80)];
-    let (_, _, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (_, _, reason) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(reason, "IA sentiment : anger(70%), harassment(80%)");
 }
 
@@ -654,8 +672,9 @@ fn reason_format_multiple_flags() {
 fn anger_only_triggers_warn() {
     // anger: weight=3.0, confidence=0.8 → score=2.4 >= warn(2.0) mais < delete(4.0)
     let classifications = vec![cls("anger", 0.80)];
-    let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (t_warn, t_delete, _, _) = resolve_thresholds(&[], &[]);
+    let (score, _, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
+    let (t_warn, t_delete, _, _) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert!(score >= t_warn);
     assert!(score < t_delete);
 }
@@ -664,8 +683,9 @@ fn anger_only_triggers_warn() {
 fn rage_triggers_delete_or_mute() {
     // rage: weight=6.0, confidence=0.85 → score=5.1 >= delete(4.0) mais < mute(6.0)
     let classifications = vec![cls("rage", 0.85)];
-    let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, t_delete, t_mute, _) = resolve_thresholds(&[], &[]);
+    let (score, _, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
+    let (_, t_delete, t_mute, _) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert!(score >= t_delete);
     assert!(score < t_mute);
 }
@@ -674,8 +694,9 @@ fn rage_triggers_delete_or_mute() {
 fn threat_high_confidence_triggers_mute() {
     // threat: weight=8.0, confidence=0.90 → score=7.2 >= mute(6.0) mais < ban(9.0)
     let classifications = vec![cls("threat", 0.90)];
-    let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, _, t_mute, t_ban) = resolve_thresholds(&[], &[]);
+    let (score, _, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
+    let (_, _, t_mute, t_ban) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert!(score >= t_mute);
     assert!(score < t_ban);
 }
@@ -684,8 +705,9 @@ fn threat_high_confidence_triggers_mute() {
 fn rage_plus_threat_triggers_ban() {
     // rage:6.0*0.8=4.8 + threat:8.0*0.8=6.4 → 11.2 >= ban(9.0)
     let classifications = vec![cls("rage", 0.80), cls("threat", 0.80)];
-    let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (_, _, _, t_ban) = resolve_thresholds(&[], &[]);
+    let (score, _, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
+    let (_, _, _, t_ban) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert!(score >= t_ban);
 }
 
@@ -720,8 +742,9 @@ fn non_ban_actions_are_untouched() {
 fn anger_low_confidence_below_warn() {
     // anger: weight=3.0, confidence=0.55 → score=1.65 < warn(2.0)
     let classifications = vec![cls("anger", 0.55)];
-    let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
-    let (t_warn, _, _, _) = resolve_thresholds(&[], &[]);
+    let (score, _, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
+    let (t_warn, _, _, _) = resolve_thresholds(&[], &[], &ScoringConfig::default());
     assert!(score < t_warn);
 }
 
@@ -739,7 +762,8 @@ fn realistic_softmax_angry_message() {
         cls("threat", 0.10),
         cls("harassment", 0.05),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Anger]);
     // anger: 3.0 * 0.55 = 1.65
     assert!((score - 1.65).abs() < 0.01);
@@ -755,7 +779,8 @@ fn realistic_softmax_threat_message() {
         cls("threat", 0.75),
         cls("harassment", 0.05),
     ];
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Threat]);
     // threat: 8.0 * 0.75 = 6.0
     assert!((score - 6.0).abs() < 0.01);
@@ -772,7 +797,8 @@ fn realistic_softmax_harassment_escalation() {
         cls("harassment", 0.30),
     ];
     // threshold 0.5 → rage(0.55) detecté, harassment(0.30) rejeté
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.5, &ScoringConfig::default()).unwrap();
     assert_eq!(flags, vec![FlagType::Rage]);
     // rage: 6.0 * 0.55 = 3.3
     assert!((score - 3.3).abs() < 0.01);
@@ -788,7 +814,8 @@ fn realistic_softmax_harassment_escalation_lower_threshold() {
         cls("harassment", 0.30),
     ];
     // Seuil plus bas (0.25) → rage ET harassment détectés
-    let (score, flags, _) = score_classifications(&classifications, &[], 0.25).unwrap();
+    let (score, flags, _) =
+        score_classifications(&classifications, &[], 0.25, &ScoringConfig::default()).unwrap();
     assert_eq!(flags.len(), 2);
     // rage: 6.0*0.55=3.3 + harassment: 7.0*0.30=2.1 → 5.4
     assert!((score - 5.4).abs() < 0.01);

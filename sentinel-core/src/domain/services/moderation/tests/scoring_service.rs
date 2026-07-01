@@ -162,7 +162,7 @@ fn test_custom_nsfw_rule_overrides_weight() {
 
 #[test]
 fn test_resolve_thresholds_empty_rules() {
-    let (w, d, m, b) = resolve_thresholds(&[], &[FlagType::Spam]);
+    let (w, d, m, b) = resolve_thresholds(&[], &[FlagType::Spam], &ScoringConfig::default());
     assert_eq!(w, DEFAULT_THRESHOLD_WARN);
     assert_eq!(d, DEFAULT_THRESHOLD_DELETE);
     assert_eq!(m, DEFAULT_THRESHOLD_MUTE);
@@ -180,7 +180,11 @@ fn test_resolve_thresholds_takes_strictest() {
     rule2.threshold_ban = 10.0;
 
     // Les deux flags sont déclenchés -> on prend le seuil le plus strict.
-    let (w, _, _, b) = resolve_thresholds(&[rule1, rule2], &[FlagType::Spam, FlagType::Insult]);
+    let (w, _, _, b) = resolve_thresholds(
+        &[rule1, rule2],
+        &[FlagType::Spam, FlagType::Insult],
+        &ScoringConfig::default(),
+    );
     assert_eq!(w, 1.0);
     assert_eq!(b, 8.0);
 }
@@ -198,7 +202,11 @@ fn test_resolve_thresholds_ignores_unrelated_flag() {
 
     // Détection d'INSULTE uniquement : la règle stricte sur les liens ne doit
     // PAS abaisser les seuils -> on garde ceux de la règle insulte (defaults).
-    let (w, d, m, b) = resolve_thresholds(&[strict_link, insult], &[FlagType::Insult]);
+    let (w, d, m, b) = resolve_thresholds(
+        &[strict_link, insult],
+        &[FlagType::Insult],
+        &ScoringConfig::default(),
+    );
     assert_eq!(w, 2.0);
     assert_eq!(d, 4.0);
     assert_eq!(m, 6.0);
@@ -210,7 +218,11 @@ fn test_resolve_thresholds_no_matching_rule_uses_defaults() {
     // Une règle stricte existe mais sur un flag non déclenché -> defaults.
     let mut strict_link = make_rule(FlagType::Link, 1.0);
     strict_link.threshold_warn = 0.5;
-    let (w, _, _, _) = resolve_thresholds(&[strict_link], &[FlagType::Insult]);
+    let (w, _, _, _) = resolve_thresholds(
+        &[strict_link],
+        &[FlagType::Insult],
+        &ScoringConfig::default(),
+    );
     assert_eq!(w, DEFAULT_THRESHOLD_WARN);
 }
 
