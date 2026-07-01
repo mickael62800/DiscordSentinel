@@ -264,7 +264,6 @@ pub async fn publish_monthly_ranking_all(
         (now.year(), now.month() - 1)
     };
     let prev_period = period_string(py, pm);
-    let baseline_partial = now.day() != 1;
 
     let guilds: Vec<(String,)> = sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
         .fetch_all(&state.pg_pool)
@@ -389,6 +388,22 @@ pub async fn publish_monthly_ranking_all(
                 }
             }
         }
+
+        // `partial` fonde sur la CONTINUITE, pas sur le jour du mois : une
+        // baseline n'est "partielle" (donc jamais publiee) que si c'est la
+        // toute premiere de ce serveur (aucune periode anterieure). Ainsi un
+        // tick en retard (worker down le 1er du mois, activation en cours de
+        // mois deja couverte) ne fait plus rater la publication : un mois se
+        // publie des lors qu'il a un predecesseur baseline.
+        let has_prior: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM user_levels_monthly_snapshot WHERE guild_id = $1 AND period_ym < $2)",
+        )
+        .bind(guild_id)
+        .bind(&this_period)
+        .fetch_one(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
+        let baseline_partial = !has_prior;
 
         // Pose la baseline du mois courant (idempotent).
         sqlx::query(
