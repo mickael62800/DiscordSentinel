@@ -36,6 +36,12 @@ pub struct SecurityDecision {
     pub send_captcha: bool,
     pub activate_lockdown: bool,
     pub slowmode_secs: u32,
+    /// `true` quand la reponse GUILD-WIDE (lockdown / slowmode / bump
+    /// verification) doit etre SUGGEREE au staff plutot qu'appliquee
+    /// automatiquement (mode `suggest` ou `hybrid` sous le seuil auto).
+    /// N'a de sens que si une action guild-wide est presente ; la
+    /// quarantaine + le captcha restent toujours appliques par le bot.
+    pub suggest_only: bool,
     pub event_type: String,
     pub event_description: String,
 }

@@ -127,6 +127,67 @@ pub fn analyze_joins(
     }
 }
 
+// ── Politique auto-vs-suggest (mode hybride anti-raid) ──
+
+/// Mode de reponse anti-raid configure par le serveur.
+///
+/// - `Auto` : la reponse guild-wide (lockdown/slowmode/verification) est
+///   appliquee directement.
+/// - `Suggest` : la reponse est seulement proposee au staff (boutons
+///   confirmer/ignorer).
+/// - `Hybrid` : auto si le raid est massif (flood de vitesse OU score eleve),
+///   sinon suggestion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RaidMode {
+    Auto,
+    Suggest,
+    Hybrid,
+}
+
+impl RaidMode {
+    /// Parse depuis la valeur de config (`auto` | `suggest` | `hybrid`).
+    /// Toute valeur inconnue (ou vide) retombe sur `Hybrid` (defaut owner).
+    pub fn from_config(value: &str) -> Self {
+        match value {
+            "auto" => RaidMode::Auto,
+            "suggest" => RaidMode::Suggest,
+            _ => RaidMode::Hybrid,
+        }
+    }
+}
+
+/// Resultat de la politique : appliquer directement ou suggerer au staff.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RaidResponseMode {
+    Auto,
+    Suggest,
+}
+
+/// Politique PURE auto-vs-suggest pour la reponse GUILD-WIDE anti-raid.
+///
+/// - `Auto` => toujours `Auto`.
+/// - `Suggest` => toujours `Suggest`.
+/// - `Hybrid` => `Auto` si `is_velocity_raid` OU `raid_score >= auto_threshold`,
+///   sinon `Suggest`.
+pub fn raid_response_mode(
+    raid_score: i32,
+    is_velocity_raid: bool,
+    mode: RaidMode,
+    auto_threshold: i32,
+) -> RaidResponseMode {
+    match mode {
+        RaidMode::Auto => RaidResponseMode::Auto,
+        RaidMode::Suggest => RaidResponseMode::Suggest,
+        RaidMode::Hybrid => {
+            if is_velocity_raid || raid_score >= auto_threshold {
+                RaidResponseMode::Auto
+            } else {
+                RaidResponseMode::Suggest
+            }
+        }
+    }
+}
+
 // ── Check age compte ──
 
 pub fn is_account_suspicious(account_created_timestamp: i64, min_age_secs: u64) -> bool {

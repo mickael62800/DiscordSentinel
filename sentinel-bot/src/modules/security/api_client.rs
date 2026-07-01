@@ -200,6 +200,7 @@ impl ApiClient {
             send_captcha: resp.send_captcha,
             activate_lockdown: resp.activate_lockdown,
             slowmode_secs: resp.slowmode_secs,
+            suggest_only: resp.suggest_only,
             event_type: resp.event_type,
             event_description: resp.event_description,
         })
@@ -227,6 +228,8 @@ pub struct SecurityDecisionResponse {
     pub send_captcha: bool,
     pub activate_lockdown: bool,
     pub slowmode_secs: u32,
+    /// La reponse guild-wide doit etre suggeree au staff (pas appliquee auto).
+    pub suggest_only: bool,
     pub event_type: String,
     pub event_description: String,
 }

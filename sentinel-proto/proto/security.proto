@@ -75,4 +75,8 @@ message SecurityDecision {
   // Evenement auto-reporte si non-vide.
   string event_type = 10;
   string event_description = 11;
+  // true => la reponse guild-wide (lockdown/slowmode/verification) doit etre
+  // suggeree au staff au lieu d'etre appliquee (mode suggest / hybrid sous
+  // le seuil). Quarantaine + captcha restent toujours auto.
+  bool suggest_only = 12;
 }

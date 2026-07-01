@@ -170,6 +170,7 @@ async fn analyze_new_member_delegates_and_maps_decision() {
         send_captcha: true,
         activate_lockdown: true,
         slowmode_secs: 30,
+        suggest_only: false,
         event_type: "raid_detected".into(),
         event_description: "Raid pattern".into(),
     };

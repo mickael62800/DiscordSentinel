@@ -175,6 +175,15 @@ impl ManageSecurityUseCase for ManageSecurityService {
         let raid_score_threshold = cfg("raid_pattern_score_threshold", 60) as u32;
         let name_distance = cfg("alt_name_distance", 2) as usize;
         let creation_spread = cfg("raid_creation_spread_secs", 3600) as i64;
+        // Mode de reponse anti-raid (auto / suggest / hybrid) + seuil auto.
+        let raid_mode = security_analyzer::RaidMode::from_config(
+            configs
+                .iter()
+                .find(|c| c.config_key == "raid_mode")
+                .map(|c| c.config_value.as_str())
+                .unwrap_or(""),
+        );
+        let raid_auto_threshold = cfg("raid_auto_threshold", 85) as i32;
 
         let mut decision = SecurityDecision::default();
 
@@ -189,6 +198,18 @@ impl ManageSecurityUseCase for ManageSecurityService {
                 decision.slowmode_secs = slowmode_secs;
                 decision.quarantine = quarantine_enabled;
                 decision.send_captcha = quarantine_enabled && captcha_enabled;
+                // Politique auto-vs-suggest sur la reponse GUILD-WIDE.
+                // Le signal de flood de vitesse est detecte cote bot ; ici on
+                // ne dispose que du score pattern, donc `is_velocity_raid=false`.
+                decision.suggest_only = matches!(
+                    security_analyzer::raid_response_mode(
+                        analysis.score as i32,
+                        false,
+                        raid_mode,
+                        raid_auto_threshold,
+                    ),
+                    security_analyzer::RaidResponseMode::Suggest
+                );
                 decision.event_type = "raid_detected".into();
                 decision.event_description = format!(
                     "Raid pattern detecte (score {}). Noms similaires: {}, Avatars par defaut: {}, Creation clusteree: {}",

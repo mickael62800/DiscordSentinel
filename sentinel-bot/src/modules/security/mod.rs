@@ -11,6 +11,7 @@ pub mod detectors;
 mod join_handler;
 pub mod lockdown_expired_consumer;
 pub mod quarantine_expired_consumer;
+pub mod raid_suggest_handler;
 pub mod slowmode_expired_consumer;
 
 use chrono::DateTime;
@@ -34,6 +35,7 @@ use detectors::lockdown::LockdownManager;
 use detectors::quarantine::QuarantineManager;
 use detectors::raid_analyzer::RecentJoinsTracker;
 use detectors::raid_detector::RaidDetector;
+use detectors::raid_suggest::RaidSuggestGuard;
 use detectors::slowmode::SlowmodeManager;
 
 pub use background::spawn_background;
@@ -88,6 +90,11 @@ impl TypeMapKey for CaptchaPendingKey {
 pub struct AltDetectorKey;
 impl TypeMapKey for AltDetectorKey {
     type Value = AltDetector;
+}
+
+pub struct RaidSuggestGuardKey;
+impl TypeMapKey for RaidSuggestGuardKey {
+    type Value = RaidSuggestGuard;
 }
 
 // ── Security config (loaded from env, stored in TypeMap) ──
@@ -174,6 +181,7 @@ pub fn init_typemap(
         sec_config.alt_name_distance,
         3600,
     ));
+    data.insert::<RaidSuggestGuardKey>(RaidSuggestGuard::new());
     data.insert::<SecurityConfigKey>(sec_config);
 }
 
@@ -194,7 +202,9 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 
 /// Retourne true si ce custom_id est gere par le module security.
 pub fn handles_component(cid: &str) -> bool {
-    cid == captcha::CAPTCHA_BUTTON_ID || cid.starts_with(captcha::CAPTCHA_MATH_PREFIX)
+    cid == captcha::CAPTCHA_BUTTON_ID
+        || cid.starts_with(captcha::CAPTCHA_MATH_PREFIX)
+        || raid_suggest_handler::handles_component(cid)
 }
 
 // ── Event handlers (appelees depuis handler.rs) ──
@@ -365,6 +375,10 @@ pub async fn on_ban_remove(
 /// Gere les interactions captcha (bouton + math).
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
+    }
+    if raid_suggest_handler::handles_component(&component.data.custom_id) {
+        raid_suggest_handler::on_component(ctx, component).await;
         return;
     }
     captcha_handler::on_component(ctx, component).await

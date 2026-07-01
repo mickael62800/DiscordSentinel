@@ -577,6 +577,99 @@ async fn analyze_new_member_raid_pattern_overrides_suspicious() {
 }
 
 #[tokio::test]
+async fn analyze_new_member_hybrid_low_score_suggests_only() {
+    use crate::domain::services::audit::security_analyzer::JoinInfo;
+    // Mode hybride (defaut), seuil auto 85. Pattern score < 85 (noms similaires
+    // uniquement => 40) => la reponse guild-wide doit etre SUGGEREE.
+    let (svc, _repo, _watched, _audit) = build_service_with_configs(
+        vec![
+            cfg_entry("raid_pattern_enabled", "true"),
+            cfg_entry("raid_pattern_score_threshold", "0"),
+            cfg_entry("lockdown_enabled", "true"),
+            cfg_entry("slowmode_seconds", "30"),
+            // raid_mode absent => hybrid par defaut ; raid_auto_threshold=85.
+        ],
+        vec![],
+    );
+    let now = Utc::now().timestamp();
+    let old = now - 86400 * 365; // comptes anciens, creations dispersees
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
+        has_avatar: true,
+        account_created_timestamp: old,
+        is_bot: false,
+        recent_joins: vec![
+            JoinInfo {
+                username: "raider01".into(),
+                account_created_timestamp: old,
+                has_avatar: true,
+            },
+            JoinInfo {
+                username: "raider02".into(),
+                account_created_timestamp: old - 100_000,
+                has_avatar: true,
+            },
+            JoinInfo {
+                username: "raider03".into(),
+                account_created_timestamp: old - 500_000,
+                has_avatar: true,
+            },
+        ],
+    };
+    let decision = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(decision.is_raid);
+    assert!(decision.raid_score < 85);
+    assert!(decision.suggest_only, "hybride sous le seuil => suggestion");
+}
+
+#[tokio::test]
+async fn analyze_new_member_auto_mode_never_suggests() {
+    use crate::domain::services::audit::security_analyzer::JoinInfo;
+    // Mode auto explicite : jamais de suggestion meme a score bas.
+    let (svc, _repo, _watched, _audit) = build_service_with_configs(
+        vec![
+            cfg_entry("raid_pattern_enabled", "true"),
+            cfg_entry("raid_pattern_score_threshold", "0"),
+            cfg_entry("lockdown_enabled", "true"),
+            cfg_entry("raid_mode", "auto"),
+        ],
+        vec![],
+    );
+    let now = Utc::now().timestamp();
+    let old = now - 86400 * 365;
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
+        has_avatar: true,
+        account_created_timestamp: old,
+        is_bot: false,
+        recent_joins: vec![
+            JoinInfo {
+                username: "raider01".into(),
+                account_created_timestamp: old,
+                has_avatar: true,
+            },
+            JoinInfo {
+                username: "raider02".into(),
+                account_created_timestamp: old - 500_000,
+                has_avatar: true,
+            },
+            JoinInfo {
+                username: "raider03".into(),
+                account_created_timestamp: old - 900_000,
+                has_avatar: true,
+            },
+        ],
+    };
+    let decision = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(decision.is_raid);
+    assert!(!decision.suggest_only, "mode auto => jamais de suggestion");
+}
+
+#[tokio::test]
 async fn analyze_new_member_config_bool_various_formats() {
     // Tester que les config bools acceptent 1/true/other.
     let (svc, _, _, _) = build_service_with_configs(

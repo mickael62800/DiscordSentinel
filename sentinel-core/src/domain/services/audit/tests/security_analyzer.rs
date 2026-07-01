@@ -210,3 +210,69 @@ fn analyze_joins_no_raid_indicator_score_zero() {
     assert!(!analysis.high_default_avatar_ratio);
     assert!(!analysis.clustered_creation);
 }
+
+// ── Politique auto-vs-suggest (mode hybride) ──
+
+#[test]
+fn raid_mode_from_config_parsing() {
+    assert_eq!(RaidMode::from_config("auto"), RaidMode::Auto);
+    assert_eq!(RaidMode::from_config("suggest"), RaidMode::Suggest);
+    assert_eq!(RaidMode::from_config("hybrid"), RaidMode::Hybrid);
+    // Valeurs inconnues / vides -> Hybrid (defaut).
+    assert_eq!(RaidMode::from_config(""), RaidMode::Hybrid);
+    assert_eq!(RaidMode::from_config("bogus"), RaidMode::Hybrid);
+}
+
+#[test]
+fn response_mode_auto_always_auto() {
+    // En mode Auto, score et velocity n'importent pas.
+    assert_eq!(
+        raid_response_mode(0, false, RaidMode::Auto, 85),
+        RaidResponseMode::Auto
+    );
+    assert_eq!(
+        raid_response_mode(100, true, RaidMode::Auto, 85),
+        RaidResponseMode::Auto
+    );
+}
+
+#[test]
+fn response_mode_suggest_always_suggest() {
+    // En mode Suggest, meme un raid massif reste une suggestion.
+    assert_eq!(
+        raid_response_mode(100, true, RaidMode::Suggest, 85),
+        RaidResponseMode::Suggest
+    );
+    assert_eq!(
+        raid_response_mode(0, false, RaidMode::Suggest, 85),
+        RaidResponseMode::Suggest
+    );
+}
+
+#[test]
+fn response_mode_hybrid_velocity_always_auto() {
+    // Flood de vitesse -> auto meme si le score est bas.
+    assert_eq!(
+        raid_response_mode(0, true, RaidMode::Hybrid, 85),
+        RaidResponseMode::Auto
+    );
+}
+
+#[test]
+fn response_mode_hybrid_score_boundary() {
+    // Juste sous le seuil -> suggestion.
+    assert_eq!(
+        raid_response_mode(84, false, RaidMode::Hybrid, 85),
+        RaidResponseMode::Suggest
+    );
+    // Pile au seuil -> auto (>=).
+    assert_eq!(
+        raid_response_mode(85, false, RaidMode::Hybrid, 85),
+        RaidResponseMode::Auto
+    );
+    // Au-dessus -> auto.
+    assert_eq!(
+        raid_response_mode(90, false, RaidMode::Hybrid, 85),
+        RaidResponseMode::Auto
+    );
+}

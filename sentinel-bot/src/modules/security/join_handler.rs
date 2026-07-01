@@ -14,7 +14,8 @@ use super::detectors::captcha::{self, CaptchaPending};
 use super::detectors::raid_analyzer::JoinInfo;
 use super::{
     AccountCheckerKey, AltDetectorKey, CaptchaPendingKey, LockdownKey, QuarantineKey,
-    RaidDetectorKey, RecentJoinsKey, SecurityApiKey, SecurityConfigKey, SlowmodeKey,
+    RaidDetectorKey, RaidSuggestGuardKey, RecentJoinsKey, SecurityApiKey, SecurityConfigKey,
+    SlowmodeKey,
 };
 
 /// Declenche a chaque nouveau membre qui rejoint un serveur.
@@ -256,26 +257,81 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
 
     let is_raid = simple_raid || decision.is_raid;
 
+    // Salon d'alerte anti-raid (suggestions) : cle dediee, repli sur le salon
+    // de logs securite. `None` => pas de salon configure.
+    let parse_channel = |key: &str| {
+        guild_config
+            .get(key)
+            .and_then(|v| v.trim().parse::<u64>().ok())
+            .filter(|id| *id > 0)
+            .map(serenity::model::id::ChannelId::new)
+    };
+    let suggest_channel =
+        parse_channel("raid_suggest_channel_id").or_else(|| parse_channel("log_channel_id"));
+
     // ── 2. Executer les decisions de l'API ──
 
     if is_raid {
         warn!(guild_id = %guild_id, score = decision.raid_score, "RAID DETECTE");
 
-        if decision.activate_lockdown {
-            if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
-                let edit = serenity::builder::EditGuild::new()
-                    .verification_level(serenity::model::guild::VerificationLevel::Higher);
-                if let Err(e) = guild.edit(&ctx.http, edit).await {
-                    error!(error = %e, "Impossible d'activer le lockdown");
+        // Reponse GUILD-WIDE presente ? (lockdown / slowmode / bump verification)
+        let has_guildwide = decision.activate_lockdown || decision.slowmode_secs > 0;
+
+        // HYBRID : si la reponse guild-wide doit etre SUGGEREE (mode suggest, ou
+        // hybrid sous le seuil) et qu'un salon d'alerte existe, on poste une
+        // suggestion staff au lieu d'appliquer. Sinon (ou aucun salon) : auto,
+        // protection avant silence.
+        let suggested = if has_guildwide && decision.suggest_only {
+            match suggest_channel {
+                Some(channel) => {
+                    let guard = data.get::<RaidSuggestGuardKey>();
+                    let acquired = guard.map(|g| g.try_acquire(guild_id)).unwrap_or(true);
+                    if acquired {
+                        super::raid_suggest_handler::post_suggestion(
+                            ctx,
+                            channel,
+                            guild_id,
+                            decision.raid_score,
+                            &decision.event_description,
+                            decision.activate_lockdown,
+                            decision.slowmode_secs,
+                        )
+                        .await;
+                    }
+                    // Qu'on ait poste ou dedupe, on n'applique pas la reponse.
+                    true
+                }
+                None => {
+                    // Aucun salon configure : repli sur l'application auto pour
+                    // ne pas rester silencieux face a un raid.
+                    warn!(
+                        guild_id = %guild_id,
+                        "Mode suggest anti-raid sans salon configure : application automatique (protection avant silence)"
+                    );
+                    false
                 }
             }
-            lockdown.activate(ctx, guild_id).await;
-        }
+        } else {
+            false
+        };
 
-        if decision.slowmode_secs > 0 {
-            slowmode
-                .activate(ctx, guild_id, decision.slowmode_secs as u16)
-                .await;
+        if !suggested {
+            if decision.activate_lockdown {
+                if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
+                    let edit = serenity::builder::EditGuild::new()
+                        .verification_level(serenity::model::guild::VerificationLevel::Higher);
+                    if let Err(e) = guild.edit(&ctx.http, edit).await {
+                        error!(error = %e, "Impossible d'activer le lockdown");
+                    }
+                }
+                lockdown.activate(ctx, guild_id).await;
+            }
+
+            if decision.slowmode_secs > 0 {
+                slowmode
+                    .activate(ctx, guild_id, decision.slowmode_secs as u16)
+                    .await;
+            }
         }
 
         raid_detector.reset(guild_id);

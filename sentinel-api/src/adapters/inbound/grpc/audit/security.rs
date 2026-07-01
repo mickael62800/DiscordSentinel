@@ -94,6 +94,7 @@ impl SecurityService for SecurityGrpc {
             slowmode_secs: decision.slowmode_secs,
             event_type: decision.event_type,
             event_description: decision.event_description,
+            suggest_only: decision.suggest_only,
         }))
     }
 }
