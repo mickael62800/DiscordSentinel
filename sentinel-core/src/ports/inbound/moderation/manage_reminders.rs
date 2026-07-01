@@ -27,5 +27,14 @@ pub trait ManageRemindersUseCase: Send + Sync {
     async fn get_pending_reminders(&self) -> Result<Vec<SanctionReminder>, DomainError>;
     async fn mark_sent(&self, reminder_id: Uuid) -> Result<(), DomainError>;
     async fn cancel_for_action(&self, action_id: Uuid) -> Result<(), DomainError>;
+    /// Annule les rappels de ban temporaire actifs pour un utilisateur (unban
+    /// manuel precoce, cf. BUG #2). Default no-op pour les stubs de test.
+    async fn cancel_for_target(
+        &self,
+        _guild_id: &str,
+        _target_id: &str,
+    ) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, DomainError>;
 }

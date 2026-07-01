@@ -252,6 +252,8 @@ fn response_mode_suggest_always_suggest() {
 #[test]
 fn response_mode_hybrid_velocity_always_auto() {
     // Flood de vitesse -> auto meme si le score est bas.
+    // Branche desormais atteignable en prod : le bot propage son signal
+    // `is_velocity_raid` jusqu'a `raid_response_mode` via l'API (BUG #1).
     assert_eq!(
         raid_response_mode(0, true, RaidMode::Hybrid, 85),
         RaidResponseMode::Auto

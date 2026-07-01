@@ -17,7 +17,7 @@ c'est ce qui trompe le plus l'utilisateur.
 | Zone | Symptôme | Fichier:ligne | Correction |
 |---|---|---|---|
 | **Game Portal** | Les migrations 189/216 déclarent tout un schéma worker (`health_check_interval_secs`, `idle_shutdown_check_interval_secs`, `reconciler_interval_secs`, `rcon_timeout_secs`, `max_auto_restart_attempts`, `auto_restart_on_crash`) — **le code ne lit AUCUNE de ces clés** | `sentinel-worker/domains/game_portal/jobs.rs:52-73`, `server.rs:103`, `worker_jobs.rs:311` | Threader la config dans `jobs::start()` + lire les clés. **Bonus bug** : défaut schéma `max_auto_restart_attempts=3` mais code = `5` |
-| **Automod** | Le mute IA + le mute vision hardcodent **600s**, ignorent `mute_duration_secs` existant | `analyze_message_service.rs:310`, `analyze_image_service.rs:320` | Lire `mute_duration_secs` |
+| **Automod** | ~~Le mute IA + le mute vision hardcodent **600s**, ignorent `mute_duration_secs` existant~~ **✅ RÉSOLU** : les deux chemins lisent désormais `mute_duration_secs` (défaut `DEFAULT_MUTE_DURATION_SECS`) | `message_handler.rs:62`, `review.rs:511`, `vote/finalize.rs:125` | ~~Lire `mute_duration_secs`~~ (fait) |
 | **Sécurité** | Le lockdown et le slowmode **persistés** ignorent `lockdown_duration_secs` / la durée configurée (hardcode 600 / 300) | `detectors/lockdown.rs:141`, `detectors/slowmode.rs:80` | Lire la durée configurée |
 | **Confessions** | Couleur d'embed hardcodée `0xff5e5e` alors que `default_embed_color_hex` existe ; les modales submit/reply ignorent `min_chars`/`max_chars` | `confessions/mod.rs:503,669,152,378` | Lire les clés existantes |
 | **Voice** | Le message anti-flood affiche "30 secondes" en dur au lieu de `voice_flood_mute_duration_secs` | `voice/handlers/message.rs:70,88` | Lire la clé |

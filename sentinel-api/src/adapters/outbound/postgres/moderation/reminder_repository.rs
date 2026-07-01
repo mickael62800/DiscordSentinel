@@ -107,12 +107,44 @@ impl ReminderRepository for PgReminderRepository {
     }
 
     async fn cancel_for_action(&self, action_id: Uuid) -> Result<(), DomainError> {
-        sqlx::query("UPDATE sanction_reminders SET status = 'cancelled' WHERE action_id = $1 AND status = 'pending'")
-            .bind(action_id)
-            .execute(&self.pool)
-            .await
-            .map_err(pg_ctx("cancel_reminders"))?;
+        // BUG #2 : on annule le DM early (`status`) MAIS AUSSI la machine
+        // d'auto-unban (`unban_status`). Le worker `expire_temp_bans` claim sur
+        // `unban_status = 'pending'` (pas sur `status`) : sans flipper
+        // `unban_status`, un ban leve precocement declencherait quand meme un
+        // `sanction_expired_unban` tardif a `expires_at`.
+        sqlx::query(
+            "UPDATE sanction_reminders
+             SET status = 'cancelled',
+                 unban_status = CASE WHEN unban_status = 'pending' THEN 'cancelled' ELSE unban_status END
+             WHERE action_id = $1 AND (status = 'pending' OR unban_status = 'pending')",
+        )
+        .bind(action_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("cancel_reminders"))?;
         Ok(())
+    }
+
+    async fn cancel_for_target(&self, guild_id: &str, target_id: &str) -> Result<u64, DomainError> {
+        // Unban manuel precoce : on ne connait que (guild, target). On annule
+        // tous les rappels de ban temporaire encore actifs pour cet utilisateur
+        // afin que l'auto-unban ne rejoue pas plus tard sur un ban plus recent.
+        // Restreint a `action_type LIKE 'ban%'` : les mutes temporaires (timeout
+        // natif) ne sont pas concernes par un unban.
+        let res = sqlx::query(
+            "UPDATE sanction_reminders
+             SET status = CASE WHEN status = 'pending' THEN 'cancelled' ELSE status END,
+                 unban_status = 'cancelled'
+             WHERE guild_id = $1 AND target_id = $2
+               AND action_type LIKE 'ban%'
+               AND unban_status = 'pending'",
+        )
+        .bind(guild_id)
+        .bind(target_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("cancel_reminders_for_target"))?;
+        Ok(res.rows_affected())
     }
 
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, DomainError> {

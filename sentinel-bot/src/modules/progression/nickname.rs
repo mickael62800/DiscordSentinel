@@ -96,20 +96,79 @@ pub fn pick_emoji(member_roles: &[(u64, i64)], mappings: &[(u64, String)]) -> Op
     best.map(|(_, e)| e.to_string())
 }
 
+/// Vrai si `c` appartient a un bloc unicode d'emoji / symbole pictographique.
+///
+/// Volontairement large sur les blocs emoji (symboles, pictogrammes, dingbats,
+/// selecteurs de variation, ZWJ) mais EXCLUT les lettres latines accentuees
+/// (ex. « É », « Ö ») pour ne pas amputer un pseudo qui commence par un
+/// caractere accentue. Sert au strip generique d'un emoji staff obsolete
+/// quand la config a change / a ete desactivee (cf. `strip_leading_emoji`).
+fn is_emoji_scalar(c: char) -> bool {
+    let u = c as u32;
+    matches!(
+        u,
+        0x200D                    // Zero Width Joiner (sequences emoji)
+        | 0x20D0..=0x20FF         // Combining Diacritical Marks for Symbols
+        | 0x2190..=0x21FF         // Arrows
+        | 0x2300..=0x23FF         // Miscellaneous Technical (⌚ ⏰ …)
+        | 0x25A0..=0x25FF         // Geometric Shapes
+        | 0x2600..=0x26FF         // Miscellaneous Symbols (⚔ …)
+        | 0x2700..=0x27BF         // Dingbats
+        | 0x2900..=0x297F         // Supplemental Arrows-B
+        | 0x2B00..=0x2BFF         // Miscellaneous Symbols and Arrows
+        | 0xFE00..=0xFE0F         // Variation Selectors
+        | 0x1F000..=0x1FAFF       // Emoji supplementaires (crown, shield, flags…)
+    )
+}
+
+/// Retire UN cluster emoji en tete (chaine contigue de scalaires emoji, ZWJ et
+/// selecteurs de variation compris), suivi d'un espace de separation optionnel.
+///
+/// Generique : ne depend PAS de la config `known_emojis` courante, ce qui
+/// permet de nettoyer un ancien prefixe emoji quand l'admin desactive
+/// `staff_prefix_enabled` ou change `staff_role_emojis`. Un pseudo commencant
+/// par une lettre normale (meme accentuee) est laisse intact.
+fn strip_leading_emoji(name: &str) -> &str {
+    let mut end = 0;
+    let mut found = false;
+    for (i, c) in name.char_indices() {
+        if is_emoji_scalar(c) {
+            found = true;
+            end = i + c.len_utf8();
+        } else {
+            break;
+        }
+    }
+    if !found {
+        return name;
+    }
+    let rest = &name[end..];
+    rest.strip_prefix(' ').unwrap_or(rest)
+}
+
 /// Retire les prefixes connus (emoji staff puis niveau `[NN]`) pour retrouver
 /// le nom de base. Robuste a l'ordre pour rester idempotent sur re-application.
 /// L'emoji est matche comme prefixe exact (gere le multi-codepoint) ; un
 /// espace de separation eventuel est aussi retire.
+///
+/// Si aucun emoji connu ne matche (config changee/desactivee), on tente un
+/// strip generique d'UN cluster emoji en tete afin de nettoyer un ancien
+/// prefixe qui n'est plus dans la map courante (cf. `strip_leading_emoji`).
 pub fn strip_all_prefixes<'a>(name: &'a str, known_emojis: &[&str]) -> &'a str {
     let mut s = name;
+    let mut matched = false;
     for e in known_emojis {
         if e.is_empty() {
             continue;
         }
         if let Some(rest) = s.strip_prefix(e) {
             s = rest.strip_prefix(' ').unwrap_or(rest);
+            matched = true;
             break;
         }
+    }
+    if !matched {
+        s = strip_leading_emoji(s);
     }
     strip_level_prefix(s)
 }
@@ -453,6 +512,66 @@ mod tests {
     fn strip_all_level_only() {
         let known: [&str; 0] = [];
         assert_eq!(strip_all_prefixes("[42]Alice", &known), "Alice");
+    }
+
+    // ── BUG #6 : strip robuste a une config emoji desactivee/changee ──
+
+    #[test]
+    fn strip_all_emoji_not_in_known_disabled_config() {
+        // Feature staff desactivee -> known vide, mais un ancien emoji reste
+        // colle au pseudo. Il doit quand meme etre retire.
+        let known: [&str; 0] = [];
+        assert_eq!(strip_all_prefixes("\u{1f451}[12]Alice", &known), "Alice");
+    }
+
+    #[test]
+    fn strip_all_emoji_changed_map() {
+        // La map a change : l'emoji present n'est plus dans `known`.
+        let known = ["\u{1f6e1}\u{fe0f}"];
+        assert_eq!(strip_all_prefixes("\u{1f451}[7]Bob", &known), "Bob");
+    }
+
+    #[test]
+    fn strip_all_multi_codepoint_emoji_not_in_known() {
+        // Emoji ZWJ multi-scalaire retire generiquement (config changee).
+        let known: [&str; 0] = [];
+        assert_eq!(strip_all_prefixes("\u{1f6e1}\u{fe0f}[3]Bob", &known), "Bob");
+    }
+
+    #[test]
+    fn strip_all_accented_base_untouched() {
+        // Un pseudo commencant par une lettre accentuee n'est PAS ampute.
+        let known: [&str; 0] = [];
+        assert_eq!(strip_all_prefixes("\u{c9}lise", &known), "\u{c9}lise");
+        assert_eq!(strip_all_prefixes("\u{c9}lise", &known), "\u{c9}lise");
+    }
+
+    #[test]
+    fn strip_all_midname_emoji_untouched() {
+        // Emoji place par l'utilisateur EN MILIEU de nom : non leading -> intact.
+        let known: [&str; 0] = [];
+        assert_eq!(
+            strip_all_prefixes("Ali\u{1f451}ce", &known),
+            "Ali\u{1f451}ce"
+        );
+    }
+
+    #[test]
+    fn strip_all_generic_reapply_idempotent() {
+        // Re-strip d'un nom deja nettoye ne change rien.
+        let known: [&str; 0] = [];
+        let once = strip_all_prefixes("\u{1f451}[12]Alice", &known);
+        assert_eq!(strip_all_prefixes(once, &known), "Alice");
+    }
+
+    #[test]
+    fn strip_leading_emoji_only_one_cluster() {
+        // Deux clusters emoji separes par espace : seul le premier cluster +
+        // l'espace sont retires (le bot n'ajoute jamais qu'un seul emoji).
+        assert_eq!(
+            strip_leading_emoji("\u{1f451} \u{1f6e1}\u{fe0f}Alice"),
+            "\u{1f6e1}\u{fe0f}Alice"
+        );
     }
 
     // ── build_nickname_full ──

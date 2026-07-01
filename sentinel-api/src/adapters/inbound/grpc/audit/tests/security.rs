@@ -183,6 +183,7 @@ async fn analyze_new_member_delegates_and_maps_decision() {
             has_avatar: false,
             account_created_timestamp: 0,
             is_bot: false,
+            is_velocity_raid: false,
             recent_joins: vec![],
         }))
         .await
@@ -207,6 +208,7 @@ async fn analyze_new_member_maps_recent_joins_to_domain() {
             has_avatar: true,
             account_created_timestamp: 1700000000,
             is_bot: false,
+            is_velocity_raid: false,
             recent_joins: vec![
                 proto::RecentJoinEntry {
                     username: "bot1".into(),

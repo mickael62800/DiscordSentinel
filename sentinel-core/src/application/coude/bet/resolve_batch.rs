@@ -139,8 +139,23 @@ impl ResolveBettingBatchService {
         // Charge params balance pour la guild (Phase 132).
         let balance = self.load_balance(&combat.guild_id).await;
 
+        // Flavor lines : probabilite reglable par serveur, threadee en donnee
+        // via CombatCurses pour que le chemin batch honore le meme reglage que
+        // le chemin instantane (cf. resolve_now). Domaine reste pur.
+        let curses = engine::combat::CombatCurses {
+            flavor_line_probability: Some(
+                crate::application::coude::guild_settings::load_economy_config(
+                    &*self.bot_config_repo,
+                    &combat.guild_id,
+                )
+                .await
+                .flavor_line_probability,
+            ),
+            ..Default::default()
+        };
+
         // Moteur pur (domain).
-        let result = engine::combat::resolve_combat(
+        let result = engine::combat::resolve_combat_with_curses(
             &attacker,
             &defender,
             atk_hp,
@@ -150,6 +165,7 @@ impl ResolveBettingBatchService {
             combat.defender_special.as_deref(),
             &engine_events,
             &balance,
+            curses,
         );
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);

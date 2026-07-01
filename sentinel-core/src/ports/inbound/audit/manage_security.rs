@@ -22,6 +22,9 @@ pub struct AnalyzeNewMemberCommand {
     pub account_created_timestamp: i64,
     pub is_bot: bool,
     pub recent_joins: Vec<JoinInfo>,
+    /// Flood de vitesse detecte cote bot (buffer local `RaidDetector`).
+    /// Force une reponse guild-wide en mode auto/hybrid (raid massif).
+    pub is_velocity_raid: bool,
 }
 
 /// Decision de securite retournee par l'API apres analyse.

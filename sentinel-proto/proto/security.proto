@@ -59,6 +59,9 @@ message AnalyzeNewMemberRequest {
   bool is_bot = 6;
   // Joins recents dans la fenetre (buffer temporel du bot).
   repeated RecentJoinEntry recent_joins = 7;
+  // Flood de vitesse detecte cote bot (RaidDetector local) : force une
+  // reponse guild-wide en mode auto/hybrid (raid massif).
+  bool is_velocity_raid = 8;
 }
 
 message SecurityDecision {

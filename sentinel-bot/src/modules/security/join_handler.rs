@@ -245,6 +245,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
             user.created_at().unix_timestamp(),
             user.bot,
             recent_entries,
+            simple_raid,
         )
         .await
     {

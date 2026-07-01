@@ -199,12 +199,13 @@ impl ManageSecurityUseCase for ManageSecurityService {
                 decision.quarantine = quarantine_enabled;
                 decision.send_captcha = quarantine_enabled && captcha_enabled;
                 // Politique auto-vs-suggest sur la reponse GUILD-WIDE.
-                // Le signal de flood de vitesse est detecte cote bot ; ici on
-                // ne dispose que du score pattern, donc `is_velocity_raid=false`.
+                // Le flood de vitesse detecte cote bot est propage ici via
+                // `cmd.is_velocity_raid` : un flood force l'application auto en
+                // mode hybrid (raid massif).
                 decision.suggest_only = matches!(
                     security_analyzer::raid_response_mode(
                         analysis.score as i32,
-                        false,
+                        cmd.is_velocity_raid,
                         raid_mode,
                         raid_auto_threshold,
                     ),
@@ -216,6 +217,28 @@ impl ManageSecurityUseCase for ManageSecurityService {
                     analysis.score, analysis.similar_names, analysis.high_default_avatar_ratio, analysis.clustered_creation
                 );
             }
+        }
+
+        // 1b. Flood de vitesse (detecte cote bot) sans pattern raid API.
+        // Un flood est traite comme un raid massif : reponse GUILD-WIDE
+        // (lockdown / slowmode / bump verification), avec la meme politique
+        // auto-vs-suggest que le pattern raid. On ne dedouble pas si le pattern
+        // raid a deja arme la reponse ci-dessus.
+        if cmd.is_velocity_raid && !decision.is_raid {
+            decision.is_raid = true;
+            decision.raid_score = decision.raid_score.max(raid_score_threshold);
+            decision.activate_lockdown = lockdown_enabled;
+            decision.slowmode_secs = slowmode_secs;
+            decision.quarantine = quarantine_enabled;
+            decision.send_captcha = quarantine_enabled && captcha_enabled;
+            // Score bas (0) : seul le signal velocity decide l'auto en hybrid.
+            decision.suggest_only = matches!(
+                security_analyzer::raid_response_mode(0, true, raid_mode, raid_auto_threshold,),
+                security_analyzer::RaidResponseMode::Suggest
+            );
+            decision.event_type = "raid_detected".into();
+            decision.event_description =
+                "Flood de vitesse detecte (trop de joins en peu de temps)".into();
         }
 
         // 2. Compte suspect (trop jeune).

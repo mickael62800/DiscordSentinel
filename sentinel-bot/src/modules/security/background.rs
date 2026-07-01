@@ -46,7 +46,7 @@ pub fn spawn_background(ctx: Context) {
             let duration = data
                 .get::<SecurityConfigKey>()
                 .map(|c| c.lockdown_duration_secs)
-                .unwrap_or(600);
+                .unwrap_or(300);
 
             let expired = lockdown.expired_guilds(duration);
             for guild_id in expired {

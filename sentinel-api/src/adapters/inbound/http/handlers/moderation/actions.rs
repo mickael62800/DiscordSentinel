@@ -407,6 +407,32 @@ pub async fn execute_unban(
         .moderation_uc
         .delete_bans_for_user(&guild_id, &target_id)
         .await?;
+
+    // BUG #2 : un unban precoce doit annuler les rappels d'auto-unban encore
+    // actifs pour cet utilisateur, sinon le worker `expire_temp_bans` emettrait
+    // un `sanction_expired_unban` tardif a `expires_at` — qui pourrait lever un
+    // ban plus recent applique entre-temps. Best-effort : un echec ne bloque
+    // pas l'unban (deja applique cote Discord).
+    match state
+        .reminders_uc
+        .cancel_for_target(guild_id.as_str(), target_id.as_str())
+        .await
+    {
+        Ok(n) if n > 0 => tracing::info!(
+            guild_id = %guild_id,
+            target_id = %target_id,
+            cancelled = n,
+            "Rappels d'auto-unban annules suite a un unban manuel"
+        ),
+        Ok(_) => {}
+        Err(e) => tracing::warn!(
+            error = %e,
+            guild_id = %guild_id,
+            target_id = %target_id,
+            "Echec annulation des rappels d'auto-unban lors de l'unban manuel"
+        ),
+    }
+
     state.moderation_uc.log_action(command).await?;
 
     state.broadcaster.broadcast(
@@ -883,6 +909,17 @@ pub async fn delete_action(
                 target_id = %target_id,
                 "Echec unban Discord lors de l'annulation — suppression DB quand meme"
             ),
+        }
+
+        // BUG #2 : l'action ban annulee peut porter un rappel d'auto-unban
+        // encore 'pending'. On l'annule (keye sur l'action_id) pour que le
+        // worker `expire_temp_bans` ne rejoue pas un unban tardif. Best-effort.
+        if let Err(e) = state.reminders_uc.cancel_for_action(uuid).await {
+            tracing::warn!(
+                error = %e,
+                action_id = %uuid,
+                "Echec annulation du rappel d'auto-unban lors de l'annulation d'un ban"
+            );
         }
     } else if lower.starts_with("mute") || lower == "timeout" {
         match state

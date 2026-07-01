@@ -64,6 +64,22 @@ impl ReminderRepository for InMemoryReminderRepo {
         Ok(())
     }
 
+    async fn cancel_for_target(&self, guild_id: &str, target_id: &str) -> Result<u64, DomainError> {
+        let mut reminders = self.reminders.lock().await;
+        let mut count = 0u64;
+        for r in reminders.iter_mut() {
+            if r.guild_id.as_str() == guild_id
+                && r.target_id == target_id
+                && r.action_type.starts_with("ban")
+                && r.status == "pending"
+            {
+                r.status = "cancelled".into();
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
     async fn find_by_guild(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, DomainError> {
         let reminders = self.reminders.lock().await;
         Ok(reminders
@@ -172,6 +188,37 @@ async fn cancel_for_action_cancels_pending() {
 
     let by_guild = svc.list_by_guild("g1").await.unwrap();
     assert_eq!(by_guild[0].status, "cancelled");
+}
+
+// ══════════════════════════════════════════════════════════
+// Tests — cancel_for_target (BUG #2 : unban manuel precoce)
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn cancel_for_target_cancels_pending_ban_reminders() {
+    let svc = build_service();
+    let mut cmd = make_cmd(7200, 3600);
+    cmd.action_type = "ban_temp".into();
+    svc.create_reminder(cmd).await.unwrap();
+
+    let cancelled = svc.cancel_for_target("g1", "u1").await.unwrap();
+    assert_eq!(cancelled, 1);
+
+    let by_guild = svc.list_by_guild("g1").await.unwrap();
+    assert_eq!(by_guild[0].status, "cancelled");
+}
+
+#[tokio::test]
+async fn cancel_for_target_ignores_non_ban_reminders() {
+    let svc = build_service();
+    // make_cmd defaut = mute_temp : un unban ne doit pas l'annuler.
+    svc.create_reminder(make_cmd(7200, 3600)).await.unwrap();
+
+    let cancelled = svc.cancel_for_target("g1", "u1").await.unwrap();
+    assert_eq!(cancelled, 0);
+
+    let by_guild = svc.list_by_guild("g1").await.unwrap();
+    assert_eq!(by_guild[0].status, "pending");
 }
 
 // ══════════════════════════════════════════════════════════

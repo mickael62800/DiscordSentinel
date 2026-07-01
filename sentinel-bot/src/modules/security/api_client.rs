@@ -172,6 +172,7 @@ impl ApiClient {
         account_created_timestamp: i64,
         is_bot: bool,
         recent_joins: Vec<RecentJoinEntry>,
+        is_velocity_raid: bool,
     ) -> Result<SecurityDecisionResponse, String> {
         let req = proto_security::AnalyzeNewMemberRequest {
             guild_id: guild_id.to_string(),
@@ -180,6 +181,7 @@ impl ApiClient {
             has_avatar,
             account_created_timestamp,
             is_bot,
+            is_velocity_raid,
             recent_joins: recent_joins
                 .into_iter()
                 .map(|j| proto_security::RecentJoinEntry {

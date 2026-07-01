@@ -386,6 +386,7 @@ fn mk_member_cmd(is_bot: bool) -> AnalyzeNewMemberCommand {
         account_created_timestamp: Utc::now().timestamp() - 86400 * 365, // 1 an
         is_bot,
         recent_joins: vec![],
+        is_velocity_raid: false,
     }
 }
 
@@ -512,6 +513,7 @@ async fn analyze_new_member_suspicious_account_triggers_event() {
         account_created_timestamp: Utc::now().timestamp() - 3600, // 1h -> suspect
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let decision = svc.analyze_new_member(cmd).await.unwrap();
     assert!(decision.is_suspicious_account);
@@ -522,6 +524,42 @@ async fn analyze_new_member_suspicious_account_triggers_event() {
     assert_eq!(repo.saved.lock().unwrap().len(), 1);
     assert_eq!(audit.create_calls.lock().unwrap().len(), 1);
     assert_eq!(watched.watch_calls.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn analyze_new_member_velocity_raid_triggers_guildwide_auto() {
+    // BUG #1 : un flood de vitesse (detecte cote bot, sans pattern raid API)
+    // doit produire une reponse GUILD-WIDE. En mode hybrid, score bas -> le
+    // signal velocity force l'AUTO (suggest_only=false).
+    let (svc, _repo, _watched, _audit) = build_service_with_configs(
+        vec![
+            cfg_entry("raid_pattern_enabled", "true"),
+            cfg_entry("lockdown_enabled", "true"),
+            cfg_entry("slowmode_seconds", "30"),
+            cfg_entry("raid_mode", "hybrid"),
+            cfg_entry("raid_auto_threshold", "85"),
+        ],
+        vec![],
+    );
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        username: "alice".into(),
+        has_avatar: true,
+        account_created_timestamp: Utc::now().timestamp() - 86400 * 365, // compte ancien
+        is_bot: false,
+        recent_joins: vec![], // pas de pattern raid : seul le velocity fire
+        is_velocity_raid: true,
+    };
+    let decision = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(decision.is_raid, "velocity doit marquer un raid");
+    assert!(decision.activate_lockdown, "reponse guild-wide attendue");
+    assert_eq!(decision.slowmode_secs, 30);
+    assert!(
+        !decision.suggest_only,
+        "hybrid + velocity -> AUTO, pas suggest"
+    );
+    assert_eq!(decision.event_type, "raid_detected");
 }
 
 #[tokio::test]
@@ -564,6 +602,7 @@ async fn analyze_new_member_raid_pattern_overrides_suspicious() {
                 has_avatar: false,
             },
         ],
+        is_velocity_raid: false,
     };
     let decision = svc.analyze_new_member(cmd).await.unwrap();
     assert!(decision.is_raid);
@@ -617,6 +656,7 @@ async fn analyze_new_member_hybrid_low_score_suggests_only() {
                 has_avatar: true,
             },
         ],
+        is_velocity_raid: false,
     };
     let decision = svc.analyze_new_member(cmd).await.unwrap();
     assert!(decision.is_raid);
@@ -663,6 +703,7 @@ async fn analyze_new_member_auto_mode_never_suggests() {
                 has_avatar: true,
             },
         ],
+        is_velocity_raid: false,
     };
     let decision = svc.analyze_new_member(cmd).await.unwrap();
     assert!(decision.is_raid);
@@ -688,6 +729,7 @@ async fn analyze_new_member_config_bool_various_formats() {
         account_created_timestamp: Utc::now().timestamp() - 60,
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(d.quarantine);
@@ -712,6 +754,7 @@ async fn analyze_new_member_invalid_numeric_config_falls_back_to_defaults() {
         account_created_timestamp: Utc::now().timestamp() - 86400 * 30,
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(!d.is_suspicious_account);

@@ -232,6 +232,7 @@ async fn log_review_sanction(
     moderator_name: &str,
 ) {
     use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
 
     if !matches!(applied_action, "prevention" | "warn" | "mute" | "ban") {
         return;
@@ -240,16 +241,42 @@ async fn log_review_sanction(
     // C1 — anti double-strike : si l'auto-protection sévère a déjà journalisé
     // une sanction pour cet incident (mute auto AVANT la carte), la finalisation
     // ne doit PAS re-journaliser -> sinon un incident = deux strikes.
-    if review.sanction_logged {
-        metrics::counter!("automod_sanction_log_total", "result" => "skipped_already_logged")
+    //
+    // BUG #5 — exception : si l'admin finalise avec une action PLUS SÉVÈRE que
+    // l'auto-protection (qui applique un mute), on journalise quand même
+    // l'escalade (sinon l'action lourde n'apparaît nulle part -> sous-comptage),
+    // mais SANS second strike (le mute auto a déjà compté le strike de
+    // l'incident). Les finalisations de sévérité égale ou moindre restent
+    // ignorées comme avant.
+    let skip_strike = if review.sanction_logged {
+        use sentinel_core::domain::entities::moderation::review::automod::AppliedAction;
+        // L'auto-protection sévère journalise un mute : c'est notre référence.
+        let auto_severity = AppliedAction::Mute.severity();
+        let finalized_severity = AppliedAction::from_str(applied_action)
+            .map(|a| a.severity())
+            .unwrap_or(0);
+        if finalized_severity <= auto_severity {
+            metrics::counter!("automod_sanction_log_total", "result" => "skipped_already_logged")
+                .increment(1);
+            tracing::info!(
+                review_id = %review.id,
+                action = %applied_action,
+                "Sanction déjà journalisée par l'auto-protection : finalisation non re-journalisée (anti double-strike)"
+            );
+            return;
+        }
+        // Escalade plus sévère : on journalise l'action lourde sans strike.
+        metrics::counter!("automod_sanction_log_total", "result" => "escalation_no_strike")
             .increment(1);
         tracing::info!(
             review_id = %review.id,
             action = %applied_action,
-            "Sanction déjà journalisée par l'auto-protection : finalisation non re-journalisée (anti double-strike)"
+            "Finalisation plus sévère que l'auto-protection : escalade journalisée sans second strike (BUG #5)"
         );
-        return;
-    }
+        true
+    } else {
+        false
+    };
 
     // Duree du mute depuis la config guild (pour le rappel d'expiration + l'historique).
     let duration = if applied_action == "mute" {
@@ -281,17 +308,36 @@ async fn log_review_sanction(
         },
         duration,
     };
-    let logged = match state.moderation_uc.log_action_with_strike(cmd).await {
-        Ok(l) => l,
-        Err(e) => {
-            // Compteur "logs manquants" : si non nul en prod, on active l'outbox
-            // (cf. ADR / CR revue moderation). Mesure la fenetre resolve->log.
-            metrics::counter!("automod_sanction_log_total", "result" => "error").increment(1);
-            tracing::error!(error = %e, review_id = %review.id, action = %applied_action, "Echec log sanction (resolve) cote serveur");
-            return;
+    // BUG #5 : en cas d'escalade (skip_strike), on journalise l'action lourde
+    // via `log_action` (SANS strike : l'incident a déjà compté son strike lors
+    // du mute auto). Sinon, chemin nominal avec strike.
+    let logged = if skip_strike {
+        match state.moderation_uc.log_action(cmd).await {
+            Ok(action) => LoggedModerationAction {
+                action,
+                strike: None,
+            },
+            Err(e) => {
+                metrics::counter!("automod_sanction_log_total", "result" => "error").increment(1);
+                tracing::error!(error = %e, review_id = %review.id, action = %applied_action, "Echec log escalade sanction (resolve) cote serveur");
+                return;
+            }
+        }
+    } else {
+        match state.moderation_uc.log_action_with_strike(cmd).await {
+            Ok(l) => l,
+            Err(e) => {
+                // Compteur "logs manquants" : si non nul en prod, on active l'outbox
+                // (cf. ADR / CR revue moderation). Mesure la fenetre resolve->log.
+                metrics::counter!("automod_sanction_log_total", "result" => "error").increment(1);
+                tracing::error!(error = %e, review_id = %review.id, action = %applied_action, "Echec log sanction (resolve) cote serveur");
+                return;
+            }
         }
     };
-    metrics::counter!("automod_sanction_log_total", "result" => "ok").increment(1);
+    if !skip_strike {
+        metrics::counter!("automod_sanction_log_total", "result" => "ok").increment(1);
+    }
 
     // Memes broadcasts que l'endpoint /api/moderation/actions, pour que le
     // journal web et les notifications de strike restent a jour.

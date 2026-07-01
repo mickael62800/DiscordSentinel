@@ -169,7 +169,7 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
             // Durees de vie persistees : refletent la config security (env),
             // identiques a celles utilisees par les boucles de revert locales.
             let env_config = data.get::<super::SecurityConfigKey>();
-            let lockdown_duration = env_config.map(|c| c.lockdown_duration_secs).unwrap_or(600);
+            let lockdown_duration = env_config.map(|c| c.lockdown_duration_secs).unwrap_or(300);
             let slowmode_duration = env_config.map(|c| c.slowmode_duration_secs).unwrap_or(300);
             if lockdown {
                 if let Some(mgr) = data.get::<LockdownKey>() {

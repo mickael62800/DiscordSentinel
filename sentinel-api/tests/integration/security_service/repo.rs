@@ -188,6 +188,7 @@ async fn analyze_new_member_alt_detection_flags_similar_username() {
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(d.is_alt_account);
@@ -211,6 +212,7 @@ async fn analyze_new_member_alt_detection_no_match_when_names_differ() {
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400 * 30,
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(!d.is_alt_account);
@@ -251,6 +253,7 @@ async fn analyze_new_member_alt_detection_skipped_when_raid() {
                 has_avatar: false,
             },
         ],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(d.is_raid);
@@ -273,6 +276,7 @@ async fn analyze_new_member_no_bans_still_runs_alt_path() {
         account_created_timestamp: chrono::Utc::now().timestamp() - 86400,
         is_bot: false,
         recent_joins: vec![],
+        is_velocity_raid: false,
     };
     let d = svc.analyze_new_member(cmd).await.unwrap();
     assert!(!d.is_alt_account);

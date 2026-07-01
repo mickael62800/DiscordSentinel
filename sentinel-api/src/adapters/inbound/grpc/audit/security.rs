@@ -79,6 +79,7 @@ impl SecurityService for SecurityGrpc {
                 account_created_timestamp: req.account_created_timestamp,
                 is_bot: req.is_bot,
                 recent_joins,
+                is_velocity_raid: req.is_velocity_raid,
             })
             .await
             .map_err(domain_to_status)?;

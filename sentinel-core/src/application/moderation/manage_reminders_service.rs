@@ -85,6 +85,10 @@ impl ManageRemindersUseCase for ManageRemindersService {
         self.repo.cancel_for_action(action_id).await
     }
 
+    async fn cancel_for_target(&self, guild_id: &str, target_id: &str) -> Result<u64, DomainError> {
+        self.repo.cancel_for_target(guild_id, target_id).await
+    }
+
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, DomainError> {
         self.repo.find_by_guild(guild_id).await
     }

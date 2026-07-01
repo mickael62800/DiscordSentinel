@@ -75,7 +75,7 @@ impl LockdownManager {
     /// `persist_duration_secs` : duree de vie persistee cote API pour que le
     /// worker `expire_lockdown` sache quand restaurer. Doit refleter la duree
     /// utilisee par la boucle de revert locale (`SecurityConfig.lockdown_duration_secs`,
-    /// reglable via l'env `LOCKDOWN_DURATION_SECS`, defaut 600).
+    /// reglable via l'env `LOCKDOWN_DURATION_SECS`, defaut 300).
     pub async fn activate(&self, ctx: &Context, guild_id: GuildId, persist_duration_secs: u64) {
         if self.active.contains_key(&guild_id) {
             return; // Deja actif

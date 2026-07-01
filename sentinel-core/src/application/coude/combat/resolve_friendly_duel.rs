@@ -12,7 +12,8 @@ use async_trait::async_trait;
 use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude::coude_combat_engine::combat::resolve_combat;
+use crate::domain::services::coude::coude_combat_engine::combat::resolve_combat_with_curses;
+use crate::domain::services::coude::coude_combat_engine::combat::CombatCurses;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelInput;
@@ -85,8 +86,18 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             hp_current: Some(defender.hp_current),
         };
 
+        let settings = GuildSettings::load(&*self.bot_config_repo, &input.guild_id).await;
+
+        // Flavor lines : probabilite reglable par serveur, threadee en donnee
+        // via CombatCurses pour que le duel amical honore le meme reglage que
+        // les autres chemins de combat. Domaine reste pur.
+        let curses = CombatCurses {
+            flavor_line_probability: Some(settings.economy_config().flavor_line_probability),
+            ..Default::default()
+        };
+
         let params = BalanceParams::default();
-        let result = resolve_combat(
+        let result = resolve_combat_with_curses(
             &attacker_lite,
             &defender_lite,
             attacker.hp_current,
@@ -96,9 +107,9 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             None,
             &[],
             &params,
+            curses,
         );
 
-        let settings = GuildSettings::load(&*self.bot_config_repo, &input.guild_id).await;
         let cfg_winner_xp = settings.get_i64("friendly_winner_xp", DEFAULT_FRIENDLY_WINNER_XP);
         let cfg_loser_xp = settings.get_i64("friendly_loser_xp", DEFAULT_FRIENDLY_LOSER_XP);
 
