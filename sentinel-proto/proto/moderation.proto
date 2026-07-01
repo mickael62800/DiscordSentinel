@@ -13,6 +13,10 @@ package sentinel.moderation.v1;
 service ModerationService {
   rpc LogAction(LogActionRequest) returns (ModerationAction);
   rpc GetHistory(GetHistoryRequest) returns (UserHistory);
+  // Copilote de moderation (lecture seule, consultatif) : contexte d'un membre
+  // et suggestion de sanction proportionnee. Chemin bot/interne de confiance ;
+  // le bot verifie la permission de moderation Discord avant d'appeler.
+  rpc GetMemberContext(GetMemberContextRequest) returns (MemberModerationContext);
 }
 
 message LogActionRequest {
@@ -69,4 +73,48 @@ message UserHistory {
   uint32 total_mutes = 4;
   uint32 total_bans = 5;
   repeated ModerationAction actions = 6;
+}
+
+// ── Copilote de moderation ──
+
+message GetMemberContextRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  // Fenetre d'agregation en jours (defaut 90, borne 1..=365 cote service).
+  int64 lookback_days = 3;
+  // Nombre minimal de precedents pour suivre la jurisprudence (defaut 3).
+  uint32 min_precedents = 4;
+}
+
+// Compte d'une action (sanction par type OU precedent par action retenue).
+message ActionCount {
+  string action = 1;
+  uint32 count = 2;
+}
+
+// Distribution des precedents (jurisprudence) pour la categorie dominante.
+message PrecedentDistribution {
+  string flag_category = 1;
+  repeated ActionCount counts_by_action = 2;
+  uint32 total = 3;
+}
+
+// Suggestion de sanction consultative + explication (POURQUOI).
+message SanctionSuggestion {
+  // Action suggeree (`warn`|`mute`|`ban`|...) ou absente si base insuffisante.
+  optional string action = 1;
+  // Fondement : "escalation" | "precedent" | "both" | "insufficient".
+  string basis = 2;
+  string rationale = 3;
+  uint32 precedent_count = 4;
+}
+
+message MemberModerationContext {
+  uint32 active_strikes = 1;
+  repeated ActionCount sanctions_by_type = 2;
+  // RFC3339, absent si aucune sanction.
+  optional string last_sanction_at = 3;
+  uint32 open_reviews = 4;
+  PrecedentDistribution precedents = 5;
+  SanctionSuggestion suggestion = 6;
 }

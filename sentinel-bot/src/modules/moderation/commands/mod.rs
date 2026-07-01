@@ -4,6 +4,7 @@ pub mod call;
 pub mod card;
 pub mod compare;
 pub mod context;
+pub mod copilote;
 pub mod evidence;
 pub mod expirations;
 pub mod export;
@@ -176,6 +177,7 @@ pub fn all() -> Vec<CreateCommand> {
         call::register(),
         card::register(),
         context::register(),
+        copilote::register(),
         appeal::register(),
         export::register(),
         expirations::register(),

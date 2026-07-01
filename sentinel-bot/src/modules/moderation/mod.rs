@@ -93,6 +93,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "call" => commands::call::handle(ctx, command).await,
         "signalement" => commands::card::handle(ctx, command).await,
         "context" => commands::context::handle(ctx, command).await,
+        "copilote" => commands::copilote::handle(ctx, command).await,
         "appeal" => commands::appeal::handle(ctx, command).await,
         "expirations" => commands::expirations::handle(ctx, command).await,
         "compare" => commands::compare::handle(ctx, command).await,

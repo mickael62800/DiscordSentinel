@@ -571,6 +571,42 @@ impl ManageModerationUseCase for MockModerationUc {
     }
 }
 
+struct MockCopilotUc;
+
+#[async_trait]
+impl sentinel_api::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
+    for MockCopilotUc
+{
+    async fn get_member_context(
+        &self,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: u32,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::copilot::MemberModerationContext,
+        DomainError,
+    > {
+        use sentinel_core::domain::entities::moderation::copilot::MemberModerationContext;
+        use sentinel_core::domain::entities::moderation::copilot::PrecedentDistribution;
+        use sentinel_core::domain::entities::moderation::copilot::SanctionSuggestion;
+        use sentinel_core::domain::entities::moderation::copilot::SuggestionBasis;
+        Ok(MemberModerationContext {
+            active_strikes: 0,
+            sanctions_by_type: vec![],
+            last_sanction_at: None,
+            open_reviews: 0,
+            precedents: PrecedentDistribution::empty(""),
+            suggestion: SanctionSuggestion {
+                action: None,
+                basis: SuggestionBasis::Insufficient,
+                rationale: "pas assez de precedents".into(),
+                precedent_count: 0,
+            },
+        })
+    }
+}
+
 struct MockRemindersUc;
 
 #[async_trait]
@@ -616,6 +652,7 @@ async fn moderation_log_action_and_get_history() {
     let svc = ModerationServiceServer::new(ModerationGrpc {
         moderation_uc: Arc::new(MockModerationUc),
         reminders_uc: Arc::new(MockRemindersUc),
+        moderation_copilot_uc: Arc::new(MockCopilotUc),
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = ModerationServiceClient::connect(Endpoint::from_shared(url).unwrap())

@@ -87,6 +87,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let moderation = ModerationGrpc {
         moderation_uc: state.moderation_uc.clone(),
         reminders_uc: state.reminders_uc.clone(),
+        moderation_copilot_uc: state.moderation_copilot_uc.clone(),
     };
     let blackjack = BlackjackGrpc {
         svc: state.blackjack_svc.clone(),

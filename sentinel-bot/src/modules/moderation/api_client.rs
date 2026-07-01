@@ -119,6 +119,45 @@ pub struct SanctionReminder {
     pub created_at: String,
 }
 
+/// Copilote — compte d'une action (sanction par type ou precedent par action).
+#[derive(Debug, Clone)]
+pub struct CopilotActionCount {
+    pub action: String,
+    pub count: u32,
+}
+
+/// Copilote — distribution des precedents (jurisprudence) pour la categorie
+/// dominante du membre.
+#[derive(Debug, Clone)]
+pub struct CopilotPrecedents {
+    pub flag_category: String,
+    pub counts_by_action: Vec<CopilotActionCount>,
+    pub total: u32,
+}
+
+/// Copilote — suggestion de sanction consultative + explication.
+#[derive(Debug, Clone)]
+pub struct CopilotSuggestion {
+    /// Action suggeree (`warn`|`mute`|`ban`|...) ou `None` si base insuffisante.
+    pub action: Option<String>,
+    /// Fondement : `escalation` | `precedent` | `both` | `insufficient`.
+    pub basis: String,
+    pub rationale: String,
+    pub precedent_count: u32,
+}
+
+/// Copilote — contexte de moderation complet d'un membre (lecture seule).
+#[derive(Debug, Clone)]
+pub struct MemberContext {
+    pub active_strikes: u32,
+    pub sanctions_by_type: Vec<CopilotActionCount>,
+    /// Derniere sanction (RFC 3339), le cas echeant.
+    pub last_sanction_at: Option<String>,
+    pub open_reviews: u32,
+    pub precedents: CopilotPrecedents,
+    pub suggestion: CopilotSuggestion,
+}
+
 /// Client API de la moderation.
 pub struct ApiClient {
     base: Arc<BaseApiClient>,
@@ -210,6 +249,51 @@ impl ApiClient {
                     strikes_count: None,
                 })
                 .collect(),
+        })
+    }
+
+    /// Copilote de moderation (gRPC) : contexte d'un membre + suggestion de
+    /// sanction proportionnee et explicable. Lecture seule, consultatif.
+    pub async fn get_member_context(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        lookback_days: i64,
+        min_precedents: u32,
+    ) -> Result<MemberContext, String> {
+        let req = proto_mod::GetMemberContextRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            lookback_days,
+            min_precedents,
+        };
+        let ctx = crate::grpc_call!(self.grpc, moderation, get_member_context, req)?;
+        let map_counts = |v: Vec<proto_mod::ActionCount>| {
+            v.into_iter()
+                .map(|c| CopilotActionCount {
+                    action: c.action,
+                    count: c.count,
+                })
+                .collect::<Vec<_>>()
+        };
+        let precedents = ctx.precedents.unwrap_or_default();
+        let suggestion = ctx.suggestion.unwrap_or_default();
+        Ok(MemberContext {
+            active_strikes: ctx.active_strikes,
+            sanctions_by_type: map_counts(ctx.sanctions_by_type),
+            last_sanction_at: ctx.last_sanction_at,
+            open_reviews: ctx.open_reviews,
+            precedents: CopilotPrecedents {
+                flag_category: precedents.flag_category,
+                counts_by_action: map_counts(precedents.counts_by_action),
+                total: precedents.total,
+            },
+            suggestion: CopilotSuggestion {
+                action: suggestion.action,
+                basis: suggestion.basis,
+                rationale: suggestion.rationale,
+                precedent_count: suggestion.precedent_count,
+            },
         })
     }
 

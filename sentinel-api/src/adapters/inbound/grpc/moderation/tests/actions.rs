@@ -254,10 +254,58 @@ impl ManageRemindersUseCase for MockRemindersUc {
     }
 }
 
+/// Mock du use case copilote : renvoie un contexte fixe deterministe.
+#[derive(Default)]
+struct MockCopilotUc {
+    calls: Mutex<Vec<(String, String, i64, u32)>>,
+}
+
+use sentinel_core::domain::entities::moderation::copilot::MemberModerationContext;
+use sentinel_core::domain::entities::moderation::copilot::PrecedentDistribution;
+use sentinel_core::domain::entities::moderation::copilot::SanctionSuggestion;
+use sentinel_core::domain::entities::moderation::copilot::SuggestionBasis;
+use sentinel_core::domain::entities::moderation::review::automod::AppliedAction;
+
+#[async_trait]
+impl ModerationCopilotUseCase for MockCopilotUc {
+    async fn get_member_context(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        lookback_days: i64,
+        min_precedents: u32,
+    ) -> Result<MemberModerationContext, DomainError> {
+        self.calls.lock().unwrap().push((
+            guild_id.into(),
+            user_id.into(),
+            lookback_days,
+            min_precedents,
+        ));
+        Ok(MemberModerationContext {
+            active_strikes: 2,
+            sanctions_by_type: vec![("warn".into(), 3), ("mute".into(), 1)],
+            last_sanction_at: Some(ts()),
+            open_reviews: 1,
+            precedents: PrecedentDistribution {
+                flag_category: "phishing".into(),
+                counts_by_action: vec![("ban".into(), 4), ("mute".into(), 1)],
+                total: 5,
+            },
+            suggestion: SanctionSuggestion {
+                action: Some(AppliedAction::Ban),
+                basis: SuggestionBasis::Both,
+                rationale: "jurisprudence concordante".into(),
+                precedent_count: 5,
+            },
+        })
+    }
+}
+
 fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
     ModerationGrpc {
         moderation_uc: uc,
         reminders_uc: Arc::new(MockRemindersUc),
+        moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
 
@@ -333,6 +381,44 @@ async fn get_history_returns_full_user_data() {
     assert_eq!(h.target_name, "Alice");
     assert_eq!(h.total_warns, 5);
     assert_eq!(h.actions.len(), 1);
+}
+
+#[tokio::test]
+async fn get_member_context_maps_domain_to_proto() {
+    let copilot = Arc::new(MockCopilotUc::default());
+    let g = ModerationGrpc {
+        moderation_uc: Arc::new(MockModerationUc::default()),
+        reminders_uc: Arc::new(MockRemindersUc),
+        moderation_copilot_uc: copilot.clone(),
+    };
+    let resp = g
+        .get_member_context(Request::new(proto::GetMemberContextRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            lookback_days: 90,
+            min_precedents: 3,
+        }))
+        .await
+        .unwrap()
+        .into_inner();
+
+    assert_eq!(
+        copilot.calls.lock().unwrap()[0],
+        ("g".into(), "u".into(), 90, 3)
+    );
+    assert_eq!(resp.active_strikes, 2);
+    assert_eq!(resp.sanctions_by_type.len(), 2);
+    assert_eq!(resp.sanctions_by_type[0].action, "warn");
+    assert_eq!(resp.sanctions_by_type[0].count, 3);
+    assert_eq!(resp.open_reviews, 1);
+    assert!(resp.last_sanction_at.is_some());
+    let prec = resp.precedents.unwrap();
+    assert_eq!(prec.flag_category, "phishing");
+    assert_eq!(prec.total, 5);
+    let sugg = resp.suggestion.unwrap();
+    assert_eq!(sugg.action.as_deref(), Some("ban"));
+    assert_eq!(sugg.basis, "both");
+    assert_eq!(sugg.precedent_count, 5);
 }
 
 #[tokio::test]

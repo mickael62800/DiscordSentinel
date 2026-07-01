@@ -21,14 +21,22 @@ use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use crate::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase;
+use crate::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase;
 use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
 use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
+use sentinel_core::domain::entities::moderation::copilot::MemberModerationContext;
+use sentinel_core::domain::entities::moderation::copilot::PrecedentDistribution;
+use sentinel_core::domain::entities::moderation::copilot::SanctionSuggestion;
 pub struct ModerationGrpc {
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
     /// Auto-creation des rappels/enregistrements d'expiration pour les sanctions
     /// temporaires journalisees par le bot (chemin gRPC). Aligne le comportement
     /// sur le handler HTTP `log_action`.
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,
+    /// Copilote de moderation (lecture seule, consultatif). Chemin bot/interne
+    /// de confiance : aucune autorisation ici (le bot verifie la permission de
+    /// moderation Discord avant d'appeler), coherent avec `log_action`/`get_history`.
+    pub moderation_copilot_uc: Arc<dyn ModerationCopilotUseCase>,
 }
 
 #[tonic::async_trait]
@@ -128,6 +136,24 @@ impl ModerationService for ModerationGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(user_history_to_proto(history)))
     }
+
+    async fn get_member_context(
+        &self,
+        request: Request<proto::GetMemberContextRequest>,
+    ) -> Result<Response<proto::MemberModerationContext>, Status> {
+        let req = request.into_inner();
+        let context = self
+            .moderation_copilot_uc
+            .get_member_context(
+                &req.guild_id,
+                &req.user_id,
+                req.lookback_days,
+                req.min_precedents,
+            )
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(member_context_to_proto(context)))
+    }
 }
 
 fn moderation_action_to_proto(a: ModerationAction) -> proto::ModerationAction {
@@ -163,6 +189,41 @@ fn user_history_to_proto(h: UserModerationHistory) -> proto::UserHistory {
             .into_iter()
             .map(moderation_action_to_proto)
             .collect(),
+    }
+}
+
+fn counts_to_proto(counts: Vec<(String, u32)>) -> Vec<proto::ActionCount> {
+    counts
+        .into_iter()
+        .map(|(action, count)| proto::ActionCount { action, count })
+        .collect()
+}
+
+fn precedents_to_proto(p: PrecedentDistribution) -> proto::PrecedentDistribution {
+    proto::PrecedentDistribution {
+        flag_category: p.flag_category,
+        counts_by_action: counts_to_proto(p.counts_by_action),
+        total: p.total,
+    }
+}
+
+fn suggestion_to_proto(s: SanctionSuggestion) -> proto::SanctionSuggestion {
+    proto::SanctionSuggestion {
+        action: s.action.map(|a| a.as_str().to_string()),
+        basis: s.basis.as_str().to_string(),
+        rationale: s.rationale,
+        precedent_count: s.precedent_count,
+    }
+}
+
+fn member_context_to_proto(c: MemberModerationContext) -> proto::MemberModerationContext {
+    proto::MemberModerationContext {
+        active_strikes: c.active_strikes,
+        sanctions_by_type: counts_to_proto(c.sanctions_by_type),
+        last_sanction_at: c.last_sanction_at.map(|d| d.to_rfc3339()),
+        open_reviews: c.open_reviews,
+        precedents: Some(precedents_to_proto(c.precedents)),
+        suggestion: Some(suggestion_to_proto(c.suggestion)),
     }
 }
 
