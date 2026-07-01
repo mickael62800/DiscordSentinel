@@ -60,6 +60,8 @@ pub struct AppState {
     pub notes_uc: Arc<dyn ManageNotesUseCase>,
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,
     pub strikes_uc: Arc<dyn ManageStrikesUseCase>,
+    pub moderation_copilot_uc:
+        Arc<dyn crate::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase>,
     pub members_uc: Arc<dyn ManageMembersUseCase>,
     pub analytics_repo: Arc<dyn AnalyticsRepository>,
     pub daily_activity_repo: Arc<dyn DailyActivityRepository>,

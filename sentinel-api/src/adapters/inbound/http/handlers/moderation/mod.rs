@@ -1,5 +1,6 @@
 pub mod actions;
 pub mod automod;
+pub mod copilot;
 pub mod infractions;
 pub mod notes;
 pub mod purge;

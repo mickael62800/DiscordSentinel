@@ -49,6 +49,25 @@ pub struct UserStrike {
     pub created_at: DateTime<Utc>,
 }
 
+/// Logique de correspondance d'echelle (ladder) partagee : trie les seuils par
+/// nombre de strikes decroissant et retourne l'action + la duree du PREMIER
+/// seuil atteint (`active_count >= seuil.strikes`). Fonction pure, sans I/O.
+///
+/// Centralise la regle jadis inline dans `ManageStrikesService::add_strike`
+/// afin que le copilote de moderation la reutilise a l'identique (pas de
+/// duplication de la logique d'escalade).
+pub fn escalation_for(
+    thresholds: &[StrikeThreshold],
+    active_count: u32,
+) -> Option<(String, Option<u64>)> {
+    let mut sorted = thresholds.to_vec();
+    sorted.sort_by(|a, b| b.strikes.cmp(&a.strikes));
+    sorted
+        .iter()
+        .find(|t| active_count >= t.strikes)
+        .map(|t| (t.action.clone(), t.duration))
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrikeResult {
     pub strike: UserStrike,

@@ -1,4 +1,5 @@
 pub mod action;
+pub mod copilot;
 pub mod detection_flags;
 pub mod infraction;
 pub mod modstats;

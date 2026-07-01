@@ -34,6 +34,10 @@ fn moderation_inner() -> Router<AppState> {
             get(handlers::moderation::actions::get_history),
         )
         .route(
+            "/{guild_id}/copilot/{user_id}",
+            get(handlers::moderation::copilot::get_member_context),
+        )
+        .route(
             "/modstats/{guild_id}",
             get(handlers::moderation::actions::get_modstats),
         )
@@ -104,4 +108,18 @@ pub fn routes() -> Router<AppState> {
         .nest("/api/strikes", strikes_inner())
         .nest("/api/notes", notes_inner())
         .nest("/api/reminders", reminders_inner())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Regression : la route dynamique `/{guild_id}/copilot/{user_id}` coexiste
+    /// avec les routes statiques (`/actions`, `/history/...`, etc.) sans
+    /// conflit matchit (axum 0.8). La construction du routeur ne doit pas paniquer.
+    #[test]
+    fn moderation_router_builds_without_conflict() {
+        let _ = moderation_inner();
+        let _ = routes();
+    }
 }

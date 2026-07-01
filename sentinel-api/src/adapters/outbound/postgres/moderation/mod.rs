@@ -1,6 +1,7 @@
 pub mod automod_review_repository;
 pub mod evidence_repository;
 pub mod infraction_repository;
+pub mod moderation_copilot_repository;
 pub mod moderation_repository;
 pub mod notes_repository;
 pub mod pending_action_repository;

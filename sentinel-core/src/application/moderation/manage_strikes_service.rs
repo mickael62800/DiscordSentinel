@@ -5,6 +5,7 @@ use chrono::Duration;
 use chrono::Utc;
 use uuid::Uuid;
 
+use crate::domain::entities::moderation::action::strikes::escalation_for;
 use crate::domain::entities::moderation::action::strikes::StrikeConfig;
 use crate::domain::entities::moderation::action::strikes::StrikeResult;
 use crate::domain::entities::moderation::action::strikes::UserStrike;
@@ -63,15 +64,11 @@ impl ManageStrikesUseCase for ManageStrikesService {
             .await?;
         let active_count = active.len() as u32;
 
-        let mut sorted_thresholds = config.thresholds.clone();
-        sorted_thresholds.sort_by(|a, b| b.strikes.cmp(&a.strikes));
-
-        let escalation = sorted_thresholds.iter().find(|t| active_count >= t.strikes);
-
-        let (escalation_action, escalation_duration) = match escalation {
-            Some(t) => (Some(t.action.clone()), t.duration),
-            None => (None, None),
-        };
+        let (escalation_action, escalation_duration) =
+            match escalation_for(&config.thresholds, active_count) {
+                Some((action, duration)) => (Some(action), duration),
+                None => (None, None),
+            };
 
         Ok(StrikeResult {
             strike,

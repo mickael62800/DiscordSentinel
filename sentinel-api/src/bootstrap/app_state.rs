@@ -266,6 +266,23 @@ pub async fn build_app_state(
     let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
     let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
     let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo.clone()));
+    // Copilote de moderation (lecture seule) : reutilise le use case strikes
+    // (ladder d'escalade) + un port focalise pour l'historique & la
+    // jurisprudence automod (anti-ancrage : exclut les reviews 'voting').
+    let moderation_copilot_repo: Arc<
+        dyn crate::ports::outbound::moderation::moderation_copilot_repository::ModerationCopilotRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::moderation::moderation_copilot_repository::PgModerationCopilotRepository::new(pg_pool.clone()),
+    );
+    let moderation_copilot_uc: Arc<
+        dyn crate::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase,
+    > = Arc::new(
+        crate::application::moderation::manage_moderation_copilot_service::ManageModerationCopilotService::new(
+            strikes_uc.clone()
+                as Arc<dyn crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase>,
+            moderation_copilot_repo,
+        ),
+    );
     let moderation_uc = Arc::new(
         ManageModerationService::new(moderation_repo.clone(), strike_repo.clone(), cache.clone())
             .with_strikes_uc(strikes_uc.clone()
@@ -814,6 +831,7 @@ pub async fn build_app_state(
         notes_uc,
         reminders_uc,
         strikes_uc,
+        moderation_copilot_uc,
         members_uc,
         analytics_repo,
         daily_activity_repo,

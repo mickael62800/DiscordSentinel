@@ -814,6 +814,38 @@ impl ManageStrikesUseCase for StubStrikes {
     }
 }
 
+pub struct StubModerationCopilot;
+#[async_trait]
+impl sentinel_api::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
+    for StubModerationCopilot
+{
+    async fn get_member_context(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _lookback_days: i64,
+        _min_precedents: u32,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::copilot::MemberModerationContext,
+        DomainError,
+    > {
+        use sentinel_core::domain::entities::moderation::copilot::*;
+        Ok(MemberModerationContext {
+            active_strikes: 0,
+            sanctions_by_type: vec![],
+            last_sanction_at: None,
+            open_reviews: 0,
+            precedents: PrecedentDistribution::default(),
+            suggestion: SanctionSuggestion {
+                action: None,
+                basis: SuggestionBasis::Insufficient,
+                rationale: "stub".into(),
+                precedent_count: 0,
+            },
+        })
+    }
+}
+
 // ══════════════════════════════════════════════════════════
 // Stub Repositories (outbound)
 // ══════════════════════════════════════════════════════════
@@ -3123,6 +3155,7 @@ fn base_state() -> AppState {
         notes_uc: Arc::new(StubNotes),
         reminders_uc: Arc::new(StubReminders),
         strikes_uc: Arc::new(StubStrikes),
+        moderation_copilot_uc: Arc::new(StubModerationCopilot),
         analytics_repo: Arc::new(StubAnalyticsRepo),
         daily_activity_repo: Arc::new(StubDailyActivityRepo),
         age_ban_repo: Arc::new(
