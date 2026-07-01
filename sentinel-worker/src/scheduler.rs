@@ -75,7 +75,7 @@ pub fn start(
     // ─────────────────────────────────────────────────────────────
     spawn_periodic(
         "automod_close_votes",
-        60,
+        config.automod_close_votes_secs,
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
@@ -88,7 +88,7 @@ pub fn start(
     // transcript restent en DB (trace web conservee).
     spawn_periodic(
         "automod_cleanup_cards",
-        86_400,
+        config.automod_cleanup_cards_secs,
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
@@ -287,7 +287,7 @@ pub fn start(
     // un tick horaire publie au plus tot apres le 1er du mois sans spammer.
     spawn_periodic(
         "publish_monthly_ranking",
-        3_600,
+        config.monthly_ranking_check_secs,
         pool.clone(),
         shutdown.clone(),
         api_url.clone(),
@@ -550,7 +550,7 @@ pub fn start(
             // UTC (gate dans resolve_tournament::run). Un intervalle <= 1h
             // garantit qu'un tick tombe toujours dans l'heure 23h, peu importe
             // l'heure de demarrage du worker. Idempotent via UNIQUE(guild,week).
-            3_600,
+            config.tournament_check_secs,
             pool.clone(),
             shutdown.clone(),
             api_url.clone(),

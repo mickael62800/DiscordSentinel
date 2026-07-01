@@ -109,6 +109,21 @@ const DEFAULT_GAME_IDLE_SHUTDOWN_CHECK_SECS: u64 = SECS_PER_HOUR;
 const DEFAULT_GAME_RECONCILER_SECS: u64 = SECS_PER_HOUR;
 const DEFAULT_GAME_IMAGE_CLEANUP_SECS: u64 = 24 * SECS_PER_HOUR;
 
+// ── Defauts automod ──
+/// Cloture des votes de moderation a echeance : tick 60s. CHEMIN CRITIQUE —
+/// seule voie qui ferme les cartes de vote a leur deadline.
+const DEFAULT_AUTOMOD_CLOSE_VOTES_SECS: u64 = SECS_PER_MINUTE;
+/// Suppression des cartes closes vieilles de > 1 mois : tick 24h.
+const DEFAULT_AUTOMOD_CLEANUP_CARDS_SECS: u64 = 24 * SECS_PER_HOUR;
+
+// ── Defauts classement mensuel (analytics) ──
+/// Check horaire ; l'API gate sur le passage de mois.
+const DEFAULT_MONTHLY_RANKING_CHECK_SECS: u64 = SECS_PER_HOUR;
+
+// ── Defauts tournoi coude ──
+/// Tick horaire ; le job n'agit que dans la fenetre dimanche >= 23h UTC.
+const DEFAULT_TOURNAMENT_CHECK_SECS: u64 = SECS_PER_HOUR;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -195,6 +210,16 @@ pub struct WorkerConfig {
     pub game_idle_shutdown_check_interval_secs: u64,
     pub game_reconciler_interval_secs: u64,
     pub game_image_cleanup_interval_secs: u64,
+
+    // ── Automod ──
+    pub automod_close_votes_secs: u64,
+    pub automod_cleanup_cards_secs: u64,
+
+    // ── Classement mensuel (analytics) ──
+    pub monthly_ranking_check_secs: u64,
+
+    // ── Tournoi (coude) ──
+    pub tournament_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -382,6 +407,25 @@ impl WorkerConfig {
                 "GAME_IMAGE_CLEANUP_INTERVAL_SECS",
                 DEFAULT_GAME_IMAGE_CLEANUP_SECS,
             ),
+
+            // automod
+            automod_close_votes_secs: load_env(
+                "AUTOMOD_CLOSE_VOTES_SECS",
+                DEFAULT_AUTOMOD_CLOSE_VOTES_SECS,
+            ),
+            automod_cleanup_cards_secs: load_env(
+                "AUTOMOD_CLEANUP_CARDS_SECS",
+                DEFAULT_AUTOMOD_CLEANUP_CARDS_SECS,
+            ),
+
+            // classement mensuel (analytics)
+            monthly_ranking_check_secs: load_env(
+                "MONTHLY_RANKING_CHECK_SECS",
+                DEFAULT_MONTHLY_RANKING_CHECK_SECS,
+            ),
+
+            // tournoi (coude)
+            tournament_check_secs: load_env("TOURNAMENT_CHECK_SECS", DEFAULT_TOURNAMENT_CHECK_SECS),
         }
     }
 
@@ -690,6 +734,36 @@ impl WorkerConfig {
             "image_cleanup_interval_secs",
             "GAME_IMAGE_CLEANUP_INTERVAL_SECS",
             DEFAULT_GAME_IMAGE_CLEANUP_SECS,
+        );
+
+        // automod — cles du schema automod-bot (module flattene).
+        self.automod_close_votes_secs = config_or_env(
+            db,
+            "automod_close_votes_secs",
+            "AUTOMOD_CLOSE_VOTES_SECS",
+            DEFAULT_AUTOMOD_CLOSE_VOTES_SECS,
+        );
+        self.automod_cleanup_cards_secs = config_or_env(
+            db,
+            "automod_cleanup_cards_secs",
+            "AUTOMOD_CLEANUP_CARDS_SECS",
+            DEFAULT_AUTOMOD_CLEANUP_CARDS_SECS,
+        );
+
+        // classement mensuel — cle du schema analytics (module flattene).
+        self.monthly_ranking_check_secs = config_or_env(
+            db,
+            "monthly_ranking_check_secs",
+            "MONTHLY_RANKING_CHECK_SECS",
+            DEFAULT_MONTHLY_RANKING_CHECK_SECS,
+        );
+
+        // tournoi — cle du schema coude-bot (module flattene).
+        self.tournament_check_secs = config_or_env(
+            db,
+            "tournament_check_secs",
+            "TOURNAMENT_CHECK_SECS",
+            DEFAULT_TOURNAMENT_CHECK_SECS,
         );
     }
 }

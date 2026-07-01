@@ -290,6 +290,7 @@ const WORKER_MODULES: &[&str] = &[
     "analytics",
     "announcements",
     "audit-bot",
+    "automod-bot",
     "blackjack-bot",
     "cache",
     "cleanup",
