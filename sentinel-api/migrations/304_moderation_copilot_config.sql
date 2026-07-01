@@ -23,7 +23,7 @@ SET config_schema = (
             "required": false,
             "default": "false",
             "label": "Copilote de modération",
-            "description": "Active la commande /copilote (fiche membre + suggestion de sanction proportionnée basée sur l'\''historique et la jurisprudence du serveur).",
+            "description": "Active la commande /copilote (fiche membre + suggestion de sanction proportionnée basée sur l''historique et la jurisprudence du serveur).",
             "depends_on": {"key": "enabled", "equals": "true"}
         }'::jsonb
         UNION ALL SELECT '{
@@ -34,7 +34,7 @@ SET config_schema = (
             "min": 1,
             "max": 365,
             "unit": "jours",
-            "label": "Copilote — fenêtre d'\''historique",
+            "label": "Copilote — fenêtre d''historique",
             "description": "Ancienneté max des précédents pris en compte.",
             "depends_on": {"key": "copilot_enabled", "equals": "true"}
         }'::jsonb
@@ -46,7 +46,7 @@ SET config_schema = (
             "min": 1,
             "max": 100,
             "label": "Copilote — précédents minimum",
-            "description": "Nombre de cas similaires requis avant de suggérer sur la jurisprudence (sinon repli sur l'\''échelle d'\''escalade).",
+            "description": "Nombre de cas similaires requis avant de suggérer sur la jurisprudence (sinon repli sur l''échelle d''escalade).",
             "depends_on": {"key": "copilot_enabled", "equals": "true"}
         }'::jsonb
     ) sub
