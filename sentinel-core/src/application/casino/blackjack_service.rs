@@ -15,6 +15,21 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Nom du module de config pour les reglages editables par serveur.
+const MODULE_BOT_NAME: &str = "blackjack-bot";
+
+/// Seuil de tirage du dealer par defaut : il tire tant que son score est
+/// strictement inferieur a 17 (regle standard du blackjack).
+pub const DEFAULT_DEALER_HIT_THRESHOLD: i32 = 17;
+
+/// Borne le seuil de tirage du dealer a un intervalle jouable/non-exploitable.
+/// En dehors de 16..=20, la regle est absurde (dealer qui ne tire jamais /
+/// tire toujours) et casse l equilibre du jeu.
+pub fn clamp_dealer_threshold(v: i32) -> i32 {
+    v.clamp(16, 20)
+}
 /// Resultat d'une action de jeu : la partie mise a jour + la liste des
 /// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
 /// La couche transport (gRPC / HTTP) est responsable de propager ces
@@ -50,6 +65,7 @@ pub struct BlackjackService {
     repo: Arc<dyn BlackjackRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl BlackjackService {
@@ -57,12 +73,31 @@ impl BlackjackService {
         repo: Arc<dyn BlackjackRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self {
             repo,
             wallet_repo,
             wallet_uc,
+            bot_config_repo,
         }
+    }
+
+    /// Charge le seuil de tirage du dealer (`dealer_hit_threshold`) depuis la
+    /// config `blackjack-bot` de la guild. Defaut 17, clampe a 16..=20.
+    /// Le domaine reste pur : la valeur (data) est passee a `dealer_play`.
+    async fn load_dealer_threshold(&self, guild_id: &str) -> i32 {
+        let cfg = self
+            .bot_config_repo
+            .get_config(guild_id, MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default();
+        let raw = cfg
+            .iter()
+            .find(|c| c.config_key == "dealer_hit_threshold")
+            .and_then(|c| c.config_value.parse::<i32>().ok())
+            .unwrap_or(DEFAULT_DEALER_HIT_THRESHOLD);
+        clamp_dealer_threshold(raw)
     }
 
     /// Démarre une nouvelle partie de blackjack.
@@ -225,7 +260,8 @@ impl BlackjackService {
         let mut game = self.get_game(game_id).await?;
         self.ensure_playing(&game)?;
 
-        self.dealer_play(&mut game);
+        let hit_threshold = self.load_dealer_threshold(&game.guild_id).await;
+        self.dealer_play(&mut game, hit_threshold);
         // Résolution PURE (status/payout en mémoire, pas de crédit).
         self.apply_resolution(&mut game);
 
@@ -293,7 +329,8 @@ impl BlackjackService {
             game.dealer_score = calculate_score(&game.dealer_hand);
         } else {
             // Le dealer joue, puis résolution PURE (pas de crédit).
-            self.dealer_play(&mut game);
+            let hit_threshold = self.load_dealer_threshold(&game.guild_id).await;
+            self.dealer_play(&mut game, hit_threshold);
             self.apply_resolution(&mut game);
         }
 
@@ -379,10 +416,11 @@ impl BlackjackService {
         Ok(())
     }
 
-    /// Le dealer tire jusqu'à atteindre 17 ou plus.
-    fn dealer_play(&self, game: &mut BlackjackGame) {
+    /// Le dealer tire jusqu'à atteindre `hit_threshold` ou plus (regle pure :
+    /// le seuil est fourni en parametre, deja clampe par l appelant).
+    fn dealer_play(&self, game: &mut BlackjackGame, hit_threshold: i32) {
         game.dealer_score = calculate_score(&game.dealer_hand);
-        while game.dealer_score < 17 {
+        while game.dealer_score < hit_threshold {
             if let Some(card) = game.deck.pop() {
                 game.dealer_hand.push(card);
                 game.dealer_score = calculate_score(&game.dealer_hand);

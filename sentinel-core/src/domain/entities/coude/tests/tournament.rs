@@ -41,27 +41,42 @@ fn week_bounds_spans_exactly_seven_days_minus_one_second() {
 
 // ── estimate_tournament_prize_pool ──
 
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
+
+fn ecfg() -> CoudeEconomyConfig {
+    CoudeEconomyConfig::default()
+}
+
 #[test]
 fn prize_pool_none_cashbox_gives_zero() {
-    assert_eq!(estimate_tournament_prize_pool(None), 0);
+    assert_eq!(estimate_tournament_prize_pool(None, &ecfg()), 0);
 }
 
 #[test]
 fn prize_pool_is_ten_percent_of_cashbox() {
-    assert_eq!(estimate_tournament_prize_pool(Some(1000)), 100);
-    assert_eq!(estimate_tournament_prize_pool(Some(10_000)), 1000);
-    assert_eq!(estimate_tournament_prize_pool(Some(123)), 12); // division entiere
+    assert_eq!(estimate_tournament_prize_pool(Some(1000), &ecfg()), 100);
+    assert_eq!(estimate_tournament_prize_pool(Some(10_000), &ecfg()), 1000);
+    assert_eq!(estimate_tournament_prize_pool(Some(123), &ecfg()), 12); // division entiere
 }
 
 #[test]
 fn prize_pool_zero_cashbox_gives_zero() {
-    assert_eq!(estimate_tournament_prize_pool(Some(0)), 0);
+    assert_eq!(estimate_tournament_prize_pool(Some(0), &ecfg()), 0);
 }
 
 #[test]
 fn prize_pool_small_cashbox_rounds_down() {
-    assert_eq!(estimate_tournament_prize_pool(Some(9)), 0);
-    assert_eq!(estimate_tournament_prize_pool(Some(1)), 0);
+    assert_eq!(estimate_tournament_prize_pool(Some(9), &ecfg()), 0);
+    assert_eq!(estimate_tournament_prize_pool(Some(1), &ecfg()), 0);
+}
+
+#[test]
+fn prize_pool_custom_pct() {
+    let cfg = CoudeEconomyConfig {
+        tournament_prize_pool_pct: 25,
+        ..CoudeEconomyConfig::default()
+    };
+    assert_eq!(estimate_tournament_prize_pool(Some(1000), &cfg), 250);
 }
 
 #[test]

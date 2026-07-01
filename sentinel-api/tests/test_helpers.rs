@@ -3174,6 +3174,7 @@ fn base_state() -> AppState {
             Arc::new(StubBlackjackRepo),
             Arc::new(StubWalletRepo),
             Arc::new(StubWalletUc),
+            Arc::new(StubBotConfigRepo),
         )),
         coude_players_uc: Arc::new(StubCoudePlayers),
         coude_combats_uc: Arc::new(StubCoudeCombats),

@@ -6,6 +6,7 @@ pub mod combat;
 pub mod cowardice_relief;
 pub mod curse;
 pub mod economy;
+pub mod economy_config;
 pub mod expire;
 pub mod fake_spectators;
 pub mod heist;

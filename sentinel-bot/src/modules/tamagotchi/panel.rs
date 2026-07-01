@@ -516,12 +516,15 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
         .await
         .unwrap_or_default();
     let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
+    // Effets (gains de jauges) configurables par serveur ; clampes 0..=100
+    // (les jauges vont de 0 a 100, un gain negatif n'a pas de sens).
+    let gain = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d).min(100) as i32;
 
-    // Effets hardcodes, prix configurables.
+    // Prix ET effets configurables (defauts = valeurs historiques).
     let (cost, hunger, happiness, energy, cure, label) = match item.as_str() {
         "croquettes" => (
             price("shop_croquettes_price", 15),
-            25,
+            gain("shop_croquettes_hunger_gain", 25),
             0,
             0,
             false,
@@ -529,7 +532,7 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
         ),
         "repas" => (
             price("shop_repas_price", 40),
-            60,
+            gain("shop_repas_hunger_gain", 60),
             0,
             0,
             false,
@@ -539,16 +542,23 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
             price("shop_boisson_price", 25),
             0,
             0,
-            40,
+            gain("shop_boisson_energy_gain", 40),
             false,
             "Boisson energisante",
         ),
-        "jouet" => (price("shop_jouet_price", 20), 0, 35, 0, false, "Jouet"),
+        "jouet" => (
+            price("shop_jouet_price", 20),
+            0,
+            gain("shop_jouet_happiness_gain", 35),
+            0,
+            false,
+            "Jouet",
+        ),
         "potion" => (
             price("shop_potion_price", 100),
-            10,
-            10,
-            10,
+            gain("shop_potion_hunger_gain", 10),
+            gain("shop_potion_happiness_gain", 10),
+            gain("shop_potion_energy_gain", 10),
             true,
             "Potion de soin",
         ),

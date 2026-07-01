@@ -1,4 +1,9 @@
 use super::*;
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
+
+fn ecfg() -> CoudeEconomyConfig {
+    CoudeEconomyConfig::default()
+}
 
 #[test]
 fn db_str_round_trip_all_kinds() {
@@ -36,15 +41,29 @@ fn pick_by_index_wraps_modulo() {
 
 #[test]
 fn lift_cost_is_double_cast_cost() {
-    assert_eq!(lift_cost(CurseKind::Banana), CURSE_COST_COINS * 2);
-    assert_eq!(lift_cost(CurseKind::Chicken), 600);
+    assert_eq!(lift_cost(CurseKind::Banana, &ecfg()), CURSE_COST_COINS * 2);
+    assert_eq!(lift_cost(CurseKind::Chicken, &ecfg()), 600);
     // Le cout de levee suit le cout de lancement specifique a la kind.
     assert_eq!(
-        lift_cost(CurseKind::Empoisonner),
-        CurseKind::Empoisonner.cost_coins() * CURSE_LIFT_MULTIPLIER
+        lift_cost(CurseKind::Empoisonner, &ecfg()),
+        CurseKind::Empoisonner.cost_coins(&ecfg()) * CURSE_LIFT_MULTIPLIER
     );
-    assert_eq!(lift_cost(CurseKind::FausseAssurance), 500 * 2);
-    assert_eq!(lift_cost(CurseKind::Pancarte), 150 * 2);
+    assert_eq!(lift_cost(CurseKind::FausseAssurance, &ecfg()), 500 * 2);
+    assert_eq!(lift_cost(CurseKind::Pancarte, &ecfg()), 150 * 2);
+}
+
+#[test]
+fn custom_config_changes_curse_cost_and_lift() {
+    let cfg = CoudeEconomyConfig {
+        curse_cost_coins: 1000,
+        curse_lift_multiplier: 3,
+        ..CoudeEconomyConfig::default()
+    };
+    // Malediction classique -> cout de base surchargé.
+    assert_eq!(CurseKind::Banana.cost_coins(&cfg), 1000);
+    assert_eq!(lift_cost(CurseKind::Banana, &cfg), 3000);
+    // Sabotage nommé -> cout dedié inchangé, mais multiplicateur applique.
+    assert_eq!(lift_cost(CurseKind::Pancarte, &cfg), 150 * 3);
 }
 
 #[test]
@@ -67,25 +86,35 @@ fn banana_passes_when_proba_at_or_above_threshold() {
 
 #[test]
 fn leaky_wallet_no_curse_returns_amount_unchanged() {
-    assert_eq!(apply_leaky_wallet(100, false), (100, 0));
+    assert_eq!(apply_leaky_wallet(100, false, &ecfg()), (100, 0));
 }
 
 #[test]
 fn leaky_wallet_subtracts_fixed_fee() {
-    assert_eq!(apply_leaky_wallet(100, true), (90, 10));
-    assert_eq!(apply_leaky_wallet(50, true), (40, 10));
+    assert_eq!(apply_leaky_wallet(100, true, &ecfg()), (90, 10));
+    assert_eq!(apply_leaky_wallet(50, true, &ecfg()), (40, 10));
 }
 
 #[test]
 fn leaky_wallet_eats_everything_when_amount_too_small() {
-    assert_eq!(apply_leaky_wallet(10, true), (0, 10));
-    assert_eq!(apply_leaky_wallet(5, true), (0, 5));
+    assert_eq!(apply_leaky_wallet(10, true, &ecfg()), (0, 10));
+    assert_eq!(apply_leaky_wallet(5, true, &ecfg()), (0, 5));
 }
 
 #[test]
 fn leaky_wallet_ignores_zero_or_negative() {
-    assert_eq!(apply_leaky_wallet(0, true), (0, 0));
-    assert_eq!(apply_leaky_wallet(-50, true), (-50, 0));
+    assert_eq!(apply_leaky_wallet(0, true, &ecfg()), (0, 0));
+    assert_eq!(apply_leaky_wallet(-50, true, &ecfg()), (-50, 0));
+}
+
+#[test]
+fn leaky_wallet_custom_fee() {
+    let cfg = CoudeEconomyConfig {
+        leaky_wallet_fee_coins: 25,
+        ..CoudeEconomyConfig::default()
+    };
+    assert_eq!(apply_leaky_wallet(100, true, &cfg), (75, 25));
+    assert_eq!(apply_leaky_wallet(20, true, &cfg), (0, 20));
 }
 
 #[test]
@@ -113,13 +142,13 @@ fn display_format_includes_emoji_and_label() {
 
 #[test]
 fn graisser_has_specific_cost_and_duration() {
-    assert_eq!(CurseKind::Graisser.cost_coins(), 200);
+    assert_eq!(CurseKind::Graisser.cost_coins(&ecfg()), 200);
     assert_eq!(CurseKind::Graisser.duration_hours(), 24);
 }
 
 #[test]
 fn pancarte_has_specific_cost_and_duration() {
-    assert_eq!(CurseKind::Pancarte.cost_coins(), 150);
+    assert_eq!(CurseKind::Pancarte.cost_coins(&ecfg()), 150);
     assert_eq!(CurseKind::Pancarte.duration_hours(), 24 * 7);
 }
 
@@ -133,7 +162,7 @@ fn classic_curses_use_default_cost_and_duration() {
         CurseKind::Insomnia,
         CurseKind::Heartbreak,
     ] {
-        assert_eq!(k.cost_coins(), 300);
+        assert_eq!(k.cost_coins(&ecfg()), 300);
         assert_eq!(k.duration_hours(), 24);
     }
 }
@@ -161,7 +190,7 @@ fn graisser_excluded_from_random_pool() {
 
 #[test]
 fn fausse_assurance_has_specific_cost_uses_duration() {
-    assert_eq!(CurseKind::FausseAssurance.cost_coins(), 500);
+    assert_eq!(CurseKind::FausseAssurance.cost_coins(&ecfg()), 500);
     assert_eq!(CurseKind::FausseAssurance.duration_hours(), 24 * 7);
     assert_eq!(CurseKind::FausseAssurance.initial_uses(), Some(1));
     assert_eq!(FAUSSE_ASSURANCE_FEE_COINS, 200);
@@ -178,7 +207,7 @@ fn fausse_assurance_round_trips_db_string() {
 
 #[test]
 fn empoisonner_has_specific_cost_uses_duration() {
-    assert_eq!(CurseKind::Empoisonner.cost_coins(), 400);
+    assert_eq!(CurseKind::Empoisonner.cost_coins(&ecfg()), 400);
     assert_eq!(CurseKind::Empoisonner.duration_hours(), 24 * 7);
     assert_eq!(CurseKind::Empoisonner.initial_uses(), Some(3));
 }

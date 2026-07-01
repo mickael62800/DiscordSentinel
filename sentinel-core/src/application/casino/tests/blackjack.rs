@@ -10,12 +10,41 @@ use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Mock config : retourne les entrees fournies (vide = defauts).
+#[derive(Default)]
+struct MockBotConfigRepo {
+    entries: Vec<BotGuildConfig>,
+}
+
+#[async_trait]
+impl BotConfigRepository for MockBotConfigRepo {
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(&self, _g: &str, _b: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(self.entries.clone())
+    }
+    async fn get_all_config(&self, _g: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(self.entries.clone())
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 fn fake_taunt(kind: StreakKind) -> TauntEvent {
     TauntEvent {
         channel_id: "chan".into(),
@@ -269,6 +298,7 @@ fn build_svc(wallet_uc: Arc<MockWalletUc>) -> BlackjackService {
         }),
         Arc::new(FakeWalletRepo),
         wallet_uc,
+        Arc::new(MockBotConfigRepo::default()),
     )
 }
 
@@ -387,7 +417,12 @@ fn build_svc_with_repo(
     repo: Arc<StatefulBjRepo>,
     wallet_uc: Arc<MockWalletUc>,
 ) -> BlackjackService {
-    BlackjackService::new(repo, Arc::new(FakeWalletRepo), wallet_uc)
+    BlackjackService::new(
+        repo,
+        Arc::new(FakeWalletRepo),
+        wallet_uc,
+        Arc::new(MockBotConfigRepo::default()),
+    )
 }
 
 #[tokio::test]

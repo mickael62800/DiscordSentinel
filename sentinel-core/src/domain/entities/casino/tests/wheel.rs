@@ -220,6 +220,84 @@ fn no_heartbreak_can_yield_licorne() {
     );
 }
 
+// ══════════════════════════════════════════════════════════
+// WheelConfig — defauts + garde-fous
+// ══════════════════════════════════════════════════════════
+
+#[test]
+fn default_config_matches_wheel_cases() {
+    let cfg = WheelConfig::default();
+    assert_eq!(cfg.segments.len(), WHEEL_CASES.len());
+    for (seg, case) in cfg.segments.iter().zip(WHEEL_CASES) {
+        assert_eq!(seg.payout, case.payout);
+        assert_eq!(seg.weight, case.weight);
+    }
+}
+
+#[test]
+fn normalized_clamps_payout_to_50000() {
+    let mut cfg = WheelConfig::default();
+    cfg.segments[0].payout = 9_999_999;
+    cfg.segments[1].payout = -9_999_999;
+    let cfg = cfg.normalized();
+    assert_eq!(cfg.segments[0].payout, WHEEL_PAYOUT_CLAMP);
+    assert_eq!(cfg.segments[1].payout, -WHEEL_PAYOUT_CLAMP);
+}
+
+#[test]
+fn normalized_restores_default_weights_when_all_zero() {
+    let mut cfg = WheelConfig::default();
+    for seg in &mut cfg.segments {
+        seg.weight = 0;
+    }
+    let cfg = cfg.normalized();
+    let total: u32 = cfg.segments.iter().map(|s| s.weight).sum();
+    assert!(total > 0, "poids restaures depuis les defauts");
+    assert_eq!(cfg.segments[0].weight, WHEEL_CASES[0].weight);
+}
+
+#[test]
+fn normalized_falls_back_on_length_mismatch() {
+    let cfg = WheelConfig {
+        segments: vec![WheelSegment {
+            payout: 1,
+            weight: 1,
+        }],
+    }
+    .normalized();
+    assert_eq!(cfg, WheelConfig::default());
+}
+
+#[test]
+fn spin_cfg_uses_configured_payout() {
+    // Une seule case a un poids > 0 -> elle sort a coup sur, avec SON payout.
+    let mut cfg = WheelConfig::default();
+    for seg in &mut cfg.segments {
+        seg.weight = 0;
+    }
+    cfg.segments[3].weight = 10;
+    cfg.segments[3].payout = 777;
+    let mut rng = StdRng::seed_from_u64(1);
+    let outcome = spin_with_rng_cfg(&mut rng, &cfg);
+    assert_eq!(outcome.case_index, 3);
+    assert_eq!(outcome.case.payout, 777);
+    assert_eq!(outcome.case.key, WHEEL_CASES[3].key);
+}
+
+#[test]
+fn spin_cfg_does_not_panic_when_block_zeroes_all_weights() {
+    // Config degeneree : seul licorne a du poids, et on la bloque.
+    let mut cfg = WheelConfig::default();
+    for seg in &mut cfg.segments {
+        seg.weight = 0;
+    }
+    let licorne_idx = WHEEL_CASES.iter().position(|c| c.key == "licorne").unwrap();
+    cfg.segments[licorne_idx].weight = 5;
+    let mut rng = StdRng::seed_from_u64(2);
+    // Ne doit pas paniquer (fallback : on ignore le blocage).
+    let _ = spin_with_rng_curses_cfg(&mut rng, true, &cfg);
+}
+
 #[test]
 fn heartbreak_keeps_other_cases_distribution() {
     let mut rng = StdRng::seed_from_u64(123);

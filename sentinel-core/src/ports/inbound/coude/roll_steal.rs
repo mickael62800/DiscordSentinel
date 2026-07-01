@@ -11,6 +11,9 @@ use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]
 pub struct RollStealCommand {
+    /// Guild concernée — sert à charger la config ECONOMY (`coude-bot`)
+    /// qui pilote les bornes de % volé (per-guild).
+    pub guild_id: String,
     /// Cible AFK (n'a pas clique sur "Se defendre"). Influe le % stolen.
     pub afk: bool,
 }

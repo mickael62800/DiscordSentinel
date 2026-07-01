@@ -25,8 +25,6 @@ use tracing::info;
 use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::heist::compute_success_chance;
 use crate::domain::entities::coude::heist::HeistOutcome;
-use crate::domain::entities::coude::heist::HEIST_GAIN_MAX_PERCENT;
-use crate::domain::entities::coude::heist::HEIST_GAIN_MIN_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_TOOLS;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_heist::HeistCooldownStatus;
@@ -107,6 +105,17 @@ impl ManageCoudeHeistService {
 
     async fn load_balance(&self, guild_id: &str) -> BalanceParams {
         crate::application::coude::guild_settings::load_balance_params(
+            &*self.bot_config_repo,
+            guild_id,
+        )
+        .await
+    }
+
+    async fn load_economy(
+        &self,
+        guild_id: &str,
+    ) -> crate::domain::entities::coude::economy_config::CoudeEconomyConfig {
+        crate::application::coude::guild_settings::load_economy_config(
             &*self.bot_config_repo,
             guild_id,
         )
@@ -284,15 +293,20 @@ impl ManageCoudeHeistService {
             .filter(|k| HEIST_TOOLS.iter().any(|t| t.key == k.as_str()))
             .collect();
 
+        // Config ECONOMY réglable par serveur (base/plafond de réussite +
+        // bornes de gain du braquage). Domaine PUR : passée en donnée.
+        let econ = self.load_economy(guild_id).await;
+
         // 5. Calcule la chance effective (domain pur).
-        let chance = compute_success_chance(&tool_keys);
+        let chance = compute_success_chance(&tool_keys, &econ);
 
         // 6. Roll + decide. On scope ThreadRng pour rester Send.
+        //    `econ` garantit gain_min <= gain_max (cf. sanitize).
         let (success, gain_percent) = {
             let mut rng = rand::thread_rng();
             let roll: u32 = rng.gen_range(1..=100);
             let success = roll <= chance;
-            let gain: u32 = rng.gen_range(HEIST_GAIN_MIN_PERCENT..=HEIST_GAIN_MAX_PERCENT);
+            let gain: u32 = rng.gen_range(econ.heist_gain_min_pct..=econ.heist_gain_max_pct);
             (success, gain)
         };
 

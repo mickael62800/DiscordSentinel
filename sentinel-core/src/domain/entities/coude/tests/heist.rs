@@ -1,33 +1,58 @@
 use super::*;
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
+
+fn ecfg() -> CoudeEconomyConfig {
+    CoudeEconomyConfig::default()
+}
 
 #[test]
 fn compute_chance_no_items_is_base() {
     let empty: Vec<&str> = vec![];
-    assert_eq!(compute_success_chance(empty), HEIST_BASE_SUCCESS_PERCENT);
+    assert_eq!(
+        compute_success_chance(empty, &ecfg()),
+        HEIST_BASE_SUCCESS_PERCENT
+    );
 }
 
 #[test]
 fn compute_chance_adds_individual_bonus() {
     let v = vec!["masque_braquage", "pied_de_biche"];
-    assert_eq!(compute_success_chance(v), 10);
+    assert_eq!(compute_success_chance(v, &ecfg()), 10);
 }
 
 #[test]
 fn compute_chance_ignores_unknown_items() {
     let v = vec!["masque_braquage", "unknown_tool"];
-    assert_eq!(compute_success_chance(v), 7);
+    assert_eq!(compute_success_chance(v, &ecfg()), 7);
 }
 
 #[test]
 fn compute_chance_deduplicates_items() {
     let v = vec!["masque_braquage", "masque_braquage"];
-    assert_eq!(compute_success_chance(v), 7);
+    assert_eq!(compute_success_chance(v, &ecfg()), 7);
 }
 
 #[test]
 fn compute_chance_caps_at_max() {
     let v: Vec<&str> = HEIST_TOOLS.iter().map(|t| t.key).collect();
-    assert_eq!(compute_success_chance(v), HEIST_MAX_SUCCESS_PERCENT);
+    assert_eq!(
+        compute_success_chance(v, &ecfg()),
+        HEIST_MAX_SUCCESS_PERCENT
+    );
+}
+
+#[test]
+fn custom_config_changes_base_and_cap() {
+    // Base 10, cap 20 : sans item -> 10 ; tous les outils -> clamp 20.
+    let cfg = CoudeEconomyConfig {
+        heist_base_success_pct: 10,
+        heist_max_success_pct: 20,
+        ..CoudeEconomyConfig::default()
+    };
+    let empty: Vec<&str> = vec![];
+    assert_eq!(compute_success_chance(empty, &cfg), 10);
+    let all: Vec<&str> = HEIST_TOOLS.iter().map(|t| t.key).collect();
+    assert_eq!(compute_success_chance(all, &cfg), 20);
 }
 
 #[test]
@@ -79,7 +104,7 @@ fn chance_never_below_base() {
             .choose_multiple(&mut rng, n.min(all_keys.len()))
             .copied()
             .collect();
-        let chance = compute_success_chance(picks);
+        let chance = compute_success_chance(picks, &ecfg());
         assert!(chance >= HEIST_BASE_SUCCESS_PERCENT);
         assert!(chance <= HEIST_MAX_SUCCESS_PERCENT);
     }
@@ -89,10 +114,10 @@ fn chance_never_below_base() {
 fn chance_monotonic_with_more_items() {
     // Invariant : ajouter un item valide ne peut pas FAIRE BAISSER la chance.
     let mut acc: Vec<&str> = vec![];
-    let mut prev = compute_success_chance(acc.clone());
+    let mut prev = compute_success_chance(acc.clone(), &ecfg());
     for tool in HEIST_TOOLS {
         acc.push(tool.key);
-        let current = compute_success_chance(acc.clone());
+        let current = compute_success_chance(acc.clone(), &ecfg());
         assert!(
             current >= prev,
             "ajouter {} a fait baisser la chance : {prev} → {current}",
@@ -111,15 +136,18 @@ fn chance_saturates_at_max_with_all_tools() {
     // Double la liste pour provoquer le dedup + clamping.
     let mut doubled = all.clone();
     doubled.extend(all.iter().copied());
-    assert_eq!(compute_success_chance(doubled), HEIST_MAX_SUCCESS_PERCENT);
+    assert_eq!(
+        compute_success_chance(doubled, &ecfg()),
+        HEIST_MAX_SUCCESS_PERCENT
+    );
 }
 
 #[test]
 fn chance_invariant_dedup_equivalence() {
     // Invariant : compute_success_chance([x, x, x]) == compute_success_chance([x])
     for tool in HEIST_TOOLS {
-        let single = compute_success_chance(vec![tool.key]);
-        let triple = compute_success_chance(vec![tool.key, tool.key, tool.key]);
+        let single = compute_success_chance(vec![tool.key], &ecfg());
+        let triple = compute_success_chance(vec![tool.key, tool.key, tool.key], &ecfg());
         assert_eq!(single, triple, "dedup cassé pour {}", tool.key);
     }
 }
@@ -128,12 +156,12 @@ fn chance_invariant_dedup_equivalence() {
 fn chance_empty_input_equals_base() {
     let empty_str: Vec<String> = vec![];
     assert_eq!(
-        compute_success_chance(empty_str),
+        compute_success_chance(empty_str, &ecfg()),
         HEIST_BASE_SUCCESS_PERCENT
     );
     let empty_ref: Vec<&str> = vec![];
     assert_eq!(
-        compute_success_chance(empty_ref),
+        compute_success_chance(empty_ref, &ecfg()),
         HEIST_BASE_SUCCESS_PERCENT
     );
 }
@@ -161,7 +189,7 @@ fn catalog_bonus_sum_equals_max() {
 fn all_tools_reach_exactly_max_chance() {
     // Avec les 9 outils, compute_success_chance doit rendre EXACTEMENT 55.
     let all: Vec<&str> = HEIST_TOOLS.iter().map(|t| t.key).collect();
-    assert_eq!(compute_success_chance(all), 55);
+    assert_eq!(compute_success_chance(all, &ecfg()), 55);
 }
 
 // ── PrisonState::is_active ──

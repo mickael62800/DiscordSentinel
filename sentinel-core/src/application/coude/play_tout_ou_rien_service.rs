@@ -24,11 +24,13 @@ use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct PlayToutOuRienService {
     player_repo: Arc<dyn PlayerRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     social_repo: Arc<dyn SocialRepository>,
     log_repo: Arc<dyn ToutOuRienRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl PlayToutOuRienService {
@@ -43,6 +45,30 @@ impl PlayToutOuRienService {
             wallet_uc,
             social_repo,
             log_repo,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche le repo de config bot pour rendre les paramètres du
+    /// tout-ou-rien (probabilité de gain, multiplicateur, % conservé en
+    /// cas de défaite) réglables par serveur via `coude-bot`. Sans repo :
+    /// valeurs par défaut historiques.
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
+    }
+
+    /// Charge la config ECONOMY de la guild (fallback default sans repo).
+    async fn load_economy(
+        &self,
+        guild_id: &str,
+    ) -> crate::domain::entities::coude::economy_config::CoudeEconomyConfig {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::load_economy_config(&**repo, guild_id)
+                    .await
+            }
+            None => crate::domain::entities::coude::economy_config::CoudeEconomyConfig::default(),
         }
     }
 
@@ -95,11 +121,15 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
             ));
         }
 
-        // 3. Tirage RNG (scope ferme avant tout await).
-        let outcome = resolve_outcome(Self::roll());
+        // Config ECONOMY réglable par serveur (probabilité/multiplicateur/
+        // % conservé). Domaine PUR : passée en donnée aux fns.
+        let econ = self.load_economy(&guild_id).await;
 
-        // 4. Delta domain pur (Win = +balance, Lose = -80%).
-        let delta = coin_delta(initial_coins, outcome);
+        // 3. Tirage RNG (scope ferme avant tout await).
+        let outcome = resolve_outcome(Self::roll(), &econ);
+
+        // 4. Delta domain pur (Win = +balance, Lose = -80% par défaut).
+        let delta = coin_delta(initial_coins, outcome, &econ);
 
         // 5. Mutation wallet via use case unifie (faillite/jackpot detectes).
         //    En cas d'echec : on RELACHE le claim (best-effort) pour ne pas

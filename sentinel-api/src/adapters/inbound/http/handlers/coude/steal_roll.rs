@@ -34,12 +34,15 @@ impl From<StealRoll> for StealRollDto {
 /// POST /api/coude/{guild_id}/steal/roll
 pub async fn roll_steal(
     State(state): State<AppState>,
-    Path(_guild_id): Path<String>,
+    Path(guild_id): Path<String>,
     Json(dto): Json<RollStealDto>,
 ) -> Result<Json<StealRollDto>, ApiError> {
     let r = state
         .roll_steal_uc
-        .roll(RollStealCommand { afk: dto.afk })
+        .roll(RollStealCommand {
+            guild_id,
+            afk: dto.afk,
+        })
         .await?;
     Ok(Json(r.into()))
 }

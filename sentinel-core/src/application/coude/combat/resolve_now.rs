@@ -184,6 +184,9 @@ impl ResolveCombatNowService {
         let mut xp_lines: Vec<String> = Vec::new();
         let mut bets_draw_taunts: Vec<crate::domain::entities::coude::taunt::TauntEvent> =
             Vec::new();
+        // Config ECONOMY réglable par serveur (XP combat, frais Fausse
+        // assurance). Domaine PUR : lue ici puis passée en donnée.
+        let econ = settings.economy_config();
 
         // Cap sur solde reel du perdant (pre-requis pour l'assurance
         // qui clamp d'abord, cf. Flow B dans apply_insurance_to_loss).
@@ -260,7 +263,7 @@ impl ResolveCombatNowService {
         // sont preleves vers le saboteur. La curse est consumee.
         if let (Some(curses_repo), Some(_ins)) = (&self.curses_repo, &active_insurance) {
             use crate::domain::entities::coude::curse::CurseKind;
-            use crate::domain::entities::coude::curse::FAUSSE_ASSURANCE_FEE_COINS;
+            let fausse_assurance_fee = econ.fausse_assurance_fee_coins;
             if let Ok(Some(c)) = curses_repo
                 .get_active_for_target(&combat.guild_id, loser_id)
                 .await
@@ -279,7 +282,7 @@ impl ResolveCombatNowService {
                             &combat.guild_id,
                             loser_id,
                             &c.source_id,
-                            FAUSSE_ASSURANCE_FEE_COINS,
+                            fausse_assurance_fee,
                             "fausse_assurance_fee",
                             "Sabotage Fausse assurance — frais",
                         )
@@ -292,7 +295,7 @@ impl ResolveCombatNowService {
                     }
                     let scam_msg = format!(
                         "\u{1f3ad} **Fausse assurance** : <@{}> decouvre que son contrat etait un scam de <@{}> ! Aucune reduction + {}c de frais preleves.",
-                        loser_id, c.source_id, FAUSSE_ASSURANCE_FEE_COINS
+                        loser_id, c.source_id, fausse_assurance_fee
                     );
                     insurance_msg = match insurance_msg {
                         Some(prev) => Some(format!("{prev}\n{scam_msg}")),
@@ -508,7 +511,12 @@ impl ResolveCombatNowService {
         }
 
         // XP (regles pures → domain::compute_combat_xp)
-        let awards = compute_combat_xp(attacker.level, defender.level, result.is_giant_killer);
+        let awards = compute_combat_xp(
+            attacker.level,
+            defender.level,
+            result.is_giant_killer,
+            &econ,
+        );
         let winner_is_underdog = awards.winner_is_underdog;
         let winner_xp = awards.winner_xp;
         let loser_xp = awards.loser_xp;

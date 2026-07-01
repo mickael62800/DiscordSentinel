@@ -4,6 +4,7 @@
 //! + formatage des résultats de paris.
 
 use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
 use crate::domain::entities::coude::inventory::Insurance;
 /// Résultat de l'ajustement d'une perte par une assurance.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,17 +100,18 @@ pub fn compute_combat_xp(
     attacker_level: i32,
     defender_level: i32,
     is_giant_killer: bool,
+    cfg: &CoudeEconomyConfig,
 ) -> CombatXpAwards {
     let level_gap = (attacker_level - defender_level).abs();
     let winner_is_underdog = level_gap >= UNDERDOG_LEVEL_GAP && is_giant_killer;
     let winner_xp = if winner_is_underdog {
-        COMBAT_XP_WINNER_UNDERDOG
+        cfg.combat_xp_winner_underdog
     } else {
-        COMBAT_XP_WINNER_BASE
+        cfg.combat_xp_winner_base
     };
     CombatXpAwards {
         winner_xp,
-        loser_xp: COMBAT_XP_LOSER,
+        loser_xp: cfg.combat_xp_loser,
         winner_is_underdog,
     }
 }
@@ -293,7 +295,7 @@ mod tests {
 
     #[test]
     fn xp_no_level_gap_returns_base_winner_xp() {
-        let awards = compute_combat_xp(10, 10, false);
+        let awards = compute_combat_xp(10, 10, false, &CoudeEconomyConfig::default());
         assert_eq!(awards.winner_xp, COMBAT_XP_WINNER_BASE);
         assert_eq!(awards.loser_xp, COMBAT_XP_LOSER);
         assert!(!awards.winner_is_underdog);
@@ -302,7 +304,7 @@ mod tests {
     #[test]
     fn xp_small_gap_does_not_trigger_underdog() {
         // Ecart de 2 niveaux = pas underdog meme si giant_killer=true
-        let awards = compute_combat_xp(5, 7, true);
+        let awards = compute_combat_xp(5, 7, true, &CoudeEconomyConfig::default());
         assert!(!awards.winner_is_underdog);
         assert_eq!(awards.winner_xp, COMBAT_XP_WINNER_BASE);
     }
@@ -310,7 +312,7 @@ mod tests {
     #[test]
     fn xp_big_gap_with_giant_killer_flag_doubles_winner() {
         // Ecart de 5 levels + giant killer = underdog
-        let awards = compute_combat_xp(3, 8, true);
+        let awards = compute_combat_xp(3, 8, true, &CoudeEconomyConfig::default());
         assert!(awards.winner_is_underdog);
         assert_eq!(awards.winner_xp, COMBAT_XP_WINNER_UNDERDOG);
     }
@@ -318,7 +320,7 @@ mod tests {
     #[test]
     fn xp_big_gap_without_giant_killer_flag_no_bonus() {
         // Ecart de 10 levels mais giant_killer=false → pas de bonus
-        let awards = compute_combat_xp(3, 13, false);
+        let awards = compute_combat_xp(3, 13, false, &CoudeEconomyConfig::default());
         assert!(!awards.winner_is_underdog);
         assert_eq!(awards.winner_xp, COMBAT_XP_WINNER_BASE);
     }
@@ -326,8 +328,8 @@ mod tests {
     #[test]
     fn xp_gap_uses_absolute_value() {
         // Que l'attaquant soit au-dessus ou au-dessous, la valeur absolue s'applique.
-        let a = compute_combat_xp(3, 10, true);
-        let b = compute_combat_xp(10, 3, true);
+        let a = compute_combat_xp(3, 10, true, &CoudeEconomyConfig::default());
+        let b = compute_combat_xp(10, 3, true, &CoudeEconomyConfig::default());
         assert_eq!(a.winner_is_underdog, b.winner_is_underdog);
         assert_eq!(a.winner_xp, b.winner_xp);
     }
@@ -335,14 +337,30 @@ mod tests {
     #[test]
     fn xp_exactly_three_levels_triggers_underdog() {
         // Boundary : 3 niveaux d'ecart = seuil exact
-        let awards = compute_combat_xp(5, 8, true);
+        let awards = compute_combat_xp(5, 8, true, &CoudeEconomyConfig::default());
         assert!(awards.winner_is_underdog);
+    }
+
+    #[test]
+    fn xp_custom_config_overrides_xp_values() {
+        // Config surchargée : les XP suivent les valeurs fournies.
+        let cfg = CoudeEconomyConfig {
+            combat_xp_winner_base: 100,
+            combat_xp_winner_underdog: 200,
+            combat_xp_loser: 50,
+            ..CoudeEconomyConfig::default()
+        };
+        let base = compute_combat_xp(10, 10, false, &cfg);
+        assert_eq!(base.winner_xp, 100);
+        assert_eq!(base.loser_xp, 50);
+        let underdog = compute_combat_xp(3, 8, true, &cfg);
+        assert_eq!(underdog.winner_xp, 200);
     }
 
     #[test]
     fn xp_loser_always_gets_five_xp() {
         for gap in 0..20 {
-            let awards = compute_combat_xp(10, 10 + gap, true);
+            let awards = compute_combat_xp(10, 10 + gap, true, &CoudeEconomyConfig::default());
             assert_eq!(awards.loser_xp, COMBAT_XP_LOSER);
         }
     }

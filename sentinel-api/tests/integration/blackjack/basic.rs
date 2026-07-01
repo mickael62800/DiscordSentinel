@@ -121,9 +121,9 @@ fn build_service(pool: PgPool) -> BlackjackService {
         wallet_repo.clone(),
         taunts_uc,
         member_repo,
-        bot_config_repo,
+        bot_config_repo.clone(),
     ));
-    BlackjackService::new(bj_repo, wallet_repo, wallet_uc)
+    BlackjackService::new(bj_repo, wallet_repo, wallet_uc, bot_config_repo)
 }
 
 // ══════════════════════════════════════════════════════════

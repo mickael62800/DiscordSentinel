@@ -14,12 +14,14 @@ use crate::ports::inbound::coude::manage_curses::CastedCurse;
 use crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 const CAST_SOURCE: &str = "curse_cast";
 const LIFT_SOURCE: &str = "curse_lift";
 
 pub struct ManageCoudeCursesService {
     curses_repo: Arc<dyn CursesRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeCursesService {
@@ -30,6 +32,28 @@ impl ManageCoudeCursesService {
         Self {
             curses_repo,
             wallet_repo,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche le repo de config bot : coût des malédictions classiques et
+    /// multiplicateur de levée deviennent réglables par serveur via
+    /// `coude-bot`. Sans repo : valeurs par défaut historiques.
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
+    }
+
+    async fn load_economy(
+        &self,
+        guild_id: &str,
+    ) -> crate::domain::entities::coude::economy_config::CoudeEconomyConfig {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::load_economy_config(&**repo, guild_id)
+                    .await
+            }
+            None => crate::domain::entities::coude::economy_config::CoudeEconomyConfig::default(),
         }
     }
 }
@@ -70,7 +94,8 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
             }
         };
 
-        let cost = chosen.cost_coins();
+        let econ = self.load_economy(guild_id).await;
+        let cost = chosen.cost_coins(&econ);
         let duration = chosen.duration_hours();
 
         // Debit du wallet de l auteur — leve l erreur si solde insuffisant.
@@ -129,7 +154,8 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
             .await?
             .ok_or_else(|| DomainError::NotFound("Aucune malediction active.".into()))?;
 
-        let cost = lift_cost(curse.kind);
+        let econ = self.load_economy(guild_id).await;
+        let cost = lift_cost(curse.kind, &econ);
         // La cible paye le cout, transfere integralement a l auteur initial.
         self.wallet_repo
             .transfer(

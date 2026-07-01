@@ -1,5 +1,6 @@
 //! Regles metier pour les tournois hebdomadaires "Coup de Coude".
 
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
 use chrono::DateTime;
 use chrono::Datelike;
 use chrono::Duration;
@@ -27,10 +28,18 @@ pub fn current_week_bounds() -> (DateTime<Utc>, DateTime<Utc>) {
     week_bounds_for(Utc::now())
 }
 
-/// Estime le prize pool d'un tournoi en fonction de la cashbox : 10% du solde.
-/// Retourne 0 si cashbox est None (aucune cashbox configuree).
-pub fn estimate_tournament_prize_pool(cashbox_balance: Option<i64>) -> i64 {
-    cashbox_balance.unwrap_or(0) / TOURNAMENT_PRIZE_POOL_PERCENT
+/// Estime le prize pool d'un tournoi en fonction de la cashbox :
+/// `cfg.tournament_prize_pool_pct` % du solde (défaut 10%).
+/// Retourne 0 si cashbox est None (aucune cashbox configuree) ou si le
+/// pourcentage est 0. Arithmétique i128 pour éviter tout overflow sur les
+/// gros soldes. `cfg.tournament_prize_pool_pct` est déjà borné à `0..=100`.
+pub fn estimate_tournament_prize_pool(
+    cashbox_balance: Option<i64>,
+    cfg: &CoudeEconomyConfig,
+) -> i64 {
+    let balance = cashbox_balance.unwrap_or(0) as i128;
+    let pct = cfg.tournament_prize_pool_pct as i128;
+    (balance * pct / 100) as i64
 }
 
 #[cfg(test)]

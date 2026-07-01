@@ -469,6 +469,7 @@ pub async fn build_app_state(
         blackjack_repo,
         wallet_repo.clone(),
         wallet_uc.clone(),
+        bot_config_repo.clone(),
     ));
 
     // Slot machine — nouvelle feature (migration 157).
@@ -499,7 +500,8 @@ pub async fn build_app_state(
                 wallet_uc.clone(),
                 uow.clone(),
             )
-            .with_curses_repo(coude_curses_repo.clone()),
+            .with_curses_repo(coude_curses_repo.clone())
+            .with_bot_config_repo(bot_config_repo.clone()),
         );
 
     let coude_economy_uc = Arc::new(
@@ -509,7 +511,8 @@ pub async fn build_app_state(
             coude_taunts_uc.clone(),
         )
         .with_leaky_wallet_support(wallet_repo.clone(), coude_curses_repo.clone())
-        .with_player_repo(coude_player_repo.clone()),
+        .with_player_repo(coude_player_repo.clone())
+        .with_bot_config_repo(bot_config_repo.clone()),
     );
     let coude_inventory_repo = Arc::new(PgInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(
@@ -588,10 +591,10 @@ pub async fn build_app_state(
     // pour permettre le branchement Heartbreak dans wheel.
     let coude_curses_uc: Arc<
         dyn crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase,
-    > = Arc::new(ManageCoudeCursesService::new(
-        coude_curses_repo.clone(),
-        wallet_repo.clone(),
-    ));
+    > = Arc::new(
+        ManageCoudeCursesService::new(coude_curses_repo.clone(), wallet_repo.clone())
+            .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) — repo deja cree
     // plus haut pour permettre le branchement dans bets et combat.
@@ -610,16 +613,19 @@ pub async fn build_app_state(
     // Phase 2 #1 audit : RNG /tout-ou-rien migre cote API.
     let play_tout_ou_rien_uc: Arc<
         dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase,
-    > = Arc::new(PlayToutOuRienService::new(
-        coude_player_repo.clone(),
-        wallet_uc.clone(),
-        coude_social_repo.clone(),
-        coude_tout_ou_rien_repo.clone(),
-    ));
+    > = Arc::new(
+        PlayToutOuRienService::new(
+            coude_player_repo.clone(),
+            wallet_uc.clone(),
+            coude_social_repo.clone(),
+            coude_tout_ou_rien_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     // Phase 2 #4 audit : RNG /voler (d20 + steal %) migre cote API.
     let roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase> =
-        Arc::new(RollStealService::new());
+        Arc::new(RollStealService::new().with_bot_config_repo(bot_config_repo.clone()));
 
     // Phase 3 #9 audit : catalogue de templates flavor (steal/heist/prank).
     let coude_flavor_templates_repo: Arc<

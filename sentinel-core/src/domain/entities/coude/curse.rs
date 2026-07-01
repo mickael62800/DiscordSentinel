@@ -11,6 +11,7 @@
 
 use std::fmt;
 
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
 use crate::domain::entities::system::discord_ids::GuildId;
 use chrono::DateTime;
 use chrono::Utc;
@@ -164,14 +165,16 @@ impl CurseKind {
     }
 
     /// Cout en coins paye par l auteur. Specifique aux sabotages /
-    /// curses non-classiques. Defaut = CURSE_COST_COINS (300c).
-    pub fn cost_coins(self) -> i64 {
+    /// curses non-classiques. Le cout des maledictions classiques est
+    /// `cfg.curse_cost_coins` (defaut 300c). Les sabotages nommes gardent
+    /// leur cout dedie (hors scope de cette batch de config).
+    pub fn cost_coins(self, cfg: &CoudeEconomyConfig) -> i64 {
         match self {
             CurseKind::Pancarte => 150,
             CurseKind::Graisser => 200,
             CurseKind::Empoisonner => 400,
             CurseKind::FausseAssurance => 500,
-            _ => CURSE_COST_COINS,
+            _ => cfg.curse_cost_coins,
         }
     }
 
@@ -229,8 +232,8 @@ pub fn pick_curse_by_index(rand_index: usize) -> CurseKind {
 /// (`cost_coins`) multiplie par `CURSE_LIFT_MULTIPLIER`. Lever une
 /// malediction couteuse (ex. Empoisonner) coute donc plus cher qu'une
 /// classique.
-pub fn lift_cost(kind: CurseKind) -> i64 {
-    kind.cost_coins() * CURSE_LIFT_MULTIPLIER
+pub fn lift_cost(kind: CurseKind, cfg: &CoudeEconomyConfig) -> i64 {
+    kind.cost_coins(cfg) * cfg.curse_lift_multiplier
 }
 
 /// Applique l effet "Peau de banane" a un jet de d20.
@@ -252,14 +255,15 @@ pub fn apply_banana_to_d20(raw_d20: u8, has_banana: bool, proba_roll: f64) -> u8
 ///
 /// Si le montant est trop petit pour absorber les frais, on retourne
 /// `(0, amount)` — la cible perd tout en frais.
-pub fn apply_leaky_wallet(amount: i64, has_leaky: bool) -> (i64, i64) {
-    if !has_leaky || amount <= 0 {
+pub fn apply_leaky_wallet(amount: i64, has_leaky: bool, cfg: &CoudeEconomyConfig) -> (i64, i64) {
+    let fee = cfg.leaky_wallet_fee_coins;
+    if !has_leaky || amount <= 0 || fee <= 0 {
         return (amount, 0);
     }
-    if amount <= LEAKY_WALLET_FEE_COINS {
+    if amount <= fee {
         return (0, amount);
     }
-    (amount - LEAKY_WALLET_FEE_COINS, LEAKY_WALLET_FEE_COINS)
+    (amount - fee, fee)
 }
 
 /// Pondere un poids de taunt de defaite sous l effet "Insomnie".

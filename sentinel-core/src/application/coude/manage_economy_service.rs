@@ -3,7 +3,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::domain::entities::coude::curse::CurseKind;
-use crate::domain::entities::coude::curse::LEAKY_WALLET_FEE_COINS;
 use crate::domain::entities::coude::economy::clamp_steal_amount;
 use crate::domain::entities::coude::economy::clamp_steal_fail_penalty;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -17,6 +16,7 @@ use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 /// Service "economie Coup de Coude".
 ///
 /// # Migration wallet unifie (PoC `/donner`)
@@ -40,6 +40,7 @@ pub struct ManageCoudeEconomyService {
     wallet_repo: Option<Arc<dyn WalletRepository>>,
     curses_repo: Option<Arc<dyn CursesRepository>>,
     player_repo: Option<Arc<dyn PlayerRepository>>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeEconomyService {
@@ -55,6 +56,29 @@ impl ManageCoudeEconomyService {
             wallet_repo: None,
             curses_repo: None,
             player_repo: None,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche le repo de config bot : le montant des frais "Portefeuille
+    /// troué" (LeakyWallet) devient réglable par serveur via `coude-bot`.
+    /// Sans repo : valeur par défaut historique (10c).
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
+    }
+
+    async fn leaky_wallet_fee(&self, guild_id: &str) -> i64 {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::load_economy_config(&**repo, guild_id)
+                    .await
+                    .leaky_wallet_fee_coins
+            }
+            None => {
+                crate::domain::entities::coude::economy_config::CoudeEconomyConfig::default()
+                    .leaky_wallet_fee_coins
+            }
         }
     }
 
@@ -149,20 +173,23 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         //       est deja passe : on log et on continue).
         if self.has_leaky_wallet(guild_id, from_id).await {
             if let Some(wallet_repo) = &self.wallet_repo {
-                if let Err(e) = wallet_repo
-                    .debit(
-                        guild_id,
-                        from_id,
-                        LEAKY_WALLET_FEE_COINS,
-                        "curse_leaky_wallet",
-                        "Frais Portefeuille troue",
-                    )
-                    .await
-                {
-                    tracing::warn!(
-                        error = %e, guild_id, from_id,
-                        "leaky wallet : echec prelevement frais (don deja passe)"
-                    );
+                let fee = self.leaky_wallet_fee(guild_id).await;
+                if fee > 0 {
+                    if let Err(e) = wallet_repo
+                        .debit(
+                            guild_id,
+                            from_id,
+                            fee,
+                            "curse_leaky_wallet",
+                            "Frais Portefeuille troue",
+                        )
+                        .await
+                    {
+                        tracing::warn!(
+                            error = %e, guild_id, from_id,
+                            "leaky wallet : echec prelevement frais (don deja passe)"
+                        );
+                    }
                 }
             }
         }

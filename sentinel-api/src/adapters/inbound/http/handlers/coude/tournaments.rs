@@ -104,8 +104,8 @@ pub async fn get_current_tournament(
         });
     }
 
-    // Prize pool estime : 10% de la caisse communautaire par defaut.
-    // Pragmatique : on ne lit pas la config ici, on utilise le default.
+    // Prize pool estime : `tournament_prize_pool_pct` % de la caisse
+    // communautaire (defaut 10%), reglable par serveur via `coude-bot`.
     let cashbox: Option<i64> =
         sqlx::query_scalar("SELECT balance FROM coude_cashbox WHERE guild_id = $1")
             .bind(&guild_id)
@@ -114,7 +114,12 @@ pub async fn get_current_tournament(
             .ok()
             .flatten();
 
-    let prize_pool_estimated = estimate_tournament_prize_pool(cashbox);
+    let econ = sentinel_core::application::coude::guild_settings::load_economy_config(
+        state.bot_config_repo.as_ref(),
+        &guild_id,
+    )
+    .await;
+    let prize_pool_estimated = estimate_tournament_prize_pool(cashbox, &econ);
 
     Ok(Json(CurrentTournamentDto {
         guild_id: guild_id.into(),

@@ -8,6 +8,7 @@
 //! **Choix d'architecture** : constantes hardcodees ici avec notes.
 //! Modifier ici puis redeployer.
 
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
 use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
 use chrono::DateTime;
@@ -141,7 +142,11 @@ pub fn find_heist_tool(key: &str) -> Option<&'static HeistToolDef> {
 /// `active_tool_keys` est la liste des item_keys de braquage presents
 /// dans l'inventaire du joueur (doublons ignores). Chaque item apporte
 /// son propre `bonus_percent` proportionnel a son prix.
-pub fn compute_success_chance<I, S>(active_tool_keys: I) -> u32
+///
+/// La base (`heist_base_success_pct`) et le plafond (`heist_max_success_pct`)
+/// proviennent de `cfg` ; `cfg` garantit `base <= max`
+/// (cf. `CoudeEconomyConfig::sanitize`).
+pub fn compute_success_chance<I, S>(active_tool_keys: I, cfg: &CoudeEconomyConfig) -> u32
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
@@ -157,7 +162,7 @@ where
         .filter_map(|k| find_heist_tool(k))
         .map(|t| t.bonus_percent)
         .sum();
-    (HEIST_BASE_SUCCESS_PERCENT + bonus).min(HEIST_MAX_SUCCESS_PERCENT)
+    (cfg.heist_base_success_pct + bonus).min(cfg.heist_max_success_pct)
 }
 
 /// Une tentative de braquage enregistree (log pour cooldown + historique).

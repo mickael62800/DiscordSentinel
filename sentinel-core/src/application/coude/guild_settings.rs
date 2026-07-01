@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 
 use crate::domain::entities::coude::balance::BalanceParams;
+use crate::domain::entities::coude::economy_config::CoudeEconomyConfig;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
@@ -42,6 +43,19 @@ pub async fn load_balance_params(repo: &dyn BotConfigRepository, guild_id: &str)
     // on obtient une map vide, et `from_config(&empty)` == `default()` (chaque
     // champ retombe sur son default), donc le comportement est identique.
     BalanceParams::from_config(&GuildSettings::load(repo, guild_id).await.raw)
+}
+
+/// Charge la config ECONOMY (`CoudeEconomyConfig`) d'une guild depuis le
+/// `BotConfigRepository`. Mirror de `load_balance_params` : fallback
+/// silencieux sur `default()` si le repo est down / la clé absente. Le
+/// domaine reste PUR — cette config est ensuite passée EN DONNÉE aux
+/// fonctions domain (combat XP, vol, tout-ou-rien, braquage, maudire,
+/// tournoi).
+pub async fn load_economy_config(
+    repo: &dyn BotConfigRepository,
+    guild_id: &str,
+) -> CoudeEconomyConfig {
+    GuildSettings::load(repo, guild_id).await.economy_config()
 }
 
 #[derive(Debug, Default, Clone)]
@@ -84,5 +98,12 @@ impl GuildSettings {
     /// retourne en `f64` ratio (0.5).
     pub fn get_percent_ratio(&self, key: &str, default_pct: i64) -> f64 {
         (self.get_i64(key, default_pct) as f64) / 100.0
+    }
+
+    /// Construit un `CoudeEconomyConfig` (valeurs ECONOMY réglables) depuis
+    /// la config brute déjà chargée. Toute clé absente/malformée retombe sur
+    /// son défaut historique et les gardes de sécurité sont appliqués.
+    pub fn economy_config(&self) -> CoudeEconomyConfig {
+        CoudeEconomyConfig::from_config(&self.raw)
     }
 }

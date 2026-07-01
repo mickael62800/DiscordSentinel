@@ -228,8 +228,17 @@ pub async fn handle_spin_in_channel(ctx: &Context, component: &ComponentInteract
     // Touch activity tracker.
     touch_activity(ctx, user_id).await;
 
-    // Lance l animation dans le salon perso.
-    play_spin_in_channel(ctx, component.channel_id, &response, &username).await;
+    // Lance l animation dans le salon perso (frames/delai editables par serveur).
+    let (frames, delay) = read_animation_config(&base, &guild_id).await;
+    play_spin_in_channel(
+        ctx,
+        component.channel_id,
+        &response,
+        &username,
+        frames,
+        delay,
+    )
+    .await;
 
     // Acquitte le clic ephemeral.
     let edit = serenity::builder::EditInteractionResponse::new().content("Spin lance !");
@@ -282,7 +291,16 @@ pub async fn handle_daily_in_channel(ctx: &Context, component: &ComponentInterac
     };
 
     touch_activity(ctx, user_id).await;
-    play_spin_in_channel(ctx, component.channel_id, &response, &username).await;
+    let (frames, delay) = read_animation_config(&base, &guild_id).await;
+    play_spin_in_channel(
+        ctx,
+        component.channel_id,
+        &response,
+        &username,
+        frames,
+        delay,
+    )
+    .await;
 
     let edit = serenity::builder::EditInteractionResponse::new().content("Daily lance !");
     let _ = component.edit_response(&ctx.http, edit).await;
@@ -356,11 +374,32 @@ pub async fn handle_close_channel(ctx: &Context, component: &ComponentInteractio
 // Animation : lance les 4 frames + re-poste les boutons d action
 // ══════════════════════════════════════════════════════════
 
+/// Lit les reglages d animation editables par serveur (`slot-bot`) :
+/// nombre de frames de revele (guard 1..=9) et delai entre frames en ms
+/// (guard 250..=5000). Fallback sur les defauts si absent/hors borne.
+async fn read_animation_config(base: &BaseApiClient, guild_id: &str) -> (usize, u64) {
+    let cfg = base
+        .get_guild_config_for(guild_id, super::MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let frames = BaseApiClient::config_u64(
+        &cfg,
+        "spin_animation_total_frames",
+        TOTAL_REVEAL_FRAMES as u64,
+    )
+    .clamp(1, 9) as usize;
+    let delay = BaseApiClient::config_u64(&cfg, "spin_animation_frame_delay_ms", FRAME_DELAY_MS)
+        .clamp(250, 5000);
+    (frames, delay)
+}
+
 async fn play_spin_in_channel(
     ctx: &Context,
     channel_id: ChannelId,
     response: &SpinResponse,
     username: &str,
+    total_frames: usize,
+    frame_delay_ms: u64,
 ) {
     // Sanity : on s attend a 3 symboles. Si l API en renvoie autre chose,
     // on affiche direct le resultat sans animation.
@@ -390,11 +429,11 @@ async fn play_spin_in_channel(
         }
     };
 
-    // Frames 1..=TOTAL_REVEAL_FRAMES : revele progressif.
-    for i in 1..=TOTAL_REVEAL_FRAMES {
-        tokio::time::sleep(Duration::from_millis(FRAME_DELAY_MS)).await;
+    // Frames 1..=total_frames : revele progressif.
+    for i in 1..=total_frames {
+        tokio::time::sleep(Duration::from_millis(frame_delay_ms)).await;
 
-        let edit = if i == TOTAL_REVEAL_FRAMES {
+        let edit = if i == total_frames {
             // Frame finale : remplace par l embed resultat complet.
             EditMessage::new().embed(embeds::build_spin_result_embed(response, username))
         } else {

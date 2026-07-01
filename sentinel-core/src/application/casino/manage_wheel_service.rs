@@ -17,9 +17,11 @@ use rand::SeedableRng;
 use uuid::Uuid;
 
 use crate::domain::entities::casino::wheel::is_memorable_case;
-use crate::domain::entities::casino::wheel::spin_with_rng_curses as wheel_spin_with_rng_curses;
+use crate::domain::entities::casino::wheel::spin_with_rng_curses_cfg as wheel_spin_with_rng_curses_cfg;
+use crate::domain::entities::casino::wheel::WheelConfig;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
+use crate::domain::entities::casino::wheel::WHEEL_CASES;
 use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
@@ -29,11 +31,14 @@ use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::uow::UnitOfWork;
+const MODULE_BOT_NAME: &str = "wheel-bot";
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     curses_repo: Option<Arc<dyn CursesRepository>>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
     uow: Arc<dyn UnitOfWork>,
 }
 
@@ -47,6 +52,7 @@ impl ManageWheelService {
             repo,
             wallet_uc,
             curses_repo: None,
+            bot_config_repo: None,
             uow,
         }
     }
@@ -58,6 +64,58 @@ impl ManageWheelService {
     pub fn with_curses_repo(mut self, repo: Arc<dyn CursesRepository>) -> Self {
         self.curses_repo = Some(repo);
         self
+    }
+
+    /// Branche le repo de config pour rendre les payouts/poids des cases
+    /// editables par serveur (`wheel-bot`). Optionnel : sans lui, la Roue
+    /// utilise les payouts/poids par defaut (`WheelConfig::default`).
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
+    }
+
+    /// Charge la config `wheel-bot` de la guild et la decode en `WheelConfig`.
+    /// Chaque cle absente retombe sur le defaut de la case ; garde-fous
+    /// (clamp payout ±50000, somme des poids > 0) appliques via `normalized()`.
+    async fn load_config(&self, guild_id: &str) -> WheelConfig {
+        let Some(repo) = &self.bot_config_repo else {
+            return WheelConfig::default();
+        };
+        let entries = match repo.get_config(guild_id, MODULE_BOT_NAME).await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(
+                    event_type = "wheel.config_load_failed",
+                    guild_id = %guild_id,
+                    error = %e,
+                    "Echec lecture config wheel-bot, utilisation des defauts"
+                );
+                return WheelConfig::default();
+            }
+        };
+
+        let mut cfg = WheelConfig::default();
+        for entry in &entries {
+            // Cles : wheel_<segment>_payout / wheel_<segment>_weight
+            let Some(rest) = entry.config_key.strip_prefix("wheel_") else {
+                continue;
+            };
+            if let Some(seg_key) = rest.strip_suffix("_payout") {
+                if let Some(idx) = WHEEL_CASES.iter().position(|c| c.key == seg_key) {
+                    if let Ok(v) = entry.config_value.parse::<i64>() {
+                        cfg.segments[idx].payout = v;
+                    }
+                }
+            } else if let Some(seg_key) = rest.strip_suffix("_weight") {
+                if let Some(idx) = WHEEL_CASES.iter().position(|c| c.key == seg_key) {
+                    if let Ok(v) = entry.config_value.parse::<u32>() {
+                        cfg.segments[idx].weight = v;
+                    }
+                }
+            }
+        }
+
+        cfg.normalized()
     }
 }
 
@@ -89,9 +147,10 @@ impl ManageWheelUseCase for ManageWheelService {
             false
         };
 
-        // 3. Spin RNG (entropie OS).
+        // 3. Spin RNG (entropie OS). Config payouts/poids editable par serveur.
+        let config = self.load_config(&cmd.guild_id).await;
         let mut rng = rand::rngs::StdRng::from_entropy();
-        let outcome = wheel_spin_with_rng_curses(&mut rng, block_licorne);
+        let outcome = wheel_spin_with_rng_curses_cfg(&mut rng, block_licorne, &config);
         let payout = outcome.case.payout;
 
         // 3. Tx atomique.

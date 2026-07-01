@@ -87,7 +87,16 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    tokio::time::sleep(Duration::from_millis(SPIN_ANIMATION_MS)).await;
+    // Duree d animation editable par serveur (guard 500..=15000 ms).
+    let anim_ms = {
+        let cfg = base
+            .get_guild_config_for(&guild_id, super::MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default();
+        BaseApiClient::config_u64(&cfg, "wheel_spin_animation_ms", SPIN_ANIMATION_MS)
+            .clamp(500, 15000)
+    };
+    tokio::time::sleep(Duration::from_millis(anim_ms)).await;
 
     let final_embed = embeds::build_result_embed(&response, &username);
     if let Err(e) = sent
