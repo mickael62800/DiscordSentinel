@@ -189,6 +189,7 @@ pub fn start(
     // ─────────────────────────────────────────────────────────────
     {
         let redis = redis_client.clone();
+        let watched_users_query_limit = config.watched_users_query_limit;
         spawn_periodic(
             "refresh_watched_users",
             config.audit_cache_refresh_secs,
@@ -199,7 +200,12 @@ pub fn start(
             move |pool| {
                 let redis = redis.clone();
                 Box::pin(async move {
-                    domains::audit_cache::refresh_watched_users::run(&pool, &redis).await
+                    domains::audit_cache::refresh_watched_users::run(
+                        &pool,
+                        &redis,
+                        watched_users_query_limit,
+                    )
+                    .await
                 })
             },
         );

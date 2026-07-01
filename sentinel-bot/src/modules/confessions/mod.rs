@@ -407,6 +407,7 @@ async fn open_reply_modal(ctx: &Context, component: &ComponentInteraction, conf_
 }
 
 async fn open_report_modal(ctx: &Context, component: &ComponentInteraction, conf_id: &str) {
+    let ui = load_ui_config(ctx, component.guild_id).await;
     let modal = CreateModal::new(
         format!("{}{}", CID_REPORT_MODAL_PREFIX, conf_id),
         "Signaler cette confession",
@@ -414,7 +415,7 @@ async fn open_report_modal(ctx: &Context, component: &ComponentInteraction, conf
     .components(vec![CreateActionRow::InputText(
         CreateInputText::new(InputTextStyle::Paragraph, "Raison du signalement", "reason")
             .min_length(3)
-            .max_length(500)
+            .max_length(ui.report_reason_max_len)
             .required(true),
     )]);
     let resp = CreateInteractionResponse::Modal(modal);
@@ -497,7 +498,8 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     };
 
     // 3. Poste l'embed sur Discord
-    let embed_color = load_ui_config(ctx, modal.guild_id).await.embed_color;
+    let ui = load_ui_config(ctx, modal.guild_id).await;
+    let embed_color = ui.embed_color;
     let embed = CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(format!(
             "Confession anonyme (#{})",
@@ -536,7 +538,7 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
             &ctx.http,
             posted.id,
             serenity::builder::CreateThread::new(thread_name)
-                .auto_archive_duration(serenity::all::AutoArchiveDuration::OneHour),
+                .auto_archive_duration(ui.thread_archive_duration()),
         )
         .await
         .ok();
@@ -738,6 +740,11 @@ struct ConfessUiConfig {
     max_chars: u16,
     /// Couleur de l'embed des confessions/reponses.
     embed_color: u32,
+    /// Duree d'auto-archivage du thread de reponses (minutes). Discord n'autorise
+    /// que 60 / 1440 / 4320 / 10080. Defaut 60.
+    thread_archive_minutes: u16,
+    /// max_length du champ "raison" de la modale de signalement (<= 4000). Defaut 500.
+    report_reason_max_len: u16,
 }
 
 impl Default for ConfessUiConfig {
@@ -746,6 +753,22 @@ impl Default for ConfessUiConfig {
             min_chars: 5,
             max_chars: 2000,
             embed_color: 0xff5e5e,
+            thread_archive_minutes: 60,
+            report_reason_max_len: 500,
+        }
+    }
+}
+
+impl ConfessUiConfig {
+    /// Traduit `thread_archive_minutes` en `AutoArchiveDuration` Discord.
+    /// Toute valeur hors des paliers autorises retombe sur 1h.
+    fn thread_archive_duration(&self) -> serenity::all::AutoArchiveDuration {
+        use serenity::all::AutoArchiveDuration::*;
+        match self.thread_archive_minutes {
+            1440 => OneDay,
+            4320 => ThreeDays,
+            10080 => OneWeek,
+            _ => OneHour,
         }
     }
 }
@@ -785,6 +808,16 @@ async fn load_ui_config(ctx: &Context, guild_id: Option<GuildId>) -> ConfessUiCo
     {
         cfg.embed_color = c;
     }
+    // Duree d'archivage du thread (paliers Discord). Valeur inconnue -> defaut 60.
+    let archive = BaseApiClient::config_u64(&entries, "thread_archive_minutes", 60);
+    cfg.thread_archive_minutes = match archive {
+        1440 => 1440,
+        4320 => 4320,
+        10080 => 10080,
+        _ => 60,
+    };
+    cfg.report_reason_max_len =
+        BaseApiClient::config_u64(&entries, "report_reason_max_len", 500).clamp(1, 4000) as u16;
     cfg
 }
 

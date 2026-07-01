@@ -121,11 +121,52 @@ pub async fn handle_type_select(ctx: &Context, component: &ComponentInteraction)
 
     let modal_id = format!("{}{}", MODAL_ID_PREFIX, ticket_type);
 
+    // Bornes des champs de la modale, reglables par serveur (config `ticket-bot`).
+    // Defauts = valeurs historiques -> aucun changement tant que non reconfigure.
+    // Gardes : min <= max, sinon on retombe sur les defauts ; max plafonne a la
+    // limite modale Discord (4000).
+    let (subject_min, subject_max, desc_min, desc_max) = {
+        let guild_config = if let Some(gid) = component.guild_id {
+            let data = ctx.data.read().await;
+            match data.get::<ApiClientKey>() {
+                Some(base) => base
+                    .get_guild_config_for(
+                        &gid.to_string(),
+                        crate::modules::tickets::MODULE_BOT_NAME,
+                    )
+                    .await
+                    .unwrap_or_default(),
+                None => std::collections::HashMap::new(),
+            }
+        } else {
+            std::collections::HashMap::new()
+        };
+        let cfg = |key: &str, default: u64, cap: u64| {
+            crate::shared::api_client::BaseApiClient::config_u64(&guild_config, key, default)
+                .clamp(1, cap)
+        };
+        let s_min = cfg("ticket_subject_min_len", 5, 4000);
+        let s_max = cfg("ticket_subject_max_len", 100, 4000);
+        let d_min = cfg("ticket_desc_min_len", 10, 4000);
+        let d_max = cfg("ticket_desc_max_len", 2000, 4000);
+        let (s_min, s_max) = if s_min <= s_max {
+            (s_min, s_max)
+        } else {
+            (5, 100)
+        };
+        let (d_min, d_max) = if d_min <= d_max {
+            (d_min, d_max)
+        } else {
+            (10, 2000)
+        };
+        (s_min as u16, s_max as u16, d_min as u16, d_max as u16)
+    };
+
     let subject_input = CreateInputText::new(InputTextStyle::Short, "Sujet", "ticket_subject")
         .placeholder("Resumez votre demande en quelques mots...")
         .required(true)
-        .min_length(5)
-        .max_length(100);
+        .min_length(subject_min)
+        .max_length(subject_max);
 
     let description_input = CreateInputText::new(
         InputTextStyle::Paragraph,
@@ -136,8 +177,8 @@ pub async fn handle_type_select(ctx: &Context, component: &ComponentInteraction)
         "Decrivez votre probleme en detail : que s'est-il passe, quand, qui est concerne...",
     )
     .required(true)
-    .min_length(10)
-    .max_length(2000);
+    .min_length(desc_min)
+    .max_length(desc_max);
 
     let modal =
         CreateModal::new(&modal_id, format!("Nouveau ticket — {}", type_label)).components(vec![

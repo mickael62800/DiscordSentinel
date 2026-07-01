@@ -38,6 +38,27 @@ pub async fn find_voice_from_text(ctx: &Context, channel_id: ChannelId) -> Optio
     map.get(&channel_id).map(|e| *e.value())
 }
 
+/// Plafond de la limite de membres d'un salon vocal. Reglable par serveur via
+/// la cle `voice_max_user_limit` de la config voice-bot, garde 1..=99 (99 = cap
+/// Discord). Defaut 99 si absent/malforme ou guild inconnue.
+pub async fn max_user_limit(ctx: &Context, guild_id: Option<serenity::model::id::GuildId>) -> i32 {
+    let Some(guild_id) = guild_id else {
+        return 99;
+    };
+    let cfg = {
+        let data = ctx.data.read().await;
+        match data.get::<crate::shared::heartbeat::ApiClientKey>() {
+            Some(base) => base
+                .get_guild_config_for(&guild_id.to_string(), super::MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
+            None => return 99,
+        }
+    };
+    let v = crate::shared::api_client::BaseApiClient::config_u64(&cfg, "voice_max_user_limit", 99);
+    v.clamp(1, 99) as i32
+}
+
 /// Helper that checks admin + returns (voice_channel_id, channel_response).
 pub async fn require_admin(
     ctx: &Context,

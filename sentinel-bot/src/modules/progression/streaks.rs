@@ -126,11 +126,28 @@ impl StreakTracker {
     }
 }
 
-/// Calcule le multiplicateur XP bonus en fonction du streak.
+/// Bonus de multiplicateur XP par semaine complete de streak (defaut historique).
+pub const DEFAULT_STREAK_BONUS_PER_WEEK: f64 = 0.1;
+/// Plafond du multiplicateur XP de streak (defaut historique).
+pub const DEFAULT_STREAK_MAX_MULTIPLIER: f64 = 1.5;
+
+/// Calcule le multiplicateur XP bonus en fonction du streak (valeurs par defaut).
 /// 1.0 base + 0.1 par semaine complete, max 1.5x (a 35 jours).
 pub fn streak_multiplier(streak_days: u32) -> f64 {
-    let bonus = (streak_days / 7) as f64 * 0.1;
-    (1.0 + bonus).min(1.5)
+    streak_multiplier_with(
+        streak_days,
+        DEFAULT_STREAK_BONUS_PER_WEEK,
+        DEFAULT_STREAK_MAX_MULTIPLIER,
+    )
+}
+
+/// Variante parametrable (fonction pure) : le bonus par semaine et le plafond
+/// sont passes en entree (config par serveur). Le plafond est garde >= 1.0 pour
+/// ne jamais reduire l'XP en dessous du base.
+pub fn streak_multiplier_with(streak_days: u32, bonus_per_week: f64, max_multiplier: f64) -> f64 {
+    let max_multiplier = max_multiplier.max(1.0);
+    let bonus = (streak_days / 7) as f64 * bonus_per_week.max(0.0);
+    (1.0 + bonus).min(max_multiplier)
 }
 
 /// Verifie si (day2, year2) est le jour suivant (day1, year1).

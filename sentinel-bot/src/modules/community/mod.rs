@@ -400,12 +400,23 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
-    // Rate limit anti-spam
+    // Rate limit anti-spam (cooldown configurable per-guild)
     {
         let data = ctx.data.read().await;
+        let cooldown_secs = if let Some(base) = data.get::<ApiClientKey>() {
+            let gc = base
+                .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default();
+            BaseApiClient::config_u64(&gc, "role_button_cooldown_secs", 2)
+        } else {
+            2
+        };
         if let Some(cooldown) = data.get::<CooldownKey>() {
             let key = format!("role_{}", role_id);
-            if let Some(remaining) = cooldown.check_and_set(component.user.id.get(), &key, 2) {
+            if let Some(remaining) =
+                cooldown.check_and_set(component.user.id.get(), &key, cooldown_secs)
+            {
                 let response = CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content(format!(

@@ -129,6 +129,7 @@ struct ConfigRow {
     panel_message_id: Option<String>,
     cooldown_secs: i32,
     max_per_day: i32,
+    quota_window_hours: i32,
     min_chars: i32,
     max_chars: i32,
     automod_enabled: bool,
@@ -146,6 +147,7 @@ impl From<ConfigRow> for ConfessionConfig {
             panel_message_id: r.panel_message_id,
             cooldown_secs: r.cooldown_secs,
             max_per_day: r.max_per_day,
+            quota_window_hours: r.quota_window_hours,
             min_chars: r.min_chars,
             max_chars: r.max_chars,
             automod_enabled: r.automod_enabled,
@@ -167,8 +169,8 @@ const SELECT_REPORT: &str = "SELECT id, guild_id, confession_id, reply_id, repor
     reason, status, resolved_by, resolved_at, created_at FROM confession_reports";
 
 const SELECT_CONFIG: &str = "SELECT guild_id, enabled, channel_id, panel_message_id, \
-    cooldown_secs, max_per_day, min_chars, max_chars, automod_enabled, banned_user_ids, \
-    updated_at FROM confession_config";
+    cooldown_secs, max_per_day, quota_window_hours, min_chars, max_chars, automod_enabled, \
+    banned_user_ids, updated_at FROM confession_config";
 
 #[async_trait]
 impl ConfessionRepository for PgConfessionRepository {
@@ -515,12 +517,14 @@ impl ConfessionRepository for PgConfessionRepository {
         sqlx::query(
             r#"INSERT INTO confession_config
                 (guild_id, enabled, channel_id, panel_message_id, cooldown_secs,
-                 max_per_day, min_chars, max_chars, automod_enabled, banned_user_ids, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+                 max_per_day, quota_window_hours, min_chars, max_chars, automod_enabled,
+                 banned_user_ids, updated_at)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
                 ON CONFLICT (guild_id) DO UPDATE SET
                     enabled = $2, channel_id = $3, panel_message_id = $4,
-                    cooldown_secs = $5, max_per_day = $6, min_chars = $7, max_chars = $8,
-                    automod_enabled = $9, banned_user_ids = $10, updated_at = NOW()"#,
+                    cooldown_secs = $5, max_per_day = $6, quota_window_hours = $7,
+                    min_chars = $8, max_chars = $9,
+                    automod_enabled = $10, banned_user_ids = $11, updated_at = NOW()"#,
         )
         .bind(c.guild_id.as_str())
         .bind(c.enabled)
@@ -528,6 +532,7 @@ impl ConfessionRepository for PgConfessionRepository {
         .bind(&c.panel_message_id)
         .bind(c.cooldown_secs)
         .bind(c.max_per_day)
+        .bind(c.quota_window_hours)
         .bind(c.min_chars)
         .bind(c.max_chars)
         .bind(c.automod_enabled)

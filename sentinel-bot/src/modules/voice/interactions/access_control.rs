@@ -332,15 +332,18 @@ async fn handle_ban_select(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
+    // Durees des presets de voice-ban : reglables par serveur via la cle CSV
+    // `voice_ban_preset_secs` (3 valeurs). Fallback aux defauts si absente/malformee.
+    let presets = ban_duration_presets(ctx, component).await;
     let row = CreateActionRow::Buttons(vec![
-        CreateButton::new(format!("ban_duration_{selected_value}_300"))
-            .label("5 min")
+        CreateButton::new(format!("ban_duration_{selected_value}_{}", presets[0]))
+            .label(format_ban_duration(presets[0]))
             .style(ButtonStyle::Secondary),
-        CreateButton::new(format!("ban_duration_{selected_value}_3600"))
-            .label("1 heure")
+        CreateButton::new(format!("ban_duration_{selected_value}_{}", presets[1]))
+            .label(format_ban_duration(presets[1]))
             .style(ButtonStyle::Secondary),
-        CreateButton::new(format!("ban_duration_{selected_value}_86400"))
-            .label("24 heures")
+        CreateButton::new(format!("ban_duration_{selected_value}_{}", presets[2]))
+            .label(format_ban_duration(presets[2]))
             .style(ButtonStyle::Danger),
         CreateButton::new(format!("ban_duration_{selected_value}_0"))
             .label("Permanent")
@@ -355,6 +358,54 @@ async fn handle_ban_select(ctx: &Context, component: &ComponentInteraction) {
     let response = CreateInteractionResponse::Message(msg);
     if let Err(e) = component.create_response(&ctx.http, response).await {
         warn!(error = %e, "Erreur envoi menu duree ban");
+    }
+}
+
+/// Lit les 3 durees (secondes) des boutons de voice-ban depuis la config
+/// voice-bot (`voice_ban_preset_secs`, CSV de 3 entiers). Retombe sur les
+/// defauts historiques [300, 3600, 86400] si la cle est absente ou malformee.
+async fn ban_duration_presets(ctx: &Context, component: &ComponentInteraction) -> [u64; 3] {
+    const DEFAULTS: [u64; 3] = [300, 3600, 86400];
+    let guild_id = match component.guild_id {
+        Some(g) => g,
+        None => return DEFAULTS,
+    };
+    let cfg = {
+        let data = ctx.data.read().await;
+        match data.get::<crate::shared::heartbeat::ApiClientKey>() {
+            Some(base) => base
+                .get_guild_config_for(
+                    &guild_id.to_string(),
+                    crate::modules::voice::MODULE_BOT_NAME,
+                )
+                .await
+                .unwrap_or_default(),
+            None => return DEFAULTS,
+        }
+    };
+    let raw =
+        crate::shared::api_client::BaseApiClient::config_or(&cfg, "voice_ban_preset_secs", "");
+    let parsed: Vec<u64> = raw
+        .split(',')
+        .filter_map(|s| s.trim().parse::<u64>().ok())
+        .collect();
+    if parsed.len() == 3 && parsed.iter().all(|&v| v > 0) {
+        [parsed[0], parsed[1], parsed[2]]
+    } else {
+        DEFAULTS
+    }
+}
+
+/// Formate une duree (secondes) en libelle court pour un bouton (ex: "5 min").
+fn format_ban_duration(secs: u64) -> String {
+    if secs.is_multiple_of(86400) {
+        format!("{} jour(s)", secs / 86400)
+    } else if secs.is_multiple_of(3600) {
+        format!("{} heure(s)", secs / 3600)
+    } else if secs.is_multiple_of(60) {
+        format!("{} min", secs / 60)
+    } else {
+        format!("{secs} s")
     }
 }
 

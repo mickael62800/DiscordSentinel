@@ -11,10 +11,42 @@ use super::{AfkTrackerKey, VoiceOwnerMapKey};
 pub fn spawn_afk_sweep(ctx: Context) {
     tokio::spawn(async move {
         loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            let interval = afk_sweep_interval_secs(&ctx).await;
+            tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
             run_afk_sweep(&ctx).await;
         }
     });
+}
+
+/// Intervalle (en secondes) entre deux balayages AFK.
+///
+/// C'est une boucle globale (un seul timer pour tout le bot), pas une tache
+/// par-guild : l'intervalle ne peut donc pas etre reellement per-serveur. On
+/// lit la cle `afk_sweep_interval_secs` de la config voice-bot de la PREMIERE
+/// guild en cache qui la definit, avec garde 30..=600 et defaut 60.
+async fn afk_sweep_interval_secs(ctx: &Context) -> u64 {
+    let base = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(b) => b.clone(),
+            None => return 60,
+        }
+    };
+    for guild_id in ctx.cache.guilds() {
+        if let Ok(cfg) = base
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::voice::MODULE_BOT_NAME,
+            )
+            .await
+        {
+            if cfg.contains_key("afk_sweep_interval_secs") {
+                let v = BaseApiClient::config_u64(&cfg, "afk_sweep_interval_secs", 60);
+                return v.clamp(30, 600);
+            }
+        }
+    }
+    60
 }
 
 async fn run_afk_sweep(ctx: &Context) {

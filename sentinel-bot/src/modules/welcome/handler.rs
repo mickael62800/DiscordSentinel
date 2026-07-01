@@ -456,10 +456,26 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             .leave_footer_text
             .replace("{count}", &member_count.to_string())
     };
+    // Couleur de l'embed de depart : reglable par serveur (defaut historique
+    // e74c3c). Lue via la config guild welcome-bot, parsee comme welcome_embed_color.
+    let leave_color = {
+        let cfg = base
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::welcome::MODULE_BOT_NAME,
+            )
+            .await
+            .unwrap_or_default();
+        template::parse_color(&crate::shared::api_client::BaseApiClient::config_or(
+            &cfg,
+            "leave_embed_color",
+            "e74c3c",
+        ))
+    };
     let mut embed = CreateEmbed::new()
         .title(&leave_title)
         .description(&text)
-        .color(0xe74c3c)
+        .color(leave_color)
         .footer(CreateEmbedFooter::new(leave_footer));
     if !config.leave_image_url.is_empty() {
         embed = embed.image(&config.leave_image_url);
@@ -516,7 +532,7 @@ pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(),
         (base, grpc)
     };
 
-    let api = WelcomeApiClient::new(base, grpc);
+    let api = WelcomeApiClient::new(base.clone(), grpc);
     let config = api
         .get_config(&guild_id.to_string())
         .await
@@ -541,10 +557,25 @@ pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(),
         }
     };
 
+    // Couleur du panneau de reglement : reglable par serveur (defaut 5865f2).
+    let rules_color = {
+        let cfg = base
+            .get_guild_config_for(
+                &guild_id.to_string(),
+                crate::modules::welcome::MODULE_BOT_NAME,
+            )
+            .await
+            .unwrap_or_default();
+        template::parse_color(&crate::shared::api_client::BaseApiClient::config_or(
+            &cfg,
+            "rules_embed_color",
+            "5865f2",
+        ))
+    };
     let embed = CreateEmbed::new()
         .title("📜 Règlement")
         .description(&config.rules_message)
-        .color(0x5865f2);
+        .color(rules_color);
     let button = CreateButton::new(RULES_ACCEPT_ID)
         .label(label)
         .style(ButtonStyle::Success);
@@ -793,13 +824,43 @@ pub async fn handle_age_modal(
         None => return,
     };
 
+    // Reglages reglables par serveur (bornes de saisie + multiplicateur de ban).
+    // Lus via la config guild welcome-bot ; defaut = valeurs historiques.
+    let (age_min, age_max, ban_days_per_year) = {
+        use crate::shared::api_client::BaseApiClient;
+        let cfg = {
+            let data = ctx.data.read().await;
+            match data.get::<ApiClientKey>() {
+                Some(base) => base
+                    .get_guild_config_for(
+                        &guild_id.to_string(),
+                        crate::modules::welcome::MODULE_BOT_NAME,
+                    )
+                    .await
+                    .unwrap_or_default(),
+                None => std::collections::HashMap::new(),
+            }
+        };
+        let read_min = BaseApiClient::config_u64(&cfg, "age_min", 5) as i32;
+        let read_max = BaseApiClient::config_u64(&cfg, "age_max", 120) as i32;
+        // Gardes : age_min >= 0 et age_min <= age_max, sinon retour aux defauts.
+        let (age_min, age_max) = if read_min >= 0 && read_min <= read_max {
+            (read_min, read_max)
+        } else {
+            (5, 120)
+        };
+        let ban_days_per_year =
+            BaseApiClient::config_u64(&cfg, "age_ban_days_per_year", 365).max(1);
+        (age_min, age_max, ban_days_per_year)
+    };
+
     // Parse de l'age saisi.
     let raw = extract_modal_input(modal, AGE_INPUT_ID).unwrap_or_default();
     let age: Option<i32> = raw
         .trim()
         .parse::<i32>()
         .ok()
-        .filter(|a| (5..=120).contains(a));
+        .filter(|a| (age_min..=age_max).contains(a));
     let age = match age {
         Some(a) => a,
         None => {
@@ -852,7 +913,8 @@ pub async fn handle_age_modal(
 
     // Age insuffisant -> ban temporaire jusqu'aux age_minimum ans.
     let years = (config.age_minimum - age).max(1);
-    let unban_at = chrono::Utc::now() + chrono::Duration::days(i64::from(years) * 365);
+    let unban_at =
+        chrono::Utc::now() + chrono::Duration::days(i64::from(years) * ban_days_per_year as i64);
     let message = config
         .age_ban_message
         .replace("{min}", &config.age_minimum.to_string())

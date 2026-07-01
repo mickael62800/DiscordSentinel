@@ -84,6 +84,9 @@ pub struct ConfessionConfig {
     pub panel_message_id: Option<String>,
     pub cooldown_secs: i32,
     pub max_per_day: i32,
+    /// Fenetre glissante (en heures) sur laquelle `max_per_day` est compte.
+    /// Defaut 24h. Bornee a >= 1 a l'usage.
+    pub quota_window_hours: i32,
     pub min_chars: i32,
     pub max_chars: i32,
     pub automod_enabled: bool,
@@ -100,6 +103,7 @@ impl ConfessionConfig {
             panel_message_id: None,
             cooldown_secs: 60,
             max_per_day: 20,
+            quota_window_hours: 24,
             min_chars: 5,
             max_chars: 2000,
             automod_enabled: true,

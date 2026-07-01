@@ -557,6 +557,7 @@ pub async fn save_config(
         panel_message_id: dto.panel_message_id,
         cooldown_secs: dto.cooldown_secs,
         max_per_day: dto.max_per_day,
+        quota_window_hours: dto.quota_window_hours,
         min_chars: dto.min_chars,
         max_chars: dto.max_chars,
         automod_enabled: dto.automod_enabled,

@@ -379,13 +379,18 @@ async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
         })
         .unwrap_or_default();
 
+    // Plafond de la limite de membres : reglable par serveur (defaut/plafond
+    // Discord 99). Lu via la config voice-bot, garde 1..=99.
+    let max_limit = super::max_user_limit(ctx, modal.guild_id).await;
     let limit: i32 = match raw.trim().parse::<i32>() {
-        Ok(n) if (0..=99).contains(&n) => n,
+        Ok(n) if (0..=max_limit).contains(&n) => n,
         _ => {
             super::respond_ephemeral_modal(
                 ctx,
                 modal,
-                "Valeur invalide. Entrez un nombre entre 0 et 99 (0 = aucune limite).",
+                &format!(
+                    "Valeur invalide. Entrez un nombre entre 0 et {max_limit} (0 = aucune limite)."
+                ),
             )
             .await;
             return;

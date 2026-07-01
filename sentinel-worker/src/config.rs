@@ -29,6 +29,8 @@ const DEFAULT_PARTITION_MANAGER_SECS: u64 = 24 * SECS_PER_HOUR;
 
 // ── Defauts audit_cache ──
 const DEFAULT_AUDIT_CACHE_REFRESH_SECS: u64 = 60;
+/// Limite du snapshot watched_users pousse en Redis (global, non per-guild).
+const DEFAULT_WATCHED_USERS_QUERY_LIMIT: i64 = 10_000;
 
 // ── Defauts blackjack ──
 const DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS: u64 = 60;
@@ -148,6 +150,7 @@ pub struct WorkerConfig {
 
     // ── Audit cache ──
     pub audit_cache_refresh_secs: u64,
+    pub watched_users_query_limit: i64,
 
     // ── Blackjack ──
     pub blackjack_scan_interval_secs: u64,
@@ -270,6 +273,10 @@ impl WorkerConfig {
             audit_cache_refresh_secs: load_env(
                 "AUDIT_CACHE_REFRESH_INTERVAL",
                 DEFAULT_AUDIT_CACHE_REFRESH_SECS,
+            ),
+            watched_users_query_limit: load_env(
+                "WATCHED_USERS_QUERY_LIMIT",
+                DEFAULT_WATCHED_USERS_QUERY_LIMIT,
             ),
 
             // blackjack
@@ -510,6 +517,14 @@ impl WorkerConfig {
             "AUDIT_CACHE_REFRESH_INTERVAL",
             DEFAULT_AUDIT_CACHE_REFRESH_SECS,
         );
+        // Borne saine : 100..100000 (evite un LIMIT 0 ou une valeur absurde).
+        let watched_limit: i64 = config_or_env(
+            db,
+            "watched_users_query_limit",
+            "WATCHED_USERS_QUERY_LIMIT",
+            DEFAULT_WATCHED_USERS_QUERY_LIMIT,
+        );
+        self.watched_users_query_limit = watched_limit.clamp(100, 100_000);
 
         // blackjack
         self.blackjack_scan_interval_secs = config_or_env(

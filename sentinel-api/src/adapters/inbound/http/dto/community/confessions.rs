@@ -6,6 +6,10 @@ use sentinel_core::domain::entities::community::confession::{
     Confession, ConfessionConfig, ConfessionReply, ConfessionReport, ReportStatus,
 };
 
+fn default_quota_window_hours() -> i32 {
+    24
+}
+
 // ── Request DTOs ───────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +77,9 @@ pub struct SaveConfigDto {
     pub panel_message_id: Option<String>,
     pub cooldown_secs: i32,
     pub max_per_day: i32,
+    /// Fenetre glissante (heures) du quota `max_per_day`. Defaut 24 si omis.
+    #[serde(default = "default_quota_window_hours")]
+    pub quota_window_hours: i32,
     pub min_chars: i32,
     pub max_chars: i32,
     /// C1 : flag mort (aucun filtre de mots n'existe). Conserve pour
@@ -195,6 +202,7 @@ pub struct ConfigDto {
     pub panel_message_id: Option<String>,
     pub cooldown_secs: i32,
     pub max_per_day: i32,
+    pub quota_window_hours: i32,
     pub min_chars: i32,
     pub max_chars: i32,
     pub automod_enabled: bool,
@@ -211,6 +219,7 @@ impl From<ConfessionConfig> for ConfigDto {
             panel_message_id: c.panel_message_id,
             cooldown_secs: c.cooldown_secs,
             max_per_day: c.max_per_day,
+            quota_window_hours: c.quota_window_hours,
             min_chars: c.min_chars,
             max_chars: c.max_chars,
             automod_enabled: c.automod_enabled,

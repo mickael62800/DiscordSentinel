@@ -190,8 +190,19 @@ fn capitalize(s: &str) -> String {
 
 pub fn spawn_voice_tick(ctx: Context) {
     use tokio::time::{interval, Duration};
+    // Granularite du timer global qui credite l'XP vocal de TOUS les serveurs.
+    // Ce n'est PAS un levier d'economie (le taux reel est gouverne par le
+    // reglage per-serveur `xp_per_voice_minute`, le credit etant proportionnel
+    // aux secondes reelles ecoulees) : le tick ne fait que fixer la frequence de
+    // credit. Il reste donc bot-level, configurable via l'env `VOICE_XP_TICK_SECS`
+    // (defaut 300). Borne a >= 1s.
+    let tick_secs = std::env::var("VOICE_XP_TICK_SECS")
+        .ok()
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&s| s >= 1)
+        .unwrap_or(300);
     tokio::spawn(async move {
-        let mut tick = interval(Duration::from_secs(300));
+        let mut tick = interval(Duration::from_secs(tick_secs));
         tick.tick().await; // skip first immediate tick
         loop {
             tick.tick().await;
@@ -448,7 +459,19 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
                 }
             }
 
-            update.xp_multiplier
+            // Le multiplicateur de streak est reglable par serveur (config
+            // `progression-bot`) : bonus par semaine + plafond. Defauts =
+            // valeurs historiques (0.1 / 1.5) -> aucun changement tant que non
+            // reconfigure. La fonction reste pure : on lui passe les valeurs.
+            let bonus_per_week = guild_config
+                .get("streak_bonus_per_week")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(streaks::DEFAULT_STREAK_BONUS_PER_WEEK);
+            let max_multiplier = guild_config
+                .get("streak_max_multiplier")
+                .and_then(|v| v.parse::<f64>().ok())
+                .unwrap_or(streaks::DEFAULT_STREAK_MAX_MULTIPLIER);
+            streaks::streak_multiplier_with(update.current_streak, bonus_per_week, max_multiplier)
         } else {
             1.0
         }

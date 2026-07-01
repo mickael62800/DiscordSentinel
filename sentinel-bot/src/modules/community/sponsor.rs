@@ -27,11 +27,29 @@ pub fn register() -> CreateCommand {
 /// Verifie les gardes anti-abus puis envoie une demande de confirmation
 /// au filleul — rien n'est enregistre tant qu'il n'a pas clique "Accepter".
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    // Rate limit anti-spam : 30s par user.
+    // Rate limit anti-spam : cooldown configurable per-guild (30s par defaut).
     {
         let data = ctx.data.read().await;
+        let cooldown_secs = if let Some(base) = data.get::<ApiClientKey>() {
+            if let Some(gid) = command.guild_id {
+                let gc = base
+                    .get_guild_config_for(
+                        &gid.to_string(),
+                        crate::modules::community::MODULE_BOT_NAME,
+                    )
+                    .await
+                    .unwrap_or_default();
+                BaseApiClient::config_u64(&gc, "sponsor_cooldown_secs", 30)
+            } else {
+                30
+            }
+        } else {
+            30
+        };
         if let Some(cooldown) = data.get::<CooldownKey>() {
-            if let Some(remaining) = cooldown.check_and_set(command.user.id.get(), "parrain", 30) {
+            if let Some(remaining) =
+                cooldown.check_and_set(command.user.id.get(), "parrain", cooldown_secs)
+            {
                 reply_ephemeral(
                     ctx, command,
                     &format!("\u{23f1}\u{fe0f} Cooldown actif. Attends {remaining}s avant de parrainer a nouveau."),

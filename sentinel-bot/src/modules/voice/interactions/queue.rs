@@ -119,9 +119,11 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             .or_else(|| ch.category_id.as_ref().and_then(|s| s.parse::<u64>().ok()));
 
         let queue_name = format!("File d'attente - {}", ch.channel_name);
+        // Limite de membres de la file : reglable par serveur (defaut/cap 99).
+        let queue_limit = super::max_user_limit(ctx, Some(guild_id)).await as u32;
         let mut queue_builder = CreateChannel::new(&queue_name)
             .kind(ChannelType::Voice)
-            .user_limit(99);
+            .user_limit(queue_limit);
 
         if let Some(cat_id) = category_id {
             queue_builder = queue_builder.category(ChannelId::new(cat_id));

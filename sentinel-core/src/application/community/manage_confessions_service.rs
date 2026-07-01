@@ -59,8 +59,9 @@ impl ManageConfessionsUseCase for ManageConfessionsService {
                 cfg.cooldown_secs
             )));
         }
-        // Quota par jour
-        let since_day = Utc::now() - Duration::days(1);
+        // Quota sur fenetre glissante (config `quota_window_hours`, defaut 24h).
+        let window_hours = cfg.quota_window_hours.max(1) as i64;
+        let since_day = Utc::now() - Duration::hours(window_hours);
         let day_count = self
             .repo
             .count_recent_by_author(&cmd.guild_id, &cmd.author_user_id, since_day)

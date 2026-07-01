@@ -36,14 +36,30 @@ pub struct AnomalyDetector {
     counters: DashMap<(GuildId, String), Vec<Instant>>,
     window: Duration,
     default_thresholds: AnomalyThresholds,
+    /// Taille max du buffer d'horodatages par (guild, categorie) avant eviction.
+    max_buffer_size: usize,
+    /// Nombre d'horodatages conserves apres eviction (les plus recents).
+    eviction_target: usize,
 }
 
 impl AnomalyDetector {
-    pub fn new(window_secs: u64, default_thresholds: AnomalyThresholds) -> Self {
+    pub fn new(
+        window_secs: u64,
+        default_thresholds: AnomalyThresholds,
+        max_buffer_size: usize,
+        eviction_target: usize,
+    ) -> Self {
+        // Garde-fous : la cible d'eviction doit valoir au moins 1 et ne jamais
+        // depasser la taille max du buffer (sinon la logique de drain panique
+        // ou ne libere rien).
+        let eviction_target = eviction_target.max(1);
+        let max_buffer_size = max_buffer_size.max(eviction_target);
         Self {
             counters: DashMap::new(),
             window: Duration::from_secs(window_secs),
             default_thresholds,
+            max_buffer_size,
+            eviction_target,
         }
     }
 
@@ -64,8 +80,8 @@ impl AnomalyDetector {
         // Nettoyer hors fenetre
         timestamps.retain(|t| now.duration_since(*t) < self.window);
         // Securite : limiter la taille du vecteur
-        if timestamps.len() > 500 {
-            timestamps.drain(0..timestamps.len() - 100);
+        if timestamps.len() > self.max_buffer_size {
+            timestamps.drain(0..timestamps.len() - self.eviction_target);
         }
         timestamps.push(now);
 
@@ -105,7 +121,24 @@ mod tests {
                 mass_delete: 5,
                 mass_role_change: 4,
             },
+            500,
+            100,
         )
+    }
+
+    #[test]
+    fn eviction_guard_clamps_target_to_buffer() {
+        // eviction_target > max_buffer_size doit etre borne a max_buffer_size.
+        let detector = AnomalyDetector::new(60, AnomalyThresholds::default(), 50, 200);
+        assert_eq!(detector.max_buffer_size, 200);
+        assert_eq!(detector.eviction_target, 200);
+    }
+
+    #[test]
+    fn eviction_guard_target_at_least_one() {
+        let detector = AnomalyDetector::new(60, AnomalyThresholds::default(), 500, 0);
+        assert_eq!(detector.eviction_target, 1);
+        assert_eq!(detector.max_buffer_size, 500);
     }
 
     #[test]

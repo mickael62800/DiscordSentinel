@@ -22,16 +22,19 @@ use tracing::{debug, info, warn};
 const REDIS_KEY: &str = "audit:watched_users";
 const REDIS_TTL_SECS: u64 = 300;
 
-pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
-    // 1. Query Postgres : union des user_ids avec infractions + manual
+pub async fn run(pool: &PgPool, redis: &redis::Client, query_limit: i64) -> Result<(), String> {
+    // 1. Query Postgres : union des user_ids avec infractions + manual.
+    // `query_limit` est borne (100..100000) cote WorkerConfig, on peut donc
+    // l'injecter directement dans le LIMIT.
     let rows: Vec<(String,)> = sqlx::query_as(
         "SELECT DISTINCT user_id FROM ( \
              SELECT DISTINCT user_id FROM infractions \
              UNION \
              SELECT DISTINCT user_id FROM manual_watched_users \
          ) AS u \
-         LIMIT 10000",
+         LIMIT $1",
     )
+    .bind(query_limit)
     .fetch_all(pool)
     .await
     .map_err(|e| format!("query watched users: {e}"))?;

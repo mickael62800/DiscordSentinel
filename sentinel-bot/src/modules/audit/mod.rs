@@ -77,6 +77,8 @@ pub struct AuditConfig {
     pub anomaly_mass_ban_threshold: usize,
     pub anomaly_mass_delete_threshold: usize,
     pub anomaly_mass_role_threshold: usize,
+    pub anomaly_detector_max_buffer_size: usize,
+    pub anomaly_detector_eviction_target: usize,
 }
 
 impl Default for AuditConfig {
@@ -90,6 +92,14 @@ impl Default for AuditConfig {
                 20,
             ),
             anomaly_mass_role_threshold: crate::shared::config::load_env("ANOMALY_MASS_ROLE", 10),
+            anomaly_detector_max_buffer_size: crate::shared::config::load_env(
+                "ANOMALY_DETECTOR_MAX_BUFFER_SIZE",
+                500,
+            ),
+            anomaly_detector_eviction_target: crate::shared::config::load_env(
+                "ANOMALY_DETECTOR_EVICTION_TARGET",
+                100,
+            ),
         }
     }
 }
@@ -109,6 +119,8 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
             mass_delete: audit_config.anomaly_mass_delete_threshold,
             mass_role_change: audit_config.anomaly_mass_role_threshold,
         },
+        audit_config.anomaly_detector_max_buffer_size,
+        audit_config.anomaly_detector_eviction_target,
     ));
     data.insert::<WeeklyTrackerKey>(weekly_report::WeeklyTracker::new());
     data.insert::<ConfigKey>(audit_config);
