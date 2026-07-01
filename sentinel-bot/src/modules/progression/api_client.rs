@@ -116,6 +116,22 @@ pub struct AddXpResponse {
     pub source: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct RankingEntry {
+    pub user_id: String,
+    pub xp: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ForceRankingResponse {
+    pub period_label: String,
+    #[serde(default)]
+    pub note: Option<String>,
+    pub text: Vec<RankingEntry>,
+    pub voice: Vec<RankingEntry>,
+    pub global: Vec<RankingEntry>,
+}
+
 // ── Client ──
 
 pub struct ApiClient {
@@ -282,6 +298,21 @@ impl ApiClient {
     }
 
     // ── HTTP legacy ──
+
+    /// Force le calcul du classement mensuel cote API (bypass des gates).
+    /// Renvoie les donnees ; le bot fait le rendu + le post Discord.
+    pub async fn force_monthly_ranking(
+        &self,
+        guild_id: &str,
+        mois: &str,
+    ) -> Result<ForceRankingResponse, String> {
+        self.base
+            .post_json(
+                "/api/analytics/force-monthly-ranking",
+                &serde_json::json!({ "guild_id": guild_id, "mois": mois }),
+            )
+            .await
+    }
 
     pub async fn get_streak(
         &self,

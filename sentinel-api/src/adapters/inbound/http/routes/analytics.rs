@@ -49,6 +49,10 @@ pub fn inner() -> Router<AppState> {
             "/publish-monthly-ranking",
             post(handlers::community::monthly_ranking::publish_monthly_ranking_all),
         )
+        .route(
+            "/force-monthly-ranking",
+            post(handlers::community::monthly_ranking::force_publish_monthly_ranking),
+        )
         // Export user-facing.
         .route("/export", get(handlers::audit::snapshots::export_analytics))
 }

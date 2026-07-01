@@ -3,6 +3,7 @@
 pub const MODULE_BOT_NAME: &str = "progression-bot";
 
 pub mod api_client;
+pub mod classement_cmd;
 pub mod level_channel;
 pub mod level_cmd;
 pub mod multipliers;
@@ -295,6 +296,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
         level_cmd::register(),
         stats_cmd::register(),
         resync_cmd::register(),
+        classement_cmd::register(),
     ]
 }
 
@@ -306,6 +308,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "level" => level_cmd::handle(ctx, command).await,
         "stats" => stats_cmd::handle(ctx, command).await,
         "progression-resync" => resync_cmd::handle(ctx, command).await,
+        "classement" => classement_cmd::handle(ctx, command).await,
         _ => {}
     }
 }
