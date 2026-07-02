@@ -119,3 +119,7 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
         auto_delete_link,
     }
 }
+
+#[cfg(test)]
+#[path = "tests/automod_routing.rs"]
+mod tests;

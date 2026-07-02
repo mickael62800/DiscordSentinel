@@ -34,3 +34,7 @@ impl HostProbe {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/host_probe.rs"]
+mod tests;

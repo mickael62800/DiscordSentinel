@@ -45,3 +45,7 @@ impl Fail2banStatus {
         self.jails.iter().map(|j| j.banned_ips.len()).sum()
     }
 }
+
+#[cfg(test)]
+#[path = "tests/ip_ban.rs"]
+mod tests;

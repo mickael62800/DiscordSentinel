@@ -108,3 +108,7 @@ pub struct MemberModerationContext {
     /// Suggestion de sanction proportionnee + explication.
     pub suggestion: SanctionSuggestion,
 }
+
+#[cfg(test)]
+#[path = "tests/copilot.rs"]
+mod tests;

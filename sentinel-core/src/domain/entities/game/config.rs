@@ -28,3 +28,7 @@ pub fn validate_config_key(key: &str) -> Result<(), String> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "tests/config.rs"]
+mod tests;

@@ -40,3 +40,7 @@ pub struct AgeBan {
     pub status: AgeBanStatus,
     pub lifted_at: Option<DateTime<Utc>>,
 }
+
+#[cfg(test)]
+#[path = "tests/age_ban.rs"]
+mod tests;

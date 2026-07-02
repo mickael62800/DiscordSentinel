@@ -40,3 +40,7 @@ impl Role {
         *self >= required
     }
 }
+
+#[cfg(test)]
+#[path = "tests/role.rs"]
+mod tests;

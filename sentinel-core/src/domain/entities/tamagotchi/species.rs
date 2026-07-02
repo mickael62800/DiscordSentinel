@@ -108,3 +108,7 @@ impl Species {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/species.rs"]
+mod tests;
