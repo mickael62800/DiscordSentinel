@@ -121,40 +121,29 @@ impl From<ReportRow> for ConfessionReport {
     }
 }
 
-#[derive(FromRow)]
-struct ConfigRow {
-    guild_id: String,
-    enabled: bool,
-    channel_id: Option<String>,
-    panel_message_id: Option<String>,
-    cooldown_secs: i32,
-    max_per_day: i32,
-    quota_window_hours: i32,
-    min_chars: i32,
-    max_chars: i32,
-    automod_enabled: bool,
-    banned_user_ids: serde_json::Value,
-    updated_at: DateTime<Utc>,
+// ── Config : source unique = bot_guild_config (composant "confessions") ──────
+//
+// Les REGLAGES des confessions vivent dans `bot_guild_config` (comme tous les
+// autres composants, editables via le dashboard generique). Seule la DONNEE
+// `banned_user_ids` reste dans la table dediee `confession_config`.
+// `get_config` reconstruit donc un `ConfessionConfig` a partir de la map
+// bot_guild_config (reglages) + de la table (bans) — le domaine reste pur, il
+// recoit un `ConfessionConfig` deja hydrate.
+
+use std::collections::HashMap;
+
+fn cfg_bool(map: &HashMap<String, String>, key: &str, default: bool) -> bool {
+    map.get(key)
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(default)
 }
 
-impl From<ConfigRow> for ConfessionConfig {
-    fn from(r: ConfigRow) -> Self {
-        let banned: Vec<String> = serde_json::from_value(r.banned_user_ids).unwrap_or_default();
-        Self {
-            guild_id: r.guild_id,
-            enabled: r.enabled,
-            channel_id: r.channel_id,
-            panel_message_id: r.panel_message_id,
-            cooldown_secs: r.cooldown_secs,
-            max_per_day: r.max_per_day,
-            quota_window_hours: r.quota_window_hours,
-            min_chars: r.min_chars,
-            max_chars: r.max_chars,
-            automod_enabled: r.automod_enabled,
-            banned_user_ids: banned,
-            updated_at: r.updated_at,
-        }
-    }
+fn cfg_i32(map: &HashMap<String, String>, key: &str, default: i32) -> i32 {
+    map.get(key).and_then(|v| v.parse().ok()).unwrap_or(default)
+}
+
+fn cfg_opt(map: &HashMap<String, String>, key: &str) -> Option<String> {
+    map.get(key).filter(|v| !v.is_empty()).cloned()
 }
 
 const SELECT_CONFESSION: &str = "SELECT id, guild_id, public_number, author_user_id, content, \
@@ -167,10 +156,6 @@ const SELECT_REPLY: &str = "SELECT id, confession_id, public_number, author_user
 
 const SELECT_REPORT: &str = "SELECT id, guild_id, confession_id, reply_id, reporter_user_id, \
     reason, status, resolved_by, resolved_at, created_at FROM confession_reports";
-
-const SELECT_CONFIG: &str = "SELECT guild_id, enabled, channel_id, panel_message_id, \
-    cooldown_secs, max_per_day, quota_window_hours, min_chars, max_chars, automod_enabled, \
-    banned_user_ids, updated_at FROM confession_config";
 
 #[async_trait]
 impl ConfessionRepository for PgConfessionRepository {
@@ -504,42 +489,98 @@ impl ConfessionRepository for PgConfessionRepository {
     }
 
     async fn get_config(&self, guild_id: &str) -> Result<Option<ConfessionConfig>, DomainError> {
-        let q = format!("{} WHERE guild_id = $1", SELECT_CONFIG);
-        let row = sqlx::query_as::<_, ConfigRow>(&q)
-            .bind(guild_id)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(pg_err)?;
-        Ok(row.map(ConfessionConfig::from))
+        // Reglages : source unique bot_guild_config (composant "confessions").
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT config_key, config_value FROM bot_guild_config \
+             WHERE guild_id = $1 AND bot_name = 'confessions'",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        let map: HashMap<String, String> = rows.into_iter().collect();
+
+        // Liste des bannis : DONNEE conservee dans la table dediee.
+        let ban_row: Option<(serde_json::Value, DateTime<Utc>)> = sqlx::query_as(
+            "SELECT banned_user_ids, updated_at FROM confession_config WHERE guild_id = $1",
+        )
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        // Ni reglages ni bans -> None (le service applique ConfessionConfig::defaults).
+        if map.is_empty() && ban_row.is_none() {
+            return Ok(None);
+        }
+
+        let mut cfg = ConfessionConfig::defaults(guild_id.to_string());
+        cfg.enabled = cfg_bool(&map, "enabled", cfg.enabled);
+        cfg.channel_id = cfg_opt(&map, "channel_id");
+        cfg.panel_message_id = cfg_opt(&map, "panel_message_id");
+        cfg.cooldown_secs = cfg_i32(&map, "cooldown_secs", cfg.cooldown_secs);
+        cfg.max_per_day = cfg_i32(&map, "max_per_day", cfg.max_per_day);
+        cfg.quota_window_hours = cfg_i32(&map, "quota_window_hours", cfg.quota_window_hours);
+        cfg.min_chars = cfg_i32(&map, "min_chars", cfg.min_chars);
+        cfg.max_chars = cfg_i32(&map, "max_chars", cfg.max_chars);
+        cfg.automod_enabled = cfg_bool(&map, "automod_enabled", cfg.automod_enabled);
+        if let Some((banned, updated)) = ban_row {
+            cfg.banned_user_ids = serde_json::from_value(banned).unwrap_or_default();
+            cfg.updated_at = updated;
+        }
+        Ok(Some(cfg))
     }
 
     async fn upsert_config(&self, c: &ConfessionConfig) -> Result<(), DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        // Reglages -> bot_guild_config (source unique).
+        let mut settings: Vec<(&str, String)> = vec![
+            ("enabled", c.enabled.to_string()),
+            ("cooldown_secs", c.cooldown_secs.to_string()),
+            ("max_per_day", c.max_per_day.to_string()),
+            ("quota_window_hours", c.quota_window_hours.to_string()),
+            ("min_chars", c.min_chars.to_string()),
+            ("max_chars", c.max_chars.to_string()),
+            // `automod_enabled` : flag mort (schema retire en migration 300) —
+            // on ne le persiste plus.
+        ];
+        if let Some(ch) = c.channel_id.as_deref().filter(|s| !s.is_empty()) {
+            settings.push(("channel_id", ch.to_string()));
+        }
+        if let Some(pm) = c.panel_message_id.as_deref().filter(|s| !s.is_empty()) {
+            settings.push(("panel_message_id", pm.to_string()));
+        }
+        for (key, value) in settings {
+            sqlx::query(
+                r#"INSERT INTO bot_guild_config
+                    (id, guild_id, bot_name, config_key, config_value, updated_at)
+                    VALUES (gen_random_uuid(), $1, 'confessions', $2, $3, NOW())
+                    ON CONFLICT (guild_id, bot_name, config_key) DO UPDATE SET
+                        config_value = EXCLUDED.config_value, updated_at = NOW()"#,
+            )
+            .bind(c.guild_id.as_str())
+            .bind(key)
+            .bind(value)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+        }
+
+        // Bans -> table dediee (donnee, pas un reglage).
         sqlx::query(
-            r#"INSERT INTO confession_config
-                (guild_id, enabled, channel_id, panel_message_id, cooldown_secs,
-                 max_per_day, quota_window_hours, min_chars, max_chars, automod_enabled,
-                 banned_user_ids, updated_at)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+            r#"INSERT INTO confession_config (guild_id, banned_user_ids, updated_at)
+                VALUES ($1, $2, NOW())
                 ON CONFLICT (guild_id) DO UPDATE SET
-                    enabled = $2, channel_id = $3, panel_message_id = $4,
-                    cooldown_secs = $5, max_per_day = $6, quota_window_hours = $7,
-                    min_chars = $8, max_chars = $9,
-                    automod_enabled = $10, banned_user_ids = $11, updated_at = NOW()"#,
+                    banned_user_ids = EXCLUDED.banned_user_ids, updated_at = NOW()"#,
         )
         .bind(c.guild_id.as_str())
-        .bind(c.enabled)
-        .bind(c.channel_id.as_deref())
-        .bind(&c.panel_message_id)
-        .bind(c.cooldown_secs)
-        .bind(c.max_per_day)
-        .bind(c.quota_window_hours)
-        .bind(c.min_chars)
-        .bind(c.max_chars)
-        .bind(c.automod_enabled)
         .bind(serde_json::to_value(&c.banned_user_ids).unwrap_or_default())
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
 }

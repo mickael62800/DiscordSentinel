@@ -190,24 +190,20 @@ async fn admin_deploy_panel(ctx: &Context, command: &CommandInteraction) {
     match channel.send_message(&ctx.http, msg).await {
         Ok(message) => {
             let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
-            // Sauvegarde le panel_message_id et channel_id en config
+            // Persiste UNIQUEMENT le salon + l'id du panneau dans la source
+            // unique (bot_guild_config, composant `confessions`). On n'ecrit
+            // PLUS de reglages codes en dur (cooldown/max/min...) : deployer le
+            // panneau ne doit jamais reinitialiser le tuning d'un serveur.
             if let Some(api) = api_client(ctx).await {
-                let body = serde_json::json!({
-                    "guild_id": guild_id,
-                    "enabled": true,
-                    "channel_id": channel.to_string(),
-                    "panel_message_id": message.id.to_string(),
-                    "cooldown_secs": 60,
-                    "max_per_day": 20,
-                    "min_chars": 5,
-                    "max_chars": 2000,
-                    // C1 : `automod_enabled` retire du payload (aucun filtre de
-                    // mots n'existe). Le champ DTO reste optionnel pour
-                    // back-compat ; on ne le surface plus depuis le bot.
-                    "banned_user_ids": Vec::<String>::new(),
-                });
-                let _: Result<serde_json::Value, _> =
-                    api.post_json("/api/confessions/config", &body).await;
+                persist_confession_setting(&api, &guild_id, "channel_id", &channel.to_string())
+                    .await;
+                persist_confession_setting(
+                    &api,
+                    &guild_id,
+                    "panel_message_id",
+                    &message.id.to_string(),
+                )
+                .await;
             }
             reply_ephemeral(ctx, command, "✅ Panel deploye dans ce canal.").await;
         }
@@ -572,18 +568,23 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
 }
 
 /// Republie le panneau en bas du salon (sticky) : poste un nouveau panneau,
-/// met a jour `panel_message_id` en config (round-trip GET->modif->POST pour ne
-/// pas ecraser les autres reglages), puis supprime l'ancien panneau.
+/// met a jour `panel_message_id` dans la source unique (bot_guild_config), puis
+/// supprime l'ancien panneau. On ne touche a AUCUN autre reglage.
 async fn repost_panel(
     ctx: &Context,
     api: &Arc<BaseApiClient>,
     channel: ChannelId,
-    mut cfg_val: serde_json::Value,
+    cfg_val: serde_json::Value,
 ) {
     let old_panel_id = cfg_val
         .get("panel_message_id")
         .and_then(|v| v.as_str())
         .map(|s| s.to_string());
+    let guild_id = cfg_val
+        .get("guild_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
 
     let posted = match channel
         .send_message(
@@ -601,11 +602,11 @@ async fn repost_panel(
         }
     };
 
-    // Persiste le nouveau panel_message_id (les autres champs du DTO sont
-    // conserves tels quels).
-    cfg_val["panel_message_id"] = serde_json::Value::String(posted.id.to_string());
-    let _: Result<serde_json::Value, String> =
-        api.post_json("/api/confessions/config", &cfg_val).await;
+    // Persiste uniquement le nouveau panel_message_id (source unique).
+    if !guild_id.is_empty() {
+        persist_confession_setting(api, &guild_id, "panel_message_id", &posted.id.to_string())
+            .await;
+    }
 
     // Supprime l'ancien panneau (best-effort ; ignore si deja absent).
     if let Some(old) = old_panel_id {
@@ -729,6 +730,24 @@ fn extract_input(modal: &ModalInteraction, field_id: &str) -> Option<String> {
 async fn api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
     let data = ctx.data.read().await;
     data.get::<ApiClientKey>().cloned()
+}
+
+/// Ecrit une cle de reglage confessions dans la source unique
+/// (`bot_guild_config`, composant `confessions`) via l'endpoint generique
+/// `/api/bots/config`. Best-effort : on log l'erreur sans bloquer.
+async fn persist_confession_setting(
+    api: &Arc<BaseApiClient>,
+    guild_id: &str,
+    key: &str,
+    value: &str,
+) {
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "bot_name": MODULE_BOT_NAME,
+        "config_key": key,
+        "config_value": value,
+    });
+    api.post_fire_and_forget("/api/bots/config", &body).await;
 }
 
 /// Reglages d'affichage des confessions lus depuis la config guild

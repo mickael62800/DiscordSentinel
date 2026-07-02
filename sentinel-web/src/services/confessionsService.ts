@@ -45,20 +45,6 @@ export interface ConfessionReport {
   created_at: string;
 }
 
-export interface ConfessionConfig {
-  guild_id: string;
-  enabled: boolean;
-  channel_id: string | null;
-  panel_message_id: string | null;
-  cooldown_secs: number;
-  max_per_day: number;
-  min_chars: number;
-  max_chars: number;
-  automod_enabled: boolean;
-  banned_user_ids: string[];
-  updated_at: string;
-}
-
 export const confessionsService = {
   list(guildId: string, includeDeleted = false, limit = 100): Promise<Confession[]> {
     return httpGet(
@@ -80,11 +66,5 @@ export const confessionsService = {
   },
   resolveReport(id: string, status: "resolved" | "dismissed", resolvedBy: string): Promise<void> {
     return httpPost(`/api/confessions/reports/${id}/resolve`, { status, resolved_by: resolvedBy });
-  },
-  getConfig(guildId: string): Promise<ConfessionConfig> {
-    return httpGet(`/api/confessions/config/${guildId}`);
-  },
-  saveConfig(cfg: ConfessionConfig): Promise<ConfessionConfig> {
-    return httpPost("/api/confessions/config", cfg);
   },
 };
