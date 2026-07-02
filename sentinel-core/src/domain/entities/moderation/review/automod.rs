@@ -361,3 +361,7 @@ pub struct NewAutomodReview {
     /// de la carte (cf. C1). Défaut `false`.
     pub sanction_logged: bool,
 }
+
+#[cfg(test)]
+#[path = "tests/automod.rs"]
+mod tests;
