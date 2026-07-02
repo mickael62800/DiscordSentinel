@@ -15,16 +15,19 @@ struct TickSummary {
     sick: usize,
     died: usize,
     recovered: usize,
+    #[serde(default)]
+    channels_reclaimed: usize,
 }
 
 pub async fn run(_pool: &PgPool) -> Result<(), String> {
     let summary: TickSummary = api::post_empty("/api/tamagotchi/tick").await?;
-    if summary.processed > 0 {
+    if summary.processed > 0 || summary.channels_reclaimed > 0 {
         info!(
             processed = summary.processed,
             sick = summary.sick,
             died = summary.died,
             recovered = summary.recovered,
+            channels_reclaimed = summary.channels_reclaimed,
             "Tick tamagotchi"
         );
     }

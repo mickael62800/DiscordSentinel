@@ -58,19 +58,28 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     if owner_id.is_empty() {
         return;
     }
+    // Evenement de reconciliation : mort deja notifiee par le passe, on ferme
+    // seulement le salon orphelin sans re-DM le proprietaire.
+    let reconcile = data
+        .get("reconcile")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
-    // 1. DM au proprietaire.
-    let dm_text = match status {
-        "sick" => format!(
-            "🤒 Ton compagnon **{pet_name}** est tombé malade ! Soigne-le vite (une potion de soin a la boutique) avant qu'il ne soit trop tard."
-        ),
-        "death" => format!(
-            "🪦 Ton compagnon **{pet_name}** est mort... Son salon va etre supprime. Rouvre-en un depuis le panneau pour adopter un nouveau compagnon."
-        ),
-        "recovered" => format!("💚 Bonne nouvelle : **{pet_name}** est gueri !"),
-        _ => return,
-    };
-    send_dm(ctx, owner_id, &dm_text).await;
+    // 1. DM au proprietaire (sauf reconciliation silencieuse : le DM de mort a
+    // deja ete envoye a l'epoque).
+    if !reconcile {
+        let dm_text = match status {
+            "sick" => format!(
+                "🤒 Ton compagnon **{pet_name}** est tombé malade ! Soigne-le vite (une potion de soin a la boutique) avant qu'il ne soit trop tard."
+            ),
+            "death" => format!(
+                "🪦 Ton compagnon **{pet_name}** est mort... Son salon va etre supprime. Rouvre-en un depuis le panneau pour adopter un nouveau compagnon."
+            ),
+            "recovered" => format!("💚 Bonne nouvelle : **{pet_name}** est gueri !"),
+            _ => return,
+        };
+        send_dm(ctx, owner_id, &dm_text).await;
+    }
 
     // 2. Mort : on supprime le salon prive du compagnon (s'il est connu) pour
     // que le joueur puisse en rouvrir un neuf et adopter. Le cadavre est purge

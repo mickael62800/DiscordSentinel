@@ -257,6 +257,37 @@ impl PetRepository for PgPetRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn list_dead_with_channel(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
+        // Compagnons morts dont le salon prive existe encore : cible de la
+        // reconciliation (fermeture des salons orphelins). Pagine par curseur
+        // `id` croissant, comme `list_alive`.
+        let rows: Vec<Row> = sqlx::query_as(
+            "SELECT * FROM pets \
+             WHERE status = 'dead' AND card_channel_id IS NOT NULL \
+               AND ($2::uuid IS NULL OR id > $2) \
+             ORDER BY id ASC LIMIT $1",
+        )
+        .bind(limit)
+        .bind(after_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn clear_card_location(&self, pet_id: Uuid) -> Result<(), DomainError> {
+        sqlx::query("UPDATE pets SET card_channel_id = NULL, card_message_id = NULL WHERE id = $1")
+            .bind(pet_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn add_event(&self, pet_id: Uuid, kind: &str, detail: &str) -> Result<(), DomainError> {
         sqlx::query("INSERT INTO pet_events (pet_id, kind, detail) VALUES ($1,$2,$3)")
             .bind(pet_id)

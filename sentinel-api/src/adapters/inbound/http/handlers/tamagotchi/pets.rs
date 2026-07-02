@@ -123,6 +123,10 @@ pub struct TickSummary {
     pub sick: usize,
     pub died: usize,
     pub recovered: usize,
+    /// Salons de compagnons morts fermes par la passe de reconciliation
+    /// (morts dont l'evenement live avait ete rate). Distinct de `died` :
+    /// n'implique aucune nouvelle transition ni DM.
+    pub channels_reclaimed: usize,
 }
 
 /// POST /api/tamagotchi/tick — appele par le worker. Applique la
@@ -140,7 +144,62 @@ pub async fn tick_all(State(state): State<AppState>) -> Result<Json<TickSummary>
         sick: 0,
         died: 0,
         recovered: 0,
+        channels_reclaimed: 0,
     };
+
+    // ── Passe de reconciliation (AVANT la boucle des vivants) ──────────────
+    // Ferme les salons prives orphelins de compagnons deja morts lors d'un
+    // tick PRECEDENT (worker/Redis indisponible a l'instant t, droits
+    // manquants, pet cree avant la fonctionnalite...). On la joue EN PREMIER
+    // pour ne voir que les morts anterieurs : un pet qui meurt CE tick est
+    // encore vivant a ce stade (la boucle des vivants ci-dessous le fera
+    // basculer et emettra l'evenement de mort normal, avec DM). On evite ainsi
+    // tout double-emit / double-DM pour une mort fraiche.
+    //
+    // Chaque salon est referme via un evenement `tamagotchi_pet_status`
+    // status="death" marque `reconcile: true` : le bot supprime le salon SANS
+    // re-DM le proprietaire (il a deja recu le DM de mort a l'epoque).
+    //
+    // Idempotence (clear-on-emit) : on efface `card_channel_id` juste apres
+    // l'emission, donc un pet n'est reconcilie qu'une fois. Tradeoff assume :
+    // si la suppression echoue cote bot (droits manquants), le champ est deja
+    // vide et on ne retentera pas. Une garantie clear-on-ack exigerait une
+    // boucle d'accuse de reception ; on garde le chemin simple.
+    let mut reconcile_after: Option<Uuid> = None;
+    loop {
+        let batch = state
+            .pets_uc
+            .list_dead_with_channel(BATCH, reconcile_after)
+            .await?;
+        if batch.is_empty() {
+            break;
+        }
+        reconcile_after = batch.last().map(|p| p.id);
+        let batch_len = batch.len();
+
+        for pet in batch {
+            state.broadcaster.broadcast(
+                "tamagotchi_pet_status",
+                serde_json::json!({
+                    "guild_id": pet.guild_id,
+                    "owner_id": pet.owner_id,
+                    "pet_name": pet.name,
+                    "species": pet.species,
+                    "status": "death",
+                    "card_channel_id": pet.card_channel_id,
+                    "card_message_id": pet.card_message_id,
+                    "reconcile": true,
+                }),
+            );
+            state.pets_uc.clear_card_location(pet.id).await?;
+            summary.channels_reclaimed += 1;
+        }
+
+        if batch_len < BATCH as usize {
+            break;
+        }
+    }
+
     // Pagination par curseur `id` : couvre TOUS les compagnons vivants, sans
     // troncature silencieuse.
     let mut after_id: Option<Uuid> = None;

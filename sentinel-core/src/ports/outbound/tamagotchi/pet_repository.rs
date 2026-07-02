@@ -42,6 +42,21 @@ pub trait PetRepository: Send + Sync {
         limit: i64,
         after_id: Option<Uuid>,
     ) -> Result<Vec<Pet>, DomainError>;
+    /// Compagnons morts dont le salon prive existe encore (`card_channel_id`
+    /// non nul), pagine par curseur `id` croissant. Sert a la reconciliation :
+    /// fermer les salons orphelins dont l'evenement de mort a ete rate (worker
+    /// ou Redis indisponible, droits manquants a l'instant t, pet cree avant la
+    /// fonctionnalite...).
+    async fn list_dead_with_channel(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError>;
+    /// Efface la localisation de la carte (`card_channel_id`/`card_message_id`
+    /// -> NULL) sans toucher au reste de la ligne (le cadavre reste intact).
+    /// Rend la reconciliation idempotente : un pet mort n'est traite qu'une
+    /// fois (au tick suivant il ne remonte plus dans `list_dead_with_channel`).
+    async fn clear_card_location(&self, pet_id: Uuid) -> Result<(), DomainError>;
     async fn add_event(&self, pet_id: Uuid, kind: &str, detail: &str) -> Result<(), DomainError>;
     async fn recent_events(&self, pet_id: Uuid, limit: i64) -> Result<Vec<PetEvent>, DomainError>;
 }

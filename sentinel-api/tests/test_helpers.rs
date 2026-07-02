@@ -2579,6 +2579,16 @@ impl sentinel_core::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase f
     ) -> Result<Vec<sentinel_core::domain::entities::tamagotchi::pet::Pet>, DomainError> {
         unimplemented!()
     }
+    async fn list_dead_with_channel(
+        &self,
+        _: i64,
+        _: Option<Uuid>,
+    ) -> Result<Vec<sentinel_core::domain::entities::tamagotchi::pet::Pet>, DomainError> {
+        unimplemented!()
+    }
+    async fn clear_card_location(&self, _: Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
 }
 
 pub struct StubRotation;

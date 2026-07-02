@@ -148,4 +148,16 @@ pub trait ManagePetsUseCase: Send + Sync {
     /// Compagnons vivants ayant une carte a rafraichir (tache horaire du bot).
     async fn list_cards(&self, limit: i64, after_id: Option<Uuid>)
         -> Result<Vec<Pet>, DomainError>;
+
+    /// Compagnons morts dont le salon prive existe encore (reconciliation :
+    /// fermer les salons orphelins d'une mort dont l'evenement a ete rate),
+    /// pagine par curseur `id` croissant.
+    async fn list_dead_with_channel(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError>;
+    /// Efface la localisation de la carte d'un compagnon (idempotence de la
+    /// reconciliation : le pet mort n'est traite qu'une fois).
+    async fn clear_card_location(&self, pet_id: Uuid) -> Result<(), DomainError>;
 }

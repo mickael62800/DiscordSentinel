@@ -458,6 +458,20 @@ impl ManagePetsUseCase for ManagePetsService {
             .await
     }
 
+    async fn list_dead_with_channel(
+        &self,
+        limit: i64,
+        after_id: Option<Uuid>,
+    ) -> Result<Vec<Pet>, DomainError> {
+        self.repo
+            .list_dead_with_channel(limit.clamp(1, 1000), after_id)
+            .await
+    }
+
+    async fn clear_card_location(&self, pet_id: Uuid) -> Result<(), DomainError> {
+        self.repo.clear_card_location(pet_id).await
+    }
+
     async fn tick(&self, pet_id: Uuid, cfg: TickConfig) -> Result<TickOutcome, DomainError> {
         let mut pet = match self.repo.get(pet_id).await? {
             Some(p) => p,
