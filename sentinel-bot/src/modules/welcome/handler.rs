@@ -826,7 +826,7 @@ pub async fn handle_age_modal(
 
     // Reglages reglables par serveur (bornes de saisie + multiplicateur de ban).
     // Lus via la config guild welcome-bot ; defaut = valeurs historiques.
-    let (age_min, age_max, ban_days_per_year) = {
+    let (age_min, age_max, ban_days_per_year, age_ban_log_channel) = {
         use crate::shared::api_client::BaseApiClient;
         let cfg = {
             let data = ctx.data.read().await;
@@ -851,7 +851,13 @@ pub async fn handle_age_modal(
         };
         let ban_days_per_year =
             BaseApiClient::config_u64(&cfg, "age_ban_days_per_year", 365).max(1);
-        (age_min, age_max, ban_days_per_year)
+        // Salon de log des bans de verification d'age (optionnel, configurable).
+        let log_channel = BaseApiClient::config_or(&cfg, "age_ban_log_channel_id", "")
+            .parse::<u64>()
+            .ok()
+            .filter(|id| *id > 0)
+            .map(ChannelId::new);
+        (age_min, age_max, ban_days_per_year, log_channel)
     };
 
     // Parse de l'age saisi.
@@ -946,6 +952,29 @@ pub async fn handle_age_modal(
         let res: Result<serde_json::Value, String> = base.post_json("/api/age-bans", &body).await;
         if let Err(e) = res {
             warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
+        }
+    }
+
+    // Log staff : card informant qu'un membre a ete banni par la verification
+    // d'age (salon configurable `age_ban_log_channel_id`, sinon rien). Best-effort.
+    if let Some(channel) = age_ban_log_channel {
+        let total_days = i64::from(years) * ban_days_per_year as i64;
+        let embed = CreateEmbed::new().color(0xE74C3Cu32).description(format!(
+            "\u{1f51e} **Ban verification d'age** \u{2014} <@{uid}> (`{uid}`)\n\
+             Age declare : **{age} ans** (minimum {min}) \u{00b7} duree : **{years} an(s)** \
+             (~{days} j) \u{00b7} deban auto <t:{ts}:R>",
+            uid = user_id.get(),
+            age = age,
+            min = config.age_minimum,
+            years = years,
+            days = total_days,
+            ts = unban_at.timestamp(),
+        ));
+        if let Err(e) = channel
+            .send_message(&ctx.http, CreateMessage::new().embed(embed))
+            .await
+        {
+            warn!(error = %e, "Echec log ban verification d'age");
         }
     }
 
