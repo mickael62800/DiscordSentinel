@@ -91,9 +91,15 @@ impl PgPetRepository {
 #[async_trait]
 impl PetRepository for PgPetRepository {
     async fn create(&self, p: NewPet) -> Result<Pet, DomainError> {
-        let row: Row = sqlx::query_as(
+        // INSERT atomique : ON CONFLICT DO NOTHING garantit qu'un doublon
+        // (guild_id, owner_id) ne peut pas etre cree, meme en cas de course
+        // (la correctness ne depend plus uniquement de la contrainte UNIQUE
+        // cote schema). Si le conflit se declenche, aucune ligne n'est
+        // retournee : on renvoie alors le meme Conflict que le service.
+        let row: Option<Row> = sqlx::query_as(
             "INSERT INTO pets (guild_id, owner_id, name, species, str, vit, agi) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *",
+             VALUES ($1,$2,$3,$4,$5,$6,$7) \
+             ON CONFLICT (guild_id, owner_id) DO NOTHING RETURNING *",
         )
         .bind(&p.guild_id)
         .bind(&p.owner_id)
@@ -102,10 +108,13 @@ impl PetRepository for PgPetRepository {
         .bind(p.str_)
         .bind(p.vit)
         .bind(p.agi)
-        .fetch_one(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(row.into())
+        match row {
+            Some(r) => Ok(r.into()),
+            None => Err(DomainError::Conflict("tu as deja un compagnon".into())),
+        }
     }
 
     async fn get(&self, id: Uuid) -> Result<Option<Pet>, DomainError> {

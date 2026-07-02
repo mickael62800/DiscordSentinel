@@ -61,18 +61,34 @@ impl ManagePetsUseCase for ManagePetsService {
             self.repo.delete(existing.id).await?;
         }
         let base = species.base_stats();
-        let pet = self
+        // L'INSERT du repo est atomique (ON CONFLICT (guild_id, owner_id)) :
+        // si une course a recree un compagnon entre le get_by_owner ci-dessus
+        // et cet appel, create() renvoie Conflict. On le traite proprement en
+        // relisant le compagnon gagnant plutot que de laisser fuiter l'erreur.
+        let pet = match self
             .repo
             .create(NewPet {
-                guild_id: cmd.guild_id,
-                owner_id: cmd.owner_id,
+                guild_id: cmd.guild_id.clone(),
+                owner_id: cmd.owner_id.clone(),
                 name: name.to_string(),
                 species: species.as_str().to_string(),
                 str_: base.str_,
                 vit: base.vit,
                 agi: base.agi,
             })
-            .await?;
+            .await
+        {
+            Ok(pet) => pet,
+            Err(DomainError::Conflict(_)) => {
+                // Un compagnon existe deja (course). On renvoie l'existant s'il
+                // est vivant, sinon on propage un Conflict explicite.
+                match self.repo.get_by_owner(&cmd.guild_id, &cmd.owner_id).await? {
+                    Some(existing) if existing.status != Health::Dead => return Ok(existing),
+                    _ => return Err(DomainError::Conflict("tu as deja un compagnon".into())),
+                }
+            }
+            Err(e) => return Err(e),
+        };
         let _ = self
             .repo
             .add_event(
