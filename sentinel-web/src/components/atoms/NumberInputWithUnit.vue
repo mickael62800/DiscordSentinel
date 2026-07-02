@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref, watch } from "vue";
 
 const props = defineProps<{
   modelValue: string | number | null | undefined;
@@ -17,9 +17,84 @@ const emit = defineEmits<{
   (e: "update:modelValue", value: string): void;
 }>();
 
+// --- Mode temps : quand l'unite native du champ est une duree (secondes ou
+// minutes), on affiche un selecteur d'unite (sec / min / heure / jour /
+// semaine) qui RE-EXPRIME la meme duree. La valeur STOCKEE reste dans l'unite
+// native du champ (secondes pour unit="s", minutes pour unit="min") ; seul
+// l'affichage change. Ca evite de saisir "604800" pour une semaine.
+const TIME_UNITS: { key: string; label: string; secs: number }[] = [
+  { key: "sec", label: "sec", secs: 1 },
+  { key: "min", label: "min", secs: 60 },
+  { key: "heure", label: "heure", secs: 3600 },
+  { key: "jour", label: "jour", secs: 86400 },
+  { key: "semaine", label: "semaine", secs: 604800 },
+];
+
+/** Nombre de secondes que vaut 1 unite native du champ, ou null si le champ
+ *  n'est pas une duree (on garde alors le comportement classique). */
+function baseSecsOf(unit?: string): number | null {
+  const u = (unit ?? "").trim().toLowerCase();
+  if (["s", "sec", "secs", "seconde", "secondes"].includes(u)) return 1;
+  if (["min", "mins", "minute", "minutes"].includes(u)) return 60;
+  return null;
+}
+
+const isTime = computed(() => baseSecsOf(props.unit) !== null);
+const baseSecs = computed(() => baseSecsOf(props.unit) ?? 1);
+// On n'offre que les unites >= a l'unite native (pas de "sec" pour un champ
+// stocke en minutes : ca creerait des fractions non stockables).
+const availableUnits = computed(() =>
+  TIME_UNITS.filter((u) => u.secs >= baseSecs.value),
+);
+
 const numericValue = computed(() => {
-  const n = Number(props.modelValue);
+  const v = props.modelValue;
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const n = Number(v);
   return Number.isFinite(n) ? n : null;
+});
+
+/** Valeur stockee convertie en secondes (source de verite pour l'affichage). */
+const storedSecs = computed(() => {
+  const n = numericValue.value;
+  return n === null ? null : n * baseSecs.value;
+});
+
+// Unite d'affichage courante. Auto-choisie (plus grande unite qui tombe juste)
+// tant que l'utilisateur n'a pas choisi manuellement.
+const unitKey = ref<string>("");
+const userPicked = ref(false);
+
+function autoPick(secs: number): string {
+  const candidates = [...availableUnits.value].sort((a, b) => b.secs - a.secs);
+  for (const u of candidates) {
+    if (secs % u.secs === 0) return u.key;
+  }
+  return availableUnits.value[0]?.key ?? "sec";
+}
+
+watch(
+  [storedSecs, isTime],
+  () => {
+    if (!isTime.value) return;
+    if (!unitKey.value) unitKey.value = availableUnits.value[0]?.key ?? "sec";
+    if (userPicked.value) return;
+    const s = storedSecs.value;
+    if (s === null || s === 0) return;
+    unitKey.value = autoPick(s);
+  },
+  { immediate: true },
+);
+
+const unitFactor = computed(
+  () => TIME_UNITS.find((u) => u.key === unitKey.value)?.secs ?? baseSecs.value,
+);
+
+/** Valeur affichee dans l'input (dans l'unite selectionnee). */
+const displayValue = computed(() => {
+  const s = storedSecs.value;
+  if (s === null) return "";
+  return String(Number((s / unitFactor.value).toFixed(4)));
 });
 
 const outOfRange = computed(() => {
@@ -38,7 +113,11 @@ const rangeMessage = computed(() => {
   return `Hors borne (${parts.join(" – ")})`;
 });
 
-const stepValue = computed(() => props.step ?? 1);
+// Pas d'increment : dans l'unite native. En mode temps, +1 dans l'unite
+// affichee = `unitFactor / baseSecs` unites natives (ex. +1 heure = +60 min).
+const stepValue = computed(() =>
+  isTime.value ? unitFactor.value / baseSecs.value : (props.step ?? 1),
+);
 
 const canDecrement = computed(() => {
   const n = numericValue.value;
@@ -73,6 +152,26 @@ function increment() {
 function onInput(e: Event) {
   emit("update:modelValue", (e.target as HTMLInputElement).value);
 }
+
+// Mode temps : saisie exprimee dans l'unite affichee -> reconvertie vers
+// l'unite native stockee (entier).
+function onTimeInput(e: Event) {
+  const raw = (e.target as HTMLInputElement).value;
+  if (raw.trim() === "") {
+    emit("update:modelValue", "");
+    return;
+  }
+  const d = Number(raw);
+  if (!Number.isFinite(d)) return;
+  const native = (d * unitFactor.value) / baseSecs.value;
+  emit("update:modelValue", String(clamp(Math.round(native))));
+}
+
+function onUnitChange(e: Event) {
+  // Changer d'unite ne modifie PAS la duree stockee : on la ré-exprime juste.
+  userPicked.value = true;
+  unitKey.value = (e.target as HTMLSelectElement).value;
+}
 </script>
 
 <template>
@@ -92,6 +191,20 @@ function onInput(e: Event) {
       </button>
 
       <input
+        v-if="isTime"
+        :id="id"
+        :value="displayValue"
+        type="number"
+        step="any"
+        min="0"
+        :placeholder="placeholder"
+        :required="required"
+        :disabled="disabled"
+        class="num-input"
+        @input="onTimeInput"
+      />
+      <input
+        v-else
         :id="id"
         :value="modelValue ?? ''"
         type="number"
@@ -105,7 +218,19 @@ function onInput(e: Event) {
         @input="onInput"
       />
 
-      <span v-if="unit" class="num-unit">{{ unit }}</span>
+      <select
+        v-if="isTime"
+        class="num-unit-select"
+        :disabled="disabled"
+        :value="unitKey"
+        aria-label="Unité de durée"
+        @change="onUnitChange"
+      >
+        <option v-for="u in availableUnits" :key="u.key" :value="u.key">
+          {{ u.label }}
+        </option>
+      </select>
+      <span v-else-if="unit" class="num-unit">{{ unit }}</span>
 
       <button
         type="button"
@@ -232,6 +357,29 @@ function onInput(e: Event) {
   letter-spacing: 0.04em;
   border-left: 1px solid var(--border);
   white-space: nowrap;
+}
+
+.num-unit-select {
+  border: none;
+  border-left: 1px solid var(--border);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.04));
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  padding: 0 8px;
+  cursor: pointer;
+  outline: none;
+  white-space: nowrap;
+}
+
+.num-unit-select:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.num-unit-select:disabled {
+  cursor: not-allowed;
 }
 
 .num-warn {
