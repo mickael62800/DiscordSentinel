@@ -2,6 +2,7 @@
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import AutomodReviewsList from "@/components/organisms/AutomodReviewsList.vue";
 import AutomodStatsGrid from "@/components/organisms/AutomodStatsGrid.vue";
+import AutomodFalsePositives from "@/components/organisms/AutomodFalsePositives.vue";
 import AutomodDetectionsTimeline from "@/components/organisms/AutomodDetectionsTimeline.vue";
 </script>
 
@@ -17,6 +18,7 @@ import AutomodDetectionsTimeline from "@/components/organisms/AutomodDetectionsT
 
     <AutomodReviewsList />
     <AutomodStatsGrid />
+    <AutomodFalsePositives />
     <AutomodDetectionsTimeline />
   </AdminPageShell>
 </template>

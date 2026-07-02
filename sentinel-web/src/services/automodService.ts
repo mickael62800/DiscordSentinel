@@ -55,7 +55,36 @@ export interface DiscussionMessage {
   sent_at: string;
 }
 
+/** Une entree de stat de faux positifs (globale, par flag ou par action). */
+export interface FpBucket {
+  total: number;
+  overturned: number;
+  ignored: number;
+  fp_rate: number;
+}
+
+export interface FpFlagStat extends FpBucket {
+  flag: string;
+}
+
+export interface FpActionStat extends FpBucket {
+  suggested_action: string;
+}
+
+/** Reponse de GET /api/automod/{guild_id}/fp-stats. */
+export interface FpStats {
+  days: number;
+  capped: boolean;
+  overall: FpBucket;
+  by_flag: FpFlagStat[];
+  by_suggested_action: FpActionStat[];
+}
+
 export const automodService = {
+  /** GET /api/automod/{guild_id}/fp-stats — taux de faux positifs de l'automod. */
+  fpStats(guildId: string, days = 30): Promise<FpStats> {
+    return httpGet(`/api/automod/${guildId}/fp-stats${q({ days })}`);
+  },
   /** GET /api/automod/{guild_id}/detections — timeline filtree action='detection'. */
   listDetections(
     guildId: string,

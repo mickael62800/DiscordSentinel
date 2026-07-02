@@ -7,8 +7,10 @@
 
 mod discussions;
 mod dto;
+mod fp_stats;
 mod reviews;
 
 pub use discussions::*;
 pub use dto::*;
+pub use fp_stats::*;
 pub use reviews::*;

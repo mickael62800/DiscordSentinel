@@ -20,6 +20,10 @@ fn automod_inner() -> Router<AppState> {
             get(handlers::moderation::automod::list_reviews),
         )
         .route(
+            "/{guild_id}/fp-stats",
+            get(handlers::moderation::automod::fp_stats),
+        )
+        .route(
             "/{guild_id}/reviews/by-message/{message_id}",
             get(handlers::moderation::automod::find_review_by_message),
         )
