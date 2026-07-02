@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
-import LevelsConfigCard from "../organisms/LevelsConfigCard.vue";
 import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
 </script>
 
 <template>
-  <AdminPageShell title="Niveaux — Configuration" icon="⚙️">
+  <AdminPageShell title="Niveaux — XP manuelle" icon="⚙️">
     <template #lede>
-      Paramètres XP / niveau (texte + vocal).
+      Ajustement manuel de l'XP des membres (admin). La configuration XP
+      (gains, cooldown, message de level-up…) se règle sur la page du
+      composant « progression-bot ».
     </template>
 
     <div class="grid">
-      <LevelsConfigCard />
       <LevelsManualXpCard />
     </div>
   </AdminPageShell>
@@ -19,8 +19,5 @@ import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
 
 <style scoped>
 @import "./_admin-page-shared.css";
-.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 640px) {
-  .grid { grid-template-columns: 1fr; gap: 12px; }
-}
+.grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
 </style>

@@ -1,47 +1,11 @@
 use crate::ports::inbound::community::manage_levels::AddXpResult;
-use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use sentinel_core::domain::entities::community::level::xp_progress;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use serde::Deserialize;
 use serde::Serialize;
 // ── Request DTOs ──
-
-#[derive(Debug, Deserialize)]
-pub struct SaveLevelConfigDto {
-    pub guild_id: GuildId,
-    #[serde(default = "default_xp_per_message")]
-    pub xp_per_message: i32,
-    #[serde(default = "default_xp_per_voice_minute")]
-    pub xp_per_voice_minute: i32,
-    #[serde(default = "default_xp_cooldown")]
-    pub xp_cooldown_secs: i32,
-    pub level_up_channel_id: Option<String>,
-    #[serde(default = "default_level_up_message")]
-    pub level_up_message: String,
-    #[serde(default)]
-    pub excluded_channels: Vec<String>,
-    #[serde(default = "default_enabled")]
-    pub enabled: bool,
-}
-
-fn default_xp_per_message() -> i32 {
-    15
-}
-fn default_xp_per_voice_minute() -> i32 {
-    5
-}
-fn default_xp_cooldown() -> i32 {
-    60
-}
-fn default_level_up_message() -> String {
-    "GG {user}, tu es maintenant niveau **{level}** !".to_string()
-}
-fn default_enabled() -> bool {
-    true
-}
 
 #[derive(Debug, Deserialize)]
 pub struct AddXpDto {
@@ -87,18 +51,6 @@ pub struct LevelLeaderboardParams {
 // ── Response DTOs ──
 
 #[derive(Debug, Serialize)]
-pub struct LevelConfigDto {
-    pub guild_id: GuildId,
-    pub xp_per_message: i32,
-    pub xp_per_voice_minute: i32,
-    pub xp_cooldown_secs: i32,
-    pub level_up_channel_id: Option<String>,
-    pub level_up_message: String,
-    pub excluded_channels: Vec<String>,
-    pub enabled: bool,
-}
-
-#[derive(Debug, Serialize)]
 pub struct UserLevelDto {
     pub id: String,
     pub guild_id: GuildId,
@@ -129,36 +81,6 @@ pub struct AddXpResponseDto {
 }
 
 // ── From impls ──
-
-impl From<SaveLevelConfigDto> for SaveLevelConfigCommand {
-    fn from(dto: SaveLevelConfigDto) -> Self {
-        Self {
-            guild_id: dto.guild_id,
-            xp_per_message: dto.xp_per_message,
-            xp_per_voice_minute: dto.xp_per_voice_minute,
-            xp_cooldown_secs: dto.xp_cooldown_secs,
-            level_up_channel_id: dto.level_up_channel_id,
-            level_up_message: dto.level_up_message,
-            excluded_channels: dto.excluded_channels,
-            enabled: dto.enabled,
-        }
-    }
-}
-
-impl From<LevelConfig> for LevelConfigDto {
-    fn from(c: LevelConfig) -> Self {
-        Self {
-            guild_id: c.guild_id,
-            xp_per_message: c.xp_per_message,
-            xp_per_voice_minute: c.xp_per_voice_minute,
-            xp_cooldown_secs: c.xp_cooldown_secs,
-            level_up_channel_id: c.level_up_channel_id,
-            level_up_message: c.level_up_message,
-            excluded_channels: c.excluded_channels,
-            enabled: c.enabled,
-        }
-    }
-}
 
 impl From<UserLevel> for UserLevelDto {
     fn from(u: UserLevel) -> Self {

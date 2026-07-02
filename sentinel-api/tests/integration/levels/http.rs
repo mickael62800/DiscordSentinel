@@ -20,9 +20,7 @@ use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use sentinel_api::ports::inbound::community::manage_levels::ResetTarget;
-use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
@@ -30,7 +28,6 @@ use test_helpers::build_test_state_levels;
 
 #[derive(Default)]
 struct MockLevelsUC {
-    config: Mutex<Option<LevelConfig>>,
     users: Mutex<Vec<UserLevel>>,
     last_source: Mutex<Option<XpSource>>,
 }
@@ -42,22 +39,6 @@ impl MockLevelsUC {
     fn with_user(self, u: UserLevel) -> Self {
         self.users.lock().unwrap().push(u);
         self
-    }
-}
-
-fn default_config(guild_id: &str) -> LevelConfig {
-    let now = Utc::now();
-    LevelConfig {
-        guild_id: guild_id.into(),
-        xp_per_message: 15,
-        xp_per_voice_minute: 5,
-        xp_cooldown_secs: 60,
-        level_up_channel_id: None,
-        level_up_message: "msg".into(),
-        excluded_channels: vec![],
-        enabled: true,
-        created_at: now,
-        updated_at: now,
     }
 }
 
@@ -82,31 +63,6 @@ fn default_user(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
 
 #[async_trait]
 impl ManageLevelsUseCase for MockLevelsUC {
-    async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError> {
-        Ok(self
-            .config
-            .lock()
-            .unwrap()
-            .clone()
-            .unwrap_or_else(|| default_config(guild_id)))
-    }
-    async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
-        let now = Utc::now();
-        let cfg = LevelConfig {
-            guild_id: cmd.guild_id,
-            xp_per_message: cmd.xp_per_message,
-            xp_per_voice_minute: cmd.xp_per_voice_minute,
-            xp_cooldown_secs: cmd.xp_cooldown_secs,
-            level_up_channel_id: cmd.level_up_channel_id,
-            level_up_message: cmd.level_up_message,
-            excluded_channels: cmd.excluded_channels,
-            enabled: cmd.enabled,
-            created_at: now,
-            updated_at: now,
-        };
-        *self.config.lock().unwrap() = Some(cfg.clone());
-        Ok(cfg)
-    }
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         let user_level = default_user(&cmd.guild_id, &cmd.user_id, cmd.amount);
         Ok(AddXpResult {
@@ -203,43 +159,6 @@ async fn post_json(
         status,
         serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
     )
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn get_config_default() {
-    let app = build_app(Arc::new(MockLevelsUC::new()));
-    let (status, json) = get(app, "/api/levels/config/111111111111111111").await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["xp_per_message"], 15);
-    assert_eq!(json["enabled"], true);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn save_config_applies_defaults_serde() {
-    let app = build_app(Arc::new(MockLevelsUC::new()));
-    let body = serde_json::json!({ "guild_id": "111111111111111111" });
-    let (status, json) = post_json(app, "/api/levels/config", body).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["xp_per_message"], 15);
-    assert_eq!(json["xp_per_voice_minute"], 5);
-    assert_eq!(json["xp_cooldown_secs"], 60);
-    assert_eq!(json["enabled"], true);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn save_config_custom_values() {
-    let app = build_app(Arc::new(MockLevelsUC::new()));
-    let body = serde_json::json!({
-        "guild_id": "111111111111111111",
-        "xp_per_message": 25, "xp_per_voice_minute": 10,
-        "xp_cooldown_secs": 30, "enabled": false,
-        "excluded_channels": ["c1", "c2"]
-    });
-    let (status, json) = post_json(app, "/api/levels/config", body).await;
-    assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["xp_per_message"], 25);
-    assert_eq!(json["enabled"], false);
-    assert_eq!(json["excluded_channels"].as_array().unwrap().len(), 2);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

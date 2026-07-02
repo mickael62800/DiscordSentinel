@@ -1,0 +1,11 @@
+-- Retrait de la surface de config XP morte.
+--
+-- La table `level_config` n'etait lue par le runtime NULLE PART : le bot lit
+-- tous ses reglages XP depuis `bot_guild_config` (composant "progression-bot").
+-- La seule chose qui alimentait `level_config` etait la carte web legacy
+-- (LevelsConfigCard) via GET/POST /api/levels/config, dont l'edition n'avait
+-- AUCUN effet sur le comportement du bot. On retire donc cette surface.
+--
+-- Les donnees XP des utilisateurs vivent dans `user_levels` (intacte).
+-- Idempotent.
+DROP TABLE IF EXISTS level_config;

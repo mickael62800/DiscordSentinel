@@ -1,16 +1,5 @@
 import { httpGet, httpPost } from "@/api/http";
-import type { LevelConfig, UserLevel } from "@/types";
-
-export interface SaveLevelConfigPayload {
-  guild_id: string;
-  xp_per_message?: number;
-  xp_per_voice_minute?: number;
-  xp_cooldown_secs?: number;
-  level_up_channel_id?: string | null;
-  level_up_message?: string;
-  excluded_channels?: string[];
-  enabled?: boolean;
-}
+import type { UserLevel } from "@/types";
 
 export interface AddXpPayload {
   guild_id: string;
@@ -21,12 +10,6 @@ export interface AddXpPayload {
 }
 
 export const levelsService = {
-  getConfig(guildId: string): Promise<LevelConfig> {
-    return httpGet(`/api/levels/config/${guildId}`);
-  },
-  saveConfig(body: SaveLevelConfigPayload): Promise<LevelConfig> {
-    return httpPost(`/api/levels/config`, body);
-  },
   addXp(body: AddXpPayload): Promise<unknown> {
     return httpPost(`/api/levels/xp`, body);
   },

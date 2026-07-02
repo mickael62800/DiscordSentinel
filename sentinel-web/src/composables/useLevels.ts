@@ -1,5 +1,5 @@
 import { ref, onMounted, watch } from "vue";
-import type { LevelConfig, UserLevel, DiscordRole } from "../types";
+import type { UserLevel, DiscordRole } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { levelsService } from "@/services/levelsService";
@@ -7,7 +7,6 @@ import { discordRolesService } from "@/services/discordRolesService";
 
 export function useLevels() {
   const { error: showError } = useToast();
-  const config = ref<LevelConfig | null>(null);
   const leaderboard = ref<UserLevel[]>([]);
   const roles = ref<DiscordRole[]>([]);
   const loading = ref(true);
@@ -17,7 +16,6 @@ export function useLevels() {
   async function fetchAll() {
     const guildId = selectedGuildId.value;
     if (!guildId) {
-      config.value = null;
       leaderboard.value = [];
       roles.value = [];
       loading.value = false;
@@ -26,12 +24,10 @@ export function useLevels() {
     loading.value = true;
     error.value = null;
     try {
-      const [c, l, ro] = await Promise.all([
-        levelsService.getConfig(guildId).catch(() => null),
+      const [l, ro] = await Promise.all([
         levelsService.getLeaderboard(guildId).catch(() => []),
         discordRolesService.getAll(guildId).catch(() => []),
       ]);
-      config.value = c;
       leaderboard.value = l ?? [];
       roles.value = ro ?? [];
     } catch (e) {
@@ -46,5 +42,5 @@ export function useLevels() {
   onMounted(fetchAll);
   watch(selectedGuildId, fetchAll);
 
-  return { config, leaderboard, roles, loading, error, fetchAll };
+  return { leaderboard, roles, loading, error, fetchAll };
 }

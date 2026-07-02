@@ -1,22 +1,10 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::community::level::LevelConfig;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
-
-pub struct SaveLevelConfigCommand {
-    pub guild_id: GuildId,
-    pub xp_per_message: i32,
-    pub xp_per_voice_minute: i32,
-    pub xp_cooldown_secs: i32,
-    pub level_up_channel_id: Option<String>,
-    pub level_up_message: String,
-    pub excluded_channels: Vec<String>,
-    pub enabled: bool,
-}
 
 pub struct AddXpCommand {
     pub guild_id: GuildId,
@@ -58,8 +46,6 @@ pub enum ResetTarget {
 
 #[async_trait]
 pub trait ManageLevelsUseCase: Send + Sync {
-    async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError>;
-    async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError>;
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError>;
     async fn get_user_level(&self, guild_id: &str, user_id: &str)
         -> Result<UserLevel, DomainError>;

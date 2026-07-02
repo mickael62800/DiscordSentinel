@@ -1,14 +1,11 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::community::level::LevelConfig;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait LevelRepository: Send + Sync {
-    async fn get_config(&self, guild_id: &str) -> Result<Option<LevelConfig>, DomainError>;
-    async fn upsert_config(&self, config: &LevelConfig) -> Result<(), DomainError>;
     async fn get_user_level(
         &self,
         guild_id: &str,

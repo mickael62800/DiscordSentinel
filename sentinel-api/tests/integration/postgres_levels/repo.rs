@@ -6,7 +6,6 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
 use sentinel_api::ports::outbound::community::level_repository::LevelRepository;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 
@@ -23,21 +22,6 @@ fn fresh_id() -> String {
     )
 }
 
-fn sample_config(guild: &str) -> LevelConfig {
-    let now = Utc::now();
-    LevelConfig {
-        guild_id: guild.into(),
-        xp_per_message: 15,
-        xp_per_voice_minute: 2,
-        xp_cooldown_secs: 60,
-        level_up_channel_id: Some("chan1".into()),
-        level_up_message: "GG <@{user}> niveau {level}!".into(),
-        excluded_channels: vec!["x1".into(), "x2".into()],
-        enabled: true,
-        created_at: now,
-        updated_at: now,
-    }
-}
 fn sample_user_level(guild: &str, user: &str) -> UserLevel {
     let now = Utc::now();
     UserLevel {
@@ -55,37 +39,6 @@ fn sample_user_level(guild: &str, user: &str) -> UserLevel {
         created_at: now,
         updated_at: now,
     }
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn config_none_when_absent() {
-    let repo = PgLevelRepository::new(pool().await);
-    assert!(repo.get_config(&fresh_id()).await.unwrap().is_none());
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn config_upsert_preserves_excluded_channels() {
-    let repo = PgLevelRepository::new(pool().await);
-    let g = fresh_id();
-    repo.upsert_config(&sample_config(&g)).await.unwrap();
-    let got = repo.get_config(&g).await.unwrap().unwrap();
-    assert_eq!(got.xp_per_message, 15);
-    assert_eq!(got.excluded_channels, vec!["x1", "x2"]);
-    assert_eq!(got.level_up_channel_id.as_deref(), Some("chan1"));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn config_upsert_updates_existing() {
-    let repo = PgLevelRepository::new(pool().await);
-    let g = fresh_id();
-    repo.upsert_config(&sample_config(&g)).await.unwrap();
-    let mut cfg = sample_config(&g);
-    cfg.enabled = false;
-    cfg.xp_per_message = 30;
-    repo.upsert_config(&cfg).await.unwrap();
-    let got = repo.get_config(&g).await.unwrap().unwrap();
-    assert!(!got.enabled);
-    assert_eq!(got.xp_per_message, 30);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

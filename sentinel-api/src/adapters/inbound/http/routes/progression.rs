@@ -11,11 +11,6 @@ use super::super::state::AppState;
 
 fn level_inner() -> Router<AppState> {
     Router::new()
-        .route(
-            "/config/{guild_id}",
-            get(handlers::community::levels::get_config),
-        )
-        .route("/config", post(handlers::community::levels::save_config))
         .route("/xp", post(handlers::community::levels::add_xp))
         .route(
             "/{guild_id}/{user_id}",

@@ -368,17 +368,6 @@ export interface TopUser {
 
 // ── Levels / XP ──
 
-export interface LevelConfig {
-  guild_id: string;
-  xp_per_message: number;
-  xp_per_voice_minute: number;
-  xp_cooldown_secs: number;
-  level_up_channel_id: string | null;
-  level_up_message: string;
-  excluded_channels: string[];
-  enabled: boolean;
-}
-
 export interface UserLevel {
   id: string;
   guild_id: string;

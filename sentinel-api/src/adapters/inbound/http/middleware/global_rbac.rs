@@ -226,8 +226,7 @@ fn route_roles() -> &'static HashMap<(&'static str, &'static str), Role> {
         m.insert(("DELETE", "/api/notes/{id}"), Role::Moderator);
         m.insert(("POST", "/api/reminders/"), Role::Moderator);
 
-        // ── Levels / progression (config) ────────────────────────────────
-        m.insert(("POST", "/api/levels/config"), Role::Admin);
+        // ── Levels / progression (admin XP overrides) ────────────────────
         m.insert(("POST", "/api/levels/admin/set-xp"), Role::Admin);
         m.insert(("POST", "/api/levels/admin/reset-xp"), Role::Admin);
 

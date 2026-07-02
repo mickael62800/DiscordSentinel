@@ -5,10 +5,8 @@ use axum::Json;
 
 use crate::adapters::inbound::http::dto::community::levels::AddXpDto;
 use crate::adapters::inbound::http::dto::community::levels::AddXpResponseDto;
-use crate::adapters::inbound::http::dto::community::levels::LevelConfigDto;
 use crate::adapters::inbound::http::dto::community::levels::LevelLeaderboardParams;
 use crate::adapters::inbound::http::dto::community::levels::ResetUserXpDto;
-use crate::adapters::inbound::http::dto::community::levels::SaveLevelConfigDto;
 use crate::adapters::inbound::http::dto::community::levels::SetUserXpDto;
 use crate::adapters::inbound::http::dto::community::levels::UserLevelDto;
 use crate::adapters::inbound::http::errors::ApiError;
@@ -23,31 +21,6 @@ use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 use axum::Extension;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::enums::system::role::Role;
-
-pub async fn get_config(
-    State(state): State<AppState>,
-    ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<LevelConfigDto>, ApiError> {
-    let config = state.levels_uc.get_config(&guild_id).await?;
-    Ok(single_dto(config))
-}
-
-pub async fn save_config(
-    State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
-    Json(dto): Json<SaveLevelConfigDto>,
-) -> Result<Json<LevelConfigDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Admin,
-        "admin+ requis pour modifier la config des niveaux",
-    )
-    .await?;
-    let config = state.levels_uc.save_config(dto.into()).await?;
-    Ok(single_dto(config))
-}
 
 pub async fn add_xp(
     State(state): State<AppState>,

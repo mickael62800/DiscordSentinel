@@ -1,58 +1,12 @@
 use super::*;
 use chrono::Utc;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use uuid::Uuid;
 
 #[test]
 fn default_values() {
-    assert_eq!(default_xp_per_message(), 15);
-    assert_eq!(default_xp_per_voice_minute(), 5);
-    assert_eq!(default_xp_cooldown(), 60);
-    assert!(default_enabled());
     assert_eq!(default_source(), "text");
-    assert!(default_level_up_message().contains("{user}"));
-    assert!(default_level_up_message().contains("{level}"));
-}
-
-#[test]
-fn save_config_dto_to_command() {
-    let dto = SaveLevelConfigDto {
-        guild_id: "g".into(),
-        xp_per_message: 20,
-        xp_per_voice_minute: 10,
-        xp_cooldown_secs: 120,
-        level_up_channel_id: Some("chan".into()),
-        level_up_message: "hey".into(),
-        excluded_channels: vec!["c1".into(), "c2".into()],
-        enabled: false,
-    };
-    let cmd: SaveLevelConfigCommand = dto.into();
-    assert_eq!(cmd.xp_per_message, 20);
-    assert_eq!(cmd.excluded_channels.len(), 2);
-    assert_eq!(cmd.level_up_channel_id.unwrap(), "chan");
-    assert!(!cmd.enabled);
-}
-
-#[test]
-fn level_config_dto_from_entity() {
-    let now = Utc::now();
-    let c = LevelConfig {
-        guild_id: "g".into(),
-        xp_per_message: 15,
-        xp_per_voice_minute: 5,
-        xp_cooldown_secs: 60,
-        level_up_channel_id: None,
-        level_up_message: "m".into(),
-        excluded_channels: vec![],
-        enabled: true,
-        created_at: now,
-        updated_at: now,
-    };
-    let dto: LevelConfigDto = c.into();
-    assert_eq!(dto.xp_per_message, 15);
-    assert!(dto.enabled);
 }
 
 fn user_level(xp: i64, xp_text: i64, xp_voice: i64) -> UserLevel {
@@ -97,38 +51,6 @@ fn user_level_dto_independent_sources() {
 }
 
 use crate::ports::inbound::community::manage_levels::AddXpResult;
-
-#[test]
-fn save_config_dto_deserializes_with_defaults() {
-    let dto: SaveLevelConfigDto = serde_json::from_value(serde_json::json!({
-        "guild_id": "g"
-    }))
-    .unwrap();
-    assert_eq!(dto.xp_per_message, 15);
-    assert_eq!(dto.xp_per_voice_minute, 5);
-    assert_eq!(dto.xp_cooldown_secs, 60);
-    assert!(dto.enabled);
-    assert!(dto.excluded_channels.is_empty());
-    assert!(dto.level_up_message.contains("{user}"));
-}
-
-#[test]
-fn save_config_dto_deserializes_with_overrides() {
-    let dto: SaveLevelConfigDto = serde_json::from_value(serde_json::json!({
-        "guild_id": "g",
-        "xp_per_message": 25,
-        "xp_per_voice_minute": 8,
-        "xp_cooldown_secs": 30,
-        "level_up_channel_id": "c1",
-        "excluded_channels": ["ex1", "ex2"],
-        "enabled": false
-    }))
-    .unwrap();
-    assert_eq!(dto.xp_per_message, 25);
-    assert_eq!(dto.level_up_channel_id.as_deref(), Some("c1"));
-    assert_eq!(dto.excluded_channels.len(), 2);
-    assert!(!dto.enabled);
-}
 
 #[test]
 fn add_xp_dto_default_source_is_text() {

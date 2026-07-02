@@ -30,21 +30,6 @@ impl XpSource {
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-pub struct LevelConfig {
-    pub guild_id: GuildId,
-    pub xp_per_message: i32,
-    pub xp_per_voice_minute: i32,
-    pub xp_cooldown_secs: i32,
-    pub level_up_channel_id: Option<String>,
-    pub level_up_message: String,
-    pub excluded_channels: Vec<String>,
-    pub enabled: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct UserLevel {
     pub id: Uuid,
     pub guild_id: GuildId,

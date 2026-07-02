@@ -132,10 +132,8 @@ use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_levels::ResetTarget;
-use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 use async_trait::async_trait;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -149,12 +147,6 @@ struct MockLevelsUc {
 
 #[async_trait]
 impl ManageLevelsUseCase for MockLevelsUc {
-    async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
-    }
-    async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
-    }
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         let source = cmd.source;
         self.add_xp_calls.lock().unwrap().push(cmd);

@@ -4,7 +4,6 @@ use async_trait::async_trait;
 use chrono::Utc;
 
 use crate::domain::entities::community::level::level_from_xp;
-use crate::domain::entities::community::level::LevelConfig;
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
@@ -12,7 +11,6 @@ use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_levels::ResetTarget;
-use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
 use crate::ports::outbound::community::level_repository::LevelRepository;
 
@@ -28,66 +26,6 @@ impl ManageLevelsService {
 
 #[async_trait]
 impl ManageLevelsUseCase for ManageLevelsService {
-    async fn get_config(&self, guild_id: &str) -> Result<LevelConfig, DomainError> {
-        // Si la guild n'a jamais sauve de config, on retourne les defauts au
-        // lieu d'un 404 — sinon le frontend pollue la console et l'admin est
-        // perdu pour comprendre comment "creer" la config initiale.
-        if let Some(cfg) = self.repo.get_config(guild_id).await? {
-            return Ok(cfg);
-        }
-        let now = Utc::now();
-        Ok(LevelConfig {
-            guild_id: guild_id.to_string().into(),
-            xp_per_message: 15,
-            xp_per_voice_minute: 5,
-            xp_cooldown_secs: 60,
-            level_up_channel_id: None,
-            level_up_message: "Bravo {user} ! Tu as atteint le niveau {level} !".into(),
-            excluded_channels: vec![],
-            enabled: true,
-            created_at: now,
-            updated_at: now,
-        })
-    }
-
-    async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
-        // Validation des bornes
-        crate::application::validation::validate_range(
-            cmd.xp_per_message.into(),
-            1,
-            1000,
-            "xp_per_message",
-        )?;
-        crate::application::validation::validate_range(
-            cmd.xp_per_voice_minute.into(),
-            1,
-            1000,
-            "xp_per_voice_minute",
-        )?;
-        crate::application::validation::validate_range(
-            cmd.xp_cooldown_secs.into(),
-            0,
-            3600,
-            "xp_cooldown_secs",
-        )?;
-
-        let now = Utc::now();
-        let config = LevelConfig {
-            guild_id: cmd.guild_id,
-            xp_per_message: cmd.xp_per_message,
-            xp_per_voice_minute: cmd.xp_per_voice_minute,
-            xp_cooldown_secs: cmd.xp_cooldown_secs,
-            level_up_channel_id: cmd.level_up_channel_id,
-            level_up_message: cmd.level_up_message,
-            excluded_channels: cmd.excluded_channels,
-            enabled: cmd.enabled,
-            created_at: now,
-            updated_at: now,
-        };
-        self.repo.upsert_config(&config).await?;
-        Ok(config)
-    }
-
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         // Validation
         crate::application::validation::validate_positive(cmd.amount, "Le montant XP")?;

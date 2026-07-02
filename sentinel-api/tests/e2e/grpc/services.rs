@@ -60,7 +60,6 @@ use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use sentinel_api::ports::inbound::community::manage_members::ManageMembersUseCase;
 use sentinel_api::ports::inbound::community::manage_members::RegisterMemberCommand;
 use sentinel_api::ports::inbound::community::manage_members::SyncMembersCommand;
@@ -91,7 +90,6 @@ use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
@@ -829,12 +827,6 @@ impl ManageLevelsUseCase for MockLevelsUc {
         Ok((0..limit.min(3))
             .map(|i| sample_user_level(guild_id, &format!("u{i}"), 1000 - i * 100))
             .collect())
-    }
-    async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
-    }
-    async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
     }
     async fn get_leaderboard_by_source(
         &self,

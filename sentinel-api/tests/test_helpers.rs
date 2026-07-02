@@ -382,15 +382,6 @@ impl ManageAuditLogsUseCase for StubAuditLogs {
 pub struct StubLevels;
 #[async_trait]
 impl ManageLevelsUseCase for StubLevels {
-    async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
-    }
-    async fn save_config(
-        &self,
-        _: manage_levels::SaveLevelConfigCommand,
-    ) -> Result<LevelConfig, DomainError> {
-        unimplemented!()
-    }
     async fn add_xp(
         &self,
         _: manage_levels::AddXpCommand,

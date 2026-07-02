@@ -4,7 +4,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::ports::outbound::community::level_repository::LevelRepository;
-use sentinel_core::domain::entities::community::level::LevelConfig;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
@@ -17,20 +16,6 @@ impl PgLevelRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
-}
-
-#[derive(sqlx::FromRow)]
-struct LevelConfigRow {
-    guild_id: String,
-    xp_per_message: i32,
-    xp_per_voice_minute: i32,
-    xp_cooldown_secs: i32,
-    level_up_channel_id: Option<String>,
-    level_up_message: String,
-    excluded_channels: Vec<String>,
-    enabled: bool,
-    created_at: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -48,23 +33,6 @@ struct UserLevelRow {
     last_xp_at: chrono::DateTime<chrono::Utc>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
-}
-
-impl From<LevelConfigRow> for LevelConfig {
-    fn from(r: LevelConfigRow) -> Self {
-        Self {
-            guild_id: r.guild_id.into(),
-            xp_per_message: r.xp_per_message,
-            xp_per_voice_minute: r.xp_per_voice_minute,
-            xp_cooldown_secs: r.xp_cooldown_secs,
-            level_up_channel_id: r.level_up_channel_id,
-            level_up_message: r.level_up_message,
-            excluded_channels: r.excluded_channels,
-            enabled: r.enabled,
-            created_at: r.created_at,
-            updated_at: r.updated_at,
-        }
-    }
 }
 
 impl From<UserLevelRow> for UserLevel {
@@ -89,41 +57,6 @@ impl From<UserLevelRow> for UserLevel {
 
 #[async_trait]
 impl LevelRepository for PgLevelRepository {
-    async fn get_config(&self, guild_id: &str) -> Result<Option<LevelConfig>, DomainError> {
-        let row =
-            sqlx::query_as::<_, LevelConfigRow>("SELECT * FROM level_config WHERE guild_id = $1")
-                .bind(guild_id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(pg_err)?;
-
-        Ok(row.map(LevelConfig::from))
-    }
-
-    async fn upsert_config(&self, config: &LevelConfig) -> Result<(), DomainError> {
-        sqlx::query(
-            r#"INSERT INTO level_config (guild_id, xp_per_message, xp_per_voice_minute, xp_cooldown_secs, level_up_channel_id, level_up_message, excluded_channels, enabled, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
-               ON CONFLICT (guild_id) DO UPDATE SET
-                 xp_per_message = $2, xp_per_voice_minute = $3, xp_cooldown_secs = $4,
-                 level_up_channel_id = $5, level_up_message = $6, excluded_channels = $7,
-                 enabled = $8, updated_at = NOW()"#,
-        )
-        .bind(config.guild_id.as_str())
-        .bind(config.xp_per_message)
-        .bind(config.xp_per_voice_minute)
-        .bind(config.xp_cooldown_secs)
-        .bind(&config.level_up_channel_id)
-        .bind(&config.level_up_message)
-        .bind(&config.excluded_channels)
-        .bind(config.enabled)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
-
-        Ok(())
-    }
-
     async fn get_user_level(
         &self,
         guild_id: &str,

@@ -3,7 +3,6 @@ use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use chrono::Utc as ChronoUtc;
 use std::sync::Mutex as StdMutex;
 
@@ -20,12 +19,6 @@ impl MockRepo {
 
 #[async_trait]
 impl LevelRepository for MockRepo {
-    async fn get_config(&self, _g: &str) -> Result<Option<LevelConfig>, DomainError> {
-        Ok(None)
-    }
-    async fn upsert_config(&self, _c: &LevelConfig) -> Result<(), DomainError> {
-        Ok(())
-    }
     async fn add_xp_atomic(
         &self,
         guild_id: &str,
@@ -78,58 +71,8 @@ impl LevelRepository for MockRepo {
     }
 }
 
-fn make_cmd(xp_per_msg: i32, xp_per_voice: i32, cooldown: i32) -> SaveLevelConfigCommand {
-    SaveLevelConfigCommand {
-        guild_id: "g".into(),
-        xp_per_message: xp_per_msg,
-        xp_per_voice_minute: xp_per_voice,
-        xp_cooldown_secs: cooldown,
-        level_up_channel_id: None,
-        level_up_message: "up!".into(),
-        excluded_channels: vec![],
-        enabled: true,
-    }
-}
-
 fn make_svc() -> ManageLevelsService {
     ManageLevelsService::new(std::sync::Arc::new(MockRepo::new()))
-}
-
-#[tokio::test]
-async fn save_config_accepts_valid_values() {
-    let svc = make_svc();
-    let cfg = svc.save_config(make_cmd(10, 5, 60)).await.unwrap();
-    assert_eq!(cfg.xp_per_message, 10);
-    assert_eq!(cfg.xp_per_voice_minute, 5);
-}
-
-#[tokio::test]
-async fn save_config_rejects_xp_per_message_out_of_range() {
-    let svc = make_svc();
-    assert!(svc.save_config(make_cmd(0, 5, 60)).await.is_err());
-    assert!(svc.save_config(make_cmd(1001, 5, 60)).await.is_err());
-    assert!(svc.save_config(make_cmd(-10, 5, 60)).await.is_err());
-}
-
-#[tokio::test]
-async fn save_config_rejects_xp_per_voice_out_of_range() {
-    let svc = make_svc();
-    assert!(svc.save_config(make_cmd(10, 0, 60)).await.is_err());
-    assert!(svc.save_config(make_cmd(10, 1001, 60)).await.is_err());
-}
-
-#[tokio::test]
-async fn save_config_rejects_cooldown_out_of_range() {
-    let svc = make_svc();
-    assert!(svc.save_config(make_cmd(10, 5, -1)).await.is_err());
-    assert!(svc.save_config(make_cmd(10, 5, 3601)).await.is_err());
-}
-
-#[tokio::test]
-async fn save_config_accepts_boundary_values() {
-    let svc = make_svc();
-    assert!(svc.save_config(make_cmd(1, 1, 0)).await.is_ok());
-    assert!(svc.save_config(make_cmd(1000, 1000, 3600)).await.is_ok());
 }
 
 #[tokio::test]
@@ -202,18 +145,6 @@ async fn add_xp_boundary_10000_accepted() {
         })
         .await
         .is_ok());
-}
-
-#[tokio::test]
-async fn get_config_returns_defaults_when_repo_empty() {
-    let svc = make_svc();
-    let cfg = svc.get_config("ghost").await.unwrap();
-    assert_eq!(cfg.xp_per_message, 15);
-    assert_eq!(cfg.xp_per_voice_minute, 5);
-    assert_eq!(cfg.xp_cooldown_secs, 60);
-    assert!(cfg.enabled);
-    assert!(cfg.excluded_channels.is_empty());
-    assert!(cfg.level_up_channel_id.is_none());
 }
 
 #[tokio::test]
