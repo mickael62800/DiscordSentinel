@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Doughnut } from "vue-chartjs";
 import { useSecurity } from "@/composables/useSecurity";
+import { registerChartJs } from "@/utils/chartjs";
+import { makeDoughnutOptions, severityColors } from "@/utils/chartTheme";
+
+registerChartJs();
 
 const { events } = useSecurity();
 
@@ -14,6 +19,29 @@ const stats = computed(() => {
     low: list.filter((e) => e.severity === "low").length,
   };
 });
+
+// B2 : doughnut de repartition des severites (garde aussi les cartes chiffrees).
+const hasData = computed(
+  () => stats.value.critical + stats.value.high + stats.value.medium + stats.value.low > 0,
+);
+
+const severityChartData = computed(() => ({
+  labels: ["Critiques", "Eleves", "Moyens", "Faibles"],
+  datasets: [
+    {
+      data: [stats.value.critical, stats.value.high, stats.value.medium, stats.value.low],
+      backgroundColor: [
+        severityColors.critical,
+        severityColors.high,
+        severityColors.medium,
+        severityColors.low,
+      ],
+      borderWidth: 0,
+    },
+  ],
+}));
+
+const severityChartOptions = makeDoughnutOptions();
 </script>
 
 <template>
@@ -37,6 +65,13 @@ const stats = computed(() => {
     <div class="card stat-card stat-low">
       <span class="stat-label">Faibles</span>
       <span class="stat-value">{{ stats.low }}</span>
+    </div>
+  </div>
+
+  <div v-if="hasData" class="card severity-chart-card">
+    <h3 class="severity-chart-title">Répartition des sévérités</h3>
+    <div class="severity-chart">
+      <Doughnut :data="severityChartData" :options="severityChartOptions" />
     </div>
   </div>
 </template>
@@ -79,6 +114,22 @@ const stats = computed(() => {
   font-weight: 700;
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
+}
+.severity-chart-card {
+  padding: 20px;
+  margin-bottom: 32px;
+}
+.severity-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 16px;
+}
+.severity-chart {
+  height: 260px;
+  position: relative;
 }
 @media (max-width: 640px) {
   .stats-grid {

@@ -3,6 +3,17 @@ import { computed, toRef } from "vue";
 import { useDashboardCharts } from "@/composables/useDashboardCharts";
 import { useAnalytics } from "@/composables/useAnalytics";
 import { Line, Bar } from "vue-chartjs";
+import { registerChartJs } from "@/utils/chartjs";
+import {
+  makeLineOptions,
+  makeBarOptions,
+  colorAt,
+  fillColor,
+  severityColors,
+} from "@/utils/chartTheme";
+
+registerChartJs();
+
 const props = defineProps<{ days: number }>();
 const daysRef = toRef(props, "days");
 
@@ -62,48 +73,15 @@ const infractionsBarData = computed(() => ({
     {
       label: "Total",
       data: [totalInfractions.value.w, totalInfractions.value.m, totalInfractions.value.b],
-      backgroundColor: ["#5bc0eb", "#fee75c", "#ed4245"],
+      backgroundColor: [severityColors.info, severityColors.medium, severityColors.critical],
       borderRadius: 6,
     },
   ],
 }));
 
-const infractionsBarOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  indexAxis: "y" as const,
-  plugins: { legend: { display: false } },
-  scales: {
-    x: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-      beginAtZero: true,
-    },
-    y: {
-      ticks: { color: "#9495b0", font: { size: 11 } },
-      grid: { display: false },
-    },
-  },
-};
+const infractionsBarOptions = makeBarOptions({}, true);
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { labels: { color: "#9495b0", font: { size: 11 } } },
-  },
-  scales: {
-    x: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-    },
-    y: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-      beginAtZero: true,
-    },
-  },
-};
+const chartOptions = makeLineOptions();
 
 const labels = computed(() =>
   activity.value.map((a) => {
@@ -118,8 +96,8 @@ const messagesChartData = computed(() => ({
     {
       label: "Messages",
       data: activity.value.map((a) => a.messages),
-      borderColor: "#5865f2",
-      backgroundColor: "rgba(88, 101, 242, 0.15)",
+      borderColor: colorAt(0),
+      backgroundColor: fillColor(colorAt(0)),
       fill: true,
       tension: 0.3,
     },
@@ -132,7 +110,7 @@ const voiceChartData = computed(() => ({
     {
       label: "Heures vocales / jour",
       data: activity.value.map((a) => Math.round((a.voice_minutes / 60) * 10) / 10),
-      backgroundColor: "#2ecc71",
+      backgroundColor: colorAt(1),
       borderRadius: 4,
     },
   ],
@@ -144,16 +122,16 @@ const memberGrowthData = computed(() => ({
     {
       label: "Arrivees",
       data: activity.value.map((a) => a.new_members),
-      borderColor: "#57f287",
-      backgroundColor: "rgba(87, 242, 135, 0.15)",
+      borderColor: severityColors.low,
+      backgroundColor: fillColor(severityColors.low),
       fill: true,
       tension: 0.3,
     },
     {
       label: "Departs",
       data: activity.value.map((a) => a.leaves),
-      borderColor: "#ed4245",
-      backgroundColor: "rgba(237, 66, 69, 0.15)",
+      borderColor: severityColors.critical,
+      backgroundColor: fillColor(severityColors.critical),
       fill: true,
       tension: 0.3,
     },
@@ -168,8 +146,8 @@ const engagementData = computed(() => ({
       data: activity.value.map((a) =>
         a.active_members > 0 ? Math.round((a.messages / a.active_members) * 10) / 10 : 0,
       ),
-      borderColor: "#e67e22",
-      backgroundColor: "rgba(230, 126, 34, 0.15)",
+      borderColor: colorAt(2),
+      backgroundColor: fillColor(colorAt(2)),
       fill: true,
       tension: 0.3,
     },
@@ -185,7 +163,7 @@ const topMessagesData = computed(() => ({
     {
       label: "Messages",
       data: topMessageUsers.value.map((u) => u.message_count),
-      backgroundColor: "#5865f2",
+      backgroundColor: colorAt(0),
       borderRadius: 6,
     },
   ],
@@ -207,29 +185,13 @@ const topVoiceData = computed(() => ({
     {
       label: "Heures vocales",
       data: topVoiceUsers.value.map((u) => Math.round(u.voice_hours * 10) / 10),
-      backgroundColor: "#57f287",
+      backgroundColor: severityColors.low,
       borderRadius: 6,
     },
   ],
 }));
 
-const horizontalBarOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  indexAxis: "y" as const,
-  plugins: { legend: { display: false } },
-  scales: {
-    x: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-      beginAtZero: true,
-    },
-    y: {
-      ticks: { color: "#9495b0", font: { size: 11 } },
-      grid: { display: false },
-    },
-  },
-};
+const horizontalBarOptions = makeBarOptions({}, true);
 
 const membersChartData = computed(() => ({
   labels: labels.value,
@@ -237,8 +199,8 @@ const membersChartData = computed(() => ({
     {
       label: "Membres actifs",
       data: activity.value.map((a) => a.active_members),
-      borderColor: "#fee75c",
-      backgroundColor: "rgba(254, 231, 92, 0.15)",
+      borderColor: colorAt(6),
+      backgroundColor: fillColor(colorAt(6)),
       fill: true,
       tension: 0.3,
     },

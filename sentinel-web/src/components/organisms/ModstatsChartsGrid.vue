@@ -7,8 +7,23 @@ import type { ModStatsEntry } from "@/types/moderation-advanced";
 import type { ModstatsTrendDay } from "@/services/moderationAdvancedService";
 import { Bar, Line } from "vue-chartjs";
 import { registerChartJs } from "@/utils/chartjs";
+import {
+  makeLineOptions,
+  makeBarOptions,
+  colorAt,
+  fillColor,
+  severityColors,
+} from "@/utils/chartTheme";
 
 registerChartJs();
+
+// Couleurs semantiques par type d'action (partagees entre tous les datasets).
+const actionColors = {
+  warns: severityColors.info,
+  mutes: severityColors.medium,
+  bans: severityColors.critical,
+  kicks: colorAt(2),
+} as const;
 
 const props = defineProps<{
   days: number;
@@ -56,24 +71,7 @@ watch([guildIdFilter, () => props.days], fetchStats);
 // ── Charts ──
 const top5Mods = computed(() => stats.value.slice(0, 5));
 
-const lineOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { labels: { color: "#9495b0", font: { size: 11 } } },
-  },
-  scales: {
-    x: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-    },
-    y: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-      beginAtZero: true,
-    },
-  },
-};
+const lineOptions = makeLineOptions();
 
 const trendData = computed(() => {
   const labels = trend.value.map((d) => {
@@ -83,10 +81,10 @@ const trendData = computed(() => {
   return {
     labels,
     datasets: [
-      { label: "Avertissements", data: trend.value.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "rgba(91, 192, 235, 0.15)", fill: true, tension: 0.3 },
-      { label: "Sourdines", data: trend.value.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "rgba(254, 231, 92, 0.15)", fill: true, tension: 0.3 },
-      { label: "Bannissements", data: trend.value.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "rgba(237, 66, 69, 0.15)", fill: true, tension: 0.3 },
-      { label: "Kicks", data: trend.value.map((d) => d.kicks), borderColor: "#e67e22", backgroundColor: "rgba(230, 126, 34, 0.15)", fill: true, tension: 0.3 },
+      { label: "Avertissements", data: trend.value.map((d) => d.warns), borderColor: actionColors.warns, backgroundColor: fillColor(actionColors.warns), fill: true, tension: 0.3 },
+      { label: "Sourdines", data: trend.value.map((d) => d.mutes), borderColor: actionColors.mutes, backgroundColor: fillColor(actionColors.mutes), fill: true, tension: 0.3 },
+      { label: "Bannissements", data: trend.value.map((d) => d.bans), borderColor: actionColors.bans, backgroundColor: fillColor(actionColors.bans), fill: true, tension: 0.3 },
+      { label: "Kicks", data: trend.value.map((d) => d.kicks), borderColor: actionColors.kicks, backgroundColor: fillColor(actionColors.kicks), fill: true, tension: 0.3 },
     ],
   };
 });
@@ -95,39 +93,20 @@ const hasTrend = computed(() =>
   trend.value.some((d) => d.warns + d.mutes + d.bans + d.kicks > 0),
 );
 
-const horizontalBarOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  indexAxis: "y" as const,
-  plugins: { legend: { display: false } },
-  scales: {
-    x: {
-      ticks: { color: "#9495b0", font: { size: 10 } },
-      grid: { color: "rgba(58, 59, 92, 0.5)" },
-      beginAtZero: true,
-    },
-    y: {
-      ticks: { color: "#9495b0", font: { size: 11 } },
-      grid: { display: false },
-    },
-  },
-};
+const horizontalBarOptions = makeBarOptions({}, true);
 
-const stackedHorizontalOptions = {
-  ...horizontalBarOptions,
-  plugins: {
-    legend: { labels: { color: "#9495b0", font: { size: 11 } }, position: "top" as const },
+const stackedHorizontalOptions = makeBarOptions(
+  {
+    plugins: { legend: { display: true, position: "top" } },
+    scales: { x: { stacked: true }, y: { stacked: true } },
   },
-  scales: {
-    x: { ...horizontalBarOptions.scales.x, stacked: true },
-    y: { ...horizontalBarOptions.scales.y, stacked: true },
-  },
-};
+  true,
+);
 
 const topModsData = computed(() => ({
   labels: top5Mods.value.map((m) => m.moderator_name),
   datasets: [
-    { label: "Total actions", data: top5Mods.value.map((m) => m.total), backgroundColor: "#5865f2", borderRadius: 6 },
+    { label: "Total actions", data: top5Mods.value.map((m) => m.total), backgroundColor: colorAt(0), borderRadius: 6 },
   ],
 }));
 
@@ -149,7 +128,7 @@ const distributionData = computed(() => ({
         totalsByType.value.bans,
         totalsByType.value.kicks,
       ],
-      backgroundColor: ["#5bc0eb", "#fee75c", "#ed4245", "#e67e22"],
+      backgroundColor: [actionColors.warns, actionColors.mutes, actionColors.bans, actionColors.kicks],
       borderRadius: 6,
     },
   ],
@@ -158,10 +137,10 @@ const distributionData = computed(() => ({
 const breakdownData = computed(() => ({
   labels: top5Mods.value.map((m) => m.moderator_name),
   datasets: [
-    { label: "Avertissements", data: top5Mods.value.map((m) => m.warns), backgroundColor: "#5bc0eb" },
-    { label: "Sourdines", data: top5Mods.value.map((m) => m.mutes), backgroundColor: "#fee75c" },
-    { label: "Bannissements", data: top5Mods.value.map((m) => m.bans), backgroundColor: "#ed4245" },
-    { label: "Kicks", data: top5Mods.value.map((m) => m.kicks), backgroundColor: "#e67e22" },
+    { label: "Avertissements", data: top5Mods.value.map((m) => m.warns), backgroundColor: actionColors.warns },
+    { label: "Sourdines", data: top5Mods.value.map((m) => m.mutes), backgroundColor: actionColors.mutes },
+    { label: "Bannissements", data: top5Mods.value.map((m) => m.bans), backgroundColor: actionColors.bans },
+    { label: "Kicks", data: top5Mods.value.map((m) => m.kicks), backgroundColor: actionColors.kicks },
   ],
 }));
 
@@ -170,7 +149,7 @@ const topWarnsUsers = computed(() =>
 );
 const topWarnsData = computed(() => ({
   labels: topWarnsUsers.value.map((m) => m.moderator_name),
-  datasets: [{ label: "Avertissements", data: topWarnsUsers.value.map((m) => m.warns), backgroundColor: "#5bc0eb", borderRadius: 6 }],
+  datasets: [{ label: "Avertissements", data: topWarnsUsers.value.map((m) => m.warns), backgroundColor: actionColors.warns, borderRadius: 6 }],
 }));
 
 const topMutesUsers = computed(() =>
@@ -178,7 +157,7 @@ const topMutesUsers = computed(() =>
 );
 const topMutesData = computed(() => ({
   labels: topMutesUsers.value.map((m) => m.moderator_name),
-  datasets: [{ label: "Sourdines", data: topMutesUsers.value.map((m) => m.mutes), backgroundColor: "#fee75c", borderRadius: 6 }],
+  datasets: [{ label: "Sourdines", data: topMutesUsers.value.map((m) => m.mutes), backgroundColor: actionColors.mutes, borderRadius: 6 }],
 }));
 
 const topHardUsers = computed(() =>
@@ -190,19 +169,15 @@ const topHardUsers = computed(() =>
 );
 const topHardData = computed(() => ({
   labels: topHardUsers.value.map((m) => m.moderator_name),
-  datasets: [{ label: "Bans + Kicks", data: topHardUsers.value.map((m) => m.hard), backgroundColor: "#ed4245", borderRadius: 6 }],
+  datasets: [{ label: "Bans + Kicks", data: topHardUsers.value.map((m) => m.hard), backgroundColor: actionColors.bans, borderRadius: 6 }],
 }));
 
-const percentBarOptions = {
-  ...horizontalBarOptions,
-  scales: {
-    ...horizontalBarOptions.scales,
-    x: {
-      ...horizontalBarOptions.scales.x,
-      ticks: { ...horizontalBarOptions.scales.x.ticks, callback: (v: number | string) => `${v}%` },
-    },
+const percentBarOptions = makeBarOptions(
+  {
+    scales: { x: { ticks: { callback: (v: number | string) => `${v}%` } } },
   },
-};
+  true,
+);
 
 const severityData = computed(() => ({
   labels: top5Mods.value.map((m) => m.moderator_name),
@@ -212,7 +187,7 @@ const severityData = computed(() => ({
       const t = m.total || 1;
       return Math.round(((m.bans + m.kicks) / t) * 1000) / 10;
     }),
-    backgroundColor: "#e67e22",
+    backgroundColor: actionColors.kicks,
     borderRadius: 6,
   }],
 }));

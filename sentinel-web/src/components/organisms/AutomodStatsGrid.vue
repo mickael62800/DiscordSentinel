@@ -1,7 +1,29 @@
 <script setup lang="ts">
+import { computed } from "vue";
+import { Bar } from "vue-chartjs";
 import { useAutomod } from "@/composables/useAutomod";
+import { registerChartJs } from "@/utils/chartjs";
+import { makeBarOptions, colorAt } from "@/utils/chartTheme";
+
+registerChartJs();
 
 const { statsByCategory, topUsers, totalDetections } = useAutomod();
+
+// B3 : les categories (cle -> compte) etaient une simple <ul>. On les affiche
+// en barres horizontales pour comparer visuellement les volumes.
+const categoryChartData = computed(() => ({
+  labels: statsByCategory.value.map((c) => c.key),
+  datasets: [
+    {
+      label: "Detections",
+      data: statsByCategory.value.map((c) => c.count),
+      backgroundColor: statsByCategory.value.map((_, i) => colorAt(i)),
+      borderRadius: 6,
+    },
+  ],
+}));
+
+const categoryChartOptions = makeBarOptions({}, true);
 </script>
 
 <template>
@@ -26,12 +48,9 @@ const { statsByCategory, topUsers, totalDetections } = useAutomod();
       <section class="card">
         <h2>Catégories</h2>
         <div v-if="statsByCategory.length === 0" class="empty">Aucune détection.</div>
-        <ul v-else class="cat-list">
-          <li v-for="cat in statsByCategory" :key="cat.key">
-            <span class="cat-name">{{ cat.key }}</span>
-            <span class="cat-count">{{ cat.count }}</span>
-          </li>
-        </ul>
+        <div v-else class="cat-chart">
+          <Bar :data="categoryChartData" :options="categoryChartOptions" />
+        </div>
       </section>
 
       <!-- Top users -->
@@ -83,6 +102,10 @@ const { statsByCategory, topUsers, totalDetections } = useAutomod();
 .card h2 { margin: 0 0 12px 0; font-size: 1.1rem; }
 .empty { color: var(--text-secondary); font-style: italic; }
 
+.cat-chart {
+  height: 260px;
+  position: relative;
+}
 .cat-list, .user-list { list-style: none; padding: 0; margin: 0; }
 .cat-list li {
   display: flex;
