@@ -127,6 +127,11 @@ const mapDefaults = computed(() => {
       <label :for="field.key" class="field-label">
         {{ field.label }}
         <span v-if="modified" class="modified-dot" />
+        <span
+          v-if="field.restart_required"
+          class="restart-badge"
+          title="Ce reglage n'est lu qu'au demarrage : la modification prend effet apres un redemarrage."
+        >&#8635; redémarrage requis</span>
       </label>
       <span
         v-if="hint"
@@ -327,6 +332,19 @@ const mapDefaults = computed(() => {
   height: 6px;
   border-radius: 50%;
   background: var(--accent);
+}
+
+/* Badge discret signalant qu'un reglage n'est applique qu'apres
+   redemarrage (champ fige au demarrage du composant). Teinte ambre. */
+.restart-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--warning, #f0a020);
+  border: 1px solid var(--warning, #f0a020);
+  border-radius: 4px;
+  padding: 1px 6px;
+  white-space: nowrap;
+  opacity: 0.85;
 }
 
 .field-input {

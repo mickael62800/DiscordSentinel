@@ -213,6 +213,12 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
     </div>
 
     <template v-else>
+      <!-- Notice worker : reglages lus au demarrage uniquement -->
+      <div v-if="isWorker" class="worker-notice">
+        Les réglages des workers sont lus au démarrage — un changement prend
+        effet au prochain redémarrage du worker.
+      </div>
+
       <!-- Section toggles -->
       <div v-if="booleanFields.length > 0" class="toggles-section">
         <div class="section-title-row">
@@ -316,6 +322,22 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .config-form-header h2 { font-size: 18px; color: var(--text-primary); }
 
 .no-params { color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
+
+/* Notice info discrete pour les workers (config figee au demarrage). */
+.worker-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
 
 /* Tooltip */
 .tooltip-wrap {

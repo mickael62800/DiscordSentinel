@@ -48,6 +48,12 @@ export interface ConfigField {
   max?: number;
   /** Options pour type="enum" (dropdown). */
   options?: ConfigFieldOption[];
+  /**
+   * Si true, ce reglage n'est lu qu'au demarrage du composant : une
+   * modification ne prend effet qu'apres un redemarrage. On affiche un
+   * badge d'avertissement a cote du label. Optionnel (retro-compat).
+   */
+  restart_required?: boolean;
   [k: string]: unknown;
 }
 
