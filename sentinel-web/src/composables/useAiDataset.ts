@@ -92,16 +92,24 @@ function buildCsv(rows: { text: string; label: string }[]): string {
   for (const r of rows) lines.push(`${csvEscape(r.text)},${r.label}`);
   return lines.join("\n") + "\n";
 }
-function downloadCsv(filename: string, content: string) {
-  const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+function downloadCsv(filename: string, content: string): boolean {
+  try {
+    const blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Revocation differee : revoquer immediatement peut annuler le
+    // telechargement dans certains navigateurs (le blob n'est plus lisible
+    // avant que l'ecriture disque soit terminee).
+    setTimeout(() => URL.revokeObjectURL(url), 40_000);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 watch(items, (list) => {
@@ -133,8 +141,33 @@ async function exportAndClean() {
     }
 
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    if (safeRows.length > 0) downloadCsv(`dataset-safe-${stamp}.csv`, buildCsv(safeRows));
-    if (severeRows.length > 0) downloadCsv(`dataset-severe-${stamp}.csv`, buildCsv(severeRows));
+    // Anti-perte de donnees : la suppression est IRREVERSIBLE. On genere
+    // d'abord les CSV et on ABANDONNE avant toute suppression si une
+    // generation echoue (blob/URL non creables).
+    const safeOk =
+      safeRows.length === 0 || downloadCsv(`dataset-safe-${stamp}.csv`, buildCsv(safeRows));
+    const severeOk =
+      severeRows.length === 0 ||
+      downloadCsv(`dataset-severe-${stamp}.csv`, buildCsv(severeRows));
+    if (!safeOk || !severeOk) {
+      showError("Echec de generation des CSV — suppression annulee, aucun message supprime.");
+      return;
+    }
+
+    // Le navigateur ne garantit pas que le fichier a bien ete enregistre
+    // (onglet en arriere-plan, blocage de telechargement...). On exige une
+    // confirmation explicite APRES le declenchement du telechargement, avant
+    // la suppression irreversible.
+    if (
+      !confirm(
+        `CSV generes (${safeRows.length} safe, ${severeRows.length} severe). ` +
+          `Verifie qu'ils sont bien dans tes telechargements. ` +
+          `Supprimer maintenant ${idsToDelete.length} messages de la BDD ? (IRREVERSIBLE)`,
+      )
+    ) {
+      showError("Suppression annulee — les messages sont conserves.");
+      return;
+    }
 
     const r = await aiDatasetService.bulkDelete(selectedGuildId.value!, idsToDelete);
     success(`${r.deleted} messages exportés et supprimés. (${safeRows.length} safe, ${severeRows.length} severe)`);
