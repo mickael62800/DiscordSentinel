@@ -27,8 +27,15 @@ function isWorker(botName: string): boolean {
   return botName.endsWith("-worker");
 }
 
+// Modules qui disposent d'une page de config dediee (surface unique) et ne
+// doivent donc PAS apparaitre dans la config generique (evite le double
+// reglage). welcome-bot est entierement gere par la page /welcome.
+const DEDICATED_CONFIG_BOTS = new Set(["welcome-bot"]);
+
 const moduleDefinitions = computed(() =>
-  definitions.value.filter((d) => !isWorker(d.bot_name)),
+  definitions.value.filter(
+    (d) => !isWorker(d.bot_name) && !DEDICATED_CONFIG_BOTS.has(d.bot_name),
+  ),
 );
 const workerDefinitions = computed(() =>
   definitions.value.filter((d) => isWorker(d.bot_name)),

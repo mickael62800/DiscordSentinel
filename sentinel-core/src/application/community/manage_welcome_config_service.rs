@@ -110,6 +110,24 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         if let Some(v) = patch.age_ban_message {
             current.age_ban_message = v;
         }
+        if let Some(v) = patch.age_min {
+            current.age_min = v;
+        }
+        if let Some(v) = patch.age_max {
+            current.age_max = v;
+        }
+        if let Some(v) = patch.age_ban_days_per_year {
+            current.age_ban_days_per_year = v;
+        }
+        if let Some(v) = patch.age_ban_log_channel_id {
+            current.age_ban_log_channel_id = Some(v);
+        }
+        if let Some(v) = patch.leave_embed_color {
+            current.leave_embed_color = v;
+        }
+        if let Some(v) = patch.rules_embed_color {
+            current.rules_embed_color = v;
+        }
         if let Some(v) = patch.counter_enabled {
             current.counter_enabled = v;
         }

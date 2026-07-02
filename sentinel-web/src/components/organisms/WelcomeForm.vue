@@ -31,17 +31,23 @@ const draft = reactive({
   leave_title: "",
   leave_image_url: "",
   leave_footer_text: "",
+  leave_embed_color: "#e74c3c",
   // Rules
   rules_enabled: false,
   rules_channel_id: "",
   rules_message: "",
   rules_role_id: "",
   rules_button_label: "",
+  rules_embed_color: "#5865f2",
   age_check_enabled: false,
   age_minimum: 20,
   unverified_role_id: "",
   age_modal_question: "",
   age_ban_message: "",
+  age_min: 5,
+  age_max: 120,
+  age_ban_days_per_year: 365,
+  age_ban_log_channel_id: "",
   // Counter
   counter_enabled: false,
   counter_channel_id: "",
@@ -83,16 +89,22 @@ watch(
     draft.leave_title = c.leave_title;
     draft.leave_image_url = c.leave_image_url;
     draft.leave_footer_text = c.leave_footer_text;
+    draft.leave_embed_color = c.leave_embed_color || "#e74c3c";
     draft.rules_enabled = c.rules_enabled;
     draft.rules_channel_id = c.rules_channel_id ?? "";
     draft.rules_message = c.rules_message;
     draft.rules_role_id = c.rules_role_id ?? "";
     draft.rules_button_label = c.rules_button_label;
+    draft.rules_embed_color = c.rules_embed_color || "#5865f2";
     draft.age_check_enabled = c.age_check_enabled;
     draft.age_minimum = c.age_minimum;
     draft.unverified_role_id = c.unverified_role_id ?? "";
     draft.age_modal_question = c.age_modal_question;
     draft.age_ban_message = c.age_ban_message;
+    draft.age_min = c.age_min;
+    draft.age_max = c.age_max;
+    draft.age_ban_days_per_year = c.age_ban_days_per_year;
+    draft.age_ban_log_channel_id = c.age_ban_log_channel_id ?? "";
     draft.counter_enabled = c.counter_enabled;
     draft.counter_channel_id = c.counter_channel_id ?? "";
     draft.counter_format = c.counter_format;
@@ -137,16 +149,22 @@ async function onSave() {
     leave_title: draft.leave_title,
     leave_image_url: draft.leave_image_url,
     leave_footer_text: draft.leave_footer_text,
+    leave_embed_color: draft.leave_embed_color,
     rules_enabled: draft.rules_enabled,
     rules_channel_id: draft.rules_channel_id || null,
     rules_message: draft.rules_message,
     rules_role_id: draft.rules_role_id || null,
     rules_button_label: draft.rules_button_label,
+    rules_embed_color: draft.rules_embed_color,
     age_check_enabled: draft.age_check_enabled,
     age_minimum: draft.age_minimum,
     unverified_role_id: draft.unverified_role_id || null,
     age_modal_question: draft.age_modal_question,
     age_ban_message: draft.age_ban_message,
+    age_min: draft.age_min,
+    age_max: draft.age_max,
+    age_ban_days_per_year: draft.age_ban_days_per_year,
+    age_ban_log_channel_id: draft.age_ban_log_channel_id || null,
     counter_enabled: draft.counter_enabled,
     counter_channel_id: draft.counter_channel_id || null,
     counter_format: draft.counter_format,
@@ -243,6 +261,9 @@ async function onSave() {
         <label>Texte du bouton
           <AppInput v-model="draft.rules_button_label" placeholder="J'ai lu les règles" />
         </label>
+        <label>Couleur du panneau (hex)
+          <AppInput v-model="draft.rules_embed_color" placeholder="5865f2" />
+        </label>
         <label class="full">Message
           <AppTextarea v-model="draft.rules_message" :rows="6" />
         </label>
@@ -271,6 +292,18 @@ async function onSave() {
           </label>
           <label class="full">Message de bannissement
             <AppTextarea v-model="draft.age_ban_message" :rows="3" placeholder="Tu dois avoir au moins {min} ans. Reviens dans {annees} an(s)." />
+          </label>
+          <label>Âge minimum saisissable
+            <AppInput v-model.number="draft.age_min" type="number" :min="0" :max="120" />
+          </label>
+          <label>Âge maximum saisissable
+            <AppInput v-model.number="draft.age_max" type="number" :min="0" :max="200" />
+          </label>
+          <label>Jours de ban par année manquante
+            <AppInput v-model.number="draft.age_ban_days_per_year" type="number" :min="1" :max="366" />
+          </label>
+          <label>Salon de log des bans d'âge
+            <ChannelSelect v-model="draft.age_ban_log_channel_id" :guild-id="guildIdFilter ?? null" />
           </label>
         </template>
 
@@ -367,6 +400,9 @@ async function onSave() {
         </label>
         <label>Image (URL)
           <AppInput v-model="draft.leave_image_url" />
+        </label>
+        <label>Couleur embed (hex)
+          <AppInput v-model="draft.leave_embed_color" placeholder="e74c3c" />
         </label>
         <label class="full">Message
           <AppTextarea v-model="draft.leave_message" :rows="6" />

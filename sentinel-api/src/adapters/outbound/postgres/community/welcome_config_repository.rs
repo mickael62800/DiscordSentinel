@@ -60,6 +60,7 @@ impl From<Row> for WelcomeConfigData {
             rules_message: r.rules_message,
             rules_role_id: r.rules_role_id,
             rules_button_label: r.rules_button_label,
+            rules_embed_color: "5865f2".into(),
             // Verification d'age : Row legacy ne porte pas ces colonnes,
             // defaults ici (lecture reelle via overlay_with_bot_config).
             age_check_enabled: false,
@@ -69,6 +70,12 @@ impl From<Row> for WelcomeConfigData {
             age_ban_message:
                 "Tu dois avoir au moins {min} ans pour rejoindre ce serveur. Tu pourras revenir dans {annees} an(s)."
                     .into(),
+            // Bornes/ban de la verification d'age : Row legacy ne porte pas ces
+            // colonnes, defaults ici (lecture reelle via overlay_with_bot_config).
+            age_min: 5,
+            age_max: 120,
+            age_ban_days_per_year: 365,
+            age_ban_log_channel_id: None,
             counter_enabled: r.counter_enabled,
             counter_channel_id: r.counter_channel_id,
             counter_format: r.counter_format,
@@ -92,6 +99,7 @@ impl From<Row> for WelcomeConfigData {
             leave_title: "Au revoir...".into(),
             leave_image_url: "".into(),
             leave_footer_text: "{count} membres".into(),
+            leave_embed_color: "e74c3c".into(),
             anniversary_title: "Joyeux anniversaire !".into(),
             anniversary_image_url: "".into(),
             anniversary_footer_text: "{count} membres".into(),
@@ -116,6 +124,7 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         rules_message: "Lis les regles et clique sur le bouton pour acceder au serveur.".into(),
         rules_role_id: None,
         rules_button_label: "J'accepte les regles".into(),
+        rules_embed_color: "5865f2".into(),
         age_check_enabled: false,
         age_minimum: 20,
         unverified_role_id: None,
@@ -123,6 +132,10 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         age_ban_message:
             "Tu dois avoir au moins {min} ans pour rejoindre ce serveur. Tu pourras revenir dans {annees} an(s)."
                 .into(),
+        age_min: 5,
+        age_max: 120,
+        age_ban_days_per_year: 365,
+        age_ban_log_channel_id: None,
         counter_enabled: false,
         counter_channel_id: None,
         counter_format: "Membres : {count}".into(),
@@ -143,6 +156,7 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         leave_title: "Au revoir...".into(),
         leave_image_url: "".into(),
         leave_footer_text: "{count} membres".into(),
+        leave_embed_color: "e74c3c".into(),
         anniversary_title: "Joyeux anniversaire !".into(),
         anniversary_image_url: "".into(),
         anniversary_footer_text: "{count} membres".into(),
@@ -222,6 +236,34 @@ fn overlay_with_bot_config(
             "age_ban_message" => {
                 if !v.is_empty() {
                     d.age_ban_message = v;
+                }
+            }
+            "age_min" => {
+                if let Ok(n) = v.parse::<i32>() {
+                    d.age_min = n;
+                }
+            }
+            "age_max" => {
+                if let Ok(n) = v.parse::<i32>() {
+                    d.age_max = n;
+                }
+            }
+            "age_ban_days_per_year" => {
+                if let Ok(n) = v.parse::<i32>() {
+                    d.age_ban_days_per_year = n;
+                }
+            }
+            "age_ban_log_channel_id" => {
+                d.age_ban_log_channel_id = if v.is_empty() { None } else { Some(v) }
+            }
+            "leave_embed_color" => {
+                if !v.is_empty() {
+                    d.leave_embed_color = v;
+                }
+            }
+            "rules_embed_color" => {
+                if !v.is_empty() {
+                    d.rules_embed_color = v;
                 }
             }
             "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
@@ -398,6 +440,12 @@ pub(super) fn build_welcome_config_kvs(d: &WelcomeConfigData) -> Vec<(&'static s
         ("unverified_role_id", opt(&d.unverified_role_id)),
         ("age_modal_question", d.age_modal_question.clone()),
         ("age_ban_message", d.age_ban_message.clone()),
+        ("age_min", d.age_min.to_string()),
+        ("age_max", d.age_max.to_string()),
+        ("age_ban_days_per_year", d.age_ban_days_per_year.to_string()),
+        ("age_ban_log_channel_id", opt(&d.age_ban_log_channel_id)),
+        ("leave_embed_color", d.leave_embed_color.clone()),
+        ("rules_embed_color", d.rules_embed_color.clone()),
         ("counter_enabled", b(d.counter_enabled)),
         ("counter_channel_id", opt(&d.counter_channel_id)),
         ("counter_format", d.counter_format.clone()),

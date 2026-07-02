@@ -28,12 +28,14 @@ export interface WelcomeConfig {
   leave_title: string;
   leave_image_url: string;
   leave_footer_text: string;
+  leave_embed_color: string;
 
   rules_enabled: boolean;
   rules_channel_id: string | null;
   rules_message: string;
   rules_role_id: string | null;
   rules_button_label: string;
+  rules_embed_color: string;
 
   // Verification d'age au reglement.
   age_check_enabled: boolean;
@@ -41,6 +43,11 @@ export interface WelcomeConfig {
   unverified_role_id: string | null;
   age_modal_question: string;
   age_ban_message: string;
+  // Bornes de saisie + parametrage du ban (lues directement par le bot).
+  age_min: number;
+  age_max: number;
+  age_ban_days_per_year: number;
+  age_ban_log_channel_id: string | null;
 
   counter_enabled: boolean;
   counter_channel_id: string | null;

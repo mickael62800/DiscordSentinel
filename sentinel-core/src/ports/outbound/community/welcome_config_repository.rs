@@ -22,12 +22,21 @@ pub struct WelcomeConfigData {
     pub rules_message: String,
     pub rules_role_id: Option<String>,
     pub rules_button_label: String,
+    pub rules_embed_color: String,
     // Verification d'age au reglement.
     pub age_check_enabled: bool,
     pub age_minimum: i32,
     pub unverified_role_id: Option<String>,
     pub age_modal_question: String,
     pub age_ban_message: String,
+    // Verification d'age — bornes de saisie + parametrage du ban. Ces cles sont
+    // lues DIRECTEMENT par le bot via get_guild_config_for("welcome-bot") (elles
+    // ne transitent PAS par le proto gRPC) ; le repo doit seulement les
+    // (re)ecrire dans bot_guild_config pour que la lecture directe du bot les voie.
+    pub age_min: i32,
+    pub age_max: i32,
+    pub age_ban_days_per_year: i32,
+    pub age_ban_log_channel_id: Option<String>,
     pub counter_enabled: bool,
     pub counter_channel_id: Option<String>,
     pub counter_format: String,
@@ -50,6 +59,7 @@ pub struct WelcomeConfigData {
     pub leave_title: String,
     pub leave_image_url: String,
     pub leave_footer_text: String,
+    pub leave_embed_color: String,
     // Embed enrichi — anniversaire
     pub anniversary_title: String,
     pub anniversary_image_url: String,
