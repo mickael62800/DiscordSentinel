@@ -412,6 +412,21 @@ pub async fn execute_ban(
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
+    if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission BAN_MEMBERS requise pour /unban.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(user = %command.user.name, "Tentative /unban sans permission");
+        return;
+    }
+
     let user_id_str =
         crate::shared::discord_helpers::option_str(&command.data.options, "user_id").unwrap_or("0");
 

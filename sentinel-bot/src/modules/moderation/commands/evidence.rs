@@ -55,6 +55,21 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission de moderation requise pour /evidence.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(user = %command.user.name, "Tentative /evidence sans permission");
+        return;
+    }
+
     if let Err(e) = command
         .create_response(
             &ctx.http,

@@ -150,6 +150,45 @@ pub(super) async fn handle_reject(ctx: &Context, component: &ComponentInteractio
         None => return,
     };
 
+    if let Some(guild_id) = component.guild_id {
+        // Fail-closed : si le membre ou ses permissions ne peuvent pas etre
+        // resolus (cache miss), on refuse au lieu de laisser passer.
+        let member = match guild_id.member(&ctx.http, component.user.id).await {
+            Ok(m) => m,
+            Err(_) => {
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Permissions indisponibles, reessaie.")
+                        .ephemeral(true),
+                );
+                let _ = component.create_response(&ctx.http, response).await;
+                return;
+            }
+        };
+        #[allow(deprecated)]
+        let perms = match member.permissions(&ctx.cache) {
+            Ok(p) => p,
+            Err(_) => {
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Permissions indisponibles, reessaie.")
+                        .ephemeral(true),
+                );
+                let _ = component.create_response(&ctx.http, response).await;
+                return;
+            }
+        };
+        if !perms.moderate_members() {
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Tu n'as pas la permission de rejeter des actions.")
+                    .ephemeral(true),
+            );
+            let _ = component.create_response(&ctx.http, response).await;
+            return;
+        }
+    }
+
     if let Some((_, pending)) = pending_actions.remove(&pending_id) {
         if let Some(api) = data.get::<ModerationApiKey>() {
             api.resolve_pending_action(&pending_id, "rejected", &component.user.id.to_string())

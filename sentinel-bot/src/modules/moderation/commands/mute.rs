@@ -416,6 +416,21 @@ pub async fn execute_mute(
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MODERATE_MEMBERS requise pour /unmute.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(user = %command.user.name, "Tentative /unmute sans permission");
+        return;
+    }
+
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => {

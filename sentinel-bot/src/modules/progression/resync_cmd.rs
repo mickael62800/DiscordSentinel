@@ -80,6 +80,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    let has_perms = command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(Permissions::MANAGE_GUILD) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false);
+    if !has_perms {
+        reply_ephemeral(
+            ctx,
+            command,
+            "Permission MANAGE_GUILD requise pour /progression-resync.",
+        )
+        .await;
+        return;
+    }
+
     let sub = match command.data.options.first() {
         Some(s) => s,
         None => {

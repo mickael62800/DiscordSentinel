@@ -3,11 +3,57 @@
 
 use serenity::all::{
     ComponentInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage,
+    Permissions,
 };
 use serenity::model::id::UserId;
 use tracing::warn;
 
 use super::{commands, risk_check};
+
+/// Re-verifie a l'execution que le membre qui clique possede la permission de
+/// moderation `required` (les boutons ne sont pas couverts par
+/// `default_member_permissions`). Fail-closed : si le membre ou ses
+/// permissions ne peuvent pas etre resolus, on refuse. Retourne `true` si le
+/// clic est autorise, `false` si une reponse de refus a deja ete envoyee.
+async fn ensure_mod_permission(
+    ctx: &Context,
+    component: &ComponentInteraction,
+    required: Permissions,
+) -> bool {
+    async fn deny(ctx: &Context, component: &ComponentInteraction, msg: &str) {
+        let response = CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .content(msg)
+                .ephemeral(true),
+        );
+        let _ = component.create_response(&ctx.http, response).await;
+    }
+
+    let Some(guild_id) = component.guild_id else {
+        deny(ctx, component, "Tu n'as pas la permission.").await;
+        return false;
+    };
+    let member = match guild_id.member(&ctx.http, component.user.id).await {
+        Ok(m) => m,
+        Err(_) => {
+            deny(ctx, component, "Permissions indisponibles, reessaie.").await;
+            return false;
+        }
+    };
+    #[allow(deprecated)]
+    let perms = match member.permissions(&ctx.cache) {
+        Ok(p) => p,
+        Err(_) => {
+            deny(ctx, component, "Permissions indisponibles, reessaie.").await;
+            return false;
+        }
+    };
+    if !perms.contains(required) && !perms.contains(Permissions::ADMINISTRATOR) {
+        deny(ctx, component, "Tu n'as pas la permission.").await;
+        return false;
+    }
+    true
+}
 
 pub(super) async fn handle_risky_confirm(ctx: &Context, component: &ComponentInteraction) {
     let pending_id = match component
@@ -43,6 +89,23 @@ pub(super) async fn handle_risky_confirm(ctx: &Context, component: &ComponentInt
             return;
         }
     };
+
+    // Re-check permission a l'execution : ce bouton declenche un ban/mute
+    // reel. On exige la meme permission que la commande correspondante
+    // (/ban -> BAN_MEMBERS, /mute -> MODERATE_MEMBERS). Fail-closed.
+    let required = match pending.kind {
+        risk_check::PendingKind::Ban { .. } => Permissions::BAN_MEMBERS,
+        risk_check::PendingKind::Mute { .. } => Permissions::MODERATE_MEMBERS,
+    };
+    if !ensure_mod_permission(ctx, component, required).await {
+        // On remet l'action en attente pour ne pas la perdre a cause d'un
+        // clic non autorise.
+        let data = ctx.data.read().await;
+        if let Some(store) = data.get::<risk_check::RiskyPendingKey>() {
+            store.insert(pending_id, pending);
+        }
+        return;
+    }
 
     let ack = CreateInteractionResponse::UpdateMessage(
         CreateInteractionResponseMessage::new()
@@ -124,6 +187,12 @@ pub(super) async fn handle_risky_cancel(ctx: &Context, component: &ComponentInte
         Some(id) => id.to_string(),
         None => return,
     };
+
+    // Meme classe de risque : seul un moderateur peut annuler une confirmation
+    // en attente. Fail-closed.
+    if !ensure_mod_permission(ctx, component, Permissions::MODERATE_MEMBERS).await {
+        return;
+    }
 
     let removed = {
         let data = ctx.data.read().await;

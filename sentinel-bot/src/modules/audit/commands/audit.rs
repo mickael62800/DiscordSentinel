@@ -50,7 +50,27 @@ pub fn register() -> CreateCommand {
         ))
 }
 
+/// Verifie (fail-closed) que l'appelant a MODERATE_MEMBERS (ou ADMINISTRATOR).
+fn has_mod_permission(command: &CommandInteraction) -> bool {
+    use serenity::all::Permissions;
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(Permissions::MODERATE_MEMBERS) || p.contains(Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false)
+}
+
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    if !has_mod_permission(command) {
+        let embed = info_embed("Audit")
+            .description("\u{274c} Permission de moderation requise pour cette commande.");
+        reply_ephemeral_embed(ctx, command, embed).await;
+        return;
+    }
+
     let sub = command
         .data
         .options

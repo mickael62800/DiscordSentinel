@@ -68,6 +68,21 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission de moderation requise pour /review.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(user = %command.user.name, "Tentative /review sans permission");
+        return;
+    }
+
     let sub = command.data.options.iter().find_map(|o| match &o.value {
         CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
         _ => None,

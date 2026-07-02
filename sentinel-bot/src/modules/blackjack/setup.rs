@@ -9,6 +9,17 @@ use tracing::{info, warn};
 
 pub const PANEL_BUTTON_ID: &str = "bj_panel_play";
 
+/// Verifie (fail-closed) que l'appelant a MANAGE_GUILD (ou ADMINISTRATOR).
+fn has_manage_guild(command: &CommandInteraction) -> bool {
+    use serenity::all::Permissions;
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(Permissions::MANAGE_GUILD) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false)
+}
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("blackjack-setup")
         .description("Deployer le panneau de Blackjack dans ce salon (admin)")
@@ -16,6 +27,20 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    if !has_manage_guild(command) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MANAGE_GUILD requise pour /blackjack-setup.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
     let channel_id = command.channel_id;
 
     let embed = CreateEmbed::new()
