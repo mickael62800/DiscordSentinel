@@ -5,6 +5,7 @@ import { useWelcome } from "@/composables/useWelcome";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import AppToggle from "@/components/atoms/AppToggle.vue";
 import ChannelSelect from "@/components/atoms/ChannelSelect.vue";
+import VoiceChannelSelect from "@/components/atoms/VoiceChannelSelect.vue";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
@@ -291,8 +292,8 @@ async function onSave() {
         </label>
       </legend>
       <div class="grid" :class="{ 'grid--disabled': !draft.counter_enabled }">
-        <label>Salon
-          <ChannelSelect v-model="draft.counter_channel_id" :guild-id="guildIdFilter ?? null" />
+        <label>Salon (vocal)
+          <VoiceChannelSelect v-model="draft.counter_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Format
           <AppInput v-model="draft.counter_format" placeholder="👥 {count} membres" />
@@ -313,8 +314,8 @@ async function onSave() {
         de membres actuellement connectés en vocal. Utilise {count}.
       </p>
       <div class="grid" :class="{ 'grid--disabled': !draft.voice_counter_enabled }">
-        <label>Salon
-          <ChannelSelect v-model="draft.voice_counter_channel_id" :guild-id="guildIdFilter ?? null" />
+        <label>Salon (vocal)
+          <VoiceChannelSelect v-model="draft.voice_counter_channel_id" :guild-id="guildIdFilter ?? null" />
         </label>
         <label>Format
           <AppInput v-model="draft.voice_counter_format" placeholder="En Vocal : {count}" />
