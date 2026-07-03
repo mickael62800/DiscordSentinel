@@ -333,7 +333,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                         super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
                         match guild_id
-                            .ban_with_reason(&ctx.http, target.id, 1, reason)
+                            .ban_with_reason(&ctx.http, target.id, 7, reason)
                             .await
                         {
                             Err(e) => {

@@ -156,7 +156,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let purge_opt = crate::shared::discord_helpers::option_i64(options, "purge");
     let ban_delete_message_days = match purge_opt {
         Some(n) => n.clamp(0, 7) as u8,
-        None => BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8,
+        None => BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 7) as u8,
     };
 
     if let Some(risk_reason) = risk_check::check_target_risk(ctx, guild_id, &target).await {

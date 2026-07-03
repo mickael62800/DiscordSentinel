@@ -384,11 +384,11 @@ pub(crate) async fn apply_member_sanction(
                                 crate::shared::api_client::BaseApiClient::config_u64(
                                     &cfg,
                                     "ban_delete_message_days",
-                                    1,
+                                    7,
                                 ) as u8
                             })
-                            .unwrap_or(1),
-                        None => 1,
+                            .unwrap_or(7),
+                        None => 7,
                     }
                 };
                 if let Err(e) = gid

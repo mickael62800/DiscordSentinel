@@ -360,7 +360,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
             CommandDataOptionValue::Integer(n) => Some((*n).clamp(0, 7) as u8),
             _ => None,
         })
-        .unwrap_or(1);
+        .unwrap_or(7);
 
     let _ = command
         .edit_response(
