@@ -119,6 +119,17 @@ async fn fetch_ranking_deltas(
     guild_id: &str,
     baseline_period_ym: &str,
 ) -> Result<Vec<(String, i64, i64)>, ApiError> {
+    // Roles exclus du classement (CSV d'IDs). Les membres portant un de ces
+    // roles (colonne guild_members.roles, JSONB array d'IDs) sont ecartes.
+    // Un array vide n'exclut personne (l'operateur `?|` renvoie false).
+    let excluded_roles: Vec<String> = read_cfg(state, guild_id, "monthly_ranking_excluded_roles")
+        .await
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     sqlx::query_as(
         r#"SELECT ul.user_id,
                   (ul.xp_text  - COALESCE(s.xp_text, 0))  AS d_text,
@@ -126,10 +137,17 @@ async fn fetch_ranking_deltas(
            FROM user_levels ul
            LEFT JOIN user_levels_monthly_snapshot s
              ON s.guild_id = ul.guild_id AND s.user_id = ul.user_id AND s.period_ym = $2
-           WHERE ul.guild_id = $1"#,
+           WHERE ul.guild_id = $1
+             AND NOT EXISTS (
+               SELECT 1 FROM guild_members gm
+               WHERE gm.guild_id = ul.guild_id
+                 AND gm.user_id = ul.user_id
+                 AND gm.roles ?| $3::text[]
+             )"#,
     )
     .bind(guild_id)
     .bind(baseline_period_ym)
+    .bind(&excluded_roles)
     .fetch_all(&state.pg_pool)
     .await
     .map_err(|e| ApiError(DomainError::Internal(e.to_string())))

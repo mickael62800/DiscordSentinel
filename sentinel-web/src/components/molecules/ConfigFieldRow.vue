@@ -42,6 +42,8 @@ const ROLE_LIST_KEYS = new Set<string>([
   "whitelist_roles",
   "exempt_roles",
   "double_xp_roles",
+  // Progression : roles exclus du classement mensuel.
+  "monthly_ranking_excluded_roles",
   // Welcome : "roles apres validation du reglement" -> liste de roles.
   "rules_role_id",
 ]);
