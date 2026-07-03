@@ -39,9 +39,8 @@ fn command_module(name: &str) -> &'static str {
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history" | "note" | "call"
         | "signalement" | "context" | "appeal" | "expirations" | "compare" | "modstats"
-        | "evidence" | "review" | "template" | "transcript" | "export" | "massmute" | "massban" => {
-            "moderation"
-        }
+        | "evidence" | "review" | "template" | "transcript" | "export" | "massmute" | "massban"
+        | "copilote" => "moderation",
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
@@ -519,7 +518,8 @@ impl EventHandler for Handler {
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
                         | "note" | "call" | "signalement" | "context" | "appeal"
                         | "expirations" | "compare" | "modstats" | "evidence" | "review"
-                        | "template" | "transcript" | "export" | "massmute" | "massban" => {
+                        | "template" | "transcript" | "export" | "massmute" | "massban"
+                        | "copilote" => {
                             modules::moderation::handle_command(&ctx, &command).await
                         }
                         "ticket" | "ticket-admin" => {
