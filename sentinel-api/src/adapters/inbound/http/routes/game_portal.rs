@@ -1,7 +1,7 @@
 //! Routes Game Portal — toutes les actions sensibles passent par
 //! component_gates (configurable depuis la page RBAC).
 
-use axum::routing::{get, post, put};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 
 use super::super::handlers;
@@ -60,6 +60,28 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/games/servers/{server_id}/sessions",
             get(handlers::game::sessions::list_sessions),
+        )
+        // Evenements de serveur : role par template, inscriptions, salons.
+        .route(
+            "/api/games/{guild_id}/template-settings",
+            get(handlers::game::session_events::list_template_settings),
+        )
+        .route(
+            "/api/games/{guild_id}/template-settings/{slug}",
+            put(handlers::game::session_events::set_template_role),
+        )
+        .route(
+            "/api/games/servers/{server_id}/registrations",
+            get(handlers::game::session_events::list_registrations)
+                .post(handlers::game::session_events::register_player),
+        )
+        .route(
+            "/api/games/servers/{server_id}/registrations/{user_id}",
+            delete(handlers::game::session_events::unregister_player),
+        )
+        .route(
+            "/api/games/servers/{server_id}/session-channels",
+            patch(handlers::game::session_events::set_session_channels),
         )
         // Endpoints internes pour game-portal-worker (auth via API key,
         // pas de RBAC user — le worker est de confiance).

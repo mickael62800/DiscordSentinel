@@ -45,6 +45,10 @@ struct ServerRow {
     stopped_at: Option<DateTime<Utc>>,
     restart_attempts: i32,
     last_restart_at: Option<DateTime<Utc>>,
+    text_channel_id: Option<String>,
+    voice_channel_id: Option<String>,
+    ip_reveal_at: Option<DateTime<Utc>>,
+    ip_revealed: bool,
 }
 
 impl TryFrom<ServerRow> for GameServer {
@@ -78,6 +82,10 @@ impl TryFrom<ServerRow> for GameServer {
             stopped_at: r.stopped_at,
             restart_attempts: r.restart_attempts,
             last_restart_at: r.last_restart_at,
+            text_channel_id: r.text_channel_id,
+            voice_channel_id: r.voice_channel_id,
+            ip_reveal_at: r.ip_reveal_at,
+            ip_revealed: r.ip_revealed,
         })
     }
 }
@@ -86,7 +94,8 @@ const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id
      host_port, rcon_port, rcon_password, volume_name, allocated_memory_mb, \
      owner_user_id, idle_shutdown_days, last_active_at, last_player_count, \
      last_error, created_at, updated_at, started_at, stopped_at, \
-     restart_attempts, last_restart_at";
+     restart_attempts, last_restart_at, \
+     text_channel_id, voice_channel_id, ip_reveal_at, ip_revealed";
 
 #[async_trait]
 impl GameServerRepository for PgGameServerRepository {
@@ -377,5 +386,35 @@ impl GameServerRepository for PgGameServerRepository {
             active_count: i32::try_from(row.0).unwrap_or(i32::MAX),
             last_activity_at: row.1,
         })
+    }
+
+    async fn set_session_channels(
+        &self,
+        id: Uuid,
+        text_channel_id: Option<&str>,
+        voice_channel_id: Option<&str>,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE game_servers SET text_channel_id = $2, voice_channel_id = $3, updated_at = NOW() \
+             WHERE id = $1",
+        )
+        .bind(id)
+        .bind(text_channel_id)
+        .bind(voice_channel_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("set_session_channels"))?;
+        Ok(())
+    }
+
+    async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE game_servers SET ip_revealed = true, updated_at = NOW() WHERE id = $1",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("mark_ip_revealed"))?;
+        Ok(())
     }
 }

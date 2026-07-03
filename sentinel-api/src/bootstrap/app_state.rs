@@ -727,6 +727,12 @@ pub async fn build_app_state(
     let game_template_repo = Arc::new(
         crate::adapters::outbound::postgres::game::template_repository::PgGameTemplateRepository::new(pg_pool.clone()),
     );
+    let game_template_settings_repo = Arc::new(
+        crate::adapters::outbound::postgres::game::session_repository::PgGameTemplateSettingsRepository::new(pg_pool.clone()),
+    );
+    let game_session_reg_repo = Arc::new(
+        crate::adapters::outbound::postgres::game::session_repository::PgGameSessionRegistrationRepository::new(pg_pool.clone()),
+    );
     let game_server_repo = Arc::new(
         crate::adapters::outbound::postgres::game::server_repository::PgGameServerRepository::new(
             pg_pool.clone(),
@@ -910,6 +916,8 @@ pub async fn build_app_state(
         game_templates_uc,
         game_server_repo: game_server_repo_dyn,
         game_template_repo: game_template_repo_dyn,
+        game_template_settings_repo,
+        game_session_reg_repo,
         game_audit_repo: game_audit_repo_dyn,
         game_session_repo,
         game_container_runtime: container_runtime,

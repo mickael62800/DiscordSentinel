@@ -96,6 +96,15 @@ pub struct GameServer {
     pub restart_attempts: i32,
     /// Timestamp du dernier redemarrage auto tente (pour le backoff).
     pub last_restart_at: Option<DateTime<Utc>>,
+    // ── Session Discord (evenement de serveur) ──
+    /// Salon textuel prive cree pour cette session (None si pas cree).
+    pub text_channel_id: Option<String>,
+    /// Salon vocal prive cree pour cette session.
+    pub voice_channel_id: Option<String>,
+    /// Date de revelation de l'IP (None = pas de revelation programmee).
+    pub ip_reveal_at: Option<DateTime<Utc>>,
+    /// True une fois l'IP revelee dans le salon.
+    pub ip_revealed: bool,
 }
 
 /// Nombre maximal PAR DEFAUT de redemarrages auto consecutifs avant abandon

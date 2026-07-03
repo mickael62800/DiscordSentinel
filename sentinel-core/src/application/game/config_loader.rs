@@ -53,6 +53,11 @@ pub struct GamePortalConfig {
     pub stop_timeout_secs: u32,
     /// Nombre max de lignes de logs recuperables en une requete (borne dure).
     pub max_log_lines: u32,
+    // Sessions de jeu (salons Discord + revelation IP).
+    pub session_category_id: Option<String>,
+    pub ip_reveal_default_days: i32,
+    pub session_daily_ping_enabled: bool,
+    pub session_daily_ping_hour: i32,
 }
 
 fn find<'a>(items: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
@@ -190,6 +195,16 @@ pub async fn load_game_portal_config(
         // Borne dure : jamais plus de 5000 lignes en une requete (protege la
         // memoire / le payload, meme si l'admin configure une valeur absurde).
         max_log_lines: parse_u32(find(&entries, "max_log_lines"), 1000).min(5000),
+        session_category_id: find(&entries, "session_category_id")
+            .filter(|s| !s.is_empty())
+            .map(String::from),
+        ip_reveal_default_days: parse_i32(find(&entries, "ip_reveal_default_days"), 7).clamp(0, 365),
+        session_daily_ping_enabled: parse_bool(
+            find(&entries, "session_daily_ping_enabled"),
+            false,
+        ),
+        session_daily_ping_hour: parse_i32(find(&entries, "session_daily_ping_hour"), 18)
+            .clamp(0, 23),
     })
 }
 

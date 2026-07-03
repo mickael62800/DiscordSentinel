@@ -137,6 +137,8 @@ pub struct AppState {
     /// appeles par game-portal-worker (health/idle/reconcile).
     pub game_server_repo: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository>,
     pub game_template_repo: Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository>,
+    pub game_template_settings_repo: Arc<dyn crate::ports::outbound::game::game_session_repository::GameTemplateSettingsRepository>,
+    pub game_session_reg_repo: Arc<dyn crate::ports::outbound::game::game_session_repository::GameSessionRegistrationRepository>,
     pub game_audit_repo: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository>,
     pub game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository>,
     pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,

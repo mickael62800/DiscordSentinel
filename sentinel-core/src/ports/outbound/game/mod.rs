@@ -8,6 +8,7 @@ pub mod container_runtime;
 pub mod game_audit_repository;
 pub mod game_server_config_repository;
 pub mod game_server_repository;
+pub mod game_session_repository;
 pub mod game_template_repository;
 pub mod player_session_repository;
 pub mod port_allocator;

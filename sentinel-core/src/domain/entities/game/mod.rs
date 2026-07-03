@@ -8,4 +8,5 @@ pub mod config;
 pub mod player_session;
 pub mod quota;
 pub mod server;
+pub mod session;
 pub mod template;

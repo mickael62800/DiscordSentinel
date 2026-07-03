@@ -62,6 +62,17 @@ pub trait GameServerRepository: Send + Sync {
     /// soft-deleted) qui ont utilise ce template. Utilise par le job
     /// image-cleanup pour decider si l'image Docker peut etre supprimee.
     async fn template_usage(&self, template_id: uuid::Uuid) -> Result<TemplateUsage, DomainError>;
+
+    /// Enregistre les salons Discord (texte + vocal) crees pour la session.
+    async fn set_session_channels(
+        &self,
+        id: Uuid,
+        text_channel_id: Option<&str>,
+        voice_channel_id: Option<&str>,
+    ) -> Result<(), DomainError>;
+
+    /// Marque l'IP comme revelee (le job de revelation l'a publiee).
+    async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError>;
 }
 
 #[derive(Debug, Clone)]
