@@ -58,16 +58,6 @@ pub fn register() -> CreateCommand {
                 "user",
                 "Supprimer les messages d'un utilisateur (par membre OU par ID)",
             )
-            .add_sub_option(CreateCommandOption::new(
-                CommandOptionType::User,
-                "utilisateur",
-                "Membre cible (laisse vide si tu utilises user_id)",
-            ))
-            .add_sub_option(CreateCommandOption::new(
-                CommandOptionType::String,
-                "user_id",
-                "ID de l'utilisateur (utile pour un membre parti / banni)",
-            ))
             .add_sub_option(
                 CreateCommandOption::new(
                     CommandOptionType::Integer,
@@ -77,7 +67,17 @@ pub fn register() -> CreateCommand {
                 .min_int_value(1)
                 .max_int_value(100)
                 .required(true),
-            ),
+            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::User,
+                "utilisateur",
+                "Membre cible (laisse vide si tu utilises user_id)",
+            ))
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::String,
+                "user_id",
+                "ID de l'utilisateur (utile pour un membre parti / banni)",
+            )),
         )
         .add_option(
             CreateCommandOption::new(
