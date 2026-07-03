@@ -166,6 +166,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
 
         super::log_to_channel(ctx, &guild_id, summary_embed).await;
+
+        // DM d'information a la personne : tous ses avertissements ont ete retires.
+        if let Some(gid) = command.guild_id {
+            notify_unwarn_dm(ctx, gid, target_id).await;
+        }
         return;
     }
 
@@ -300,6 +305,17 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
                         "Moderation | Sentinel",
                     ));
                 super::log_to_channel(ctx, &guild_id.to_string(), log_embed).await;
+
+                // DM d'information a la personne : un avertissement a ete retire.
+                if let Some(uid) = component
+                    .message
+                    .embeds
+                    .first()
+                    .and_then(|e| e.description.as_deref())
+                    .and_then(first_user_mention)
+                {
+                    notify_unwarn_dm(ctx, guild_id, uid).await;
+                }
             }
         }
         Ok(false) => {
@@ -337,4 +353,48 @@ async fn edit_response(ctx: &Context, command: &CommandInteraction, content: &st
             serenity::builder::EditInteractionResponse::new().content(content),
         )
         .await;
+}
+
+/// Extrait le 1er user mentionne (`<@id>` ou `<@!id>`) d'un texte.
+fn first_user_mention(text: &str) -> Option<serenity::model::id::UserId> {
+    let start = text.find("<@")?;
+    let rest = &text[start + 2..];
+    let end = rest.find('>')?;
+    let digits: String = rest[..end].chars().filter(|c| c.is_ascii_digit()).collect();
+    digits
+        .parse::<u64>()
+        .ok()
+        .map(serenity::model::id::UserId::new)
+}
+
+/// Envoie un DM a la personne pour l'informer qu'un de ses avertissements a
+/// ete retire.
+async fn notify_unwarn_dm(
+    ctx: &Context,
+    guild_id: serenity::model::id::GuildId,
+    user_id: serenity::model::id::UserId,
+) {
+    let guild_name = guild_id
+        .to_partial_guild(&ctx.http)
+        .await
+        .map(|g| g.name)
+        .unwrap_or_else(|_| "le serveur".into());
+    if let Ok(user) = user_id.to_user(&ctx.http).await {
+        if let Ok(dm) = user.create_dm_channel(&ctx.http).await {
+            let embed = serenity::builder::CreateEmbed::new()
+                .title(format!("✅ Un avertissement retire sur **{guild_name}**"))
+                .description("Un de tes avertissements a ete retire par la moderation.")
+                .color(0x2ecc71)
+                .timestamp(serenity::model::Timestamp::now());
+            if let Err(e) = dm
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
+                warn!(error = %e, "Failed to send unwarn DM to user");
+            }
+        }
+    }
 }

@@ -498,6 +498,26 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     info!(target = %target_name, "Unmute applique");
 
+    // DM d'information a la personne : son mute a ete leve.
+    if let Some(user) = &target {
+        let guild_name = guild_id
+            .to_partial_guild(&ctx.http)
+            .await
+            .map(|g| g.name)
+            .unwrap_or_else(|_| "le serveur".into());
+        if let Ok(dm) = user.create_dm_channel(&ctx.http).await {
+            let dm_embed = success_embed(format!("🔊 Ton mute sur **{guild_name}** a ete leve"))
+                .description("Tu peux a nouveau ecrire et parler sur le serveur.")
+                .timestamp(serenity::model::Timestamp::now());
+            if let Err(e) = dm
+                .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
+                .await
+            {
+                warn!(error = %e, "Failed to send unmute DM to user");
+            }
+        }
+    }
+
     let unmute_embed = success_embed("🔊 Unmute")
         .field("Cible", format!("<@{target_id}>"), true)
         .field("Moderateur", format!("<@{}>", command.user.id), true)
