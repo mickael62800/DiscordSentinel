@@ -254,15 +254,16 @@ async fn defer_with_confirmation(
             .style(ButtonStyle::Secondary),
     ]);
 
+    // L'interaction a deja ete deferee (ephemere) au debut du handler : on
+    // EDITE la reponse differee au lieu de create_response (sinon Discord
+    // renvoie "Interaction has already been acknowledged" et le prompt de
+    // confirmation ne s'affiche jamais -> impossible de bannir une cible a risque).
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(vec![row])
-                    .ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new()
+                .embed(embed)
+                .components(vec![row]),
         )
         .await
     {

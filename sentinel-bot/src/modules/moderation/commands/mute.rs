@@ -240,15 +240,14 @@ async fn defer_with_confirmation(
             .style(ButtonStyle::Secondary),
     ]);
 
+    // Interaction deja deferee au debut du handler : on EDITE (sinon
+    // "Interaction has already been acknowledged" et le prompt ne s'affiche pas).
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(vec![row])
-                    .ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new()
+                .embed(embed)
+                .components(vec![row]),
         )
         .await
     {
