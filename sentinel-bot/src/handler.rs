@@ -175,6 +175,7 @@ impl EventHandler for Handler {
         // Games : consumer Redis pour deployer/rafraichir le panneau de jeux
         // (bouton "Deployer" du dashboard).
         modules::games::spawn(ctx.clone());
+        modules::game_portal::spawn(ctx.clone());
 
         // AI dataset : task de collecte (client-streaming gRPC longue duree).
         modules::ai_dataset::spawn_collector(ctx.clone()).await;
@@ -583,6 +584,8 @@ impl EventHandler for Handler {
                     modules::welcome::on_component(&ctx, &component).await;
                 } else if modules::games::handles_component(cid) {
                     modules::games::on_component(&ctx, &component).await;
+                } else if modules::game_portal::handles_component(cid) {
+                    modules::game_portal::on_component(&ctx, &component).await;
                 } else if modules::community::handles_component(cid) {
                     modules::community::on_component(&ctx, &component).await;
                 } else if modules::blackjack::handles_component(cid) {

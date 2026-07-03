@@ -11,6 +11,7 @@ pub mod command_channel;
 pub mod community;
 pub mod confessions;
 pub mod coude;
+pub mod game_portal;
 pub mod games;
 pub mod moderation;
 pub mod progression;

@@ -46,6 +46,11 @@ pub struct GameServerDto {
     pub created_at: DateTime<Utc>,
     pub started_at: Option<DateTime<Utc>>,
     pub stopped_at: Option<DateTime<Utc>>,
+    // Session Discord (evenement de serveur).
+    pub text_channel_id: Option<String>,
+    pub voice_channel_id: Option<String>,
+    pub ip_reveal_at: Option<DateTime<Utc>>,
+    pub ip_revealed: bool,
 }
 
 impl From<GameServer> for GameServerDto {
@@ -66,6 +71,10 @@ impl From<GameServer> for GameServerDto {
             created_at: s.created_at,
             started_at: s.started_at,
             stopped_at: s.stopped_at,
+            text_channel_id: s.text_channel_id,
+            voice_channel_id: s.voice_channel_id,
+            ip_reveal_at: s.ip_reveal_at,
+            ip_revealed: s.ip_revealed,
         }
     }
 }
