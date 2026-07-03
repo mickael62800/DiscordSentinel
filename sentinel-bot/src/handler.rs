@@ -29,7 +29,7 @@ fn command_module(name: &str) -> &'static str {
         "game" | "game-admin" => "games",
         "roles-panel" | "parrain" => "community",
         "audit" => "audit",
-        "level" | "stats" | "progression-resync" => "progression",
+        "level" | "stats" | "progression-resync" | "classement" => "progression",
         "blackjack-setup" => "blackjack",
         "slot-setup" => "slot",
         "wheel-setup" => "wheel",
@@ -504,7 +504,7 @@ impl EventHandler for Handler {
                             modules::community::handle_command(&ctx, &command).await
                         }
                         "audit" => modules::audit::handle_command(&ctx, &command).await,
-                        "level" | "stats" | "progression-resync" => {
+                        "level" | "stats" | "progression-resync" | "classement" => {
                             modules::progression::handle_command(&ctx, &command).await
                         }
                         "blackjack-setup" => {
