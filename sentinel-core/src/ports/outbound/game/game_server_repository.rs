@@ -73,6 +73,17 @@ pub trait GameServerRepository: Send + Sync {
 
     /// Marque l'IP comme revelee (le job de revelation l'a publiee).
     async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError>;
+
+    /// Sessions dont l'IP doit etre revelee maintenant (non revelee,
+    /// `ip_reveal_at <= now`, salon cree, non supprimee).
+    async fn list_ip_reveal_due(&self) -> Result<Vec<GameServer>, DomainError>;
+
+    /// Sessions en attente de revelation (IP encore masquee, salon cree) et
+    /// qui n'ont pas encore recu leur ping du jour. Pour le ping quotidien.
+    async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<GameServer>, DomainError>;
+
+    /// Marque qu'un ping quotidien vient d'etre emis pour cette session.
+    async fn mark_daily_ping(&self, id: Uuid) -> Result<(), DomainError>;
 }
 
 #[derive(Debug, Clone)]

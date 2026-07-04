@@ -101,6 +101,8 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         Some("game_server_stopped") | Some("game_server_deleted") => {
             on_stopped(ctx, &server_id).await
         }
+        Some("game_ip_reveal") => on_ip_reveal(ctx, &server_id).await,
+        Some("game_daily_ping") => on_daily_ping(ctx, &server_id).await,
         _ => {}
     }
 }
@@ -309,6 +311,145 @@ async fn on_stopped(ctx: &Context, server_id: &str) {
     )
     .await;
     tracing::info!(server_id, "game-portal: session fermee (salons supprimes)");
+}
+
+// ── Revelation d'IP (event worker) ──
+
+async fn on_ip_reveal(ctx: &Context, server_id: &str) {
+    let Some(base) = api(ctx).await else { return };
+    let Ok(detail) = base
+        .get_json::<ServerDetailResp>(&format!("/api/games/servers/{server_id}"))
+        .await
+    else {
+        return;
+    };
+    let server = detail.server;
+    let Some(text_ch) = server
+        .text_channel_id
+        .as_deref()
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(ChannelId::new)
+    else {
+        return;
+    };
+
+    let template: Option<TemplateResp> = base
+        .get_json(&format!("/api/games/templates/{}", server.template_id))
+        .await
+        .ok();
+    let game_name = template
+        .as_ref()
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| "Jeu".into());
+    let role_id = match template.as_ref().map(|t| t.slug.clone()) {
+        Some(slug) => resolve_role(&base, &server.guild_id, &slug).await,
+        None => None,
+    };
+
+    // Adresse : {host public}:{port} si l'hote est configure, sinon le port seul.
+    let cfg = base
+        .get_guild_config_for(&server.guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let host = cfg.get("session_public_host").cloned().unwrap_or_default();
+    let addr = match (host.trim().is_empty(), server.host_port) {
+        (false, Some(p)) => format!("`{}:{}`", host.trim(), p),
+        (true, Some(p)) => format!("port `{p}`"),
+        _ => "_communiquee par le staff_".to_string(),
+    };
+
+    let ping = role_id
+        .map(|r| format!("<@&{r}> "))
+        .unwrap_or_default();
+    let _ = text_ch
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().content(format!(
+                "{ping}🎉 Le serveur **{game_name}** est **OUVERT** ! Connexion : {addr}"
+            )),
+        )
+        .await;
+
+    // Met a jour le panneau epingle (IP desormais visible).
+    let regs: Vec<RegResp> = base
+        .get_json(&format!("/api/games/servers/{server_id}/registrations"))
+        .await
+        .unwrap_or_default();
+    let user_ids: Vec<String> = regs.into_iter().map(|r| r.user_id).collect();
+    let embed = build_panel_embed(&game_name, &server.name, &user_ids, None, true, server.host_port);
+    if let Ok(pins) = text_ch.pins(&ctx.http).await {
+        if let Some(m) = pins.into_iter().find(|m| !m.embeds.is_empty()) {
+            let _ = text_ch
+                .edit_message(
+                    &ctx.http,
+                    m.id,
+                    serenity::builder::EditMessage::new()
+                        .embed(embed)
+                        .components(vec![register_row(server_id)]),
+                )
+                .await;
+        }
+    }
+
+    tracing::info!(server_id, "game-portal: IP revelee");
+}
+
+// ── Ping quotidien (event worker) ──
+
+async fn on_daily_ping(ctx: &Context, server_id: &str) {
+    let Some(base) = api(ctx).await else { return };
+    let Ok(detail) = base
+        .get_json::<ServerDetailResp>(&format!("/api/games/servers/{server_id}"))
+        .await
+    else {
+        return;
+    };
+    let server = detail.server;
+    let Some(text_ch) = server
+        .text_channel_id
+        .as_deref()
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(ChannelId::new)
+    else {
+        return;
+    };
+
+    let template: Option<TemplateResp> = base
+        .get_json(&format!("/api/games/templates/{}", server.template_id))
+        .await
+        .ok();
+    let game_name = template
+        .as_ref()
+        .map(|t| t.name.clone())
+        .unwrap_or_else(|| "Jeu".into());
+    let role_id = match template.as_ref().map(|t| t.slug.clone()) {
+        Some(slug) => resolve_role(&base, &server.guild_id, &slug).await,
+        None => None,
+    };
+    let Some(rid) = role_id else { return };
+
+    // Jours restants avant la revelation.
+    let remaining = server.ip_reveal_at.as_deref().and_then(|d| {
+        chrono::DateTime::parse_from_rfc3339(d).ok().map(|dt| {
+            (dt.with_timezone(&chrono::Utc) - chrono::Utc::now())
+                .num_days()
+                .max(0)
+        })
+    });
+    let when = match remaining {
+        Some(0) => "aujourd'hui".to_string(),
+        Some(n) => format!("dans **{n}** jour(s)"),
+        None => "bientot".to_string(),
+    };
+
+    let _ = text_ch
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().content(format!(
+                "<@&{rid}> ⏳ Le serveur **{game_name}** ouvre {when} ! Inscris-toi sur le panneau. 🎮"
+            )),
+        )
+        .await;
 }
 
 // ── Bouton d'inscription ──

@@ -101,4 +101,12 @@ pub fn routes() -> Router<AppState> {
             "/api/games/internal/jobs/image-cleanup",
             post(handlers::game::jobs::job_image_cleanup),
         )
+        .route(
+            "/api/games/internal/jobs/reveal-ip",
+            post(handlers::game::jobs::job_reveal_ip),
+        )
+        .route(
+            "/api/games/internal/jobs/daily-ping",
+            post(handlers::game::jobs::job_daily_ping),
+        )
 }

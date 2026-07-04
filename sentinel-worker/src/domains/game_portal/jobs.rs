@@ -36,6 +36,8 @@ pub struct GamePortalIntervals {
     pub idle_shutdown_secs: u64,
     pub reconciler_secs: u64,
     pub image_cleanup_secs: u64,
+    pub reveal_ip_secs: u64,
+    pub daily_ping_secs: u64,
 }
 
 /// Spawn les 4 tasks paralleles. Ne bloque pas l'appelant.
@@ -75,11 +77,26 @@ pub fn start(api_url: String, intervals: GamePortalIntervals) {
         Duration::from_secs(intervals.reconciler_secs),
     );
     spawn_job(
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
+        "image-cleanup",
+        Duration::from_secs(intervals.image_cleanup_secs),
+    );
+    // Sessions : revelation d'IP a l'echeance + ping quotidien.
+    spawn_job(
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
+        "reveal-ip",
+        Duration::from_secs(intervals.reveal_ip_secs),
+    );
+    spawn_job(
         http,
         api_url,
         api_key,
-        "image-cleanup",
-        Duration::from_secs(intervals.image_cleanup_secs),
+        "daily-ping",
+        Duration::from_secs(intervals.daily_ping_secs),
     );
 }
 

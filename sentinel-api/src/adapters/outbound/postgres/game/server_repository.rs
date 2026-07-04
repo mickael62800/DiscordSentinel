@@ -417,4 +417,44 @@ impl GameServerRepository for PgGameServerRepository {
         .map_err(pg_ctx("mark_ip_revealed"))?;
         Ok(())
     }
+
+    async fn list_ip_reveal_due(&self) -> Result<Vec<GameServer>, DomainError> {
+        let q = format!(
+            "SELECT {SELECT_COLS} FROM game_servers \
+             WHERE deleted_at IS NULL AND ip_revealed = false \
+               AND ip_reveal_at IS NOT NULL AND ip_reveal_at <= NOW() \
+               AND text_channel_id IS NOT NULL \
+             ORDER BY ip_reveal_at ASC LIMIT 100"
+        );
+        let rows = sqlx::query_as::<_, ServerRow>(&q)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_ctx("list_ip_reveal_due"))?;
+        rows.into_iter().map(GameServer::try_from).collect()
+    }
+
+    async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<GameServer>, DomainError> {
+        let q = format!(
+            "SELECT {SELECT_COLS} FROM game_servers \
+             WHERE deleted_at IS NULL AND ip_revealed = false \
+               AND ip_reveal_at IS NOT NULL AND ip_reveal_at > NOW() \
+               AND text_channel_id IS NOT NULL \
+               AND (last_daily_ping_at IS NULL OR last_daily_ping_at < date_trunc('day', NOW())) \
+             ORDER BY ip_reveal_at ASC LIMIT 100"
+        );
+        let rows = sqlx::query_as::<_, ServerRow>(&q)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_ctx("list_awaiting_reveal_no_ping_today"))?;
+        rows.into_iter().map(GameServer::try_from).collect()
+    }
+
+    async fn mark_daily_ping(&self, id: Uuid) -> Result<(), DomainError> {
+        sqlx::query("UPDATE game_servers SET last_daily_ping_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_ctx("mark_daily_ping"))?;
+        Ok(())
+    }
 }

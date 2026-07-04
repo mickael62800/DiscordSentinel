@@ -448,6 +448,10 @@ pub fn start(
             idle_shutdown_secs: config.game_idle_shutdown_check_interval_secs,
             reconciler_secs: config.game_reconciler_interval_secs,
             image_cleanup_secs: config.game_image_cleanup_interval_secs,
+            // Revelation d'IP : verif toutes les 5 min. Ping quotidien : verif
+            // toutes les heures (le job compare a l'heure configuree).
+            reveal_ip_secs: 300,
+            daily_ping_secs: 3600,
         },
     );
 
