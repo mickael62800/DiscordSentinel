@@ -54,12 +54,28 @@ fn command_module(name: &str) -> &'static str {
 /// de moderation/securite/nettoyage/audit/rotation, les `*-setup`, les `*-admin`
 /// et les panneaux de config communautaires.
 fn is_admin_command(name: &str) -> bool {
+    // Les sanctions produisent DEJA une carte de moderation riche (cible,
+    // moderateur, raison, strikes...) : on evite le doublon avec le log
+    // une-ligne. Les commandes modo utilitaires (history, export, modstats...)
+    // n'ont pas de carte -> elles restent loggees.
+    if has_own_action_log(name) {
+        return false;
+    }
     matches!(
         command_module(name),
         "moderation" | "automod" | "security" | "cleanup" | "audit" | "rotation"
     ) || name.ends_with("-setup")
         || name.ends_with("-admin")
         || matches!(name, "roles-panel" | "parrain")
+}
+
+/// Commandes de sanction qui ont deja leur propre log riche (carte de
+/// moderation) : exclues du log une-ligne pour eviter le doublon.
+fn has_own_action_log(name: &str) -> bool {
+    matches!(
+        name,
+        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "massmute" | "massban" | "note"
+    )
 }
 
 /// Cherche (en descendant dans les sous-commandes) une option texte « reason »
