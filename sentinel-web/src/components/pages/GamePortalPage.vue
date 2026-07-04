@@ -345,11 +345,6 @@ watch(selectedServerId, async (sid) => {
         @launch="launchTemplate"
       />
 
-      <GamePortalRolesPanel
-        :templates="templates"
-        :guild-id="selectedGuildId ?? null"
-      />
-
       <GamePortalConsolePanel
         v-model:cmd="cmd"
         :selected-server="selectedServer"
@@ -357,6 +352,13 @@ watch(selectedServerId, async (sid) => {
         @send="sendCommand"
       />
     </main>
+
+    <GamePortalRolesPanel
+      v-if="selectedGuildId"
+      class="roles-full"
+      :templates="templates"
+      :guild-id="selectedGuildId ?? null"
+    />
 
     <GameServerConfigModal
       :open="configModalOpen"
@@ -436,6 +438,11 @@ watch(selectedServerId, async (sid) => {
   /* Hauteur fixe pour forcer le scroll interne des panels */
   height: calc(100vh - 240px);
   min-height: 500px;
+}
+
+/* Panneau "Role par jeu" : pleine largeur sous la grille (hors des 3 colonnes). */
+.roles-full {
+  margin-top: var(--space-lg);
 }
 
 .empty {
