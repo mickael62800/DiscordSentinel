@@ -144,6 +144,9 @@ pub struct AppState {
     pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,
     pub game_rcon_client: Arc<dyn crate::ports::outbound::game::rcon_client::RconClient>,
     pub game_port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator>,
+    /// Jeu Influence — use cases.
+    pub influence_view_profile_uc:
+        Arc<dyn crate::ports::inbound::influence::view_profile::ViewProfileUseCase>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

@@ -12,6 +12,7 @@ pub mod bump;
 pub mod coude;
 pub mod dashboard;
 pub mod game_portal;
+pub mod influence;
 pub mod games;
 pub mod members;
 pub mod moderation;

@@ -94,6 +94,7 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::members::routes())
         // Coup de coude
         .merge(routes::coude::routes())
+        .merge(routes::influence::routes())
         .merge(routes::tamagotchi::routes())
         .merge(routes::bump::routes())
         .merge(routes::rotation::routes())

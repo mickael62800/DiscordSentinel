@@ -823,6 +823,23 @@ pub async fn build_app_state(
         ),
     );
 
+    // ── Jeu Influence (Phase 1) ──
+    let influence_citizen_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::citizen_repository::CitizenRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::citizen_repository::PgCitizenRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_view_profile_uc: Arc<
+        dyn sentinel_core::ports::inbound::influence::view_profile::ViewProfileUseCase,
+    > = Arc::new(
+        sentinel_core::application::influence::view_profile_service::ViewProfileService::new(
+            influence_citizen_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
+
     AppState {
         analyze_uc,
         analyze_image_uc,
@@ -923,6 +940,7 @@ pub async fn build_app_state(
         game_container_runtime: container_runtime,
         game_rcon_client: rcon_client,
         game_port_allocator: port_allocator,
+        influence_view_profile_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

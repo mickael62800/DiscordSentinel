@@ -44,6 +44,7 @@ fn command_module(name: &str) -> &'static str {
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
+        _ if modules::influence::handles_command(name) => "influence",
         _ => "unknown",
     }
 }
@@ -534,6 +535,9 @@ impl EventHandler for Handler {
                         }
                         _ if modules::coude::handles_command(name) => {
                             modules::coude::handle_command(&ctx, &command).await
+                        }
+                        _ if modules::influence::handles_command(name) => {
+                            modules::influence::handle_command(&ctx, &command).await
                         }
                         _ => {}
                     }
