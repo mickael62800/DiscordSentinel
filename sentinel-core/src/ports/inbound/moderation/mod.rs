@@ -7,3 +7,5 @@ pub mod manage_rules;
 pub mod manage_strikes;
 pub mod moderation_copilot;
 pub mod read_modstats;
+
+pub mod manage_sursis;

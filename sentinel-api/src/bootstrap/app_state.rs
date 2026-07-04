@@ -974,6 +974,22 @@ pub async fn build_app_state(
         .with_bot_config_repo(bot_config_repo.clone()),
     );
 
+    // ── Ban en sursis (moderation) ──
+    let sursis_repo: Arc<
+        dyn sentinel_core::ports::outbound::moderation::sursis_repository::SursisRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::moderation::sursis_repository::PgSursisRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let sursis_uc: Arc<
+        dyn sentinel_core::ports::inbound::moderation::manage_sursis::ManageSursisUseCase,
+    > = Arc::new(
+        sentinel_core::application::moderation::manage_sursis_service::ManageSursisService::new(
+            sursis_repo,
+        ),
+    );
+
     AppState {
         analyze_uc,
         analyze_image_uc,
@@ -1081,6 +1097,7 @@ pub async fn build_app_state(
         influence_laws_uc,
         influence_information_uc,
         influence_archives_uc,
+        sursis_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

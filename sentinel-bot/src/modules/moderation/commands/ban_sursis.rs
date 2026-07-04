@@ -1,0 +1,322 @@
+//! Commande `/ban-sursis` — « ban en sursis » : au lieu d'un ban Discord direct,
+//! on retire tous les roles du membre, on lui donne le role Sursis (ne voit que
+//! le reglement + son salon d'appel), et il a N jours pour contester. Passe ce
+//! delai, un worker le bannit definitivement.
+//!
+//! Boutons modo dans le salon d'appel : Gracier (restaure) / Bannir maintenant.
+
+use serenity::all::{
+    ButtonStyle, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
+    CreateButton, CreateCommand, CreateCommandOption, CreateEmbedFooter,
+    CreateInteractionResponse, CreateInteractionResponseFollowup,
+    CreateInteractionResponseMessage, EditMember,
+};
+use serenity::model::id::{RoleId, UserId};
+use tracing::{info, warn};
+
+use crate::shared::discord_helpers::{option_str, option_user, reply_ephemeral, require_guild_id};
+use crate::shared::heartbeat::ApiClientKey;
+
+pub const SURSIS_PARDON_PREFIX: &str = "mod_sursis_pardon_";
+pub const SURSIS_BAN_PREFIX: &str = "mod_sursis_ban_";
+
+pub fn register() -> CreateCommand {
+    CreateCommand::new("ban-sursis")
+        .description("Ban avec appel : le membre passe en Sursis et peut contester")
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::User, "membre", "Membre a sanctionner")
+                .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison")
+                .required(false),
+        )
+}
+
+pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    let Some(guild_id) = require_guild_id(ctx, command).await else {
+        return;
+    };
+    let Some(target) = option_user(&command.data.options, "membre") else {
+        return;
+    };
+    let reason = option_str(&command.data.options, "reason").unwrap_or("Aucune raison spécifiée");
+
+    let gid_u64: u64 = match guild_id.parse() {
+        Ok(g) => g,
+        Err(_) => return,
+    };
+    let guild = serenity::model::id::GuildId::new(gid_u64);
+
+    // Config : role Sursis (requis).
+    let (sursis_role, base) = {
+        let data = ctx.data.read().await;
+        let Some(base) = data.get::<ApiClientKey>().cloned() else {
+            return;
+        };
+        let cfg = base
+            .get_guild_config_for(&guild_id, crate::modules::moderation::MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default();
+        let role = cfg
+            .get("sursis_role_id")
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&n| n > 0);
+        (role, base)
+    };
+    let Some(sursis_role) = sursis_role else {
+        reply_ephemeral(
+            ctx,
+            command,
+            "Le rôle Sursis n'est pas configuré. Dashboard → Modération → « Rôle Sursis ».",
+        )
+        .await;
+        return;
+    };
+    let sursis_role = RoleId::new(sursis_role);
+
+    // Membre + ses roles actuels (a sauvegarder).
+    let mut member = match guild.member(&ctx.http, target).await {
+        Ok(m) => m,
+        Err(_) => {
+            reply_ephemeral(ctx, command, "Membre introuvable sur le serveur.").await;
+            return;
+        }
+    };
+    let saved_roles: Vec<String> = member.roles.iter().map(|r| r.to_string()).collect();
+
+    // Applique le sursis : on remplace tous les roles par le seul role Sursis.
+    // (edit remplace les roles non-manages ; les roles manages sont ignores.)
+    if let Err(e) = member
+        .edit(&ctx.http, EditMember::new().roles(vec![sursis_role]))
+        .await
+    {
+        warn!(error = %e, "Echec application du role Sursis (edit roles)");
+        // Fallback : au moins ajouter le role Sursis.
+        let _ = guild.member(&ctx.http, target).await.map(|m| async move {
+            let _ = m.add_role(&ctx.http, sursis_role).await;
+        });
+    }
+
+    // Salon d'appel (sous appeal_category_id), sans boutons pour l'instant.
+    let target_name = command
+        .data
+        .resolved
+        .users
+        .get(&target)
+        .map(|u| u.name.clone())
+        .unwrap_or_default();
+    let intro = crate::shared::embeds::critical_embed("⏳ Ban en sursis")
+        .description(format!(
+            "<@{target}> est placé en **sursis**. Sans appel accepté, le bannissement sera automatique.\n**Raison :** {reason}"
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+    let channel = crate::modules::moderation::create_appeal_channel(
+        ctx,
+        &guild_id,
+        target.get(),
+        &target_name,
+        intro,
+        vec![],
+    )
+    .await;
+
+    // Enregistre le sursis (delai depuis la config cote API).
+    let body = serde_json::json!({
+        "user_id": target.to_string(),
+        "username": target_name,
+        "moderator_id": command.user.id.to_string(),
+        "moderator_name": command.user.name,
+        "reason": reason,
+        "saved_roles": saved_roles,
+        "channel_id": channel.map(|c| c.to_string()),
+    });
+    let created: Option<serde_json::Value> = base
+        .post_json(&format!("/api/moderation/{guild_id}/sursis"), &body)
+        .await
+        .ok();
+    let sursis_id = created
+        .as_ref()
+        .and_then(|v| v.get("id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or_default()
+        .to_string();
+    let expires_at = created
+        .as_ref()
+        .and_then(|v| v.get("expires_at"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    // Poste les boutons modo dans le salon (maintenant qu'on a l'id).
+    if let (Some(channel), false) = (channel, sursis_id.is_empty()) {
+        let row = serenity::all::CreateActionRow::Buttons(vec![
+            CreateButton::new(format!("{SURSIS_PARDON_PREFIX}{sursis_id}"))
+                .label("Gracier (accepter l'appel)")
+                .emoji('♻')
+                .style(ButtonStyle::Success),
+            CreateButton::new(format!("{SURSIS_BAN_PREFIX}{sursis_id}"))
+                .label("Bannir maintenant")
+                .emoji('🔨')
+                .style(ButtonStyle::Danger),
+        ]);
+        let panel = crate::shared::embeds::info_embed("Décision de modération")
+            .description(
+                "**Gracier** : rend ses rôles et lève le sursis.\n**Bannir maintenant** : ban immédiat.\nSinon, ban automatique à l'échéance.",
+            )
+            .footer(CreateEmbedFooter::new(
+                if expires_at.is_empty() { "".to_string() } else { format!("Échéance : {expires_at}") },
+            ));
+        let _ = channel
+            .send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new()
+                    .embed(panel)
+                    .components(vec![row]),
+            )
+            .await;
+    }
+
+    // DM au membre.
+    if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
+        let mut txt = format!(
+            "Tu as été placé en **sursis** sur **{}**.\n**Raison :** {reason}\n\nTu peux contester dans le salon dédié avant le bannissement définitif.",
+            guild
+                .to_partial_guild(&ctx.http)
+                .await
+                .map(|g| g.name)
+                .unwrap_or_else(|_| guild_id.clone())
+        );
+        if let Some(c) = channel {
+            txt.push_str(&format!("\n➡️ Ton salon d'appel : <#{c}>"));
+        }
+        let _ = dm
+            .send_message(&ctx.http, serenity::builder::CreateMessage::new().content(txt))
+            .await;
+    }
+
+    reply_ephemeral(
+        ctx,
+        command,
+        &format!(
+            "⏳ <@{target}> est placé en sursis.{}",
+            channel.map(|c| format!(" Salon d'appel : <#{c}>")).unwrap_or_default()
+        ),
+    )
+    .await;
+    info!(target = %target, mod = %command.user.name, "Ban en sursis applique");
+}
+
+// ── Boutons ──
+
+async fn get_sursis(base: &crate::shared::api_client::BaseApiClient, id: &str) -> Option<serde_json::Value> {
+    base.get_json(&format!("/api/moderation/sursis/{id}")).await.ok()
+}
+
+/// Bouton « Gracier » : restaure les roles + leve le sursis.
+pub async fn handle_pardon(ctx: &Context, component: &ComponentInteraction) {
+    if !super::appeal::ensure_moderator(ctx, component).await {
+        return;
+    }
+    let Some(id) = component.data.custom_id.strip_prefix(SURSIS_PARDON_PREFIX).map(str::to_string) else {
+        return;
+    };
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+        )
+        .await;
+
+    let base = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>().cloned() {
+            Some(b) => b,
+            None => return,
+        }
+    };
+    let Some(sursis) = get_sursis(&base, &id).await else {
+        followup(ctx, component, "Sursis introuvable.").await;
+        return;
+    };
+    let Some(guild_id) = component.guild_id else { return };
+    let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
+    let Ok(uid) = user_id.parse::<u64>() else { return };
+
+    // Restaure les roles sauvegardes.
+    if let Ok(mut member) = guild_id.member(&ctx.http, UserId::new(uid)).await {
+        let roles: Vec<RoleId> = sursis
+            .get("saved_roles")
+            .and_then(|v| v.as_array())
+            .map(|a| a.iter().filter_map(|v| v.as_str()?.parse::<u64>().ok().map(RoleId::new)).collect())
+            .unwrap_or_default();
+        let _ = member.edit(&ctx.http, EditMember::new().roles(roles)).await;
+    }
+    let _ = base
+        .post_json::<_, serde_json::Value>(
+            &format!("/api/moderation/sursis/{id}/resolve"),
+            &serde_json::json!({ "status": "gracie" }),
+        )
+        .await;
+    if let Ok(dm) = UserId::new(uid).create_dm_channel(&ctx.http).await {
+        let _ = dm
+            .send_message(&ctx.http, serenity::builder::CreateMessage::new().content("✅ Ton appel a été accepté : tes accès sont rétablis."))
+            .await;
+    }
+    followup(ctx, component, "♻️ Membre gracié : rôles restaurés, sursis levé. Salon supprimé…").await;
+    let _ = component.channel_id.delete(&ctx.http).await;
+    info!(sursis = %id, "Sursis gracie");
+}
+
+/// Bouton « Bannir maintenant » : ban immediat.
+pub async fn handle_ban_now(ctx: &Context, component: &ComponentInteraction) {
+    if !super::appeal::ensure_moderator(ctx, component).await {
+        return;
+    }
+    let Some(id) = component.data.custom_id.strip_prefix(SURSIS_BAN_PREFIX).map(str::to_string) else {
+        return;
+    };
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+        )
+        .await;
+
+    let base = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>().cloned() {
+            Some(b) => b,
+            None => return,
+        }
+    };
+    let Some(sursis) = get_sursis(&base, &id).await else {
+        followup(ctx, component, "Sursis introuvable.").await;
+        return;
+    };
+    let Some(guild_id) = component.guild_id else { return };
+    let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
+    let Ok(uid) = user_id.parse::<u64>() else { return };
+
+    if let Err(e) = guild_id.ban_with_reason(&ctx.http, UserId::new(uid), 0, "Ban en sursis confirmé").await {
+        warn!(error = %e, "Echec ban depuis sursis");
+    }
+    let _ = base
+        .post_json::<_, serde_json::Value>(
+            &format!("/api/moderation/sursis/{id}/resolve"),
+            &serde_json::json!({ "status": "banni" }),
+        )
+        .await;
+    followup(ctx, component, "🔨 Membre banni. Salon supprimé…").await;
+    let _ = component.channel_id.delete(&ctx.http).await;
+    info!(sursis = %id, "Sursis -> ban immediat");
+}
+
+async fn followup(ctx: &Context, component: &ComponentInteraction, msg: &str) {
+    let _ = component
+        .create_followup(
+            &ctx.http,
+            CreateInteractionResponseFollowup::new().content(msg).ephemeral(true),
+        )
+        .await;
+}

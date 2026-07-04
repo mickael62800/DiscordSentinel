@@ -172,6 +172,7 @@ pub fn all() -> Vec<CreateCommand> {
         mute::register_unmute(),
         ban::register(),
         ban::register_unban(),
+        ban_sursis::register(),
         history::register(),
         notes::register(),
         call::register(),
@@ -192,3 +193,5 @@ pub fn all() -> Vec<CreateCommand> {
         unwarn::register(),
     ]
 }
+
+pub mod ban_sursis;

@@ -9,3 +9,5 @@ pub mod reminder_repository;
 pub mod review_repository;
 pub mod rule_repository;
 pub mod strike_repository;
+
+pub mod sursis_repository;

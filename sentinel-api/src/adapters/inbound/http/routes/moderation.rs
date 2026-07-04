@@ -16,6 +16,23 @@ fn moderation_inner() -> Router<AppState> {
             "/actions/{id}",
             delete(handlers::moderation::actions::delete_action),
         )
+        // Ban en sursis
+        .route(
+            "/{guild_id}/sursis",
+            post(handlers::moderation::sursis::create_sursis),
+        )
+        .route(
+            "/sursis/{id}",
+            get(handlers::moderation::sursis::get_sursis),
+        )
+        .route(
+            "/sursis/{id}/resolve",
+            post(handlers::moderation::sursis::resolve_sursis),
+        )
+        .route(
+            "/internal/jobs/sursis-expire",
+            post(handlers::moderation::sursis::job_sursis_expire),
+        )
         .route("/bans", get(handlers::moderation::actions::list_bans))
         .route(
             "/execute-ban",

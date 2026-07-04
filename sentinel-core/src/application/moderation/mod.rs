@@ -7,3 +7,5 @@ pub mod manage_reminders_service;
 pub mod manage_rules_service;
 pub mod manage_strikes_service;
 pub mod read_modstats_service;
+
+pub mod manage_sursis_service;

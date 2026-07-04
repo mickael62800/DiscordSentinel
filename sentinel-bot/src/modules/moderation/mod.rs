@@ -87,6 +87,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "mute" => commands::mute::handle(ctx, command).await,
         "unmute" => commands::mute::handle_unmute(ctx, command).await,
         "ban" => commands::ban::handle(ctx, command).await,
+        "ban-sursis" => commands::ban_sursis::handle(ctx, command).await,
         "unban" => commands::ban::handle_unban(ctx, command).await,
         "history" => commands::history::handle(ctx, command).await,
         "note" => commands::notes::handle(ctx, command).await,
@@ -126,6 +127,8 @@ pub fn handles_component(cid: &str) -> bool {
         || cid.starts_with(commands::appeal::APPEAL_PREFIX)
         || cid.starts_with(commands::appeal::APPEAL_CANCEL_PREFIX)
         || cid == commands::appeal::APPEAL_CLOSE_ID
+        || cid.starts_with(commands::ban_sursis::SURSIS_PARDON_PREFIX)
+        || cid.starts_with(commands::ban_sursis::SURSIS_BAN_PREFIX)
         || cid.starts_with(APPROVE_PREFIX)
         || cid.starts_with(REJECT_PREFIX)
         || cid.starts_with(risk_check::CONFIRM_PREFIX)
@@ -146,6 +149,10 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::appeal::handle_appeal_cancel(ctx, component).await;
     } else if custom_id == commands::appeal::APPEAL_CLOSE_ID {
         commands::appeal::handle_appeal_close(ctx, component).await;
+    } else if custom_id.starts_with(commands::ban_sursis::SURSIS_PARDON_PREFIX) {
+        commands::ban_sursis::handle_pardon(ctx, component).await;
+    } else if custom_id.starts_with(commands::ban_sursis::SURSIS_BAN_PREFIX) {
+        commands::ban_sursis::handle_ban_now(ctx, component).await;
     } else if custom_id.starts_with(commands::appeal::APPEAL_PREFIX) {
         commands::appeal::handle_appeal_button(ctx, component).await;
     } else if custom_id.starts_with(APPROVE_PREFIX) {
@@ -264,8 +271,8 @@ pub async fn create_appeal_channel(
     guild_id: &str,
     appellant_id: u64,
     appellant_name: &str,
-    action_id: Option<&str>,
     intro: serenity::builder::CreateEmbed,
+    buttons: Vec<serenity::builder::CreateButton>,
 ) -> Option<serenity::model::id::ChannelId> {
     use serenity::all::{
         ChannelType, CreateChannel, PermissionOverwrite, PermissionOverwriteType, Permissions,
@@ -343,34 +350,15 @@ pub async fn create_appeal_channel(
         }
     };
 
-    // Boutons modo : annuler la sanction (si connue) + fermer le salon.
-    use serenity::all::{ButtonStyle, CreateActionRow, CreateButton};
-    let mut buttons = Vec::new();
-    if let Some(aid) = action_id {
-        buttons.push(
-            CreateButton::new(format!("{}{aid}", commands::appeal::APPEAL_CANCEL_PREFIX))
-                .label("Annuler la sanction")
-                .emoji('♻')
-                .style(ButtonStyle::Success),
-        );
+    // Message d'accroche : ping l'appelant + embed d'intro + boutons modo fournis.
+    use serenity::all::CreateActionRow;
+    let mut msg = serenity::builder::CreateMessage::new()
+        .content(format!("<@{appellant_id}>"))
+        .embed(intro);
+    if !buttons.is_empty() {
+        msg = msg.components(vec![CreateActionRow::Buttons(buttons)]);
     }
-    buttons.push(
-        CreateButton::new(commands::appeal::APPEAL_CLOSE_ID)
-            .label("Fermer le salon")
-            .emoji('🔒')
-            .style(ButtonStyle::Secondary),
-    );
-
-    // Message d'accroche : ping l'appelant + embed d'intro + boutons modo.
-    let _ = channel
-        .send_message(
-            &ctx.http,
-            serenity::builder::CreateMessage::new()
-                .content(format!("<@{appellant_id}>"))
-                .embed(intro)
-                .components(vec![CreateActionRow::Buttons(buttons)]),
-        )
-        .await;
+    let _ = channel.send_message(&ctx.http, msg).await;
 
     Some(channel.id)
 }

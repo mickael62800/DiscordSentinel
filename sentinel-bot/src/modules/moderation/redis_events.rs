@@ -21,7 +21,34 @@ pub(super) async fn handle_redis_moderation_event(ctx: &Context, payload: &str) 
         "sanction_expiry_reminder" => handle_sanction_expiry_reminder(ctx, data).await,
         "sanction_expired_unban" => handle_sanction_expired_unban(ctx, data).await,
         "appeal_sla_escalated" => handle_appeal_sla_escalated(ctx, data).await,
+        "sursis_ban" => handle_sursis_ban(ctx, data).await,
         _ => {}
+    }
+}
+
+/// Ban definitif d'un sursis arrive a echeance (emis par le worker via l'API).
+async fn handle_sursis_ban(ctx: &Context, data: &serde_json::Value) {
+    let guild_id = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
+    let user_id = data.get("user_id").and_then(|v| v.as_str()).unwrap_or("");
+    let reason = data
+        .get("reason")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Ban en sursis — délai d'appel écoulé");
+    let (Ok(gid), Ok(uid)) = (guild_id.parse::<u64>(), user_id.parse::<u64>()) else {
+        return;
+    };
+    let guild = serenity::model::id::GuildId::new(gid);
+    if let Err(e) = guild
+        .ban_with_reason(&ctx.http, UserId::new(uid), 0, reason)
+        .await
+    {
+        warn!(error = %e, guild_id, user_id, "sursis_ban: echec du ban Discord");
+    } else {
+        info!(guild_id, user_id, "Sursis expire -> ban definitif applique");
+    }
+    // Nettoie le salon d'appel si connu.
+    if let Some(cid) = data.get("channel_id").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
+        let _ = serenity::model::id::ChannelId::new(cid).delete(&ctx.http).await;
     }
 }
 

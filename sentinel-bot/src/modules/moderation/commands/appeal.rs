@@ -163,14 +163,32 @@ async fn finalize_appeal<F, Fut>(
         .description(desc)
         .timestamp(serenity::model::Timestamp::now());
 
+    // Boutons modo : annuler la sanction (si connue) + fermer le salon.
+    use serenity::all::{ButtonStyle, CreateButton};
+    let mut buttons = Vec::new();
+    if let Some(aid) = action_id {
+        buttons.push(
+            CreateButton::new(format!("{APPEAL_CANCEL_PREFIX}{aid}"))
+                .label("Annuler la sanction")
+                .emoji('♻')
+                .style(ButtonStyle::Success),
+        );
+    }
+    buttons.push(
+        CreateButton::new(APPEAL_CLOSE_ID)
+            .label("Fermer le salon")
+            .emoji('🔒')
+            .style(ButtonStyle::Secondary),
+    );
+
     // 1) Salon dedie sous la categorie (si configuree).
     if let Some(channel) = crate::modules::moderation::create_appeal_channel(
         ctx,
         guild_id,
         appellant_id,
         appellant_name,
-        action_id,
         intro,
+        buttons,
     )
     .await
     {
@@ -290,7 +308,7 @@ async fn deny_not_mod(ctx: &Context, component: &ComponentInteraction) {
         .await;
 }
 
-async fn ensure_moderator(ctx: &Context, component: &ComponentInteraction) -> bool {
+pub(crate) async fn ensure_moderator(ctx: &Context, component: &ComponentInteraction) -> bool {
     use serenity::all::Permissions;
     let Some(gid) = component.guild_id else {
         deny_not_mod(ctx, component).await;

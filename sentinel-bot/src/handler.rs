@@ -37,10 +37,10 @@ fn command_module(name: &str) -> &'static str {
         "rotation" => "rotation",
         "security" => "security",
         "automod" => "automod",
-        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history" | "note" | "call"
-        | "signalement" | "context" | "appeal" | "expirations" | "compare" | "modstats"
-        | "evidence" | "review" | "template" | "transcript" | "export" | "massmute" | "massban"
-        | "copilote" => "moderation",
+        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "ban-sursis" | "unban" | "history"
+        | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
+        | "modstats" | "evidence" | "review" | "template" | "transcript" | "export" | "massmute"
+        | "massban" | "copilote" => "moderation",
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         _ if modules::coude::handles_command(name) => "coude",
@@ -588,8 +588,8 @@ impl EventHandler for Handler {
                         "rotation" => modules::rotation::handle_command(&ctx, &command).await,
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
-                        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-                        | "note" | "call" | "signalement" | "context" | "appeal"
+                        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "ban-sursis" | "unban"
+                        | "history" | "note" | "call" | "signalement" | "context" | "appeal"
                         | "expirations" | "compare" | "modstats" | "evidence" | "review"
                         | "template" | "transcript" | "export" | "massmute" | "massban"
                         | "copilote" => {

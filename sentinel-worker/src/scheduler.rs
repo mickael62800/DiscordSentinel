@@ -511,6 +511,25 @@ pub fn start(
             },
         );
     }
+    // Ban en sursis : bannit definitivement les sursis dont le delai d'appel
+    // est ecoule -> event sursis_ban consomme par le moderation-bot.
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "sursis_expire",
+            config.send_reminders_interval_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "moderation-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(
+                    async move { domains::moderation::sursis_expire::run(&pool, &redis).await },
+                )
+            },
+        );
+    }
     // Auto-deban verification d'age (cadence mensuelle) : leve les bans
     // age_verification_bans echus -> event age_ban_lift consomme par le bot.
     {
