@@ -47,6 +47,11 @@ impl InfluenceSettings {
         self.get_i64("influence_org_creation_cost", 1000)
     }
 
+    /// Cout du role Discord d'une organisation (coins, gratuit pour un modo).
+    pub fn org_role_cost(&self) -> i64 {
+        self.get_i64("influence_org_role_cost", 2000)
+    }
+
     /// Nombre max d'organisations qu'un citoyen peut fonder.
     pub fn org_max_per_citizen(&self) -> i64 {
         self.get_i64("influence_org_max_per_citizen", 3)

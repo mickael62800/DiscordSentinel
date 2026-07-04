@@ -93,6 +93,14 @@ fn influence_inner() -> Router<AppState> {
             post(handlers::influence::orgs::set_relation),
         )
         .route(
+            "/{guild_id}/orgs/role/prepare",
+            post(handlers::influence::orgs::prepare_role),
+        )
+        .route(
+            "/{guild_id}/orgs/role/link",
+            post(handlers::influence::orgs::link_role),
+        )
+        .route(
             "/{guild_id}/archives",
             post(handlers::influence::archives::list_archives),
         )

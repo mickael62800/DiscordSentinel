@@ -99,6 +99,63 @@ pub async fn org_members(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct PrepareRoleDto {
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub actor_username: String,
+    #[serde(default)]
+    pub is_moderator: bool,
+    pub org_name: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct RolePrepDto {
+    pub founder_user_id: String,
+    pub org_name: String,
+}
+
+/// POST /api/influence/{guild_id}/orgs/role/prepare
+pub async fn prepare_role(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<PrepareRoleDto>,
+) -> Result<Json<RolePrepDto>, ApiError> {
+    let prep = state
+        .influence_orgs_uc
+        .prepare_role(
+            &guild_id,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            dto.is_moderator,
+            &dto.org_name,
+        )
+        .await?;
+    Ok(Json(RolePrepDto {
+        founder_user_id: prep.founder_user_id,
+        org_name: prep.org_name,
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LinkRoleDto {
+    pub org_name: String,
+    pub role_id: String,
+}
+
+/// POST /api/influence/{guild_id}/orgs/role/link
+pub async fn link_role(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<LinkRoleDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .influence_orgs_uc
+        .set_role(&guild_id, &dto.org_name, &dto.role_id)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct SetRelationDto {
     pub actor_user_id: String,
     #[serde(default)]

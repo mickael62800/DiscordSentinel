@@ -12,7 +12,7 @@ use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_organizations::{
-    ManageOrganizationsUseCase, OrgInfo,
+    ManageOrganizationsUseCase, OrgInfo, RolePrep,
 };
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -245,6 +245,66 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
     ) -> Result<Vec<OrgMemberView>, DomainError> {
         let org = self.require_org(guild_id, name).await?;
         self.memberships.list_views(org.id).await
+    }
+
+    async fn prepare_role(
+        &self,
+        guild_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        is_moderator: bool,
+        org_name: &str,
+    ) -> Result<RolePrep, DomainError> {
+        let org = self.require_org(guild_id, org_name).await?;
+        if org.discord_role_id.is_some() {
+            return Err(DomainError::Conflict(
+                "Cette organisation a deja un role Discord.".into(),
+            ));
+        }
+        let founder_user_id = self
+            .orgs
+            .founder_user_id(org.id)
+            .await?
+            .ok_or_else(|| DomainError::Internal("Fondateur introuvable.".into()))?;
+
+        // Permission : fondateur (paye) ou moderateur (gratuit).
+        let is_founder = actor_user_id == founder_user_id;
+        if !is_founder && !is_moderator {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur ou un moderateur peuvent creer le role.".into(),
+            ));
+        }
+
+        // Le fondateur paie en coins (sauf s'il agit en moderateur).
+        if is_founder && !is_moderator {
+            let cost = self.settings(guild_id).await.org_role_cost();
+            let balance = self.money_balance(guild_id, actor_user_id).await;
+            if balance < cost {
+                return Err(DomainError::Forbidden(format!(
+                    "Le role coute {cost} coins (tu en as {balance})."
+                )));
+            }
+            if let Some(w) = &self.wallet {
+                w.debit(guild_id, actor_user_id, cost, "influence", "Role d'organisation")
+                    .await?;
+            }
+        }
+        let _ = actor_username;
+
+        Ok(RolePrep {
+            founder_user_id,
+            org_name: org.name,
+        })
+    }
+
+    async fn set_role(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        role_id: &str,
+    ) -> Result<(), DomainError> {
+        let org = self.require_org(guild_id, org_name).await?;
+        self.orgs.set_discord_role(org.id, role_id).await
     }
 
     async fn set_relation(

@@ -63,6 +63,17 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
+                "role",
+                "Crée un rôle Discord au nom de ton organisation",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Ton organisation")
+                    .required(true),
+            ),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
                 "relation",
                 "Declare une relation envers une autre organisation",
             )
@@ -138,6 +149,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         },
         "join" => match api_client::join_org(&api, &guild_id, &name, &user_id, &username).await {
             Ok(org) => {
+                // Si l'orga a un role Discord, on l'attribue au nouveau membre.
+                if let (Some(role), Some(gid)) = (&org.discord_role_id, command.guild_id) {
+                    if let Ok(rid) = role.parse::<u64>() {
+                        if let Ok(m) = gid.member(&ctx.http, command.user.id).await {
+                            let _ = m
+                                .add_role(&ctx.http, serenity::model::id::RoleId::new(rid))
+                                .await;
+                        }
+                    }
+                }
                 reply_ephemeral(
                     ctx,
                     command,
@@ -147,6 +168,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
             Err(e) => reply_ephemeral(ctx, command, &format!("Impossible de rejoindre : {e}")).await,
         },
+        "role" => handle_role(ctx, command, &api, &guild_id, &user_id, &username, &name).await,
         "membres" => match api_client::org_members(&api, &guild_id, &name).await {
             Ok(members) => {
                 let lines = if members.is_empty() {
@@ -217,4 +239,67 @@ fn info_embed(o: &api_client::OrgInfo) -> CreateEmbed {
     embed.footer(CreateEmbedFooter::new(
         "Le patrimoine appartient à l'organisation, pas au dirigeant.",
     ))
+}
+
+/// Crée le rôle Discord de l'organisation (fondateur payant / modo gratuit).
+async fn handle_role(
+    ctx: &Context,
+    command: &CommandInteraction,
+    api: &std::sync::Arc<crate::shared::api_client::BaseApiClient>,
+    guild_id: &str,
+    user_id: &str,
+    username: &str,
+    org_name: &str,
+) {
+    use serenity::all::{EditRole, Permissions};
+    let Some(gid) = command.guild_id else { return };
+
+    // Moderateur ? (permissions de gestion des roles / admin).
+    let is_moderator = command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(Permissions::MANAGE_ROLES) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false);
+
+    // Autorisation + cout cote API.
+    let prep = match api_client::prepare_role(api, guild_id, user_id, username, is_moderator, org_name).await {
+        Ok(p) => p,
+        Err(e) => {
+            reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await;
+            return;
+        }
+    };
+
+    // Cree le role Discord au nom de l'orga.
+    let role = match gid
+        .create_role(&ctx.http, EditRole::new().name(&prep.org_name).mentionable(true))
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            reply_ephemeral(ctx, command, &format!("Échec création du rôle : {e}")).await;
+            return;
+        }
+    };
+
+    // Attribue le role au fondateur.
+    if let Ok(founder) = prep.founder_user_id.parse::<u64>() {
+        if let Ok(m) = gid.member(&ctx.http, serenity::model::id::UserId::new(founder)).await {
+            let _ = m.add_role(&ctx.http, role.id).await;
+        }
+    }
+
+    // Lie le role a l'orga en base.
+    let _ = api_client::link_role(api, guild_id, &prep.org_name, &role.id.to_string()).await;
+
+    reply_ephemeral(
+        ctx,
+        command,
+        &format!(
+            "✅ Rôle <@&{}> créé pour **{}**. Les membres qui rejoignent l'obtiendront automatiquement.",
+            role.id, prep.org_name
+        ),
+    )
+    .await;
 }

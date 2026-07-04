@@ -40,6 +40,7 @@ struct Row {
     reputation: i64,
     influence: i64,
     founder_id: Uuid,
+    discord_role_id: Option<String>,
     created_at: DateTime<Utc>,
     dissolved_at: Option<DateTime<Utc>>,
 }
@@ -59,6 +60,7 @@ impl TryFrom<Row> for Organization {
             reputation: r.reputation,
             influence: r.influence,
             founder_id: r.founder_id,
+            discord_role_id: r.discord_role_id,
             created_at: r.created_at,
             dissolved_at: r.dissolved_at,
         })
@@ -66,7 +68,7 @@ impl TryFrom<Row> for Organization {
 }
 
 const SELECT_COLS: &str = "id, guild_id, kind, name, motto, treasury, reputation, \
-    influence, founder_id, created_at, dissolved_at";
+    influence, founder_id, discord_role_id, created_at, dissolved_at";
 
 #[async_trait]
 impl OrganizationRepository for PgOrganizationRepository {
@@ -142,5 +144,27 @@ impl OrganizationRepository for PgOrganizationRepository {
             .await
             .map_err(pg_err)?;
         rows.into_iter().map(TryInto::try_into).collect()
+    }
+
+    async fn set_discord_role(&self, org_id: Uuid, role_id: &str) -> Result<(), DomainError> {
+        sqlx::query("UPDATE influence_organizations SET discord_role_id = $2 WHERE id = $1")
+            .bind(org_id)
+            .bind(role_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn founder_user_id(&self, org_id: Uuid) -> Result<Option<String>, DomainError> {
+        let uid: Option<String> = sqlx::query_scalar(
+            "SELECT c.user_id FROM influence_organizations o \
+             JOIN influence_citizens c ON c.id = o.founder_id WHERE o.id = $1",
+        )
+        .bind(org_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(uid)
     }
 }

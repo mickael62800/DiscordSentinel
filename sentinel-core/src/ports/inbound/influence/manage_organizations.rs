@@ -8,6 +8,13 @@ use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 
+/// Autorisation de creation de role : a qui attribuer + nom de l'orga.
+#[derive(Debug, Clone)]
+pub struct RolePrep {
+    pub founder_user_id: String,
+    pub org_name: String,
+}
+
 /// Vue d'ensemble d'une organisation (`/org info`).
 #[derive(Debug, Clone)]
 pub struct OrgInfo {
@@ -48,6 +55,26 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         guild_id: &str,
         name: &str,
     ) -> Result<Vec<OrgMemberView>, DomainError>;
+
+    /// Autorise la creation du role Discord d'une orga : verifie que l'acteur
+    /// est le fondateur (paie le cout en coins) ou un moderateur (gratuit), et
+    /// renvoie le discord user_id du fondateur (a qui attribuer le role).
+    async fn prepare_role(
+        &self,
+        guild_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        is_moderator: bool,
+        org_name: &str,
+    ) -> Result<RolePrep, DomainError>;
+
+    /// Lie le role Discord cree a l'organisation.
+    async fn set_role(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        role_id: &str,
+    ) -> Result<(), DomainError>;
 
     /// Declare une relation d'une organisation vers une autre. L'acteur doit
     /// etre dirigeant (ou fondateur) de l'organisation source.

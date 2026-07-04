@@ -18,6 +18,7 @@ pub struct Organization {
     pub reputation: i64,
     pub influence: i64,
     pub founder_id: Uuid,
+    pub discord_role_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub dissolved_at: Option<DateTime<Utc>>,
 }

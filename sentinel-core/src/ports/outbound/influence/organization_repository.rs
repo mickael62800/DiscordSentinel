@@ -36,4 +36,10 @@ pub trait OrganizationRepository: Send + Sync {
 
     /// Liste des organisations actives du serveur.
     async fn list_for_guild(&self, guild_id: &str) -> Result<Vec<Organization>, DomainError>;
+
+    /// Lie un role Discord a une organisation.
+    async fn set_discord_role(&self, org_id: Uuid, role_id: &str) -> Result<(), DomainError>;
+
+    /// Discord user_id du fondateur d'une organisation (JOIN citizens).
+    async fn founder_user_id(&self, org_id: Uuid) -> Result<Option<String>, DomainError>;
 }

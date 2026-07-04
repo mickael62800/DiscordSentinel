@@ -39,6 +39,14 @@ pub struct Organization {
     pub emoji: String,
     pub motto: String,
     pub treasury: i64,
+    #[serde(default)]
+    pub discord_role_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RolePrep {
+    pub founder_user_id: String,
+    pub org_name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -576,6 +584,50 @@ pub async fn list_archives(
     api.post_json(
         &format!("/api/influence/{guild_id}/archives"),
         &ArchivesQueryBody { limit },
+    )
+    .await
+}
+
+// ── Role Discord d'organisation ──
+
+#[derive(Debug, Serialize)]
+struct PrepareRoleBody<'a> {
+    actor_user_id: &'a str,
+    actor_username: &'a str,
+    is_moderator: bool,
+    org_name: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct LinkRoleBody<'a> {
+    org_name: &'a str,
+    role_id: &'a str,
+}
+
+pub async fn prepare_role(
+    api: &BaseApiClient,
+    guild_id: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    is_moderator: bool,
+    org_name: &str,
+) -> Result<RolePrep, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/role/prepare"),
+        &PrepareRoleBody { actor_user_id, actor_username, is_moderator, org_name },
+    )
+    .await
+}
+
+pub async fn link_role(
+    api: &BaseApiClient,
+    guild_id: &str,
+    org_name: &str,
+    role_id: &str,
+) -> Result<serde_json::Value, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/role/link"),
+        &LinkRoleBody { org_name, role_id },
     )
     .await
 }

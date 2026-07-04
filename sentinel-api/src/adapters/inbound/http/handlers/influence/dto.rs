@@ -68,6 +68,7 @@ pub struct OrganizationDto {
     pub treasury: i64,
     pub reputation: i64,
     pub influence: i64,
+    pub discord_role_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -84,6 +85,7 @@ impl From<Organization> for OrganizationDto {
             treasury: o.treasury,
             reputation: o.reputation,
             influence: o.influence,
+            discord_role_id: o.discord_role_id,
             created_at: o.created_at,
         }
     }
