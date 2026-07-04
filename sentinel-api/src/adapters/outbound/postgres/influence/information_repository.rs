@@ -228,6 +228,13 @@ impl PgArchiveRepository {
     }
 }
 
+#[derive(sqlx::FromRow)]
+struct ArchiveRow {
+    event_type: String,
+    payload: serde_json::Value,
+    occurred_at: DateTime<Utc>,
+}
+
 #[async_trait]
 impl ArchiveRepository for PgArchiveRepository {
     async fn append(
@@ -246,5 +253,30 @@ impl ArchiveRepository for PgArchiveRepository {
         .await
         .map_err(|e| pg_err_ctx("influence_archives", e))?;
         Ok(())
+    }
+
+    async fn list_recent(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::influence::archive::ArchiveEntry>, DomainError>
+    {
+        let rows: Vec<ArchiveRow> = sqlx::query_as(
+            "SELECT event_type, payload, occurred_at FROM influence_archives \
+             WHERE guild_id = $1 ORDER BY occurred_at DESC LIMIT $2",
+        )
+        .bind(guild_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| pg_err_ctx("influence_archives", e))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| sentinel_core::domain::entities::influence::archive::ArchiveEntry {
+                event_type: r.event_type,
+                payload: r.payload,
+                occurred_at: r.occurred_at,
+            })
+            .collect())
     }
 }

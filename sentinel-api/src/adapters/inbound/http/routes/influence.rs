@@ -88,6 +88,14 @@ fn influence_inner() -> Router<AppState> {
             "/internal/jobs/resolve-investigations",
             post(handlers::influence::information::job_resolve_investigations),
         )
+        .route(
+            "/{guild_id}/orgs/relation",
+            post(handlers::influence::orgs::set_relation),
+        )
+        .route(
+            "/{guild_id}/archives",
+            post(handlers::influence::archives::list_archives),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

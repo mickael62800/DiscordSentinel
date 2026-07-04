@@ -3,6 +3,7 @@
 //! Phase 1 (MVP) : citoyen + 5 capitaux + paliers narratifs. Les organisations,
 //! votes, lois, etc. s'ajoutent aux phases suivantes.
 
+pub mod archive;
 pub mod capital;
 pub mod citizen;
 pub mod conversion;

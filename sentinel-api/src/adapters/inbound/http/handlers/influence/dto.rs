@@ -90,10 +90,18 @@ impl From<Organization> for OrganizationDto {
 }
 
 #[derive(Debug, Serialize)]
+pub struct OrgRelationDto {
+    pub other: String,
+    pub relation: String,
+    pub emoji: String,
+}
+
+#[derive(Debug, Serialize)]
 pub struct OrgInfoDto {
     #[serde(flatten)]
     pub org: OrganizationDto,
     pub member_count: i64,
+    pub relations: Vec<OrgRelationDto>,
 }
 
 impl From<OrgInfo> for OrgInfoDto {
@@ -101,6 +109,15 @@ impl From<OrgInfo> for OrgInfoDto {
         Self {
             org: i.org.into(),
             member_count: i.member_count,
+            relations: i
+                .relations
+                .into_iter()
+                .map(|r| OrgRelationDto {
+                    other: r.other_org_name,
+                    relation: r.relation.label().to_string(),
+                    emoji: r.relation.emoji().to_string(),
+                })
+                .collect(),
         }
     }
 }
@@ -318,6 +335,42 @@ impl From<RevealOutcome> for RevealOutcomeDto {
             target_user_id: o.target_user_id,
             target_username: o.target_username,
             reputation_loss: o.reputation_loss,
+        }
+    }
+}
+
+use sentinel_core::domain::entities::influence::archive::ArchiveEntry;
+
+#[derive(Debug, Serialize)]
+pub struct ArchiveEntryDto {
+    pub event_type: String,
+    pub summary: String,
+    pub occurred_at: DateTime<Utc>,
+}
+
+impl From<ArchiveEntry> for ArchiveEntryDto {
+    fn from(e: ArchiveEntry) -> Self {
+        let p = &e.payload;
+        let s = |k: &str| p.get(k).and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let summary = match e.event_type.as_str() {
+            "org_created" => format!("🏛️ {} a fondé « {} » ({})", s("founder"), s("name"), s("kind")),
+            "org_relation" => format!("🔗 {} → {} : {}", s("org"), s("other"), s("relation")),
+            "law_adopted" => format!("📜 Loi adoptée : « {} »", s("title")),
+            "law_rejected" => format!("📜 Loi rejetée : « {} »", s("title")),
+            "scandal" => {
+                let target = s("target");
+                if target.is_empty() {
+                    format!("💥 Scandale : {}", s("content"))
+                } else {
+                    format!("💥 Scandale visant {} : {}", target, s("content"))
+                }
+            }
+            other => format!("• {other}"),
+        };
+        Self {
+            event_type: e.event_type,
+            summary,
+            occurred_at: e.occurred_at,
         }
     }
 }

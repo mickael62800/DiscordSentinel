@@ -6,6 +6,7 @@ use async_trait::async_trait;
 
 use crate::application::influence::guild_settings::InfluenceSettings;
 use crate::application::validation::validate_non_empty;
+use crate::domain::entities::influence::archive::RelationKind;
 use crate::domain::entities::influence::org_membership::{OrgMemberView, OrgRole};
 use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
@@ -14,10 +15,12 @@ use crate::ports::inbound::influence::manage_organizations::{
     ManageOrganizationsUseCase, OrgInfo,
 };
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
+use crate::ports::outbound::influence::information_repository::ArchiveRepository;
 use crate::ports::outbound::influence::membership_repository::MembershipRepository;
 use crate::ports::outbound::influence::organization_repository::{
     NewOrganization, OrganizationRepository,
 };
+use crate::ports::outbound::influence::relation_repository::RelationRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 /// Longueur max d'un nom / d'une devise d'organisation.
@@ -28,6 +31,8 @@ pub struct ManageOrganizationsService {
     citizens: Arc<dyn CitizenRepository>,
     orgs: Arc<dyn OrganizationRepository>,
     memberships: Arc<dyn MembershipRepository>,
+    relations: Option<Arc<dyn RelationRepository>>,
+    archives: Option<Arc<dyn ArchiveRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -41,12 +46,24 @@ impl ManageOrganizationsService {
             citizens,
             orgs,
             memberships,
+            relations: None,
+            archives: None,
             cfg_repo: None,
         }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.cfg_repo = Some(repo);
+        self
+    }
+
+    pub fn with_relation_repo(mut self, repo: Arc<dyn RelationRepository>) -> Self {
+        self.relations = Some(repo);
+        self
+    }
+
+    pub fn with_archive_repo(mut self, repo: Arc<dyn ArchiveRepository>) -> Self {
+        self.archives = Some(repo);
         self
     }
 
@@ -139,13 +156,36 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             .add(org.id, founder.id, OrgRole::Fondateur)
             .await?;
 
+        // Archive best-effort : la creation d'org entre dans la memoire du serveur.
+        if let Some(arch) = &self.archives {
+            let _ = arch
+                .append(
+                    guild_id,
+                    "org_created",
+                    serde_json::json!({
+                        "name": org.name,
+                        "kind": org.kind.label(),
+                        "founder": founder.username,
+                    }),
+                )
+                .await;
+        }
+
         Ok(org)
     }
 
     async fn info(&self, guild_id: &str, name: &str) -> Result<OrgInfo, DomainError> {
         let org = self.require_org(guild_id, name).await?;
         let member_count = self.memberships.count(org.id).await?;
-        Ok(OrgInfo { org, member_count })
+        let relations = match &self.relations {
+            Some(r) => r.list_for_org(org.id).await.unwrap_or_default(),
+            None => Vec::new(),
+        };
+        Ok(OrgInfo {
+            org,
+            member_count,
+            relations,
+        })
     }
 
     async fn join(
@@ -180,5 +220,64 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
     ) -> Result<Vec<OrgMemberView>, DomainError> {
         let org = self.require_org(guild_id, name).await?;
         self.memberships.list_views(org.id).await
+    }
+
+    async fn set_relation(
+        &self,
+        guild_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        org_name: &str,
+        other_org_name: &str,
+        relation: RelationKind,
+    ) -> Result<(), DomainError> {
+        let Some(relations) = &self.relations else {
+            return Err(DomainError::NotImplemented(
+                "Relations indisponibles.".into(),
+            ));
+        };
+        let org = self.require_org(guild_id, org_name).await?;
+        let other = self.require_org(guild_id, other_org_name).await?;
+        if org.id == other.id {
+            return Err(DomainError::ValidationError(
+                "Une organisation ne peut pas se lier a elle-meme.".into(),
+            ));
+        }
+
+        // L'acteur doit etre dirigeant (ou fondateur) de l'organisation source.
+        let settings = self.settings(guild_id).await;
+        let actor = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        let membership = self
+            .memberships
+            .get(org.id, actor.id)
+            .await?
+            .ok_or_else(|| {
+                DomainError::Forbidden("Tu n'es pas membre de cette organisation.".into())
+            })?;
+        if membership.role.rank() > OrgRole::Dirigeant.rank() {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur et les dirigeants peuvent declarer une relation.".into(),
+            ));
+        }
+
+        relations.set(guild_id, org.id, other.id, relation).await?;
+
+        if let Some(arch) = &self.archives {
+            let _ = arch
+                .append(
+                    guild_id,
+                    "org_relation",
+                    serde_json::json!({
+                        "org": org.name,
+                        "other": other.name,
+                        "relation": relation.label(),
+                    }),
+                )
+                .await;
+        }
+        Ok(())
     }
 }

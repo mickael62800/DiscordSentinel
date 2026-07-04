@@ -12,6 +12,7 @@ use crate::domain::entities::influence::law::{Law, LawStatus};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_laws::{LawState, ManageLawsUseCase};
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
+use crate::ports::outbound::influence::information_repository::ArchiveRepository;
 use crate::ports::outbound::influence::law_repository::LawRepository;
 use crate::ports::outbound::influence::motion_repository::VoteRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -23,6 +24,7 @@ pub struct ManageLawsService {
     citizens: Arc<dyn CitizenRepository>,
     laws: Arc<dyn LawRepository>,
     votes: Arc<dyn VoteRepository>,
+    archives: Option<Arc<dyn ArchiveRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -36,12 +38,18 @@ impl ManageLawsService {
             citizens,
             laws,
             votes,
+            archives: None,
             cfg_repo: None,
         }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.cfg_repo = Some(repo);
+        self
+    }
+
+    pub fn with_archive_repo(mut self, repo: Arc<dyn ArchiveRepository>) -> Self {
+        self.archives = Some(repo);
         self
     }
 
@@ -165,6 +173,26 @@ impl ManageLawsUseCase for ManageLawsService {
             };
             self.laws.close(law.id, status).await?;
             law.status = status;
+
+            if let Some(arch) = &self.archives {
+                let event = if status == LawStatus::Adoptee {
+                    "law_adopted"
+                } else {
+                    "law_rejected"
+                };
+                let _ = arch
+                    .append(
+                        &law.guild_id,
+                        event,
+                        serde_json::json!({
+                            "title": law.title,
+                            "pour": tally.pour,
+                            "contre": tally.contre,
+                        }),
+                    )
+                    .await;
+            }
+
             closed.push(LawState { law, tally });
         }
         Ok(closed)

@@ -77,6 +77,11 @@ impl InfluenceSettings {
         self.get_i64("influence_scandal_reputation_loss", 200)
     }
 
+    /// Nombre d'evenements affiches par /actu et /archives.
+    pub fn feed_size(&self) -> i64 {
+        self.get_i64("influence_feed_size", 10).clamp(1, 25)
+    }
+
     /// Seuils de paliers narratifs (defaut pour le MVP ; reglables plus tard).
     pub fn tier_thresholds(&self) -> TierThresholds {
         TierThresholds::default()

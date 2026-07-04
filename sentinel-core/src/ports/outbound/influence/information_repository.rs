@@ -71,4 +71,11 @@ pub trait ArchiveRepository: Send + Sync {
         event_type: &str,
         payload: serde_json::Value,
     ) -> Result<(), DomainError>;
+
+    /// Dernieres entrees de la memoire du serveur (plus recentes d'abord).
+    async fn list_recent(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<crate::domain::entities::influence::archive::ArchiveEntry>, DomainError>;
 }

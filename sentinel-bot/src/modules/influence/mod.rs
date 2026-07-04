@@ -27,6 +27,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
         commands::information::register_enquete(),
         commands::information::register_dossier(),
         commands::information::register_reveler(),
+        commands::archives::register_actu(),
+        commands::archives::register_archives(),
     ]
 }
 
@@ -43,6 +45,8 @@ pub fn handles_command(name: &str) -> bool {
             | "enquete"
             | "dossier"
             | "reveler"
+            | "actu"
+            | "archives"
     )
 }
 
@@ -61,6 +65,8 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "enquete" => commands::information::handle_enquete(ctx, command).await,
         "dossier" => commands::information::handle_dossier(ctx, command).await,
         "reveler" => commands::information::handle_reveler(ctx, command).await,
+        "actu" => commands::archives::handle_actu(ctx, command).await,
+        "archives" => commands::archives::handle_archives(ctx, command).await,
         _ => {}
     }
 }

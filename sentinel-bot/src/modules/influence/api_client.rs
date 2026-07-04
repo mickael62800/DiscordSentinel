@@ -42,6 +42,13 @@ pub struct Organization {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct OrgRelation {
+    pub other: String,
+    pub relation: String,
+    pub emoji: String,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct OrgInfo {
     pub name: String,
     pub kind_label: String,
@@ -51,6 +58,8 @@ pub struct OrgInfo {
     pub reputation: i64,
     pub influence: i64,
     pub member_count: i64,
+    #[serde(default)]
+    pub relations: Vec<OrgRelation>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -512,6 +521,61 @@ pub async fn reveal(
     api.post_json(
         &format!("/api/influence/{guild_id}/reveal"),
         &RevealBody { user_id, username, info_id },
+    )
+    .await
+}
+
+// ── Relations & archives (Phase 5) ──
+
+#[derive(Debug, Deserialize)]
+pub struct ArchiveEntry {
+    pub summary: String,
+}
+
+#[derive(Debug, Serialize)]
+struct SetRelationBody<'a> {
+    actor_user_id: &'a str,
+    actor_username: &'a str,
+    org_name: &'a str,
+    other_org_name: &'a str,
+    relation: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct ArchivesQueryBody {
+    limit: Option<i64>,
+}
+
+pub async fn set_relation(
+    api: &BaseApiClient,
+    guild_id: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    org_name: &str,
+    other_org_name: &str,
+    relation: &str,
+) -> Result<serde_json::Value, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/relation"),
+        &SetRelationBody {
+            actor_user_id,
+            actor_username,
+            org_name,
+            other_org_name,
+            relation,
+        },
+    )
+    .await
+}
+
+pub async fn list_archives(
+    api: &BaseApiClient,
+    guild_id: &str,
+    limit: Option<i64>,
+) -> Result<Vec<ArchiveEntry>, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/archives"),
+        &ArchivesQueryBody { limit },
     )
     .await
 }

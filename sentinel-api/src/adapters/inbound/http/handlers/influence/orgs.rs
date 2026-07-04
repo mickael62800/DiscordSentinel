@@ -4,6 +4,7 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
+use sentinel_core::domain::entities::influence::archive::RelationKind;
 use sentinel_core::domain::enums::influence::organization_kind::OrganizationKind;
 use sentinel_core::domain::errors::DomainError;
 
@@ -95,4 +96,40 @@ pub async fn org_members(
 ) -> Result<Json<Vec<OrgMemberDto>>, ApiError> {
     let members = state.influence_orgs_uc.members(&guild_id, &dto.name).await?;
     Ok(Json(members.into_iter().map(Into::into).collect()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetRelationDto {
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub actor_username: String,
+    pub org_name: String,
+    pub other_org_name: String,
+    pub relation: String,
+}
+
+/// POST /api/influence/{guild_id}/orgs/relation
+pub async fn set_relation(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<SetRelationDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let relation = RelationKind::from_str_lossy(&dto.relation).ok_or_else(|| {
+        ApiError(DomainError::ValidationError(format!(
+            "Relation invalide : {}",
+            dto.relation
+        )))
+    })?;
+    state
+        .influence_orgs_uc
+        .set_relation(
+            &guild_id,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            &dto.org_name,
+            &dto.other_org_name,
+            relation,
+        )
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
 }

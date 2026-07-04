@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 
+use crate::domain::entities::influence::archive::{OrgRelation, RelationKind};
 use crate::domain::entities::influence::org_membership::OrgMemberView;
 use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
@@ -12,6 +13,7 @@ use crate::domain::errors::DomainError;
 pub struct OrgInfo {
     pub org: Organization,
     pub member_count: i64,
+    pub relations: Vec<OrgRelation>,
 }
 
 #[async_trait]
@@ -46,4 +48,16 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         guild_id: &str,
         name: &str,
     ) -> Result<Vec<OrgMemberView>, DomainError>;
+
+    /// Declare une relation d'une organisation vers une autre. L'acteur doit
+    /// etre dirigeant (ou fondateur) de l'organisation source.
+    async fn set_relation(
+        &self,
+        guild_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        org_name: &str,
+        other_org_name: &str,
+        relation: RelationKind,
+    ) -> Result<(), DomainError>;
 }

@@ -60,6 +60,28 @@ pub fn register() -> CreateCommand {
                         .required(true),
                 ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "relation",
+                "Declare une relation envers une autre organisation",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Ton organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "cible", "Organisation visee")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "type", "Nature de la relation")
+                    .required(true)
+                    .add_string_choice("Alliance", "alliance")
+                    .add_string_choice("Rivalité", "rivalite")
+                    .add_string_choice("Boycott", "boycott"),
+            ),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -144,12 +166,29 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
             Err(e) => reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await,
         },
+        "relation" => {
+            let cible = option_str(&opts, "cible").unwrap_or("");
+            let rtype = option_str(&opts, "type").unwrap_or("");
+            match api_client::set_relation(&api, &guild_id, &user_id, &username, &name, cible, rtype)
+                .await
+            {
+                Ok(_) => {
+                    reply_ephemeral(
+                        ctx,
+                        command,
+                        &format!("🔗 Relation déclarée : **{name}** → **{cible}**."),
+                    )
+                    .await
+                }
+                Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
+            }
+        }
         _ => {}
     }
 }
 
 fn info_embed(o: &api_client::OrgInfo) -> CreateEmbed {
-    CreateEmbed::new()
+    let embed = CreateEmbed::new()
         .title(format!("{} {}", o.emoji, o.name))
         .color(0x8E44AD)
         .description(if o.motto.is_empty() {
@@ -161,8 +200,21 @@ fn info_embed(o: &api_client::OrgInfo) -> CreateEmbed {
         .field("Membres", o.member_count.to_string(), true)
         .field("Trésorerie", format!("{} 💰", o.treasury), true)
         .field("Réputation", o.reputation.to_string(), true)
-        .field("Influence", o.influence.to_string(), true)
-        .footer(CreateEmbedFooter::new(
-            "Le patrimoine appartient à l'organisation, pas au dirigeant.",
-        ))
+        .field("Influence", o.influence.to_string(), true);
+
+    let embed = if o.relations.is_empty() {
+        embed
+    } else {
+        let rels = o
+            .relations
+            .iter()
+            .map(|r| format!("{} {} — {}", r.emoji, r.relation, r.other))
+            .collect::<Vec<_>>()
+            .join("\n");
+        embed.field("Relations", rels, false)
+    };
+
+    embed.footer(CreateEmbedFooter::new(
+        "Le patrimoine appartient à l'organisation, pas au dirigeant.",
+    ))
 }
