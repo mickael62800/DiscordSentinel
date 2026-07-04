@@ -5,6 +5,8 @@
 
 pub mod capital;
 pub mod citizen;
+pub mod motion;
 pub mod org_membership;
 pub mod organization;
 pub mod tier;
+pub mod vote;

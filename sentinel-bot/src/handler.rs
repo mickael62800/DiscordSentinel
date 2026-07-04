@@ -593,6 +593,8 @@ impl EventHandler for Handler {
                     modules::games::on_component(&ctx, &component).await;
                 } else if modules::game_portal::handles_component(cid) {
                     modules::game_portal::on_component(&ctx, &component).await;
+                } else if modules::influence::handles_component(cid) {
+                    modules::influence::on_component(&ctx, &component).await;
                 } else if modules::community::handles_component(cid) {
                     modules::community::on_component(&ctx, &component).await;
                 } else if modules::blackjack::handles_component(cid) {

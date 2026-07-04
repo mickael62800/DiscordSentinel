@@ -28,6 +28,22 @@ fn influence_inner() -> Router<AppState> {
             "/{guild_id}/orgs/members",
             post(handlers::influence::orgs::org_members),
         )
+        .route(
+            "/{guild_id}/motions",
+            post(handlers::influence::votes::create_motion),
+        )
+        .route(
+            "/{guild_id}/motions/vote",
+            post(handlers::influence::votes::cast_vote),
+        )
+        .route(
+            "/{guild_id}/motions/close",
+            post(handlers::influence::votes::close_motion),
+        )
+        .route(
+            "/{guild_id}/motions/state",
+            post(handlers::influence::votes::motion_state),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

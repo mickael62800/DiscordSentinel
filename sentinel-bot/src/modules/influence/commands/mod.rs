@@ -2,3 +2,4 @@
 
 pub mod org;
 pub mod profil;
+pub mod vote;

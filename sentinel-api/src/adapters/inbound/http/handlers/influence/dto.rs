@@ -123,3 +123,32 @@ impl From<OrgMemberView> for OrgMemberDto {
         }
     }
 }
+
+use sentinel_core::ports::inbound::influence::manage_votes::MotionState;
+
+#[derive(Debug, Serialize)]
+pub struct MotionStateDto {
+    pub motion_id: Uuid,
+    pub org_name: String,
+    pub title: String,
+    pub status: String,
+    pub status_label: String,
+    pub pour: i64,
+    pub contre: i64,
+    pub abstention: i64,
+}
+
+impl From<MotionState> for MotionStateDto {
+    fn from(s: MotionState) -> Self {
+        Self {
+            motion_id: s.motion.id,
+            org_name: s.org_name,
+            title: s.motion.title,
+            status: s.motion.status.as_str().to_string(),
+            status_label: s.motion.status.label().to_string(),
+            pour: s.tally.pour,
+            contre: s.tally.contre,
+            abstention: s.tally.abstention,
+        }
+    }
+}

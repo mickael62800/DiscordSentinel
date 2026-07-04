@@ -162,3 +162,92 @@ pub async fn view_profile(
     )
     .await
 }
+
+// ── Votes / motions ──
+
+#[derive(Debug, Deserialize)]
+pub struct MotionState {
+    pub motion_id: String,
+    pub org_name: String,
+    pub title: String,
+    pub status: String,
+    pub status_label: String,
+    pub pour: i64,
+    pub contre: i64,
+    pub abstention: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct CreateMotionBody<'a> {
+    org_name: &'a str,
+    creator_user_id: &'a str,
+    creator_username: &'a str,
+    title: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct CastVoteBody<'a> {
+    motion_id: &'a str,
+    user_id: &'a str,
+    username: &'a str,
+    choice: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct MotionActorBody<'a> {
+    motion_id: &'a str,
+    user_id: &'a str,
+}
+
+pub async fn create_motion(
+    api: &BaseApiClient,
+    guild_id: &str,
+    org_name: &str,
+    creator_user_id: &str,
+    creator_username: &str,
+    title: &str,
+) -> Result<MotionState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/motions"),
+        &CreateMotionBody {
+            org_name,
+            creator_user_id,
+            creator_username,
+            title,
+        },
+    )
+    .await
+}
+
+pub async fn cast_vote(
+    api: &BaseApiClient,
+    guild_id: &str,
+    motion_id: &str,
+    user_id: &str,
+    username: &str,
+    choice: &str,
+) -> Result<MotionState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/motions/vote"),
+        &CastVoteBody {
+            motion_id,
+            user_id,
+            username,
+            choice,
+        },
+    )
+    .await
+}
+
+pub async fn close_motion(
+    api: &BaseApiClient,
+    guild_id: &str,
+    motion_id: &str,
+    user_id: &str,
+) -> Result<MotionState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/motions/close"),
+        &MotionActorBody { motion_id, user_id },
+    )
+    .await
+}
