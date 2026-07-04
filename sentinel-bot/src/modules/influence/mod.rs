@@ -24,6 +24,9 @@ pub fn register_commands() -> Vec<CreateCommand> {
         commands::capital::register(),
         commands::transfert::register(),
         commands::loi::register(),
+        commands::information::register_enquete(),
+        commands::information::register_dossier(),
+        commands::information::register_reveler(),
     ]
 }
 
@@ -31,7 +34,15 @@ pub fn register_commands() -> Vec<CreateCommand> {
 pub fn handles_command(name: &str) -> bool {
     matches!(
         name,
-        "influence-profil" | "org" | "vote" | "capital" | "transfert" | "loi"
+        "influence-profil"
+            | "org"
+            | "vote"
+            | "capital"
+            | "transfert"
+            | "loi"
+            | "enquete"
+            | "dossier"
+            | "reveler"
     )
 }
 
@@ -47,6 +58,9 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "capital" => commands::capital::handle(ctx, command).await,
         "transfert" => commands::transfert::handle(ctx, command).await,
         "loi" => commands::loi::handle(ctx, command).await,
+        "enquete" => commands::information::handle_enquete(ctx, command).await,
+        "dossier" => commands::information::handle_dossier(ctx, command).await,
+        "reveler" => commands::information::handle_reveler(ctx, command).await,
         _ => {}
     }
 }
@@ -176,13 +190,47 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         Ok(v) => v,
         Err(_) => return,
     };
-    if env.get("event").and_then(|v| v.as_str()) != Some("influence_law_closed") {
-        return;
-    }
+    let event = env.get("event").and_then(|v| v.as_str());
     let data = match env.get("data") {
         Some(d) => d,
         None => return,
     };
+    match event {
+        Some("influence_law_closed") => on_law_closed(ctx, data).await,
+        Some("influence_investigation_done") => on_investigation_done(ctx, data).await,
+        _ => {}
+    }
+}
+
+/// Enquete resolue : notifie l'initiateur en message prive.
+async fn on_investigation_done(ctx: &Context, data: &serde_json::Value) {
+    let (Some(user_id), Some(target), Some(subject), Some(success)) = (
+        data.get("initiator_user_id").and_then(|v| v.as_str()),
+        data.get("target_username").and_then(|v| v.as_str()),
+        data.get("subject").and_then(|v| v.as_str()),
+        data.get("success").and_then(|v| v.as_bool()),
+    ) else {
+        return;
+    };
+    let Ok(uid) = user_id.parse::<u64>() else { return };
+    let msg = if success {
+        format!(
+            "🔎 Ton enquete sur **{target}** (« {subject} ») a **abouti** ! Consulte ton `/dossier` — tu peux la `/reveler` quand tu veux."
+        )
+    } else {
+        format!("🔎 Ton enquete sur **{target}** (« {subject} ») n'a **rien donne** cette fois.")
+    };
+    if let Ok(channel) = serenity::model::id::UserId::new(uid).create_dm_channel(&ctx.http).await {
+        let _ = channel
+            .send_message(
+                &ctx.http,
+                serenity::all::CreateMessage::new().content(msg),
+            )
+            .await;
+    }
+}
+
+async fn on_law_closed(ctx: &Context, data: &serde_json::Value) {
     let (Some(guild_id), Some(law_id), Some(channel_id), Some(message_id)) = (
         data.get("guild_id").and_then(|v| v.as_str()),
         data.get("law_id").and_then(|v| v.as_str()),

@@ -72,6 +72,22 @@ fn influence_inner() -> Router<AppState> {
             "/internal/jobs/close-laws",
             post(handlers::influence::laws::job_close_laws),
         )
+        .route(
+            "/{guild_id}/investigations",
+            post(handlers::influence::information::open_investigation),
+        )
+        .route(
+            "/{guild_id}/intel",
+            post(handlers::influence::information::list_intel),
+        )
+        .route(
+            "/{guild_id}/reveal",
+            post(handlers::influence::information::reveal),
+        )
+        .route(
+            "/internal/jobs/resolve-investigations",
+            post(handlers::influence::information::job_resolve_investigations),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

@@ -6,6 +6,7 @@
 pub mod capital;
 pub mod citizen;
 pub mod conversion;
+pub mod information;
 pub mod law;
 pub mod motion;
 pub mod movement;

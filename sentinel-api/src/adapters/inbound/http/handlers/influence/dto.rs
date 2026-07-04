@@ -261,3 +261,63 @@ impl From<LawState> for LawStateDto {
         }
     }
 }
+
+use sentinel_core::domain::entities::influence::information::{Information, Investigation};
+use sentinel_core::ports::inbound::influence::manage_information::RevealOutcome;
+
+#[derive(Debug, Serialize)]
+pub struct InvestigationDto {
+    pub id: Uuid,
+    pub target_username: String,
+    pub subject: String,
+    pub resolves_at: DateTime<Utc>,
+}
+
+impl From<Investigation> for InvestigationDto {
+    fn from(i: Investigation) -> Self {
+        Self {
+            id: i.id,
+            target_username: i.target_username,
+            subject: i.subject,
+            resolves_at: i.resolves_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct InformationDto {
+    pub id: Uuid,
+    pub target_username: String,
+    pub content: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<Information> for InformationDto {
+    fn from(i: Information) -> Self {
+        Self {
+            id: i.id,
+            target_username: i.target_username,
+            content: i.content,
+            created_at: i.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RevealOutcomeDto {
+    pub content: String,
+    pub target_user_id: String,
+    pub target_username: String,
+    pub reputation_loss: i64,
+}
+
+impl From<RevealOutcome> for RevealOutcomeDto {
+    fn from(o: RevealOutcome) -> Self {
+        Self {
+            content: o.content,
+            target_user_id: o.target_user_id,
+            target_username: o.target_username,
+            reputation_loss: o.reputation_loss,
+        }
+    }
+}

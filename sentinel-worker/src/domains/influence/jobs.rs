@@ -23,8 +23,9 @@ struct JobReport {
     errors: usize,
 }
 
-/// Spawn le job periodique de cloture des lois. Ne bloque pas l'appelant.
-pub fn start(api_url: String, close_laws_secs: u64) {
+/// Spawn les jobs periodiques Influence (cloture des lois + resolution des
+/// enquetes). Ne bloque pas l'appelant.
+pub fn start(api_url: String, interval_secs: u64) {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
     let http = match reqwest::Client::builder()
         .timeout(Duration::from_secs(60))
@@ -37,26 +38,37 @@ pub fn start(api_url: String, close_laws_secs: u64) {
         }
     };
 
+    spawn_job(http.clone(), api_url.clone(), api_key.clone(), "close-laws", interval_secs);
+    spawn_job(http, api_url, api_key, "resolve-investigations", interval_secs);
+}
+
+fn spawn_job(
+    http: reqwest::Client,
+    api_url: String,
+    api_key: String,
+    job: &'static str,
+    interval_secs: u64,
+) {
     tokio::spawn(async move {
-        let mut tick = tokio::time::interval(Duration::from_secs(close_laws_secs));
+        let mut tick = tokio::time::interval(Duration::from_secs(interval_secs));
         tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             tick.tick().await;
-            match call_close_laws(&http, &api_url, &api_key).await {
+            match call_job(&http, &api_url, &api_key, job).await {
                 Ok(report) => {
                     if report.processed > 0 {
-                        info!(processed = report.processed, "influence: lois cloturees");
+                        info!(job, processed = report.processed, "influence: tick OK");
                     }
                 }
                 Err(e) => {
-                    error!(error = %e, "influence: close-laws failed");
+                    error!(error = %e, job, "influence: job failed");
                     common::send_worker_log(
                         &api_url,
                         WORKER_NAME,
                         "error",
-                        "close-laws",
-                        &format!("job close-laws echec: {e}"),
-                        serde_json::json!({ "event_type": "influence.close_laws.error", "error": e }),
+                        job,
+                        &format!("job {job} echec: {e}"),
+                        serde_json::json!({ "event_type": format!("influence.{job}.error"), "error": e }),
                     )
                     .await;
                 }
@@ -65,12 +77,13 @@ pub fn start(api_url: String, close_laws_secs: u64) {
     });
 }
 
-async fn call_close_laws(
+async fn call_job(
     http: &reqwest::Client,
     api_url: &str,
     api_key: &str,
+    job: &str,
 ) -> Result<JobReport, String> {
-    let url = format!("{api_url}/api/influence/internal/jobs/close-laws");
+    let url = format!("{api_url}/api/influence/internal/jobs/{job}");
     let mut req = http.post(&url);
     if !api_key.is_empty() {
         req = req.bearer_auth(api_key);

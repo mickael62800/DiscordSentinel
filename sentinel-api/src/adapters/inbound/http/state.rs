@@ -156,6 +156,8 @@ pub struct AppState {
         Arc<dyn crate::ports::inbound::influence::manage_capital::ManageCapitalUseCase>,
     pub influence_laws_uc:
         Arc<dyn crate::ports::inbound::influence::manage_laws::ManageLawsUseCase>,
+    pub influence_information_uc:
+        Arc<dyn crate::ports::inbound::influence::manage_information::ManageInformationUseCase>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

@@ -428,3 +428,90 @@ pub async fn law_state(
     )
     .await
 }
+
+// ── Information / enquetes (Phase 4) ──
+
+#[derive(Debug, Deserialize)]
+pub struct Investigation {
+    pub target_username: String,
+    pub subject: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Information {
+    pub id: String,
+    pub target_username: String,
+    pub content: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RevealOutcome {
+    pub content: String,
+    pub target_username: String,
+    pub reputation_loss: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct OpenInvestigationBody<'a> {
+    initiator_user_id: &'a str,
+    initiator_username: &'a str,
+    target_user_id: &'a str,
+    target_username: &'a str,
+    subject: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct RevealBody<'a> {
+    user_id: &'a str,
+    username: &'a str,
+    info_id: &'a str,
+}
+
+pub async fn open_investigation(
+    api: &BaseApiClient,
+    guild_id: &str,
+    initiator_user_id: &str,
+    initiator_username: &str,
+    target_user_id: &str,
+    target_username: &str,
+    subject: &str,
+) -> Result<Investigation, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/investigations"),
+        &OpenInvestigationBody {
+            initiator_user_id,
+            initiator_username,
+            target_user_id,
+            target_username,
+            subject,
+        },
+    )
+    .await
+}
+
+pub async fn list_intel(
+    api: &BaseApiClient,
+    guild_id: &str,
+    user_id: &str,
+    username: &str,
+) -> Result<Vec<Information>, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/intel"),
+        &UserBody { user_id, username },
+    )
+    .await
+}
+
+pub async fn reveal(
+    api: &BaseApiClient,
+    guild_id: &str,
+    user_id: &str,
+    username: &str,
+    info_id: &str,
+) -> Result<RevealOutcome, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/reveal"),
+        &RevealBody { user_id, username, info_id },
+    )
+    .await
+}

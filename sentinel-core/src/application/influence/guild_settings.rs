@@ -57,6 +57,26 @@ impl InfluenceSettings {
         self.get_i64("influence_law_debate_hours", 48)
     }
 
+    /// Cout d'une enquete (Argent).
+    pub fn investigation_cost(&self) -> i64 {
+        self.get_i64("influence_investigation_cost", 300)
+    }
+
+    /// Duree d'une enquete (heures).
+    pub fn investigation_hours(&self) -> i64 {
+        self.get_i64("influence_investigation_hours", 6)
+    }
+
+    /// Probabilite de reussite d'une enquete (0..=100).
+    pub fn investigation_success_pct(&self) -> i64 {
+        self.get_i64("influence_investigation_success_pct", 60)
+    }
+
+    /// Reputation retiree a la cible d'un scandale.
+    pub fn scandal_reputation_loss(&self) -> i64 {
+        self.get_i64("influence_scandal_reputation_loss", 200)
+    }
+
     /// Seuils de paliers narratifs (defaut pour le MVP ; reglables plus tard).
     pub fn tier_thresholds(&self) -> TierThresholds {
         TierThresholds::default()

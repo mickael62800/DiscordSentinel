@@ -922,6 +922,39 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone()),
     );
+    let influence_investigation_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::information_repository::InvestigationRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::information_repository::PgInvestigationRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_information_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::information_repository::InformationRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::information_repository::PgInformationRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_archive_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::information_repository::ArchiveRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::information_repository::PgArchiveRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_information_uc: Arc<
+        dyn sentinel_core::ports::inbound::influence::manage_information::ManageInformationUseCase,
+    > = Arc::new(
+        sentinel_core::application::influence::manage_information_service::ManageInformationService::new(
+            influence_citizen_repo.clone(),
+            influence_investigation_repo.clone(),
+            influence_information_repo.clone(),
+            influence_archive_repo.clone(),
+            influence_movement_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     AppState {
         analyze_uc,
@@ -1028,6 +1061,7 @@ pub async fn build_app_state(
         influence_votes_uc,
         influence_capital_uc,
         influence_laws_uc,
+        influence_information_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),
