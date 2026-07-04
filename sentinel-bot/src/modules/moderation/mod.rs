@@ -223,44 +223,6 @@ pub async fn handle_autocomplete(ctx: &Context, autocomplete: &CommandInteractio
     }
 }
 
-// ── Helpers : appeal channel (log_channel_id deja gere par log_to_channel) ──
-
-/// Poste un embed dans `appeal_channel_id` configure pour la guild.
-/// Utilise pour notifier les mods quand un appel de sanction est cree.
-/// Best-effort : si la cle est vide ou l'envoi echoue, log warn.
-pub async fn post_to_appeal_channel(
-    ctx: &Context,
-    guild_id: &str,
-    embed: serenity::builder::CreateEmbed,
-) {
-    let cfg = {
-        let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(api) => api
-                .get_guild_config_for(guild_id, MODULE_BOT_NAME)
-                .await
-                .unwrap_or_default(),
-            None => return,
-        }
-    };
-    let channel_id = match cfg
-        .get("appeal_channel_id")
-        .and_then(|s| s.parse::<u64>().ok())
-    {
-        Some(n) if n > 0 => n,
-        _ => return,
-    };
-    let ch = serenity::model::id::ChannelId::new(channel_id);
-    if let Err(e) = ch
-        .send_message(
-            &ctx.http,
-            serenity::builder::CreateMessage::new().embed(embed),
-        )
-        .await
-    {
-        warn!(error = %e, channel_id, "Echec post appeal channel");
-    }
-}
 
 /// Cree un salon d'appel PRIVE sous la categorie `appeal_category_id` : visible
 /// seulement par l'appelant et le role moderateur. Retourne l'id du salon cree,

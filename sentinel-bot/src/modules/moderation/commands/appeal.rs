@@ -199,13 +199,14 @@ async fn finalize_appeal<F, Fut>(
         return;
     }
 
-    // 2) Fallback : notification dans le salon d'appels configure.
-    let notif = crate::shared::embeds::info_embed("📨 Nouvel appel de sanction")
-        .description(format!("<@{appellant_id}> conteste sa sanction."))
-        .timestamp(serenity::model::Timestamp::now());
-    crate::modules::moderation::post_to_appeal_channel(ctx, guild_id, notif).await;
+    // Pas de salon cree = categorie d'appel non configuree. On NE retombe plus
+    // sur une notification dans un salon (systeme retire) : l'appel passe
+    // exclusivement par un salon dedie cree sous la categorie.
+    let _ = appellant_id;
     reply(
-        "✅ Ton appel a été enregistré. Un modérateur senior va l'examiner.".to_string(),
+        "⚠️ Le système d'appel n'est pas configuré (catégorie d'appel manquante). \
+         Contacte un modérateur — dashboard → Modération → « Catégorie des salons d'appel »."
+            .to_string(),
     )
     .await;
 }
