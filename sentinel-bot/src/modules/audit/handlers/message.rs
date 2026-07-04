@@ -73,19 +73,26 @@ pub async fn handle_delete(
     let channel_name = super::resolve_channel_name(ctx, channel_id).await;
     let chan_label = channel_name.clone().unwrap_or_else(|| "?".to_string());
 
-    // Chercher dans le cache
-    let data = ctx.data.read().await;
-    let cached = data
-        .get::<MessageCacheKey>()
-        .and_then(|cache| cache.remove(gid, message_id));
+    // Chercher dans le cache (on libere le lock aussitot).
+    let cached = {
+        let data = ctx.data.read().await;
+        data.get::<MessageCacheKey>()
+            .and_then(|cache| cache.remove(gid, message_id))
+    };
 
     // Suppression d'un message de bot : on n'audite pas (pas de log Discord, pas
-    // de tracking). On libere le lock d'abord.
+    // de tracking).
     if cached.as_ref().map(|c| c.is_bot).unwrap_or(false) {
         return;
     }
 
-    let (log_msg, details) = match &cached {
+    // Qui a supprime ? Discord ne l'indique PAS dans l'event MESSAGE_DELETE :
+    // on interroge l'audit log. Absent si l'auteur a supprime son propre
+    // message (Discord ne cree pas d'entree dans ce cas).
+    let author_id_u64 = cached.as_ref().and_then(|c| c.author_id.parse::<u64>().ok());
+    let deleter = resolve_deleter(ctx, gid, channel_id, author_id_u64).await;
+
+    let (mut log_msg, mut details) = match &cached {
         Some(c) => {
             let preview = if c.content.chars().count() > 100 {
                 format!("{}...", c.content.chars().take(100).collect::<String>())
@@ -109,6 +116,15 @@ pub async fn handle_delete(
             serde_json::json!({}),
         ),
     };
+
+    // Enrichit avec le suppresseur si identifie via l'audit log.
+    if let Some((del_id, del_name)) = &deleter {
+        log_msg.push_str(&format!(" — supprime par **{del_name}**"));
+        if let Some(obj) = details.as_object_mut() {
+            obj.insert("deleted_by".into(), serde_json::json!(del_id));
+            obj.insert("deleted_by_name".into(), serde_json::json!(del_name));
+        }
+    }
 
     log(ctx, "warn", &gid_str, &log_msg).await;
 
@@ -145,6 +161,14 @@ pub async fn handle_delete(
                 false,
             );
         }
+        embed = match &deleter {
+            Some((del_id, _)) => embed.field("Supprimé par", format!("<@{del_id}>"), true),
+            None => embed.field(
+                "Supprimé par",
+                "l'auteur lui-même (ou inconnu)",
+                true,
+            ),
+        };
         embed = embed.timestamp(serenity::model::Timestamp::now());
         post_to_channel(ctx, &gid_str, MESSAGE_LOG_KEYS, embed).await;
     }
@@ -165,10 +189,12 @@ pub async fn handle_delete(
     }
 
     // Weekly stats
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::MessageDeleted);
+    {
+        let data = ctx.data.read().await;
+        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
+            tracker.increment(gid, StatField::MessageDeleted);
+        }
     }
-    drop(data);
 
     // Anomaly detection (on release le lock data d'abord pour pouvoir poster).
     // Thresholds per-guild.
@@ -515,4 +541,59 @@ pub async fn handle_delete_bulk(
     if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
         tracker.increment_deleted(gid, count as u64);
     }
+}
+
+/// Determine qui a supprime un message via l'audit log Discord.
+///
+/// Discord n'indique PAS le suppresseur dans l'event MESSAGE_DELETE. On lit
+/// donc l'audit log (action 72) et on correle par salon + auteur cible.
+/// Renvoie `None` quand l'auteur a supprime lui-meme son message (Discord ne
+/// cree alors aucune entree), ou si le bot n'a pas la permission VIEW_AUDIT_LOG.
+///
+/// Limites Discord : les suppressions du meme moderateur sur le meme auteur
+/// sont agregees (compteur) ; la correlation reste donc heuristique.
+async fn resolve_deleter(
+    ctx: &Context,
+    gid: GuildId,
+    channel_id: ChannelId,
+    author_id: Option<u64>,
+) -> Option<(String, String)> {
+    use serenity::model::guild::audit_log::{Action, MessageAction};
+
+    // L'entree audit peut arriver juste apres l'event : petit delai.
+    tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+
+    let logs = gid
+        .audit_logs(
+            &ctx.http,
+            Some(Action::Message(MessageAction::Delete)),
+            None,
+            None,
+            Some(8),
+        )
+        .await
+        .ok()?;
+
+    let entry = logs.entries.into_iter().find(|e| {
+        let chan_ok = e
+            .options
+            .as_ref()
+            .and_then(|o| o.channel_id)
+            .map(|c| c.get() == channel_id.get())
+            .unwrap_or(false);
+        let target_ok = match (author_id, e.target_id) {
+            (Some(a), Some(t)) => t.get() == a,
+            (None, _) => true,
+            _ => false,
+        };
+        chan_ok && target_ok
+    })?;
+
+    let executor = entry.user_id;
+    let name = executor
+        .to_user(&ctx.http)
+        .await
+        .map(|u| u.name)
+        .unwrap_or_else(|_| executor.to_string());
+    Some((executor.to_string(), name))
 }
