@@ -249,6 +249,106 @@ pub async fn post_to_appeal_channel(
     }
 }
 
+/// Cree un salon d'appel PRIVE sous la categorie `appeal_category_id` : visible
+/// seulement par l'appelant et le role moderateur. Retourne l'id du salon cree,
+/// ou `None` si la categorie n'est pas configuree (l'appelant retombe alors sur
+/// la notification `appeal_channel_id`).
+pub async fn create_appeal_channel(
+    ctx: &Context,
+    guild_id: &str,
+    appellant_id: u64,
+    appellant_name: &str,
+    intro: serenity::builder::CreateEmbed,
+) -> Option<serenity::model::id::ChannelId> {
+    use serenity::all::{
+        ChannelType, CreateChannel, PermissionOverwrite, PermissionOverwriteType, Permissions,
+    };
+    use serenity::model::id::{ChannelId, GuildId, RoleId, UserId};
+
+    let gid: u64 = guild_id.parse().ok()?;
+    let guild = GuildId::new(gid);
+
+    let cfg = {
+        let data = ctx.data.read().await;
+        let api = data.get::<ApiClientKey>()?;
+        api.get_guild_config_for(guild_id, MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default()
+    };
+
+    // Categorie requise : sans elle, on ne cree pas de salon (fallback appelant).
+    let category_id = cfg
+        .get("appeal_category_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|&n| n > 0)?;
+
+    // Permissions : @everyone ne voit rien, l'appelant et le role modo voient.
+    let mut overwrites = vec![
+        PermissionOverwrite {
+            allow: Permissions::empty(),
+            deny: Permissions::VIEW_CHANNEL,
+            kind: PermissionOverwriteType::Role(RoleId::new(gid)), // @everyone
+        },
+        PermissionOverwrite {
+            allow: Permissions::VIEW_CHANNEL
+                | Permissions::SEND_MESSAGES
+                | Permissions::READ_MESSAGE_HISTORY,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(UserId::new(appellant_id)),
+        },
+    ];
+    for key in ["moderator_role_id", "mod_role_id"] {
+        if let Some(rid) = cfg.get(key).and_then(|v| v.parse::<u64>().ok()).filter(|&n| n > 0) {
+            overwrites.push(PermissionOverwrite {
+                allow: Permissions::VIEW_CHANNEL
+                    | Permissions::SEND_MESSAGES
+                    | Permissions::READ_MESSAGE_HISTORY,
+                deny: Permissions::empty(),
+                kind: PermissionOverwriteType::Role(RoleId::new(rid)),
+            });
+            break;
+        }
+    }
+
+    // Nom de salon : appel-<pseudo assaini>.
+    let slug: String = appellant_name
+        .to_lowercase()
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .chars()
+        .take(90)
+        .collect();
+    let channel_name = format!("appel-{}", if slug.is_empty() { "membre".into() } else { slug });
+
+    let create = CreateChannel::new(&channel_name)
+        .kind(ChannelType::Text)
+        .category(ChannelId::new(category_id))
+        .topic(format!("Appel de sanction — {appellant_name}"))
+        .permissions(overwrites);
+
+    let channel = match guild.create_channel(&ctx.http, create).await {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(error = %e, guild_id, "Echec creation salon d'appel");
+            return None;
+        }
+    };
+
+    // Message d'accroche : ping l'appelant + embed d'intro.
+    let _ = channel
+        .send_message(
+            &ctx.http,
+            serenity::builder::CreateMessage::new()
+                .content(format!("<@{appellant_id}>"))
+                .embed(intro),
+        )
+        .await;
+
+    Some(channel.id)
+}
+
 // ── Background tasks ──
 
 /// Spawn le consumer Redis des events moderation (appele depuis ready).

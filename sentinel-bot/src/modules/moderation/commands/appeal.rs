@@ -103,6 +103,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
+    // Ticket dashboard (best-effort, pour le suivi cote web).
     let req = base
         .client()
         .post(format!("{}/api/tickets", base.base_url()))
@@ -115,32 +116,75 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             "category": "appel_sanction",
             "ticket_type": "appel_sanction",
         }));
-
-    match base.auth(req).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            record_appeal(&guild_id.to_string(), &user_id);
-            reply_ephemeral(
-                ctx,
-                command,
-                "Votre appel de sanction a ete enregistre. Un ticket a ete cree et un moderateur senior va l'examiner.",
-            ).await;
-            info!(user = %command.user.name, "Appel de sanction cree via /appeal");
-        }
-        Ok(resp) => {
-            let status = resp.status();
-            error!(status = %status, "Erreur creation ticket appel");
-            reply_ephemeral(
-                ctx,
-                command,
-                "Erreur lors de la creation de l'appel. Reessayez plus tard.",
-            )
-            .await;
-        }
-        Err(e) => {
-            error!(error = %e, "Erreur reseau creation ticket appel");
-            reply_ephemeral(ctx, command, "Erreur reseau. Reessayez plus tard.").await;
-        }
+    if let Err(e) = base.auth(req).send().await {
+        warn!(error = %e, "Ticket appel (dashboard) non cree — on continue");
     }
+
+    record_appeal(&guild_id.to_string(), &user_id);
+    finalize_appeal(
+        ctx,
+        &guild_id.to_string(),
+        command.user.id.get(),
+        &command.user.name,
+        None,
+        |content| {
+            let ctx = ctx.clone();
+            async move {
+                reply_ephemeral(&ctx, command, &content).await;
+            }
+        },
+    )
+    .await;
+    info!(user = %command.user.name, "Appel de sanction traite via /appeal");
+}
+
+/// Cree le salon d'appel (si categorie configuree) + notifie ; puis renvoie le
+/// message a afficher a l'appelant via `reply`.
+async fn finalize_appeal<F, Fut>(
+    ctx: &Context,
+    guild_id: &str,
+    appellant_id: u64,
+    appellant_name: &str,
+    action_id: Option<&str>,
+    reply: F,
+) where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = ()>,
+{
+    let mut desc = format!("<@{appellant_id}> conteste une sanction et demande un réexamen.");
+    if let Some(a) = action_id {
+        desc.push_str(&format!("\n**Action :** `{}`", &a[..16.min(a.len())]));
+    }
+    let intro = crate::shared::embeds::info_embed("📨 Appel de sanction")
+        .description(desc)
+        .timestamp(serenity::model::Timestamp::now());
+
+    // 1) Salon dedie sous la categorie (si configuree).
+    if let Some(channel) = crate::modules::moderation::create_appeal_channel(
+        ctx,
+        guild_id,
+        appellant_id,
+        appellant_name,
+        intro,
+    )
+    .await
+    {
+        reply(format!(
+            "✅ Ton appel est ouvert : <#{channel}>. Un modérateur va l'examiner."
+        ))
+        .await;
+        return;
+    }
+
+    // 2) Fallback : notification dans le salon d'appels configure.
+    let notif = crate::shared::embeds::info_embed("📨 Nouvel appel de sanction")
+        .description(format!("<@{appellant_id}> conteste sa sanction."))
+        .timestamp(serenity::model::Timestamp::now());
+    crate::modules::moderation::post_to_appeal_channel(ctx, guild_id, notif).await;
+    reply(
+        "✅ Ton appel a été enregistré. Un modérateur senior va l'examiner.".to_string(),
+    )
+    .await;
 }
 
 pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteraction) {
@@ -170,61 +214,60 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
         }
     };
 
-    let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => b,
-        None => return,
-    };
-
-    let req = base
-        .client()
-        .post(format!("{}/api/tickets", base.base_url()))
-        .json(&serde_json::json!({
-            "title": format!("Appel de sanction — {} (action: {})", component.user.name, &action_id[..8.min(action_id.len())]),
-            "priority": "medium",
-            "author_id": component.user.id.to_string(),
-            "author_name": component.user.name,
-            "server": found_guild,
-            "category": "appel_sanction",
-            "ticket_type": "appel_sanction",
-        }));
-
-    match base.auth(req).send().await {
-        Ok(resp) if resp.status().is_success() => {
-            let response = CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("Votre appel a ete enregistre. Un ticket a ete cree et un moderateur senior va l'examiner.")
-                    .ephemeral(true),
-            );
-            if let Err(e) = component.create_response(&ctx.http, response).await {
-                warn!(error = %e, "Failed to send appeal success response");
-            }
-            info!(user = %component.user.name, action_id = action_id, "Appel de sanction cree via bouton DM");
-
-            // Notifie le salon d'appels (si configure) que le ticket a ete
-            // cree -- permet aux mods de voir l'appel directement dans
-            // Discord sans surveiller la dashboard tickets.
-            let notif_embed = crate::shared::embeds::info_embed("Nouvel appel de sanction")
-                .description(format!(
-                    "<@{}> conteste sa sanction.\n**Action ID :** `{}`\nUn ticket a ete cree (categorie `appel_sanction`).",
-                    component.user.id,
-                    &action_id[..16.min(action_id.len())],
-                ))
-                .timestamp(serenity::model::Timestamp::now());
-            crate::modules::moderation::post_to_appeal_channel(ctx, &found_guild, notif_embed)
-                .await;
-        }
-        _ => {
-            let response = CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("Erreur lors de la creation de l'appel. Utilisez `/appeal` dans le serveur.")
-                    .ephemeral(true),
-            );
-            if let Err(e) = component.create_response(&ctx.http, response).await {
-                warn!(error = %e, "Failed to send appeal error response");
+    // Ticket dashboard (best-effort). On lit le client puis on relache le lock.
+    {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let req = base
+                .client()
+                .post(format!("{}/api/tickets", base.base_url()))
+                .json(&serde_json::json!({
+                    "title": format!("Appel de sanction — {} (action: {})", component.user.name, &action_id[..8.min(action_id.len())]),
+                    "priority": "medium",
+                    "author_id": component.user.id.to_string(),
+                    "author_name": component.user.name,
+                    "server": found_guild,
+                    "category": "appel_sanction",
+                    "ticket_type": "appel_sanction",
+                }));
+            if let Err(e) = base.auth(req).send().await {
+                warn!(error = %e, "Ticket appel (dashboard) non cree — on continue");
             }
         }
     }
+
+    // Repond a l'interaction (differe : la creation du salon peut prendre du temps).
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await;
+
+    finalize_appeal(
+        ctx,
+        &found_guild,
+        component.user.id.get(),
+        &component.user.name,
+        Some(action_id),
+        |content| {
+            let ctx = ctx.clone();
+            async move {
+                let _ = component
+                    .create_followup(
+                        &ctx.http,
+                        serenity::builder::CreateInteractionResponseFollowup::new()
+                            .content(content)
+                            .ephemeral(true),
+                    )
+                    .await;
+            }
+        },
+    )
+    .await;
+    info!(user = %component.user.name, action_id = action_id, "Appel de sanction traite via bouton DM");
 }
 
 /// Construit la ligne de bouton "Contester" attachee aux DM de sanction.
