@@ -52,6 +52,11 @@ impl InfluenceSettings {
         self.get_i64("influence_org_max_per_citizen", 3)
     }
 
+    /// Duree du vote d'une loi (heures).
+    pub fn law_debate_hours(&self) -> i64 {
+        self.get_i64("influence_law_debate_hours", 48)
+    }
+
     /// Seuils de paliers narratifs (defaut pour le MVP ; reglables plus tard).
     pub fn tier_thresholds(&self) -> TierThresholds {
         TierThresholds::default()

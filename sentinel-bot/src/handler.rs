@@ -177,6 +177,7 @@ impl EventHandler for Handler {
         // (bouton "Deployer" du dashboard).
         modules::games::spawn(ctx.clone());
         modules::game_portal::spawn(ctx.clone());
+        modules::influence::spawn(ctx.clone());
 
         // AI dataset : task de collecte (client-streaming gRPC longue duree).
         modules::ai_dataset::spawn_collector(ctx.clone()).await;

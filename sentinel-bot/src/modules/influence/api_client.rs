@@ -330,3 +330,101 @@ pub async fn convert_capital(
     )
     .await
 }
+
+// ── Lois (Phase 3) ──
+
+#[derive(Debug, Deserialize)]
+pub struct LawState {
+    pub law_id: String,
+    pub title: String,
+    pub body: String,
+    pub status: String,
+    pub status_label: String,
+    pub pour: i64,
+    pub contre: i64,
+    pub abstention: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct ProposeLawBody<'a> {
+    author_user_id: &'a str,
+    author_username: &'a str,
+    title: &'a str,
+    body: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct LawVoteBody<'a> {
+    law_id: &'a str,
+    user_id: &'a str,
+    username: &'a str,
+    choice: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct SetLawMessageBody<'a> {
+    law_id: &'a str,
+    channel_id: &'a str,
+    message_id: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct LawIdBody<'a> {
+    law_id: &'a str,
+}
+
+pub async fn propose_law(
+    api: &BaseApiClient,
+    guild_id: &str,
+    author_user_id: &str,
+    author_username: &str,
+    title: &str,
+    body: &str,
+) -> Result<LawState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/laws"),
+        &ProposeLawBody { author_user_id, author_username, title, body },
+    )
+    .await
+}
+
+pub async fn law_vote(
+    api: &BaseApiClient,
+    guild_id: &str,
+    law_id: &str,
+    user_id: &str,
+    username: &str,
+    choice: &str,
+) -> Result<LawState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/laws/vote"),
+        &LawVoteBody { law_id, user_id, username, choice },
+    )
+    .await
+}
+
+pub async fn set_law_message(
+    api: &BaseApiClient,
+    guild_id: &str,
+    law_id: &str,
+    channel_id: &str,
+    message_id: &str,
+) -> Result<serde_json::Value, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/laws/message"),
+        &SetLawMessageBody { law_id, channel_id, message_id },
+    )
+    .await
+}
+
+pub async fn law_state(
+    api: &BaseApiClient,
+    guild_id: &str,
+    law_id: &str,
+) -> Result<LawState, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/laws/state"),
+        &LawIdBody { law_id },
+    )
+    .await
+}

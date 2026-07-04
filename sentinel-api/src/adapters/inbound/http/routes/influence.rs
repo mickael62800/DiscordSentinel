@@ -52,6 +52,26 @@ fn influence_inner() -> Router<AppState> {
             "/{guild_id}/capital/convert",
             post(handlers::influence::capital::convert_capital),
         )
+        .route(
+            "/{guild_id}/laws",
+            post(handlers::influence::laws::propose_law),
+        )
+        .route(
+            "/{guild_id}/laws/vote",
+            post(handlers::influence::laws::law_vote),
+        )
+        .route(
+            "/{guild_id}/laws/state",
+            post(handlers::influence::laws::law_state),
+        )
+        .route(
+            "/{guild_id}/laws/message",
+            post(handlers::influence::laws::set_law_message),
+        )
+        .route(
+            "/internal/jobs/close-laws",
+            post(handlers::influence::laws::job_close_laws),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

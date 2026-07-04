@@ -456,6 +456,11 @@ pub fn start(
     );
 
     // ─────────────────────────────────────────────────────────────
+    // Domaine : influence (monde vivant — cloture des lois a echeance)
+    // ─────────────────────────────────────────────────────────────
+    domains::influence::jobs::start(api_url.clone(), 300);
+
+    // ─────────────────────────────────────────────────────────────
     // Domaine : moderation (conduit, bans, propositions, rappels)
     // Porte de l'ancien moderation-worker.
     // ─────────────────────────────────────────────────────────────

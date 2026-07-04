@@ -905,6 +905,23 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone()),
     );
+    let influence_law_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::law_repository::LawRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::law_repository::PgLawRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_laws_uc: Arc<
+        dyn sentinel_core::ports::inbound::influence::manage_laws::ManageLawsUseCase,
+    > = Arc::new(
+        sentinel_core::application::influence::manage_laws_service::ManageLawsService::new(
+            influence_citizen_repo.clone(),
+            influence_law_repo.clone(),
+            influence_vote_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     AppState {
         analyze_uc,
@@ -1010,6 +1027,7 @@ pub async fn build_app_state(
         influence_orgs_uc,
         influence_votes_uc,
         influence_capital_uc,
+        influence_laws_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

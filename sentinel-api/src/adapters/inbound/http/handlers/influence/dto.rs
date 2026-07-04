@@ -228,3 +228,36 @@ impl From<ConversionOutcome> for ConversionOutcomeDto {
         }
     }
 }
+
+use sentinel_core::ports::inbound::influence::manage_laws::LawState;
+
+#[derive(Debug, Serialize)]
+pub struct LawStateDto {
+    pub law_id: Uuid,
+    pub title: String,
+    pub body: String,
+    pub status: String,
+    pub status_label: String,
+    pub channel_id: Option<String>,
+    pub message_id: Option<String>,
+    pub pour: i64,
+    pub contre: i64,
+    pub abstention: i64,
+}
+
+impl From<LawState> for LawStateDto {
+    fn from(s: LawState) -> Self {
+        Self {
+            law_id: s.law.id,
+            title: s.law.title,
+            body: s.law.body,
+            status: s.law.status.as_str().to_string(),
+            status_label: s.law.status.label().to_string(),
+            channel_id: s.law.channel_id,
+            message_id: s.law.message_id,
+            pour: s.tally.pour,
+            contre: s.tally.contre,
+            abstention: s.tally.abstention,
+        }
+    }
+}
