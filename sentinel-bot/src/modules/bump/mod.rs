@@ -161,6 +161,32 @@ struct BumpRewardResp {
     vip_just_unlocked: bool,
 }
 
+/// Appele a chaque EDITION de message. Certains bots de bump (DiscordL)
+/// repondent d'abord un message VIDE a l'interaction `/bump`, puis l'editent
+/// pour y ajouter l'embed de resultat. On ne voit donc rien au MESSAGE_CREATE :
+/// il faut re-lire le message a l'edition, quand l'embed est enfin present.
+pub async fn on_message_update(
+    ctx: &Context,
+    event: &serenity::model::event::MessageUpdateEvent,
+) {
+    // Un embed vient-il d'apparaitre ? (sinon rien a detecter).
+    let has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false);
+    if !has_embeds {
+        return;
+    }
+    // Si l'auteur est connu et n'est pas un provider bump, on ignore
+    // (evite de refetch tous les messages edites du serveur).
+    if let Some(author) = &event.author {
+        if provider_for_bot(author.id.get()).is_none() {
+            return;
+        }
+    }
+    // Re-lit le message complet (embed + interaction_metadata desormais la).
+    if let Ok(msg) = event.channel_id.message(&ctx.http, event.id).await {
+        on_message(ctx, &msg).await;
+    }
+}
+
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
