@@ -257,6 +257,52 @@ pub async fn post_to_channel(
     }
 }
 
+/// Log une-ligne d'utilisation d'une commande admin/moderateur, dans un salon
+/// DEDIE et parametrable (`command_log_channel_id`). Ne poste QUE si le module
+/// est actif, que `command_log_enabled` vaut true et que le salon est configure
+/// (aucun fallback sur le log d'audit general, pour ne pas le polluer).
+pub async fn log_admin_command(
+    ctx: &Context,
+    guild_id: &str,
+    user_id: &str,
+    user_name: &str,
+    full_command: &str,
+) {
+    let config = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(base) => base
+                .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
+            None => return,
+        }
+    };
+
+    // Opt-in explicite : toggle + salon dedie.
+    let enabled = config
+        .get("command_log_enabled")
+        .map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on"))
+        .unwrap_or(false);
+    if !enabled {
+        return;
+    }
+    let channel_id = match config.get("command_log_channel_id").and_then(|v| v.parse::<u64>().ok()) {
+        Some(id) if id > 0 => id,
+        _ => return,
+    };
+
+    let line = format!("🛠️ <@{user_id}> (`{user_name}`) a utilisé **/{full_command}**");
+    let embed = serenity::builder::CreateEmbed::new()
+        .description(line)
+        .color(0x5865F2)
+        .timestamp(serenity::model::Timestamp::now());
+    let msg = serenity::builder::CreateMessage::new().embed(embed);
+    if let Err(e) = ChannelId::new(channel_id).send_message(&ctx.http, msg).await {
+        warn!(error = %e, "Echec log commande admin");
+    }
+}
+
 // ── Event handler free functions ──
 
 /// Called on ready — bootstrap watched users + start Redis consumer.

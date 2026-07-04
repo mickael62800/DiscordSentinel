@@ -49,6 +49,19 @@ fn command_module(name: &str) -> &'static str {
     }
 }
 
+/// `true` si la commande est une commande admin/moderateur (loggue dans le
+/// salon dedie `command_log_channel_id`). Couvre automod + toutes les commandes
+/// de moderation/securite/nettoyage/audit/rotation, les `*-setup`, les `*-admin`
+/// et les panneaux de config communautaires.
+fn is_admin_command(name: &str) -> bool {
+    matches!(
+        command_module(name),
+        "moderation" | "automod" | "security" | "cleanup" | "audit" | "rotation"
+    ) || name.ends_with("-setup")
+        || name.ends_with("-admin")
+        || matches!(name, "roles-panel" | "parrain")
+}
+
 /// Reconstruit le nom complet de la commande slash y compris
 /// subcommand_group / subcommand (ex: "ticket close all", "audit channel set").
 fn format_full_command(data: &CommandData) -> String {
@@ -493,6 +506,15 @@ impl EventHandler for Handler {
                             }),
                         );
                     }
+                }
+
+                // Log une-ligne des commandes admin/moderateur dans le salon
+                // dedie et parametrable (opt-in via la config audit-bot).
+                if !guild_id.is_empty() && is_admin_command(name) {
+                    modules::audit::log_admin_command(
+                        &ctx, &guild_id, &user_id, &user_name, &full_cmd,
+                    )
+                    .await;
                 }
 
                 let start = std::time::Instant::now();
