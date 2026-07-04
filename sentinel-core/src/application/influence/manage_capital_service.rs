@@ -13,6 +13,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_capital::{
     CapitalLine, CapitalOverview, ConversionOutcome, ManageCapitalUseCase,
 };
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
 use crate::ports::outbound::influence::movement_repository::MovementRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -23,6 +24,7 @@ const HISTORY_LIMIT: i64 = 10;
 pub struct ManageCapitalService {
     citizens: Arc<dyn CitizenRepository>,
     movements: Arc<dyn MovementRepository>,
+    wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -34,6 +36,7 @@ impl ManageCapitalService {
         Self {
             citizens,
             movements,
+            wallet: None,
             cfg_repo: None,
         }
     }
@@ -41,6 +44,19 @@ impl ManageCapitalService {
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.cfg_repo = Some(repo);
         self
+    }
+
+    pub fn with_wallet_repo(mut self, repo: Arc<dyn WalletRepository>) -> Self {
+        self.wallet = Some(repo);
+        self
+    }
+
+    /// Solde d'Argent (coins wallet partage), fallback sur la valeur donnee.
+    async fn money_balance(&self, guild_id: &str, user_id: &str, fallback: i64) -> i64 {
+        match &self.wallet {
+            Some(w) => w.get(guild_id, user_id).await.ok().flatten().map(|x| x.coins).unwrap_or(0),
+            None => fallback,
+        }
     }
 
     async fn settings(&self, guild_id: &str) -> InfluenceSettings {
@@ -59,15 +75,15 @@ impl ManageCapitalUseCase for ManageCapitalService {
         user_id: &str,
         username: &str,
     ) -> Result<CapitalOverview, DomainError> {
-        let start_money = self.settings(guild_id).await.start_money();
         let citizen = self
             .citizens
-            .get_or_create(guild_id, user_id, username, start_money)
+            .get_or_create(guild_id, user_id, username, 0)
             .await?;
         let c = citizen.capitals;
+        let money = self.money_balance(guild_id, user_id, c.money).await;
         let lines = vec![
             CapitalLine { capital: Capital::Influence, value: c.influence },
-            CapitalLine { capital: Capital::Money, value: c.money },
+            CapitalLine { capital: Capital::Money, value: money },
             CapitalLine { capital: Capital::Reputation, value: c.reputation },
             CapitalLine { capital: Capital::Information, value: c.information },
             CapitalLine { capital: Capital::Network, value: c.network },
@@ -97,12 +113,17 @@ impl ManageCapitalUseCase for ManageCapitalService {
         let rates = settings.conversion_rates();
         let citizen = self
             .citizens
-            .get_or_create(guild_id, user_id, username, settings.start_money())
+            .get_or_create(guild_id, user_id, username, 0)
             .await?;
 
         let source = kind.source();
         let target = kind.target();
-        let available = citizen.capitals.get(source);
+        // Solde disponible : coins du wallet si la source est l'Argent.
+        let available = if source == Capital::Money {
+            self.money_balance(guild_id, user_id, citizen.capitals.money).await
+        } else {
+            citizen.capitals.get(source)
+        };
 
         let result = convert(kind, budget, available, &rates).map_err(|e| match e {
             ConversionError::InvalidRate => {
@@ -119,16 +140,31 @@ impl ManageCapitalUseCase for ManageCapitalService {
             )),
         })?;
 
-        // Applique le debit puis le credit.
+        // Applique le debit (source) puis le credit (cible). L'Argent passe par
+        // le wallet partage ; les autres capitaux par influence_citizens.
         let reason = format!("Conversion {} -> {}", source.label(), target.label());
-        let new_source = self
-            .citizens
-            .adjust_capital(citizen.id, source, -result.spent)
-            .await?;
-        let new_target = self
-            .citizens
-            .adjust_capital(citizen.id, target, result.gained)
-            .await?;
+        let new_source = if source == Capital::Money {
+            match &self.wallet {
+                Some(w) => w
+                    .debit(guild_id, user_id, result.spent, "influence", &reason)
+                    .await?
+                    .coins,
+                None => self.citizens.adjust_capital(citizen.id, source, -result.spent).await?,
+            }
+        } else {
+            self.citizens.adjust_capital(citizen.id, source, -result.spent).await?
+        };
+        let new_target = if target == Capital::Money {
+            match &self.wallet {
+                Some(w) => w
+                    .credit(guild_id, user_id, result.gained, "influence", &reason)
+                    .await?
+                    .coins,
+                None => self.citizens.adjust_capital(citizen.id, target, result.gained).await?,
+            }
+        } else {
+            self.citizens.adjust_capital(citizen.id, target, result.gained).await?
+        };
 
         // Trace best-effort (ne fait pas echouer la conversion).
         let _ = self

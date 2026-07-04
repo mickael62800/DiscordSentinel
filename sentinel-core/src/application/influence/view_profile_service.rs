@@ -13,11 +13,13 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::view_profile::{
     CapitalView, ProfileView, ViewProfileUseCase,
 };
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 pub struct ViewProfileService {
     citizens: Arc<dyn CitizenRepository>,
+    wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -25,6 +27,7 @@ impl ViewProfileService {
     pub fn new(citizens: Arc<dyn CitizenRepository>) -> Self {
         Self {
             citizens,
+            wallet: None,
             cfg_repo: None,
         }
     }
@@ -32,6 +35,20 @@ impl ViewProfileService {
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.cfg_repo = Some(repo);
         self
+    }
+
+    /// Branche l'« Argent » sur le wallet partage (`user_wallets.coins`).
+    pub fn with_wallet_repo(mut self, repo: Arc<dyn WalletRepository>) -> Self {
+        self.wallet = Some(repo);
+        self
+    }
+
+    /// Solde d'Argent = coins du wallet partage (0 si aucun wallet).
+    async fn money_balance(&self, guild_id: &str, user_id: &str, fallback: i64) -> i64 {
+        match &self.wallet {
+            Some(w) => w.get(guild_id, user_id).await.ok().flatten().map(|x| x.coins).unwrap_or(0),
+            None => fallback,
+        }
     }
 
     async fn settings(&self, guild_id: &str) -> InfluenceSettings {
@@ -54,12 +71,14 @@ impl ViewProfileUseCase for ViewProfileService {
         let settings = self.settings(guild_id).await;
         let citizen = self
             .citizens
-            .get_or_create(guild_id, target_user_id, target_username, settings.start_money())
+            .get_or_create(guild_id, target_user_id, target_username, 0)
             .await?;
 
         let is_self = viewer_user_id == target_user_id;
         let th = settings.tier_thresholds();
         let capitals = citizen.capitals;
+        // Argent = coins du wallet partage (source unique de verite).
+        let money = self.money_balance(guild_id, target_user_id, capitals.money).await;
 
         // Vue d'un capital « generique » (palier + etoiles, chiffre si soi).
         let cap = |value: i64| CapitalView {
@@ -72,7 +91,7 @@ impl ViewProfileUseCase for ViewProfileService {
             username: citizen.username,
             is_self,
             influence: cap(capitals.influence),
-            money: cap(capitals.money),
+            money: cap(money),
             reputation_tier: to_reputation_tier(capitals.reputation).label(),
             reputation_exact: is_self.then_some(capitals.reputation),
             information: cap(capitals.information),

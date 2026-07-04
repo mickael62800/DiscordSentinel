@@ -837,7 +837,8 @@ pub async fn build_app_state(
         sentinel_core::application::influence::view_profile_service::ViewProfileService::new(
             influence_citizen_repo.clone(),
         )
-        .with_bot_config_repo(bot_config_repo.clone()),
+        .with_bot_config_repo(bot_config_repo.clone())
+        .with_wallet_repo(wallet_repo.clone()),
     );
     let influence_org_repo: Arc<
         dyn sentinel_core::ports::outbound::influence::organization_repository::OrganizationRepository,
@@ -877,7 +878,8 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone())
         .with_relation_repo(influence_relation_repo.clone())
-        .with_archive_repo(influence_archive_repo.clone()),
+        .with_archive_repo(influence_archive_repo.clone())
+        .with_wallet_repo(wallet_repo.clone()),
     );
     let influence_archives_uc: Arc<
         dyn sentinel_core::ports::inbound::influence::read_archives::ReadArchivesUseCase,
@@ -927,7 +929,8 @@ pub async fn build_app_state(
             influence_citizen_repo.clone(),
             influence_movement_repo.clone(),
         )
-        .with_bot_config_repo(bot_config_repo.clone()),
+        .with_bot_config_repo(bot_config_repo.clone())
+        .with_wallet_repo(wallet_repo.clone()),
     );
     let influence_law_repo: Arc<
         dyn sentinel_core::ports::outbound::influence::law_repository::LawRepository,
@@ -971,7 +974,8 @@ pub async fn build_app_state(
             influence_archive_repo.clone(),
             influence_movement_repo.clone(),
         )
-        .with_bot_config_repo(bot_config_repo.clone()),
+        .with_bot_config_repo(bot_config_repo.clone())
+        .with_wallet_repo(wallet_repo.clone()),
     );
 
     // ── Ban en sursis (moderation) ──

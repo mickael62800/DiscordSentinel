@@ -33,6 +33,7 @@ pub struct ManageInformationService {
     information: Arc<dyn InformationRepository>,
     archives: Arc<dyn ArchiveRepository>,
     movements: Arc<dyn MovementRepository>,
+    wallet: Option<Arc<dyn crate::ports::outbound::casino::wallet_repository::WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -50,7 +51,23 @@ impl ManageInformationService {
             information,
             archives,
             movements,
+            wallet: None,
             cfg_repo: None,
+        }
+    }
+
+    pub fn with_wallet_repo(
+        mut self,
+        repo: Arc<dyn crate::ports::outbound::casino::wallet_repository::WalletRepository>,
+    ) -> Self {
+        self.wallet = Some(repo);
+        self
+    }
+
+    async fn money_balance(&self, guild_id: &str, user_id: &str) -> i64 {
+        match &self.wallet {
+            Some(w) => w.get(guild_id, user_id).await.ok().flatten().map(|x| x.coins).unwrap_or(0),
+            None => 0,
         }
     }
 
@@ -100,20 +117,27 @@ impl ManageInformationUseCase for ManageInformationService {
         let cost = settings.investigation_cost();
         let initiator = self
             .citizens
-            .get_or_create(guild_id, initiator_user_id, initiator_username, settings.start_money())
+            .get_or_create(guild_id, initiator_user_id, initiator_username, 0)
             .await?;
-        if initiator.capitals.money < cost {
+        // Cout en coins (wallet partage).
+        let balance = self.money_balance(guild_id, initiator_user_id).await;
+        if balance < cost {
             return Err(DomainError::Forbidden(format!(
-                "Une enquete coute {cost} d'Argent (tu en as {}).",
-                initiator.capitals.money
+                "Une enquete coute {cost} coins (tu en as {balance})."
             )));
         }
-
-        self.citizens.adjust_capital(initiator.id, Capital::Money, -cost).await?;
-        let _ = self
-            .movements
-            .record(guild_id, initiator.id, Capital::Money, -cost, "Enquete")
-            .await;
+        match &self.wallet {
+            Some(w) => {
+                w.debit(guild_id, initiator_user_id, cost, "influence", "Enquete").await?;
+            }
+            None => {
+                self.citizens.adjust_capital(initiator.id, Capital::Money, -cost).await?;
+                let _ = self
+                    .movements
+                    .record(guild_id, initiator.id, Capital::Money, -cost, "Enquete")
+                    .await;
+            }
+        }
 
         let resolves_at = Utc::now() + Duration::hours(settings.investigation_hours().max(1));
         self.investigations

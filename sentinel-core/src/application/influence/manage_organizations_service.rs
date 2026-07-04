@@ -14,6 +14,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_organizations::{
     ManageOrganizationsUseCase, OrgInfo,
 };
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
 use crate::ports::outbound::influence::information_repository::ArchiveRepository;
 use crate::ports::outbound::influence::membership_repository::MembershipRepository;
@@ -33,6 +34,7 @@ pub struct ManageOrganizationsService {
     memberships: Arc<dyn MembershipRepository>,
     relations: Option<Arc<dyn RelationRepository>>,
     archives: Option<Arc<dyn ArchiveRepository>>,
+    wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
@@ -48,8 +50,14 @@ impl ManageOrganizationsService {
             memberships,
             relations: None,
             archives: None,
+            wallet: None,
             cfg_repo: None,
         }
+    }
+
+    pub fn with_wallet_repo(mut self, repo: Arc<dyn WalletRepository>) -> Self {
+        self.wallet = Some(repo);
+        self
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
@@ -71,6 +79,14 @@ impl ManageOrganizationsService {
         match &self.cfg_repo {
             Some(repo) => InfluenceSettings::load(repo.as_ref(), guild_id).await,
             None => InfluenceSettings::default(),
+        }
+    }
+
+    /// Solde d'Argent (coins wallet partage) d'un citoyen.
+    async fn money_balance(&self, guild_id: &str, user_id: &str) -> i64 {
+        match &self.wallet {
+            Some(w) => w.get(guild_id, user_id).await.ok().flatten().map(|x| x.coins).unwrap_or(0),
+            None => 0,
         }
     }
 
@@ -114,7 +130,7 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
 
         let founder = self
             .citizens
-            .get_or_create(guild_id, founder_user_id, founder_username, settings.start_money())
+            .get_or_create(guild_id, founder_user_id, founder_username, 0)
             .await?;
 
         // Quota d'organisations fondees.
@@ -124,11 +140,11 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             )));
         }
 
-        // Argent suffisant ?
-        if founder.capitals.money < cost {
+        // Argent (coins du wallet partage) suffisant ?
+        let balance = self.money_balance(guild_id, founder_user_id).await;
+        if balance < cost {
             return Err(DomainError::Forbidden(format!(
-                "Il te faut {cost} d'Argent pour fonder une organisation (tu en as {}).",
-                founder.capitals.money
+                "Il te faut {cost} coins pour fonder une organisation (tu en as {balance})."
             )));
         }
 
@@ -151,7 +167,16 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 founder_id: founder.id,
             })
             .await?;
-        self.citizens.adjust_money(founder.id, -cost).await?;
+        // Debite les coins (wallet partage) ; fallback capital si pas de wallet.
+        match &self.wallet {
+            Some(w) => {
+                w.debit(guild_id, founder_user_id, cost, "influence", "Creation organisation")
+                    .await?;
+            }
+            None => {
+                self.citizens.adjust_money(founder.id, -cost).await?;
+            }
+        }
         self.memberships
             .add(org.id, founder.id, OrgRole::Fondateur)
             .await?;
