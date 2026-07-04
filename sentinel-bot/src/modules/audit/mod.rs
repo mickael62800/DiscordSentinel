@@ -267,6 +267,7 @@ pub async fn log_admin_command(
     user_id: &str,
     user_name: &str,
     full_command: &str,
+    reason: Option<&str>,
 ) {
     let config = {
         let data = ctx.data.read().await;
@@ -292,7 +293,12 @@ pub async fn log_admin_command(
         _ => return,
     };
 
-    let line = format!("🛠️ <@{user_id}> (`{user_name}`) a utilisé **/{full_command}**");
+    let mut line = format!("🛠️ <@{user_id}> (`{user_name}`) a utilisé **/{full_command}**");
+    if let Some(r) = reason.map(str::trim).filter(|r| !r.is_empty()) {
+        // Tronque les raisons tres longues pour garder une ligne lisible.
+        let r: String = r.chars().take(200).collect();
+        line.push_str(&format!("\n> 📝 {r}"));
+    }
     let embed = serenity::builder::CreateEmbed::new()
         .description(line)
         .color(0x5865F2)

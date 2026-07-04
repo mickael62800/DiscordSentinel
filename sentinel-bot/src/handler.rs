@@ -62,6 +62,29 @@ fn is_admin_command(name: &str) -> bool {
         || matches!(name, "roles-panel" | "parrain")
 }
 
+/// Cherche (en descendant dans les sous-commandes) une option texte « reason »
+/// / « raison » / « motif » pour l'ajouter au log de commande admin.
+fn extract_reason(options: &[CommandDataOption]) -> Option<String> {
+    for opt in options {
+        match &opt.value {
+            CommandDataOptionValue::String(s)
+                if matches!(opt.name.as_str(), "reason" | "raison" | "motif")
+                    && !s.trim().is_empty() =>
+            {
+                return Some(s.clone());
+            }
+            CommandDataOptionValue::SubCommand(sub)
+            | CommandDataOptionValue::SubCommandGroup(sub) => {
+                if let Some(r) = extract_reason(sub) {
+                    return Some(r);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
+}
+
 /// Reconstruit le nom complet de la commande slash y compris
 /// subcommand_group / subcommand (ex: "ticket close all", "audit channel set").
 fn format_full_command(data: &CommandData) -> String {
@@ -511,8 +534,14 @@ impl EventHandler for Handler {
                 // Log une-ligne des commandes admin/moderateur dans le salon
                 // dedie et parametrable (opt-in via la config audit-bot).
                 if !guild_id.is_empty() && is_admin_command(name) {
+                    let reason = extract_reason(&command.data.options);
                     modules::audit::log_admin_command(
-                        &ctx, &guild_id, &user_id, &user_name, &full_cmd,
+                        &ctx,
+                        &guild_id,
+                        &user_id,
+                        &user_name,
+                        &full_cmd,
+                        reason.as_deref(),
                     )
                     .await;
                 }
