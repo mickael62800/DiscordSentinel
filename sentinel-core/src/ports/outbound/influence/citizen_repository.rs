@@ -20,4 +20,12 @@ pub trait CitizenRepository: Send + Sync {
 
     /// Recupere le citoyen s'il existe (sans le creer).
     async fn get(&self, guild_id: &str, user_id: &str) -> Result<Option<Citizen>, DomainError>;
+
+    /// Ajuste le capital Argent d'un citoyen (delta signe). Renvoie le nouveau
+    /// solde. Utilise notamment pour debiter le cout de creation d'une org.
+    async fn adjust_money(
+        &self,
+        citizen_id: uuid::Uuid,
+        delta: i64,
+    ) -> Result<i64, DomainError>;
 }

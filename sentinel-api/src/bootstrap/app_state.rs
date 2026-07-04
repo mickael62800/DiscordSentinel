@@ -839,6 +839,30 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone()),
     );
+    let influence_org_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::organization_repository::OrganizationRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::organization_repository::PgOrganizationRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_membership_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::membership_repository::MembershipRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::membership_repository::PgMembershipRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_orgs_uc: Arc<
+        dyn sentinel_core::ports::inbound::influence::manage_organizations::ManageOrganizationsUseCase,
+    > = Arc::new(
+        sentinel_core::application::influence::manage_organizations_service::ManageOrganizationsService::new(
+            influence_citizen_repo.clone(),
+            influence_org_repo.clone(),
+            influence_membership_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     AppState {
         analyze_uc,
@@ -941,6 +965,7 @@ pub async fn build_app_state(
         game_rcon_client: rcon_client,
         game_port_allocator: port_allocator,
         influence_view_profile_uc,
+        influence_orgs_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

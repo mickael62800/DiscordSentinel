@@ -105,4 +105,17 @@ impl CitizenRepository for PgCitizenRepository {
             .map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
+
+    async fn adjust_money(&self, citizen_id: Uuid, delta: i64) -> Result<i64, DomainError> {
+        let new_balance: i64 = sqlx::query_scalar(
+            "UPDATE influence_citizens SET money = money + $2, updated_at = NOW() \
+             WHERE id = $1 RETURNING money",
+        )
+        .bind(citizen_id)
+        .bind(delta)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(new_balance)
+    }
 }

@@ -1,0 +1,184 @@
+//! Service : gestion des organisations (creation, info, adhesion, membres).
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+
+use crate::application::influence::guild_settings::InfluenceSettings;
+use crate::application::validation::validate_non_empty;
+use crate::domain::entities::influence::org_membership::{OrgMemberView, OrgRole};
+use crate::domain::entities::influence::organization::Organization;
+use crate::domain::enums::influence::organization_kind::OrganizationKind;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::influence::manage_organizations::{
+    ManageOrganizationsUseCase, OrgInfo,
+};
+use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
+use crate::ports::outbound::influence::membership_repository::MembershipRepository;
+use crate::ports::outbound::influence::organization_repository::{
+    NewOrganization, OrganizationRepository,
+};
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Longueur max d'un nom / d'une devise d'organisation.
+const NAME_MAX: usize = 60;
+const MOTTO_MAX: usize = 140;
+
+pub struct ManageOrganizationsService {
+    citizens: Arc<dyn CitizenRepository>,
+    orgs: Arc<dyn OrganizationRepository>,
+    memberships: Arc<dyn MembershipRepository>,
+    cfg_repo: Option<Arc<dyn BotConfigRepository>>,
+}
+
+impl ManageOrganizationsService {
+    pub fn new(
+        citizens: Arc<dyn CitizenRepository>,
+        orgs: Arc<dyn OrganizationRepository>,
+        memberships: Arc<dyn MembershipRepository>,
+    ) -> Self {
+        Self {
+            citizens,
+            orgs,
+            memberships,
+            cfg_repo: None,
+        }
+    }
+
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.cfg_repo = Some(repo);
+        self
+    }
+
+    async fn settings(&self, guild_id: &str) -> InfluenceSettings {
+        match &self.cfg_repo {
+            Some(repo) => InfluenceSettings::load(repo.as_ref(), guild_id).await,
+            None => InfluenceSettings::default(),
+        }
+    }
+
+    /// Resout une organisation active par nom ou renvoie `NotFound`.
+    async fn require_org(&self, guild_id: &str, name: &str) -> Result<Organization, DomainError> {
+        self.orgs
+            .find_by_name(guild_id, name)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!("Aucune organisation nommée « {name} »")))
+    }
+}
+
+#[async_trait]
+impl ManageOrganizationsUseCase for ManageOrganizationsService {
+    async fn create(
+        &self,
+        guild_id: &str,
+        founder_user_id: &str,
+        founder_username: &str,
+        kind: OrganizationKind,
+        name: &str,
+        motto: &str,
+    ) -> Result<Organization, DomainError> {
+        let name = name.trim();
+        let motto = motto.trim();
+        validate_non_empty(name, "Le nom")?;
+        if name.chars().count() > NAME_MAX {
+            return Err(DomainError::ValidationError(format!(
+                "Le nom ne peut pas depasser {NAME_MAX} caracteres"
+            )));
+        }
+        if motto.chars().count() > MOTTO_MAX {
+            return Err(DomainError::ValidationError(format!(
+                "La devise ne peut pas depasser {MOTTO_MAX} caracteres"
+            )));
+        }
+
+        let settings = self.settings(guild_id).await;
+        let cost = settings.org_creation_cost();
+        let quota = settings.org_max_per_citizen();
+
+        let founder = self
+            .citizens
+            .get_or_create(guild_id, founder_user_id, founder_username, settings.start_money())
+            .await?;
+
+        // Quota d'organisations fondees.
+        if self.orgs.count_active_founded_by(founder.id).await? >= quota {
+            return Err(DomainError::Forbidden(format!(
+                "Tu as atteint la limite de {quota} organisations fondees."
+            )));
+        }
+
+        // Argent suffisant ?
+        if founder.capitals.money < cost {
+            return Err(DomainError::Forbidden(format!(
+                "Il te faut {cost} d'Argent pour fonder une organisation (tu en as {}).",
+                founder.capitals.money
+            )));
+        }
+
+        // Nom deja pris ? (la contrainte UNIQUE fait aussi foi.)
+        if self.orgs.find_by_name(guild_id, name).await?.is_some() {
+            return Err(DomainError::Conflict(format!(
+                "Une organisation nommée « {name} » existe deja."
+            )));
+        }
+
+        // Cree l'org d'abord (echoue avant tout debit si conflit), puis debite
+        // et inscrit le fondateur.
+        let org = self
+            .orgs
+            .create(NewOrganization {
+                guild_id,
+                kind,
+                name,
+                motto,
+                founder_id: founder.id,
+            })
+            .await?;
+        self.citizens.adjust_money(founder.id, -cost).await?;
+        self.memberships
+            .add(org.id, founder.id, OrgRole::Fondateur)
+            .await?;
+
+        Ok(org)
+    }
+
+    async fn info(&self, guild_id: &str, name: &str) -> Result<OrgInfo, DomainError> {
+        let org = self.require_org(guild_id, name).await?;
+        let member_count = self.memberships.count(org.id).await?;
+        Ok(OrgInfo { org, member_count })
+    }
+
+    async fn join(
+        &self,
+        guild_id: &str,
+        name: &str,
+        user_id: &str,
+        username: &str,
+    ) -> Result<Organization, DomainError> {
+        let settings = self.settings(guild_id).await;
+        let citizen = self
+            .citizens
+            .get_or_create(guild_id, user_id, username, settings.start_money())
+            .await?;
+        let org = self.require_org(guild_id, name).await?;
+
+        if self.memberships.get(org.id, citizen.id).await?.is_some() {
+            return Err(DomainError::Conflict(
+                "Tu es deja membre de cette organisation.".to_string(),
+            ));
+        }
+        self.memberships
+            .add(org.id, citizen.id, OrgRole::Recrue)
+            .await?;
+        Ok(org)
+    }
+
+    async fn members(
+        &self,
+        guild_id: &str,
+        name: &str,
+    ) -> Result<Vec<OrgMemberView>, DomainError> {
+        let org = self.require_org(guild_id, name).await?;
+        self.memberships.list_views(org.id).await
+    }
+}

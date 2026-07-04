@@ -2,7 +2,11 @@
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
+use uuid::Uuid;
 
+use sentinel_core::domain::entities::influence::org_membership::OrgMemberView;
+use sentinel_core::domain::entities::influence::organization::Organization;
+use sentinel_core::ports::inbound::influence::manage_organizations::OrgInfo;
 use sentinel_core::ports::inbound::influence::view_profile::{CapitalView, ProfileView};
 
 #[derive(Debug, Serialize)]
@@ -48,6 +52,74 @@ impl From<ProfileView> for ProfileViewDto {
             information: p.information.into(),
             network: p.network.into(),
             joined_at: p.joined_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrganizationDto {
+    pub id: Uuid,
+    pub guild_id: String,
+    pub kind: String,
+    pub kind_label: String,
+    pub emoji: String,
+    pub name: String,
+    pub motto: String,
+    pub treasury: i64,
+    pub reputation: i64,
+    pub influence: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<Organization> for OrganizationDto {
+    fn from(o: Organization) -> Self {
+        Self {
+            id: o.id,
+            guild_id: o.guild_id,
+            kind: o.kind.as_str().to_string(),
+            kind_label: o.kind.label().to_string(),
+            emoji: o.kind.emoji().to_string(),
+            name: o.name,
+            motto: o.motto,
+            treasury: o.treasury,
+            reputation: o.reputation,
+            influence: o.influence,
+            created_at: o.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrgInfoDto {
+    #[serde(flatten)]
+    pub org: OrganizationDto,
+    pub member_count: i64,
+}
+
+impl From<OrgInfo> for OrgInfoDto {
+    fn from(i: OrgInfo) -> Self {
+        Self {
+            org: i.org.into(),
+            member_count: i.member_count,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct OrgMemberDto {
+    pub username: String,
+    pub role: String,
+    pub role_label: String,
+    pub joined_at: DateTime<Utc>,
+}
+
+impl From<OrgMemberView> for OrgMemberDto {
+    fn from(m: OrgMemberView) -> Self {
+        Self {
+            username: m.username,
+            role: m.role.as_str().to_string(),
+            role_label: m.role.label().to_string(),
+            joined_at: m.joined_at,
         }
     }
 }

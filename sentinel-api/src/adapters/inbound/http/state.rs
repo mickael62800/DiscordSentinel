@@ -147,6 +147,9 @@ pub struct AppState {
     /// Jeu Influence — use cases.
     pub influence_view_profile_uc:
         Arc<dyn crate::ports::inbound::influence::view_profile::ViewProfileUseCase>,
+    pub influence_orgs_uc: Arc<
+        dyn crate::ports::inbound::influence::manage_organizations::ManageOrganizationsUseCase,
+    >,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

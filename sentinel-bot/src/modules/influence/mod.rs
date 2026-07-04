@@ -14,12 +14,12 @@ pub const MODULE_BOT_NAME: &str = "influence-bot";
 
 /// Commandes slash exposees par le module.
 pub fn register_commands() -> Vec<CreateCommand> {
-    vec![commands::profil::register()]
+    vec![commands::profil::register(), commands::org::register()]
 }
 
 /// `true` si la commande appartient a ce module.
 pub fn handles_command(name: &str) -> bool {
-    matches!(name, "influence-profil")
+    matches!(name, "influence-profil" | "org")
 }
 
 /// Dispatch d'une commande du module.
@@ -29,6 +29,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     }
     match command.data.name.as_str() {
         "influence-profil" => commands::profil::handle(ctx, command).await,
+        "org" => commands::org::handle(ctx, command).await,
         _ => {}
     }
 }
