@@ -15,6 +15,7 @@ import GameServerConfigModal from "@/components/molecules/GameServerConfigModal.
 import GameServerSessionsModal from "@/components/molecules/GameServerSessionsModal.vue";
 import GamePortalServersPanel from "@/components/organisms/GamePortalServersPanel.vue";
 import GamePortalCatalogPanel from "@/components/organisms/GamePortalCatalogPanel.vue";
+import GamePortalRolesPanel from "@/components/organisms/GamePortalRolesPanel.vue";
 import GamePortalConsolePanel, { type LogLine } from "@/components/organisms/GamePortalConsolePanel.vue";
 
 const { selectedGuildId } = useGuildSelector();
@@ -342,6 +343,11 @@ watch(selectedServerId, async (sid) => {
         :templates="templates"
         :busy="busy"
         @launch="launchTemplate"
+      />
+
+      <GamePortalRolesPanel
+        :templates="templates"
+        :guild-id="selectedGuildId ?? null"
       />
 
       <GamePortalConsolePanel

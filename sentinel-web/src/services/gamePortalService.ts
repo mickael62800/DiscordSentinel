@@ -88,6 +88,14 @@ export interface CreateGameServerPayload {
   memory_mb?: number;
   owner_user_id: string;
   config?: Record<string, string>;
+  /** Delai (jours) avant la revelation de l'IP. Vide = defaut serveur ; 0 = aucune. */
+  ip_reveal_days?: number;
+}
+
+/** Reglage d'un template pour cette guild (role a pinguer). */
+export interface TemplateSettings {
+  template_slug: string;
+  discord_role_id: string | null;
 }
 
 export interface RconResponse {
@@ -112,6 +120,20 @@ export const gamePortalService = {
   },
   getTemplate(id: string): Promise<GameTemplate> {
     return httpGet(`/api/games/templates/${id}`);
+  },
+
+  // Reglages par template (role a pinguer pour les sessions)
+  listTemplateSettings(guildId: string): Promise<TemplateSettings[]> {
+    return httpGet(`/api/games/${guildId}/template-settings`);
+  },
+  setTemplateRole(
+    guildId: string,
+    slug: string,
+    discordRoleId: string | null,
+  ): Promise<{ ok: boolean }> {
+    return httpPut(`/api/games/${guildId}/template-settings/${slug}`, {
+      discord_role_id: discordRoleId,
+    });
   },
 
   // Servers

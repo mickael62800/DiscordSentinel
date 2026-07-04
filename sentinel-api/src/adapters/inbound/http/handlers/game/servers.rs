@@ -62,6 +62,25 @@ pub async fn create_server(
     };
     let server = state.game_servers_uc.create(cmd).await?;
 
+    // Programme la revelation d'IP : delai fourni, sinon defaut de la guild.
+    // 0 jour = pas de revelation programmee.
+    let default_days = state
+        .bot_config_repo
+        .get_config(&guild_id, "game-portal")
+        .await
+        .ok()
+        .and_then(|cfg| {
+            cfg.iter()
+                .find(|c| c.config_key == "ip_reveal_default_days")
+                .and_then(|c| c.config_value.parse::<i32>().ok())
+        })
+        .unwrap_or(7);
+    let days = dto.ip_reveal_days.unwrap_or(default_days).max(0);
+    if days > 0 {
+        let at = chrono::Utc::now() + chrono::Duration::days(i64::from(days));
+        let _ = state.game_server_repo.set_ip_reveal_at(server.id, Some(at)).await;
+    }
+
     state.broadcaster.broadcast(
         "game_server_created",
         serde_json::json!({

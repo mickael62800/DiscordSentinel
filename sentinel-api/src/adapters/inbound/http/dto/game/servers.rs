@@ -17,6 +17,9 @@ pub struct CreateGameServerDto {
     /// Overrides initiaux (key/value SCREAMING_SNAKE).
     #[serde(default)]
     pub config: HashMap<String, String>,
+    /// Delai (jours) avant la revelation de l'IP. Vide = defaut de la guild
+    /// (`ip_reveal_default_days`). 0 = pas de revelation programmee.
+    pub ip_reveal_days: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]

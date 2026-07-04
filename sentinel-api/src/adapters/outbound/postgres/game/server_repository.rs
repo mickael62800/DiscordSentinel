@@ -457,4 +457,21 @@ impl GameServerRepository for PgGameServerRepository {
             .map_err(pg_ctx("mark_daily_ping"))?;
         Ok(())
     }
+
+    async fn set_ip_reveal_at(
+        &self,
+        id: Uuid,
+        at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE game_servers SET ip_reveal_at = $2, ip_revealed = false, updated_at = NOW() \
+             WHERE id = $1",
+        )
+        .bind(id)
+        .bind(at)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("set_ip_reveal_at"))?;
+        Ok(())
+    }
 }

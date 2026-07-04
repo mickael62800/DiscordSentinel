@@ -84,6 +84,13 @@ pub trait GameServerRepository: Send + Sync {
 
     /// Marque qu'un ping quotidien vient d'etre emis pour cette session.
     async fn mark_daily_ping(&self, id: Uuid) -> Result<(), DomainError>;
+
+    /// Definit la date de revelation de l'IP (None pour desactiver).
+    async fn set_ip_reveal_at(
+        &self,
+        id: Uuid,
+        at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), DomainError>;
 }
 
 #[derive(Debug, Clone)]
