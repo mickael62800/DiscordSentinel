@@ -251,3 +251,82 @@ pub async fn close_motion(
     )
     .await
 }
+
+// ── Capitaux & conversions (Phase 2) ──
+
+#[derive(Debug, Deserialize)]
+pub struct CapitalLine {
+    pub label: String,
+    pub emoji: String,
+    pub value: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Movement {
+    pub emoji: String,
+    pub delta: i64,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CapitalOverview {
+    pub lines: Vec<CapitalLine>,
+    pub movements: Vec<Movement>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ConversionOutcome {
+    pub source_label: String,
+    pub target_label: String,
+    pub spent: i64,
+    pub gained: i64,
+    pub new_source: i64,
+    pub new_target: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct UserBody<'a> {
+    user_id: &'a str,
+    username: &'a str,
+}
+
+#[derive(Debug, Serialize)]
+struct ConvertBody<'a> {
+    user_id: &'a str,
+    username: &'a str,
+    kind: &'a str,
+    budget: i64,
+}
+
+pub async fn view_capital(
+    api: &BaseApiClient,
+    guild_id: &str,
+    user_id: &str,
+    username: &str,
+) -> Result<CapitalOverview, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/capital"),
+        &UserBody { user_id, username },
+    )
+    .await
+}
+
+pub async fn convert_capital(
+    api: &BaseApiClient,
+    guild_id: &str,
+    user_id: &str,
+    username: &str,
+    kind: &str,
+    budget: i64,
+) -> Result<ConversionOutcome, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/capital/convert"),
+        &ConvertBody {
+            user_id,
+            username,
+            kind,
+            budget,
+        },
+    )
+    .await
+}

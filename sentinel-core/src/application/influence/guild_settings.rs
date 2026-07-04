@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use crate::domain::entities::influence::conversion::ConversionRates;
 use crate::domain::entities::influence::tier::TierThresholds;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
@@ -54,5 +55,18 @@ impl InfluenceSettings {
     /// Seuils de paliers narratifs (defaut pour le MVP ; reglables plus tard).
     pub fn tier_thresholds(&self) -> TierThresholds {
         TierThresholds::default()
+    }
+
+    /// Taux de conversion des capitaux (cout en source par point de cible).
+    pub fn conversion_rates(&self) -> ConversionRates {
+        let d = ConversionRates::default();
+        ConversionRates {
+            money_to_reputation: self
+                .get_i64("influence_conv_money_reputation", d.money_to_reputation),
+            reputation_to_influence: self
+                .get_i64("influence_conv_reputation_influence", d.reputation_to_influence),
+            money_to_information: self
+                .get_i64("influence_conv_money_information", d.money_to_information),
+        }
     }
 }

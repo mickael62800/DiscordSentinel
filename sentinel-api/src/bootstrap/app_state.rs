@@ -889,6 +889,22 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone()),
     );
+    let influence_movement_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::movement_repository::MovementRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::movement_repository::PgMovementRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let influence_capital_uc: Arc<
+        dyn sentinel_core::ports::inbound::influence::manage_capital::ManageCapitalUseCase,
+    > = Arc::new(
+        sentinel_core::application::influence::manage_capital_service::ManageCapitalService::new(
+            influence_citizen_repo.clone(),
+            influence_movement_repo.clone(),
+        )
+        .with_bot_config_repo(bot_config_repo.clone()),
+    );
 
     AppState {
         analyze_uc,
@@ -993,6 +1009,7 @@ pub async fn build_app_state(
         influence_view_profile_uc,
         influence_orgs_uc,
         influence_votes_uc,
+        influence_capital_uc,
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

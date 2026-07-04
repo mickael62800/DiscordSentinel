@@ -44,6 +44,14 @@ fn influence_inner() -> Router<AppState> {
             "/{guild_id}/motions/state",
             post(handlers::influence::votes::motion_state),
         )
+        .route(
+            "/{guild_id}/capital",
+            post(handlers::influence::capital::view_capital),
+        )
+        .route(
+            "/{guild_id}/capital/convert",
+            post(handlers::influence::capital::convert_capital),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

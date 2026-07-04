@@ -28,4 +28,13 @@ pub trait CitizenRepository: Send + Sync {
         citizen_id: uuid::Uuid,
         delta: i64,
     ) -> Result<i64, DomainError>;
+
+    /// Ajuste un capital quelconque d'un citoyen (delta signe). Renvoie le
+    /// nouveau solde de ce capital.
+    async fn adjust_capital(
+        &self,
+        citizen_id: uuid::Uuid,
+        capital: crate::domain::entities::influence::capital::Capital,
+        delta: i64,
+    ) -> Result<i64, DomainError>;
 }

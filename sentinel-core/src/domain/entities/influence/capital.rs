@@ -31,4 +31,68 @@ impl Capitals {
             network: 0,
         }
     }
+
+    /// Valeur d'un capital donne.
+    pub fn get(&self, capital: Capital) -> i64 {
+        match capital {
+            Capital::Influence => self.influence,
+            Capital::Money => self.money,
+            Capital::Reputation => self.reputation,
+            Capital::Information => self.information,
+            Capital::Network => self.network,
+        }
+    }
+}
+
+/// Designe l'un des 5 capitaux (pour les conversions, le registre, etc.).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Capital {
+    Influence,
+    Money,
+    Reputation,
+    Information,
+    Network,
+}
+
+impl Capital {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Capital::Influence => "influence",
+            Capital::Money => "money",
+            Capital::Reputation => "reputation",
+            Capital::Information => "information",
+            Capital::Network => "network",
+        }
+    }
+
+    pub fn from_str_lossy(s: &str) -> Option<Self> {
+        match s {
+            "influence" => Some(Self::Influence),
+            "money" => Some(Self::Money),
+            "reputation" => Some(Self::Reputation),
+            "information" => Some(Self::Information),
+            "network" => Some(Self::Network),
+            _ => None,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Capital::Influence => "Influence",
+            Capital::Money => "Argent",
+            Capital::Reputation => "Réputation",
+            Capital::Information => "Information",
+            Capital::Network => "Réseau",
+        }
+    }
+
+    pub fn emoji(&self) -> &'static str {
+        match self {
+            Capital::Influence => "🏛️",
+            Capital::Money => "💰",
+            Capital::Reputation => "⭐",
+            Capital::Information => "🕵️",
+            Capital::Network => "🤝",
+        }
+    }
 }

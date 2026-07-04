@@ -152,3 +152,79 @@ impl From<MotionState> for MotionStateDto {
         }
     }
 }
+
+use sentinel_core::ports::inbound::influence::manage_capital::{CapitalOverview, ConversionOutcome};
+
+#[derive(Debug, Serialize)]
+pub struct CapitalLineDto {
+    pub capital: String,
+    pub label: String,
+    pub emoji: String,
+    pub value: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct MovementDto {
+    pub capital: String,
+    pub emoji: String,
+    pub delta: i64,
+    pub reason: String,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CapitalOverviewDto {
+    pub lines: Vec<CapitalLineDto>,
+    pub movements: Vec<MovementDto>,
+}
+
+impl From<CapitalOverview> for CapitalOverviewDto {
+    fn from(o: CapitalOverview) -> Self {
+        Self {
+            lines: o
+                .lines
+                .into_iter()
+                .map(|l| CapitalLineDto {
+                    capital: l.capital.as_str().to_string(),
+                    label: l.capital.label().to_string(),
+                    emoji: l.capital.emoji().to_string(),
+                    value: l.value,
+                })
+                .collect(),
+            movements: o
+                .movements
+                .into_iter()
+                .map(|m| MovementDto {
+                    capital: m.capital.as_str().to_string(),
+                    emoji: m.capital.emoji().to_string(),
+                    delta: m.delta,
+                    reason: m.reason,
+                    created_at: m.created_at,
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConversionOutcomeDto {
+    pub source_label: String,
+    pub target_label: String,
+    pub spent: i64,
+    pub gained: i64,
+    pub new_source: i64,
+    pub new_target: i64,
+}
+
+impl From<ConversionOutcome> for ConversionOutcomeDto {
+    fn from(o: ConversionOutcome) -> Self {
+        Self {
+            source_label: o.kind.source().label().to_string(),
+            target_label: o.kind.target().label().to_string(),
+            spent: o.spent,
+            gained: o.gained,
+            new_source: o.new_source,
+            new_target: o.new_target,
+        }
+    }
+}

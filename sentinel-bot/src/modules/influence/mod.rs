@@ -21,12 +21,17 @@ pub fn register_commands() -> Vec<CreateCommand> {
         commands::profil::register(),
         commands::org::register(),
         commands::vote::register(),
+        commands::capital::register(),
+        commands::transfert::register(),
     ]
 }
 
 /// `true` si la commande appartient a ce module.
 pub fn handles_command(name: &str) -> bool {
-    matches!(name, "influence-profil" | "org" | "vote")
+    matches!(
+        name,
+        "influence-profil" | "org" | "vote" | "capital" | "transfert"
+    )
 }
 
 /// Dispatch d'une commande du module.
@@ -38,6 +43,8 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "influence-profil" => commands::profil::handle(ctx, command).await,
         "org" => commands::org::handle(ctx, command).await,
         "vote" => commands::vote::handle(ctx, command).await,
+        "capital" => commands::capital::handle(ctx, command).await,
+        "transfert" => commands::transfert::handle(ctx, command).await,
         _ => {}
     }
 }

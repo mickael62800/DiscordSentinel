@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::domain::entities::influence::capital::Capitals;
+use sentinel_core::domain::entities::influence::capital::{Capital, Capitals};
 use sentinel_core::domain::entities::influence::citizen::Citizen;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -107,15 +107,28 @@ impl CitizenRepository for PgCitizenRepository {
     }
 
     async fn adjust_money(&self, citizen_id: Uuid, delta: i64) -> Result<i64, DomainError> {
-        let new_balance: i64 = sqlx::query_scalar(
-            "UPDATE influence_citizens SET money = money + $2, updated_at = NOW() \
-             WHERE id = $1 RETURNING money",
-        )
-        .bind(citizen_id)
-        .bind(delta)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(pg_err)?;
-        Ok(new_balance)
+        self.adjust_capital(citizen_id, Capital::Money, delta).await
+    }
+
+    async fn adjust_capital(
+        &self,
+        citizen_id: Uuid,
+        capital: Capital,
+        delta: i64,
+    ) -> Result<i64, DomainError> {
+        // Le nom de colonne vient d'un enum ferme (jamais une entree externe) :
+        // pas d'injection possible.
+        let col = capital.as_str();
+        let sql = format!(
+            "UPDATE influence_citizens SET {col} = {col} + $2, updated_at = NOW() \
+             WHERE id = $1 RETURNING {col}"
+        );
+        let new_value: i64 = sqlx::query_scalar(&sql)
+            .bind(citizen_id)
+            .bind(delta)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(new_value)
     }
 }
