@@ -6,12 +6,16 @@ use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use crate::shared::discord_helpers::reply_ephemeral;
 use crate::shared::heartbeat::ApiClientKey;
 
 pub const APPEAL_PREFIX: &str = "sentinel_mod_appeal_";
+/// Bouton modo « Annuler la sanction » : `mod_appeal_cancel_{action_id}`.
+pub const APPEAL_CANCEL_PREFIX: &str = "mod_appeal_cancel_";
+/// Bouton modo « Fermer le salon » (supprime le salon d'appel).
+pub const APPEAL_CLOSE_ID: &str = "mod_appeal_close";
 
 /// MOD #9 — fenetre anti-spam de `/appeal` par (guild, user).
 const APPEAL_COOLDOWN: Duration = Duration::from_secs(5 * 60);
@@ -165,6 +169,7 @@ async fn finalize_appeal<F, Fut>(
         guild_id,
         appellant_id,
         appellant_name,
+        action_id,
         intro,
     )
     .await
@@ -268,6 +273,123 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
     )
     .await;
     info!(user = %component.user.name, action_id = action_id, "Appel de sanction traite via bouton DM");
+}
+
+/// Verifie que le cliqueur est un moderateur (permissions de sanction ou admin).
+/// Repond en ephemere et renvoie `false` sinon.
+async fn deny_not_mod(ctx: &Context, component: &ComponentInteraction) {
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Réservé aux modérateurs.")
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+}
+
+async fn ensure_moderator(ctx: &Context, component: &ComponentInteraction) -> bool {
+    use serenity::all::Permissions;
+    let Some(gid) = component.guild_id else {
+        deny_not_mod(ctx, component).await;
+        return false;
+    };
+    let member = match gid.member(&ctx.http, component.user.id).await {
+        Ok(m) => m,
+        Err(_) => {
+            deny_not_mod(ctx, component).await;
+            return false;
+        }
+    };
+    #[allow(deprecated)]
+    let perms = member
+        .permissions(&ctx.cache)
+        .unwrap_or_else(|_| Permissions::empty());
+    let is_mod = perms.contains(Permissions::ADMINISTRATOR)
+        || perms.contains(Permissions::MODERATE_MEMBERS)
+        || perms.contains(Permissions::BAN_MEMBERS)
+        || perms.contains(Permissions::KICK_MEMBERS)
+        || perms.contains(Permissions::MANAGE_GUILD);
+    if !is_mod {
+        deny_not_mod(ctx, component).await;
+    }
+    is_mod
+}
+
+/// Bouton « Fermer le salon » : supprime le salon d'appel (modo uniquement).
+pub async fn handle_appeal_close(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_moderator(ctx, component).await {
+        return;
+    }
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("🔒 Appel clôturé — suppression du salon…")
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+    if let Err(e) = component.channel_id.delete(&ctx.http).await {
+        warn!(error = %e, "Echec suppression salon d'appel");
+    }
+}
+
+/// Bouton « Annuler la sanction » : leve la sanction contestee (modo uniquement).
+pub async fn handle_appeal_cancel(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_moderator(ctx, component).await {
+        return;
+    }
+    let Some(action_id) = component
+        .data
+        .custom_id
+        .strip_prefix(APPEAL_CANCEL_PREFIX)
+        .map(str::to_string)
+    else {
+        return;
+    };
+
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await;
+
+    // DELETE /api/moderation/actions/{id} leve l'effet Discord (unban/unmute),
+    // annule les rappels et supprime l'action.
+    let result = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(base) => {
+                let req = base
+                    .client()
+                    .delete(format!("{}/api/moderation/actions/{action_id}", base.base_url()));
+                base.auth(req).send().await.map_err(|e| e.to_string())
+            }
+            None => Err("api indisponible".into()),
+        }
+    };
+
+    let msg = match result {
+        Ok(resp) if resp.status().is_success() => {
+            "♻️ **Sanction annulée** — l'effet Discord a été levé et l'action retirée de l'historique.".to_string()
+        }
+        Ok(resp) => format!("Échec de l'annulation (HTTP {}).", resp.status()),
+        Err(e) => format!("Erreur réseau : {e}"),
+    };
+    let _ = component
+        .create_followup(
+            &ctx.http,
+            serenity::builder::CreateInteractionResponseFollowup::new().content(msg),
+        )
+        .await;
+    info!(action_id, mod = %component.user.name, "Annulation de sanction via bouton d'appel");
 }
 
 /// Construit la ligne de bouton "Contester" attachee aux DM de sanction.

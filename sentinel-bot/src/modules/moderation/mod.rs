@@ -124,6 +124,8 @@ pub fn handles_component(cid: &str) -> bool {
     cid.starts_with(commands::unwarn::UNWARN_PREFIX)
         || cid.starts_with(commands::call::CALL_CLOSE_PREFIX)
         || cid.starts_with(commands::appeal::APPEAL_PREFIX)
+        || cid.starts_with(commands::appeal::APPEAL_CANCEL_PREFIX)
+        || cid == commands::appeal::APPEAL_CLOSE_ID
         || cid.starts_with(APPROVE_PREFIX)
         || cid.starts_with(REJECT_PREFIX)
         || cid.starts_with(risk_check::CONFIRM_PREFIX)
@@ -140,6 +142,10 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::unwarn::handle_button(ctx, component).await;
     } else if custom_id.starts_with(commands::call::CALL_CLOSE_PREFIX) {
         commands::call::handle_close(ctx, component).await;
+    } else if custom_id.starts_with(commands::appeal::APPEAL_CANCEL_PREFIX) {
+        commands::appeal::handle_appeal_cancel(ctx, component).await;
+    } else if custom_id == commands::appeal::APPEAL_CLOSE_ID {
+        commands::appeal::handle_appeal_close(ctx, component).await;
     } else if custom_id.starts_with(commands::appeal::APPEAL_PREFIX) {
         commands::appeal::handle_appeal_button(ctx, component).await;
     } else if custom_id.starts_with(APPROVE_PREFIX) {
@@ -258,6 +264,7 @@ pub async fn create_appeal_channel(
     guild_id: &str,
     appellant_id: u64,
     appellant_name: &str,
+    action_id: Option<&str>,
     intro: serenity::builder::CreateEmbed,
 ) -> Option<serenity::model::id::ChannelId> {
     use serenity::all::{
@@ -336,13 +343,32 @@ pub async fn create_appeal_channel(
         }
     };
 
-    // Message d'accroche : ping l'appelant + embed d'intro.
+    // Boutons modo : annuler la sanction (si connue) + fermer le salon.
+    use serenity::all::{ButtonStyle, CreateActionRow, CreateButton};
+    let mut buttons = Vec::new();
+    if let Some(aid) = action_id {
+        buttons.push(
+            CreateButton::new(format!("{}{aid}", commands::appeal::APPEAL_CANCEL_PREFIX))
+                .label("Annuler la sanction")
+                .emoji('♻')
+                .style(ButtonStyle::Success),
+        );
+    }
+    buttons.push(
+        CreateButton::new(commands::appeal::APPEAL_CLOSE_ID)
+            .label("Fermer le salon")
+            .emoji('🔒')
+            .style(ButtonStyle::Secondary),
+    );
+
+    // Message d'accroche : ping l'appelant + embed d'intro + boutons modo.
     let _ = channel
         .send_message(
             &ctx.http,
             serenity::builder::CreateMessage::new()
                 .content(format!("<@{appellant_id}>"))
-                .embed(intro),
+                .embed(intro)
+                .components(vec![CreateActionRow::Buttons(buttons)]),
         )
         .await;
 
