@@ -20,6 +20,7 @@ pub mod commands;
 pub mod handlers;
 pub mod message_cache;
 pub mod permission_diff;
+pub mod role_card;
 pub mod watched_users;
 pub mod weekly_report;
 
@@ -125,6 +126,9 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     data.insert::<WeeklyTrackerKey>(weekly_report::WeeklyTracker::new());
     data.insert::<ConfigKey>(audit_config);
     data.insert::<WatchedUserIdsKey>(Arc::new(DashSet::new()));
+    data.insert::<role_card::RoleCardTrackerKey>(Arc::new(
+        role_card::RoleCardTracker::default(),
+    ));
 }
 
 // ── Commands registration ──

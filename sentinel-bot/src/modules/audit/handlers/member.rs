@@ -483,40 +483,29 @@ pub async fn handle_update(ctx: &Context, old: Option<Member>, new_member: &Memb
         )
         .await;
 
-        // Diff : roles ajoutes/retires pour un affichage clair
-        let added: Vec<String> = new_roles
+        // Diff des roles (ids) -> carte vivante (anti-spam) : une seule carte
+        // par membre, editee pendant une fenetre glissante avec l'historique
+        // complet des mouvements (cf. audit::role_card).
+        let added_ids: Vec<serenity::model::id::RoleId> = new_roles
             .iter()
             .filter(|r| !old_roles.contains(r))
-            .map(|r| format!("<@&{}>", r))
+            .filter_map(|r| r.parse::<u64>().ok())
+            .map(serenity::model::id::RoleId::new)
             .collect();
-        let removed: Vec<String> = old_roles
+        let removed_ids: Vec<serenity::model::id::RoleId> = old_roles
             .iter()
             .filter(|r| !new_roles.contains(r))
-            .map(|r| format!("<@&{}>", r))
+            .filter_map(|r| r.parse::<u64>().ok())
+            .map(serenity::model::id::RoleId::new)
             .collect();
-        let added_str = if added.is_empty() {
-            "-".to_string()
-        } else {
-            added.join(", ")
-        };
-        let removed_str = if removed.is_empty() {
-            "-".to_string()
-        } else {
-            removed.join(", ")
-        };
-
-        // Embed Discord -> profile_edit_channel_id
-        let embed = info_embed("Roles modifies")
-            .field("Membre", format!("<@{}>", new_member.user.id), true)
-            .field("ID", user_id.clone(), true)
-            .field("Ajoutes", added_str, false)
-            .field("Retires", removed_str, false)
-            .thumbnail(new_member.user.face())
-            .timestamp(serenity::model::Timestamp::now())
-            .footer(serenity::builder::CreateEmbedFooter::new(
-                "Audit | Sentinel",
-            ));
-        post_to_channel(ctx, &gid_str, &["profile_edit_channel_id"], embed).await;
+        crate::modules::audit::role_card::handle_role_change(
+            ctx,
+            &gid_str,
+            new_member,
+            &added_ids,
+            &removed_ids,
+        )
+        .await;
 
         send_event(
             ctx,
