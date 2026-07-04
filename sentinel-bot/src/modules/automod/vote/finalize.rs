@@ -368,8 +368,38 @@ pub(crate) async fn apply_member_sanction(
         }
         "ban" => {
             if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
-                // Purge des messages selon le reglage serveur (defaut 1 jour),
-                // comme la commande /ban — au lieu de 0 (aucune suppression).
+                let user = serenity::model::id::UserId::new(uid);
+
+                // AutoMod : un ban propose devient un BAN EN SURSIS (appel
+                // possible) si le role Sursis est configure. Le ban dur reste
+                // pour /ban (scam/raid). On supprime d'abord le message.
+                if let Ok(mid) = message_id_str.parse::<u64>() {
+                    let _ = channel_id
+                        .delete_message(&ctx.http, serenity::model::id::MessageId::new(mid))
+                        .await;
+                }
+                let username = user
+                    .to_user(&ctx.http)
+                    .await
+                    .map(|u| u.name)
+                    .unwrap_or_default();
+                let sursis = crate::modules::moderation::commands::ban_sursis::apply_sursis(
+                    ctx,
+                    &gid.to_string(),
+                    user,
+                    &username,
+                    "automod",
+                    "AutoMod",
+                    "Sanction AutoMod validee",
+                )
+                .await;
+                if sursis.is_some() {
+                    // Sursis applique : pas de ban dur.
+                    return;
+                }
+
+                // Fallback : role Sursis non configure -> ban dur.
+                // Purge des messages selon le reglage serveur (defaut 7 jours).
                 let delete_days: u8 = {
                     let data = ctx.data.read().await;
                     match data.get::<crate::shared::heartbeat::ApiClientKey>() {

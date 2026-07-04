@@ -41,21 +41,78 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     };
     let reason = option_str(&command.data.options, "reason").unwrap_or("Aucune raison spécifiée");
+    let target_name = command
+        .data
+        .resolved
+        .users
+        .get(&target)
+        .map(|u| u.name.clone())
+        .unwrap_or_default();
 
-    let gid_u64: u64 = match guild_id.parse() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
+    match apply_sursis(
+        ctx,
+        &guild_id,
+        target,
+        &target_name,
+        &command.user.id.to_string(),
+        &command.user.name,
+        reason,
+    )
+    .await
+    {
+        Some(applied) => {
+            reply_ephemeral(
+                ctx,
+                command,
+                &format!(
+                    "⏳ <@{target}> est placé en sursis.{}",
+                    applied
+                        .channel
+                        .map(|c| format!(" Salon d'appel : <#{c}>"))
+                        .unwrap_or_default()
+                ),
+            )
+            .await;
+        }
+        None => {
+            reply_ephemeral(
+                ctx,
+                command,
+                "Le rôle Sursis n'est pas configuré. Dashboard → Modération → « Rôle Sursis ».",
+            )
+            .await;
+        }
+    }
+}
+
+/// Resultat d'une mise en sursis appliquee.
+pub struct SursisApplied {
+    pub channel: Option<serenity::model::id::ChannelId>,
+}
+
+/// Met un membre en sursis (partage entre /ban-sursis et Automod). Renvoie
+/// `None` si le role Sursis n'est pas configure (l'appelant peut alors retomber
+/// sur un ban dur).
+pub async fn apply_sursis(
+    ctx: &Context,
+    guild_id: &str,
+    target: UserId,
+    target_name: &str,
+    moderator_id: &str,
+    moderator_name: &str,
+    reason: &str,
+) -> Option<SursisApplied> {
+    let gid_u64: u64 = guild_id.parse().ok()?;
     let guild = serenity::model::id::GuildId::new(gid_u64);
 
     // Config : role Sursis (requis).
     let (sursis_role, base) = {
         let data = ctx.data.read().await;
         let Some(base) = data.get::<ApiClientKey>().cloned() else {
-            return;
+            return None;
         };
         let cfg = base
-            .get_guild_config_for(&guild_id, crate::modules::moderation::MODULE_BOT_NAME)
+            .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
             .await
             .unwrap_or_default();
         let role = cfg
@@ -64,24 +121,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .filter(|&n| n > 0);
         (role, base)
     };
-    let Some(sursis_role) = sursis_role else {
-        reply_ephemeral(
-            ctx,
-            command,
-            "Le rôle Sursis n'est pas configuré. Dashboard → Modération → « Rôle Sursis ».",
-        )
-        .await;
-        return;
-    };
-    let sursis_role = RoleId::new(sursis_role);
+    // Role Sursis non configure -> l'appelant peut retomber sur un ban dur.
+    let sursis_role = RoleId::new(sursis_role?);
 
     // Membre + ses roles actuels (a sauvegarder).
     let mut member = match guild.member(&ctx.http, target).await {
         Ok(m) => m,
-        Err(_) => {
-            reply_ephemeral(ctx, command, "Membre introuvable sur le serveur.").await;
-            return;
-        }
+        Err(_) => return None,
     };
     let saved_roles: Vec<String> = member.roles.iter().map(|r| r.to_string()).collect();
 
@@ -99,13 +145,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Salon d'appel (sous appeal_category_id), sans boutons pour l'instant.
-    let target_name = command
-        .data
-        .resolved
-        .users
-        .get(&target)
-        .map(|u| u.name.clone())
-        .unwrap_or_default();
     let intro = crate::shared::embeds::critical_embed("⏳ Ban en sursis")
         .description(format!(
             "<@{target}> est placé en **sursis**. Sans appel accepté, le bannissement sera automatique.\n**Raison :** {reason}"
@@ -113,9 +152,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now());
     let channel = crate::modules::moderation::create_appeal_channel(
         ctx,
-        &guild_id,
+        guild_id,
         target.get(),
-        &target_name,
+        target_name,
         intro,
         vec![],
     )
@@ -125,8 +164,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let body = serde_json::json!({
         "user_id": target.to_string(),
         "username": target_name,
-        "moderator_id": command.user.id.to_string(),
-        "moderator_name": command.user.name,
+        "moderator_id": moderator_id,
+        "moderator_name": moderator_name,
         "reason": reason,
         "saved_roles": saved_roles,
         "channel_id": channel.map(|c| c.to_string()),
@@ -185,7 +224,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .to_partial_guild(&ctx.http)
                 .await
                 .map(|g| g.name)
-                .unwrap_or_else(|_| guild_id.clone())
+                .unwrap_or_else(|_| guild_id.to_string())
         );
         if let Some(c) = channel {
             txt.push_str(&format!("\n➡️ Ton salon d'appel : <#{c}>"));
@@ -195,16 +234,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
     }
 
-    reply_ephemeral(
-        ctx,
-        command,
-        &format!(
-            "⏳ <@{target}> est placé en sursis.{}",
-            channel.map(|c| format!(" Salon d'appel : <#{c}>")).unwrap_or_default()
-        ),
-    )
-    .await;
-    info!(target = %target, mod = %command.user.name, "Ban en sursis applique");
+    info!(target = %target, by = moderator_name, "Ban en sursis applique");
+    Some(SursisApplied { channel })
 }
 
 // ── Boutons ──
