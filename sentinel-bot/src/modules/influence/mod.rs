@@ -12,6 +12,7 @@ use crate::shared::heartbeat::ApiClientKey;
 
 pub mod api_client;
 pub mod commands;
+pub mod press;
 
 pub const MODULE_BOT_NAME: &str = "influence-bot";
 
@@ -261,4 +262,16 @@ async fn on_law_closed(ctx: &Context, data: &serde_json::Value) {
     let _ = ChannelId::new(chan)
         .edit_message(&ctx.http, MessageId::new(mid), edit)
         .await;
+
+    // Une du journal : le verdict de la loi.
+    let headline = if state.status == "adoptee" {
+        format!("📜 Loi ADOPTÉE : {}", state.title)
+    } else {
+        format!("📜 Loi REJETÉE : {}", state.title)
+    };
+    let body = format!(
+        "Résultat du vote : **{} pour** / **{} contre**.",
+        state.pour, state.contre
+    );
+    press::publish_news(ctx, guild_id, &headline, &body).await;
 }

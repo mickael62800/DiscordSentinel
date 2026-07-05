@@ -162,6 +162,13 @@ pub async fn handle_reveler(ctx: &Context, command: &CommandInteraction) {
             {
                 tracing::warn!(error = %e, "Echec annonce scandale");
             }
+            // Une du journal : le scandale fait la presse.
+            let headline = if o.target_username.is_empty() {
+                "💥 SCANDALE !".to_string()
+            } else {
+                format!("💥 SCANDALE — {} éclaboussé !", o.target_username)
+            };
+            crate::modules::influence::press::publish_news(ctx, &guild_id, &headline, &o.content).await;
         }
         Err(e) => reply_ephemeral(ctx, command, &format!("Revelation impossible : {e}")).await,
     }

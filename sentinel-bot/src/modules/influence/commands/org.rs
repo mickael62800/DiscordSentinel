@@ -131,7 +131,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     let embed = CreateEmbed::new()
                         .title(format!("{} Organisation fondée : {}", org.emoji, org.name))
                         .color(0x8E44AD)
-                        .field("Type", org.kind_label, true)
+                        .field("Type", org.kind_label.clone(), true)
                         .field("Trésorerie", format!("{} 💰", org.treasury), true)
                         .description(if org.motto.is_empty() {
                             "Tu en es le **Fondateur**.".to_string()
@@ -139,6 +139,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                             format!("*« {} »*\n\nTu en es le **Fondateur**.", org.motto)
                         });
                     reply_ephemeral_embed(ctx, command, embed).await;
+                    // Une du journal : une nouvelle organisation voit le jour.
+                    crate::modules::influence::press::publish_news(
+                        ctx,
+                        &guild_id,
+                        &format!("{} Nouvelle organisation : {}", org.emoji, org.name),
+                        &format!(
+                            "**{}** ({}) vient d'être fondée par <@{}>.",
+                            org.name, org.kind_label, user_id
+                        ),
+                    )
+                    .await;
                 }
                 Err(e) => reply_ephemeral(ctx, command, &format!("Impossible de fonder : {e}")).await,
             }
