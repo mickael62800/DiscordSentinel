@@ -61,7 +61,7 @@ pub fn escalation_for(
     active_count: u32,
 ) -> Option<(String, Option<u64>)> {
     let mut sorted = thresholds.to_vec();
-    sorted.sort_by(|a, b| b.strikes.cmp(&a.strikes));
+    sorted.sort_by_key(|t| std::cmp::Reverse(t.strikes));
     sorted
         .iter()
         .find(|t| active_count >= t.strikes)

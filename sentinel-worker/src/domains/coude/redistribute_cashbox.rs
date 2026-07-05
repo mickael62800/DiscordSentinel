@@ -16,6 +16,8 @@ use tracing::{error, info};
 use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceClient;
 use sentinel_proto::coude::v1::RedistributeDueRequest;
 
+// Intercepteur tonic : Result<_, tonic::Status> impose un Err volumineux.
+#[allow(clippy::result_large_err)]
 pub async fn run(_pool: &PgPool, min_days: i64) -> Result<(), String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 

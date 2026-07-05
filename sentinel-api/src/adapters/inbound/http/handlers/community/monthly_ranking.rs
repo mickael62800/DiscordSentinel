@@ -91,7 +91,7 @@ fn month_label_fr(period: &str) -> String {
 
 /// Construit un bloc de classement (top N, deltas > 0 uniquement).
 fn build_ranking_block(mut rows: Vec<(String, i64)>, top: usize) -> String {
-    rows.sort_by(|a, b| b.1.cmp(&a.1));
+    rows.sort_by_key(|r| std::cmp::Reverse(r.1));
     let lines: Vec<String> = rows
         .into_iter()
         .filter(|(_, xp)| *xp > 0)
@@ -193,7 +193,7 @@ fn top_entries(
         })
         .filter(|e| e.xp > 0)
         .collect();
-    entries.sort_by(|a, b| b.xp.cmp(&a.xp));
+    entries.sort_by_key(|e| std::cmp::Reverse(e.xp));
     entries.truncate(top);
     entries
 }

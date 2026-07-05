@@ -475,8 +475,8 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                     // Running mais container mort -> crash. L'etat DESIRE est
                     // Running (l'utilisateur ne l'a pas stoppe) : on tente un
                     // auto-restart borne + backoff plutot que de juste stopper.
-                    GameServerStatus::Running if exited => {
-                        if handle_running_crash(
+                    GameServerStatus::Running if exited
+                        && handle_running_crash(
                             ctx,
                             s,
                             now,
@@ -486,10 +486,9 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                             cfg.restart_backoff_cap_secs,
                         )
                         .await
-                        {
+                        => {
                             errors += 1;
                         }
-                    }
                     // Running et container running : observation saine. Si des
                     // tentatives de redemarrage etaient en cours, on les remet
                     // a 0 (cheap : seulement si restart_attempts > 0). Couvre

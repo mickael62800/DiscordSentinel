@@ -77,6 +77,8 @@ pub async fn connect() -> Result<Channel, String> {
 ///
 /// Si `API_KEY` est vide ou invalide en metadata, l'interceptor laisse
 /// passer la requete sans auth (l'API repondra 401).
+// L'intercepteur tonic impose Result<_, tonic::Status> (Err volumineux non evitable).
+#[allow(clippy::result_large_err)]
 pub fn bearer_interceptor(
 ) -> Result<impl Fn(Request<()>) -> Result<Request<()>, tonic::Status> + Clone, String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();

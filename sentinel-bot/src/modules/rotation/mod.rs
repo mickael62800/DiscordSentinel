@@ -505,18 +505,16 @@ async fn tick(ctx: &Context, guild_id: GuildId) {
                 start_rotation(ctx, guild_id, &cfg, &api, &mut st).await;
             }
         }
-        "offering_candidate" | "awaiting_owner" => {
-            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours {
+        "offering_candidate" | "awaiting_owner"
+            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours => {
                 advance_or_finish(ctx, guild_id, &cfg, &api, &mut st).await;
             }
-        }
-        "offering_stay" => {
-            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours {
+        "offering_stay"
+            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours => {
                 // Pas de reponse de l'admin actuel : on le garde, fin de cycle.
                 st.state = "idle".into();
                 save_state(&api, &st).await;
             }
-        }
         _ => {}
     }
 }

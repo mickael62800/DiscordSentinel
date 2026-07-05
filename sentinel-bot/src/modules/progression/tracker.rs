@@ -225,7 +225,7 @@ impl StatsTracker {
         }
 
         let mut entries: Vec<_> = result.into_iter().collect();
-        entries.sort_by(|a, b| b.1.message_count.cmp(&a.1.message_count));
+        entries.sort_by_key(|e| std::cmp::Reverse(e.1.message_count));
         entries
     }
 }

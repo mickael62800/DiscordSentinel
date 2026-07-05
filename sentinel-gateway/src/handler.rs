@@ -140,6 +140,8 @@ pub async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, state.broadcaster, logger, client_ip))
 }
 
+// Le `if let` imbrique ne peut pas fusionner avec le match : `data` y est deplace.
+#[allow(clippy::collapsible_match)]
 async fn handle_socket(
     mut socket: WebSocket,
     broadcaster: Arc<EventBroadcaster>,

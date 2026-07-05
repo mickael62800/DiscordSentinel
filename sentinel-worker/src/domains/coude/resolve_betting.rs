@@ -81,6 +81,8 @@ pub async fn run(_pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), 
     Ok(())
 }
 
+// Intercepteur tonic : Result<_, tonic::Status> impose un Err volumineux.
+#[allow(clippy::result_large_err)]
 async fn call_resolve_batch() -> Result<Vec<ResolvedBettingCombat>, String> {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 

@@ -108,9 +108,7 @@ pub async fn apply_sursis(
     // Config : role Sursis (requis).
     let (sursis_role, base) = {
         let data = ctx.data.read().await;
-        let Some(base) = data.get::<ApiClientKey>().cloned() else {
-            return None;
-        };
+        let base = data.get::<ApiClientKey>().cloned()?;
         let cfg = base
             .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
             .await

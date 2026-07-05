@@ -83,7 +83,7 @@ impl ManageCoudeStealProtectionsUseCase for ManageCoudeStealProtectionsService {
         // que le coffre_fort roll avant chien_garde. Le premier blocage
         // arrete la chaine.
         let mut items_desc: Vec<_> = STEAL_PROTECTION_ITEMS.iter().collect();
-        items_desc.sort_by(|a, b| b.block_chance_percent.cmp(&a.block_chance_percent));
+        items_desc.sort_by_key(|i| std::cmp::Reverse(i.block_chance_percent));
 
         // Scope le ThreadRng avant l'Ok final pour satisfaire Send.
         let trigger = {
