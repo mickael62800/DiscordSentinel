@@ -201,8 +201,9 @@ fn avatar_svg(id: usize, c: &Circle, png_b64: &Option<String>) -> String {
 }
 
 fn text(x: f32, y: f32, anchor: &str, size: f32, s: &str) -> String {
+    // DejaVu Sans : police installee dans l'image Docker (comme la carte tama).
     format!(
-        "<text x=\"{x}\" y=\"{y}\" text-anchor=\"{anchor}\" font-family=\"sans-serif\" \
+        "<text x=\"{x}\" y=\"{y}\" text-anchor=\"{anchor}\" font-family=\"DejaVu Sans\" \
          font-weight=\"bold\" font-size=\"{size}\" fill=\"#ffffff\" \
          stroke=\"#000000\" stroke-width=\"3\" paint-order=\"stroke\">{}</text>",
         esc(s)
