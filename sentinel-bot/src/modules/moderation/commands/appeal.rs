@@ -171,12 +171,37 @@ async fn finalize_appeal<F, Fut>(
     F: FnOnce(String) -> Fut,
     Fut: std::future::Future<Output = ()>,
 {
-    let mut desc = format!("<@{appellant_id}> conteste une sanction et demande un réexamen.");
+    let mut desc = format!(
+        "<@{appellant_id}> conteste une sanction et demande un réexamen.\n\n\
+         Ce salon est **privé** : seuls toi et l'équipe de modération le voyez. \
+         Expose calmement ta version — l'objectif est de vérifier si la sanction \
+         est justifiée ou non."
+    );
     if let Some(a) = action_id {
-        desc.push_str(&format!("\n**Action :** `{}`", &a[..16.min(a.len())]));
+        desc.push_str(&format!("\n\n**Référence de l'action :** `{}`", &a[..16.min(a.len())]));
     }
-    let intro = crate::shared::embeds::info_embed("📨 Appel de sanction")
+    let intro = crate::shared::embeds::info_embed("📨 Appel de sanction — mode d'emploi")
         .description(desc)
+        .field(
+            "📎 Ce qu'on attend de toi",
+            "• Des **preuves** concrètes : captures d'écran, liens de messages, dates, contexte.\n\
+             • Reste **factuel** et **respectueux** : pas d'insultes ni d'accusations gratuites.\n\
+             • Un appel n'est pas une 2ᵉ dispute — apporte des éléments **nouveaux ou vérifiables**.",
+            false,
+        )
+        .field(
+            "⚖️ Tes droits",
+            "• Être **écouté** et obtenir un **réexamen** de ta sanction.\n\
+             • Si le problème concerne **un modérateur en particulier**, tu peux **demander qu'il ne participe pas** à ce salon (conflit d'intérêt) : indique-le clairement ici, un autre membre du staff prendra le relais.\n\
+             • La décision d'annuler une sanction n'est **jamais** prise par un seul modo : plusieurs votent, puis un **admin valide**.",
+            false,
+        )
+        .field(
+            "🚫 Tes devoirs",
+            "• **Honnêteté** : mentir ou falsifier des preuves aggrave ta situation.\n\
+             • Un appel **abusif** (spam, insultes, mauvaise foi) peut être **refusé** et mener à un **bannissement**.",
+            false,
+        )
         .timestamp(serenity::model::Timestamp::now());
 
     // Boutons modo. Annulation d'une sanction = VOTE de modos + validation ADMIN.
