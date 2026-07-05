@@ -22,9 +22,9 @@ use crate::shared::heartbeat::ApiClientKey;
 
 pub const MODULE_BOT_NAME: &str = "bump-bot";
 
-/// Description d'une plateforme de bump (Disboard, DiscordL, ...).
+/// Description d'une plateforme de bump/vote (Disboard, DiscordL bump/vote, ...).
 struct BumpProvider {
-    /// User id du bot qui poste la confirmation de /bump.
+    /// User id du bot qui poste la confirmation.
     bot_id: u64,
     /// Identifiant stable envoye a l'API + namespace de config ("disboard").
     key: &'static str,
@@ -32,38 +32,68 @@ struct BumpProvider {
     display: &'static str,
     /// Texte de la commande a rappeler (ex: "/bump (Disboard)").
     bump_hint: &'static str,
+    /// Verbe de l'action pour les annonces/rappels ("bump" | "vote").
+    action: &'static str,
     /// Cooldown par defaut en minutes (indicatif ; l'API tranche).
     #[allow(dead_code)]
     default_cooldown_min: i64,
-    /// Detection d'un bump REUSSI (et pas un cooldown/echec) pour ce provider.
+    /// Discrimine l'ACTION : ce message correspond-il a ce provider ?
+    /// (le meme bot DiscordL poste bump ET vote — on tranche sur le titre).
+    matches: fn(&Message) -> bool,
+    /// Detection d'un SUCCES (et pas un cooldown/echec) pour ce provider.
     detect: fn(&Message) -> bool,
 }
 
-/// Disboard (bot historique).
+/// Disboard (bot historique, bump uniquement).
 const DISBOARD: BumpProvider = BumpProvider {
     bot_id: 302050872383242240,
     key: "disboard",
     display: "Disboard",
     bump_hint: "/bump (Disboard)",
+    action: "bump",
     default_cooldown_min: 120,
+    matches: |_| true,
     detect: detect_disboard,
 };
 
-/// DiscordL (discordl.org).
+/// DiscordL — bump (discordl.org).
 const DISCORDL: BumpProvider = BumpProvider {
     bot_id: 528557940811104258,
     key: "discordl",
     display: "DiscordL",
     bump_hint: "/bump (DiscordL)",
+    action: "bump",
     default_cooldown_min: 240,
-    detect: detect_discordl,
+    matches: matches_discordl_bump,
+    detect: detect_discordl_bump,
+};
+
+/// DiscordL — vote (meme bot, action differente).
+const DISCORDL_VOTE: BumpProvider = BumpProvider {
+    bot_id: 528557940811104258,
+    key: "discordl_vote",
+    display: "DiscordL",
+    bump_hint: "/vote (DiscordL)",
+    action: "vote",
+    default_cooldown_min: 720,
+    matches: matches_discordl_vote,
+    detect: detect_discordl_vote,
 };
 
 /// Registre des plateformes supportees.
-static PROVIDERS: &[BumpProvider] = &[DISBOARD, DISCORDL];
+static PROVIDERS: &[BumpProvider] = &[DISBOARD, DISCORDL, DISCORDL_VOTE];
 
-fn provider_for_bot(bot_id: u64) -> Option<&'static BumpProvider> {
-    PROVIDERS.iter().find(|p| p.bot_id == bot_id)
+/// Provider correspondant a CE message : bon bot_id ET bonne action.
+fn provider_for_message(msg: &Message) -> Option<&'static BumpProvider> {
+    let bot_id = msg.author.id.get();
+    PROVIDERS
+        .iter()
+        .find(|p| p.bot_id == bot_id && (p.matches)(msg))
+}
+
+/// Un provider connu poste-t-il avec ce bot_id ? (filtre rapide a l'edition).
+fn is_provider_bot(bot_id: u64) -> bool {
+    PROVIDERS.iter().any(|p| p.bot_id == bot_id)
 }
 
 fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
@@ -90,30 +120,42 @@ fn detect_disboard(msg: &Message) -> bool {
     positive
 }
 
-/// `true` si l'embed DiscordL indique un bump REUSSI. Le message de succes a un
-/// titre "Résultat du Bump sur DiscordL" et une description avec "✅" + "a BUMP".
-fn detect_discordl(msg: &Message) -> bool {
-    let mut positive = false;
-    for e in &msg.embeds {
+/// `true` si un embed DiscordL contient l'un des motifs (titre ou description).
+fn dl_has(msg: &Message, needles: &[&str]) -> bool {
+    msg.embeds.iter().any(|e| {
         let title = e.title.as_deref().unwrap_or("").to_lowercase();
         let desc = e.description.as_deref().unwrap_or("").to_lowercase();
-        // Cooldown / echec : mots generiques d'attente.
-        for hay in [&title, &desc] {
-            if hay.contains("wait")
-                || hay.contains("minutes")
-                || hay.contains("patient")
-                || hay.contains("attends")
-                || hay.contains("prochain")
-                || hay.contains("déjà")
-            {
-                return false;
-            }
-        }
-        if title.contains("résultat du bump") || desc.contains("✅") || desc.contains("a bump") {
-            positive = true;
-        }
-    }
-    positive
+        needles
+            .iter()
+            .any(|n| title.contains(n) || desc.contains(n))
+    })
+}
+
+/// `true` si le message DiscordL est un cooldown/echec (pas un succes).
+fn dl_is_cooldown(msg: &Message) -> bool {
+    dl_has(
+        msg,
+        &[
+            "wait", "patient", "attends", "prochain", "déjà", "reviens", "already", "minute",
+        ],
+    )
+}
+
+// Le meme bot DiscordL poste bump ET vote : on tranche sur "Bump" vs "Vote".
+fn matches_discordl_bump(msg: &Message) -> bool {
+    dl_has(msg, &["résultat du bump", "a bump"])
+}
+fn matches_discordl_vote(msg: &Message) -> bool {
+    dl_has(msg, &["résultat du vote", "a voté", "a vote"])
+}
+
+/// Bump DiscordL reussi (titre "Résultat du Bump" / "a BUMP", hors cooldown).
+fn detect_discordl_bump(msg: &Message) -> bool {
+    !dl_is_cooldown(msg) && dl_has(msg, &["a bump", "résultat du bump"])
+}
+/// Vote DiscordL reussi (titre "Résultat du Vote" / "a Voté", hors cooldown).
+fn detect_discordl_vote(msg: &Message) -> bool {
+    !dl_is_cooldown(msg) && dl_has(msg, &["a voté", "a vote", "résultat du vote"])
 }
 
 /// Resout l'auteur du /bump : d'abord via interaction_metadata (reponse de
@@ -198,7 +240,7 @@ pub async fn on_message_update(
     // Si l'auteur est connu et n'est pas un provider bump, on ignore
     // (evite de refetch tous les messages edites du serveur).
     if let Some(author) = &event.author {
-        if provider_for_bot(author.id.get()).is_none() {
+        if !is_provider_bot(author.id.get()) {
             return;
         }
     }
@@ -211,7 +253,7 @@ pub async fn on_message_update(
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
-    let Some(provider) = provider_for_bot(msg.author.id.get()) else {
+    let Some(provider) = provider_for_message(msg) else {
         return;
     };
     let Some(guild_id) = msg.guild_id else { return };
@@ -331,8 +373,8 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
 
     let content = format!(
-        "🎉 Merci <@{}> pour le **bump** ({}) ! **+{} coins** (bump #{} de la semaine)",
-        bumper_id, provider.display, resp.reward, resp.weekly_count
+        "🎉 Merci <@{}> pour le **{}** ({}) ! **+{} coins** ({} #{} de la semaine)",
+        bumper_id, provider.action, provider.display, resp.reward, provider.action, resp.weekly_count
     );
     if let Err(e) = msg.channel_id.say(&ctx.http, content).await {
         warn!(error = %e, "Echec annonce recompense bump");
@@ -369,10 +411,17 @@ pub fn spawn_background(ctx: Context) {
             for d in due {
                 let provider = provider_by_key(&d.provider).unwrap_or(&DISBOARD);
                 if let Ok(cid) = d.channel_id.parse::<u64>() {
-                    let text = format!(
-                        "⏰ Le serveur peut être **bumpé** à nouveau sur **{}** ! Faites `{}` pour le faire remonter — et gagner des coins.",
-                        provider.display, provider.bump_hint
-                    );
+                    let text = if provider.action == "vote" {
+                        format!(
+                            "⏰ Tu peux **voter** à nouveau pour le serveur sur **{}** ! Faites `{}` — et gagnez des coins.",
+                            provider.display, provider.bump_hint
+                        )
+                    } else {
+                        format!(
+                            "⏰ Le serveur peut être **bumpé** à nouveau sur **{}** ! Faites `{}` pour le faire remonter — et gagner des coins.",
+                            provider.display, provider.bump_hint
+                        )
+                    };
                     let _ = ChannelId::new(cid).say(&ctx.http, text).await;
                 }
                 // Best-effort : on marque envoye meme si le post echoue, pour ne

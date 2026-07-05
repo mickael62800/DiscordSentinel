@@ -132,6 +132,7 @@ pub async fn record_bump(
     // l'ancienne cle pour disboard (retrocompat) et 240 pour discordl.
     let cooldown_default = match provider.as_str() {
         "discordl" => 240,
+        "discordl_vote" => 720,
         _ => cfg_i64(&cfg, "bump_cooldown_minutes", 120),
     };
     let cooldown = cfg_i64(
