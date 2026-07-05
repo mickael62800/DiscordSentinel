@@ -167,24 +167,23 @@ fn layout_for(cat: Category) -> Layout {
             r_name_x: 883.0,
             r_xp_x: 1200.0,
         },
-        // topvocal.png — meme disposition supposee que le general (a confirmer
-        // quand le template sera fourni).
+        // topvocal.png — 1402×1122 (transparent), centres detectes via les trous.
         Category::Vocal => Layout {
-            w: 1536.0,
-            h: 1024.0,
+            w: 1402.0,
+            h: 1122.0,
             podium: [
-                Circle { cx: 768.0, cy: 406.0, r: 121.0 },
-                Circle { cx: 420.0, cy: 422.0, r: 103.0 },
-                Circle { cx: 1080.0, cy: 436.0, r: 96.0 },
+                Circle { cx: 700.0, cy: 446.0, r: 103.0 }, // #1 centre
+                Circle { cx: 374.0, cy: 482.0, r: 90.0 },  // #2 gauche
+                Circle { cx: 1024.0, cy: 482.0, r: 89.0 }, // #3 droite
             ],
-            row_ys: [656.0, 724.0, 792.0, 860.0, 928.0],
-            row_avatar_r: 33.0,
-            l_avatar_x: 232.0,
-            l_name_x: 278.0,
-            l_xp_x: 655.0,
-            r_avatar_x: 894.0,
-            r_name_x: 938.0,
-            r_xp_x: 1315.0,
+            row_ys: [770.0, 830.0, 892.0, 954.0, 1016.0],
+            row_avatar_r: 27.0,
+            l_avatar_x: 270.0,
+            l_name_x: 316.0,
+            l_xp_x: 620.0,
+            r_avatar_x: 843.0,
+            r_name_x: 889.0,
+            r_xp_x: 1200.0,
         },
     }
 }
