@@ -130,18 +130,20 @@ fn layout_for(cat: Category) -> Layout {
         Category::General => Layout {
             w: 1536.0,
             h: 1024.0,
-            // Centres/rayons cales sur le template (podium).
+            // Centres exacts detectes via les trous transparents (alpha=0).
+            // Rayon un peu > trou : l'avatar remplit le trou, le template masque
+            // le surplus (effet encastre).
             podium: [
-                Circle { cx: 767.0, cy: 406.0, r: 124.0 }, // #1 centre (encore agrandi)
-                Circle { cx: 419.0, cy: 422.0, r: 99.0 },  // #2 gauche (parfait)
-                Circle { cx: 1080.0, cy: 435.0, r: 96.0 }, // #3 droite (remonte un peu)
+                Circle { cx: 768.0, cy: 406.0, r: 121.0 }, // #1 centre
+                Circle { cx: 420.0, cy: 422.0, r: 103.0 }, // #2 gauche
+                Circle { cx: 1080.0, cy: 436.0, r: 96.0 }, // #3 droite
             ],
-            row_ys: [668.0, 727.0, 787.0, 847.0, 906.0],
-            row_avatar_r: 30.0,
-            l_avatar_x: 228.0,
+            row_ys: [656.0, 724.0, 792.0, 860.0, 928.0],
+            row_avatar_r: 33.0,
+            l_avatar_x: 232.0,
             l_name_x: 278.0,
             l_xp_x: 655.0,
-            r_avatar_x: 888.0,
+            r_avatar_x: 894.0,
             r_name_x: 938.0,
             r_xp_x: 1315.0,
         },
@@ -165,21 +167,22 @@ fn layout_for(cat: Category) -> Layout {
             r_name_x: 889.0,
             r_xp_x: 1200.0,
         },
-        // topvocal.png — même disposition supposée que le général (a calibrer).
+        // topvocal.png — meme disposition supposee que le general (a confirmer
+        // quand le template sera fourni).
         Category::Vocal => Layout {
             w: 1536.0,
             h: 1024.0,
             podium: [
-                Circle { cx: 768.0, cy: 415.0, r: 118.0 },
-                Circle { cx: 432.0, cy: 432.0, r: 104.0 },
-                Circle { cx: 1108.0, cy: 448.0, r: 100.0 },
+                Circle { cx: 768.0, cy: 406.0, r: 121.0 },
+                Circle { cx: 420.0, cy: 422.0, r: 103.0 },
+                Circle { cx: 1080.0, cy: 436.0, r: 96.0 },
             ],
-            row_ys: [668.0, 727.0, 787.0, 847.0, 906.0],
-            row_avatar_r: 30.0,
-            l_avatar_x: 228.0,
+            row_ys: [656.0, 724.0, 792.0, 860.0, 928.0],
+            row_avatar_r: 33.0,
+            l_avatar_x: 232.0,
             l_name_x: 278.0,
             l_xp_x: 655.0,
-            r_avatar_x: 888.0,
+            r_avatar_x: 894.0,
             r_name_x: 938.0,
             r_xp_x: 1315.0,
         },
