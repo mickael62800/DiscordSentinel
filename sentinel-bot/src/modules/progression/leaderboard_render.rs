@@ -132,9 +132,9 @@ fn layout_for(cat: Category) -> Layout {
             h: 1024.0,
             // Centres/rayons cales sur le template (podium).
             podium: [
-                Circle { cx: 767.0, cy: 407.0, r: 118.0 }, // #1 centre (agrandi vers le haut)
+                Circle { cx: 767.0, cy: 406.0, r: 124.0 }, // #1 centre (encore agrandi)
                 Circle { cx: 419.0, cy: 422.0, r: 99.0 },  // #2 gauche (parfait)
-                Circle { cx: 1080.0, cy: 441.0, r: 96.0 }, // #3 droite (agrandi vers le bas)
+                Circle { cx: 1080.0, cy: 435.0, r: 96.0 }, // #3 droite (remonte un peu)
             ],
             row_ys: [668.0, 727.0, 787.0, 847.0, 906.0],
             row_avatar_r: 30.0,
