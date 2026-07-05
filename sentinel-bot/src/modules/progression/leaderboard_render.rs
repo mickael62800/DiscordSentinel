@@ -213,7 +213,7 @@ fn text(x: f32, y: f32, anchor: &str, size: f32, s: &str) -> String {
     )
 }
 
-fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout) -> String {
+fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout, template_on_top: bool) -> String {
     let mut avatars = String::new();
     let mut labels = String::new();
 
@@ -248,10 +248,21 @@ fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout) -> String {
         }
     }
 
+    let template_img = format!(
+        "<image x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" href=\"data:image/png;base64,{template_b64}\"/>",
+        w = lay.w,
+        h = lay.h,
+    );
+    // Template transparent (trous aux cercles) -> avatars DERRIERE, template
+    // par-dessus (encadre l'avatar), textes tout devant. Sinon (opaque) ->
+    // template au fond, avatars puis textes dessus.
+    let body = if template_on_top {
+        format!("{avatars}{template_img}{labels}")
+    } else {
+        format!("{template_img}{avatars}{labels}")
+    };
     format!(
-        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">\
-         <image x=\"0\" y=\"0\" width=\"{w}\" height=\"{h}\" href=\"data:image/png;base64,{template_b64}\"/>\
-         {avatars}{labels}</svg>",
+        "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{w}\" height=\"{h}\" viewBox=\"0 0 {w} {h}\">{body}</svg>",
         w = lay.w,
         h = lay.h,
     )
@@ -263,7 +274,12 @@ pub fn render_leaderboard(category: Category, entries: &[LbEntry]) -> Option<Vec
     let template = std::fs::read(templates_dir().join(category.file()))
         .map_err(|e| warn!(error = %e, file = category.file(), "Template classement introuvable"))
         .ok()?;
-    let svg = build_svg(&b64(&template), entries, &layout_for(category));
+    // Detecte la transparence : si le template a un canal alpha (trous aux
+    // cercles), on le dessine PAR-DESSUS les avatars pour l'effet "encastre".
+    let on_top = image::load_from_memory(&template)
+        .map(|img| img.color().has_alpha())
+        .unwrap_or(false);
+    let svg = build_svg(&b64(&template), entries, &layout_for(category), on_top);
 
     let opt = usvg::Options {
         fontdb: fontdb(),
