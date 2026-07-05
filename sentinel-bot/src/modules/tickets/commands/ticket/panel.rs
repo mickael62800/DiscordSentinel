@@ -67,7 +67,7 @@ pub fn build_panel_message() -> CreateMessage {
              **Types de demandes disponibles :**\n\
              > **Probleme serveur** — Un souci technique ou de configuration\n\
              > **Probleme avec un membre** — Signaler un comportement inapproprie\n\
-             > **Probleme avec un moderateur** — Confidentiel, visible uniquement par les admins\n\
+             > **Probleme avec un moderateur** — Confidentiel, remonte directement aux proprietaires du serveur\n\
              > **Appel de sanction** — Contester une sanction recue\n\
              > **Situation urgente / detresse** — Besoin d'aide rapide dans une situation grave\n\
              > **Question** — Poser une question au staff\n\
@@ -392,20 +392,55 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     let mut all_overwrites = overwrites;
     let is_admin_only = ADMIN_ONLY_TYPES.contains(&ticket_type.as_str());
 
-    if let Some(admin_role_str) = guild_config.get("admin_role_id") {
-        if let Ok(role_id) = admin_role_str.parse::<u64>() {
+    if is_admin_only {
+        // « Probleme avec un moderateur » : ca remonte AU PLUS HAUT — les
+        // PROPRIETAIRES du serveur (owner Discord + co-fondateurs configures),
+        // PAS les admins ni les mods. On accorde l'acces aux proprietaires et on
+        // refuse la vue au role moderateur.
+        let mut owner_ids: Vec<u64> = Vec::new();
+        if let Ok(partial) = guild_id.to_partial_guild(&ctx.http).await {
+            owner_ids.push(partial.owner_id.get());
+        }
+        if let Some(csv) = guild_config.get("ticket_owner_ids") {
+            for id in csv.split(',').filter_map(|s| s.trim().parse::<u64>().ok()) {
+                owner_ids.push(id);
+            }
+        }
+        owner_ids.sort_unstable();
+        owner_ids.dedup();
+        for uid in owner_ids {
             all_overwrites.push(PermissionOverwrite {
                 allow: Permissions::VIEW_CHANNEL
                     | Permissions::SEND_MESSAGES
                     | Permissions::READ_MESSAGE_HISTORY
                     | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
-                kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
+                kind: PermissionOverwriteType::Member(serenity::model::id::UserId::new(uid)),
             });
         }
-    }
-
-    if !is_admin_only {
+        if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
+            if let Ok(role_id) = mod_role_str.parse::<u64>() {
+                all_overwrites.push(PermissionOverwrite {
+                    allow: Permissions::empty(),
+                    deny: Permissions::VIEW_CHANNEL,
+                    kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
+                });
+            }
+        }
+    } else {
+        // Tickets normaux : acces admin + moderateur.
+        if let Some(admin_role_str) = guild_config.get("admin_role_id") {
+            if let Ok(role_id) = admin_role_str.parse::<u64>() {
+                all_overwrites.push(PermissionOverwrite {
+                    allow: Permissions::VIEW_CHANNEL
+                        | Permissions::SEND_MESSAGES
+                        | Permissions::READ_MESSAGE_HISTORY
+                        | Permissions::MANAGE_CHANNELS,
+                    deny: Permissions::empty(),
+                    kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
+                });
+            }
+        }
         if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
             if let Ok(role_id) = mod_role_str.parse::<u64>() {
                 all_overwrites.push(PermissionOverwrite {
@@ -416,14 +451,6 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                     kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
                 });
             }
-        }
-    } else if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
-        if let Ok(role_id) = mod_role_str.parse::<u64>() {
-            all_overwrites.push(PermissionOverwrite {
-                allow: Permissions::empty(),
-                deny: Permissions::VIEW_CHANNEL,
-                kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
-            });
         }
     }
 
@@ -569,7 +596,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     }
 
     let staff_line = if is_admin_only {
-        "Ce ticket est **confidentiel**. Seuls les administrateurs peuvent le voir.\nUn administrateur vous repondra sous peu."
+        "Ce ticket est **strictement confidentiel**. Il remonte directement aux **propriétaires du serveur** — ni les modérateurs ni les administrateurs n'y ont accès.\nUn **propriétaire** vous répondra."
     } else if URGENT_TYPES.contains(&ticket_type.as_str()) {
         "**PRIORITE URGENTE** — Un membre du staff va vous repondre le plus rapidement possible.\nVous n'etes pas seul(e), nous sommes la pour vous aider."
     } else {
@@ -642,7 +669,25 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         .description(welcome_text)
         .color(embed_color);
 
-    let welcome = CreateMessage::new().embed(welcome_embed);
+    let mut welcome = CreateMessage::new().embed(welcome_embed);
+    // Probleme avec un moderateur : on PING les proprietaires pour remonter
+    // l'affaire immediatement au plus haut.
+    if is_admin_only {
+        let mut mentions = String::new();
+        if let Ok(partial) = guild_id.to_partial_guild(&ctx.http).await {
+            mentions.push_str(&format!("<@{}> ", partial.owner_id));
+        }
+        if let Some(csv) = guild_config.get("ticket_owner_ids") {
+            for id in csv.split(',').filter_map(|s| s.trim().parse::<u64>().ok()) {
+                mentions.push_str(&format!("<@{id}> "));
+            }
+        }
+        if !mentions.trim().is_empty() {
+            welcome = welcome.content(format!(
+                "🚨 {mentions}— signalement **confidentiel** concernant un modérateur."
+            ));
+        }
+    }
     let welcome_posted = match channel.send_message(&ctx.http, welcome).await {
         Ok(msg) => Some(msg),
         Err(e) => {

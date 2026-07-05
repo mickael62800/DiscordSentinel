@@ -31,7 +31,7 @@ pub const TICKET_TYPES: &[(&str, &str, &str)] = &[
     (
         "probleme_moderateur",
         "Probleme avec un moderateur",
-        "Signaler un abus ou probleme avec un moderateur (confidentiel, admins uniquement)",
+        "Signaler un abus ou probleme avec un moderateur (confidentiel, remonte aux proprietaires du serveur)",
     ),
     (
         "appel_sanction",
