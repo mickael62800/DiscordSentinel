@@ -151,20 +151,20 @@ fn layout_for(cat: Category) -> Layout {
         Category::Ecrit => Layout {
             w: 1402.0,
             h: 1122.0,
-            // Centres/rayons mesures sur le template ecrit.
+            // Centres exacts detectes via les trous transparents (alpha=0).
             podium: [
-                Circle { cx: 700.0, cy: 463.0, r: 97.0 },  // #1 centre
-                Circle { cx: 375.0, cy: 475.0, r: 92.0 },  // #2 gauche
-                Circle { cx: 1020.0, cy: 480.0, r: 90.0 }, // #3 droite
+                Circle { cx: 700.0, cy: 444.0, r: 100.0 }, // #1 centre
+                Circle { cx: 374.0, cy: 478.0, r: 86.0 },  // #2 gauche
+                Circle { cx: 1022.0, cy: 476.0, r: 87.0 }, // #3 droite
             ],
-            // Y des lignes mesures sur le template ecrit.
-            row_ys: [802.0, 868.0, 931.0, 994.0, 1052.0],
-            row_avatar_r: 30.0,
-            l_avatar_x: 280.0,
-            l_name_x: 324.0,
+            // Y des lignes detectes sur les trous alpha.
+            row_ys: [772.0, 836.0, 900.0, 964.0, 1026.0],
+            row_avatar_r: 27.0,
+            l_avatar_x: 274.0,
+            l_name_x: 322.0,
             l_xp_x: 620.0,
-            r_avatar_x: 845.0,
-            r_name_x: 889.0,
+            r_avatar_x: 835.0,
+            r_name_x: 883.0,
             r_xp_x: 1200.0,
         },
         // topvocal.png — meme disposition supposee que le general (a confirmer
