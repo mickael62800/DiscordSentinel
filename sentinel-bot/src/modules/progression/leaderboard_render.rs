@@ -130,10 +130,11 @@ fn layout_for(cat: Category) -> Layout {
         Category::General => Layout {
             w: 1536.0,
             h: 1024.0,
+            // Centres/rayons mesures precisement sur le template.
             podium: [
-                Circle { cx: 768.0, cy: 415.0, r: 118.0 },
-                Circle { cx: 432.0, cy: 432.0, r: 104.0 },
-                Circle { cx: 1108.0, cy: 448.0, r: 100.0 },
+                Circle { cx: 767.0, cy: 415.0, r: 110.0 }, // #1 centre
+                Circle { cx: 419.0, cy: 422.0, r: 99.0 },  // #2 gauche
+                Circle { cx: 1080.0, cy: 433.0, r: 88.0 }, // #3 droite
             ],
             row_ys: [668.0, 727.0, 787.0, 847.0, 906.0],
             row_avatar_r: 30.0,
@@ -148,18 +149,20 @@ fn layout_for(cat: Category) -> Layout {
         Category::Ecrit => Layout {
             w: 1402.0,
             h: 1122.0,
+            // Centres/rayons mesures sur le template ecrit.
             podium: [
-                Circle { cx: 700.0, cy: 470.0, r: 106.0 },
-                Circle { cx: 378.0, cy: 468.0, r: 92.0 },
-                Circle { cx: 1022.0, cy: 470.0, r: 90.0 },
+                Circle { cx: 700.0, cy: 463.0, r: 97.0 },  // #1 centre
+                Circle { cx: 375.0, cy: 475.0, r: 92.0 },  // #2 gauche
+                Circle { cx: 1020.0, cy: 480.0, r: 90.0 }, // #3 droite
             ],
-            row_ys: [782.0, 852.0, 918.0, 984.0, 1048.0],
+            // Y des lignes mesures sur le template ecrit.
+            row_ys: [802.0, 868.0, 931.0, 994.0, 1052.0],
             row_avatar_r: 30.0,
-            l_avatar_x: 278.0,
-            l_name_x: 322.0,
+            l_avatar_x: 280.0,
+            l_name_x: 324.0,
             l_xp_x: 620.0,
-            r_avatar_x: 840.0,
-            r_name_x: 884.0,
+            r_avatar_x: 845.0,
+            r_name_x: 889.0,
             r_xp_x: 1200.0,
         },
         // topvocal.png — même disposition supposée que le général (a calibrer).
