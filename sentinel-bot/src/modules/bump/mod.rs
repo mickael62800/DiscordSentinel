@@ -125,7 +125,7 @@ fn resolve_bumper(msg: &Message) -> Option<UserId> {
             return Some(meta.user.id);
         }
     }
-    // Repli : premiere mention non-bot dans l'embed.
+    // Repli : premiere mention non-bot dans l'embed (si presente dans msg.mentions).
     for e in &msg.embeds {
         let desc = e.description.as_deref().unwrap_or("");
         for m in &msg.mentions {
@@ -134,8 +134,29 @@ fn resolve_bumper(msg: &Message) -> Option<UserId> {
             }
         }
     }
+    // Repli cle pour DiscordL : `msg.mentions` n'inclut PAS les mentions situees
+    // DANS les embeds (seulement celles du contenu). On parse donc `<@id>`
+    // directement dans la description/titre de l'embed.
+    for e in &msg.embeds {
+        for s in [e.description.as_deref(), e.title.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            if let Some(id) = first_mention_id(s) {
+                return Some(UserId::new(id));
+            }
+        }
+    }
     // Repli ultime : toute mention non-bot du message.
     msg.mentions.iter().find(|m| !m.bot).map(|m| m.id)
+}
+
+/// Extrait l'ID de la premiere mention utilisateur `<@id>` / `<@!id>` d'un texte.
+fn first_mention_id(s: &str) -> Option<u64> {
+    let start = s.find("<@")?;
+    let rest = s[start + 2..].trim_start_matches('!');
+    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+    digits.parse().ok()
 }
 
 #[derive(serde::Serialize)]
