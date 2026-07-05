@@ -128,8 +128,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         (ranking, channel_cfg)
     };
 
-    let embed = build_ranking_embed(&ranking);
-
     // Salon cible : configure si valide, sinon le salon d'invocation.
     let target = channel_cfg
         .trim()
@@ -138,17 +136,39 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(ChannelId::new)
         .unwrap_or(command.channel_id);
 
-    match target
-        .send_message(&ctx.http, CreateMessage::new().embed(embed))
-        .await
-    {
+    // Rend les 3 classements en images (podium + top 13 sur les templates).
+    // Resolution des pseudos + avatars (cachee entre les 3 categories).
+    let mut cache: std::collections::HashMap<String, (String, Option<Vec<u8>>)> =
+        std::collections::HashMap::new();
+    let gen = resolve_entries(ctx, &ranking.global, &mut cache).await;
+    let txt = resolve_entries(ctx, &ranking.text, &mut cache).await;
+    let voc = resolve_entries(ctx, &ranking.voice, &mut cache).await;
+
+    use crate::modules::progression::leaderboard_render::{render_leaderboard, Category};
+    let mut msg = CreateMessage::new();
+    let mut has_image = false;
+    for (cat, entries) in [
+        (Category::General, &gen),
+        (Category::Ecrit, &txt),
+        (Category::Vocal, &voc),
+    ] {
+        if let Some(png) = render_leaderboard(cat, entries) {
+            msg = msg.add_file(serenity::builder::CreateAttachment::bytes(
+                png,
+                format!("classement_{}.png", cat.label().to_lowercase()),
+            ));
+            has_image = true;
+        }
+    }
+
+    // Fallback embed texte si aucun template dispo / rendu impossible.
+    if !has_image {
+        msg = msg.embed(build_ranking_embed(&ranking));
+    }
+
+    match target.send_message(&ctx.http, msg).await {
         Ok(_) => {
-            followup(
-                ctx,
-                command,
-                &format!("Classement publie dans <#{target}>."),
-            )
-            .await;
+            followup(ctx, command, &format!("Classement publie dans <#{target}>.")).await;
         }
         Err(e) => {
             warn!(error = %e, channel = %target, "Echec publication classement force");
@@ -160,6 +180,48 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
         }
     }
+}
+
+/// Resout pseudo + avatar PNG pour les 13 premieres entrees (avec cache).
+async fn resolve_entries(
+    ctx: &Context,
+    entries: &[crate::modules::progression::api_client::RankingEntry],
+    cache: &mut std::collections::HashMap<String, (String, Option<Vec<u8>>)>,
+) -> Vec<crate::modules::progression::leaderboard_render::LbEntry> {
+    use crate::modules::progression::leaderboard_render::LbEntry;
+    let mut out = Vec::new();
+    for e in entries.iter().take(13) {
+        let (name, avatar) = if let Some(c) = cache.get(&e.user_id) {
+            c.clone()
+        } else {
+            let resolved = match e.user_id.parse::<u64>() {
+                Ok(uid) => match ctx.http.get_user(serenity::model::id::UserId::new(uid)).await {
+                    Ok(u) => {
+                        let name = u.global_name.clone().unwrap_or_else(|| u.name.clone());
+                        let url = u
+                            .face()
+                            .replace(".webp", ".png")
+                            .replace(".gif", ".png");
+                        (name, fetch_png(&url).await)
+                    }
+                    Err(_) => ("Inconnu".to_string(), None),
+                },
+                Err(_) => ("?".to_string(), None),
+            };
+            cache.insert(e.user_id.clone(), resolved.clone());
+            resolved
+        };
+        out.push(LbEntry { name, xp: e.xp, avatar_png: avatar });
+    }
+    out
+}
+
+async fn fetch_png(url: &str) -> Option<Vec<u8>> {
+    let resp = reqwest::get(url).await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    Some(resp.bytes().await.ok()?.to_vec())
 }
 
 fn sub_mois(sub: &serenity::all::CommandDataOption) -> &str {

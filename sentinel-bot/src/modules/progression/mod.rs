@@ -777,3 +777,5 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
         }
     }
 }
+
+pub mod leaderboard_render;
