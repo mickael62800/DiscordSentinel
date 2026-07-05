@@ -125,7 +125,10 @@ pub fn handles_component(cid: &str) -> bool {
     cid.starts_with(commands::unwarn::UNWARN_PREFIX)
         || cid.starts_with(commands::call::CALL_CLOSE_PREFIX)
         || cid.starts_with(commands::appeal::APPEAL_PREFIX)
-        || cid.starts_with(commands::appeal::APPEAL_CANCEL_PREFIX)
+        || cid.starts_with(commands::appeal::APPEAL_VOTE_PREFIX)
+        || cid.starts_with(commands::appeal::APPEAL_VALIDATE_PREFIX)
+        || cid.starts_with(commands::appeal::APPEAL_BANCLOSE_PREFIX)
+        || cid.starts_with(commands::appeal::APPEAL_BANCONFIRM_PREFIX)
         || cid == commands::appeal::APPEAL_CLOSE_ID
         || cid.starts_with(commands::ban_sursis::SURSIS_PARDON_PREFIX)
         || cid.starts_with(commands::ban_sursis::SURSIS_BAN_PREFIX)
@@ -145,8 +148,14 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::unwarn::handle_button(ctx, component).await;
     } else if custom_id.starts_with(commands::call::CALL_CLOSE_PREFIX) {
         commands::call::handle_close(ctx, component).await;
-    } else if custom_id.starts_with(commands::appeal::APPEAL_CANCEL_PREFIX) {
-        commands::appeal::handle_appeal_cancel(ctx, component).await;
+    } else if custom_id.starts_with(commands::appeal::APPEAL_VOTE_PREFIX) {
+        commands::appeal::handle_vote_cancel(ctx, component).await;
+    } else if custom_id.starts_with(commands::appeal::APPEAL_VALIDATE_PREFIX) {
+        commands::appeal::handle_validate_cancel(ctx, component).await;
+    } else if custom_id.starts_with(commands::appeal::APPEAL_BANCONFIRM_PREFIX) {
+        commands::appeal::handle_ban_confirm(ctx, component).await;
+    } else if custom_id.starts_with(commands::appeal::APPEAL_BANCLOSE_PREFIX) {
+        commands::appeal::handle_ban_close(ctx, component).await;
     } else if custom_id == commands::appeal::APPEAL_CLOSE_ID {
         commands::appeal::handle_appeal_close(ctx, component).await;
     } else if custom_id.starts_with(commands::ban_sursis::SURSIS_PARDON_PREFIX) {

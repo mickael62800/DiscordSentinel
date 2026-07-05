@@ -6,16 +6,32 @@ use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
+use serenity::model::id::UserId;
 use tracing::{info, warn};
 
 use crate::shared::discord_helpers::reply_ephemeral;
 use crate::shared::heartbeat::ApiClientKey;
 
 pub const APPEAL_PREFIX: &str = "sentinel_mod_appeal_";
-/// Bouton modo « Annuler la sanction » : `mod_appeal_cancel_{action_id}`.
-pub const APPEAL_CANCEL_PREFIX: &str = "mod_appeal_cancel_";
+/// Bouton modo « Voter pour annuler » : `mod_appeal_votecancel_{action_id}`.
+pub const APPEAL_VOTE_PREFIX: &str = "mod_appeal_votecancel_";
+/// Bouton admin « Valider l'annulation » : `mod_appeal_validate_{action_id}`.
+pub const APPEAL_VALIDATE_PREFIX: &str = "mod_appeal_validate_";
+/// Bouton modo « Fermer + bannir » (etape 1) : `mod_appeal_banclose_{user_id}`.
+pub const APPEAL_BANCLOSE_PREFIX: &str = "mod_appeal_banclose_";
+/// Confirmation du ban (etape 2) : `mod_appeal_banconfirm_{user_id}`.
+pub const APPEAL_BANCONFIRM_PREFIX: &str = "mod_appeal_banconfirm_";
 /// Bouton modo « Fermer le salon » (supprime le salon d'appel).
 pub const APPEAL_CLOSE_ID: &str = "mod_appeal_close";
+
+/// Votes d'annulation en cours : `action_id -> set des user_id moderateurs`.
+/// In-process (les votes repartent a zero au redemarrage — acceptable, un appel
+/// est de courte duree).
+fn cancel_votes() -> &'static Mutex<HashMap<String, std::collections::HashSet<String>>> {
+    static MAP: OnceLock<Mutex<HashMap<String, std::collections::HashSet<String>>>> =
+        OnceLock::new();
+    MAP.get_or_init(|| Mutex::new(HashMap::new()))
+}
 
 /// MOD #9 — fenetre anti-spam de `/appeal` par (guild, user).
 const APPEAL_COOLDOWN: Duration = Duration::from_secs(5 * 60);
@@ -163,17 +179,30 @@ async fn finalize_appeal<F, Fut>(
         .description(desc)
         .timestamp(serenity::model::Timestamp::now());
 
-    // Boutons modo : annuler la sanction (si connue) + fermer le salon.
+    // Boutons modo. Annulation d'une sanction = VOTE de modos + validation ADMIN.
+    // Ban+fermeture = confirmation en 2 clics. Fermer = clore sans sanction.
     use serenity::all::{ButtonStyle, CreateButton};
     let mut buttons = Vec::new();
     if let Some(aid) = action_id {
         buttons.push(
-            CreateButton::new(format!("{APPEAL_CANCEL_PREFIX}{aid}"))
-                .label("Annuler la sanction")
-                .emoji('♻')
+            CreateButton::new(format!("{APPEAL_VOTE_PREFIX}{aid}"))
+                .label("Voter : annuler")
+                .emoji('🗳')
+                .style(ButtonStyle::Secondary),
+        );
+        buttons.push(
+            CreateButton::new(format!("{APPEAL_VALIDATE_PREFIX}{aid}"))
+                .label("Valider l'annulation (admin)")
+                .emoji('✅')
                 .style(ButtonStyle::Success),
         );
     }
+    buttons.push(
+        CreateButton::new(format!("{APPEAL_BANCLOSE_PREFIX}{appellant_id}"))
+            .label("Fermer + bannir")
+            .emoji('🔨')
+            .style(ButtonStyle::Danger),
+    );
     buttons.push(
         CreateButton::new(APPEAL_CLOSE_ID)
             .label("Fermer le salon")
@@ -357,58 +386,258 @@ pub async fn handle_appeal_close(ctx: &Context, component: &ComponentInteraction
     }
 }
 
-/// Bouton « Annuler la sanction » : leve la sanction contestee (modo uniquement).
-pub async fn handle_appeal_cancel(ctx: &Context, component: &ComponentInteraction) {
+/// Lit le quorum de votes d'annulation (config, defaut 2).
+async fn cancel_quorum(ctx: &Context, guild_id: &str) -> usize {
+    let cfg = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(api) => api
+                .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
+                .await
+                .unwrap_or_default(),
+            None => return 2,
+        }
+    };
+    cfg.get("appeal_cancel_quorum")
+        .and_then(|v| v.parse::<usize>().ok())
+        .filter(|&n| n >= 1)
+        .unwrap_or(2)
+}
+
+/// Verifie que le cliqueur est administrateur (permission ADMINISTRATOR).
+async fn ensure_admin(ctx: &Context, component: &ComponentInteraction) -> bool {
+    use serenity::all::Permissions;
+    let Some(gid) = component.guild_id else {
+        deny_not_mod(ctx, component).await;
+        return false;
+    };
+    let member = match gid.member(&ctx.http, component.user.id).await {
+        Ok(m) => m,
+        Err(_) => {
+            deny_not_mod(ctx, component).await;
+            return false;
+        }
+    };
+    #[allow(deprecated)]
+    let perms = member
+        .permissions(&ctx.cache)
+        .unwrap_or_else(|_| Permissions::empty());
+    if perms.contains(Permissions::ADMINISTRATOR) {
+        return true;
+    }
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Réservé aux administrateurs.")
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+    false
+}
+
+/// Appelle DELETE /api/moderation/actions/{id} (leve la sanction : unban/unmute,
+/// annule les rappels, retire l'action). Renvoie Ok si succes.
+async fn do_cancel_action(ctx: &Context, action_id: &str) -> Result<(), String> {
+    let data = ctx.data.read().await;
+    let base = data.get::<ApiClientKey>().ok_or("api indisponible")?;
+    let req = base
+        .client()
+        .delete(format!("{}/api/moderation/actions/{action_id}", base.base_url()));
+    let resp = base.auth(req).send().await.map_err(|e| e.to_string())?;
+    if resp.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!("HTTP {}", resp.status()))
+    }
+}
+
+/// Embed de statut du vote d'annulation.
+fn vote_embed(voters: &[String], quorum: usize) -> serenity::builder::CreateEmbed {
+    let count = voters.len();
+    let reached = count >= quorum;
+    let voter_list = if voters.is_empty() {
+        "—".to_string()
+    } else {
+        voters.iter().map(|v| format!("<@{v}>")).collect::<Vec<_>>().join(", ")
+    };
+    let status = if reached {
+        "✅ Quorum atteint — un **administrateur** peut valider l'annulation."
+    } else {
+        "🕒 En attente d'autres votes de modérateurs."
+    };
+    crate::shared::embeds::info_embed("🗳️ Vote d'annulation de la sanction")
+        .description(format!(
+            "Votes : **{count}/{quorum}**\nOnt voté : {voter_list}\n\n{status}"
+        ))
+        .timestamp(serenity::model::Timestamp::now())
+}
+
+/// Bouton « Voter pour annuler » : un modo ajoute son vote (quorum requis).
+pub async fn handle_vote_cancel(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(action_id) = component
-        .data
-        .custom_id
-        .strip_prefix(APPEAL_CANCEL_PREFIX)
-        .map(str::to_string)
+    let Some(action_id) = component.data.custom_id.strip_prefix(APPEAL_VOTE_PREFIX).map(str::to_string)
     else {
         return;
     };
+    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else { return };
+    let quorum = cancel_quorum(ctx, &guild_id).await;
+
+    let voters: Vec<String> = {
+        let mut map = cancel_votes().lock().unwrap();
+        let set = map.entry(action_id.clone()).or_default();
+        set.insert(component.user.id.to_string());
+        set.iter().cloned().collect()
+    };
+
+    // Accuse reception (ephemere) puis met a jour l'embed du salon (boutons conserves).
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!("🗳️ Ton vote est pris en compte ({}/{quorum}).", voters.len()))
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+    let _ = component
+        .channel_id
+        .edit_message(
+            &ctx.http,
+            component.message.id,
+            serenity::builder::EditMessage::new().embed(vote_embed(&voters, quorum)),
+        )
+        .await;
+}
+
+/// Bouton « Valider l'annulation » : ADMIN uniquement, apres le quorum.
+pub async fn handle_validate_cancel(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_admin(ctx, component).await {
+        return;
+    }
+    let Some(action_id) = component.data.custom_id.strip_prefix(APPEAL_VALIDATE_PREFIX).map(str::to_string)
+    else {
+        return;
+    };
+    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else { return };
+    let quorum = cancel_quorum(ctx, &guild_id).await;
+
+    let count = cancel_votes()
+        .lock()
+        .unwrap()
+        .get(&action_id)
+        .map(|s| s.len())
+        .unwrap_or(0);
+    if count < quorum {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("Quorum non atteint : {count}/{quorum} vote(s) de modérateurs requis avant validation."))
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
 
     let _ = component
         .create_response(
             &ctx.http,
-            CreateInteractionResponse::Defer(
-                CreateInteractionResponseMessage::new().ephemeral(true),
+            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+        )
+        .await;
+
+    match do_cancel_action(ctx, &action_id).await {
+        Ok(()) => {
+            cancel_votes().lock().unwrap().remove(&action_id);
+            let _ = component
+                .create_followup(
+                    &ctx.http,
+                    serenity::builder::CreateInteractionResponseFollowup::new()
+                        .content("♻️ **Sanction annulée** (validée par un admin après vote). Suppression du salon…"),
+                )
+                .await;
+            let _ = component.channel_id.delete(&ctx.http).await;
+            info!(action_id, admin = %component.user.name, "Sanction annulee apres vote + validation admin");
+        }
+        Err(e) => {
+            let _ = component
+                .create_followup(
+                    &ctx.http,
+                    serenity::builder::CreateInteractionResponseFollowup::new()
+                        .content(format!("Échec de l'annulation : {e}")),
+                )
+                .await;
+        }
+    }
+}
+
+/// Bouton « Fermer + bannir » (etape 1) : demande une confirmation.
+pub async fn handle_ban_close(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_moderator(ctx, component).await {
+        return;
+    }
+    let Some(user_id) = component.data.custom_id.strip_prefix(APPEAL_BANCLOSE_PREFIX).map(str::to_string)
+    else {
+        return;
+    };
+    let confirm = serenity::builder::CreateActionRow::Buttons(vec![serenity::builder::CreateButton::new(
+        format!("{APPEAL_BANCONFIRM_PREFIX}{user_id}"),
+    )
+    .label("⚠️ Confirmer le bannissement")
+    .style(serenity::all::ButtonStyle::Danger)]);
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!(
+                        "Confirmer : **bannir <@{user_id}> et fermer le salon** ? Action irréversible."
+                    ))
+                    .components(vec![confirm])
+                    .ephemeral(true),
             ),
         )
         .await;
+}
 
-    // DELETE /api/moderation/actions/{id} leve l'effet Discord (unban/unmute),
-    // annule les rappels et supprime l'action.
-    let result = {
-        let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(base) => {
-                let req = base
-                    .client()
-                    .delete(format!("{}/api/moderation/actions/{action_id}", base.base_url()));
-                base.auth(req).send().await.map_err(|e| e.to_string())
-            }
-            None => Err("api indisponible".into()),
-        }
+/// Bouton « Confirmer le ban » (etape 2) : bannit + ferme le salon.
+pub async fn handle_ban_confirm(ctx: &Context, component: &ComponentInteraction) {
+    if !ensure_moderator(ctx, component).await {
+        return;
+    }
+    let Some(user_id) = component.data.custom_id.strip_prefix(APPEAL_BANCONFIRM_PREFIX).map(str::to_string)
+    else {
+        return;
     };
-
-    let msg = match result {
-        Ok(resp) if resp.status().is_success() => {
-            "♻️ **Sanction annulée** — l'effet Discord a été levé et l'action retirée de l'historique.".to_string()
-        }
-        Ok(resp) => format!("Échec de l'annulation (HTTP {}).", resp.status()),
-        Err(e) => format!("Erreur réseau : {e}"),
-    };
+    let Some(gid) = component.guild_id else { return };
     let _ = component
-        .create_followup(
+        .create_response(
             &ctx.http,
-            serenity::builder::CreateInteractionResponseFollowup::new().content(msg),
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("🔨 Bannissement… suppression du salon.")
+                    .ephemeral(true),
+            ),
         )
         .await;
-    info!(action_id, mod = %component.user.name, "Annulation de sanction via bouton d'appel");
+    if let Ok(uid) = user_id.parse::<u64>() {
+        if let Err(e) = gid
+            .ban_with_reason(&ctx.http, UserId::new(uid), 0, "Appel refusé — bannissement")
+            .await
+        {
+            warn!(error = %e, user_id, "Echec ban depuis salon d'appel");
+        }
+    }
+    let _ = component.channel_id.delete(&ctx.http).await;
+    info!(user_id, mod = %component.user.name, "Appel refuse -> ban + fermeture salon");
 }
 
 /// Construit la ligne de bouton "Contester" attachee aux DM de sanction.
