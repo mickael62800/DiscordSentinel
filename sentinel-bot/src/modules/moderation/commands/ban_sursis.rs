@@ -145,11 +145,11 @@ pub async fn apply_sursis(
     }
 
     // Salon d'appel (sous appeal_category_id), sans boutons pour l'instant.
-    let intro = crate::shared::embeds::critical_embed("⏳ Ban en sursis")
-        .description(format!(
-            "<@{target}> est placé en **sursis**. Sans appel accepté, le bannissement sera automatique.\n**Raison :** {reason}"
-        ))
-        .timestamp(serenity::model::Timestamp::now());
+    // Meme cadre « mode d'emploi » que l'appel, avec une note de sursis en tete.
+    let context = format!(
+        "⏳ **Ban en sursis** — sans appel accepté, le bannissement sera **automatique** à l'échéance.\n**Raison :** {reason}"
+    );
+    let intro = super::appeal::guidelines_embed(ctx, guild_id, target.get(), None, Some(&context)).await;
     let channel = crate::modules::moderation::create_appeal_channel(
         ctx,
         guild_id,

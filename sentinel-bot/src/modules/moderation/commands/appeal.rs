@@ -158,6 +158,68 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     info!(user = %command.user.name, "Appel de sanction traite via /appeal");
 }
 
+/// Texte par defaut du « mode d'emploi » de l'appel (si config vide). Editable
+/// via le dashboard (cle `appeal_guidelines`).
+pub const DEFAULT_GUIDELINES: &str = "\
+**📎 Ce qu'on attend de toi**\n\
+• Des **preuves** concrètes : captures d'écran, liens de messages, dates, contexte.\n\
+• Reste **factuel** et **respectueux** : pas d'insultes ni d'accusations gratuites.\n\
+• Un appel n'est pas une 2ᵉ dispute — apporte des éléments **nouveaux ou vérifiables**.\n\n\
+**⚖️ Tes droits**\n\
+• Être **écouté** et obtenir un **réexamen** de ta sanction.\n\
+• Si le problème concerne **un modérateur en particulier**, tu peux **demander qu'il ne participe pas** à ce salon (conflit d'intérêt) : indique-le clairement ici, un autre membre du staff prendra le relais.\n\
+• La décision d'annuler une sanction n'est **jamais** prise par un seul modo : plusieurs votent, puis un **admin valide**.\n\n\
+**🚫 Tes devoirs**\n\
+• **Honnêteté** : mentir ou falsifier des preuves aggrave ta situation.\n\
+• Un appel **abusif** (spam, insultes, mauvaise foi) peut être **refusé** et mener à un **bannissement**.";
+
+/// Construit la carte « mode d'emploi » de l'appel (partagee appel + sursis).
+/// Le texte des regles est parametrable (`appeal_guidelines`), `context` ajoute
+/// une note en tete (ex. l'echeance d'un sursis).
+pub async fn guidelines_embed(
+    ctx: &Context,
+    guild_id: &str,
+    appellant_id: u64,
+    action_id: Option<&str>,
+    context: Option<&str>,
+) -> serenity::builder::CreateEmbed {
+    let guidelines = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(api) => api
+                .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
+                .await
+                .ok()
+                .and_then(|cfg| {
+                    cfg.get("appeal_guidelines")
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                })
+                .unwrap_or_else(|| DEFAULT_GUIDELINES.to_string()),
+            None => DEFAULT_GUIDELINES.to_string(),
+        }
+    };
+
+    let mut desc = String::new();
+    if let Some(c) = context {
+        desc.push_str(c);
+        desc.push_str("\n\n");
+    }
+    desc.push_str(&format!(
+        "<@{appellant_id}> conteste une sanction et demande un réexamen. Ce salon est \
+         **privé** : seuls toi et l'équipe de modération le voyez. Expose calmement ta \
+         version — l'objectif est de vérifier si la sanction est justifiée.\n\n"
+    ));
+    if let Some(a) = action_id {
+        desc.push_str(&format!("**Référence de l'action :** `{}`\n\n", &a[..16.min(a.len())]));
+    }
+    desc.push_str(&guidelines);
+
+    crate::shared::embeds::info_embed("📨 Appel de sanction — mode d'emploi")
+        .description(desc)
+        .timestamp(serenity::model::Timestamp::now())
+}
+
 /// Cree le salon d'appel (si categorie configuree) + notifie ; puis renvoie le
 /// message a afficher a l'appelant via `reply`.
 async fn finalize_appeal<F, Fut>(
@@ -171,38 +233,7 @@ async fn finalize_appeal<F, Fut>(
     F: FnOnce(String) -> Fut,
     Fut: std::future::Future<Output = ()>,
 {
-    let mut desc = format!(
-        "<@{appellant_id}> conteste une sanction et demande un réexamen.\n\n\
-         Ce salon est **privé** : seuls toi et l'équipe de modération le voyez. \
-         Expose calmement ta version — l'objectif est de vérifier si la sanction \
-         est justifiée ou non."
-    );
-    if let Some(a) = action_id {
-        desc.push_str(&format!("\n\n**Référence de l'action :** `{}`", &a[..16.min(a.len())]));
-    }
-    let intro = crate::shared::embeds::info_embed("📨 Appel de sanction — mode d'emploi")
-        .description(desc)
-        .field(
-            "📎 Ce qu'on attend de toi",
-            "• Des **preuves** concrètes : captures d'écran, liens de messages, dates, contexte.\n\
-             • Reste **factuel** et **respectueux** : pas d'insultes ni d'accusations gratuites.\n\
-             • Un appel n'est pas une 2ᵉ dispute — apporte des éléments **nouveaux ou vérifiables**.",
-            false,
-        )
-        .field(
-            "⚖️ Tes droits",
-            "• Être **écouté** et obtenir un **réexamen** de ta sanction.\n\
-             • Si le problème concerne **un modérateur en particulier**, tu peux **demander qu'il ne participe pas** à ce salon (conflit d'intérêt) : indique-le clairement ici, un autre membre du staff prendra le relais.\n\
-             • La décision d'annuler une sanction n'est **jamais** prise par un seul modo : plusieurs votent, puis un **admin valide**.",
-            false,
-        )
-        .field(
-            "🚫 Tes devoirs",
-            "• **Honnêteté** : mentir ou falsifier des preuves aggrave ta situation.\n\
-             • Un appel **abusif** (spam, insultes, mauvaise foi) peut être **refusé** et mener à un **bannissement**.",
-            false,
-        )
-        .timestamp(serenity::model::Timestamp::now());
+    let intro = guidelines_embed(ctx, guild_id, appellant_id, action_id, None).await;
 
     // Boutons modo. Annulation d'une sanction = VOTE de modos + validation ADMIN.
     // Ban+fermeture = confirmation en 2 clics. Fermer = clore sans sanction.
