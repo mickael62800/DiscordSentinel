@@ -130,11 +130,11 @@ fn layout_for(cat: Category) -> Layout {
         Category::General => Layout {
             w: 1536.0,
             h: 1024.0,
-            // Centres/rayons mesures precisement sur le template.
+            // Centres/rayons cales sur le template (podium).
             podium: [
-                Circle { cx: 767.0, cy: 415.0, r: 110.0 }, // #1 centre
-                Circle { cx: 419.0, cy: 422.0, r: 99.0 },  // #2 gauche
-                Circle { cx: 1080.0, cy: 433.0, r: 88.0 }, // #3 droite
+                Circle { cx: 767.0, cy: 407.0, r: 118.0 }, // #1 centre (agrandi vers le haut)
+                Circle { cx: 419.0, cy: 422.0, r: 99.0 },  // #2 gauche (parfait)
+                Circle { cx: 1080.0, cy: 441.0, r: 96.0 }, // #3 droite (agrandi vers le bas)
             ],
             row_ys: [668.0, 727.0, 787.0, 847.0, 906.0],
             row_avatar_r: 30.0,
