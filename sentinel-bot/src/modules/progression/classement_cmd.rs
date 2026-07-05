@@ -145,41 +145,36 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let voc = resolve_entries(ctx, &ranking.voice, &mut cache).await;
 
     use crate::modules::progression::leaderboard_render::{render_leaderboard, Category};
-    let mut msg = CreateMessage::new();
-    let mut has_image = false;
+    // UN message PAR classement (image plus grande/lisible dans Discord).
+    let mut sent = 0u8;
     for (cat, entries) in [
         (Category::General, &gen),
         (Category::Ecrit, &txt),
         (Category::Vocal, &voc),
     ] {
         if let Some(png) = render_leaderboard(cat, entries) {
-            msg = msg.add_file(serenity::builder::CreateAttachment::bytes(
+            let file = serenity::builder::CreateAttachment::bytes(
                 png,
                 format!("classement_{}.png", cat.label().to_lowercase()),
-            ));
-            has_image = true;
+            );
+            match target
+                .send_message(&ctx.http, CreateMessage::new().add_file(file))
+                .await
+            {
+                Ok(_) => sent += 1,
+                Err(e) => warn!(error = %e, cat = cat.label(), "Echec envoi image classement"),
+            }
         }
     }
 
     // Fallback embed texte si aucun template dispo / rendu impossible.
-    if !has_image {
-        msg = msg.embed(build_ranking_embed(&ranking));
+    if sent == 0 {
+        let _ = target
+            .send_message(&ctx.http, CreateMessage::new().embed(build_ranking_embed(&ranking)))
+            .await;
     }
 
-    match target.send_message(&ctx.http, msg).await {
-        Ok(_) => {
-            followup(ctx, command, &format!("Classement publie dans <#{target}>.")).await;
-        }
-        Err(e) => {
-            warn!(error = %e, channel = %target, "Echec publication classement force");
-            followup(
-                ctx,
-                command,
-                "Impossible de poster dans le salon cible (permissions ?).",
-            )
-            .await;
-        }
-    }
+    followup(ctx, command, &format!("Classement publie dans <#{target}>.")).await;
 }
 
 /// Resout pseudo + avatar PNG pour les 13 premieres entrees (avec cache).
