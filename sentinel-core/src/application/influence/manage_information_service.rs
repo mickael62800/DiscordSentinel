@@ -229,19 +229,30 @@ impl ManageInformationUseCase for ManageInformationService {
             None => base_loss,
         };
         let mut new_target_reputation = None;
+        let mut applied_loss = 0;
         if !info.target_user_id.is_empty() {
             let target = self
                 .citizens
                 .get_or_create(guild_id, &info.target_user_id, &info.target_username, start_money)
                 .await?;
+            // TRANSPARENCE de la cible : si elle etait deja a decouvert, le
+            // scandale fait moins mal (jusqu'a -50 % du malus).
+            let effective_loss = match &self.rep_dims {
+                Some(dims) => {
+                    let transp = dims.get(target.id).await.map(|x| x.transparency).unwrap_or(0);
+                    (loss * (100 - transp.clamp(0, 50)) / 100).max(0)
+                }
+                None => loss,
+            };
+            applied_loss = effective_loss;
             let new_rep = self
                 .citizens
-                .adjust_capital(target.id, Capital::Reputation, -loss)
+                .adjust_capital(target.id, Capital::Reputation, -effective_loss)
                 .await?;
             new_target_reputation = Some(new_rep);
             let _ = self
                 .movements
-                .record(guild_id, target.id, Capital::Reputation, -loss, "Scandale")
+                .record(guild_id, target.id, Capital::Reputation, -effective_loss, "Scandale")
                 .await;
             // Reputation multi-dimensionnelle : un scandale entame la FIABILITE
             // et la TRANSPARENCE de la cible (elle cachait quelque chose).
@@ -275,7 +286,7 @@ impl ManageInformationUseCase for ManageInformationService {
             content: info.content,
             target_user_id: info.target_user_id,
             target_username: info.target_username,
-            reputation_loss: if new_target_reputation.is_some() { loss } else { 0 },
+            reputation_loss: applied_loss,
             new_target_reputation,
         })
     }

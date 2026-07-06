@@ -148,13 +148,20 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         }
 
         let settings = self.settings(guild_id).await;
-        let cost = settings.org_creation_cost();
+        let mut cost = settings.org_creation_cost();
         let quota = settings.org_max_per_citizen();
 
         let founder = self
             .citizens
             .get_or_create(guild_id, founder_user_id, founder_username, 0)
             .await?;
+
+        // POPULARITE du fondateur : le soutien de la communaute reduit le cout
+        // de creation (jusqu'a -40 %).
+        if let Some(d) = &self.rep_dims {
+            let pop = d.get(founder.id).await.map(|x| x.popularity).unwrap_or(0);
+            cost = (cost * (100 - pop.clamp(0, 40)) / 100).max(0);
+        }
 
         // Quota d'organisations fondees.
         if self.orgs.count_active_founded_by(founder.id).await? >= quota {

@@ -143,10 +143,12 @@ impl ManageLawsUseCase for ManageLawsService {
             .laws
             .create(guild_id, title, body, citizen.id, closes_at, effect_key, effect_val)
             .await?;
-        // Proposer une loi te rend plus connu : +NOTORIETE.
+        // Proposer une loi te rend plus connu (+NOTORIETE) et c'est une prise de
+        // position publique (+TRANSPARENCE).
         if let Some(d) = &self.rep_dims {
             use crate::domain::entities::influence::reputation_dims::ReputationDim;
             let _ = d.adjust(citizen.id, ReputationDim::Notoriety, 5).await;
+            let _ = d.adjust(citizen.id, ReputationDim::Transparency, 3).await;
         }
         Ok(LawState {
             law,
