@@ -323,11 +323,15 @@ fn resolve_actor(
     explicit: Option<&str>,
     fallback: &str,
 ) -> String {
-    if let Some(s) = explicit {
-        return s.to_string();
-    }
+    // L'identite authentifiee (RoleContext, token Discord verifie) PRIME : on
+    // n'accepte pas un actor_id arbitraire du query pour un appelant web (sinon
+    // usurpation de l'audit trail sur des actions sensibles : delete/RCON...).
+    // L'actor_id explicite ne sert que pour les appels internes/bot (sans RBAC).
     if let Some(Extension(ctx)) = rbac {
         return ctx.discord_user_id.clone();
+    }
+    if let Some(s) = explicit {
+        return s.to_string();
     }
     fallback.to_string()
 }

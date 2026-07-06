@@ -49,18 +49,26 @@ pub async fn job_image_cleanup(State(state): State<AppState>) -> Result<Json<Job
 pub async fn job_reveal_ip(State(state): State<AppState>) -> Result<Json<JobReport>, ApiError> {
     let due = state.game_server_repo.list_ip_reveal_due().await?;
     let mut processed = 0usize;
+    let mut errors = 0usize;
     for s in &due {
+        // Marque d'ABORD (at-most-once) : si le mark echoue on NE broadcast PAS
+        // (sinon l'IP serait repostee au tick suivant), on compte l'erreur et on
+        // continue le batch au lieu d'avorter (`?`).
+        if let Err(e) = state.game_server_repo.mark_ip_revealed(s.id).await {
+            tracing::warn!(error = %e, server_id = %s.id, "reveal_ip: mark echoue, skip");
+            errors += 1;
+            continue;
+        }
         state.broadcaster.broadcast(
             "game_ip_reveal",
             serde_json::json!({ "server_id": s.id.to_string(), "guild_id": s.guild_id }),
         );
-        state.game_server_repo.mark_ip_revealed(s.id).await?;
         processed += 1;
     }
     Ok(Json(JobReport {
         job: "reveal_ip",
         processed,
-        errors: 0,
+        errors,
         details: serde_json::json!({}),
     }))
 }
@@ -76,6 +84,7 @@ pub async fn job_daily_ping(State(state): State<AppState>) -> Result<Json<JobRep
         .list_awaiting_reveal_no_ping_today()
         .await?;
     let mut processed = 0usize;
+    let mut errors = 0usize;
     for s in &awaiting {
         let cfg = state
             .bot_config_repo
@@ -87,19 +96,28 @@ pub async fn job_daily_ping(State(state): State<AppState>) -> Result<Json<JobRep
         let hour = get("session_daily_ping_hour")
             .and_then(|v| v.parse::<i64>().ok())
             .unwrap_or(18);
-        if enabled && hour == now_hour {
+        // `>=` (pas `==`) : si le tick tombe apres l'heure pile, on ne rate pas
+        // le ping du jour (le fire-once/jour est deja garanti par la requete
+        // list_awaiting_reveal_no_ping_today).
+        if enabled && now_hour >= hour {
+            // Marque d'ABORD (at-most-once), broadcast seulement si le mark
+            // reussit -> pas de double ping ; compte l'erreur sans avorter.
+            if let Err(e) = state.game_server_repo.mark_daily_ping(s.id).await {
+                tracing::warn!(error = %e, server_id = %s.id, "daily_ping: mark echoue, skip");
+                errors += 1;
+                continue;
+            }
             state.broadcaster.broadcast(
                 "game_daily_ping",
                 serde_json::json!({ "server_id": s.id.to_string(), "guild_id": s.guild_id }),
             );
-            state.game_server_repo.mark_daily_ping(s.id).await?;
             processed += 1;
         }
     }
     Ok(Json(JobReport {
         job: "daily_ping",
         processed,
-        errors: 0,
+        errors,
         details: serde_json::json!({}),
     }))
 }
