@@ -215,6 +215,13 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         .unwrap_or(env_config.raid_pattern_score_threshold);
 
     // ── 0. Buffer temporel des joins (le bot garde le timing, pas le metier) ──
+    // Les bots (ajoutes par un admin via OAuth, pas un vecteur de raid) ne sont
+    // pas comptes dans le seuil de raid -> evite qu'un ajout d'integrations
+    // gonfle le compteur et declenche un faux positif.
+    if user.bot {
+        return;
+    }
+
     let join_info = JoinInfo {
         username: user.name.clone(),
         has_avatar: user.avatar.is_some(),

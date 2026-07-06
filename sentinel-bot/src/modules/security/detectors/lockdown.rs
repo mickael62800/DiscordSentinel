@@ -93,7 +93,13 @@ impl LockdownManager {
         let mut saved_states = Vec::new();
 
         for (channel_id, channel) in &channels {
-            if channel.kind != ChannelType::Text {
+            // Verrouille tous les salons TEXTUELS (Text, Annonces/News, Forum) ;
+            // avant, seul Text -> les salons Annonces/Forum restaient ouverts
+            // pendant un raid (lockdown contournable).
+            if !matches!(
+                channel.kind,
+                ChannelType::Text | ChannelType::News | ChannelType::Forum
+            ) {
                 continue;
             }
 

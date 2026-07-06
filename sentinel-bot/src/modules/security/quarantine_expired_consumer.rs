@@ -58,6 +58,21 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         Err(_) => return,
     };
 
+    // Anti-race : ne kicke que si l'utilisateur est ENCORE suivi en quarantaine
+    // cote bot. S'il a valide le captcha entre le DELETE+publish du worker et la
+    // reception de cet event, son tracking RAM a ete retire -> on n'expulse pas
+    // un innocent qui vient d'etre valide. (Fail-safe apres reboot : RAM vide ->
+    // pas de kick, le role de quarantaine reste applique.)
+    {
+        let bot_data = ctx.data.read().await;
+        if let Some(q) = bot_data.get::<QuarantineKey>() {
+            if !q.is_quarantined(guild_id, user_id) {
+                info!(guild = %guild_id, user = %user_id, "quarantine_expired ignore : deja libere/valide");
+                return;
+            }
+        }
+    }
+
     if let Err(e) = guild_id.kick(&ctx.http, user_id).await {
         warn!(error = %e, guild = %guild_id, user = %user_id, "Impossible de kick (quarantine_expired)");
     } else {
