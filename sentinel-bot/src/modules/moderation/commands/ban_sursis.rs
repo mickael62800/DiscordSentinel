@@ -280,6 +280,25 @@ pub async fn handle_pardon(ctx: &Context, component: &ComponentInteraction) {
     let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
     let Ok(uid) = user_id.parse::<u64>() else { return };
 
+    // Claim d'abord : ne restaure les roles / n'agit que si CE clic a bien leve
+    // le sursis (garde d'etat). Sinon (deja banni/gracie par une action
+    // concurrente ou un double-clic), on s'abstient.
+    let resolved = base
+        .post_json::<_, serde_json::Value>(
+            &format!("/api/moderation/sursis/{id}/resolve"),
+            &serde_json::json!({ "status": "gracie" }),
+        )
+        .await
+        .ok();
+    let claimed = resolved
+        .as_ref()
+        .and_then(|v| v.get("claimed"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !claimed {
+        followup(ctx, component, "⚠️ Ce sursis a déjà été traité.").await;
+        return;
+    }
     // Restaure les roles sauvegardes.
     if let Ok(mut member) = guild_id.member(&ctx.http, UserId::new(uid)).await {
         let roles: Vec<RoleId> = sursis
@@ -289,12 +308,6 @@ pub async fn handle_pardon(ctx: &Context, component: &ComponentInteraction) {
             .unwrap_or_default();
         let _ = member.edit(&ctx.http, EditMember::new().roles(roles)).await;
     }
-    let _ = base
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/moderation/sursis/{id}/resolve"),
-            &serde_json::json!({ "status": "gracie" }),
-        )
-        .await;
     if let Ok(dm) = UserId::new(uid).create_dm_channel(&ctx.http).await {
         let _ = dm
             .send_message(&ctx.http, serenity::builder::CreateMessage::new().content("✅ Ton appel a été accepté : tes accès sont rétablis."))
@@ -335,15 +348,27 @@ pub async fn handle_ban_now(ctx: &Context, component: &ComponentInteraction) {
     let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
     let Ok(uid) = user_id.parse::<u64>() else { return };
 
-    if let Err(e) = guild_id.ban_with_reason(&ctx.http, UserId::new(uid), 0, "Ban en sursis confirmé").await {
-        warn!(error = %e, "Echec ban depuis sursis");
-    }
-    let _ = base
+    // Claim d'abord : ne bannit que si CE clic a bien resolu le sursis (garde
+    // d'etat -> pas de re-ban sur double-clic ni si deja gracie).
+    let resolved = base
         .post_json::<_, serde_json::Value>(
             &format!("/api/moderation/sursis/{id}/resolve"),
             &serde_json::json!({ "status": "banni" }),
         )
-        .await;
+        .await
+        .ok();
+    let claimed = resolved
+        .as_ref()
+        .and_then(|v| v.get("claimed"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    if !claimed {
+        followup(ctx, component, "⚠️ Ce sursis a déjà été traité.").await;
+        return;
+    }
+    if let Err(e) = guild_id.ban_with_reason(&ctx.http, UserId::new(uid), 0, "Ban en sursis confirmé").await {
+        warn!(error = %e, "Echec ban depuis sursis");
+    }
     followup(ctx, component, "🔨 Membre banni. Salon supprimé…").await;
     let _ = component.channel_id.delete(&ctx.http).await;
     info!(sursis = %id, "Sursis -> ban immediat");

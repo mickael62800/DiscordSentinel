@@ -40,6 +40,31 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // Garde de permission (F-2) : reserve aux modos (le default_member_permissions
+    // est reecrivable par un admin de guilde).
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        edit_response_text(ctx, command, "❌ Permission de modération requise.").await;
+        return;
+    }
+    // F-1 : l'invocateur doit avoir acces (VIEW_CHANNEL) au salon cible, sinon on
+    // exposerait un salon prive/staff auquel il n'a pas droit.
+    if let (Some(gid), Some(member)) = (command.guild_id, command.member.as_ref()) {
+        let can_view = ctx
+            .cache
+            .guild(gid)
+            .map(|g| match g.channels.get(&channel_id) {
+                Some(ch) => g
+                    .user_permissions_in(ch, member)
+                    .contains(serenity::all::Permissions::VIEW_CHANNEL),
+                None => false,
+            })
+            .unwrap_or(false);
+        if !can_view {
+            edit_response_text(ctx, command, "❌ Tu n'as pas accès à ce salon.").await;
+            return;
+        }
+    }
+
     let defer =
         CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true));
     if let Err(e) = command.create_response(&ctx.http, defer).await {

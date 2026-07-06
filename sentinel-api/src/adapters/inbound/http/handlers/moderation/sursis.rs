@@ -156,8 +156,11 @@ pub async fn resolve_sursis(
         "moderator+ requis pour resoudre un sursis",
     )
     .await?;
-    state.sursis_uc.resolve(id, status).await?;
-    Ok(Json(serde_json::json!({ "ok": true })))
+    // `claimed` = ce resolve a bien fait la transition (le sursis etait encore
+    // en_sursis). false = deja resolu -> le bot doit s'abstenir de refaire
+    // l'action Discord (re-ban / re-DM / suppression de salon).
+    let claimed = state.sursis_uc.resolve(id, status).await?;
+    Ok(Json(serde_json::json!({ "ok": true, "claimed": claimed })))
 }
 
 /// POST /api/moderation/internal/jobs/sursis-expire  (worker)
