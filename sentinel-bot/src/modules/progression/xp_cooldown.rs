@@ -14,7 +14,9 @@ impl XpCooldown {
         }
     }
 
-    /// Verifie si l'utilisateur peut gagner de l'XP (cooldown expire).
+    /// Verifie si l'utilisateur peut gagner de l'XP (cooldown expire). Conserve
+    /// pour les tests ; le chemin de prod utilise `try_claim` (atomique).
+    #[allow(dead_code)]
     pub fn can_gain_xp(&self, guild_id: u64, user_id: u64, cooldown_secs: u64) -> bool {
         if cooldown_secs == 0 {
             return true;
@@ -29,7 +31,39 @@ impl XpCooldown {
         }
     }
 
+    /// Reserve ATOMIQUEMENT le gain d'XP : renvoie `true` (et pose le timestamp)
+    /// si le cooldown est expire, `false` sinon. Remplace le couple non atomique
+    /// can_gain_xp + record_xp (deux messages concurrents pouvaient tous deux
+    /// passer le check avant le record -> double credit). Le lock d'entree
+    /// DashMap rend le compare-and-set indivisible.
+    pub fn try_claim(&self, guild_id: u64, user_id: u64, cooldown_secs: u64) -> bool {
+        let now = Instant::now();
+        if cooldown_secs == 0 {
+            self.last_xp.insert((guild_id, user_id), now);
+            return true;
+        }
+        let cooldown = Duration::from_secs(cooldown_secs);
+        let mut allowed = false;
+        self.last_xp
+            .entry((guild_id, user_id))
+            .and_modify(|last| {
+                if now.duration_since(*last) >= cooldown {
+                    *last = now;
+                    allowed = true;
+                }
+            })
+            .or_insert_with(|| {
+                allowed = true;
+                now
+            });
+        if self.last_xp.len() > 10_000 {
+            self.cleanup(300);
+        }
+        allowed
+    }
+
     /// Enregistre le gain d'XP pour le cooldown.
+    #[allow(dead_code)]
     pub fn record_xp(&self, guild_id: u64, user_id: u64) {
         self.last_xp.insert((guild_id, user_id), Instant::now());
 

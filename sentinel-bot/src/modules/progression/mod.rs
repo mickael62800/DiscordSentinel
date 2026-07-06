@@ -392,18 +392,16 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
 
     let cooldown_secs = BaseApiClient::config_u64(&guild_config, "xp_cooldown_secs", 60);
+    // Reservation ATOMIQUE (check-and-set) : evite que deux messages concurrents
+    // du meme user passent tous deux le cooldown avant l'enregistrement.
     let can_gain = if let Some(cooldown) = data.get::<XpCooldownKey>() {
-        cooldown.can_gain_xp(guild_id.get(), msg.author.id.get(), cooldown_secs)
+        cooldown.try_claim(guild_id.get(), msg.author.id.get(), cooldown_secs)
     } else {
         true
     };
 
     if !can_gain {
         return;
-    }
-
-    if let Some(cooldown) = data.get::<XpCooldownKey>() {
-        cooldown.record_xp(guild_id.get(), msg.author.id.get());
     }
 
     let streak_enabled = BaseApiClient::config_bool(&guild_config, "streak_enabled", true);

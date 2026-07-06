@@ -24,8 +24,20 @@ use sentinel_core::domain::enums::system::role::Role;
 
 pub async fn add_xp(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddXpDto>,
 ) -> Result<Json<AddXpResponseDto>, ApiError> {
+    // L'attribution d'XP est une operation du BOT (Bearer API_KEY -> Internal,
+    // bypass). Un appelant web ne doit pas pouvoir s'auto-crediter de l'XP :
+    // reserve admin+ (avant, AUCUNE garde -> auto-attribution).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour attribuer de l'XP",
+    )
+    .await?;
     let guild_id = dto.guild_id.clone();
     let user_id = dto.user_id.clone();
     let amount = dto.amount;

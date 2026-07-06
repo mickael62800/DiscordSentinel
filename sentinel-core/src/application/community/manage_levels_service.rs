@@ -133,25 +133,28 @@ impl ManageLevelsUseCase for ManageLevelsService {
                 ))
             })?;
 
+        // Borne haute (anti-overflow) : bien au-dela de l'XP du niveau max, mais
+        // loin de i64::MAX pour que xp_text + xp_voice ne deborde jamais.
+        const MAX_XP: i64 = 1_000_000_000_000_000; // 1e15
         if let Some(xp_t) = cmd.xp_text {
-            if xp_t < 0 {
+            if !(0..=MAX_XP).contains(&xp_t) {
                 return Err(DomainError::ValidationError(
-                    "xp_text doit etre >= 0".into(),
+                    "xp_text hors bornes (0..=1e15)".into(),
                 ));
             }
             user.xp_text = xp_t;
             user.level_text = level_from_xp(xp_t);
         }
         if let Some(xp_v) = cmd.xp_voice {
-            if xp_v < 0 {
+            if !(0..=MAX_XP).contains(&xp_v) {
                 return Err(DomainError::ValidationError(
-                    "xp_voice doit etre >= 0".into(),
+                    "xp_voice hors bornes (0..=1e15)".into(),
                 ));
             }
             user.xp_voice = xp_v;
             user.level_voice = level_from_xp(xp_v);
         }
-        user.xp = user.xp_text + user.xp_voice;
+        user.xp = user.xp_text.saturating_add(user.xp_voice);
         user.level = level_from_xp(user.xp);
         user.updated_at = Utc::now();
 
