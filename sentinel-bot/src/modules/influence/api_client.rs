@@ -63,11 +63,13 @@ pub struct OrgInfo {
     pub emoji: String,
     pub motto: String,
     pub treasury: i64,
-    pub reputation: i64,
-    pub influence: i64,
     pub member_count: i64,
     #[serde(default)]
     pub relations: Vec<OrgRelation>,
+    #[serde(default)]
+    pub collective_influence: i64,
+    #[serde(default)]
+    pub collective_reputation: i64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -166,6 +168,8 @@ pub struct OrgRank {
     pub name: String,
     pub treasury: i64,
     pub member_count: i64,
+    #[serde(default)]
+    pub collective_influence: i64,
 }
 
 pub async fn org_ranking(

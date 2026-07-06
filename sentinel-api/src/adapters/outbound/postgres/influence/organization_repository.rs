@@ -169,6 +169,19 @@ impl OrganizationRepository for PgOrganizationRepository {
         Ok(uid)
     }
 
+    async fn collective_power(&self, org_id: Uuid) -> Result<(i64, i64), DomainError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COALESCE(SUM(c.influence), 0), COALESCE(SUM(c.reputation), 0) \
+             FROM influence_org_members m JOIN influence_citizens c ON c.id = m.citizen_id \
+             WHERE m.org_id = $1",
+        )
+        .bind(org_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row)
+    }
+
     async fn deposit_treasury(
         &self,
         org_id: Uuid,

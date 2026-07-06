@@ -44,6 +44,10 @@ pub trait OrganizationRepository: Send + Sync {
     /// Discord user_id du fondateur d'une organisation (JOIN citizens).
     async fn founder_user_id(&self, org_id: Uuid) -> Result<Option<String>, DomainError>;
 
+    /// Puissance COLLECTIVE d'une org : (influence, reputation) sommees sur les
+    /// capitaux de ses membres. Reflete son poids politique reel.
+    async fn collective_power(&self, org_id: Uuid) -> Result<(i64, i64), DomainError>;
+
     /// Incremente la tresorerie (depot) + enregistre le mouvement. Renvoie le
     /// nouveau solde.
     async fn deposit_treasury(

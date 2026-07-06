@@ -104,6 +104,10 @@ pub struct OrgInfoDto {
     pub org: OrganizationDto,
     pub member_count: i64,
     pub relations: Vec<OrgRelationDto>,
+    #[serde(default)]
+    pub collective_influence: i64,
+    #[serde(default)]
+    pub collective_reputation: i64,
 }
 
 impl From<OrgInfo> for OrgInfoDto {
@@ -120,6 +124,8 @@ impl From<OrgInfo> for OrgInfoDto {
                     emoji: r.relation.emoji().to_string(),
                 })
                 .collect(),
+            collective_influence: i.collective_influence,
+            collective_reputation: i.collective_reputation,
         }
     }
 }
@@ -162,6 +168,8 @@ pub struct OrgRankDto {
     pub name: String,
     pub treasury: i64,
     pub member_count: i64,
+    #[serde(default)]
+    pub collective_influence: i64,
 }
 
 impl From<sentinel_core::ports::inbound::influence::manage_organizations::OrgRankEntry>
@@ -172,6 +180,7 @@ impl From<sentinel_core::ports::inbound::influence::manage_organizations::OrgRan
             name: e.name,
             treasury: e.treasury,
             member_count: e.member_count,
+            collective_influence: e.collective_influence,
         }
     }
 }

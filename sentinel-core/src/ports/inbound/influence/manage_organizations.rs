@@ -22,6 +22,9 @@ pub struct OrgInfo {
     pub org: Organization,
     pub member_count: i64,
     pub relations: Vec<OrgRelation>,
+    /// Puissance collective = somme des capitaux des membres.
+    pub collective_influence: i64,
+    pub collective_reputation: i64,
 }
 
 /// Une ligne du palmares des organisations (`/org classement`).
@@ -30,6 +33,7 @@ pub struct OrgRankEntry {
     pub name: String,
     pub treasury: i64,
     pub member_count: i64,
+    pub collective_influence: i64,
 }
 
 #[async_trait]

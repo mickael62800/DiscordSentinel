@@ -296,8 +296,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                                 _ => "▫️",
                             };
                             format!(
-                                "{medal} **{}** — {} 💰 ({} membres)",
-                                o.name, o.treasury, o.member_count
+                                "{medal} **{}** — {} 💰 · ⚖️ {} influence ({} membres)",
+                                o.name, o.treasury, o.collective_influence, o.member_count
                             )
                         })
                         .collect::<Vec<_>>()
@@ -423,8 +423,16 @@ fn info_embed(o: &api_client::OrgInfo) -> CreateEmbed {
         .field("Type", o.kind_label.clone(), true)
         .field("Membres", o.member_count.to_string(), true)
         .field("Trésorerie", format!("{} 💰", o.treasury), true)
-        .field("Réputation", o.reputation.to_string(), true)
-        .field("Influence", o.influence.to_string(), true);
+        .field(
+            "⚖️ Influence collective",
+            o.collective_influence.to_string(),
+            true,
+        )
+        .field(
+            "🎖️ Réputation collective",
+            o.collective_reputation.to_string(),
+            true,
+        );
 
     let embed = if o.relations.is_empty() {
         embed

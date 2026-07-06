@@ -231,10 +231,14 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             Some(r) => r.list_for_org(org.id).await.unwrap_or_default(),
             None => Vec::new(),
         };
+        let (collective_influence, collective_reputation) =
+            self.orgs.collective_power(org.id).await.unwrap_or((0, 0));
         Ok(OrgInfo {
             org,
             member_count,
             relations,
+            collective_influence,
+            collective_reputation,
         })
     }
 
@@ -415,10 +419,12 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         let mut out = Vec::with_capacity(orgs.len());
         for o in orgs {
             let member_count = self.memberships.count(o.id).await.unwrap_or(0);
+            let (collective_influence, _) = self.orgs.collective_power(o.id).await.unwrap_or((0, 0));
             out.push(OrgRankEntry {
                 name: o.name,
                 treasury: o.treasury,
                 member_count,
+                collective_influence,
             });
         }
         Ok(out)
