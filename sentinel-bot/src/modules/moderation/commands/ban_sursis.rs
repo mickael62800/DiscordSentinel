@@ -57,6 +57,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(|u| u.name.clone())
         .unwrap_or_default();
 
+    if let Some(gid) = command.guild_id {
+        if let Err(msg) = super::check_hierarchy(ctx, command, gid, target) {
+            reply_ephemeral(ctx, command, &format!("❌ {msg}")).await;
+            return;
+        }
+    }
+
     match apply_sursis(
         ctx,
         &guild_id,

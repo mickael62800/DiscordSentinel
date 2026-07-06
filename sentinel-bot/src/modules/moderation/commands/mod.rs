@@ -105,6 +105,52 @@ pub async fn find_immune_role(
     }
 }
 
+/// Verifie la hierarchie avant une sanction : bloque self / bot / proprietaire,
+/// et refuse de sanctionner un membre de rang EGAL ou SUPERIEUR au moderateur.
+/// Un moderateur proprietaire du serveur surclasse tout le monde. Fail-open si
+/// la guilde/le membre n'est pas en cache (on ne peut pas comparer -> on laisse
+/// les autres gardes agir). `Ok(())` = autorise, `Err(msg)` = refuse.
+pub fn check_hierarchy(
+    ctx: &Context,
+    command: &CommandInteraction,
+    guild_id: GuildId,
+    target: UserId,
+) -> Result<(), String> {
+    if target == command.user.id {
+        return Err("Tu ne peux pas te sanctionner toi-même.".to_string());
+    }
+    if target == ctx.cache.current_user().id {
+        return Err("Je ne peux pas être la cible d'une sanction.".to_string());
+    }
+    let Some(g) = ctx.cache.guild(guild_id) else {
+        return Ok(()); // cache miss -> fail-open (comme find_immune_role)
+    };
+    if target == g.owner_id {
+        return Err("Le propriétaire du serveur ne peut pas être sanctionné.".to_string());
+    }
+    if command.user.id == g.owner_id {
+        return Ok(()); // le proprietaire surclasse tout le monde
+    }
+    let top = |roles: &[serenity::model::id::RoleId]| -> i64 {
+        roles
+            .iter()
+            .filter_map(|rid| g.roles.get(rid))
+            .map(|r| r.position as i64)
+            .max()
+            .unwrap_or(-1)
+    };
+    let mod_top = command.member.as_ref().map(|m| top(&m.roles)).unwrap_or(-1);
+    if let Some(tm) = g.members.get(&target) {
+        if top(&tm.roles) >= mod_top {
+            return Err(
+                "Tu ne peux pas sanctionner un membre de rang égal ou supérieur au tien."
+                    .to_string(),
+            );
+        }
+    }
+    Ok(())
+}
+
 /// Helper : retourne un message user-friendly pour signaler qu'un user est immunise.
 pub fn immunity_message(role_id: u64, action_label: &str) -> String {
     format!(

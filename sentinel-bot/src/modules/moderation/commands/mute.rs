@@ -114,6 +114,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    if let Err(msg) = super::check_hierarchy(ctx, command, guild_id, target_id) {
+        edit_response_text(ctx, command, &format!("❌ {msg}")).await;
+        return;
+    }
+
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
         Err(_) => {
