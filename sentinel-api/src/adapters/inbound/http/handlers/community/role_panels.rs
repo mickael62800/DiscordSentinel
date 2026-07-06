@@ -60,8 +60,20 @@ pub async fn list_panels(
 
 pub async fn set_message_id(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<SetMessageIdDto>,
 ) -> Result<Json<()>, ApiError> {
+    // Charge le panneau pour scoper la garde a SA guilde (avant : aucun RBAC ->
+    // n'importe qui rebindait le message_id d'un panneau arbitraire = hijack).
+    let detail = state.role_panels_uc.get_panel(&dto.panel_id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &detail.panel.guild_id,
+        Role::Admin,
+        "admin+ requis pour lier un panneau a un message",
+    )
+    .await?;
     state.role_panels_uc.set_message_id(dto.into()).await?;
     Ok(Json(()))
 }

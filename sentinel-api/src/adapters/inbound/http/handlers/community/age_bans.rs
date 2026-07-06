@@ -6,13 +6,15 @@
 //! - POST /api/age-bans/{id}/lift  : le worker marque un ban comme leve.
 
 use axum::extract::{Path, Query, State};
-use axum::Json;
+use axum::{Extension, Json};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{check_role, check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::community::age_ban::{AgeBan, AgeBanStatus};
 
 #[derive(Deserialize)]
@@ -48,8 +50,19 @@ impl From<AgeBan> for AgeBanDto {
 /// POST /api/age-bans
 pub async fn create_age_ban(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateAgeBanDto>,
 ) -> Result<Json<AgeBanDto>, ApiError> {
+    // Moderation : reserve moderator+ (le bot passe en Internal -> bypass). Avant :
+    // aucun RBAC -> ecriture IDOR d'un ban pour n'importe quelle guilde.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour enregistrer un age-ban",
+    )
+    .await?;
     let ban = AgeBan {
         id: Uuid::new_v4(),
         guild_id: dto.guild_id,
@@ -82,8 +95,13 @@ pub async fn list_due_age_bans(
 /// POST /api/age-bans/{id}/lift — marque un ban comme leve (worker).
 pub async fn lift_age_ban(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Pas de guild dans le path (le worker Internal appelle ceci) : un appelant
+    // web ne doit pas pouvoir lever un ban -> Owner requis ; le worker (pas de
+    // RoleContext) passe. Avant : aucun RBAC -> contournement de moderation.
+    check_role(&rbac, Role::Owner, "owner requis pour lever un age-ban")?;
     state.age_ban_repo.mark_lifted(id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
