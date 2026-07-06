@@ -328,8 +328,12 @@ impl TicketRepository for PgTicketRepository {
                 .map_err(pg_err)?;
         }
         if let Some(rating) = satisfaction_rating {
+            // Ecriture UNIQUE : on ne pose la note que si aucune n'existe deja
+            // -> l'auteur ne peut pas recliquer indefiniment pour manipuler la
+            // note (spam de 5/5 ou 1/5).
             sqlx::query(
-                "UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2",
+                "UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() \
+                 WHERE id = $2 AND satisfaction_rating IS NULL",
             )
             .bind(rating)
             .bind(id)

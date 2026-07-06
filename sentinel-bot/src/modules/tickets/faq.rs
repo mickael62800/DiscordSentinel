@@ -25,11 +25,14 @@ pub fn build_faq_embed(entries: &[FaqEntry]) -> CreateEmbed {
         .color(0x3498db);
 
     for (i, entry) in entries.iter().take(10).enumerate() {
-        embed = embed.field(
-            format!("{}. {}", i + 1, entry.question),
-            &entry.answer,
-            false,
-        );
+        // Bornes Discord (nom de champ 256, valeur 1024) : une reponse trop
+        // longue faisait rejeter TOUT l'embed -> la FAQ ne s'affichait plus.
+        let name: String = format!("{}. {}", i + 1, entry.question)
+            .chars()
+            .take(256)
+            .collect();
+        let value: String = entry.answer.chars().take(1024).collect();
+        embed = embed.field(name, value, false);
     }
 
     embed
