@@ -323,3 +323,37 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
     message_handler::process(ctx, msg).await
 }
+
+/// Re-analyse un message EDITE : un membre peut poster un contenu benin puis
+/// l'editer en phishing/insulte/pub -> sans ca, jamais detecte.
+pub async fn on_message_update(
+    ctx: &Context,
+    event: &serenity::model::event::MessageUpdateEvent,
+) {
+    // Vraie edition de contenu uniquement (ignore les updates d'embed/pins).
+    if event.edited_timestamp.is_none() {
+        return;
+    }
+    let Some(guild_id) = event.guild_id else {
+        return;
+    };
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
+        return;
+    }
+    // Re-lit le message a jour (le contenu de l'event peut etre partiel).
+    let Ok(msg) = event.channel_id.message(&ctx.http, event.id).await else {
+        return;
+    };
+    if msg.author.bot {
+        return;
+    }
+    // Autorise la re-analyse : on retire l'entree de deduplication de ce
+    // message (sinon `process` le sauterait comme deja traite).
+    {
+        let data = ctx.data.read().await;
+        if let Some(processed) = data.get::<ProcessedMessagesKey>() {
+            processed.remove(&msg.id);
+        }
+    }
+    message_handler::process(ctx, &msg).await;
+}

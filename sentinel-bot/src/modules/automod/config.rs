@@ -23,14 +23,14 @@ pub(super) fn build_detector_config(
             config,
             "spam_repeat_char_threshold",
             6,
-        ) as usize,
+        ).max(1) as usize,
         spam_repeat_word_threshold: BaseApiClient::config_u64(
             config,
             "spam_repeat_word_threshold",
             5,
-        ) as usize,
+        ).max(1) as usize,
         caps_enabled: BaseApiClient::config_bool(config, "caps_warning_enabled", true),
-        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8) as usize,
+        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8).max(1) as usize,
         insult_enabled: BaseApiClient::config_bool(config, "insult_detection_enabled", true),
         insult_custom_words: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
             config,
@@ -51,9 +51,9 @@ pub(super) fn build_detector_config(
             "",
         )),
         emoji_spam_enabled: BaseApiClient::config_bool(config, "emoji_spam_enabled", true),
-        emoji_spam_max: BaseApiClient::config_u64(config, "emoji_spam_max", 10) as usize,
+        emoji_spam_max: BaseApiClient::config_u64(config, "emoji_spam_max", 10).max(1) as usize,
         mentions_enabled: BaseApiClient::config_bool(config, "mentions_enabled", true),
-        mentions_max: BaseApiClient::config_u64(config, "mentions_max", 5) as usize,
+        mentions_max: BaseApiClient::config_u64(config, "mentions_max", 5).max(1) as usize,
         suspicious_files_enabled: BaseApiClient::config_bool(
             config,
             "suspicious_files_enabled",
@@ -65,9 +65,9 @@ pub(super) fn build_detector_config(
             "",
         )),
         unicode_enabled: BaseApiClient::config_bool(config, "unicode_detection_enabled", true),
-        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3)
+        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3).max(1)
             as usize,
-        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5)
+        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5).max(1)
             as usize,
     }
 }

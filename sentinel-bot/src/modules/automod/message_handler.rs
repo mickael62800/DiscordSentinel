@@ -26,15 +26,21 @@ const DEFAULT_MUTE_DURATION_SECS: u64 = 3600;
 /// Main automod message handler. Called from the sentinel handler's message event.
 /// Analyzes messages for spam, insults, links, phishing, flood, caps, etc.
 pub(super) async fn process(ctx: &Context, msg: &Message) {
+    // Pas d'automod en messages prives (aucune guild -> rien a moderer).
+    if msg.guild_id.is_none() {
+        return;
+    }
     // Deduplication : ignorer si deja traite
     {
         let data = ctx.data.read().await;
         if let Some(processed) = data.get::<ProcessedMessagesKey>() {
             let now = Instant::now();
-            if processed.contains_key(&msg.id) {
+            // Insertion ATOMIQUE : si la cle existait deja, le message a deja
+            // ete traite (redelivrance gateway concurrente) -> on sort. Evite
+            // un contains_key+insert non atomique qui laissait passer 2 fois.
+            if processed.insert(msg.id, now).is_some() {
                 return;
             }
-            processed.insert(msg.id, now);
             if processed.len() > 2000 {
                 processed.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
             }

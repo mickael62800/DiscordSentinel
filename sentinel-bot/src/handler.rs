@@ -295,6 +295,8 @@ impl EventHandler for Handler {
         // Bump : DiscordL edite un message vide pour y mettre l'embed de
         // resultat -> on re-detecte a l'edition (avant le move de `event`).
         modules::bump::on_message_update(&ctx, &event).await;
+        // Automod : re-analyse le contenu edite (contournement post-benin/edit).
+        modules::automod::on_message_update(&ctx, &event).await;
         modules::audit::on_message_update(&ctx, old, new, event).await;
     }
 
