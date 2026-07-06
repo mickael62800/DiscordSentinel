@@ -55,9 +55,15 @@ impl MessageCache {
             }
         }
 
-        self.cache.insert((guild_id, message_id), cached);
+        // On n'incremente que sur une insertion REELLE : re-`store` d'un meme
+        // message_id (edition, ou re-cache) REMPLACE l'entree sans en ajouter.
+        // Sinon le compteur derive au-dessus de cache.len() -> eviction
+        // prematuree de vrais messages (contenu d'audit perdu).
+        let is_new = self.cache.insert((guild_id, message_id), cached).is_none();
         let mut count = self.counts.entry(guild_id).or_insert(0);
-        *count += 1;
+        if is_new {
+            *count += 1;
+        }
 
         // Garde de securite globale : empecher le cache de depasser 2x la limite
         if *count > self.max_per_guild * 2 {

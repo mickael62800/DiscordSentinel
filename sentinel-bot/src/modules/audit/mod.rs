@@ -317,6 +317,14 @@ pub async fn log_admin_command(
 
 /// Called on ready — bootstrap watched users + start Redis consumer.
 pub async fn on_ready(ctx: &Context) {
+    // Garde run-once : `ready` refire a chaque reconnexion gateway -> sans elle,
+    // N consumers Redis + N bootstraps s'accumulent (traitement duplique, fuite
+    // de taches).
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     let ctx_bootstrap = ctx.clone();
     tokio::spawn(async move {
         watched_users::bootstrap_watched_users(&ctx_bootstrap).await;
