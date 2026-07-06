@@ -28,6 +28,9 @@ pub struct ManageLawsService {
     votes: Arc<dyn VoteRepository>,
     archives: Option<Arc<dyn ArchiveRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
+    rep_dims: Option<
+        Arc<dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository>,
+    >,
 }
 
 impl ManageLawsService {
@@ -42,11 +45,22 @@ impl ManageLawsService {
             votes,
             archives: None,
             cfg_repo: None,
+            rep_dims: None,
         }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.cfg_repo = Some(repo);
+        self
+    }
+
+    pub fn with_rep_dims_repo(
+        mut self,
+        repo: Arc<
+            dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository,
+        >,
+    ) -> Self {
+        self.rep_dims = Some(repo);
         self
     }
 
@@ -129,6 +143,11 @@ impl ManageLawsUseCase for ManageLawsService {
             .laws
             .create(guild_id, title, body, citizen.id, closes_at, effect_key, effect_val)
             .await?;
+        // Proposer une loi te rend plus connu : +NOTORIETE.
+        if let Some(d) = &self.rep_dims {
+            use crate::domain::entities::influence::reputation_dims::ReputationDim;
+            let _ = d.adjust(citizen.id, ReputationDim::Notoriety, 5).await;
+        }
         Ok(LawState {
             law,
             tally: Default::default(),

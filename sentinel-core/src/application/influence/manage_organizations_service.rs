@@ -39,6 +39,9 @@ pub struct ManageOrganizationsService {
     wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
     laws: Option<Arc<dyn LawRepository>>,
+    rep_dims: Option<
+        Arc<dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository>,
+    >,
 }
 
 impl ManageOrganizationsService {
@@ -56,11 +59,22 @@ impl ManageOrganizationsService {
             wallet: None,
             cfg_repo: None,
             laws: None,
+            rep_dims: None,
         }
     }
 
     pub fn with_wallet_repo(mut self, repo: Arc<dyn WalletRepository>) -> Self {
         self.wallet = Some(repo);
+        self
+    }
+
+    pub fn with_rep_dims_repo(
+        mut self,
+        repo: Arc<
+            dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository,
+        >,
+    ) -> Self {
+        self.rep_dims = Some(repo);
         self
     }
 
@@ -213,6 +227,12 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         self.memberships
             .add(org.id, founder.id, OrgRole::Fondateur)
             .await?;
+
+        // Fonder une organisation te met en avant : +NOTORIETE.
+        if let Some(d) = &self.rep_dims {
+            use crate::domain::entities::influence::reputation_dims::ReputationDim;
+            let _ = d.adjust(founder.id, ReputationDim::Notoriety, 10).await;
+        }
 
         // Archive best-effort : la creation d'org entre dans la memoire du serveur.
         if let Some(arch) = &self.archives {
@@ -622,6 +642,13 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 .credit(guild_id, actor_user_id, amount, "influence-treasury", "Remboursement don echoue")
                 .await;
             return Err(e);
+        }
+        // Donner publiquement a son org renforce la POPULARITE (proportionnel au
+        // don, plafonne pour eviter le farm de micro-dons).
+        if let Some(d) = &self.rep_dims {
+            use crate::domain::entities::influence::reputation_dims::ReputationDim;
+            let gain = (amount / 100).clamp(1, 25);
+            let _ = d.adjust(citizen.id, ReputationDim::Popularity, gain).await;
         }
         self.treasury(guild_id, org_name).await
     }
