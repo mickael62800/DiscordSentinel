@@ -151,11 +151,18 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
         .map(|u| u.name.clone())
         .unwrap_or_else(|_| target_id.to_string());
 
+    // Un co-admin recoit des perms de MODERATION (deplacer/mute/deafen) mais PAS
+    // MANAGE_CHANNELS : sinon il pourrait supprimer/renommer/re-permissionner le
+    // salon directement via le client Discord, contournant les checks owner-only
+    // du bot. La gestion (kick/ban/rename...) passe par les boutons du bot (qui
+    // agissent avec l'identite du bot, gardee par is_owner_or_co_admin).
     let overwrite = serenity::model::channel::PermissionOverwrite {
         allow: Permissions::VIEW_CHANNEL
             | Permissions::CONNECT
             | Permissions::SPEAK
-            | Permissions::MANAGE_CHANNELS,
+            | Permissions::MOVE_MEMBERS
+            | Permissions::MUTE_MEMBERS
+            | Permissions::DEAFEN_MEMBERS,
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };

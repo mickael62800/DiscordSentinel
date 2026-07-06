@@ -227,7 +227,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
 async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
     // Defense en profondeur : meme si le salon admin-panel n'est visible que
     // par l'owner/co-admin, on re-verifie l'ownership via l'API.
-    let Some((voice_channel_id, _ch)) = super::require_admin(ctx, component).await else {
+    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
         return;
     };
 
@@ -244,6 +244,32 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
     let target_user_id = UserId::new(target_id);
 
     let guild_id = component.guild_id.unwrap_or_default();
+
+    // La cible doit REELLEMENT etre dans la file d'attente (queue_channel_id) ->
+    // empeche un custom_id forge de deplacer de force un membre d'un autre salon
+    // du serveur vers le salon de l'owner.
+    let in_queue = ch
+        .queue_channel_id
+        .as_ref()
+        .and_then(|q| q.parse::<u64>().ok())
+        .map(serenity::model::id::ChannelId::new)
+        .map(|queue_ch| {
+            ctx.cache
+                .guild(guild_id)
+                .map(|g| {
+                    g.voice_states
+                        .get(&target_user_id)
+                        .and_then(|vs| vs.channel_id)
+                        == Some(queue_ch)
+                })
+                .unwrap_or(false)
+        })
+        .unwrap_or(false);
+    if !in_queue {
+        super::respond_ephemeral(ctx, component, "Ce membre n'est pas dans la file d'attente.")
+            .await;
+        return;
+    }
 
     // Move the user from the queue channel to the voice channel
     let edit = serenity::builder::EditMember::new().voice_channel(voice_channel_id);
