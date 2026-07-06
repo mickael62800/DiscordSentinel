@@ -508,4 +508,71 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         }
         self.treasury(guild_id, org_name).await
     }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn pay_member(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        beneficiary_user_id: &str,
+        beneficiary_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError> {
+        validate_positive(amount, "Le paiement")?;
+        let org = self.require_org(guild_id, org_name).await?;
+        let settings = self.settings(guild_id).await;
+        // Acteur : Dirigeant+.
+        let actor = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        let can = self
+            .memberships
+            .get(org.id, actor.id)
+            .await?
+            .map(|m| m.role.can_manage_treasury())
+            .unwrap_or(false);
+        if !can {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur et les dirigeants peuvent payer un membre.".into(),
+            ));
+        }
+        // Beneficiaire : doit etre membre de l'org.
+        let benef = self
+            .citizens
+            .get_or_create(guild_id, beneficiary_user_id, beneficiary_username, settings.start_money())
+            .await?;
+        if self.memberships.get(org.id, benef.id).await?.is_none() {
+            return Err(DomainError::Forbidden(
+                "Le beneficiaire doit etre membre de l'organisation.".into(),
+            ));
+        }
+        let Some(w) = &self.wallet else {
+            return Err(DomainError::Internal("Wallet indisponible.".into()));
+        };
+        // Retrait GARDE de la tresorerie, puis credit du BENEFICIAIRE (re-depot
+        // si le credit echoue).
+        let new_bal = self
+            .orgs
+            .withdraw_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+            .await?;
+        if new_bal.is_none() {
+            return Err(DomainError::Forbidden(
+                "Tresorerie insuffisante pour ce paiement.".into(),
+            ));
+        }
+        if let Err(e) = w
+            .credit(guild_id, beneficiary_user_id, amount, "influence-treasury", "Salaire d'organisation")
+            .await
+        {
+            let _ = self
+                .orgs
+                .deposit_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+                .await;
+            return Err(e);
+        }
+        self.treasury(guild_id, org_name).await
+    }
 }

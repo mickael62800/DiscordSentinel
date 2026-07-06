@@ -134,6 +134,20 @@ pub struct TreasuryOpDto {
     pub amount: i64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PayMemberDto {
+    pub name: String,
+    #[serde(default)]
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub actor_username: String,
+    #[serde(default)]
+    pub beneficiary_user_id: String,
+    #[serde(default)]
+    pub beneficiary_username: String,
+    pub amount: i64,
+}
+
 #[derive(Debug, Serialize)]
 pub struct TreasuryMovementDto {
     pub kind: String,

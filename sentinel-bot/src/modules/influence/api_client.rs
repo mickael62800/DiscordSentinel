@@ -227,6 +227,41 @@ pub async fn treasury_withdraw(
     .await
 }
 
+#[derive(Debug, Serialize)]
+struct PayMemberBody<'a> {
+    name: &'a str,
+    actor_user_id: &'a str,
+    actor_username: &'a str,
+    beneficiary_user_id: &'a str,
+    beneficiary_username: &'a str,
+    amount: i64,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn treasury_pay(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    beneficiary_user_id: &str,
+    beneficiary_username: &str,
+    amount: i64,
+) -> Result<TreasuryView, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/treasury/pay"),
+        &PayMemberBody {
+            name,
+            actor_user_id,
+            actor_username,
+            beneficiary_user_id,
+            beneficiary_username,
+            amount,
+        },
+    )
+    .await
+}
+
 /// POST /api/influence/{guild}/profile
 pub async fn view_profile(
     api: &BaseApiClient,

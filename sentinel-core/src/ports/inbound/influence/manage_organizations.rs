@@ -115,4 +115,18 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         actor_username: &str,
         amount: i64,
     ) -> Result<TreasuryView, DomainError>;
+
+    /// Paie un MEMBRE depuis la tresorerie (salaire/prime) : -tresorerie -> wallet
+    /// du beneficiaire. Reserve aux Dirigeant+ ; le beneficiaire doit etre membre.
+    #[allow(clippy::too_many_arguments)]
+    async fn pay_member(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        beneficiary_user_id: &str,
+        beneficiary_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError>;
 }

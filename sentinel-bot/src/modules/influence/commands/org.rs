@@ -134,6 +134,25 @@ pub fn register() -> CreateCommand {
                     .required(true),
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "paye",
+                "Paie un membre depuis la trésorerie (dirigeants)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::User, "membre", "Membre à payer")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::Integer, "montant", "Montant à verser")
+                    .required(true),
+            ),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -284,6 +303,39 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 Ok(v) => {
                     let embed = treasury_embed(&v)
                         .title(format!("💸 -{montant} retirés de {}", v.org_name));
+                    reply_ephemeral_embed(ctx, command, embed).await;
+                }
+                Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
+            }
+        }
+        "paye" => {
+            let montant = option_i64(&opts, "montant").unwrap_or(0);
+            // Beneficiaire : option User -> id + pseudo (via resolved).
+            let benef = opts.iter().find(|o| o.name == "membre").and_then(|o| match &o.value {
+                CommandDataOptionValue::User(uid) => {
+                    let name = command
+                        .data
+                        .resolved
+                        .users
+                        .get(uid)
+                        .map(|u| u.name.clone())
+                        .unwrap_or_default();
+                    Some((uid.to_string(), name))
+                }
+                _ => None,
+            });
+            let Some((benef_id, benef_name)) = benef else {
+                reply_ephemeral(ctx, command, "Membre à payer invalide.").await;
+                return;
+            };
+            match api_client::treasury_pay(
+                &api, &guild_id, &name, &user_id, &username, &benef_id, &benef_name, montant,
+            )
+            .await
+            {
+                Ok(v) => {
+                    let embed = treasury_embed(&v)
+                        .title(format!("💵 {montant} versés à {benef_name}"));
                     reply_ephemeral_embed(ctx, command, embed).await;
                 }
                 Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,

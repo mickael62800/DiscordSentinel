@@ -11,7 +11,7 @@ use sentinel_core::domain::errors::DomainError;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::influence::dto::{
-    OrgInfoDto, OrgMemberDto, OrganizationDto, TreasuryOpDto, TreasuryViewDto,
+    OrgInfoDto, OrgMemberDto, OrganizationDto, PayMemberDto, TreasuryOpDto, TreasuryViewDto,
 };
 use crate::adapters::inbound::http::state::AppState;
 
@@ -140,6 +140,27 @@ pub async fn treasury_withdraw(
             &dto.name,
             &dto.actor_user_id,
             &dto.actor_username,
+            dto.amount,
+        )
+        .await?;
+    Ok(Json(v.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/treasury/pay — paie un membre.
+pub async fn treasury_pay(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<PayMemberDto>,
+) -> Result<Json<TreasuryViewDto>, ApiError> {
+    let v = state
+        .influence_orgs_uc
+        .pay_member(
+            &guild_id,
+            &dto.name,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            &dto.beneficiary_user_id,
+            &dto.beneficiary_username,
             dto.amount,
         )
         .await?;

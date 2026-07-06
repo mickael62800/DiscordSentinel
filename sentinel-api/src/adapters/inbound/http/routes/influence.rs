@@ -41,6 +41,10 @@ fn influence_inner() -> Router<AppState> {
             post(handlers::influence::orgs::treasury_withdraw),
         )
         .route(
+            "/{guild_id}/orgs/treasury/pay",
+            post(handlers::influence::orgs::treasury_pay),
+        )
+        .route(
             "/{guild_id}/motions",
             post(handlers::influence::votes::create_motion),
         )
