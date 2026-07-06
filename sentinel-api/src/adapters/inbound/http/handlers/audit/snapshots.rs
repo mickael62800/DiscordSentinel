@@ -21,11 +21,13 @@ use axum::http::header;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::response::Response;
-use axum::Json;
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 const ANALYTICS_BOT: &str = "analytics";
@@ -459,6 +461,7 @@ pub struct ExportQuery {
 /// GET /api/analytics/export?guild_id=...&days=N&format=json|csv
 pub async fn export_analytics(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<ExportQuery>,
 ) -> Result<Response, ApiError> {
     if params.guild_id.is_empty() {
@@ -466,6 +469,15 @@ pub async fn export_analytics(
             "guild_id requis".into(),
         )));
     }
+    // IDOR : export cross-serveur de l'activite (messages/vocal/infractions).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &params.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour exporter les analytics",
+    )
+    .await?;
     let days = params.days.unwrap_or(30).clamp(1, 365);
 
     let format = match params.format {

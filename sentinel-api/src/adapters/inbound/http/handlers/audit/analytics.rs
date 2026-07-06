@@ -67,11 +67,37 @@ where
     Ok(Json(value))
 }
 
+/// Garde commune aux lectures analytics : exige un guild_id + moderator+ scope
+/// guilde. Les GET echappent au gate global -> sans elle, tout appelant lisait
+/// les analytics de moderation (top infracteurs, tendances) de n'importe quel
+/// serveur, ou l'agregat GLOBAL (guild_id absent) tous serveurs confondus.
+async fn guard_analytics_read(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    guild_id: Option<&str>,
+) -> Result<(), ApiError> {
+    let gid = guild_id.ok_or_else(|| {
+        ApiError::from(sentinel_core::domain::errors::DomainError::ValidationError(
+            "guild_id requis".into(),
+        ))
+    })?;
+    check_role_for_guild(
+        state,
+        rbac,
+        gid,
+        Role::Moderator,
+        "moderator+ requis pour les analytics",
+    )
+    .await
+}
+
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete (cache 5min).
 pub async fn get_full_analytics(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<FullAnalyticsDto>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let days = params.days();
     let limit = params.limit();
     let guild_id = params.guild_id.as_deref();
@@ -102,8 +128,10 @@ pub async fn get_full_analytics(
 /// GET /api/analytics/heatmap (cache 5min)
 pub async fn get_heatmap(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<HeatmapPointDto>>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let key = cache_key("heatmap", params.guild_id.as_deref(), params.days(), None);
 
     cached(&state, &key, || async {
@@ -119,8 +147,10 @@ pub async fn get_heatmap(
 /// GET /api/analytics/actions (cache 5min)
 pub async fn get_action_distribution(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<ActionDistributionDto>>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let key = cache_key("actions", params.guild_id.as_deref(), params.days(), None);
 
     cached(&state, &key, || async {
@@ -140,8 +170,10 @@ pub async fn get_action_distribution(
 /// `analytics`). Sinon defaut hardcode 10.
 pub async fn get_top_infractors(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<TopInfractorDto>>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     // Charge la config analytics du guild une seule fois : deux cles
     // (top_users_count, low_activity_filter) sont lues ci-dessous.
     let analytics_cfg = if let Some(gid) = params.guild_id.as_deref() {
@@ -208,8 +240,10 @@ pub async fn get_top_infractors(
 /// GET /api/analytics/moderation-trend (cache 5min)
 pub async fn get_moderation_trend(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<ModerationTrendDto>>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let key = cache_key("trend", params.guild_id.as_deref(), params.days(), None);
 
     cached(&state, &key, || async {
@@ -225,8 +259,10 @@ pub async fn get_moderation_trend(
 /// GET /api/analytics/peak-hours (cache 5min)
 pub async fn get_peak_hours(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<Vec<PeakHourDto>>, ApiError> {
+    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let key = cache_key("peaks", params.guild_id.as_deref(), params.days(), None);
 
     cached(&state, &key, || async {
