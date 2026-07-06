@@ -337,10 +337,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 break;
             }
 
-            // Remove from donor
-            if let Err(e) = api.use_item(&guild_id, &donor_id, item_key).await {
-                error_message = Some(e);
-                break;
+            // Remove from donor : on ne cree l'item chez la cible QUE si la
+            // consommation a reellement eu lieu (consumed == true). Un
+            // `Ok(false)` (course avec un autre /donner, item deja parti) sans
+            // ce test dupliquerait l'item (cree chez la cible sans retrait).
+            match api.use_item(&guild_id, &donor_id, item_key).await {
+                Ok(true) => {}
+                Ok(false) => {
+                    error_message = Some(format!("Tu n'as plus assez de {}.", item.name));
+                    break;
+                }
+                Err(e) => {
+                    error_message = Some(e);
+                    break;
+                }
             }
 
             // Give to receiver

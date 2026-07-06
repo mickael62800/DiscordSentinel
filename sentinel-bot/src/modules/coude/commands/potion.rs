@@ -162,10 +162,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    // Consommer l'item
-    if let Err(e) = api.use_item(&guild_id, &user_id, &potion_key).await {
-        followup_info(ctx, command, &e).await;
-        return;
+    // Consommer l'item : on N'APPLIQUE le heal QUE si l'item a reellement ete
+    // consomme (consumed == true). Avant, seul `Err` etait teste -> un `Ok(false)`
+    // (plus de potion, ou 2e clic concurrent qui perd la course de consommation)
+    // soignait quand meme -> heal gratuit/infini.
+    match api.use_item(&guild_id, &user_id, &potion_key).await {
+        Ok(true) => {}
+        Ok(false) => {
+            followup_info(ctx, command, "Tu n'as plus de potion a utiliser.").await;
+            return;
+        }
+        Err(e) => {
+            followup_info(ctx, command, &e).await;
+            return;
+        }
     }
 
     // Calculer le soin effectif (clamp au HP max)

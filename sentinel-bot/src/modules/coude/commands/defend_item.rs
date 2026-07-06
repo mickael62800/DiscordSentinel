@@ -230,9 +230,12 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         return;
     }
 
-    // Consommer l'objet si ce n'est pas "none"
+    // Consommer l'objet si ce n'est pas "none". On n'enregistre l'objet
+    // defensif QUE s'il a reellement ete consomme (consumed == true) : sinon
+    // (plus d'item / 2e clic concurrent) on donnait l'effet defensif sans
+    // consommer -> item defensif gratuit/repetable.
     if selected_item != "none" {
-        if let Err(e) = api
+        match api
             .use_item(
                 &combat_record.guild_id,
                 &combat_record.defender_id,
@@ -240,8 +243,15 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
             )
             .await
         {
-            edit_response_text(ctx, component, &format!("Erreur : {e}")).await;
-            return;
+            Ok(true) => {}
+            Ok(false) => {
+                edit_response_text(ctx, component, "Tu n'as plus cet objet.").await;
+                return;
+            }
+            Err(e) => {
+                edit_response_text(ctx, component, &format!("Erreur : {e}")).await;
+                return;
+            }
         }
 
         // Enregistrer l'objet defensif dans le combat
