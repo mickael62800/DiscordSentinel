@@ -37,6 +37,8 @@ struct Row {
     expires_at: Option<DateTime<Utc>>,
     channel_id: Option<String>,
     message_id: Option<String>,
+    effect_key: Option<String>,
+    effect_value: Option<i64>,
 }
 
 impl TryFrom<Row> for Law {
@@ -54,12 +56,14 @@ impl TryFrom<Row> for Law {
             closes_at: r.expires_at,
             channel_id: r.channel_id,
             message_id: r.message_id,
+            effect_key: r.effect_key,
+            effect_value: r.effect_value,
         })
     }
 }
 
-const COLS: &str =
-    "id, guild_id, title, body, status, author_id, expires_at, channel_id, message_id";
+const COLS: &str = "id, guild_id, title, body, status, author_id, expires_at, \
+     channel_id, message_id, effect_key, effect_value";
 
 #[async_trait]
 impl LawRepository for PgLawRepository {
@@ -70,10 +74,13 @@ impl LawRepository for PgLawRepository {
         body: &str,
         author_id: Uuid,
         closes_at: DateTime<Utc>,
+        effect_key: Option<&str>,
+        effect_value: Option<i64>,
     ) -> Result<Law, DomainError> {
         let sql = format!(
-            "INSERT INTO influence_laws (guild_id, title, body, status, author_id, expires_at) \
-             VALUES ($1, $2, $3, 'vote', $4, $5) RETURNING {COLS}"
+            "INSERT INTO influence_laws \
+             (guild_id, title, body, status, author_id, expires_at, effect_key, effect_value) \
+             VALUES ($1, $2, $3, 'vote', $4, $5, $6, $7) RETURNING {COLS}"
         );
         let row: Row = sqlx::query_as(&sql)
             .bind(guild_id)
@@ -81,6 +88,8 @@ impl LawRepository for PgLawRepository {
             .bind(body)
             .bind(author_id)
             .bind(closes_at)
+            .bind(effect_key)
+            .bind(effect_value)
             .fetch_one(&self.pool)
             .await
             .map_err(pg_err)?;

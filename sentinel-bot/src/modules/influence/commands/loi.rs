@@ -26,6 +26,28 @@ pub fn register() -> CreateCommand {
                 .add_sub_option(
                     CreateCommandOption::new(CommandOptionType::String, "texte", "Contenu de la loi")
                         .required(true),
+                )
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::String,
+                        "parametre",
+                        "Réglage modifié si la loi est adoptée (optionnel)",
+                    )
+                    .add_string_choice("Coût d'une enquête", "cout_enquete")
+                    .add_string_choice("Coût de création d'organisation", "cout_creation_org")
+                    .add_string_choice("Coût du rôle d'organisation", "cout_role_org")
+                    .add_string_choice("Réputation perdue par scandale", "perte_reputation_scandale")
+                    .add_string_choice("Proba de réussite d'enquête (%)", "proba_enquete")
+                    .add_string_choice("Durée de débat d'une loi (h)", "duree_debat_loi")
+                    .required(false),
+                )
+                .add_sub_option(
+                    CreateCommandOption::new(
+                        CommandOptionType::Integer,
+                        "valeur",
+                        "Nouvelle valeur du réglage (si un paramètre est choisi)",
+                    )
+                    .required(false),
                 ),
         )
 }
@@ -41,6 +63,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
     let titre = option_str(&opts, "titre").unwrap_or("");
     let texte = option_str(&opts, "texte").unwrap_or("");
+    // Effet optionnel : parametre (choix) + valeur (entier).
+    let parametre = option_str(&opts, "parametre");
+    let valeur = opts.iter().find(|o| o.name == "valeur").and_then(|o| {
+        match &o.value {
+            serenity::all::CommandDataOptionValue::Integer(i) => Some(*i),
+            _ => None,
+        }
+    });
 
     let api = {
         let data = ctx.data.read().await;
@@ -57,6 +87,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         &command.user.name,
         titre,
         texte,
+        parametre,
+        valeur,
     )
     .await
     {
@@ -115,7 +147,7 @@ pub fn build_embed(s: &LawState) -> CreateEmbed {
         _ => 0x3498DB,
     };
     let body: String = s.body.chars().take(1000).collect();
-    CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .title(format!("📜 Loi : {}", s.title))
         .color(color)
         .description(body)
@@ -128,7 +160,15 @@ pub fn build_embed(s: &LawState) -> CreateEmbed {
             "⚖️ Poids (influence)",
             format!("Pour **{}** / Contre **{}**", s.pour_weight, s.contre_weight),
             false,
-        )
+        );
+    if let (Some(label), Some(val)) = (&s.effect_label, s.effect_value) {
+        embed = embed.field(
+            "⚙️ Effet si adoptée",
+            format!("**{label}** → **{val}**"),
+            false,
+        );
+    }
+    embed
         .footer(CreateEmbedFooter::new(if s.status == "vote" {
             "Le résultat est pondéré par l'influence des votants. Clôture automatique à l'échéance."
         } else {

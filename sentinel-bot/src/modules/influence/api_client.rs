@@ -368,6 +368,10 @@ pub struct LawState {
     pub pour_weight: i64,
     #[serde(default)]
     pub contre_weight: i64,
+    #[serde(default)]
+    pub effect_label: Option<String>,
+    #[serde(default)]
+    pub effect_value: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -376,6 +380,10 @@ struct ProposeLawBody<'a> {
     author_username: &'a str,
     title: &'a str,
     body: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect_param: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effect_value: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -398,6 +406,7 @@ struct LawIdBody<'a> {
     law_id: &'a str,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn propose_law(
     api: &BaseApiClient,
     guild_id: &str,
@@ -405,10 +414,19 @@ pub async fn propose_law(
     author_username: &str,
     title: &str,
     body: &str,
+    effect_param: Option<&str>,
+    effect_value: Option<i64>,
 ) -> Result<LawState, String> {
     api.post_json(
         &format!("/api/influence/{guild_id}/laws"),
-        &ProposeLawBody { author_user_id, author_username, title, body },
+        &ProposeLawBody {
+            author_user_id,
+            author_username,
+            title,
+            body,
+            effect_param,
+            effect_value,
+        },
     )
     .await
 }

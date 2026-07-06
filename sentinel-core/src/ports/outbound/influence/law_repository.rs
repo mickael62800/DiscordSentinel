@@ -9,7 +9,8 @@ use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait LawRepository: Send + Sync {
-    /// Cree une loi en statut « vote » avec une echeance.
+    /// Cree une loi en statut « vote » avec une echeance et un effet optionnel
+    /// (cle de config + valeur a appliquer si adoptee).
     async fn create(
         &self,
         guild_id: &str,
@@ -17,6 +18,8 @@ pub trait LawRepository: Send + Sync {
         body: &str,
         author_id: Uuid,
         closes_at: DateTime<Utc>,
+        effect_key: Option<&str>,
+        effect_value: Option<i64>,
     ) -> Result<Law, DomainError>;
 
     async fn get(&self, id: Uuid) -> Result<Option<Law>, DomainError>;

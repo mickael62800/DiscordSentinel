@@ -8,7 +8,9 @@ use uuid::Uuid;
 
 use crate::application::influence::guild_settings::InfluenceSettings;
 use crate::application::validation::validate_non_empty;
-use crate::domain::entities::influence::law::{Law, LawStatus};
+use crate::domain::entities::influence::law::{
+    clamp_effect_value, law_effect_key, law_effect_label, Law, LawStatus,
+};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_laws::{LawState, ManageLawsUseCase};
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -80,6 +82,8 @@ impl ManageLawsUseCase for ManageLawsService {
         author_username: &str,
         title: &str,
         body: &str,
+        effect_param: Option<&str>,
+        effect_value: Option<i64>,
     ) -> Result<LawState, DomainError> {
         let title = title.trim();
         let body = body.trim();
@@ -102,11 +106,28 @@ impl ManageLawsUseCase for ManageLawsService {
             .get_or_create(guild_id, author_user_id, author_username, settings.start_money())
             .await?;
 
+        // Effet optionnel : le parametre doit etre dans la whitelist ; la valeur
+        // est bornee selon la cle. Sinon la loi reste purement narrative.
+        let (effect_key, effect_val): (Option<&str>, Option<i64>) = match effect_param {
+            Some(param) => {
+                let key = law_effect_key(param).ok_or_else(|| {
+                    DomainError::ValidationError(format!("Parametre de loi inconnu : {param}"))
+                })?;
+                let val = effect_value.ok_or_else(|| {
+                    DomainError::ValidationError(
+                        "Une valeur est requise pour ce parametre de loi.".into(),
+                    )
+                })?;
+                (Some(key), Some(clamp_effect_value(key, val)))
+            }
+            None => (None, None),
+        };
+
         let hours = settings.law_debate_hours().max(1);
         let closes_at = Utc::now() + Duration::hours(hours);
         let law = self
             .laws
-            .create(guild_id, title, body, citizen.id, closes_at)
+            .create(guild_id, title, body, citizen.id, closes_at, effect_key, effect_val)
             .await?;
         Ok(LawState {
             law,
@@ -178,6 +199,23 @@ impl ManageLawsUseCase for ManageLawsService {
             }
             law.status = status;
 
+            // EFFET REEL : une loi adoptee porteuse d'un effet fixe le reglage
+            // gameplay correspondant (whitelist + valeur bornee). C'est le seul
+            // endroit qui applique l'effet.
+            let mut effect_desc: Option<String> = None;
+            if status == LawStatus::Adoptee {
+                if let (Some(key), Some(val)) = (law.effect_key.as_deref(), law.effect_value) {
+                    let v = clamp_effect_value(key, val);
+                    if let Some(repo) = &self.cfg_repo {
+                        let _ = repo
+                            .set_config(&law.guild_id, "influence-bot", key, &v.to_string())
+                            .await;
+                    }
+                    let label = law_effect_label(key).unwrap_or(key);
+                    effect_desc = Some(format!("{label} → {v}"));
+                }
+            }
+
             if let Some(arch) = &self.archives {
                 let event = if status == LawStatus::Adoptee {
                     "law_adopted"
@@ -192,6 +230,7 @@ impl ManageLawsUseCase for ManageLawsService {
                             "title": law.title,
                             "pour": tally.pour,
                             "contre": tally.contre,
+                            "effect": effect_desc,
                         }),
                     )
                     .await;

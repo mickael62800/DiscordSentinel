@@ -20,6 +20,10 @@ pub struct ProposeLawDto {
     pub author_username: String,
     pub title: String,
     pub body: String,
+    #[serde(default)]
+    pub effect_param: Option<String>,
+    #[serde(default)]
+    pub effect_value: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -57,6 +61,8 @@ pub async fn propose_law(
             &dto.author_username,
             &dto.title,
             &dto.body,
+            dto.effect_param.as_deref(),
+            dto.effect_value,
         )
         .await?;
     Ok(Json(st.into()))

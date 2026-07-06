@@ -254,6 +254,7 @@ impl From<ConversionOutcome> for ConversionOutcomeDto {
     }
 }
 
+use sentinel_core::domain::entities::influence::law::law_effect_label;
 use sentinel_core::ports::inbound::influence::manage_laws::LawState;
 
 #[derive(Debug, Serialize)]
@@ -272,6 +273,9 @@ pub struct LawStateDto {
     pub pour_weight: i64,
     #[serde(default)]
     pub contre_weight: i64,
+    /// Effet mecanique lisible si la loi est adoptee (None = loi narrative).
+    pub effect_label: Option<String>,
+    pub effect_value: Option<i64>,
 }
 
 impl From<LawState> for LawStateDto {
@@ -289,6 +293,12 @@ impl From<LawState> for LawStateDto {
             abstention: s.tally.abstention,
             pour_weight: s.tally.pour_weight,
             contre_weight: s.tally.contre_weight,
+            effect_label: s
+                .law
+                .effect_key
+                .as_deref()
+                .and_then(|k| law_effect_label(k).map(str::to_string)),
+            effect_value: s.law.effect_value,
         }
     }
 }

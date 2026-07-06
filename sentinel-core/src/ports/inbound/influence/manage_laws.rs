@@ -23,6 +23,10 @@ pub trait ManageLawsUseCase: Send + Sync {
         author_username: &str,
         title: &str,
         body: &str,
+        // Effet optionnel : parametre public (cf. LAW_EFFECTS) + valeur, applique
+        // si la loi est adoptee. `None` = loi purement narrative.
+        effect_param: Option<&str>,
+        effect_value: Option<i64>,
     ) -> Result<LawState, DomainError>;
 
     /// Enregistre le vote d'un citoyen sur une loi.
