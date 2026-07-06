@@ -259,6 +259,21 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         Ok(d) => d,
         Err(e) => {
             error!(error = %e, "Erreur API analyze_new_member");
+            // Fallback local (F2) : l'API porte toute la decision ; si elle tombe,
+            // on n'est plus protege. Le detecteur local `simple_raid` prend le
+            // relais avec une action CONSERVATRICE et reversible (slowmode, pas de
+            // lockdown/ban sur une simple heuristique).
+            if simple_raid {
+                slowmode
+                    .activate(
+                        ctx,
+                        guild_id,
+                        env_config.slowmode_seconds,
+                        env_config.slowmode_duration_secs,
+                    )
+                    .await;
+                warn!(guild_id = %guild_id, "API indisponible + pic de joins local -> slowmode de repli applique");
+            }
             return;
         }
     };
