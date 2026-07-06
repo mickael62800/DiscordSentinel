@@ -912,9 +912,21 @@ pub async fn list_themes(
 
 pub async fn create_theme(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
+    // Le theme (channel_name_template...) est consomme par le bot pour nommer
+    // les salons -> reserve admin+, scope a la guilde du path (avant : aucune
+    // garde -> injection/override cross-serveur).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "admin+ requis pour gerer les themes voice",
+    )
+    .await?;
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 
@@ -924,9 +936,18 @@ pub async fn create_theme(
 
 pub async fn update_theme(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "admin+ requis pour gerer les themes voice",
+    )
+    .await?;
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 

@@ -149,6 +149,15 @@ pub async fn on_voice_state_update(ctx: &Context, old: &Option<VoiceState>, new:
 /// Initialisation appelee depuis ready (reconcile channels + spawn background tasks).
 pub async fn on_ready(ctx: &Context, ready: &Ready) {
     reconcile_voice_channels(ctx, ready).await;
+    // Les taches de fond ne doivent tourner qu'UNE fois par process : ready()
+    // est reemis a chaque reconnexion gateway -> sans garde, les boucles AFK et
+    // le consumer Redis s'accumulent (un user AFK deplace N fois, events traites
+    // N fois).
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static SPAWNED: AtomicBool = AtomicBool::new(false);
+    if SPAWNED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tasks::spawn_afk_sweep(ctx.clone());
     spawn_redis_listener(ctx.clone());
 }

@@ -156,12 +156,19 @@ pub(super) async fn create_temp_channel(
         .unwrap_or(false);
     let preset_locked = preset.as_ref().map(|p| p.locked).unwrap_or(false);
 
-    if kind != "game" && (preset_hidden || preset_locked) {
+    // Un salon 'private' SANS preset sauvegarde doit etre prive PAR DEFAUT (deny
+    // @everyone). Avant, faute de preset, aucun deny n'etait pose -> le salon
+    // "prive" etait en fait connectable/visible par tout le monde.
+    let private_default = kind == "private" && preset.is_none();
+    let deny_hidden = preset_hidden || private_default;
+    let deny_locked = preset_locked || private_default;
+
+    if kind != "game" && (deny_hidden || deny_locked) {
         let mut deny = Permissions::empty();
-        if preset_hidden {
+        if deny_hidden {
             deny |= Permissions::VIEW_CHANNEL | Permissions::CONNECT;
         }
-        if preset_locked {
+        if deny_locked {
             deny |= Permissions::CONNECT;
         }
         let everyone_overwrite = PermissionOverwrite {
