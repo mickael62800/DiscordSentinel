@@ -140,9 +140,18 @@ pub async fn remove_member(
 /// PATCH /api/members/{guild_id}/{user_id} — met a jour un membre
 pub async fn update_member(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(payload): Json<UpdateMemberPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Gate RBAC : admin+ requis (ce handler ecrit aussi le champ `roles`).
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour modifier un membre".into(),
+            ))
+        })?;
+    }
     state
         .members_uc
         .update_member(UpdateMemberCommand {

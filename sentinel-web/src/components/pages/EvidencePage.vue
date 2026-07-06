@@ -8,6 +8,7 @@ import type { EvidenceEntry } from "@/types/moderation-advanced";
 import type { Infraction } from "@/types";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
 import { useFormatDate } from "@/composables/useFormatDate";
+import { safeLinkUrl } from "@/utils/safeUrl";
 
 interface Props {
   /** Quand true, cache l'en-tete et le champ de recherche (utilise dans le
@@ -209,7 +210,16 @@ watch(lookupUserId, async (id) => {
         <tbody>
           <tr v-for="e in evidenceEntries" :key="e.id">
             <td>{{ formatDate(e.uploaded_at) }}</td>
-            <td><a :href="e.url" target="_blank" rel="noopener">{{ e.url }}</a></td>
+            <td>
+              <a
+                v-if="safeLinkUrl(e.url)"
+                :href="safeLinkUrl(e.url)!"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ e.url }}</a
+              >
+              <span v-else>{{ e.url }}</span>
+            </td>
             <td>{{ e.description ?? "—" }}</td>
             <td>{{ e.uploaded_by_name }}</td>
           </tr>

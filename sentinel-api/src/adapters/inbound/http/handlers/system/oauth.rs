@@ -236,12 +236,13 @@ pub async fn callback(
         }
     };
     let state_key = format!("{}{}", STATE_PREFIX, csrf_state);
-    let existed: Option<String> = redis_conn.get(&state_key).await.unwrap_or(None);
+    // Pop ATOMIQUE (GETDEL) : un GET puis DEL laisse une fenetre de course ou
+    // deux callbacks concurrents avec le meme state passent tous les deux.
+    let existed: Option<String> = redis_conn.get_del(&state_key).await.unwrap_or(None);
     if existed.is_none() {
         tracing::warn!("state OAuth inconnu ou expire");
         return front_error_redirect(&front, "state_invalide");
     }
-    let _: Result<(), _> = redis_conn.del::<_, ()>(&state_key).await;
 
     // 2. Echanger le code contre un access_token via Discord.
     let client = reqwest::Client::new();

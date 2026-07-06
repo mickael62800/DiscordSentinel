@@ -23,6 +23,23 @@ const ALLOWED_IMAGE_HOSTS = new Set<string>([
  * - Host hors whitelist -> null
  * - URL malformee -> null
  */
+/**
+ * Valide une URL de LIEN (`<a :href>`). Autorise uniquement http(s) — bloque
+ * `javascript:`, `data:`, `vbscript:` qui s'executeraient au clic (vol de token).
+ * Contrairement aux images, on n'impose pas de whitelist d'hote (un lien de
+ * preuve peut pointer n'importe ou), seulement le protocole.
+ */
+export function safeLinkUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function safeImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
