@@ -140,19 +140,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Resolution des pseudos + avatars (cachee entre les 3 categories).
     let mut cache: std::collections::HashMap<String, (String, Option<Vec<u8>>)> =
         std::collections::HashMap::new();
-    let gen = resolve_entries(ctx, &ranking.global, &mut cache).await;
-    let txt = resolve_entries(ctx, &ranking.text, &mut cache).await;
-    let voc = resolve_entries(ctx, &ranking.voice, &mut cache).await;
 
     use crate::modules::progression::leaderboard_render::{render_leaderboard, Category};
     // UN message PAR classement (image plus grande/lisible dans Discord).
     let mut sent = 0u8;
-    for (cat, entries) in [
-        (Category::General, &gen),
-        (Category::Ecrit, &txt),
-        (Category::Vocal, &voc),
-    ] {
-        if let Some(png) = render_leaderboard(cat, entries) {
+    for cat in Category::ALL {
+        let raw = match cat {
+            Category::General => &ranking.global,
+            Category::Ecrit => &ranking.text,
+            Category::Vocal => &ranking.voice,
+        };
+        let entries = resolve_entries(ctx, raw, &mut cache).await;
+        if let Some(png) = render_leaderboard(cat, &entries) {
             let file = serenity::builder::CreateAttachment::bytes(
                 png,
                 format!("classement_{}.png", cat.label().to_lowercase()),

@@ -22,6 +22,23 @@ use crate::shared::heartbeat::ApiClientKey;
 
 pub const MODULE_BOT_NAME: &str = "bump-bot";
 
+/// Action recompensee : bump (remontee de serveur) ou vote.
+#[derive(Clone, Copy, PartialEq)]
+enum BumpAction {
+    Bump,
+    Vote,
+}
+
+impl BumpAction {
+    /// Mot affiche dans les annonces ("pour le **bump**" / "#3 de la semaine").
+    fn label(self) -> &'static str {
+        match self {
+            BumpAction::Bump => "bump",
+            BumpAction::Vote => "vote",
+        }
+    }
+}
+
 /// Description d'une plateforme de bump/vote (Disboard, DiscordL bump/vote, ...).
 struct BumpProvider {
     /// User id du bot qui poste la confirmation.
@@ -32,8 +49,8 @@ struct BumpProvider {
     display: &'static str,
     /// Texte de la commande a rappeler (ex: "/bump (Disboard)").
     bump_hint: &'static str,
-    /// Verbe de l'action pour les annonces/rappels ("bump" | "vote").
-    action: &'static str,
+    /// Action recompensee (bump ou vote) pour les annonces/rappels.
+    action: BumpAction,
     /// Cooldown par defaut en minutes (indicatif ; l'API tranche).
     #[allow(dead_code)]
     default_cooldown_min: i64,
@@ -50,7 +67,7 @@ const DISBOARD: BumpProvider = BumpProvider {
     key: "disboard",
     display: "Disboard",
     bump_hint: "/bump (Disboard)",
-    action: "bump",
+    action: BumpAction::Bump,
     default_cooldown_min: 120,
     matches: |_| true,
     detect: detect_disboard,
@@ -62,7 +79,7 @@ const DISCORDL: BumpProvider = BumpProvider {
     key: "discordl",
     display: "DiscordL",
     bump_hint: "/bump (DiscordL)",
-    action: "bump",
+    action: BumpAction::Bump,
     default_cooldown_min: 240,
     matches: matches_discordl_bump,
     detect: detect_discordl_bump,
@@ -74,7 +91,7 @@ const DISCORDL_VOTE: BumpProvider = BumpProvider {
     key: "discordl_vote",
     display: "DiscordL",
     bump_hint: "/vote (DiscordL)",
-    action: "vote",
+    action: BumpAction::Vote,
     default_cooldown_min: 720,
     matches: matches_discordl_vote,
     detect: detect_discordl_vote,
@@ -149,13 +166,13 @@ fn matches_discordl_vote(msg: &Message) -> bool {
     dl_has(msg, &["résultat du vote", "a voté", "a vote"])
 }
 
-/// Bump DiscordL reussi (titre "Résultat du Bump" / "a BUMP", hors cooldown).
+/// Bump DiscordL reussi : message de bump (cf. `matches_discordl_bump`) hors cooldown.
 fn detect_discordl_bump(msg: &Message) -> bool {
-    !dl_is_cooldown(msg) && dl_has(msg, &["a bump", "résultat du bump"])
+    !dl_is_cooldown(msg) && matches_discordl_bump(msg)
 }
-/// Vote DiscordL reussi (titre "Résultat du Vote" / "a Voté", hors cooldown).
+/// Vote DiscordL reussi : message de vote (cf. `matches_discordl_vote`) hors cooldown.
 fn detect_discordl_vote(msg: &Message) -> bool {
-    !dl_is_cooldown(msg) && dl_has(msg, &["a voté", "a vote", "résultat du vote"])
+    !dl_is_cooldown(msg) && matches_discordl_vote(msg)
 }
 
 /// Resout l'auteur du /bump : d'abord via interaction_metadata (reponse de
@@ -374,7 +391,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     let content = format!(
         "🎉 Merci <@{}> pour le **{}** ({}) ! **+{} coins** ({} #{} de la semaine)",
-        bumper_id, provider.action, provider.display, resp.reward, provider.action, resp.weekly_count
+        bumper_id, provider.action.label(), provider.display, resp.reward, provider.action.label(), resp.weekly_count
     );
     if let Err(e) = msg.channel_id.say(&ctx.http, content).await {
         warn!(error = %e, "Echec annonce recompense bump");
@@ -411,7 +428,7 @@ pub fn spawn_background(ctx: Context) {
             for d in due {
                 let provider = provider_by_key(&d.provider).unwrap_or(&DISBOARD);
                 if let Ok(cid) = d.channel_id.parse::<u64>() {
-                    let text = if provider.action == "vote" {
+                    let text = if provider.action == BumpAction::Vote {
                         format!(
                             "⏰ Tu peux **voter** à nouveau pour le serveur sur **{}** ! Faites `{}` — et gagnez des coins.",
                             provider.display, provider.bump_hint

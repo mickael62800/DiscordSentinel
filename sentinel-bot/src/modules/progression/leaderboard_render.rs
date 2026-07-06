@@ -4,12 +4,12 @@
 //! emplacements du template (podium top 3 + rangs 4-13 sur 2 colonnes).
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
-use base64::Engine;
 use once_cell::sync::OnceCell;
 use resvg::usvg;
 use tracing::warn;
+
+use crate::shared::svg::{b64, esc as xml_esc, fontdb};
 
 /// Catégorie de classement -> fichier template.
 #[derive(Clone, Copy)]
@@ -20,6 +20,17 @@ pub enum Category {
 }
 
 impl Category {
+    /// Les 3 classements, dans l'ordre de publication.
+    pub const ALL: [Category; 3] = [Category::General, Category::Ecrit, Category::Vocal];
+
+    fn idx(self) -> usize {
+        match self {
+            Category::General => 0,
+            Category::Ecrit => 1,
+            Category::Vocal => 2,
+        }
+    }
+
     pub fn file(self) -> &'static str {
         match self {
             Category::General => "topgeneral.png",
@@ -43,17 +54,6 @@ pub struct LbEntry {
     pub avatar_png: Option<Vec<u8>>,
 }
 
-static FONTDB: OnceCell<Arc<usvg::fontdb::Database>> = OnceCell::new();
-fn fontdb() -> Arc<usvg::fontdb::Database> {
-    FONTDB
-        .get_or_init(|| {
-            let mut db = usvg::fontdb::Database::new();
-            db.load_system_fonts();
-            Arc::new(db)
-        })
-        .clone()
-}
-
 /// Racine des templates de classement (cwd local + conteneur Docker).
 fn templates_dir() -> PathBuf {
     for c in [
@@ -70,18 +70,9 @@ fn templates_dir() -> PathBuf {
     PathBuf::from("assets/leaderboard")
 }
 
-fn b64(bytes: &[u8]) -> String {
-    base64::engine::general_purpose::STANDARD.encode(bytes)
-}
-
+/// Echappe + tronque a 18 caracteres (place limitee sur les cartes).
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .chars()
-        .take(18)
-        .collect()
+    xml_esc(&s.chars().take(18).collect::<String>())
 }
 
 /// XP au format abrégé : 12 400 -> 12.4k, 1 500 000 -> 1.5M.
@@ -270,18 +261,35 @@ fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout, template_on_
     )
 }
 
+/// Template statique en cache : (base64, template_on_top) par categorie.
+/// Le fichier est lu/decode/encode une seule fois (evite 1-3 Mo d'I/O + un
+/// decodage PNG complet a chaque `/classement`).
+static TEMPLATE_CACHE: [OnceCell<Option<(String, bool)>>; 3] =
+    [OnceCell::new(), OnceCell::new(), OnceCell::new()];
+
+fn template_data(category: Category) -> Option<&'static (String, bool)> {
+    TEMPLATE_CACHE[category.idx()]
+        .get_or_init(|| {
+            let bytes = std::fs::read(templates_dir().join(category.file()))
+                .map_err(|e| {
+                    warn!(error = %e, file = category.file(), "Template classement introuvable")
+                })
+                .ok()?;
+            // Canal alpha (trous aux cercles) -> template dessine PAR-DESSUS les
+            // avatars (effet encastre). Sinon (opaque) -> template au fond.
+            let on_top = image::load_from_memory(&bytes)
+                .map(|img| img.color().has_alpha())
+                .unwrap_or(false);
+            Some((b64(&bytes), on_top))
+        })
+        .as_ref()
+}
+
 /// Rend le classement d'une catégorie en PNG. `None` si le template est absent
 /// ou le rendu échoue (le caller retombe alors sur l'embed texte).
 pub fn render_leaderboard(category: Category, entries: &[LbEntry]) -> Option<Vec<u8>> {
-    let template = std::fs::read(templates_dir().join(category.file()))
-        .map_err(|e| warn!(error = %e, file = category.file(), "Template classement introuvable"))
-        .ok()?;
-    // Detecte la transparence : si le template a un canal alpha (trous aux
-    // cercles), on le dessine PAR-DESSUS les avatars pour l'effet "encastre".
-    let on_top = image::load_from_memory(&template)
-        .map(|img| img.color().has_alpha())
-        .unwrap_or(false);
-    let svg = build_svg(&b64(&template), entries, &layout_for(category), on_top);
+    let (template_b64, on_top) = template_data(category)?;
+    let svg = build_svg(template_b64, entries, &layout_for(category), *on_top);
 
     let opt = usvg::Options {
         fontdb: fontdb(),

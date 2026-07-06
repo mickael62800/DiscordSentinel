@@ -6,11 +6,10 @@
 //! L'avatar est pour l'instant un placeholder (cercle colore + initiale) ;
 //! il sera remplace par les illustrations d'especes plus tard.
 
-use std::sync::Arc;
-
-use once_cell::sync::OnceCell;
 use resvg::usvg;
 use tracing::warn;
+
+use crate::shared::svg::{esc, fontdb};
 
 /// Donnees affichees sur la carte.
 pub struct CardData {
@@ -44,25 +43,6 @@ pub struct CardData {
     /// affame/mecontent (`sprite_unhappy_stat_threshold`, defaut 25),
     /// clampe [0, 100] a la construction.
     pub sprite_unhappy_stat_threshold: i32,
-}
-
-static FONTDB: OnceCell<Arc<usvg::fontdb::Database>> = OnceCell::new();
-
-fn fontdb() -> Arc<usvg::fontdb::Database> {
-    FONTDB
-        .get_or_init(|| {
-            let mut db = usvg::fontdb::Database::new();
-            db.load_system_fonts();
-            Arc::new(db)
-        })
-        .clone()
-}
-
-fn esc(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
 }
 
 /// Largeur remplie d'une barre (sur `max_w`) pour une jauge 0-100.
@@ -161,10 +141,9 @@ fn sprite_filename(d: &CardData) -> String {
 /// renvoie en base64 (embarquement SVG). `None` si le fichier est absent ->
 /// le rendu retombe sur le placeholder.
 fn load_sprite_b64(d: &CardData) -> Option<String> {
-    use base64::Engine;
     let file = format!("{}.png", sprite_filename(d));
     let bytes = std::fs::read(sprites_dir().join(&file)).ok()?;
-    Some(base64::engine::general_purpose::STANDARD.encode(bytes))
+    Some(crate::shared::svg::b64(&bytes))
 }
 
 /// Racine des sprites. Override via `TAMAGOTCHI_SPRITES_DIR` ; sinon on essaie
