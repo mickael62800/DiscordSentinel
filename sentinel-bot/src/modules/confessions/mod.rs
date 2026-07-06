@@ -438,6 +438,18 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
 }
 
 async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
+    // ACK immediat (deferred ephemere) : la suite enchaine plusieurs appels HTTP
+    // (creation, config, embed, thread, panneau) qui depassent les 3s Discord.
+    // Sans ce defer, l'interaction echoue et l'utilisateur resoumet -> confessions
+    // dupliquees. Les reponses ulterieures passent en followup (cf. helper).
+    let _ = modal
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await;
     let content = extract_input(modal, "content").unwrap_or_default();
     let guild_id = modal.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = modal.user.id.to_string();
@@ -619,6 +631,16 @@ async fn repost_panel(
 }
 
 async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
+    // ACK immediat (defer ephemere) : idem handle_submit, evite le timeout 3s
+    // et les resoumissions.
+    let _ = modal
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await;
     let content = extract_input(modal, "content").unwrap_or_default();
     let user_id = modal.user.id.to_string();
     let api = match api_client(ctx).await {
@@ -857,8 +879,17 @@ async fn modal_reply_ephemeral(ctx: &Context, modal: &ModalInteraction, content:
             .content(content)
             .ephemeral(true),
     );
-    if let Err(e) = modal.create_response(&ctx.http, resp).await {
-        warn!(error = %e, "Echec reply ephemere modal confess");
+    // Si l'interaction a deja ete acquittee (Defer en amont pour ACK &lt; 3s), le
+    // create_response echoue -> on retombe sur un followup ephemere.
+    if modal.create_response(&ctx.http, resp).await.is_err() {
+        let _ = modal
+            .create_followup(
+                &ctx.http,
+                serenity::builder::CreateInteractionResponseFollowup::new()
+                    .content(content)
+                    .ephemeral(true),
+            )
+            .await;
     }
 }
 
