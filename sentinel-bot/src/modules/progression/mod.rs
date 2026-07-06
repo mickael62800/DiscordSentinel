@@ -265,7 +265,9 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
 
         let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
         let xp_amount =
-            multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 100_000.0);
+            // clamp_max aligne sur le cap serveur (add_xp rejette > 10000) : au-dela,
+            // l'XP vocal etait entierement PERDU (l'appel API echouait).
+            multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 10_000.0);
         info!(
             guild = %guild_id, user = %user_id, channel = %channel_id,
             seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
@@ -671,7 +673,8 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             role_mult,
                             1.0,
                             0.0,
-                            100_000.0,
+                            // Aligne sur le cap serveur (10000) : au-dela l'XP etait perdu.
+                            10_000.0,
                         );
                         info!(
                             guild = %guild_id, user = %user_id, channel = %channel_id_str,
