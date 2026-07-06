@@ -162,6 +162,35 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                 }
             }
             None => {
+                // Pas de captcha en attente : soit expire, soit perdu apres un
+                // reboot du bot (l'index correct etait en RAM). Si l'utilisateur
+                // est ENCORE quarantine (rehydrate depuis la DB), on lui renvoie
+                // un NOUVEAU captcha au lieu de le laisser bloque -> il peut se
+                // verifier malgre le redemarrage.
+                if quarantine.is_quarantined(guild_id, user_id) {
+                    let guild_name = guild_id
+                        .to_partial_guild(&ctx.http)
+                        .await
+                        .map(|g| g.name)
+                        .unwrap_or_else(|_| "le serveur".to_string());
+                    captcha::send_math_challenge(
+                        ctx,
+                        user_id,
+                        guild_id,
+                        &guild_name,
+                        captcha_pending,
+                    )
+                    .await;
+                    let embed = warn_embed("\u{1f504} Nouveau captcha envoye")
+                        .description("Un nouveau captcha vient de vous etre envoye en message prive.");
+                    let response = serenity::builder::CreateInteractionResponse::Message(
+                        serenity::builder::CreateInteractionResponseMessage::new()
+                            .embed(embed)
+                            .ephemeral(true),
+                    );
+                    let _ = component.create_response(&ctx.http, response).await;
+                    return;
+                }
                 let embed = warn_embed("\u{26a0}\u{fe0f} Captcha expire")
                     .description("Ce captcha n'est plus valide.");
                 let response = serenity::builder::CreateInteractionResponse::Message(

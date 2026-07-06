@@ -41,6 +41,22 @@ pub async fn create_quarantine(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// GET /api/security/quarantine/active — liste les quarantaines encore actives
+/// (non expirees). Le bot l'appelle au demarrage pour rehydrater son tracker RAM
+/// (sinon, apres un reboot, un user quarantine ne peut plus se verifier et sa
+/// quarantaine ne peut plus etre levee cote bot).
+pub async fn list_active_quarantines(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<(String, String)>>, ApiError> {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT guild_id, user_id FROM security_quarantine_pending WHERE expires_at > NOW()",
+    )
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(sqlx_internal("list active quarantines"))?;
+    Ok(Json(rows))
+}
+
 /// DELETE /api/security/quarantine/{guild_id}/{user_id} — bot retire un
 /// user de la quarantaine apres validation captcha (ou suppression par
 /// admin). Idempotent.

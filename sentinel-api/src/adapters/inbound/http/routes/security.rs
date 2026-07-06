@@ -1,6 +1,7 @@
 //! Routes security (montees sous `/api/security`).
 
 use axum::routing::delete;
+use axum::routing::get;
 use axum::routing::post;
 use axum::Router;
 
@@ -22,6 +23,10 @@ fn security_inner() -> Router<AppState> {
         .route(
             "/quarantine",
             post(handlers::system::quarantine::create_quarantine),
+        )
+        .route(
+            "/quarantine/active",
+            get(handlers::system::quarantine::list_active_quarantines),
         )
         .route(
             "/quarantine/{guild_id}/{user_id}",

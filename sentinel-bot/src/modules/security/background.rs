@@ -4,13 +4,44 @@
 //! consume via `quarantine_expired_consumer.rs`.
 
 use serenity::all::Context;
+use serenity::model::id::{GuildId, UserId};
 
-use super::{LockdownKey, SecurityConfigKey, SlowmodeKey};
+use super::{LockdownKey, QuarantineKey, SecurityConfigKey, SlowmodeKey};
 
 /// Spawn les background tasks security restantes : slowmode + lockdown
 /// revert (encore en RAM tant que les `PermissionOverwrite` originaux
 /// ne sont pas persistes en DB).
 pub fn spawn_background(ctx: Context) {
+    // 1. Rehydratation des quarantaines actives depuis la DB (post-reboot) : sans
+    // ca, apres un redemarrage un user quarantine ne peut plus se verifier
+    // (is_quarantined=false) et sa quarantaine ne peut plus etre levee cote bot.
+    let ctx_q = ctx.clone();
+    tokio::spawn(async move {
+        let data = ctx_q.data.read().await;
+        let (Some(base), Some(quarantine)) = (
+            data.get::<crate::shared::heartbeat::ApiClientKey>(),
+            data.get::<QuarantineKey>(),
+        ) else {
+            return;
+        };
+        match base
+            .get_json::<Vec<(String, String)>>("/api/security/quarantine/active")
+            .await
+        {
+            Ok(list) => {
+                let mut n = 0u32;
+                for (g, u) in list {
+                    if let (Ok(gid), Ok(uid)) = (g.parse::<u64>(), u.parse::<u64>()) {
+                        quarantine.rehydrate(GuildId::new(gid), UserId::new(uid));
+                        n += 1;
+                    }
+                }
+                tracing::info!(count = n, "Quarantaines actives rehydratees au demarrage");
+            }
+            Err(e) => tracing::warn!(error = %e, "Echec rehydratation des quarantaines"),
+        }
+    });
+
     // 2. Slowmode revert (15s loop)
     let ctx_s = ctx.clone();
     tokio::spawn(async move {

@@ -94,6 +94,15 @@ impl QuarantineManager {
     }
 
     /// Verifie si un utilisateur est en quarantaine.
+    /// Rehydrate une entree de quarantaine au demarrage (depuis la DB). Les
+    /// roles originaux ne sont pas persistes mais `release_user` ne les utilise
+    /// pas (il retire seulement le role de quarantaine).
+    pub fn rehydrate(&self, guild_id: GuildId, user_id: UserId) {
+        self.quarantined
+            .entry((guild_id, user_id))
+            .or_insert_with(|| (Instant::now(), Vec::new()));
+    }
+
     pub fn is_quarantined(&self, guild_id: GuildId, user_id: UserId) -> bool {
         self.quarantined.contains_key(&(guild_id, user_id))
     }
