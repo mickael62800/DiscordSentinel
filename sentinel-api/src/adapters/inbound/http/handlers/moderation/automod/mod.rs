@@ -5,11 +5,13 @@
 //! les handlers restent reachable a leur path historique
 //! (`handlers::moderation::automod::HANDLER`) via les re-exports ci-dessous.
 
+mod adaptive_slowmode;
 mod discussions;
 mod dto;
 mod fp_stats;
 mod reviews;
 
+pub use adaptive_slowmode::*;
 pub use discussions::*;
 pub use dto::*;
 pub use fp_stats::*;

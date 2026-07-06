@@ -181,3 +181,43 @@ fn proto_routing_to_routing(value: i32) -> Routing {
 }
 
 use crate::shared::grpc_client::grpc_err_to_string;
+
+// ── Persistance du slowmode adaptatif (BUG3) ──
+// Le tracker est en memoire ; on mirroir l'ensemble actif cote API pour le
+// recharger apres un redemarrage (sinon salons bloques en slowmode a vie).
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct AdaptiveSlowmodeEntry {
+    #[serde(default)]
+    pub guild_id: String,
+    pub channel_id: String,
+}
+
+/// Marque un salon comme slowmode adaptatif actif (best-effort).
+pub async fn persist_slowmode(api: &BaseApiClient, guild_id: &str, channel_id: &str) {
+    let body = AdaptiveSlowmodeEntry {
+        guild_id: guild_id.to_string(),
+        channel_id: channel_id.to_string(),
+    };
+    let _ = api
+        .post_json::<_, serde_json::Value>("/api/automod/adaptive-slowmode", &body)
+        .await;
+}
+
+/// Retire un salon (slowmode desactive) — best-effort.
+pub async fn forget_slowmode(api: &BaseApiClient, channel_id: &str) {
+    let body = AdaptiveSlowmodeEntry {
+        guild_id: String::new(),
+        channel_id: channel_id.to_string(),
+    };
+    let _ = api
+        .post_json::<_, serde_json::Value>("/api/automod/adaptive-slowmode/remove", &body)
+        .await;
+}
+
+/// Liste tous les salons actifs (rechargement au demarrage).
+pub async fn list_slowmode(api: &BaseApiClient) -> Vec<AdaptiveSlowmodeEntry> {
+    api.get_json("/api/automod/adaptive-slowmode")
+        .await
+        .unwrap_or_default()
+}

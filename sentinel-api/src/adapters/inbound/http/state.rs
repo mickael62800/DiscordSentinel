@@ -112,6 +112,7 @@ pub struct AppState {
     pub user_activity_repo: Arc<dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository>,
     pub welcome_config_uc: Arc<dyn crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase>,
     pub automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase>,
+    pub automod_adaptive_slowmode_repo: Arc<dyn crate::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository>,
     pub reset_guild_uc: Arc<dyn crate::ports::inbound::system::reset_guild::ResetGuildUseCase>,
     pub pets_uc: Arc<dyn crate::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase>,
     pub rotation_uc: Arc<dyn crate::ports::inbound::system::manage_rotation::ManageRotationUseCase>,

@@ -218,6 +218,24 @@ pub fn spawn_background_tasks(ctx: &Context) {
     // Background task : desactiver le slowmode adaptatif quand l'activite retombe
     let ctx_clone = ctx.clone();
     tokio::spawn(async move {
+        // BUG3 : recharge l'ensemble des salons persistes comme actifs (survit au
+        // redemarrage du bot). Ils entrent dans `active` -> la boucle les levera
+        // des que l'activite est confirmee retombee (au lieu de rester colles).
+        let api = ctx_clone
+            .data
+            .read()
+            .await
+            .get::<crate::shared::heartbeat::ApiClientKey>()
+            .cloned();
+        if let Some(api) = api {
+            for e in api_client::list_slowmode(&api).await {
+                if let Ok(cid) = e.channel_id.parse::<u64>() {
+                    if let Some(tracker) = ctx_clone.data.read().await.get::<SlowmodeTrackerKey>() {
+                        tracker.mark_active(ChannelId::new(cid));
+                    }
+                }
+            }
+        }
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             let data = ctx_clone.data.read().await;
@@ -230,6 +248,16 @@ pub fn spawn_background_tasks(ctx: &Context) {
                         warn!(error = %e, channel_id = %channel_id, "Echec desactivation slowmode adaptatif");
                     } else {
                         info!(channel_id = %channel_id, "Slowmode adaptatif desactive (activite retombee)");
+                        // BUG3 : retire de la persistance (best-effort).
+                        let api = ctx_clone
+                            .data
+                            .read()
+                            .await
+                            .get::<crate::shared::heartbeat::ApiClientKey>()
+                            .cloned();
+                        if let Some(api) = api {
+                            api_client::forget_slowmode(&api, &channel_id.to_string()).await;
+                        }
                     }
                 }
             }

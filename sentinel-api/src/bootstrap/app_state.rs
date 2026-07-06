@@ -204,6 +204,9 @@ pub async fn build_app_state(
     let automod_review_repo: Arc<dyn crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository> = Arc::new(
         crate::adapters::outbound::postgres::moderation::automod_review_repository::PgAutomodReviewRepository::new(pg_pool.clone()),
     );
+    let automod_adaptive_slowmode_repo: Arc<dyn crate::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository> = Arc::new(
+        crate::adapters::outbound::postgres::moderation::adaptive_slowmode_repository::PgAdaptiveSlowmodeRepository::new(pg_pool.clone()),
+    );
     let automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase> =
         Arc::new(crate::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
             automod_review_repo.clone(),
@@ -1073,6 +1076,7 @@ pub async fn build_app_state(
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
         automod_reviews_uc,
+        automod_adaptive_slowmode_repo,
         reset_guild_uc,
         pets_uc,
         rotation_uc,

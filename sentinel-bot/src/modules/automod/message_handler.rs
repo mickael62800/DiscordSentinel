@@ -453,6 +453,16 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                         // sinon il ne pourrait plus etre desactive -> slowmode
                         // colle a vie).
                         tracker.mark_active(msg.channel_id);
+                        // BUG3 : persiste cote API pour survivre a un redemarrage
+                        // (best-effort, hors chemin critique).
+                        if let Some(api) = data.get::<ApiClientKey>() {
+                            let api = api.clone();
+                            let gid = guild_id.clone();
+                            let cid = msg.channel_id.to_string();
+                            tokio::spawn(async move {
+                                super::api_client::persist_slowmode(&api, &gid, &cid).await;
+                            });
+                        }
                     }
                     tracker.finish_activation(msg.channel_id);
                 }

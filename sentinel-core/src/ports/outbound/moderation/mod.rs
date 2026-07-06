@@ -1,3 +1,4 @@
+pub mod adaptive_slowmode_repository;
 pub mod automod_review_repository;
 pub mod evidence_repository;
 pub mod infraction_repository;

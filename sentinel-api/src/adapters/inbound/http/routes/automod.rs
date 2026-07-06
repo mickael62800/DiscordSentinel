@@ -36,6 +36,15 @@ fn automod_inner() -> Router<AppState> {
             post(handlers::moderation::automod::cleanup_expired_cards),
         )
         .route(
+            "/adaptive-slowmode",
+            get(handlers::moderation::automod::list_adaptive_slowmode)
+                .post(handlers::moderation::automod::mark_adaptive_slowmode),
+        )
+        .route(
+            "/adaptive-slowmode/remove",
+            post(handlers::moderation::automod::unmark_adaptive_slowmode),
+        )
+        .route(
             "/reviews/{review_id}/resolve",
             post(handlers::moderation::automod::resolve_review),
         )
