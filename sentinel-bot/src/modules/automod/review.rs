@@ -692,7 +692,7 @@ pub(super) async fn handle_review_button(
         }
         Action::Ban => {
             // Decision humaine -> ban reel (coherent avec la finalisation de vote).
-            super::vote::apply_member_sanction(
+            let _ = super::vote::apply_member_sanction(
                 ctx,
                 component.guild_id,
                 channel_id_str,
@@ -967,7 +967,7 @@ async fn apply_web_resolution(ctx: &Context, action_id: &str, applied_action: &s
     // Action Discord (delete/mute/ban ; warn = pas d'action destructive).
     // La sanction est tracee cote API dans la requete /resolve (source web) ;
     // le bot n'applique ici que l'action Discord (pas de log redondant).
-    super::vote::apply_member_sanction(
+    let _ = super::vote::apply_member_sanction(
         ctx,
         gid,
         &review.channel_id,

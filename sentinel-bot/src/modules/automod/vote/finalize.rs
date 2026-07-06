@@ -127,7 +127,7 @@ pub(crate) async fn handle_finalize_button(
     );
 
     // Execute la sanction Discord (delete/mute/ban).
-    apply_member_sanction(
+    let sanction_ok = apply_member_sanction(
         ctx,
         component.guild_id,
         &review.channel_id,
@@ -137,6 +137,22 @@ pub(crate) async fn handle_finalize_button(
         mute_secs,
     )
     .await;
+    // F3 : la review est deja marquee « appliquee » cote API (ordre resolve-first
+    // qui protege du double-ban). Si l'execution Discord a echoue, on alerte le
+    // moderateur au lieu de laisser la sanction « perdue en silence ».
+    if !sanction_ok {
+        let _ = component
+            .create_followup(
+                &ctx.http,
+                serenity::builder::CreateInteractionResponseFollowup::new()
+                    .content(
+                        "⚠️ Sanction **enregistrée**, mais son **exécution Discord a échoué** \
+                         (permission manquante ou membre déjà parti). Applique-la manuellement si nécessaire.",
+                    )
+                    .ephemeral(true),
+            )
+            .await;
+    }
 
     // BUG #4 : card de sanction pour les decisions humaines du vote (warn/mute/ban),
     // au meme titre que les sanctions manuelles et l'auto-mute automod. Best-effort.
@@ -323,6 +339,12 @@ pub(crate) async fn log_sanction_to_moderation(
 /// Execute la sanction Discord decidee (delete/mute/ban). Helper partage par le
 /// vote (finalisation) et la review 1-clic, pour une seule implementation.
 /// `warn`/`ignore` = pas d'action Discord destructive.
+/// Execute la sanction Discord. Retourne `true` si l'action a bien ete
+/// appliquee (ou n'exigeait rien) ; `false` si l'execution Discord a echoue
+/// (permission manquante, membre parti...) — le caller peut alors alerter le
+/// moderateur au lieu de laisser la sanction « perdue en silence » alors que la
+/// DB la marque appliquee.
+#[must_use]
 pub(crate) async fn apply_member_sanction(
     ctx: &Context,
     guild_id: Option<serenity::model::id::GuildId>,
@@ -331,10 +353,10 @@ pub(crate) async fn apply_member_sanction(
     user_id_str: &str,
     action: &str,
     mute_secs: u64,
-) {
+) -> bool {
     let channel_id = match channel_id_str.parse::<u64>() {
         Ok(id) => serenity::model::id::ChannelId::new(id),
-        Err(_) => return,
+        Err(_) => return false,
     };
     match action {
         "delete" | "mute" => {
@@ -344,30 +366,38 @@ pub(crate) async fn apply_member_sanction(
                     .await;
             }
             if action == "mute" {
-                if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
-                    if let Ok(mut member) = gid
-                        .member(&ctx.http, serenity::model::id::UserId::new(uid))
-                        .await
-                    {
-                        let until = (std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_secs() as i64)
-                            .unwrap_or(0))
-                            + mute_secs as i64;
-                        if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(until) {
-                            let _ = member
-                                .disable_communication_until_datetime(
-                                    &ctx.http,
-                                    serenity::model::Timestamp::from(dt),
-                                )
-                                .await;
-                        }
-                    }
-                }
+                let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) else {
+                    return false;
+                };
+                let Ok(mut member) = gid
+                    .member(&ctx.http, serenity::model::id::UserId::new(uid))
+                    .await
+                else {
+                    return false; // membre introuvable (deja parti)
+                };
+                let until = (std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs() as i64)
+                    .unwrap_or(0))
+                    + mute_secs as i64;
+                let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(until) else {
+                    return false;
+                };
+                return member
+                    .disable_communication_until_datetime(
+                        &ctx.http,
+                        serenity::model::Timestamp::from(dt),
+                    )
+                    .await
+                    .is_ok();
             }
+            true // "delete" pur : rien de plus a executer
         }
         "ban" => {
-            if let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) {
+            let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) else {
+                return false;
+            };
+            {
                 let user = serenity::model::id::UserId::new(uid);
 
                 // AutoMod : un ban propose devient un BAN EN SURSIS (appel
@@ -394,8 +424,8 @@ pub(crate) async fn apply_member_sanction(
                 )
                 .await;
                 if sursis.is_some() {
-                    // Sursis applique : pas de ban dur.
-                    return;
+                    // Sursis applique : pas de ban dur -> succes.
+                    return true;
                 }
 
                 // Fallback : role Sursis non configure -> ban dur.
@@ -421,7 +451,7 @@ pub(crate) async fn apply_member_sanction(
                         None => 7,
                     }
                 };
-                if let Err(e) = gid
+                match gid
                     .ban_with_reason(
                         &ctx.http,
                         serenity::model::id::UserId::new(uid),
@@ -430,7 +460,11 @@ pub(crate) async fn apply_member_sanction(
                     )
                     .await
                 {
-                    warn!(error = %e, user = user_id_str, "Echec ban (sanction validee) -- permission BAN_MEMBERS ?");
+                    Ok(_) => true,
+                    Err(e) => {
+                        warn!(error = %e, user = user_id_str, "Echec ban (sanction validee) -- permission BAN_MEMBERS ?");
+                        false
+                    }
                 }
             }
         }
@@ -450,7 +484,9 @@ pub(crate) async fn apply_member_sanction(
                     serenity::builder::CreateMessage::new().embed(embed),
                 )
                 .await;
+            true
         }
-        _ => {}
+        // Action inconnue / "ignore" : rien a executer, pas un echec.
+        _ => true,
     }
 }
