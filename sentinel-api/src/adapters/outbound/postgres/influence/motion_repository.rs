@@ -140,13 +140,15 @@ impl VoteRepository for PgVoteRepository {
     }
 
     async fn tally(&self, subject_id: Uuid) -> Result<Tally, DomainError> {
-        // Compte brut + poids pondere par l'influence du votant (plancher 1 :
-        // meme un citoyen sans influence garde une voix). Jointure sur le citoyen
-        // pour recuperer son influence courante.
+        // Compte brut + poids du vote = influence (plancher 1) + NOTORIETE du
+        // votant (une figure connue pese davantage). LEFT JOIN sur les
+        // dimensions de reputation (0 si aucune ligne).
         let rows: Vec<(String, i64, i64)> = sqlx::query_as(
-            "SELECT v.choice, COUNT(*), COALESCE(SUM(GREATEST(c.influence, 1)), 0) \
+            "SELECT v.choice, COUNT(*), \
+                    COALESCE(SUM(GREATEST(c.influence, 1) + GREATEST(COALESCE(rd.notoriety, 0), 0)), 0) \
              FROM influence_votes v \
              JOIN influence_citizens c ON c.id = v.voter_id \
+             LEFT JOIN influence_reputation_dims rd ON rd.citizen_id = c.id \
              WHERE v.subject_id = $1 GROUP BY v.choice",
         )
         .bind(subject_id)

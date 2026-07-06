@@ -340,7 +340,7 @@ pub fn build_embed(s: &LawState) -> CreateEmbed {
         .field("❌ Contre", s.contre.to_string(), true)
         .field("⚪ Abstention", s.abstention.to_string(), true)
         .field(
-            "⚖️ Poids (influence)",
+            "⚖️ Poids du vote (influence + notoriété)",
             format!("Pour **{}** / Contre **{}**", s.pour_weight, s.contre_weight),
             false,
         );
