@@ -64,11 +64,23 @@ impl ManageStrikesUseCase for ManageStrikesService {
             .await?;
         let active_count = active.len() as u32;
 
-        let (escalation_action, escalation_duration) =
-            match escalation_for(&config.thresholds, active_count) {
+        // N'escalade que si CE strike FRANCHIT un nouveau palier : on compare le
+        // palier au compte courant a celui du compte precedent. S'ils sont
+        // identiques (deja au-dessus du seuil), pas de re-application -> plus de
+        // re-mute/re-ban a chaque strike suivant. Prend aussi en compte un
+        // changement de duree entre deux paliers de meme action.
+        let current = escalation_for(&config.thresholds, active_count);
+        let previous = active_count
+            .checked_sub(1)
+            .and_then(|prev| escalation_for(&config.thresholds, prev));
+        let (escalation_action, escalation_duration) = if current != previous {
+            match current {
                 Some((action, duration)) => (Some(action), duration),
                 None => (None, None),
-            };
+            }
+        } else {
+            (None, None)
+        };
 
         Ok(StrikeResult {
             strike,

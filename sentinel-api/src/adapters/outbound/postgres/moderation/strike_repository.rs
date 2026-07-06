@@ -107,17 +107,22 @@ impl StrikeRepository for PgStrikeRepository {
         window_secs: i64,
     ) -> Result<Vec<UserStrike>, DomainError> {
         let cutoff = Utc::now() - Duration::seconds(window_secs);
+        // window_secs <= 0 = strikes "permanents" : on ne filtre PAS par
+        // created_at (sinon cutoff = maintenant -> 0 strike compte -> escalade
+        // morte). L'expiration reste geree par expires_at (NULL = permanent).
+        let no_window = window_secs <= 0;
         let rows = sqlx::query_as::<_, StrikeRow>(
             "SELECT id, guild_id, user_id, reason, source, infraction_id, expires_at, created_at
              FROM user_strikes
              WHERE guild_id = $1 AND user_id = $2
                AND (expires_at IS NULL OR expires_at > NOW())
-               AND created_at > $3
+               AND (created_at > $3 OR $4)
              ORDER BY created_at DESC",
         )
         .bind(guild_id)
         .bind(user_id)
         .bind(cutoff)
+        .bind(no_window)
         .fetch_all(&self.pool)
         .await
         .map_err(pg_ctx("find_active_strikes"))?;
