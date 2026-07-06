@@ -171,4 +171,18 @@ impl LawRepository for PgLawRepository {
             .map_err(pg_err)?;
         rows.into_iter().map(TryInto::try_into).collect()
     }
+
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<Law>, DomainError> {
+        let sql = format!(
+            "SELECT {COLS} FROM influence_laws \
+             WHERE guild_id = $1 AND status = 'vote' \
+             ORDER BY expires_at ASC NULLS LAST LIMIT 25"
+        );
+        let rows: Vec<Row> = sqlx::query_as(&sql)
+            .bind(guild_id)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        rows.into_iter().map(TryInto::try_into).collect()
+    }
 }

@@ -41,6 +41,9 @@ pub trait LawRepository: Send + Sync {
     /// Lois en vote dont l'echeance est passee (scan worker).
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Law>, DomainError>;
 
+    /// Lois actuellement en vote sur un serveur (pour `/loi liste`).
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<Law>, DomainError>;
+
     /// Ajoute du poids de financement a un camp (uniquement en statut vote).
     /// `true` si applique (false si la loi n'est plus en vote).
     async fn add_funding(

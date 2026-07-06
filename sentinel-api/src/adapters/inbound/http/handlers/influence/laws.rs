@@ -48,6 +48,15 @@ pub struct SetLawMessageDto {
 }
 
 /// POST /api/influence/{guild_id}/laws
+/// POST /api/influence/{guild_id}/laws/list — lois en cours de vote.
+pub async fn list_active_laws(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+) -> Result<Json<Vec<LawStateDto>>, ApiError> {
+    let laws = state.influence_laws_uc.list_active(&guild_id).await?;
+    Ok(Json(laws.into_iter().map(Into::into).collect()))
+}
+
 pub async fn propose_law(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,

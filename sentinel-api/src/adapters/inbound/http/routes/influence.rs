@@ -93,6 +93,10 @@ fn influence_inner() -> Router<AppState> {
             post(handlers::influence::laws::law_state),
         )
         .route(
+            "/{guild_id}/laws/list",
+            post(handlers::influence::laws::list_active_laws),
+        )
+        .route(
             "/{guild_id}/laws/message",
             post(handlers::influence::laws::set_law_message),
         )

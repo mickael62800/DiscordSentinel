@@ -75,6 +75,72 @@ pub fn register() -> CreateCommand {
                     .add_string_choice("Contre", "contre"),
             ),
         )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "liste",
+            "Liste les lois actuellement en vote (avec leur ID)",
+        ))
+}
+
+async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str) {
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+    let embed = match api_client::list_laws(&api, guild_id).await {
+        Ok(laws) if laws.is_empty() => CreateEmbed::new()
+            .title("📜 Lois en vote")
+            .color(0x3498DB)
+            .description("*Aucune loi en vote actuellement.*"),
+        Ok(laws) => {
+            let desc = laws
+                .iter()
+                .map(|l| {
+                    let funding = if l.funding_pour > 0 || l.funding_contre > 0 {
+                        format!(" · 🏛️ {}/{}", l.funding_pour, l.funding_contre)
+                    } else {
+                        String::new()
+                    };
+                    format!(
+                        "**{}**\n`{}` · ✅ {} / ❌ {}{}",
+                        l.title, l.law_id, l.pour_weight, l.contre_weight, funding
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n\n");
+            CreateEmbed::new()
+                .title("📜 Lois en vote")
+                .color(0x3498DB)
+                .description(desc)
+                .footer(CreateEmbedFooter::new(
+                    "Utilise l'ID pour /loi financer (lobbying) ou pour voter.",
+                ))
+        }
+        Err(e) => {
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!("Erreur : {e}"))
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+            return;
+        }
+    };
+    let _ = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+            ),
+        )
+        .await;
 }
 
 async fn handle_fund(
@@ -159,6 +225,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
     if sub_name == "financer" {
         handle_fund(ctx, command, &guild_id, &opts).await;
+        return;
+    }
+    if sub_name == "liste" {
+        handle_list(ctx, command, &guild_id).await;
         return;
     }
     // Sous-commande propose (par defaut).

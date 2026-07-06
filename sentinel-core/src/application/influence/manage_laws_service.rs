@@ -172,6 +172,15 @@ impl ManageLawsUseCase for ManageLawsService {
         self.state_of(law).await
     }
 
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<LawState>, DomainError> {
+        let laws = self.laws.list_active(guild_id).await?;
+        let mut out = Vec::with_capacity(laws.len());
+        for law in laws {
+            out.push(self.state_of(law).await?);
+        }
+        Ok(out)
+    }
+
     async fn set_message(
         &self,
         law_id: &str,

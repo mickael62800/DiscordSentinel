@@ -42,6 +42,9 @@ pub trait ManageLawsUseCase: Send + Sync {
     /// Etat courant d'une loi (rafraichissement).
     async fn get_state(&self, law_id: &str) -> Result<LawState, DomainError>;
 
+    /// Lois actuellement en vote sur le serveur (avec leur decompte).
+    async fn list_active(&self, guild_id: &str) -> Result<Vec<LawState>, DomainError>;
+
     /// Memorise le message Discord d'une loi (pour edition a la cloture).
     async fn set_message(
         &self,

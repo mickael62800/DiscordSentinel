@@ -601,6 +601,17 @@ struct LawIdBody<'a> {
     law_id: &'a str,
 }
 
+pub async fn list_laws(
+    api: &BaseApiClient,
+    guild_id: &str,
+) -> Result<Vec<LawState>, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/laws/list"),
+        &serde_json::json!({}),
+    )
+    .await
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn propose_law(
     api: &BaseApiClient,
