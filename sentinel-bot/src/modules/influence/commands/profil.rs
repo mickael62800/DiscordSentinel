@@ -93,13 +93,24 @@ fn build_embed(p: &api_client::ProfileView) -> CreateEmbed {
         "Tu ne vois que des paliers : les chiffres exacts restent prives."
     };
 
-    CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .title(titre)
         .color(0x8E44AD)
         .field("🏛️ Influence", cap_line(&p.influence), false)
         .field("💰 Argent", cap_line(&p.money), false)
         .field("⭐ Réputation", reputation, false)
         .field("🕵️ Information", cap_line(&p.information), false)
-        .field("🤝 Réseau", cap_line(&p.network), false)
-        .footer(CreateEmbedFooter::new(footer))
+        .field("🤝 Réseau", cap_line(&p.network), false);
+    // Reputation multi-dimensionnelle (seulement sur son propre profil).
+    if let Some(d) = &p.reputation_dims {
+        embed = embed.field(
+            "📊 Réputation détaillée",
+            format!(
+                "Fiabilité **{}** · Popularité **{}** · Notoriété **{}** · Transparence **{}**",
+                d.reliability, d.popularity, d.notoriety, d.transparency
+            ),
+            false,
+        );
+    }
+    embed.footer(CreateEmbedFooter::new(footer))
 }

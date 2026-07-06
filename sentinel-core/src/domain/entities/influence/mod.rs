@@ -13,6 +13,7 @@ pub mod motion;
 pub mod movement;
 pub mod org_membership;
 pub mod organization;
+pub mod reputation_dims;
 pub mod tier;
 pub mod treasury;
 pub mod vote;

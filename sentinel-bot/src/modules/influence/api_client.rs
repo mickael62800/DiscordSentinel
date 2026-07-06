@@ -28,6 +28,16 @@ pub struct ProfileView {
     pub reputation_exact: Option<i64>,
     pub information: CapitalView,
     pub network: CapitalView,
+    #[serde(default)]
+    pub reputation_dims: Option<ReputationDims>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReputationDims {
+    pub reliability: i64,
+    pub popularity: i64,
+    pub notoriety: i64,
+    pub transparency: i64,
 }
 
 // ── Organisations ──

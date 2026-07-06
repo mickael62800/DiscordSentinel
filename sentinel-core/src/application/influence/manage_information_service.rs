@@ -35,6 +35,9 @@ pub struct ManageInformationService {
     movements: Arc<dyn MovementRepository>,
     wallet: Option<Arc<dyn crate::ports::outbound::casino::wallet_repository::WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
+    rep_dims: Option<
+        Arc<dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository>,
+    >,
 }
 
 impl ManageInformationService {
@@ -53,7 +56,18 @@ impl ManageInformationService {
             movements,
             wallet: None,
             cfg_repo: None,
+            rep_dims: None,
         }
+    }
+
+    pub fn with_rep_dims_repo(
+        mut self,
+        repo: Arc<
+            dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository,
+        >,
+    ) -> Self {
+        self.rep_dims = Some(repo);
+        self
     }
 
     pub fn with_wallet_repo(
@@ -218,6 +232,19 @@ impl ManageInformationUseCase for ManageInformationService {
                 .movements
                 .record(guild_id, target.id, Capital::Reputation, -loss, "Scandale")
                 .await;
+            // Reputation multi-dimensionnelle : un scandale entame la FIABILITE
+            // et la TRANSPARENCE de la cible (elle cachait quelque chose).
+            if let Some(dims) = &self.rep_dims {
+                use crate::domain::entities::influence::reputation_dims::ReputationDim;
+                let _ = dims.adjust(target.id, ReputationDim::Reliability, -10).await;
+                let _ = dims.adjust(target.id, ReputationDim::Transparency, -10).await;
+            }
+        }
+
+        // L'enqueteur qui revele gagne en NOTORIETE.
+        if let Some(dims) = &self.rep_dims {
+            use crate::domain::entities::influence::reputation_dims::ReputationDim;
+            let _ = dims.adjust(citizen.id, ReputationDim::Notoriety, 5).await;
         }
 
         let _ = self

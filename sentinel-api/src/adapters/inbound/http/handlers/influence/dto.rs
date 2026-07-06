@@ -38,6 +38,16 @@ pub struct ProfileViewDto {
     pub information: CapitalViewDto,
     pub network: CapitalViewDto,
     pub joined_at: DateTime<Utc>,
+    #[serde(default)]
+    pub reputation_dims: Option<ReputationDimsDto>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReputationDimsDto {
+    pub reliability: i64,
+    pub popularity: i64,
+    pub notoriety: i64,
+    pub transparency: i64,
 }
 
 impl From<ProfileView> for ProfileViewDto {
@@ -52,6 +62,12 @@ impl From<ProfileView> for ProfileViewDto {
             information: p.information.into(),
             network: p.network.into(),
             joined_at: p.joined_at,
+            reputation_dims: p.reputation_dims.map(|d| ReputationDimsDto {
+                reliability: d.reliability,
+                popularity: d.popularity,
+                notoriety: d.notoriety,
+                transparency: d.transparency,
+            }),
         }
     }
 }

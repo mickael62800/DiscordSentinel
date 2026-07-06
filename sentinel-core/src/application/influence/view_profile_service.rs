@@ -21,6 +21,9 @@ pub struct ViewProfileService {
     citizens: Arc<dyn CitizenRepository>,
     wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
+    rep_dims: Option<
+        Arc<dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository>,
+    >,
 }
 
 impl ViewProfileService {
@@ -29,7 +32,18 @@ impl ViewProfileService {
             citizens,
             wallet: None,
             cfg_repo: None,
+            rep_dims: None,
         }
+    }
+
+    pub fn with_rep_dims_repo(
+        mut self,
+        repo: Arc<
+            dyn crate::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository,
+        >,
+    ) -> Self {
+        self.rep_dims = Some(repo);
+        self
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
@@ -87,6 +101,17 @@ impl ViewProfileUseCase for ViewProfileService {
             exact: is_self.then_some(value),
         };
 
+        // Dimensions de reputation : chiffres exacts, seulement sur son propre
+        // profil (comme les autres capitaux).
+        let reputation_dims = if is_self {
+            match &self.rep_dims {
+                Some(d) => d.get(citizen.id).await.ok(),
+                None => None,
+            }
+        } else {
+            None
+        };
+
         Ok(ProfileView {
             username: citizen.username,
             is_self,
@@ -97,6 +122,7 @@ impl ViewProfileUseCase for ViewProfileService {
             information: cap(capitals.information),
             network: cap(capitals.network),
             joined_at: citizen.joined_at,
+            reputation_dims,
         })
     }
 }

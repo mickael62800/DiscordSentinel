@@ -831,6 +831,13 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ),
     );
+    let influence_rep_dims_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::reputation_dims_repository::ReputationDimsRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::reputation_dims_repository::PgReputationDimsRepository::new(
+            pg_pool.clone(),
+        ),
+    );
     let influence_view_profile_uc: Arc<
         dyn sentinel_core::ports::inbound::influence::view_profile::ViewProfileUseCase,
     > = Arc::new(
@@ -838,7 +845,8 @@ pub async fn build_app_state(
             influence_citizen_repo.clone(),
         )
         .with_bot_config_repo(bot_config_repo.clone())
-        .with_wallet_repo(wallet_repo.clone()),
+        .with_wallet_repo(wallet_repo.clone())
+        .with_rep_dims_repo(influence_rep_dims_repo.clone()),
     );
     let influence_org_repo: Arc<
         dyn sentinel_core::ports::outbound::influence::organization_repository::OrganizationRepository,
@@ -976,7 +984,8 @@ pub async fn build_app_state(
             influence_movement_repo.clone(),
         )
         .with_bot_config_repo(bot_config_repo.clone())
-        .with_wallet_repo(wallet_repo.clone()),
+        .with_wallet_repo(wallet_repo.clone())
+        .with_rep_dims_repo(influence_rep_dims_repo.clone()),
     );
 
     // ── Ban en sursis (moderation) ──

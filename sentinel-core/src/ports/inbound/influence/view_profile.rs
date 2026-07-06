@@ -30,6 +30,9 @@ pub struct ProfileView {
     pub information: CapitalView,
     pub network: CapitalView,
     pub joined_at: DateTime<Utc>,
+    /// Reputation multi-dimensionnelle (chiffres exacts, seulement pour soi).
+    pub reputation_dims:
+        Option<crate::domain::entities::influence::reputation_dims::ReputationDims>,
 }
 
 #[async_trait]

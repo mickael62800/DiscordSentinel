@@ -8,3 +8,4 @@ pub mod motion_repository;
 pub mod movement_repository;
 pub mod organization_repository;
 pub mod relation_repository;
+pub mod reputation_dims_repository;
