@@ -92,6 +92,7 @@ impl SlowmodeManager {
                 "guild_id": guild_id.to_string(),
                 "previous_states": states_json,
                 "duration_secs": persist_duration_secs,
+                "imposed_rate": slowmode_secs,
             });
             base.post_fire_and_forget("/api/security/slowmode", &body)
                 .await;

@@ -48,6 +48,12 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         None => return,
     };
 
+    // Rate impose par le raid + etat courant des salons : on ne restaure un
+    // salon que s'il porte ENCORE le rate impose (sinon un modo l'a change
+    // manuellement pendant la fenetre -> on respecte sa valeur).
+    let imposed_rate = data.get("imposed_rate").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
+    let current = guild_id.channels(&ctx.http).await.ok();
+
     let mut restored = 0usize;
     for entry in states {
         let ch_str = entry
@@ -59,6 +65,13 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             Ok(c) => ChannelId::new(c),
             Err(_) => continue,
         };
+        if let Some(map) = &current {
+            if let Some(ch) = map.get(&channel_id) {
+                if ch.rate_limit_per_user.unwrap_or(0) != imposed_rate {
+                    continue; // valeur manuelle d'un modo : ne pas ecraser
+                }
+            }
+        }
         let edit = EditChannel::new().rate_limit_per_user(rate);
         if let Err(e) = channel_id.edit(&ctx.http, edit).await {
             warn!(error = %e, channel = %channel_id, "Restore slowmode echoue");

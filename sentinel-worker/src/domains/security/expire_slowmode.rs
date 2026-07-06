@@ -8,11 +8,12 @@ use tracing::{debug, info, warn};
 struct ExpiredSlowmode {
     guild_id: String,
     previous_states: serde_json::Value,
+    imposed_rate: i32,
 }
 
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let candidates: Vec<ExpiredSlowmode> = sqlx::query_as(
-        "SELECT guild_id, previous_states \
+        "SELECT guild_id, previous_states, imposed_rate \
          FROM security_slowmode_active \
          WHERE expires_at < NOW() \
          ORDER BY expires_at ASC LIMIT 50",
@@ -50,6 +51,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             "data": {
                 "guild_id": s.guild_id,
                 "previous_states": s.previous_states,
+                "imposed_rate": s.imposed_rate,
             }
         });
         let res = crate::common::redis_helpers::xadd_event(&mut conn, &payload.to_string()).await;
