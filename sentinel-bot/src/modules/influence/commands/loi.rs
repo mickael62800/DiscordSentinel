@@ -195,6 +195,18 @@ async fn handle_fund(
                     ),
                 )
                 .await;
+            // Une du journal : le financement politique est rendu public (drama
+            // + transparence : qui achete de l'influence sur quelle loi).
+            crate::modules::influence::press::publish_news(
+                ctx,
+                guild_id,
+                "🏛️ Financement politique",
+                &format!(
+                    "**{}** a investi **{}** coins pour soutenir le camp **{}** de la loi « {} ».",
+                    org, r.amount, camp, r.law_title
+                ),
+            )
+            .await;
         }
         Err(e) => {
             let _ = command
