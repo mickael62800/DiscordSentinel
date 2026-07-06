@@ -174,6 +174,11 @@ pub async fn on_voice_state_update(
 }
 
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
+    // Les bots ajoutes au serveur ne doivent pas declencher le welcome / DM /
+    // role de verification (ni recevoir le role "membre temporaire").
+    if new_member.user.bot {
+        return;
+    }
     let ctx = ctx.clone();
     let new_member = new_member.clone();
     let guild_id = new_member.guild_id;
@@ -609,8 +614,38 @@ async fn assign_roles_csv(
         .map(RoleId::new)
         .collect();
 
+    // GARDE ANTI-ESCALADE : on n'auto-attribue JAMAIS un role privilegie /
+    // managed / introuvable. Un rules_role_id/unverified_role_id mal configure
+    // (ou pointant sur un role admin sous le bot) ne doit pas donner ce role a
+    // tout arrivant qui accepte les regles / complete le screening.
+    let dangerous = serenity::all::Permissions::ADMINISTRATOR
+        | serenity::all::Permissions::MANAGE_GUILD
+        | serenity::all::Permissions::MANAGE_ROLES
+        | serenity::all::Permissions::MANAGE_CHANNELS
+        | serenity::all::Permissions::MANAGE_WEBHOOKS
+        | serenity::all::Permissions::BAN_MEMBERS
+        | serenity::all::Permissions::KICK_MEMBERS
+        | serenity::all::Permissions::MODERATE_MEMBERS
+        | serenity::all::Permissions::MANAGE_MESSAGES
+        | serenity::all::Permissions::MENTION_EVERYONE
+        | serenity::all::Permissions::MANAGE_NICKNAMES
+        | serenity::all::Permissions::MANAGE_THREADS
+        | serenity::all::Permissions::MANAGE_EVENTS;
+
     let mut assigned = 0usize;
     for role_id in &role_ids {
+        let safe = ctx
+            .cache
+            .guild(guild_id)
+            .map(|g| match g.roles.get(role_id) {
+                Some(r) => !r.managed && (r.permissions & dangerous).is_empty(),
+                None => false,
+            })
+            .unwrap_or(false);
+        if !safe {
+            warn!(role = %role_id, "Refus auto-attribution d'un role privilegie/introuvable (welcome)");
+            continue;
+        }
         match ctx
             .http
             .add_member_role(guild_id, user_id, *role_id, Some("Reglement accepte"))

@@ -64,6 +64,13 @@ pub async fn on_modal(ctx: &Context, modal: &serenity::model::application::Modal
 /// Ecoute `welcome_rules_publish` (bouton "Publier le reglement" du dashboard)
 /// et poste le panneau de reglement avec le bouton d'acceptation.
 pub fn spawn(ctx: Context) {
+    // Garde run-once : `ready` refire a chaque reconnexion gateway -> sans garde,
+    // N consumers Redis s'accumulent (panneau de reglement publie N fois).
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static SPAWNED: AtomicBool = AtomicBool::new(false);
+    if SPAWNED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tokio::spawn(async move {
         let consumer = crate::shared::event_bus::default_consumer_name();
         crate::shared::event_bus::listen_stream_group(
