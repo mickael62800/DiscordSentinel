@@ -13,7 +13,10 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use axum::Extension;
+use sentinel_core::domain::enums::system::role::Role;
 
 /// Recompense graduee : 1er bump = base ; chaque bump suppl. de la semaine
 /// ajoute `step` ; plafonnee a `max`. `n` = Nieme bump de la semaine (>=1).
@@ -103,9 +106,21 @@ pub struct BumpRewardDto {
 /// recompense graduee de la semaine et credite le wallet.
 pub async fn record_bump(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(body): Json<RecordBumpBody>,
 ) -> Result<Json<BumpRewardDto>, ApiError> {
+    // Constater un bump et crediter est une operation du BOT (Bearer API_KEY ->
+    // Internal, bypass). Sans cette garde, tout appelant web creditait n'importe
+    // quel user de n'importe quel serveur (IDOR + creation de monnaie).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "acces reserve pour enregistrer un bump",
+    )
+    .await?;
     let provider = sanitize_provider(&body.provider);
     let cfg = state
         .bot_config_repo
@@ -125,9 +140,13 @@ pub async fn record_bump(
             vip_just_unlocked: false,
         }));
     }
-    let base = cfg_i64(&cfg, "bump_reward_base", 100).max(0);
-    let step = cfg_i64(&cfg, "bump_reward_step", 50).max(0);
-    let max = cfg_i64(&cfg, "bump_reward_max", 500).max(0);
+    // Bornes dures (anti-overflow + anti-truncation i32 sur reward_coins) : sans
+    // elles une config abusive creditait un montant colossal / faisait diverger
+    // le journal (as i32) du montant credite (i64).
+    const MAX_BUMP_REWARD: i64 = 100_000_000;
+    let base = cfg_i64(&cfg, "bump_reward_base", 100).clamp(0, MAX_BUMP_REWARD);
+    let step = cfg_i64(&cfg, "bump_reward_step", 50).clamp(0, MAX_BUMP_REWARD);
+    let max = cfg_i64(&cfg, "bump_reward_max", 500).clamp(0, MAX_BUMP_REWARD);
     // Cooldown par provider : `{provider}_cooldown_minutes`, avec repli sur
     // l'ancienne cle pour disboard (retrocompat) et 240 pour discordl.
     let cooldown_default = match provider.as_str() {
@@ -153,6 +172,44 @@ pub async fn record_bump(
             c
         }
     };
+
+    // Garde de cooldown ATOMIQUE (anti double-recompense / spam) : l'upsert de
+    // l'etat sert de CAS. On ne met a jour last_bump_at (et donc on ne recompense)
+    // QUE si le dernier bump du (guild, provider) date de plus de `cooldown`
+    // minutes. Un re-POST sur edition de l'embed Disboard, un rejeu ou un spam
+    // tombe dans la fenetre -> aucune ligne mise a jour -> pas de recompense.
+    // C'est aussi la barriere anti-TOCTOU (une seule requete atomique).
+    let slot_won: Option<String> = sqlx::query_scalar(
+        "INSERT INTO bump_guild_state (guild_id, provider, channel_id, last_bump_at, cooldown_minutes, reminder_enabled, reminder_sent, updated_at) \
+         VALUES ($1,$2,$3,NOW(),$4,$5,FALSE,NOW()) \
+         ON CONFLICT (guild_id, provider) DO UPDATE SET \
+            channel_id = EXCLUDED.channel_id, last_bump_at = NOW(), \
+            cooldown_minutes = EXCLUDED.cooldown_minutes, reminder_enabled = EXCLUDED.reminder_enabled, \
+            reminder_sent = FALSE, updated_at = NOW() \
+         WHERE bump_guild_state.last_bump_at < NOW() - make_interval(mins => $4::int) \
+         RETURNING guild_id",
+    )
+    .bind(&guild_id)
+    .bind(&provider)
+    .bind(&channel)
+    .bind(cooldown as i32)
+    .bind(reminder_enabled)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(sqlx_internal("bump state cas"))?;
+
+    if slot_won.is_none() {
+        // Bump dans la fenetre de cooldown -> doublon (edition) ou spam : on ne
+        // recompense pas (et pas de VIP/credit ci-dessous).
+        return Ok(Json(BumpRewardDto {
+            rewarded: false,
+            reward: 0,
+            weekly_count: 0,
+            new_balance: None,
+            vip_role_id: None,
+            vip_just_unlocked: false,
+        }));
+    }
 
     // Nieme bump de la semaine (fenetre glissante 7 jours).
     let week_count: i64 = sqlx::query_scalar(
@@ -204,22 +261,8 @@ pub async fn record_bump(
         None
     };
 
-    // Etat pour le rappel apres cooldown (snapshot de la config), par provider.
-    let _ = sqlx::query(
-        "INSERT INTO bump_guild_state (guild_id, provider, channel_id, last_bump_at, cooldown_minutes, reminder_enabled, reminder_sent, updated_at) \
-         VALUES ($1,$2,$3,NOW(),$4,$5,FALSE,NOW()) \
-         ON CONFLICT (guild_id, provider) DO UPDATE SET \
-            channel_id = EXCLUDED.channel_id, last_bump_at = NOW(), \
-            cooldown_minutes = EXCLUDED.cooldown_minutes, reminder_enabled = EXCLUDED.reminder_enabled, \
-            reminder_sent = FALSE, updated_at = NOW()",
-    )
-    .bind(&guild_id)
-    .bind(&provider)
-    .bind(&channel)
-    .bind(cooldown as i32)
-    .bind(reminder_enabled)
-    .execute(&state.pg_pool)
-    .await;
+    // (L'etat bump_guild_state / last_bump_at a deja ete pose atomiquement par le
+    // CAS de cooldown en amont.)
 
     // Role VIP : attribue a partir d'un seuil de bumps CUMULES (all-time).
     // Le bot fait l'ajout Discord (idempotent) ; on lui renvoie juste le role
