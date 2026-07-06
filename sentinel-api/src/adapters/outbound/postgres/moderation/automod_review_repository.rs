@@ -502,7 +502,8 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 status = 'voting', applied_action = NULL, decided_action = NULL, \
                 quorum_met = FALSE, decided_at = NULL, resolved_by_id = NULL, \
                 resolved_by_name = NULL, resolved_source = NULL, resolved_at = NULL, \
-                voting_deadline = NOW() + make_interval(hours => $2) \
+                voting_deadline = NOW() + make_interval(hours => $2), \
+                sanction_logged = (status = 'applied') \
              WHERE id = $1 AND status IN ('applied','ignored') \
              RETURNING *",
         )
