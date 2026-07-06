@@ -32,6 +32,8 @@ use crate::shared::discord_helpers::{
     component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral, require_guild_id,
 };
 
+use super::channel_manager::ActionGuard;
+use super::ChannelManagerKey;
 use super::GameApiKey;
 
 use super::api_client::{ApiClient, BlackjackGameDto, TauntEvent};
@@ -331,6 +333,26 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         .await;
         return;
     }
+
+    // Verrou in-flight : sans lui, un double-clic (ou un retry Discord) fait
+    // passer deux actions concurrentes le check owns_game -> 2 cartes pour un
+    // Hit, ou un double debit sur Double. Le guard se relache au Drop (fin de
+    // fonction, tout chemin). Si aucun ChannelManager, on ne bloque pas.
+    let _action_guard = match data.get::<ChannelManagerKey>().cloned() {
+        Some(mgr) => match ActionGuard::try_acquire(mgr, component.user.id) {
+            Some(g) => Some(g),
+            None => {
+                followup_err(
+                    ctx,
+                    component,
+                    "Une action est deja en cours, patiente une seconde.".to_string(),
+                )
+                .await;
+                return;
+            }
+        },
+        None => None,
+    };
 
     let result = match action {
         "hit" => api.hit(&game_id).await,

@@ -8,6 +8,43 @@ use serenity::model::id::{ChannelId, GuildId, UserId};
 pub struct ChannelManager {
     /// user_id -> (channel_id, guild_id, game_id, last_activity)
     active: DashMap<UserId, ActiveTable>,
+    /// Verrou in-flight par joueur : empeche le double-traitement concurrent
+    /// d'une action (Hit/Stand/Double) sur double-clic / retry Discord.
+    in_flight: DashMap<UserId, ()>,
+}
+
+/// Garde RAII du verrou d'action d'un joueur. Le verrou est relache
+/// automatiquement au Drop (fin du handler, quel que soit le chemin de sortie).
+pub struct ActionGuard {
+    mgr: std::sync::Arc<ChannelManager>,
+    user: UserId,
+}
+
+impl ActionGuard {
+    /// Tente d'acquerir le verrou d'action. Renvoie `None` si une action est
+    /// deja en cours de traitement pour ce joueur (double-clic).
+    pub fn try_acquire(mgr: std::sync::Arc<ChannelManager>, user: UserId) -> Option<Self> {
+        use dashmap::mapref::entry::Entry;
+        // Scope l'emprunt de l'entry AVANT de deplacer `mgr` dans Self.
+        let acquired = match mgr.in_flight.entry(user) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(v) => {
+                v.insert(());
+                true
+            }
+        };
+        if acquired {
+            Some(Self { mgr, user })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for ActionGuard {
+    fn drop(&mut self) {
+        self.mgr.in_flight.remove(&self.user);
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -24,6 +61,7 @@ impl ChannelManager {
     pub fn new() -> Self {
         Self {
             active: DashMap::new(),
+            in_flight: DashMap::new(),
         }
     }
 
