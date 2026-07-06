@@ -40,7 +40,9 @@ fn normalize_leet(content: &str) -> String {
             '9' => Some('g'),
             '@' => Some('a'),
             '$' => Some('s'),
-            '(' => Some('c'),
+            // NB: on NE mappe PAS '(' -> 'c' : « (on se voit ? » deviendrait
+            // « con » (faux positif tres frequent en francais). Le gain
+            // anti-contournement ne vaut pas ce faux positif.
             '+' => Some('t'),
             '|' => Some('l'),
             '*' | '.' | '_' | '-' => None, // caracteres de separation supprimes
@@ -337,7 +339,10 @@ mod tests {
     }
     #[test]
     fn normalize_parenthesis() {
-        assert_eq!(normalize_leet("(unt"), "cunt");
+        // '(' n'est plus mappe vers 'c' : « (on se voit ? » ne doit PAS devenir
+        // « con » (faux positif frequent). Compromis : on perd « (unt ».
+        assert_eq!(normalize_leet("(unt"), "(unt");
+        assert_eq!(normalize_leet("(on se voit"), "(on se voit");
     }
     #[test]
     fn normalize_separators_removed() {

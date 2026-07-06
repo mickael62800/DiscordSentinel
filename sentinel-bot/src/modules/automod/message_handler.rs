@@ -412,6 +412,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 warn!(error = %e, "Echec envoi avertissement caps");
             }
         }
+        // Le caps est traite (carte de review OU avertissement) : on ne relance
+        // PAS l'analyse IA sur le meme message (evitait un double traitement =
+        // deux cartes / double strike). Comme les branches flood/fichier suspect.
+        return;
     }
 
     // Slowmode adaptatif

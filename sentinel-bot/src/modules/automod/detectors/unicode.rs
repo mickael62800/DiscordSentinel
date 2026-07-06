@@ -27,24 +27,26 @@ pub fn detect_invisible(content: &str, max_invisible: usize) -> bool {
     count >= max_invisible
 }
 
-/// Detecte les homoglyphes (melange scripts latin + cyrillique dans le meme message).
+/// Detecte les homoglyphes : un melange latin + cyrillique DANS LE MEME MOT
+/// (usurpation type « disc<cyrillique-o>rd »). Un message bilingue legitime
+/// (mots latins ET mots cyrilliques separes, ex. « Привет guys ») n'est PAS
+/// suspect — c'est le melange intra-mot qui trahit un homoglyphe.
 pub fn detect_homoglyphs(content: &str) -> bool {
-    let mut has_latin = false;
-    let mut has_cyrillic = false;
-
-    for c in content.chars() {
-        if is_latin(c) {
-            has_latin = true;
-        } else if is_cyrillic(c) {
-            has_cyrillic = true;
+    content.split_whitespace().any(|word| {
+        let mut has_latin = false;
+        let mut has_cyrillic = false;
+        for c in word.chars() {
+            if is_latin(c) {
+                has_latin = true;
+            } else if is_cyrillic(c) {
+                has_cyrillic = true;
+            }
+            if has_latin && has_cyrillic {
+                return true;
+            }
         }
-
-        if has_latin && has_cyrillic {
-            return true;
-        }
-    }
-
-    false
+        false
+    })
 }
 
 /// Detection combinee : retourne true si l'un des checks passe.
@@ -189,6 +191,12 @@ mod tests {
         // "discord" avec le "o" en cyrillique (U+043E)
         let msg = "disc\u{043E}rd.gift/free";
         assert!(detect_homoglyphs(msg));
+    }
+
+    #[test]
+    fn homoglyph_bilingual_message_ok() {
+        // Russe + anglais dans des MOTS separes -> legitime, pas un homoglyphe.
+        assert!(!detect_homoglyphs("\u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442} guys gg"));
     }
 
     // ── Combined detect ──
