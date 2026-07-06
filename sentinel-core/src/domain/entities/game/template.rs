@@ -136,7 +136,14 @@ impl GameTemplate {
     pub fn validate_config_value(&self, key: &str, value: &str) -> Result<(), String> {
         let field = match self.find_field(key) {
             Some(f) => f,
-            None => return Ok(()),
+            // SECURITE : une cle absente du schema du template est REJETEE (avant,
+            // acceptee -> injectait n'importe quelle variable d'env dans le
+            // conteneur, ex. LD_PRELOAD / JAVA_TOOL_OPTIONS -> RCE conteneur).
+            None => {
+                return Err(format!(
+                    "'{key}': cle de configuration inconnue pour ce template"
+                ))
+            }
         };
         match field.field_type {
             ConfigFieldType::Number => {
@@ -235,9 +242,12 @@ mod tests {
     }
 
     #[test]
-    fn unknown_key_is_accepted() {
+    fn unknown_key_is_rejected() {
+        // SECURITE : une cle hors schema est refusee (avant, acceptee -> env
+        // arbitraire injecte dans le conteneur).
         let t = tmpl(vec![]);
-        assert!(t.validate_config_value("WHATEVER", "x").is_ok());
+        assert!(t.validate_config_value("WHATEVER", "x").is_err());
+        assert!(t.validate_config_value("LD_PRELOAD", "/evil.so").is_err());
     }
 
     #[test]

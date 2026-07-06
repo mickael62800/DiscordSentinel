@@ -136,6 +136,16 @@ impl AutomodReviewRepository for MockRepo {
     > {
         Ok(vec![])
     }
+    async fn expire_stale_decided(
+        &self,
+        _grace_hours: i64,
+        _l: i64,
+    ) -> Result<
+        Vec<crate::domain::entities::moderation::review::automod::ExpiredReviewCard>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
     async fn find_discussion(
         &self,
         _id: Uuid,
