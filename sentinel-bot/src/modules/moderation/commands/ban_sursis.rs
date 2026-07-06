@@ -23,6 +23,7 @@ pub const SURSIS_BAN_PREFIX: &str = "mod_sursis_ban_";
 pub fn register() -> CreateCommand {
     CreateCommand::new("ban-sursis")
         .description("Ban avec appel : le membre passe en Sursis et peut contester")
+        .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "membre", "Membre a sanctionner")
                 .required(true),
@@ -34,6 +35,13 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Garde de permission (le default_member_permissions du register est
+    // reecrivable par un admin de guilde -> on re-verifie cote code, comme /ban).
+    if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
+        reply_ephemeral(ctx, command, "❌ Permission BAN_MEMBERS requise pour /ban-sursis.").await;
+        warn!(user = %command.user.name, "Tentative /ban-sursis sans permission");
+        return;
+    }
     let Some(guild_id) = require_guild_id(ctx, command).await else {
         return;
     };

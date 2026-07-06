@@ -45,7 +45,7 @@ impl ManageSursisUseCase for ManageSursisService {
         self.repo.get(id).await
     }
 
-    async fn resolve(&self, id: Uuid, status: SursisStatus) -> Result<(), DomainError> {
+    async fn resolve(&self, id: Uuid, status: SursisStatus) -> Result<bool, DomainError> {
         self.repo.set_status(id, status).await
     }
 

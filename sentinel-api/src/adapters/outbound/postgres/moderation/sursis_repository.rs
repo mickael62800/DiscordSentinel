@@ -110,14 +110,19 @@ impl SursisRepository for PgSursisRepository {
         row.map(TryInto::try_into).transpose()
     }
 
-    async fn set_status(&self, id: Uuid, status: SursisStatus) -> Result<(), DomainError> {
-        sqlx::query("UPDATE moderation_sursis SET status = $2 WHERE id = $1")
-            .bind(id)
-            .bind(status.as_str())
-            .execute(&self.pool)
-            .await
-            .map_err(pg_err)?;
-        Ok(())
+    async fn set_status(&self, id: Uuid, status: SursisStatus) -> Result<bool, DomainError> {
+        // Garde d'etat : on ne transitionne QUE depuis 'en_sursis' (TOCTOU). Le
+        // resultat (claim) permet a l'appelant de n'agir que s'il a gagne la
+        // course -> pas de double ban / double pardon.
+        let res = sqlx::query(
+            "UPDATE moderation_sursis SET status = $2 WHERE id = $1 AND status = 'en_sursis'",
+        )
+        .bind(id)
+        .bind(status.as_str())
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(res.rows_affected() == 1)
     }
 
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Sursis>, DomainError> {

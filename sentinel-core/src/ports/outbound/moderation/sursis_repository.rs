@@ -28,7 +28,7 @@ pub trait SursisRepository: Send + Sync {
     async fn get(&self, id: Uuid) -> Result<Option<Sursis>, DomainError>;
 
     /// Fige le statut d'un sursis (gracie / banni).
-    async fn set_status(&self, id: Uuid, status: SursisStatus) -> Result<(), DomainError>;
+    async fn set_status(&self, id: Uuid, status: SursisStatus) -> Result<bool, DomainError>;
 
     /// Sursis arrives a echeance (scan worker).
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Sursis>, DomainError>;

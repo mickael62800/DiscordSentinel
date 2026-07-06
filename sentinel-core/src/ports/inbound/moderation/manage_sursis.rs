@@ -24,7 +24,7 @@ pub struct CreateSursisCommand {
 pub trait ManageSursisUseCase: Send + Sync {
     async fn create(&self, cmd: CreateSursisCommand) -> Result<Sursis, DomainError>;
     async fn get(&self, id: Uuid) -> Result<Option<Sursis>, DomainError>;
-    async fn resolve(&self, id: Uuid, status: SursisStatus) -> Result<(), DomainError>;
+    async fn resolve(&self, id: Uuid, status: SursisStatus) -> Result<bool, DomainError>;
     /// Sursis echus (worker).
     async fn list_due(&self) -> Result<Vec<Sursis>, DomainError>;
 }

@@ -1,16 +1,18 @@
 //! Handlers « ban en sursis ».
 
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::moderation::sursis::{Sursis, SursisStatus};
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::moderation::manage_sursis::CreateSursisCommand;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::application::game::worker_jobs::JobReport;
 
@@ -61,8 +63,17 @@ pub struct CreateSursisDto {
 pub async fn create_sursis(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateSursisDto>,
 ) -> Result<Json<SursisDto>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour mettre un membre en sursis",
+    )
+    .await?;
     // Delai depuis la config (parametrable), defaut 7 jours.
     let days = state
         .bot_config_repo
@@ -97,12 +108,23 @@ pub async fn create_sursis(
 pub async fn get_sursis(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<SursisDto>, ApiError> {
     let s = state
         .sursis_uc
         .get(id)
         .await?
         .ok_or_else(|| ApiError(DomainError::NotFound("Sursis introuvable".into())))?;
+    // Scope tenant : on gate sur la guilde de la ressource (pas de guild_id dans
+    // le path -> on le derive du sursis, comme resolve_review).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &s.guild_id,
+        Role::Moderator,
+        "moderator+ requis",
+    )
+    .await?;
     Ok(Json(s.into()))
 }
 
@@ -115,10 +137,25 @@ pub struct ResolveSursisDto {
 pub async fn resolve_sursis(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ResolveSursisDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let status = SursisStatus::from_str_lossy(&dto.status)
         .ok_or_else(|| ApiError(DomainError::ValidationError(format!("statut invalide : {}", dto.status))))?;
+    // Gate sur la guilde du sursis (derive de la ressource) avant de resoudre.
+    let s = state
+        .sursis_uc
+        .get(id)
+        .await?
+        .ok_or_else(|| ApiError(DomainError::NotFound("Sursis introuvable".into())))?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &s.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour resoudre un sursis",
+    )
+    .await?;
     state.sursis_uc.resolve(id, status).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -131,8 +168,21 @@ pub async fn job_sursis_expire(
     State(state): State<AppState>,
 ) -> Result<Json<JobReport>, ApiError> {
     let due = state.sursis_uc.list_due().await?;
-    let processed = due.len();
+    let mut processed = 0;
     for s in &due {
+        // Claim atomique AVANT d'agir : on ne bannit que si CE worker a bien fait
+        // la transition en_sursis -> banni. Un pardon manuel concurrent (statut
+        // != en_sursis) fait echouer le claim -> pas de ban de quelqu'un de
+        // gracie, pas de double ban sur deux runs concurrents.
+        let claimed = state
+            .sursis_uc
+            .resolve(s.id, SursisStatus::Banni)
+            .await
+            .unwrap_or(false);
+        if !claimed {
+            continue;
+        }
+        processed += 1;
         state.broadcaster.broadcast(
             "sursis_ban",
             serde_json::json!({
@@ -143,7 +193,6 @@ pub async fn job_sursis_expire(
                 "channel_id": s.channel_id,
             }),
         );
-        state.sursis_uc.resolve(s.id, SursisStatus::Banni).await?;
     }
     Ok(Json(JobReport {
         job: "sursis_expire",
