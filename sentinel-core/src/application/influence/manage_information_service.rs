@@ -215,8 +215,19 @@ impl ManageInformationUseCase for ManageInformationService {
             return Err(DomainError::Conflict("Deja revelee.".into()));
         }
 
-        // Scandale : la cible perd de la reputation.
-        let loss = self.settings(guild_id).await.scandal_reputation_loss();
+        // Scandale : la cible perd de la reputation, MODULEE par la CREDIBILITE
+        // du revelateur (sa fiabilite). Un accusateur fiable frappe fort ; un
+        // menteur notoire (fiabilite negative, deja pris en scandale) fait a
+        // peine mal. Facteur = (100 + fiabilite) borne a [50, 150] %.
+        let base_loss = self.settings(guild_id).await.scandal_reputation_loss();
+        let loss = match &self.rep_dims {
+            Some(d) => {
+                let reliability = d.get(citizen.id).await.map(|x| x.reliability).unwrap_or(0);
+                let pct = (100 + reliability).clamp(50, 150);
+                (base_loss * pct / 100).max(0)
+            }
+            None => base_loss,
+        };
         let mut new_target_reputation = None;
         if !info.target_user_id.is_empty() {
             let target = self

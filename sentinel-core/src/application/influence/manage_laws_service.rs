@@ -245,6 +245,12 @@ impl ManageLawsUseCase for ManageLawsService {
                     let label = law_effect_label(key).unwrap_or(key);
                     effect_desc = Some(format!("{label} → {v}"));
                 }
+                // Faire adopter sa loi renforce la FIABILITE de l'auteur (il a
+                // porte un texte qui a convaincu -> credible pour la suite).
+                if let Some(d) = &self.rep_dims {
+                    use crate::domain::entities::influence::reputation_dims::ReputationDim;
+                    let _ = d.adjust(law.author_id, ReputationDim::Reliability, 5).await;
+                }
             }
 
             if let Some(arch) = &self.archives {
