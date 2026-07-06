@@ -189,18 +189,18 @@ pub async fn update_announcement(
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
-    if rbac.is_some() {
-        if let Ok(existing) = state.announcements_uc.get(id).await {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &existing.guild_id,
-                Role::Admin,
-                "admin+ requis pour modifier une annonce",
-            )
-            .await?;
-        }
-    }
+    // Fail-closed : charge l'annonce (erreur DB propagee au lieu d'etre avalee)
+    // et gate toujours (check_role_for_guild bypasse en interne si pas de
+    // RoleContext = appel bot). Avant, `if let Ok` sautait la garde sur erreur DB.
+    let existing = state.announcements_uc.get(id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &existing.guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier une annonce",
+    )
+    .await?;
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
     let cmd = UpdateAnnouncementCommand {
@@ -235,27 +235,36 @@ pub async fn delete_announcement(
     rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, ApiError> {
-    if rbac.is_some() {
-        if let Ok(existing) = state.announcements_uc.get(id).await {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &existing.guild_id,
-                Role::Admin,
-                "admin+ requis pour supprimer une annonce",
-            )
-            .await?;
-        }
-    }
+    // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
+    let existing = state.announcements_uc.get(id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &existing.guild_id,
+        Role::Admin,
+        "admin+ requis pour supprimer une annonce",
+    )
+    .await?;
     state.announcements_uc.delete(id).await?;
     Ok(Json(()))
 }
 
 pub async fn get_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
     let ann = state.announcements_uc.get(id).await?;
+    // IDOR : sans garde, tout appelant lisait le contenu d'une annonce d'un autre
+    // serveur par enumeration d'UUID.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &ann.guild_id,
+        Role::Viewer,
+        "acces reserve aux membres du serveur",
+    )
+    .await?;
     Ok(single_dto(ann))
 }
 
@@ -273,35 +282,53 @@ pub async fn toggle_announcement(
     Path(id): Path<Uuid>,
     Json(dto): Json<ToggleAnnouncementDto>,
 ) -> Result<Json<bool>, ApiError> {
-    if rbac.is_some() {
-        if let Ok(existing) = state.announcements_uc.get(id).await {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &existing.guild_id,
-                Role::Admin,
-                "admin+ requis pour activer/desactiver une annonce",
-            )
-            .await?;
-        }
-    }
+    // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
+    let existing = state.announcements_uc.get(id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &existing.guild_id,
+        Role::Admin,
+        "admin+ requis pour activer/desactiver une annonce",
+    )
+    .await?;
     let new_state = state.announcements_uc.toggle(id, dto.enabled).await?;
     Ok(Json(new_state))
 }
 
 pub async fn preview_announcement(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RenderedAnnouncement>, ApiError> {
+    let ann = state.announcements_uc.get(id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &ann.guild_id,
+        Role::Viewer,
+        "acces reserve aux membres du serveur",
+    )
+    .await?;
     let rendered = state.announcements_uc.preview(id).await?;
     Ok(Json(rendered))
 }
 
 pub async fn list_runs(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
 ) -> Result<Json<Vec<AnnouncementRunDto>>, ApiError> {
+    let ann = state.announcements_uc.get(id).await?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &ann.guild_id,
+        Role::Viewer,
+        "acces reserve aux membres du serveur",
+    )
+    .await?;
     let limit = params.limit.unwrap_or(50).min(500);
     let runs = state.announcements_uc.list_runs(id, limit).await?;
     Ok(map_to_dtos(runs))
