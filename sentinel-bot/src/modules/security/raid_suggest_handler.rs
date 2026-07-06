@@ -162,6 +162,16 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
             }
         };
 
+        // F3 : la permission verifiee plus haut porte sur `component.guild_id`.
+        // On exige que le serveur cible (encode dans le custom_id) soit CELUI de
+        // l'interaction -> sinon un staff du serveur A pourrait declencher un
+        // lockdown sur le serveur B (custom_id forge/rejoue).
+        if component.guild_id != Some(guild_id) {
+            warn!(user = %component.user.name, target = %guild_id, "Confirmation anti-raid cross-serveur refusee");
+            finalize(ctx, component, "\u{26a0}\u{fe0f} Action non autorisée sur ce serveur").await;
+            return;
+        }
+
         // Applique la reponse via les managers existants (idempotents : le
         // "already active" evite les doublons).
         {

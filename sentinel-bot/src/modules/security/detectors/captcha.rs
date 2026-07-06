@@ -55,6 +55,11 @@ impl CaptchaPending {
             self.pending.remove(&(guild_id, user_id));
             return None;
         }
+        // USAGE UNIQUE (anti brute-force) : on consomme l'entree que la reponse
+        // soit bonne OU mauvaise. Sinon un self-bot cliquerait les 4 boutons et
+        // trouverait le bon en <= 4 essais garantis. Une mauvaise reponse
+        // invalide donc le captcha (le user devra en obtenir un nouveau).
+        self.pending.remove(&(guild_id, user_id));
         Some(pressed_index == correct)
     }
 
@@ -301,9 +306,11 @@ mod tests {
         let guild = GuildId::new(1);
         let user = UserId::new(42);
         pending.store(guild, user, 2);
+        // Usage unique : la 1re mauvaise reponse consomme le captcha ...
         assert_eq!(pending.verify(guild, user, 0), Some(false));
-        assert_eq!(pending.verify(guild, user, 1), Some(false));
-        assert_eq!(pending.verify(guild, user, 3), Some(false));
+        // ... les tentatives suivantes n'ont plus de captcha (anti brute-force).
+        assert_eq!(pending.verify(guild, user, 1), None);
+        assert_eq!(pending.verify(guild, user, 3), None);
     }
 
     #[test]
