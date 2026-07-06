@@ -464,12 +464,27 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     };
     let Some(base) = api(ctx).await else { return };
 
-    let _: Result<serde_json::Value, String> = base
+    let reg_result: Result<serde_json::Value, String> = base
         .post_json(
             &format!("/api/games/servers/{server_id}/registrations"),
             &serde_json::json!({ "user_id": component.user.id.to_string() }),
         )
         .await;
+    // L'API peut refuser (serveur ferme, capacite, etc.) : on ne pretend pas que
+    // l'inscription a reussi -> message ephemere et on s'arrete.
+    if let Err(e) = reg_result {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("❌ Inscription impossible : {e}"))
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
 
     // Re-fetch inscrits + serveur pour reconstruire le panneau.
     let regs: Vec<RegResp> = base
