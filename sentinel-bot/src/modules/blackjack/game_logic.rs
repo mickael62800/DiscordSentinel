@@ -146,7 +146,10 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(CommandOptionType::Integer, "mise", "Montant a miser")
                 .required(true)
-                .min_int_value(10),
+                .min_int_value(10)
+                // Borne haute : evite une mise absurde (i64::MAX) qui pourrait
+                // overflow un calcul serveur (bet*2 sur un double down, etc.).
+                .max_int_value(1_000_000_000),
         )
 }
 

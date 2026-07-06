@@ -81,7 +81,10 @@ fn starting_coins_accepts_negative() {
 fn positive_amount_accepts_gt_zero() {
     assert!(validate_positive_amount(1).is_ok());
     assert!(validate_positive_amount(1000).is_ok());
-    assert!(validate_positive_amount(i64::MAX).is_ok());
+    // Borne haute : un montant absurde (i64::MAX) est rejete (anti-overflow).
+    assert!(validate_positive_amount(i64::MAX).is_err());
+    assert!(validate_positive_amount(super::super::wallet::MAX_WALLET_AMOUNT).is_ok());
+    assert!(validate_positive_amount(super::super::wallet::MAX_WALLET_AMOUNT + 1).is_err());
 }
 
 #[test]

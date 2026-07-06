@@ -64,9 +64,16 @@ pub fn resolve_starting_coins(env_override: Option<&str>) -> i64 {
 /// Valide qu'un montant pour credit/debit/transfer est strictement positif.
 /// Regle metier : on n'accepte ni zero ni negatif (utiliser le handler
 /// specifique `reset` pour remettre a zero).
+/// Plafond metier d'une operation wallet unitaire. Empeche un montant absurde
+/// (proche de i64::MAX) qui saturerait la ligne (overflow bigint -> toutes les
+/// mutations suivantes echouent) ou dupliquerait des coins en masse.
+pub const MAX_WALLET_AMOUNT: i64 = 1_000_000_000_000; // 1e12
+
 pub fn validate_positive_amount(amount: i64) -> Result<(), &'static str> {
     if amount <= 0 {
         Err("Le montant doit etre positif")
+    } else if amount > MAX_WALLET_AMOUNT {
+        Err("Montant trop eleve")
     } else {
         Ok(())
     }
