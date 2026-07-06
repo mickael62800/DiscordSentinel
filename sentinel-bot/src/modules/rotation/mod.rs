@@ -219,6 +219,17 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
             .await;
         }
         "definir" => {
+            // F3 : `definir` attribue le role admin DIRECTEMENT (sans le flux
+            // d'approbation owner). Le reserver au proprietaire empeche un
+            // MANAGE_GUILD de s'auto-nommer admin (franchissement de privilege).
+            if owner_id(ctx, guild_id) != Some(command.user.id) {
+                return reply_cmd(
+                    ctx,
+                    command,
+                    "Seul le proprietaire du serveur peut definir directement l'administrateur.",
+                )
+                .await;
+            }
             // L'option `membre` est imbriquee dans la sous-commande `definir`.
             let target = command.data.options.first().and_then(|o| match &o.value {
                 serenity::all::CommandDataOptionValue::SubCommand(opts) => opts
@@ -456,6 +467,30 @@ fn owner_id(ctx: &Context, guild_id: GuildId) -> Option<UserId> {
     ctx.cache.guild(guild_id).map(|g| g.owner_id)
 }
 
+/// `true` si le role peut etre attribue en rotation. GARDE ANTI-ESCALADE : on
+/// refuse tout role de CONTROLE serveur (ADMINISTRATOR / MANAGE_GUILD /
+/// MANAGE_ROLES / MANAGE_WEBHOOKS -> permettraient a un membre tournant de
+/// prendre le controle de facon permanente), tout role `managed`, et `@everyone`.
+/// Un role de moderation (kick/ban/mute/manage_messages) reste autorise (c'est
+/// l'usage voulu). Un admin_role_id mal configure ne peut donc pas promouvoir un
+/// membre en admin plein serveur.
+fn role_is_safe_to_rotate(ctx: &Context, guild_id: GuildId, role_id: u64) -> bool {
+    if role_id == guild_id.get() {
+        return false; // @everyone
+    }
+    let dangerous = serenity::all::Permissions::ADMINISTRATOR
+        | serenity::all::Permissions::MANAGE_GUILD
+        | serenity::all::Permissions::MANAGE_ROLES
+        | serenity::all::Permissions::MANAGE_WEBHOOKS;
+    ctx.cache
+        .guild(guild_id)
+        .map(|g| match g.roles.get(&RoleId::new(role_id)) {
+            Some(r) => !r.managed && (r.permissions & dangerous).is_empty(),
+            None => false, // role introuvable -> refus (fail-closed)
+        })
+        .unwrap_or(false)
+}
+
 /// Applique le changement de roles (best-effort).
 async fn swap_roles(
     ctx: &Context,
@@ -469,7 +504,15 @@ async fn swap_roles(
             let _ = member.remove_role(&ctx.http, RoleId::new(r)).await;
         }
         if let Some(a) = add {
-            let _ = member.add_role(&ctx.http, RoleId::new(a)).await;
+            if role_is_safe_to_rotate(ctx, guild_id, a) {
+                let _ = member.add_role(&ctx.http, RoleId::new(a)).await;
+            } else {
+                warn!(
+                    role = a,
+                    guild = %guild_id,
+                    "Rotation: refus d'attribuer un role de controle serveur / managed / @everyone"
+                );
+            }
         }
     }
 }
