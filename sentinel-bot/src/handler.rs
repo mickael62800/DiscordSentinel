@@ -145,6 +145,19 @@ impl EventHandler for Handler {
         let guild_ids: Vec<_> = ready.guilds.iter().map(|g| g.id).collect();
         crate::command_registry::refresh_all_guilds(&ctx, &guild_ids).await;
 
+        // ── Demarrage UNIQUE (une seule fois par process) ──
+        // `ready()` refire a CHAQUE reconnexion Discord (et par shard). Tout ce
+        // qui suit — tâches de fond, consumers Redis, hydratations de caches —
+        // ne doit tourner qu'UNE fois : les caches en memoire persistent entre
+        // reconnexions, et relancer les boucles = doublons (rappels postes
+        // plusieurs fois, etc.). L'enregistrement des commandes ci-dessus, lui,
+        // reste per-ready (idempotent, resync utile apres reconnexion).
+        use std::sync::atomic::{AtomicBool, Ordering};
+        static BOOTSTRAPPED: AtomicBool = AtomicBool::new(false);
+        if BOOTSTRAPPED.swap(true, Ordering::SeqCst) {
+            return;
+        }
+
         // Listener Redis pour les events bot_enabled_changed -> re-register
         // les commandes guild a la volee quand un admin toggle on/off.
         crate::command_registry::spawn_consumer(ctx.clone());
