@@ -34,11 +34,15 @@ pub fn register() -> CreateCommand {
             "user_id",
             "ID de l'utilisateur (ex. deja parti du serveur)",
         ))
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::Integer,
-            "duration",
-            "Duree en heures (vide = permanent)",
-        ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "duration",
+                "Duree en heures (vide = permanent)",
+            )
+            .min_int_value(1)
+            .max_int_value(672), // 28 jours (plafond Discord)
+        )
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::Integer,
@@ -138,7 +142,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let is_permanent = duration_hours.is_none();
-    let duration_secs = duration_hours.map(|h| (h as u64) * 3600);
+    // Defense en profondeur (l'option est deja bornee 1..=672) : rejette les
+    // valeurs non positives et sature la multiplication.
+    let duration_secs = duration_hours
+        .and_then(|h| u64::try_from(h).ok())
+        .filter(|&h| h > 0)
+        .map(|h| h.saturating_mul(3600));
     let duration_label = if is_permanent {
         "permanent".to_string()
     } else {

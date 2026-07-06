@@ -34,11 +34,15 @@ pub fn register() -> CreateCommand {
             "user_id",
             "ID de l'utilisateur (alternative au selecteur)",
         ))
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::Integer,
-            "duration",
-            "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
-        ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "duration",
+                "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
+            )
+            .min_int_value(1)
+            .max_int_value(40320),
+        )
 }
 
 pub fn register_unmute() -> CreateCommand {
