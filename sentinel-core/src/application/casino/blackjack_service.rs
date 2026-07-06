@@ -166,10 +166,12 @@ impl BlackjackService {
                 ("push".to_string(), bet, Some(Utc::now()))
             }
             NaturalDealOutcome::PlayerBlackjack => {
-                // Blackjack naturel du joueur. On `.round()` au lieu de
-                // tronquer : pour bet=51 avec payout=1.5, le calcul donne
-                // 127.5 -> 128 (fair) au lieu de 127 (perte de 0.5 coin).
-                let payout = (bet as f64 * (1.0 + blackjack_payout)).round() as i64;
+                // Blackjack naturel : on TRONQUE (`.floor()`) au lieu d'arrondir.
+                // `.round()` arrondissait le `.5` d'une mise impaire TOUJOURS vers
+                // le haut -> +0,5 coin cree ex nihilo a chaque BJ (biais
+                // inflationniste sur le wallet partage). floor => la maison ne
+                // perd jamais, aucune creation de monnaie.
+                let payout = (bet as f64 * (1.0 + blackjack_payout)).floor() as i64;
                 ("player_blackjack".to_string(), payout, Some(Utc::now()))
             }
             NaturalDealOutcome::KeepPlaying => ("playing".to_string(), 0, None),

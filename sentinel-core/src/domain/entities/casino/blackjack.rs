@@ -7,6 +7,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+/// Plafond dur d'une mise blackjack (config). Empeche un max_bet abusif de faire
+/// deborder le calcul de payout (f64 + saturating_mul). 1e12 << i64::MAX / 4.
+pub const MAX_BLACKJACK_BET: i64 = 1_000_000_000_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
     pub rank: String,
@@ -155,14 +159,18 @@ impl BlackjackConfig {
                 "min_bet" => {
                     if let Ok(n) = v.parse::<i64>() {
                         if n > 0 {
-                            cfg.min_bet = n;
+                            cfg.min_bet = n.min(MAX_BLACKJACK_BET);
                         }
                     }
                 }
                 "max_bet" => {
                     if let Ok(n) = v.parse::<i64>() {
                         if n > 0 {
-                            cfg.max_bet = n;
+                            // Plafond dur : sans lui, un max_bet abusif (proche de
+                            // i64::MAX) faisait exploser le payout (overflow f64 +
+                            // saturating_mul -> credit ~ i64::MAX pour un debit de
+                            // 2*bet seulement).
+                            cfg.max_bet = n.min(MAX_BLACKJACK_BET);
                         }
                     }
                 }
