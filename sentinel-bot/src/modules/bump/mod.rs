@@ -412,7 +412,16 @@ fn default_provider() -> String {
 }
 
 /// Tache de fond : poste un rappel quand le cooldown de bump est ecoule.
+///
+/// Idempotent : `ready()` refire a chaque reconnexion Discord, mais on ne veut
+/// qu'UNE boucle de rappel par process (sinon chaque boucle poste le meme
+/// rappel -> doublons/triplons).
 pub fn spawn_background(ctx: Context) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
