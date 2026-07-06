@@ -67,6 +67,20 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
                 floor: Role::Admin,
             },
         );
+
+        // ── Rotation d'admin ───────────────────────────────────────────
+        // Ecrire l'etat de rotation revient a designer le detenteur d'un role
+        // privilegie -> owner-only STRICT (floor Owner, pas de descente possible).
+        // La cle etait absente du registry (fallback Owner par accident + spam de
+        // logs) ; on la fige ici pour eviter qu'une resync avec le front ("admin")
+        // ne l'abaisse a Admin -> escalade.
+        m.insert(
+            "rotation.dashboard",
+            GateDef {
+                default_role: Role::Owner,
+                floor: Role::Owner,
+            },
+        );
         m.insert(
             "db.purge.voice_channel",
             GateDef {
