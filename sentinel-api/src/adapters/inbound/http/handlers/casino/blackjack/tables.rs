@@ -19,8 +19,20 @@ use sentinel_core::domain::errors::DomainError;
 /// POST /api/blackjack/tables
 pub async fn create_table(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateTableDto>,
 ) -> Result<Json<BlackjackTable>, ApiError> {
+    // Le bot (Bearer API_KEY -> Internal) cree les tables et bypasse. Un appelant
+    // web doit etre membre du serveur cible (avant : aucune garde -> creation de
+    // tables cross-serveur / spam DB).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Viewer,
+        "membre du serveur requis pour creer une table",
+    )
+    .await?;
     use rand::seq::SliceRandom;
     use sentinel_core::domain::entities::casino::blackjack::create_deck;
     use sentinel_core::domain::entities::casino::blackjack::BLACKJACK_SHOE_DECKS;
@@ -53,6 +65,7 @@ pub async fn create_table(
 /// POST /api/blackjack/tables/{table_id}/join
 pub async fn join_table(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(table_id): Path<String>,
     Json(dto): Json<JoinTableDto>,
 ) -> Result<StatusCode, ApiError> {
@@ -66,6 +79,18 @@ pub async fn join_table(
         None => return Err(DomainError::NotFound("Table introuvable".into()).into()),
     }
     let guild_id = info.unwrap().1;
+
+    // Le bot (Internal) fait rejoindre les joueurs -> bypass. Un appelant web
+    // doit etre membre du serveur (avant : aucune garde -> ajout d'un user_id
+    // arbitraire a la table de n'importe quel serveur).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Viewer,
+        "membre du serveur requis pour rejoindre une table",
+    )
+    .await?;
 
     let current_count = state.blackjack_table_repo.count_players(&table_id).await?;
     let max_players: i64 = state
@@ -133,16 +158,17 @@ pub async fn close_table(
 ) -> Result<StatusCode, ApiError> {
     let guild_id = state.blackjack_table_repo.get_guild_id(&table_id).await?;
     if let Some(ref gid) = guild_id {
-        if rbac.is_some() {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                gid,
-                Role::Moderator,
-                "moderator+ requis pour fermer une table",
-            )
-            .await?;
-        }
+        // Fail-closed : on appelle toujours la garde (le `if rbac.is_some()`
+        // precedent la court-circuitait). check_role_for_guild bypasse en interne
+        // quand il n'y a pas de RoleContext (bot Internal).
+        check_role_for_guild(
+            &state,
+            &rbac,
+            gid,
+            Role::Moderator,
+            "moderator+ requis pour fermer une table",
+        )
+        .await?;
     }
     state.blackjack_table_repo.close(&table_id).await?;
 
