@@ -63,6 +63,13 @@ pub fn register_commands() -> Vec<CreateCommand> {
 /// manager). Best-effort : un delete qui echoue (salon deja supprime) est logge
 /// puis ignore, mais l'entree est tout de meme retiree du manager.
 pub fn spawn_background(ctx: Context) {
+    // Garde run-once : `ready` refire a chaque reconnexion gateway -> sans elle,
+    // N boucles de cleanup s'accumulent (double-delete des memes salons).
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(AFK_SCAN_INTERVAL_SECS)).await;

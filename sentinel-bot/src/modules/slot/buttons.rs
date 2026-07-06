@@ -202,6 +202,28 @@ pub async fn handle_spin_in_channel(ctx: &Context, component: &ComponentInteract
         return;
     }
 
+    // Verrou in-flight : refuse un 2e spin concurrent (double-clic pendant les
+    // ~6s d'animation -> double debit). Le guard se relache au Drop (fin de
+    // fonction, tout chemin). Sans SlotChannelManager, on ne bloque pas.
+    let _spin_guard = {
+        let mgr = {
+            let data = ctx.data.read().await;
+            data.get::<SlotChannelManagerKey>()
+                .map(std::sync::Arc::clone)
+        };
+        match mgr {
+            Some(mgr) => match super::channel_manager::SpinGuard::try_acquire(mgr, user_id) {
+                Some(g) => Some(g),
+                None => {
+                    edit_ephemeral_error(ctx, component, "Un spin est deja en cours, patiente.")
+                        .await;
+                    return;
+                }
+            },
+            None => None,
+        }
+    };
+
     let base = match get_api_client(ctx).await {
         Some(c) => c,
         None => {

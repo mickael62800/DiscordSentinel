@@ -25,6 +25,40 @@ pub struct ActiveSlotChannel {
 pub struct SlotChannelManager {
     /// user_id -> son salon slot actif (1 max par user).
     active: DashMap<UserId, ActiveSlotChannel>,
+    /// Verrou in-flight par joueur : empeche un double-clic "Tirer" de lancer
+    /// deux spins (donc deux debits) concurrents pendant l'animation.
+    in_flight: DashMap<UserId, ()>,
+}
+
+/// Garde RAII du verrou de spin d'un joueur. Relachee au Drop.
+pub struct SpinGuard {
+    mgr: std::sync::Arc<SlotChannelManager>,
+    user: UserId,
+}
+
+impl SpinGuard {
+    /// Tente d'acquerir le verrou de spin. `None` si un spin est deja en cours.
+    pub fn try_acquire(mgr: std::sync::Arc<SlotChannelManager>, user: UserId) -> Option<Self> {
+        use dashmap::mapref::entry::Entry;
+        let acquired = match mgr.in_flight.entry(user) {
+            Entry::Occupied(_) => false,
+            Entry::Vacant(v) => {
+                v.insert(());
+                true
+            }
+        };
+        if acquired {
+            Some(Self { mgr, user })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for SpinGuard {
+    fn drop(&mut self) {
+        self.mgr.in_flight.remove(&self.user);
+    }
 }
 
 impl Default for SlotChannelManager {
@@ -37,6 +71,7 @@ impl SlotChannelManager {
     pub fn new() -> Self {
         Self {
             active: DashMap::new(),
+            in_flight: DashMap::new(),
         }
     }
 
