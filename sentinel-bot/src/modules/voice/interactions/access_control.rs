@@ -208,7 +208,7 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
 
 async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
     super::defer_ephemeral(ctx, component).await;
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await
+    let Some((_voice_channel_id_check, ch)) = super::require_admin_deferred(ctx, component).await
     else {
         return;
     };
@@ -256,6 +256,36 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
     };
 
     let target_user_id = UserId::new(target_id);
+
+    // #2 : on ne peut pas expulser le PROPRIETAIRE du salon (un co-admin qui a
+    // acces au menu ne doit pas pouvoir virer l'owner).
+    if ch.owner_id == target_id.to_string() {
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Tu ne peux pas expulser le proprietaire du salon.",
+        )
+        .await;
+        return;
+    }
+    // #4 : la cible doit REELLEMENT etre dans CE salon vocal (un custom_id/select
+    // forge ne doit pas permettre de deconnecter un membre d'un autre salon du
+    // serveur).
+    let target_here = ctx
+        .cache
+        .guild(guild_id)
+        .map(|g| {
+            g.voice_states
+                .get(&target_user_id)
+                .and_then(|vs| vs.channel_id)
+                == Some(voice_channel_id)
+        })
+        .unwrap_or(false);
+    if !target_here {
+        super::respond_followup_ephemeral(ctx, component, "Ce membre n'est pas dans ton salon.")
+            .await;
+        return;
+    }
 
     match guild_id.disconnect_member(&ctx.http, target_user_id).await {
         Ok(_) => {
@@ -411,7 +441,7 @@ fn format_ban_duration(secs: u64) -> String {
 
 async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     super::defer_ephemeral(ctx, component).await;
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await
+    let Some((_voice_channel_id_check, ch)) = super::require_admin_deferred(ctx, component).await
     else {
         return;
     };
@@ -455,6 +485,34 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     };
 
     let guild_id = component.guild_id.unwrap_or_default();
+
+    // #2 : on ne bannit pas le PROPRIETAIRE du salon.
+    if ch.owner_id == target_id.to_string() {
+        super::respond_followup_ephemeral(
+            ctx,
+            component,
+            "Tu ne peux pas bannir le proprietaire du salon.",
+        )
+        .await;
+        return;
+    }
+    // #4 : la cible doit REELLEMENT etre dans CE salon (empeche un custom_id
+    // forge de deconnecter/bannir un membre d'un autre salon du serveur).
+    let target_here = ctx
+        .cache
+        .guild(guild_id)
+        .map(|g| {
+            g.voice_states
+                .get(&target_user_id)
+                .and_then(|vs| vs.channel_id)
+                == Some(voice_channel_id)
+        })
+        .unwrap_or(false);
+    if !target_here {
+        super::respond_followup_ephemeral(ctx, component, "Ce membre n'est pas dans ton salon.")
+            .await;
+        return;
+    }
 
     if let Err(e) = guild_id.disconnect_member(&ctx.http, target_user_id).await {
         tracing::warn!(error = %e, "failed to disconnect banned member");

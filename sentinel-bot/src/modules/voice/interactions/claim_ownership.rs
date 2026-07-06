@@ -45,6 +45,50 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
+    // Anti-vol de salon : on ne peut reprendre QUE (a) un salon REELLEMENT gere
+    // (present dans la map d'ownership -> pas un salon permanent arbitraire via
+    // un custom_id forge) ET (b) dont l'owner courant est ABSENT du vocal. Sinon
+    // n'importe quel membre present pourrait voler le salon d'un owner actif.
+    {
+        let data = ctx.data.read().await;
+        let current_owner = data
+            .get::<VoiceOwnerMapKey>()
+            .and_then(|m| m.get(&voice_channel_id).map(|r| *r.value()));
+        match current_owner {
+            None => {
+                drop(data);
+                super::respond_ephemeral(
+                    ctx,
+                    component,
+                    "Ce salon n'est pas un salon temporaire gere.",
+                )
+                .await;
+                return;
+            }
+            Some(owner) => {
+                let owner_present = component
+                    .guild_id
+                    .and_then(|gid| ctx.cache.guild(gid))
+                    .map(|guild| {
+                        guild.voice_states.values().any(|vs| {
+                            vs.channel_id == Some(voice_channel_id) && vs.user_id == owner
+                        })
+                    })
+                    .unwrap_or(false);
+                if owner_present {
+                    drop(data);
+                    super::respond_ephemeral(
+                        ctx,
+                        component,
+                        "Le proprietaire est toujours dans le salon — impossible de le reprendre.",
+                    )
+                    .await;
+                    return;
+                }
+            }
+        }
+    }
+
     let new_owner_name = component
         .member
         .as_ref()
