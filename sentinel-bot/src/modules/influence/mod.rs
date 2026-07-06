@@ -269,9 +269,21 @@ async fn on_law_closed(ctx: &Context, data: &serde_json::Value) {
     } else {
         format!("📜 Loi REJETÉE : {}", state.title)
     };
-    let body = format!(
+    let mut body = format!(
         "Résultat du vote : **{} pour** / **{} contre**.",
         state.pour, state.contre
     );
+    if state.funding_pour > 0 || state.funding_contre > 0 {
+        body.push_str(&format!(
+            "\nFinancement (lobbying) : Pour **{}** / Contre **{}**.",
+            state.funding_pour, state.funding_contre
+        ));
+    }
+    // Loi adoptee a effet : on annonce publiquement le changement de regle.
+    if state.status == "adoptee" {
+        if let (Some(label), Some(val)) = (&state.effect_label, state.effect_value) {
+            body.push_str(&format!("\n⚙️ **Nouvelle règle en vigueur** : {label} → **{val}**."));
+        }
+    }
     press::publish_news(ctx, guild_id, &headline, &body).await;
 }
