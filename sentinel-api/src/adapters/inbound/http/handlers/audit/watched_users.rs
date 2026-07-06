@@ -27,21 +27,48 @@ pub struct WatchedUsersQueryParams {
 
 pub async fn list_watched_users(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<WatchedUsersQueryParams>,
 ) -> Result<Json<Vec<WatchedUserResponseDto>>, ApiError> {
+    // IDOR : sans guild_id la liste est GLOBALE (tous serveurs) et les GET
+    // echappent au gate global. On exige guild_id + moderator+ scope guilde.
+    let guild_id = params.guild_id.clone().ok_or_else(|| {
+        ApiError(sentinel_core::domain::errors::DomainError::ValidationError(
+            "guild_id est obligatoire".into(),
+        ))
+    })?;
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour lister les utilisateurs surveilles",
+    )
+    .await?;
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
     let users = state
         .watched_users_uc
-        .list_watched_users(params.guild_id.as_deref(), limit, offset)
+        .list_watched_users(Some(&guild_id), limit, offset)
         .await?;
     Ok(map_to_dtos(users))
 }
 
 pub async fn get_user_dossier(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserDossierResponseDto>, ApiError> {
+    // IDOR + donnees tres sensibles (infractions, notes internes) : le dossier
+    // n'etait pas gate alors que add/remove le sont. Reserve moderator+.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour consulter un dossier de surveillance",
+    )
+    .await?;
     let dossier = state
         .watched_users_uc
         .get_user_dossier(&guild_id, &user_id)

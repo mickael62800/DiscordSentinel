@@ -2,12 +2,16 @@ use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
@@ -62,8 +66,20 @@ pub async fn create_activity(
 /// Utilise par le bot lors d'un edit pour retrouver l'ancien contenu.
 pub async fn get_by_message_id(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, message_id)): Path<(String, String)>,
 ) -> Result<Json<Option<UserActivity>>, ApiError> {
+    // Expose l'ancien contenu d'un message. Le bot (Internal) l'utilise -> bypass ;
+    // un appelant web doit etre moderateur du serveur (avant : aucune garde ->
+    // lecture de contenu cross-serveur).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis",
+    )
+    .await?;
     let activity = state
         .user_activity_repo
         .find_by_message_id(&guild_id, &message_id)
@@ -74,9 +90,20 @@ pub async fn get_by_message_id(
 /// GET /api/user-activity/{guild_id}/{user_id} — timeline d'un utilisateur
 pub async fn get_activity(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<ActivityQuery>,
 ) -> Result<Json<Vec<UserActivity>>, ApiError> {
+    // IDOR + surveillance : la timeline expose le contenu des messages d'un user
+    // arbitraire. Reserve moderator+ scope guilde.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour consulter l'activite d'un membre",
+    )
+    .await?;
     let limit = params.limit.unwrap_or(50).min(200) as i64;
     let offset = params.offset.unwrap_or(0) as i64;
 

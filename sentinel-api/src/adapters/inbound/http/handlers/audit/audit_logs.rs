@@ -7,9 +7,11 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::domain::enums::system::role::Role;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Extension;
@@ -49,6 +51,7 @@ pub async fn purge_audit_logs(
 
 pub async fn list_audit_logs(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AuditLogQueryParams>,
 ) -> Result<Json<Vec<AuditLogResponseDto>>, ApiError> {
     // Securite : guild_id obligatoire pour eviter une fuite inter-guild.
@@ -57,6 +60,18 @@ pub async fn list_audit_logs(
             "guild_id est obligatoire".into(),
         ))
     })?;
+
+    // IDOR : le gate global ne protege JAMAIS les GET -> sans cette garde, tout
+    // appelant lisait les audit logs (qui a banni/mute qui) de n'importe quel
+    // serveur en changeant guild_id. Reserve moderator+ scope guilde.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour lire les audit logs",
+    )
+    .await?;
 
     let filters = AuditLogFilters {
         event_type: params.event_type,
