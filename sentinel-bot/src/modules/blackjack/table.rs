@@ -545,13 +545,6 @@ pub(super) async fn handle_join(ctx: &Context, component: &ComponentInteraction)
 
 /// Ferme la table (supprime le channel).
 pub(super) async fn handle_close_table(ctx: &Context, component: &ComponentInteraction) {
-    let resp = CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new()
-            .content("\u{1f44b} Table fermee ! A bientot.")
-            .ephemeral(true),
-    );
-    let _ = component.create_response(&ctx.http, resp).await;
-
     let data = ctx.data.read().await;
     let mgr = match data.get::<ChannelManagerKey>() {
         Some(m) => Arc::clone(m),
@@ -560,21 +553,63 @@ pub(super) async fn handle_close_table(ctx: &Context, component: &ComponentInter
     let api = data.get::<GameApiKey>().cloned();
     drop(data);
 
-    mgr.remove(component.user.id);
-
-    // Marquer la table comme fermee en DB (sinon la row reste 'open' orpheline).
-    if let Some(api) = api {
-        match api
+    // Recupere la table pour verifier l'OWNER : seul le proprietaire peut fermer
+    // (avant, N'IMPORTE quel joueur invite supprimait le salon pour tout le
+    // monde). Sans API pas de moyen de verifier -> on refuse.
+    let table = match &api {
+        Some(api) => api
             .get_table_by_channel(&component.channel_id.to_string())
             .await
-        {
-            Ok(Some(table)) => {
-                if let Err(e) = api.close_table(&table.id).await {
-                    warn!(error = %e, table_id = %table.id, "Echec close_table API");
-                }
-            }
-            Ok(None) => {}
-            Err(e) => warn!(error = %e, "Echec lookup table by channel"),
+            .ok()
+            .flatten(),
+        None => None,
+    };
+    let Some(table) = table else {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Table introuvable.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    };
+    if table.owner_id != component.user.id.to_string() {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Seul le proprietaire de la table peut la fermer.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    let _ = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("\u{1f44b} Table fermee ! A bientot.")
+                    .ephemeral(true),
+            ),
+        )
+        .await;
+
+    // Retire l'entree via l'OWNER (le ChannelManager est indexe par owner, pas
+    // par le cliqueur -> avant, l'entree restait orpheline).
+    if let Ok(owner) = table.owner_id.parse::<u64>() {
+        mgr.remove(serenity::model::id::UserId::new(owner));
+    }
+    if let Some(api) = api {
+        if let Err(e) = api.close_table(&table.id).await {
+            warn!(error = %e, table_id = %table.id, "Echec close_table API");
         }
     }
 
@@ -583,6 +618,6 @@ pub(super) async fn handle_close_table(ctx: &Context, component: &ComponentInter
     if let Err(e) = component.channel_id.delete(&ctx.http).await {
         warn!(error = %e, "Echec suppression channel blackjack");
     } else {
-        info!(user = %component.user.name, "Table blackjack fermee par le joueur");
+        info!(user = %component.user.name, "Table blackjack fermee par le proprietaire");
     }
 }
