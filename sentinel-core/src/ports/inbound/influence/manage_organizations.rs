@@ -36,6 +36,15 @@ pub struct OrgRankEntry {
     pub collective_influence: i64,
 }
 
+/// Resultat d'une distribution de dividendes (`/org dividende`).
+#[derive(Debug, Clone)]
+pub struct DividendResult {
+    pub paid_count: i64,
+    pub per_member: i64,
+    pub total: i64,
+    pub treasury_left: i64,
+}
+
 #[async_trait]
 pub trait ManageOrganizationsUseCase: Send + Sync {
     /// Fonde une organisation : verifie le quota et le cout (debite l'Argent du
@@ -106,6 +115,17 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
 
     /// Palmares des organisations du serveur, triees par tresor de guerre.
     async fn ranking(&self, guild_id: &str) -> Result<Vec<OrgRankEntry>, DomainError>;
+
+    /// Verse `per_member` coins a CHAQUE membre depuis la tresorerie (Dirigeant+).
+    /// S'arrete quand la tresorerie est epuisee ; renvoie le nombre paye.
+    async fn distribute_dividend(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        per_member: i64,
+    ) -> Result<DividendResult, DomainError>;
 
     /// Consulte la tresorerie d'une organisation (solde + derniers mouvements).
     async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError>;

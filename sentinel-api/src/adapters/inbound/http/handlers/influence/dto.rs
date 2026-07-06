@@ -186,6 +186,29 @@ impl From<sentinel_core::ports::inbound::influence::manage_organizations::OrgRan
 }
 
 #[derive(Debug, Serialize)]
+pub struct DividendResultDto {
+    pub paid_count: i64,
+    pub per_member: i64,
+    pub total: i64,
+    pub treasury_left: i64,
+}
+
+impl From<sentinel_core::ports::inbound::influence::manage_organizations::DividendResult>
+    for DividendResultDto
+{
+    fn from(
+        r: sentinel_core::ports::inbound::influence::manage_organizations::DividendResult,
+    ) -> Self {
+        Self {
+            paid_count: r.paid_count,
+            per_member: r.per_member,
+            total: r.total,
+            treasury_left: r.treasury_left,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct TreasuryViewDto {
     pub org_name: String,
     pub balance: i64,

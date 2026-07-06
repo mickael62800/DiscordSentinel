@@ -24,4 +24,11 @@ pub trait MembershipRepository: Send + Sync {
 
     /// Nombre de membres d'une organisation.
     async fn count(&self, org_id: Uuid) -> Result<i64, DomainError>;
+
+    /// (user_id Discord, username) de chaque membre — pour crediter leurs wallets
+    /// (dividendes).
+    async fn list_member_user_ids(
+        &self,
+        org_id: Uuid,
+    ) -> Result<Vec<(String, String)>, DomainError>;
 }

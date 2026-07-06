@@ -13,7 +13,7 @@ use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_organizations::{
-    ManageOrganizationsUseCase, OrgInfo, OrgRankEntry, RolePrep,
+    DividendResult, ManageOrganizationsUseCase, OrgInfo, OrgRankEntry, RolePrep,
 };
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -428,6 +428,69 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             });
         }
         Ok(out)
+    }
+
+    async fn distribute_dividend(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        per_member: i64,
+    ) -> Result<DividendResult, DomainError> {
+        validate_positive(per_member, "Le dividende")?;
+        let org = self.require_org(guild_id, org_name).await?;
+        let settings = self.settings(guild_id).await;
+        let actor = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        let can = self
+            .memberships
+            .get(org.id, actor.id)
+            .await?
+            .map(|m| m.role.can_manage_treasury())
+            .unwrap_or(false);
+        if !can {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur et les dirigeants peuvent verser des dividendes.".into(),
+            ));
+        }
+        let Some(w) = &self.wallet else {
+            return Err(DomainError::Internal("Wallet indisponible.".into()));
+        };
+        let members = self.memberships.list_member_user_ids(org.id).await?;
+        // Chaque versement est atomique (retrait garde + credit) ; on s'arrete
+        // des que la tresorerie ne couvre plus un membre.
+        let mut paid = 0i64;
+        for (uid, _uname) in &members {
+            let bal = self
+                .orgs
+                .withdraw_treasury(org.id, guild_id, per_member, actor_user_id, actor_username)
+                .await?;
+            if bal.is_none() {
+                break;
+            }
+            if w
+                .credit(guild_id, uid, per_member, "influence-treasury", "Dividende d'organisation")
+                .await
+                .is_err()
+            {
+                let _ = self
+                    .orgs
+                    .deposit_treasury(org.id, guild_id, per_member, actor_user_id, actor_username)
+                    .await;
+                break;
+            }
+            paid += 1;
+        }
+        let treasury_left = self.orgs.get(org.id).await?.map(|o| o.treasury).unwrap_or(0);
+        Ok(DividendResult {
+            paid_count: paid,
+            per_member,
+            total: paid * per_member,
+            treasury_left,
+        })
     }
 
     async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError> {

@@ -153,6 +153,25 @@ pub fn register() -> CreateCommand {
                     .required(true),
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "dividende",
+                "Verse un montant à CHAQUE membre depuis la trésorerie (dirigeants)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::Integer,
+                    "montant",
+                    "Montant versé à chaque membre",
+                )
+                .required(true),
+            ),
+        )
         .add_option(CreateCommandOption::new(
             CommandOptionType::SubCommand,
             "classement",
@@ -277,6 +296,25 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         &format!("🔗 Relation déclarée : **{name}** → **{cible}**."),
                     )
                     .await
+                }
+                Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
+            }
+        }
+        "dividende" => {
+            let montant = option_i64(&opts, "montant").unwrap_or(0);
+            match api_client::treasury_dividend(&api, &guild_id, &name, &user_id, &username, montant)
+                .await
+            {
+                Ok(r) => {
+                    reply_ephemeral(
+                        ctx,
+                        command,
+                        &format!(
+                            "💸 Dividende de **{}** versé à **{}** membre(s) (total **{}**). Trésorerie restante : **{}** 💰",
+                            r.per_member, r.paid_count, r.total, r.treasury_left
+                        ),
+                    )
+                    .await;
                 }
                 Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
             }

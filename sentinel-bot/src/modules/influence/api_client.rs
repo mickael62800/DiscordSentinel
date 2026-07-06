@@ -249,6 +249,29 @@ pub async fn treasury_withdraw(
     .await
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DividendResult {
+    pub paid_count: i64,
+    pub per_member: i64,
+    pub total: i64,
+    pub treasury_left: i64,
+}
+
+pub async fn treasury_dividend(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    per_member: i64,
+) -> Result<DividendResult, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/treasury/dividend"),
+        &TreasuryOpBody { name, actor_user_id, actor_username, amount: per_member },
+    )
+    .await
+}
+
 #[derive(Debug, Serialize)]
 struct PayMemberBody<'a> {
     name: &'a str,

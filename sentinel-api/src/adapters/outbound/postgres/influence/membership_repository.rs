@@ -138,4 +138,18 @@ impl MembershipRepository for PgMembershipRepository {
             .await
             .map_err(pg_err)
     }
+
+    async fn list_member_user_ids(
+        &self,
+        org_id: Uuid,
+    ) -> Result<Vec<(String, String)>, DomainError> {
+        sqlx::query_as(
+            "SELECT c.user_id, c.username FROM influence_org_members m \
+             JOIN influence_citizens c ON c.id = m.citizen_id WHERE m.org_id = $1",
+        )
+        .bind(org_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)
+    }
 }

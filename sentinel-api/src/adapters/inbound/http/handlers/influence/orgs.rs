@@ -11,8 +11,8 @@ use sentinel_core::domain::errors::DomainError;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::influence::dto::{
-    OrgInfoDto, OrgMemberDto, OrgRankDto, OrganizationDto, PayMemberDto, TreasuryOpDto,
-    TreasuryViewDto,
+    DividendResultDto, OrgInfoDto, OrgMemberDto, OrgRankDto, OrganizationDto, PayMemberDto,
+    TreasuryOpDto, TreasuryViewDto,
 };
 use crate::adapters::inbound::http::state::AppState;
 
@@ -154,6 +154,25 @@ pub async fn treasury_withdraw(
         )
         .await?;
     Ok(Json(v.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/treasury/dividend — verse a chaque membre.
+pub async fn treasury_dividend(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<TreasuryOpDto>,
+) -> Result<Json<DividendResultDto>, ApiError> {
+    let r = state
+        .influence_orgs_uc
+        .distribute_dividend(
+            &guild_id,
+            &dto.name,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            dto.amount,
+        )
+        .await?;
+    Ok(Json(r.into()))
 }
 
 /// POST /api/influence/{guild_id}/orgs/treasury/pay — paie un membre.
