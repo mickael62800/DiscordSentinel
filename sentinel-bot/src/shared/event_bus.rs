@@ -143,8 +143,11 @@ where
     ensure_group(&mut conn, group).await?;
     info!(group = %group, consumer = %consumer, "Stream consumer demarre");
 
+    // Dedup des IDs deja traites (idempotence sur re-livraison / reclaim).
+    let mut seen = ProcessedIds::new(4096);
+
     // Premier passage : claim des pending laisses par un consumer precedent.
-    if let Err(e) = autoclaim_pending(&mut conn, group, consumer, &handler).await {
+    if let Err(e) = autoclaim_pending(&mut conn, group, consumer, &handler, &mut seen).await {
         warn!(error = %e, "autoclaim initial failed");
     }
 
@@ -163,16 +166,51 @@ where
         if let Some(reply) = reply {
             for key in reply.keys {
                 for entry in key.ids {
-                    process_entry(&mut conn, group, &entry, &handler).await;
+                    process_entry(&mut conn, group, &entry, &handler, &mut seen).await;
                 }
             }
         }
 
         if last_autoclaim.elapsed() >= Duration::from_secs(AUTOCLAIM_INTERVAL_SECS) {
-            if let Err(e) = autoclaim_pending(&mut conn, group, consumer, &handler).await {
+            if let Err(e) =
+                autoclaim_pending(&mut conn, group, consumer, &handler, &mut seen).await
+            {
                 warn!(error = %e, "autoclaim periodique failed");
             }
             last_autoclaim = std::time::Instant::now();
+        }
+    }
+}
+
+/// Deduplication bornee des IDs de message Redis deja traites. Un message peut
+/// etre re-livre (reclaim via XAUTOCLAIM) s'il a ete traite mais pas acke (crash
+/// reseau sur le XACK) -> sans garde, l'action du handler serait rejouee. On
+/// memorise les derniers IDs traites (FIFO borne) pour ne pas rejouer.
+struct ProcessedIds {
+    set: std::collections::HashSet<String>,
+    order: std::collections::VecDeque<String>,
+    cap: usize,
+}
+
+impl ProcessedIds {
+    fn new(cap: usize) -> Self {
+        Self {
+            set: std::collections::HashSet::new(),
+            order: std::collections::VecDeque::new(),
+            cap,
+        }
+    }
+    fn contains(&self, id: &str) -> bool {
+        self.set.contains(id)
+    }
+    fn record(&mut self, id: String) {
+        if self.set.insert(id.clone()) {
+            self.order.push_back(id);
+            if self.order.len() > self.cap {
+                if let Some(old) = self.order.pop_front() {
+                    self.set.remove(&old);
+                }
+            }
         }
     }
 }
@@ -182,14 +220,25 @@ async fn process_entry<F, Fut>(
     group: &str,
     entry: &StreamId,
     handler: &F,
+    seen: &mut ProcessedIds,
 ) where
     F: Fn(String) -> Fut + Send + Sync,
     Fut: Future<Output = ()> + Send,
 {
+    // Idempotence : un ID deja traite (re-livre car non acke) n'est PAS rejoue,
+    // on se contente de (re)acker pour vider la pending list.
+    if seen.contains(entry.id.as_str()) {
+        debug!(entry_id = %entry.id, "Entry deja traitee -> skip (idempotence)");
+        let _ = conn
+            .xack::<_, _, _, i64>(STREAM_KEY, group, &[entry.id.as_str()])
+            .await;
+        return;
+    }
     let payload = extract_payload(&entry.map);
     match payload {
         Some(s) => {
             handler(s).await;
+            seen.record(entry.id.to_string());
             if let Err(e) = conn
                 .xack::<_, _, _, i64>(STREAM_KEY, group, &[entry.id.as_str()])
                 .await
@@ -226,6 +275,7 @@ async fn autoclaim_pending<F, Fut>(
     group: &str,
     consumer: &str,
     handler: &F,
+    seen: &mut ProcessedIds,
 ) -> redis::RedisResult<()>
 where
     F: Fn(String) -> Fut + Send + Sync,
@@ -251,7 +301,7 @@ where
 
     info!(group = %group, count = claimed.len(), "Auto-claim pending entries");
     for entry in claimed {
-        process_entry(conn, group, &entry, handler).await;
+        process_entry(conn, group, &entry, handler, seen).await;
     }
     Ok(())
 }
