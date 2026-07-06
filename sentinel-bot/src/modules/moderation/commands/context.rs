@@ -29,6 +29,19 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                serenity::all::CreateInteractionResponse::Message(
+                    serenity::all::CreateInteractionResponseMessage::new()
+                        .content("❌ Permission de modération requise.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
     if let Err(e) = command
         .create_response(
             &ctx.http,
