@@ -158,7 +158,7 @@ impl ManagePetsUseCase for ManagePetsService {
         pet.happiness = clamp_gauge(pet.happiness + cmd.happiness_delta);
         pet.energy = clamp_gauge(pet.energy + cmd.energy_delta);
         if cmd.xp_gain > 0 {
-            pet.xp += cmd.xp_gain;
+            pet.xp = pet.xp.saturating_add(cmd.xp_gain);
             pet.refresh_level();
         }
         // Potion de soin : guerit la maladie.
@@ -212,10 +212,13 @@ impl ManagePetsUseCase for ManagePetsService {
                 .await?;
         }
         pet.energy = clamp_gauge(pet.energy - cmd.energy_cost);
+        // saturating_add + gain borne a >= 0 : evite l'overflow i32 (gain enorme
+        // via config) et qu'un stat_gain negatif ne devienne une baisse detournee.
+        let gain = cmd.stat_gain.max(0);
         match cmd.stat.as_str() {
-            "str" => pet.str_ += cmd.stat_gain,
-            "vit" => pet.vit += cmd.stat_gain,
-            "agi" => pet.agi += cmd.stat_gain,
+            "str" => pet.str_ = pet.str_.saturating_add(gain),
+            "vit" => pet.vit = pet.vit.saturating_add(gain),
+            "agi" => pet.agi = pet.agi.saturating_add(gain),
             _ => {
                 return Err(DomainError::ValidationError(
                     "stat invalide (str|vit|agi)".into(),
@@ -275,7 +278,16 @@ impl ManagePetsUseCase for ManagePetsService {
             ));
         }
 
-        // Recompense le visite : coins (wallet) + XP.
+        // Cooldown + compteur cote visiteur AVANT le credit : sinon, si le credit
+        // reussit puis un save echoue (target/visitor), le cooldown n'est jamais
+        // persiste et le client peut rejouer -> credit repete = coins infinis.
+        // En posant/persistant le cooldown d'abord, un rejeu est bloque avant tout
+        // credit.
+        visitor.set_cooldown("visit", now);
+        visitor.bump_daily_counter("visit", &today);
+        self.repo.save(&visitor).await?;
+
+        // Recompense la cible : coins (wallet) + XP.
         if cmd.coins_reward > 0 {
             self.wallet
                 .credit(
@@ -288,7 +300,7 @@ impl ManagePetsUseCase for ManagePetsService {
                 .await?;
         }
         if cmd.xp_reward > 0 {
-            target.xp += cmd.xp_reward;
+            target.xp = target.xp.saturating_add(cmd.xp_reward);
             target.refresh_level();
             self.repo.save(&target).await?;
         }
@@ -303,11 +315,6 @@ impl ManagePetsUseCase for ManagePetsService {
                 ),
             )
             .await;
-
-        // Cooldown + compteur cote visiteur.
-        visitor.set_cooldown("visit", now);
-        visitor.bump_daily_counter("visit", &today);
-        self.repo.save(&visitor).await?;
 
         Ok(VisitResult {
             target_name: target.name,
@@ -377,16 +384,16 @@ impl ManagePetsUseCase for ManagePetsService {
             def.elo = nl;
             att.wins += 1;
             def.losses += 1;
-            att.xp += cmd.xp_win;
-            def.xp += cmd.xp_loss;
+            att.xp = att.xp.saturating_add(cmd.xp_win.max(0));
+            def.xp = def.xp.saturating_add(cmd.xp_loss.max(0));
         } else {
             let (nw, nl) = elo_update(def.elo, att.elo, cmd.elo_k);
             def.elo = nw;
             att.elo = nl;
             att.losses += 1;
             def.wins += 1;
-            att.xp += cmd.xp_loss;
-            def.xp += cmd.xp_win;
+            att.xp = att.xp.saturating_add(cmd.xp_loss.max(0));
+            def.xp = def.xp.saturating_add(cmd.xp_win.max(0));
         }
         att.refresh_level();
         def.refresh_level();
