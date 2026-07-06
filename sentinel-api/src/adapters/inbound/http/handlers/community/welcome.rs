@@ -176,8 +176,19 @@ pub struct SaveWelcomeConfigDto {
 /// GET /api/welcome/{guild_id}
 pub async fn get_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
+    // La config expose salons de logs, roles auto, templates -> lecture reservee
+    // aux moderateurs du serveur (avant : aucun RBAC -> lecture cross-serveur).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour lire la config de bienvenue",
+    )
+    .await?;
     let config = state.welcome_config_uc.get(&guild_id).await?;
     Ok(Json(config.into()))
 }
