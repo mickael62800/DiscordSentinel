@@ -221,7 +221,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .find(|o| o.name == "nombre")
         .and_then(|o| o.value.as_i64())
         .unwrap_or(10)
-        .min(100) as u8;
+        .clamp(1, 100) as u8;
 
     let channel_id = command.channel_id;
 
@@ -352,6 +352,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // F4 : ne jamais supprimer les messages EPINGLES (contenu important, souvent
+    // des annonces) — quel que soit le mode de purge.
+    let filtered: Vec<_> = filtered.into_iter().filter(|m| !m.pinned).collect();
+
     if filtered.is_empty() {
         reply_error(ctx, command, "Aucun message correspondant trouve.").await;
         return;
@@ -460,8 +464,19 @@ async fn has_manage_messages(ctx: &Context, command: &CommandInteraction) -> boo
     match guild_id.member(&ctx.http, command.user.id).await {
         Ok(member) => {
             if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
-                let permissions = guild.member_permissions(&member);
-                permissions.manage_messages() || permissions.administrator()
+                // Permissions EFFECTIVES sur le salon de la commande (overrides de
+                // salon inclus), pas seulement au niveau serveur -> un mod prive de
+                // MANAGE_MESSAGES dans CE salon ne peut plus le purger.
+                match guild.channels.get(&command.channel_id) {
+                    Some(channel) => {
+                        let perms = guild.user_permissions_in(channel, &member);
+                        perms.manage_messages() || perms.administrator()
+                    }
+                    None => {
+                        let permissions = guild.member_permissions(&member);
+                        permissions.manage_messages() || permissions.administrator()
+                    }
+                }
             } else {
                 false
             }
@@ -511,6 +526,11 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
         let mut recent_ids: Vec<MessageId> = Vec::new();
         let mut old_ids: Vec<MessageId> = Vec::new();
         for msg in &messages {
+            // F4 : ne jamais supprimer un message epingle (l'empty_streak assure
+            // la terminaison quand il ne reste que des pins).
+            if msg.pinned {
+                continue;
+            }
             if now - msg.timestamp.unix_timestamp() < fourteen_days_secs {
                 recent_ids.push(msg.id);
             } else {
