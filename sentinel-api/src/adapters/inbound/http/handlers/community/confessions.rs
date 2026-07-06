@@ -261,7 +261,10 @@ pub async fn edit_confession(
             "public_number": c.public_number,
         }),
     );
-    Ok(single_dto(c))
+    // Redaction : mutation gardee au seuil Moderator mais l'auteur n'est visible
+    // qu'a partir d'Admin (cf. get/list) -> on redacte toujours ici (plus de
+    // desanonymisation via edit/delete).
+    Ok(Json(confession_dto(c, true)))
 }
 
 pub async fn delete_confession(
@@ -299,7 +302,8 @@ pub async fn delete_confession(
             "channel_id": &c.channel_id,
         }),
     );
-    Ok(single_dto(c))
+    // Redaction (anti-desanonymisation via delete, cf. edit).
+    Ok(Json(confession_dto(c, true)))
 }
 
 pub async fn get_confession(
@@ -428,7 +432,8 @@ pub async fn delete_reply(
             "message_id": &r.message_id,
         }),
     );
-    Ok(single_dto(r))
+    // Redaction (anti-desanonymisation via delete_reply).
+    Ok(Json(reply_dto(r, true)))
 }
 
 pub async fn list_replies(
