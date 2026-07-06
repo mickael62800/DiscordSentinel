@@ -82,9 +82,13 @@ impl From<StrikeConfigRow> for StrikeConfig {
 #[async_trait]
 impl StrikeRepository for PgStrikeRepository {
     async fn save_strike(&self, strike: &UserStrike) -> Result<(), DomainError> {
+        // ON CONFLICT (F4) : idempotence -> un seul strike par action de
+        // moderation (infraction_id). Un re-appel pour la meme action ne cree
+        // pas de second strike (pas de double escalade).
         sqlx::query(
             "INSERT INTO user_strikes (id, guild_id, user_id, reason, source, infraction_id, expires_at, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             ON CONFLICT (infraction_id) WHERE infraction_id IS NOT NULL DO NOTHING"
         )
         .bind(strike.id)
         .bind(strike.guild_id.as_str())
