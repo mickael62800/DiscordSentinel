@@ -28,11 +28,19 @@ impl FileBanQueue {
             .ok_or_else(|| DomainError::Internal(format!("chemin file invalide: {path}")))?;
         std::fs::create_dir_all(parent)
             .map_err(|e| DomainError::Internal(format!("mkdir: {e}")))?;
+        // SECURITE : la `reason` est ecrite dans une ligne TAB-separee relue par
+        // le cron hote (IFS=\t). Un `\n`/`\r`/`\t` dans `reason` injecterait une
+        // NOUVELLE ligne de ban -> on pourrait bannir une IP arbitraire (LAN/
+        // loopback) en contournant validate_bannable_ip. On neutralise ces
+        // caracteres de controle avant l'ecriture.
+        let safe_reason = reason
+            .unwrap_or("")
+            .replace(['\n', '\r', '\t'], " ");
         let line = format!(
             "{}\t{}\t{}\n",
             ip,
             chrono::Utc::now().to_rfc3339(),
-            reason.unwrap_or("")
+            safe_reason
         );
         let mut f = OpenOptions::new()
             .create(true)
