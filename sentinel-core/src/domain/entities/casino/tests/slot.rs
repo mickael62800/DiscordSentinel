@@ -335,12 +335,13 @@ fn payout_three_of_a_kind_multiplies_mise() {
 
 #[test]
 fn payout_three_of_a_kind_rounds_to_int() {
-    // 17 * 1.5 = 25.5 -> arrondi a 26
+    // 17 * 1.5 = 25.5 -> TRONQUE a 25 (.floor(), pas .round()) : la maison ne
+    // paie jamais le demi-coin -> aucune creation de monnaie.
     let outcome = SpinOutcome::ThreeOfAKind {
         symbol_index: 0,
         multiplier: 1.5,
     };
-    assert_eq!(compute_payout(17, &outcome, 0), 26);
+    assert_eq!(compute_payout(17, &outcome, 0), 25);
 }
 
 #[test]

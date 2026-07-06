@@ -128,7 +128,14 @@ pub enum SlotConfigError {
     AllWeightsZero,
     BetRangeInvalid,
     SharePctOutOfRange,
+    MultiplierOutOfRange,
 }
+
+/// Plafond dur d'une mise slot (anti-overflow du payout f64/saturating).
+pub const MAX_SLOT_BET: i64 = 1_000_000_000;
+/// Plafond dur d'un multiplicateur 3-of-a-kind (anti frappe de monnaie via
+/// config abusive : mise * mult).
+pub const MAX_SLOT_MULTIPLIER: f64 = 1000.0;
 
 impl SlotConfigError {
     pub fn as_str(&self) -> &'static str {
@@ -138,9 +145,14 @@ impl SlotConfigError {
             }
             SlotConfigError::EmptySymbols => "il faut au moins 2 symboles",
             SlotConfigError::AllWeightsZero => "la somme des poids doit etre > 0",
-            SlotConfigError::BetRangeInvalid => "min_bet > 0 et min_bet <= max_bet requis",
+            SlotConfigError::BetRangeInvalid => {
+                "min_bet > 0, min_bet <= max_bet et max_bet <= 1e9 requis"
+            }
             SlotConfigError::SharePctOutOfRange => {
                 "jackpot_pool_share_pct doit etre entre 0 et 100"
+            }
+            SlotConfigError::MultiplierOutOfRange => {
+                "chaque multiplicateur doit etre entre 0 et 1000"
             }
         }
     }
@@ -158,8 +170,16 @@ pub fn validate_slot_config(c: &SlotConfig) -> Result<(), SlotConfigError> {
     if c.weights.iter().sum::<u32>() == 0 {
         return Err(SlotConfigError::AllWeightsZero);
     }
-    if c.min_bet <= 0 || c.min_bet > c.max_bet {
+    if c.min_bet <= 0 || c.min_bet > c.max_bet || c.max_bet > MAX_SLOT_BET {
         return Err(SlotConfigError::BetRangeInvalid);
+    }
+    // Anti frappe de monnaie : un multiplicateur abusif (config) ferait exploser
+    // le payout (mise * mult -> overflow f64/saturating).
+    if c.multipliers_3x
+        .iter()
+        .any(|&m| !(0.0..=MAX_SLOT_MULTIPLIER).contains(&m))
+    {
+        return Err(SlotConfigError::MultiplierOutOfRange);
     }
     if !(0.0..=100.0).contains(&c.jackpot_pool_share_pct) {
         return Err(SlotConfigError::SharePctOutOfRange);
@@ -211,10 +231,12 @@ pub fn compute_payout(mise: i64, outcome: &SpinOutcome, current_jackpot_pool: i6
     match outcome {
         SpinOutcome::Loss => 0,
         SpinOutcome::RefundTwoOfAKind => mise,
-        SpinOutcome::ThreeOfAKind { multiplier, .. } => ((mise as f64) * multiplier).round() as i64,
+        // .floor() (pas .round()) : `.round()` half-up creait un demi-coin en
+        // faveur du joueur sur mise*mult non entier (cf. meme bug blackjack).
+        SpinOutcome::ThreeOfAKind { multiplier, .. } => ((mise as f64) * multiplier).floor() as i64,
         SpinOutcome::Jackpot { multiplier } => {
             // saturating_add : evite un wrap i64 si payout + pool depasse i64::MAX.
-            (((mise as f64) * multiplier).round() as i64).saturating_add(current_jackpot_pool)
+            (((mise as f64) * multiplier).floor() as i64).saturating_add(current_jackpot_pool)
         }
     }
 }
