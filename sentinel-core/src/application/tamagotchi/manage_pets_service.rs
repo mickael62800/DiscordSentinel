@@ -133,11 +133,24 @@ impl ManagePetsUseCase for ManagePetsService {
         }
 
         let now = Utc::now();
-        let remaining = pet.cooldown_remaining_secs(&cmd.action, now, cmd.cooldown_secs);
-        if remaining > 0 {
-            return Err(DomainError::Conflict(format!(
-                "action en cooldown ({remaining}s restantes)"
-            )));
+        // Reservation ATOMIQUE du cooldown (CAS) AVANT tout debit : bloque le
+        // double-declenchement (double-clic / rejeu / appels concurrents) au niveau
+        // DB, la ou le couple lecture+set_cooldown+save laissait une fenetre de
+        // course (deux care lisaient cooldown=0 et debitaient deux fois).
+        if cmd.cooldown_secs > 0 {
+            if !self
+                .repo
+                .try_claim_cooldown(pet.id, &cmd.action, now, cmd.cooldown_secs)
+                .await?
+            {
+                let remaining = pet.cooldown_remaining_secs(&cmd.action, now, cmd.cooldown_secs);
+                return Err(DomainError::Conflict(format!(
+                    "action en cooldown ({remaining}s restantes)"
+                )));
+            }
+            // Sync in-memory : le save() final reecrit tout p.cooldowns, il doit
+            // donc contenir le claim qu'on vient de poser (sinon il l'ecraserait).
+            pet.set_cooldown(&cmd.action, now);
         }
 
         // Debit coins (wallet partage) si l'action a un cout.
@@ -169,9 +182,8 @@ impl ManagePetsUseCase for ManagePetsService {
         if pet.hunger > 0 {
             pet.hunger_zero_since = None;
         }
-        if cmd.cooldown_secs > 0 {
-            pet.set_cooldown(&cmd.action, now);
-        }
+        // (Cooldown deja reserve atomiquement en tete via try_claim_cooldown +
+        // sync in-memory.)
 
         let saved = self.repo.save(&pet).await?;
         let _ = self
@@ -191,11 +203,19 @@ impl ManagePetsUseCase for ManagePetsService {
             return Err(DomainError::Conflict("ton compagnon est mort".into()));
         }
         let now = Utc::now();
-        let remaining = pet.cooldown_remaining_secs("train", now, cmd.cooldown_secs);
-        if remaining > 0 {
-            return Err(DomainError::Conflict(format!(
-                "entrainement en cooldown ({remaining}s restantes)"
-            )));
+        // Reservation atomique du cooldown (CAS) avant le debit (cf. care).
+        if cmd.cooldown_secs > 0 {
+            if !self
+                .repo
+                .try_claim_cooldown(pet.id, "train", now, cmd.cooldown_secs)
+                .await?
+            {
+                let remaining = pet.cooldown_remaining_secs("train", now, cmd.cooldown_secs);
+                return Err(DomainError::Conflict(format!(
+                    "entrainement en cooldown ({remaining}s restantes)"
+                )));
+            }
+            pet.set_cooldown("train", now);
         }
         if pet.energy < cmd.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
@@ -225,7 +245,7 @@ impl ManagePetsUseCase for ManagePetsService {
                 ))
             }
         }
-        pet.set_cooldown("train", now);
+        // (Cooldown "train" deja reserve atomiquement en tete + sync in-memory.)
         let saved = self.repo.save(&pet).await?;
         let _ = self
             .repo
@@ -252,8 +272,15 @@ impl ManagePetsUseCase for ManagePetsService {
             .ok_or_else(|| DomainError::Conflict("tu n'as pas de compagnon".into()))?;
 
         let now = Utc::now();
-        let remaining = visitor.cooldown_remaining_secs("visit", now, cmd.cooldown_secs);
-        if remaining > 0 {
+        // Reservation ATOMIQUE du cooldown visiteur (CAS) : bloque le rejeu/double
+        // AVANT tout credit vers la cible (le credit = creation de monnaie).
+        if cmd.cooldown_secs > 0
+            && !self
+                .repo
+                .try_claim_cooldown(visitor.id, "visit", now, cmd.cooldown_secs)
+                .await?
+        {
+            let remaining = visitor.cooldown_remaining_secs("visit", now, cmd.cooldown_secs);
             return Err(DomainError::Conflict(format!(
                 "visite en cooldown ({remaining}s restantes)"
             )));
@@ -338,11 +365,20 @@ impl ManagePetsUseCase for ManagePetsService {
             return Err(DomainError::Conflict("ton compagnon est mort".into()));
         }
         let now = Utc::now();
-        let remaining = att.cooldown_remaining_secs("combat", now, cmd.cooldown_secs);
-        if remaining > 0 {
-            return Err(DomainError::Conflict(format!(
-                "combat en cooldown ({remaining}s restantes)"
-            )));
+        // Reservation atomique du cooldown combat (CAS) : evite le farm XP/ELO par
+        // double-declenchement concurrent.
+        if cmd.cooldown_secs > 0 {
+            if !self
+                .repo
+                .try_claim_cooldown(att.id, "combat", now, cmd.cooldown_secs)
+                .await?
+            {
+                let remaining = att.cooldown_remaining_secs("combat", now, cmd.cooldown_secs);
+                return Err(DomainError::Conflict(format!(
+                    "combat en cooldown ({remaining}s restantes)"
+                )));
+            }
+            att.set_cooldown("combat", now);
         }
         if att.energy < cmd.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
@@ -397,7 +433,7 @@ impl ManagePetsUseCase for ManagePetsService {
         }
         att.refresh_level();
         def.refresh_level();
-        att.set_cooldown("combat", now);
+        // (Cooldown "combat" deja reserve atomiquement en tete + sync in-memory.)
 
         self.repo.save(&att).await?;
         self.repo.save(&def).await?;

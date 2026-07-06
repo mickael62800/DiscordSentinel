@@ -20,6 +20,19 @@ pub trait PetRepository: Send + Sync {
     /// Persiste l'etat mutable du compagnon (jauges, stats, statut, xp/level,
     /// cooldowns, timers de sante, last_decay_at).
     async fn save(&self, pet: &Pet) -> Result<Pet, DomainError>;
+    /// Reserve ATOMIQUEMENT le cooldown d'une action : pose `now` comme dernier
+    /// usage SI l'action n'est pas deja en cooldown, et renvoie `true`. Renvoie
+    /// `false` (sans rien modifier) si l'action est encore en cooldown. Sert de
+    /// garde compare-and-set contre le double-declenchement (double-clic, rejeu,
+    /// appels concurrents) : le check-and-set est indivisible cote DB, contrairement
+    /// au couple lecture `cooldown_remaining_secs` + `set_cooldown` + `save`.
+    async fn try_claim_cooldown(
+        &self,
+        pet_id: Uuid,
+        action: &str,
+        now: chrono::DateTime<chrono::Utc>,
+        cd_secs: i64,
+    ) -> Result<bool, DomainError>;
     /// Compagnons vivants a faire decroitre (job worker), pagine par curseur
     /// `id` croissant. `after_id = None` pour la premiere page ; passer le
     /// dernier id recu pour la page suivante. Tri par `id` (stable malgre les

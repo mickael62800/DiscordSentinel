@@ -195,6 +195,41 @@ impl PetRepository for PgPetRepository {
         Ok(row.into())
     }
 
+    async fn try_claim_cooldown(
+        &self,
+        pet_id: Uuid,
+        action: &str,
+        now: chrono::DateTime<chrono::Utc>,
+        cd_secs: i64,
+    ) -> Result<bool, DomainError> {
+        if cd_secs <= 0 {
+            return Ok(true);
+        }
+        // CAS atomique : pose le timestamp du cooldown UNIQUEMENT si l'action est
+        // absente OU si son dernier usage remonte a plus de `cd_secs`. RETURNING ne
+        // renvoie une ligne que si la condition passe -> claim reussi et indivisible
+        // (une seule des N requetes concurrentes gagne). `action` est bind (jamais
+        // interpole) -> pas d'injection sur la cle JSON. jsonb_exists = operateur
+        // `?` en forme fonction (evite le conflit avec le placeholder sqlx).
+        let now_str = now.to_rfc3339();
+        let claimed: Option<Uuid> = sqlx::query_scalar(
+            "UPDATE pets \
+             SET cooldowns = jsonb_set(coalesce(cooldowns, '{}'::jsonb), ARRAY[$2], to_jsonb($3::text)) \
+             WHERE id = $1 \
+               AND ( NOT jsonb_exists(coalesce(cooldowns, '{}'::jsonb), $2) \
+                     OR (cooldowns->>$2)::timestamptz <= $3::timestamptz - make_interval(secs => $4) ) \
+             RETURNING id",
+        )
+        .bind(pet_id)
+        .bind(action)
+        .bind(&now_str)
+        .bind(cd_secs as f64)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(claimed.is_some())
+    }
+
     async fn list_alive(
         &self,
         limit: i64,
