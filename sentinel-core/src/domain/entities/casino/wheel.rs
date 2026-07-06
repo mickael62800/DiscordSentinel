@@ -98,6 +98,10 @@ pub const WHEEL_CASES: &[WheelCase] = &[
 /// configuree ne doit pas pouvoir ruiner / faire exploser l economie.
 pub const WHEEL_PAYOUT_CLAMP: i64 = 50_000;
 
+/// Plafond dur d'un poids de segment. Empeche un `weight` de config abusif de
+/// faire deborder la somme cumulee u32 de `WeightedIndex::new` (-> panic/DoS).
+pub const WHEEL_WEIGHT_CLAMP: u32 = 1_000_000;
+
 /// Payout + poids d une case, editables par serveur. Les `key`/`label`
 /// restent figes dans `WHEEL_CASES` (l ordre/index fait foi).
 #[derive(Debug, Clone, PartialEq)]
@@ -147,6 +151,9 @@ impl WheelConfig {
         }
         for seg in &mut self.segments {
             seg.payout = seg.payout.clamp(-WHEEL_PAYOUT_CLAMP, WHEEL_PAYOUT_CLAMP);
+            // Borne le poids : sinon la somme cumulee u32 de WeightedIndex peut
+            // deborder -> panic sur chaque spin (DoS via config).
+            seg.weight = seg.weight.min(WHEEL_WEIGHT_CLAMP);
         }
         if self.segments.iter().map(|s| s.weight).sum::<u32>() == 0 {
             for (seg, case) in self.segments.iter_mut().zip(WHEEL_CASES) {
@@ -209,8 +216,12 @@ pub fn spin_with_rng_curses_cfg(
         // on ignore le blocage pour ne pas paniquer.
         weights = config.segments.iter().map(|s| s.weight).collect();
     }
-    let dist =
-        WeightedIndex::new(&weights).expect("WheelConfig normalise doit avoir des poids > 0");
+    let dist = WeightedIndex::new(&weights).unwrap_or_else(|_| {
+        // Poids degeneres (somme nulle ou overflow du cumul) : distribution
+        // uniforme de secours au lieu de paniquer sur chaque spin (DoS).
+        let uniform = vec![1u32; weights.len().max(1)];
+        WeightedIndex::new(&uniform).expect("distribution uniforme non vide toujours valide")
+    });
     let idx = dist.sample(rng);
     let case = WheelCase {
         key: WHEEL_CASES[idx].key,
