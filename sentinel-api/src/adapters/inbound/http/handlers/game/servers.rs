@@ -19,7 +19,7 @@ use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::game::server::CreateGameServerCommand;
 
 /// Helper : extrait le guild_id du serveur via DB et gate RBAC.
-async fn gate_server(
+pub(super) async fn gate_server(
     state: &AppState,
     rbac: &Option<Extension<RoleContext>>,
     server_id: Uuid,
@@ -95,8 +95,17 @@ pub async fn create_server(
 /// GET /api/games/{guild_id}/servers
 pub async fn list_servers(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GameServerDto>>, ApiError> {
+    check_component_role(
+        &state,
+        &rbac,
+        &guild_id,
+        "game.server.view",
+        "role insuffisant pour lister les serveurs",
+    )
+    .await?;
     let list = state.game_servers_uc.list_for_guild(&guild_id).await?;
     Ok(Json(list.into_iter().map(GameServerDto::from).collect()))
 }
@@ -104,8 +113,17 @@ pub async fn list_servers(
 /// GET /api/games/servers/{server_id}
 pub async fn get_server(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(server_id): Path<Uuid>,
 ) -> Result<Json<GameServerDetailDto>, ApiError> {
+    gate_server(
+        &state,
+        &rbac,
+        server_id,
+        "game.server.view",
+        "role insuffisant pour consulter un serveur",
+    )
+    .await?;
     let detail = state.game_servers_uc.get(server_id).await?;
     Ok(Json(detail.into()))
 }
@@ -216,9 +234,19 @@ pub struct LogsQuery {
 /// GET /api/games/servers/{server_id}/logs?lines=200
 pub async fn get_logs(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(server_id): Path<Uuid>,
     Query(q): Query<LogsQuery>,
 ) -> Result<Json<Vec<String>>, ApiError> {
+    // Les logs console peuvent contenir des secrets (RCON) et des IP joueurs.
+    gate_server(
+        &state,
+        &rbac,
+        server_id,
+        "game.server.view",
+        "role insuffisant pour consulter les logs",
+    )
+    .await?;
     let lines = q.lines.unwrap_or(200).min(1000);
     let logs = state.game_servers_uc.get_logs(server_id, lines).await?;
     Ok(Json(logs))
@@ -227,8 +255,17 @@ pub async fn get_logs(
 /// GET /api/games/servers/{server_id}/stats
 pub async fn get_stats(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(server_id): Path<Uuid>,
 ) -> Result<Json<GameServerStatsDto>, ApiError> {
+    gate_server(
+        &state,
+        &rbac,
+        server_id,
+        "game.server.view",
+        "role insuffisant pour consulter les stats",
+    )
+    .await?;
     let stats = state.game_servers_uc.get_stats(server_id).await?;
     Ok(Json(stats.into()))
 }

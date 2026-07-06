@@ -42,9 +42,18 @@ impl From<PlayerSession> for PlayerSessionDto {
 
 pub async fn list_sessions(
     State(state): State<AppState>,
+    rbac: Option<axum::Extension<crate::adapters::inbound::http::middleware::rbac::RoleContext>>,
     Path(server_id): Path<Uuid>,
     Query(q): Query<SessionsQuery>,
 ) -> Result<Json<Vec<PlayerSessionDto>>, ApiError> {
+    super::servers::gate_server(
+        &state,
+        &rbac,
+        server_id,
+        "game.session.view",
+        "role insuffisant pour consulter les sessions",
+    )
+    .await?;
     let limit = q.limit.unwrap_or(100).clamp(1, 1000);
     let offset = q.offset.unwrap_or(0).max(0);
     let list = state

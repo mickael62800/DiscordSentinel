@@ -141,6 +141,41 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
                 floor: Role::Admin,
             },
         );
+        // Lecture serveur (get/logs/stats/list) : les logs peuvent contenir des
+        // secrets (RCON) et des IP -> reserve aux moderateurs.
+        m.insert(
+            "game.server.view",
+            GateDef {
+                default_role: Role::Moderator,
+                floor: Role::Moderator,
+            },
+        );
+        // Lecture des sessions / inscriptions.
+        m.insert(
+            "game.session.view",
+            GateDef {
+                default_role: Role::Moderator,
+                floor: Role::Moderator,
+            },
+        );
+        // Gestion des inscriptions (inscrire/desinscrire cote web). L'auto-
+        // inscription du bot passe en Internal (bypass RBAC).
+        m.insert(
+            "game.session.register",
+            GateDef {
+                default_role: Role::Moderator,
+                floor: Role::Moderator,
+            },
+        );
+        // Reglages de session (role de template, salons) = potentielle escalade
+        // (assignation de role) -> Admin.
+        m.insert(
+            "game.session.settings_edit",
+            GateDef {
+                default_role: Role::Admin,
+                floor: Role::Moderator,
+            },
+        );
 
         m
     })
