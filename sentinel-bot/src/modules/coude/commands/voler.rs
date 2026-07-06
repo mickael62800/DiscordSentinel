@@ -738,6 +738,23 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
+    // CLAIM atomique de la resolution : on ne transfere les coins QUE si CE clic
+    // a gagne la course (contre le worker AFK ou un double-clic). Sinon le vol a
+    // deja ete resolu -> on sort sans re-transferer (anti double-vol).
+    if let Some(attempt_id) = attempt_id_opt {
+        if !api.mark_steal_resolved(attempt_id).await {
+            let _ = component
+                .create_followup(
+                    &ctx.http,
+                    serenity::all::CreateInteractionResponseFollowup::new()
+                        .content("Ce vol a déjà été résolu.")
+                        .ephemeral(true),
+                )
+                .await;
+            return;
+        }
+    }
+
     let (embed, taunt_events) = resolve_steal_attempt(
         api,
         &catalog_defend,

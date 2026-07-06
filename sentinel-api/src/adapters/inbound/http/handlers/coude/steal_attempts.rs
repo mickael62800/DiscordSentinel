@@ -91,13 +91,17 @@ pub async fn mark_defended(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// PATCH /api/coude/steals/{id}/resolved — le bot a fini la resolution.
-/// Marque le row resolved (etat final).
+/// PATCH /api/coude/steals/{id}/resolved — CLAIM atomique de la resolution.
+/// Renvoie `{claimed: true}` uniquement si CET appel a fait la transition vers
+/// 'resolved' (etat final). Les appelants (clic "Se defendre" ET worker AFK)
+/// s'en servent pour n'appliquer le transfert de coins QU'UNE fois : le 2e
+/// resolveur recoit claimed=false et n'effectue pas le vol -> plus de
+/// double-resolution (victime sur-drainee).
 pub async fn mark_resolved(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
-) -> Result<StatusCode, ApiError> {
-    sqlx::query(
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let res = sqlx::query(
         "UPDATE coude_steal_attempts SET status = 'resolved', resolved_at = NOW() \
          WHERE id = $1 AND status IN ('pending','defended','expired')",
     )
@@ -105,5 +109,5 @@ pub async fn mark_resolved(
     .execute(&state.pg_pool)
     .await
     .map_err(sqlx_internal("mark resolved"))?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(serde_json::json!({ "claimed": res.rows_affected() == 1 })))
 }

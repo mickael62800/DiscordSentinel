@@ -54,12 +54,20 @@ impl ApiClient {
             .await;
     }
 
-    /// Marque le row resolved apres post-resolution (idempotent).
-    /// Fire-and-forget.
-    pub async fn mark_steal_resolved(&self, attempt_id: Uuid) {
+    /// CLAIM atomique de la resolution. Renvoie `true` uniquement si CET appel a
+    /// fait la transition -> resolved (donc c'est a lui d'appliquer le transfert
+    /// de coins). `false` = deja resolu par l'autre chemin (bouton/worker) OU
+    /// echec reseau -> l'appelant NE doit PAS effectuer le vol (anti double-vol).
+    pub async fn mark_steal_resolved(&self, attempt_id: Uuid) -> bool {
         let body = serde_json::json!({});
         self.base
-            .patch_fire_and_forget(&format!("/api/coude/steals/{attempt_id}/resolved"), &body)
-            .await;
+            .patch_json::<_, serde_json::Value>(
+                &format!("/api/coude/steals/{attempt_id}/resolved"),
+                &body,
+            )
+            .await
+            .ok()
+            .and_then(|v| v.get("claimed").and_then(|c| c.as_bool()))
+            .unwrap_or(false)
     }
 }

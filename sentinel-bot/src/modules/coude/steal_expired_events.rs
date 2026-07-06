@@ -143,6 +143,13 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         }
     };
 
+    // CLAIM atomique AVANT de resoudre : si la victime a clique "Se defendre"
+    // entre-temps (ou un autre tick worker), le claim echoue et on n'applique
+    // PAS le vol AFK -> plus de double-resolution (victime sur-drainee).
+    if !api.mark_steal_resolved(attempt_id).await {
+        return;
+    }
+
     let (result_embed, taunt_events) = resolve_steal_attempt(
         api,
         &catalog,
@@ -177,6 +184,5 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         }
     }
 
-    // Marque resolved (idempotent, fire-and-forget).
-    api.mark_steal_resolved(attempt_id).await;
+    // (La resolution a deja ete claim en tete via mark_steal_resolved.)
 }
