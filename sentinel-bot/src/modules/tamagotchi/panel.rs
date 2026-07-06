@@ -17,6 +17,37 @@ use crate::shared::heartbeat::ApiClientKey;
 use super::api_client::{CareArgs, CombatArgs, PetData as PetDto, TamaApi, TrainArgs, VisitArgs};
 use super::MODULE_BOT_NAME;
 
+/// Verrou in-flight par joueur : empeche un double-clic (ou retry Discord) de
+/// lancer deux actions concurrentes (nourrir/jouer/entrainer/acheter) -> deux
+/// debits/credits. Complementaire de la garde de cooldown atomique cote serveur.
+fn action_locks() -> &'static dashmap::DashMap<u64, ()> {
+    static LOCKS: std::sync::OnceLock<dashmap::DashMap<u64, ()>> = std::sync::OnceLock::new();
+    LOCKS.get_or_init(dashmap::DashMap::new)
+}
+
+/// Garde RAII du verrou d'action d'un joueur (relachee au Drop, tout chemin).
+struct ActionGuard(u64);
+
+impl ActionGuard {
+    /// `None` si une action est deja en cours pour ce joueur.
+    fn try_acquire(user_id: u64) -> Option<Self> {
+        use dashmap::mapref::entry::Entry;
+        match action_locks().entry(user_id) {
+            Entry::Occupied(_) => None,
+            Entry::Vacant(v) => {
+                v.insert(());
+                Some(ActionGuard(user_id))
+            }
+        }
+    }
+}
+
+impl Drop for ActionGuard {
+    fn drop(&mut self) {
+        action_locks().remove(&self.0);
+    }
+}
+
 pub const PICK_PREFIX: &str = "tama_pick:";
 pub const ACT_PREFIX: &str = "tama_act:";
 pub const TRAIN_PREFIX: &str = "tama_train:";
@@ -207,6 +238,13 @@ pub async fn handle_pick(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
+    let _guard = match ActionGuard::try_acquire(component.user.id.get()) {
+        Some(g) => g,
+        None => {
+            reply_ephemeral(ctx, component, "Une action est deja en cours, patiente.").await;
+            return;
+        }
+    };
     let species = component
         .data
         .custom_id
@@ -270,6 +308,13 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
+    let _guard = match ActionGuard::try_acquire(component.user.id.get()) {
+        Some(g) => g,
+        None => {
+            reply_ephemeral(ctx, component, "Une action est deja en cours, patiente.").await;
+            return;
+        }
+    };
     let action = component
         .data
         .custom_id
@@ -383,6 +428,13 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
+    let _guard = match ActionGuard::try_acquire(component.user.id.get()) {
+        Some(g) => g,
+        None => {
+            reply_ephemeral(ctx, component, "Une action est deja en cours, patiente.").await;
+            return;
+        }
+    };
     let stat = component
         .data
         .custom_id
@@ -488,6 +540,13 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_owner(ctx, component).await {
         return;
     }
+    let _guard = match ActionGuard::try_acquire(component.user.id.get()) {
+        Some(g) => g,
+        None => {
+            reply_ephemeral(ctx, component, "Une action est deja en cours, patiente.").await;
+            return;
+        }
+    };
     let item = component
         .data
         .custom_id
