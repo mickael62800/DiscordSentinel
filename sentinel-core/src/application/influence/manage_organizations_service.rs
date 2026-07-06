@@ -5,8 +5,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::application::influence::guild_settings::InfluenceSettings;
-use crate::application::validation::validate_non_empty;
+use crate::application::validation::{validate_non_empty, validate_positive};
 use crate::domain::entities::influence::archive::RelationKind;
+use crate::domain::entities::influence::treasury::TreasuryView;
 use crate::domain::entities::influence::org_membership::{OrgMemberView, OrgRole};
 use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
@@ -405,5 +406,106 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 .await;
         }
         Ok(())
+    }
+
+    async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError> {
+        let org = self.require_org(guild_id, org_name).await?;
+        let movements = self.orgs.list_treasury_movements(org.id, 10).await?;
+        Ok(TreasuryView {
+            org_name: org.name,
+            balance: org.treasury,
+            movements,
+        })
+    }
+
+    async fn deposit_treasury(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError> {
+        validate_positive(amount, "Le don")?;
+        let org = self.require_org(guild_id, org_name).await?;
+        let settings = self.settings(guild_id).await;
+        let citizen = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        // Tout membre peut alimenter la tresorerie.
+        if self.memberships.get(org.id, citizen.id).await?.is_none() {
+            return Err(DomainError::Forbidden(
+                "Tu dois etre membre de l'organisation pour l'alimenter.".into(),
+            ));
+        }
+        let Some(w) = &self.wallet else {
+            return Err(DomainError::Internal("Wallet indisponible.".into()));
+        };
+        // Debite le membre (echoue si solde insuffisant), puis credite la
+        // tresorerie ; rembourse le membre si l'ecriture tresorerie echoue.
+        w.debit(guild_id, actor_user_id, amount, "influence-treasury", "Don a l'organisation")
+            .await?;
+        if let Err(e) = self
+            .orgs
+            .deposit_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+            .await
+        {
+            let _ = w
+                .credit(guild_id, actor_user_id, amount, "influence-treasury", "Remboursement don echoue")
+                .await;
+            return Err(e);
+        }
+        self.treasury(guild_id, org_name).await
+    }
+
+    async fn withdraw_treasury(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError> {
+        validate_positive(amount, "Le retrait")?;
+        let org = self.require_org(guild_id, org_name).await?;
+        let settings = self.settings(guild_id).await;
+        let citizen = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        // Seuls Dirigeant+ peuvent retirer/depenser.
+        let member = self.memberships.get(org.id, citizen.id).await?;
+        let can = member.map(|m| m.role.can_manage_treasury()).unwrap_or(false);
+        if !can {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur et les dirigeants peuvent retirer de la tresorerie.".into(),
+            ));
+        }
+        // Retrait GARDE cote tresorerie, puis credit du wallet ; re-depot si le
+        // credit echoue.
+        let new_bal = self
+            .orgs
+            .withdraw_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+            .await?;
+        if new_bal.is_none() {
+            return Err(DomainError::Forbidden(
+                "Tresorerie insuffisante pour ce retrait.".into(),
+            ));
+        }
+        let Some(w) = &self.wallet else {
+            return Err(DomainError::Internal("Wallet indisponible.".into()));
+        };
+        if let Err(e) = w
+            .credit(guild_id, actor_user_id, amount, "influence-treasury", "Retrait de tresorerie")
+            .await
+        {
+            let _ = self
+                .orgs
+                .deposit_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+                .await;
+            return Err(e);
+        }
+        self.treasury(guild_id, org_name).await
     }
 }

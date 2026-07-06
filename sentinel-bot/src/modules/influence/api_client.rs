@@ -161,6 +161,72 @@ pub async fn org_members(
     .await
 }
 
+#[derive(Debug, Deserialize)]
+pub struct TreasuryMovement {
+    pub kind_label: String,
+    pub amount: i64,
+    pub treasury_after: i64,
+    pub actor_username: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TreasuryView {
+    pub org_name: String,
+    pub balance: i64,
+    #[serde(default)]
+    pub movements: Vec<TreasuryMovement>,
+}
+
+#[derive(Debug, Serialize)]
+struct TreasuryOpBody<'a> {
+    name: &'a str,
+    actor_user_id: &'a str,
+    actor_username: &'a str,
+    amount: i64,
+}
+
+pub async fn get_treasury(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+) -> Result<TreasuryView, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/treasury"),
+        &OrgNameBody { name },
+    )
+    .await
+}
+
+pub async fn treasury_deposit(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    amount: i64,
+) -> Result<TreasuryView, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/treasury/deposit"),
+        &TreasuryOpBody { name, actor_user_id, actor_username, amount },
+    )
+    .await
+}
+
+pub async fn treasury_withdraw(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    amount: i64,
+) -> Result<TreasuryView, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/treasury/withdraw"),
+        &TreasuryOpBody { name, actor_user_id, actor_username, amount },
+    )
+    .await
+}
+
 /// POST /api/influence/{guild}/profile
 pub async fn view_profile(
     api: &BaseApiClient,

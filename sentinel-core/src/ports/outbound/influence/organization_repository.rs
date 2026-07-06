@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::influence::organization::Organization;
+use crate::domain::entities::influence::treasury::TreasuryMovement;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 
@@ -42,4 +43,34 @@ pub trait OrganizationRepository: Send + Sync {
 
     /// Discord user_id du fondateur d'une organisation (JOIN citizens).
     async fn founder_user_id(&self, org_id: Uuid) -> Result<Option<String>, DomainError>;
+
+    /// Incremente la tresorerie (depot) + enregistre le mouvement. Renvoie le
+    /// nouveau solde.
+    async fn deposit_treasury(
+        &self,
+        org_id: Uuid,
+        guild_id: &str,
+        amount: i64,
+        actor_user_id: &str,
+        actor_username: &str,
+    ) -> Result<i64, DomainError>;
+
+    /// Decremente la tresorerie (retrait) de facon GARDEE (`treasury >= amount`)
+    /// + enregistre le mouvement. `None` si solde insuffisant. Renvoie le
+    /// nouveau solde.
+    async fn withdraw_treasury(
+        &self,
+        org_id: Uuid,
+        guild_id: &str,
+        amount: i64,
+        actor_user_id: &str,
+        actor_username: &str,
+    ) -> Result<Option<i64>, DomainError>;
+
+    /// Derniers mouvements de tresorerie (plus recents d'abord).
+    async fn list_treasury_movements(
+        &self,
+        org_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<TreasuryMovement>, DomainError>;
 }

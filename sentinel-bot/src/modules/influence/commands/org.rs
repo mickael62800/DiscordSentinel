@@ -93,6 +93,47 @@ pub fn register() -> CreateCommand {
                     .add_string_choice("Boycott", "boycott"),
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "tresorerie",
+                "Consulte la trésorerie d'une organisation",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Organisation")
+                    .required(true),
+            ),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "don",
+                "Reverse des coins à la trésorerie de ton organisation",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::Integer, "montant", "Montant à reverser")
+                    .required(true),
+            ),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "retrait",
+                "Retire des coins de la trésorerie (dirigeants)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::Integer, "montant", "Montant à retirer")
+                    .required(true),
+            ),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -216,8 +257,71 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
             }
         }
+        "tresorerie" => match api_client::get_treasury(&api, &guild_id, &name).await {
+            Ok(v) => reply_ephemeral_embed(ctx, command, treasury_embed(&v)).await,
+            Err(e) => reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await,
+        },
+        "don" => {
+            let montant = option_i64(&opts, "montant").unwrap_or(0);
+            match api_client::treasury_deposit(&api, &guild_id, &name, &user_id, &username, montant)
+                .await
+            {
+                Ok(v) => {
+                    let embed = treasury_embed(&v).title(format!(
+                        "💰 +{montant} versés à {}",
+                        v.org_name
+                    ));
+                    reply_ephemeral_embed(ctx, command, embed).await;
+                }
+                Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
+            }
+        }
+        "retrait" => {
+            let montant = option_i64(&opts, "montant").unwrap_or(0);
+            match api_client::treasury_withdraw(&api, &guild_id, &name, &user_id, &username, montant)
+                .await
+            {
+                Ok(v) => {
+                    let embed = treasury_embed(&v)
+                        .title(format!("💸 -{montant} retirés de {}", v.org_name));
+                    reply_ephemeral_embed(ctx, command, embed).await;
+                }
+                Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
+            }
+        }
         _ => {}
     }
+}
+
+/// Extrait une option entiere.
+fn option_i64(opts: &[serenity::all::CommandDataOption], key: &str) -> Option<i64> {
+    opts.iter().find(|o| o.name == key).and_then(|o| match &o.value {
+        CommandDataOptionValue::Integer(i) => Some(*i),
+        _ => None,
+    })
+}
+
+/// Embed de trésorerie (solde + derniers mouvements).
+fn treasury_embed(v: &api_client::TreasuryView) -> CreateEmbed {
+    let movements = if v.movements.is_empty() {
+        "*Aucun mouvement.*".to_string()
+    } else {
+        v.movements
+            .iter()
+            .map(|m| {
+                format!(
+                    "• {} **{}** par {} — solde {}",
+                    m.kind_label, m.amount, m.actor_username, m.treasury_after
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    CreateEmbed::new()
+        .title(format!("🏦 Trésorerie de {}", v.org_name))
+        .color(0x8E44AD)
+        .field("Solde", format!("**{}** 💰", v.balance), false)
+        .field("Derniers mouvements", movements, false)
 }
 
 fn info_embed(o: &api_client::OrgInfo) -> CreateEmbed {

@@ -1,7 +1,7 @@
 //! DTOs HTTP du jeu Influence.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::influence::org_membership::OrgMemberView;
@@ -118,6 +118,52 @@ impl From<OrgInfo> for OrgInfoDto {
                     other: r.other_org_name,
                     relation: r.relation.label().to_string(),
                     emoji: r.relation.emoji().to_string(),
+                })
+                .collect(),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TreasuryOpDto {
+    pub name: String,
+    #[serde(default)]
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub actor_username: String,
+    pub amount: i64,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TreasuryMovementDto {
+    pub kind: String,
+    pub kind_label: String,
+    pub amount: i64,
+    pub treasury_after: i64,
+    pub actor_username: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TreasuryViewDto {
+    pub org_name: String,
+    pub balance: i64,
+    pub movements: Vec<TreasuryMovementDto>,
+}
+
+impl From<sentinel_core::domain::entities::influence::treasury::TreasuryView> for TreasuryViewDto {
+    fn from(v: sentinel_core::domain::entities::influence::treasury::TreasuryView) -> Self {
+        Self {
+            org_name: v.org_name,
+            balance: v.balance,
+            movements: v
+                .movements
+                .into_iter()
+                .map(|m| TreasuryMovementDto {
+                    kind: m.kind.as_str().to_string(),
+                    kind_label: m.kind.label().to_string(),
+                    amount: m.amount,
+                    treasury_after: m.treasury_after,
+                    actor_username: m.actor_username,
                 })
                 .collect(),
         }

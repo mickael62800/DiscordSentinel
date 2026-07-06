@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use crate::domain::entities::influence::archive::{OrgRelation, RelationKind};
 use crate::domain::entities::influence::org_membership::OrgMemberView;
 use crate::domain::entities::influence::organization::Organization;
+use crate::domain::entities::influence::treasury::TreasuryView;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 
@@ -90,4 +91,28 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         other_org_name: &str,
         relation: RelationKind,
     ) -> Result<(), DomainError>;
+
+    /// Consulte la tresorerie d'une organisation (solde + derniers mouvements).
+    async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError>;
+
+    /// Reverse des coins du wallet du membre vers la tresorerie de l'org
+    /// (tout membre). Debite le wallet, incremente la tresorerie.
+    async fn deposit_treasury(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError>;
+
+    /// Retire des coins de la tresorerie vers le wallet de l'acteur (Dirigeant+).
+    async fn withdraw_treasury(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+    ) -> Result<TreasuryView, DomainError>;
 }

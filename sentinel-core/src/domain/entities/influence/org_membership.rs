@@ -61,6 +61,12 @@ impl OrgRole {
     pub fn can_recruit(&self) -> bool {
         self.rank() <= OrgRole::Responsable.rank()
     }
+
+    /// Peut retirer/depenser la tresorerie de l'org (Dirigeant et au-dessus).
+    /// Le depot, lui, est ouvert a tout membre.
+    pub fn can_manage_treasury(&self) -> bool {
+        self.rank() <= OrgRole::Dirigeant.rank()
+    }
 }
 
 /// Un membre d'une organisation.

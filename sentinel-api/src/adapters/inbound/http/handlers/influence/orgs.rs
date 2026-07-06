@@ -11,7 +11,7 @@ use sentinel_core::domain::errors::DomainError;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::influence::dto::{
-    OrgInfoDto, OrgMemberDto, OrganizationDto,
+    OrgInfoDto, OrgMemberDto, OrganizationDto, TreasuryOpDto, TreasuryViewDto,
 };
 use crate::adapters::inbound::http::state::AppState;
 
@@ -96,6 +96,54 @@ pub async fn org_members(
 ) -> Result<Json<Vec<OrgMemberDto>>, ApiError> {
     let members = state.influence_orgs_uc.members(&guild_id, &dto.name).await?;
     Ok(Json(members.into_iter().map(Into::into).collect()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/treasury — consulte la tresorerie.
+pub async fn org_treasury(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<OrgNameDto>,
+) -> Result<Json<TreasuryViewDto>, ApiError> {
+    let v = state.influence_orgs_uc.treasury(&guild_id, &dto.name).await?;
+    Ok(Json(v.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/treasury/deposit — reverse des coins.
+pub async fn treasury_deposit(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<TreasuryOpDto>,
+) -> Result<Json<TreasuryViewDto>, ApiError> {
+    let v = state
+        .influence_orgs_uc
+        .deposit_treasury(
+            &guild_id,
+            &dto.name,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            dto.amount,
+        )
+        .await?;
+    Ok(Json(v.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/treasury/withdraw — retire des coins.
+pub async fn treasury_withdraw(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<TreasuryOpDto>,
+) -> Result<Json<TreasuryViewDto>, ApiError> {
+    let v = state
+        .influence_orgs_uc
+        .withdraw_treasury(
+            &guild_id,
+            &dto.name,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            dto.amount,
+        )
+        .await?;
+    Ok(Json(v.into()))
 }
 
 #[derive(Debug, Deserialize)]

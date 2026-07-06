@@ -6,6 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_core::domain::entities::influence::organization::Organization;
+use sentinel_core::domain::entities::influence::treasury::{TreasuryKind, TreasuryMovement};
 use sentinel_core::domain::enums::influence::organization_kind::OrganizationKind;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::influence::organization_repository::{
@@ -166,5 +167,112 @@ impl OrganizationRepository for PgOrganizationRepository {
         .await
         .map_err(pg_err)?;
         Ok(uid)
+    }
+
+    async fn deposit_treasury(
+        &self,
+        org_id: Uuid,
+        guild_id: &str,
+        amount: i64,
+        actor_user_id: &str,
+        actor_username: &str,
+    ) -> Result<i64, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let new_bal: i64 = sqlx::query_scalar(
+            "UPDATE influence_organizations SET treasury = treasury + $2 WHERE id = $1 RETURNING treasury",
+        )
+        .bind(org_id)
+        .bind(amount)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        sqlx::query(
+            "INSERT INTO influence_org_treasury_movements \
+             (guild_id, org_id, kind, amount, treasury_after, actor_user_id, actor_username) \
+             VALUES ($1, $2, 'deposit', $3, $4, $5, $6)",
+        )
+        .bind(guild_id)
+        .bind(org_id)
+        .bind(amount)
+        .bind(new_bal)
+        .bind(actor_user_id)
+        .bind(actor_username)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(new_bal)
+    }
+
+    async fn withdraw_treasury(
+        &self,
+        org_id: Uuid,
+        guild_id: &str,
+        amount: i64,
+        actor_user_id: &str,
+        actor_username: &str,
+    ) -> Result<Option<i64>, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        // Garde `treasury >= amount` : jamais de solde negatif.
+        let new_bal: Option<i64> = sqlx::query_scalar(
+            "UPDATE influence_organizations SET treasury = treasury - $2 \
+             WHERE id = $1 AND treasury >= $2 RETURNING treasury",
+        )
+        .bind(org_id)
+        .bind(amount)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        let Some(bal) = new_bal else {
+            tx.rollback().await.map_err(pg_err)?;
+            return Ok(None);
+        };
+        sqlx::query(
+            "INSERT INTO influence_org_treasury_movements \
+             (guild_id, org_id, kind, amount, treasury_after, actor_user_id, actor_username) \
+             VALUES ($1, $2, 'withdrawal', $3, $4, $5, $6)",
+        )
+        .bind(guild_id)
+        .bind(org_id)
+        .bind(amount)
+        .bind(bal)
+        .bind(actor_user_id)
+        .bind(actor_username)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(Some(bal))
+    }
+
+    async fn list_treasury_movements(
+        &self,
+        org_id: Uuid,
+        limit: i64,
+    ) -> Result<Vec<TreasuryMovement>, DomainError> {
+        let rows: Vec<(String, i64, i64, String, DateTime<Utc>)> = sqlx::query_as(
+            "SELECT kind, amount, treasury_after, actor_username, created_at \
+             FROM influence_org_treasury_movements \
+             WHERE org_id = $1 ORDER BY created_at DESC LIMIT $2",
+        )
+        .bind(org_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|(kind, amount, after, actor, created_at)| TreasuryMovement {
+                kind: if kind == "withdrawal" {
+                    TreasuryKind::Withdrawal
+                } else {
+                    TreasuryKind::Deposit
+                },
+                amount,
+                treasury_after: after,
+                actor_username: actor,
+                created_at,
+            })
+            .collect())
     }
 }

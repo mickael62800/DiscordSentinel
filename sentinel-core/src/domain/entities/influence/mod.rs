@@ -14,4 +14,5 @@ pub mod movement;
 pub mod org_membership;
 pub mod organization;
 pub mod tier;
+pub mod treasury;
 pub mod vote;
