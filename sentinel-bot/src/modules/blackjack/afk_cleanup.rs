@@ -17,6 +17,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use super::ChannelManagerKey;
+use super::GameApiKey;
 
 /// Spawn le consumer durable. Appele une seule fois au `ready`.
 pub fn spawn(ctx: Context) {
@@ -68,6 +69,28 @@ async fn handle_cleanup_event(ctx: &Context, payload_json: &str) {
             return;
         }
     };
+
+    // Remboursement AFK : la mise a ete debitee au demarrage de la partie. Si la
+    // table part en AFK sans partie resolue, on rembourse via cancel_game
+    // (idempotent cote serveur : no-op si deja terminee). Sinon la mise serait
+    // perdue seche pour le joueur.
+    {
+        let ctx_data = ctx.data.read().await;
+        let mgr = ctx_data.get::<ChannelManagerKey>().map(Arc::clone);
+        let api = ctx_data.get::<GameApiKey>().cloned();
+        drop(ctx_data);
+        if let (Some(mgr), Some(api)) = (mgr, api) {
+            if let Some((_uid, table)) = mgr.find_by_channel(channel_id) {
+                if let Some(game_id) = table.game_id {
+                    if let Err(e) = api.cancel_game(&game_id).await {
+                        // "Partie deja terminee" est attendu si elle a ete resolue
+                        // normalement -> pas un echec.
+                        tracing::debug!(error = %e, game_id, "cancel_game AFK (deja resolue ?)");
+                    }
+                }
+            }
+        }
+    }
 
     // Notification dans le channel avant suppression (best-effort)
     let embed = CreateEmbed::new()

@@ -374,6 +374,28 @@ impl ApiClient {
         }
         Ok(())
     }
+
+    /// Annule + REMBOURSE une partie encore active. Idempotent cote serveur
+    /// (SELECT ... FOR UPDATE + rejet si status terminal) -> pas de double
+    /// remboursement si la partie a deja ete resolue normalement. Utilise au
+    /// cleanup AFK pour ne pas faire perdre la mise deja debitee au joueur.
+    pub async fn cancel_game(&self, game_id: &str) -> Result<(), String> {
+        let req = self.base.client().delete(format!(
+            "{}/api/blackjack/admin/games/{}",
+            self.base.base_url(),
+            game_id
+        ));
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy)]
