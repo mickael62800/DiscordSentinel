@@ -13,6 +13,8 @@ name = "sentinel_api"
 path = "src/lib.rs"
 
 [dependencies]
+hmac = "0.12"
+sha2 = "0.10"
 # Web
 axum = { version = "0.8", features = ["macros", "multipart"] }
 tokio = { workspace = true }

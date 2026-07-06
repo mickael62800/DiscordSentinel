@@ -5,6 +5,8 @@ edition = "2021"
 description = "Bot Discord unifie DiscordSentinel — tous les modules en un seul processus"
 
 [dependencies]
+hmac = "0.12"
+sha2 = "0.10"
 sentinel-proto = { workspace = true }
 prost = { workspace = true }
 thiserror = { workspace = true }

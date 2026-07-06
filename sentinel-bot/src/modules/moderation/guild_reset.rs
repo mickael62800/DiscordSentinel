@@ -39,6 +39,21 @@ pub async fn handle_guild_reset_event(ctx: &Context, payload: &str) {
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
+    // Verification de la signature HMAC (secret = API_KEY partage bot<->api).
+    // En prod (secret non vide) un event guild_reset non signe ou mal signe est
+    // REJETE -> impossible de forcer un reset destructif en publiant sur Redis
+    // sans le secret. En dev (API_KEY vide) la signature n'est pas exigee.
+    let secret = std::env::var("API_KEY").unwrap_or_default();
+    if !secret.is_empty() {
+        let guild_id_str = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or_default();
+        let expected = sign_guild_reset(&secret, guild_id_str, unban, unmute, remove_roles);
+        let got = data.get("sig").and_then(|v| v.as_str()).unwrap_or_default();
+        if got.is_empty() || got != expected {
+            warn!(guild = %gid, "guild_reset: signature invalide ou absente -> event REJETE");
+            return;
+        }
+    }
+
     let mut role_ids: Vec<RoleId> = Vec::new();
     if let Some(q) = data
         .get("quarantine_role_id")
@@ -102,4 +117,28 @@ pub async fn handle_guild_reset_event(ctx: &Context, payload: &str) {
 
         info!(guild = %gid, "guild_reset : annulation Discord terminee");
     });
+}
+
+/// Signature HMAC-SHA256 d'un event `guild_reset` (meme format canonique que
+/// cote API). Secret vide -> signature vide.
+fn sign_guild_reset(
+    secret: &str,
+    guild_id: &str,
+    unban: bool,
+    unmute: bool,
+    remove_roles: bool,
+) -> String {
+    if secret.is_empty() {
+        return String::new();
+    }
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let msg = format!("guild_reset:{guild_id}:{unban}:{unmute}:{remove_roles}");
+    let mut mac = <Hmac<Sha256>>::new_from_slice(secret.as_bytes()).expect("cle HMAC");
+    mac.update(msg.as_bytes());
+    mac.finalize()
+        .into_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
