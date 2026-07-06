@@ -602,6 +602,8 @@ struct PrepareRoleBody<'a> {
 struct LinkRoleBody<'a> {
     org_name: &'a str,
     role_id: &'a str,
+    actor_user_id: &'a str,
+    is_moderator: bool,
 }
 
 pub async fn prepare_role(
@@ -624,10 +626,12 @@ pub async fn link_role(
     guild_id: &str,
     org_name: &str,
     role_id: &str,
+    actor_user_id: &str,
+    is_moderator: bool,
 ) -> Result<serde_json::Value, String> {
     api.post_json(
         &format!("/api/influence/{guild_id}/orgs/role/link"),
-        &LinkRoleBody { org_name, role_id },
+        &LinkRoleBody { org_name, role_id, actor_user_id, is_moderator },
     )
     .await
 }

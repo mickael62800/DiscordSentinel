@@ -299,7 +299,10 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             ));
         }
 
-        // Le fondateur paie en coins (sauf s'il agit en moderateur).
+        // Le fondateur paie en coins (sauf s'il agit en moderateur). On VALIDE
+        // seulement le solde ici ; le DEBIT reel est fait dans set_role, une fois
+        // le role Discord cree — sinon un echec/relance de creation re-debiterait
+        // a chaque tentative sans jamais poser de role.
         if is_founder && !is_moderator {
             let cost = self.settings(guild_id).await.org_role_cost();
             let balance = self.money_balance(guild_id, actor_user_id).await;
@@ -307,10 +310,6 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 return Err(DomainError::Forbidden(format!(
                     "Le role coute {cost} coins (tu en as {balance})."
                 )));
-            }
-            if let Some(w) = &self.wallet {
-                w.debit(guild_id, actor_user_id, cost, "influence", "Role d'organisation")
-                    .await?;
             }
         }
         let _ = actor_username;
@@ -326,9 +325,27 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         guild_id: &str,
         org_name: &str,
         role_id: &str,
+        actor_user_id: &str,
+        is_moderator: bool,
     ) -> Result<(), DomainError> {
         let org = self.require_org(guild_id, org_name).await?;
-        self.orgs.set_discord_role(org.id, role_id).await
+        self.orgs.set_discord_role(org.id, role_id).await?;
+
+        // Debit du fondateur (gratuit pour un modo), APRES que le role existe :
+        // c'est le seul point de paiement (best-effort ; un echec de debit ne
+        // detruit pas le role deja cree).
+        let founder_user_id = self.orgs.founder_user_id(org.id).await?.unwrap_or_default();
+        if actor_user_id == founder_user_id && !is_moderator {
+            let cost = self.settings(guild_id).await.org_role_cost();
+            if cost > 0 {
+                if let Some(w) = &self.wallet {
+                    let _ = w
+                        .debit(guild_id, actor_user_id, cost, "influence", "Role d'organisation")
+                        .await;
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn set_relation(

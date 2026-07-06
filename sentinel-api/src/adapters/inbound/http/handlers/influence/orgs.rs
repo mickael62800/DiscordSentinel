@@ -140,6 +140,10 @@ pub async fn prepare_role(
 pub struct LinkRoleDto {
     pub org_name: String,
     pub role_id: String,
+    #[serde(default)]
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub is_moderator: bool,
 }
 
 /// POST /api/influence/{guild_id}/orgs/role/link
@@ -150,7 +154,13 @@ pub async fn link_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
         .influence_orgs_uc
-        .set_role(&guild_id, &dto.org_name, &dto.role_id)
+        .set_role(
+            &guild_id,
+            &dto.org_name,
+            &dto.role_id,
+            &dto.actor_user_id,
+            dto.is_moderator,
+        )
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }

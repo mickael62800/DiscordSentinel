@@ -68,12 +68,15 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         org_name: &str,
     ) -> Result<RolePrep, DomainError>;
 
-    /// Lie le role Discord cree a l'organisation.
+    /// Lie le role Discord cree a l'organisation ET debite le fondateur (seul
+    /// point de paiement, apres creation effective du role).
     async fn set_role(
         &self,
         guild_id: &str,
         org_name: &str,
         role_id: &str,
+        actor_user_id: &str,
+        is_moderator: bool,
     ) -> Result<(), DomainError>;
 
     /// Declare une relation d'une organisation vers une autre. L'acteur doit

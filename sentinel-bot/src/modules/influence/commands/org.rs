@@ -301,8 +301,18 @@ async fn handle_role(
         }
     }
 
-    // Lie le role a l'orga en base.
-    let _ = api_client::link_role(api, guild_id, &prep.org_name, &role.id.to_string()).await;
+    // Lie le role a l'orga en base ET debite le fondateur (paiement effectif
+    // ici, une fois le role reellement cree -> pas de double debit si la
+    // creation echouait avant).
+    let _ = api_client::link_role(
+        api,
+        guild_id,
+        &prep.org_name,
+        &role.id.to_string(),
+        user_id,
+        is_moderator,
+    )
+    .await;
 
     reply_ephemeral(
         ctx,

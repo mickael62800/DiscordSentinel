@@ -39,47 +39,47 @@ impl InfluenceSettings {
 
     /// Argent de depart d'un nouveau citoyen.
     pub fn start_money(&self) -> i64 {
-        self.get_i64("influence_start_money", 1000)
+        self.get_i64("influence_start_money", 1000).max(0)
     }
 
     /// Cout de creation d'une organisation.
     pub fn org_creation_cost(&self) -> i64 {
-        self.get_i64("influence_org_creation_cost", 1000)
+        self.get_i64("influence_org_creation_cost", 1000).max(0)
     }
 
     /// Cout du role Discord d'une organisation (coins, gratuit pour un modo).
     pub fn org_role_cost(&self) -> i64 {
-        self.get_i64("influence_org_role_cost", 2000)
+        self.get_i64("influence_org_role_cost", 2000).max(0)
     }
 
     /// Nombre max d'organisations qu'un citoyen peut fonder.
     pub fn org_max_per_citizen(&self) -> i64 {
-        self.get_i64("influence_org_max_per_citizen", 3)
+        self.get_i64("influence_org_max_per_citizen", 3).max(0)
     }
 
     /// Duree du vote d'une loi (heures).
     pub fn law_debate_hours(&self) -> i64 {
-        self.get_i64("influence_law_debate_hours", 48)
+        self.get_i64("influence_law_debate_hours", 48).max(1)
     }
 
     /// Cout d'une enquete (Argent).
     pub fn investigation_cost(&self) -> i64 {
-        self.get_i64("influence_investigation_cost", 300)
+        self.get_i64("influence_investigation_cost", 300).max(0)
     }
 
     /// Duree d'une enquete (heures).
     pub fn investigation_hours(&self) -> i64 {
-        self.get_i64("influence_investigation_hours", 6)
+        self.get_i64("influence_investigation_hours", 6).max(1)
     }
 
     /// Probabilite de reussite d'une enquete (0..=100).
     pub fn investigation_success_pct(&self) -> i64 {
-        self.get_i64("influence_investigation_success_pct", 60)
+        self.get_i64("influence_investigation_success_pct", 60).clamp(0, 100)
     }
 
     /// Reputation retiree a la cible d'un scandale.
     pub fn scandal_reputation_loss(&self) -> i64 {
-        self.get_i64("influence_scandal_reputation_loss", 200)
+        self.get_i64("influence_scandal_reputation_loss", 200).max(0)
     }
 
     /// Nombre d'evenements affiches par /actu et /archives.
