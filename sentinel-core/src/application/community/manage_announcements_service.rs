@@ -65,6 +65,18 @@ impl ManageAnnouncementsService {
                 "au moins 1 channel requis".into(),
             ));
         }
+        // Bornes de taille (anti-DoS : contenu enorme x N salons x recurrence).
+        if cmd.channel_ids.len() > 25 {
+            return Err(DomainError::ValidationError("max 25 salons".into()));
+        }
+        if cmd.name.chars().count() > 100 {
+            return Err(DomainError::ValidationError("name trop long (max 100)".into()));
+        }
+        if cmd.content_text.chars().count() > 4000 {
+            return Err(DomainError::ValidationError(
+                "content_text trop long (max 4000)".into(),
+            ));
+        }
         match cmd.recurrence_type {
             RecurrenceType::Once => {
                 if cmd.scheduled_at.is_none() {
