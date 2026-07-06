@@ -1,3 +1,7 @@
+use std::collections::HashSet;
+use std::sync::Mutex;
+
+use once_cell::sync::Lazy;
 use serenity::all::{
     ComponentInteraction, Context, CreateActionRow, CreateButton, CreateInteractionResponse,
     CreateInteractionResponseMessage,
@@ -11,6 +15,32 @@ use crate::modules::tickets::api_client::{ApiClient, TicketMessage};
 
 use super::constants::*;
 use super::helpers::*;
+
+/// Verrou in-flight par salon de ticket : empeche deux fermetures concurrentes
+/// (double-clic "Valider", 2 staff simultanes) d'envoyer 2x le transcript + le
+/// DM de satisfaction et de tenter 2x la suppression du salon.
+static CLOSE_IN_PROGRESS: Lazy<Mutex<HashSet<u64>>> = Lazy::new(|| Mutex::new(HashSet::new()));
+
+struct CloseGuard {
+    channel: u64,
+}
+
+impl CloseGuard {
+    fn try_acquire(channel: u64) -> Option<Self> {
+        let mut set = CLOSE_IN_PROGRESS.lock().unwrap();
+        if set.insert(channel) {
+            Some(Self { channel })
+        } else {
+            None
+        }
+    }
+}
+
+impl Drop for CloseGuard {
+    fn drop(&mut self) {
+        CLOSE_IN_PROGRESS.lock().unwrap().remove(&self.channel);
+    }
+}
 
 /// Genere le transcript selon le format demande (text / markdown / html).
 /// markdown = format actuel (messages Discord supportent **bold** et > quote).
@@ -169,6 +199,25 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let guild_id = match component.guild_id {
         Some(id) => id,
         None => return,
+    };
+
+    // Verrou in-flight : si une fermeture de CE salon est deja en cours (double
+    // clic / 2 staff), on abandonne -> pas de transcript/DM/delete en double.
+    let _close_guard = match CloseGuard::try_acquire(component.channel_id.get()) {
+        Some(g) => g,
+        None => {
+            let _ = component
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content("Fermeture déjà en cours…")
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+            return;
+        }
     };
 
     let is_staff = match guild_id.member(&ctx.http, component.user.id).await {

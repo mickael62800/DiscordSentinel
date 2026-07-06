@@ -281,10 +281,13 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                     std::collections::HashMap::new()
                 }
             };
+            // Defaut NON nul (3) : avant, 0 = illimite -> tout membre pouvait
+            // creer des salons en boucle (spam/DoS). 0 reste possible en config
+            // explicite si un serveur veut vraiment l'illimite.
             let max_open: u64 = crate::shared::api_client::BaseApiClient::config_u64(
                 &guild_config,
                 "max_open_per_user",
-                0,
+                3,
             );
 
             if max_open > 0 {
@@ -294,9 +297,17 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                 };
                 let api = ApiClient::new(base.clone(), grpc);
                 if let Ok(tickets) = api.list_tickets().await {
+                    // Compteur scope a CE serveur (list_tickets cote bot n'est
+                    // pas scope -> sans ce filtre, on comptait les tickets de
+                    // toutes les guildes et on bloquait/comptait a tort).
+                    let guild_str = guild_id.to_string();
                     let open_count = tickets
                         .iter()
-                        .filter(|t| t.author_id == author.id.to_string() && t.status != "closed")
+                        .filter(|t| {
+                            t.author_id == author.id.to_string()
+                                && t.status != "closed"
+                                && t.server == guild_str
+                        })
                         .count() as u64;
 
                     if open_count >= max_open {

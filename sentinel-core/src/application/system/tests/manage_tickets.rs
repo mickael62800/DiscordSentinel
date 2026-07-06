@@ -63,6 +63,18 @@ impl TicketRepository for MockTicketRepo {
         Ok(())
     }
 
+    async fn close_if_open(&self, id: Uuid) -> Result<bool, DomainError> {
+        let mut tickets = self.tickets.lock().unwrap();
+        if let Some(t) = tickets.iter_mut().find(|t| t.id == id) {
+            if t.status == "closed" {
+                return Ok(false);
+            }
+            t.status = "closed".to_string();
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
     async fn update_assignee(&self, id: Uuid, assignee: &str) -> Result<(), DomainError> {
         *self.last_assignee.lock().unwrap() = Some((id, assignee.to_string()));
         Ok(())
@@ -208,11 +220,16 @@ async fn test_close_ticket() {
     let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
     let id = ticket.id.to_string();
 
-    service.close_ticket(&id).await.unwrap();
+    // Premier close : transitionne -> claimed = true.
+    assert!(service.close_ticket(&id).await.unwrap());
+    // Deuxieme close : deja ferme -> claimed = false (idempotent, anti-double).
+    assert!(!service.close_ticket(&id).await.unwrap());
 
-    let (uuid, status) = repo.last_status.lock().unwrap().clone().unwrap();
-    assert_eq!(uuid, ticket.id);
-    assert_eq!(status, "closed");
+    let tickets = repo.tickets.lock().unwrap();
+    assert_eq!(
+        tickets.iter().find(|t| t.id == ticket.id).unwrap().status,
+        "closed"
+    );
 }
 
 #[tokio::test]
@@ -281,8 +298,13 @@ async fn test_reply_ticket_on_closed_is_rejected_and_does_not_reopen() {
     assert!(matches!(err, DomainError::Conflict(_)));
 
     // Le statut reste "closed", aucun message enregistre.
-    let (_, status) = repo.last_status.lock().unwrap().clone().unwrap();
-    assert_eq!(status, "closed");
+    {
+        let tickets = repo.tickets.lock().unwrap();
+        assert_eq!(
+            tickets.iter().find(|t| t.id == ticket.id).unwrap().status,
+            "closed"
+        );
+    }
     assert_eq!(repo.messages.lock().unwrap().len(), 0);
 }
 

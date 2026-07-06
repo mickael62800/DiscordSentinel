@@ -80,9 +80,12 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             continue;
         }
 
-        // UPDATE atomique avec garde + bumps priorite a high.
+        // UPDATE atomique avec garde. On MONTE la priorite a 'high' SANS
+        // retrograder un ticket deja 'urgent' (le staff l'avait manuellement
+        // eleve) -> l'escalade ne doit jamais baisser la priorite.
         let updated = sqlx::query(
-            "UPDATE tickets SET escalated_at = NOW(), priority = 'high', updated_at = NOW() \
+            "UPDATE tickets SET escalated_at = NOW(), updated_at = NOW(), \
+                 priority = CASE WHEN priority = 'urgent' THEN 'urgent' ELSE 'high' END \
              WHERE id = $1 AND escalated_at IS NULL",
         )
         .bind(t.id)

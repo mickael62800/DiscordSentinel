@@ -27,8 +27,11 @@ pub fn build_template_select(templates: &[Template]) -> CreateActionRow {
         .take(25)
         .enumerate()
         .map(|(i, t)| {
-            let desc = if t.content.len() > 80 {
-                format!("{}...", &t.content[..77])
+            // Troncature par CARACTERES (pas par octets) : `&content[..77]`
+            // paniquait si l'octet 77 tombait au milieu d'un char multi-octets
+            // (accent/emoji) -> menu templates cassé.
+            let desc = if t.content.chars().count() > 80 {
+                format!("{}...", t.content.chars().take(77).collect::<String>())
             } else {
                 t.content.clone()
             };

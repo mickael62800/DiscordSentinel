@@ -216,6 +216,18 @@ impl TicketRepository for PgTicketRepository {
         Ok(())
     }
 
+    async fn close_if_open(&self, id: Uuid) -> Result<bool, DomainError> {
+        let res = sqlx::query(
+            "UPDATE tickets SET status = 'closed', updated_at = NOW() \
+             WHERE id = $1 AND status <> 'closed'",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(res.rows_affected() == 1)
+    }
+
     async fn update_assignee(&self, id: Uuid, assignee: &str) -> Result<(), DomainError> {
         sqlx::query("UPDATE tickets SET assigned_to = $1, updated_at = NOW() WHERE id = $2")
             .bind(assignee)

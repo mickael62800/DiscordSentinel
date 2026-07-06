@@ -49,7 +49,10 @@ pub trait ManageTicketsUseCase: Send + Sync {
     async fn get_ticket_detail(&self, id: &str) -> Result<TicketDetail, DomainError>;
     async fn create_ticket(&self, command: CreateTicketCommand) -> Result<Ticket, DomainError>;
     async fn reply_ticket(&self, command: ReplyTicketCommand) -> Result<(), DomainError>;
-    async fn close_ticket(&self, id: &str) -> Result<(), DomainError>;
+    /// Ferme un ticket. Renvoie `true` si CE close a fait la transition (sinon
+    /// deja ferme) -> permet a l'appelant de n'envoyer transcript/DM/delete
+    /// qu'une fois (anti double-fermeture).
+    async fn close_ticket(&self, id: &str) -> Result<bool, DomainError>;
     async fn assign_ticket(&self, command: AssignTicketCommand) -> Result<(), DomainError>;
     async fn update_status(&self, id: &str, status: &str) -> Result<(), DomainError>;
     async fn update_ticket_channel(

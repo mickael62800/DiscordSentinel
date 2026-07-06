@@ -19,6 +19,11 @@ pub trait TicketRepository: Send + Sync {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Ticket>, DomainError>;
     async fn save(&self, ticket: &Ticket) -> Result<(), DomainError>;
     async fn update_status(&self, id: Uuid, status: &str) -> Result<(), DomainError>;
+
+    /// Ferme un ticket de facon ATOMIQUE : `WHERE status <> 'closed'`. Renvoie
+    /// `true` uniquement si CE close a fait la transition -> l'appelant n'envoie
+    /// le transcript / DM de satisfaction et ne supprime le salon qu'une fois.
+    async fn close_if_open(&self, id: Uuid) -> Result<bool, DomainError>;
     async fn update_assignee(&self, id: Uuid, assignee: &str) -> Result<(), DomainError>;
     async fn find_messages(&self, ticket_id: Uuid) -> Result<Vec<TicketMessage>, DomainError>;
     async fn save_message(&self, message: &TicketMessage) -> Result<(), DomainError>;

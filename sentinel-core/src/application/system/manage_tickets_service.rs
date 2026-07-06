@@ -182,15 +182,17 @@ impl ManageTicketsUseCase for ManageTicketsService {
         Ok(())
     }
 
-    async fn close_ticket(&self, id: &str) -> Result<(), DomainError> {
+    async fn close_ticket(&self, id: &str) -> Result<bool, DomainError> {
         let uuid = id
             .parse::<Uuid>()
             .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {id}")))?;
 
-        self.ticket_repo.update_status(uuid, "closed").await?;
-        self.invalidate_tickets_cache().await;
-
-        Ok(())
+        // Garde atomique : ne transitionne que si pas deja ferme.
+        let claimed = self.ticket_repo.close_if_open(uuid).await?;
+        if claimed {
+            self.invalidate_tickets_cache().await;
+        }
+        Ok(claimed)
     }
 
     async fn update_status(&self, id: &str, status: &str) -> Result<(), DomainError> {

@@ -142,13 +142,13 @@ async fn handle_close(ctx: &Context, command: &CommandInteraction) -> Result<(),
                 .and_then(|c| c.guild())
                 .and_then(|c| c.topic)
                 .unwrap_or_default();
-            // Les tickets recents stockent l'id de l'auteur via le marqueur
-            // `[author:<id>]`. On le compare en priorite ; a defaut (tickets
-            // crees avant l'ajout du marqueur), on retombe sur l'ancien
-            // comportement (recherche de l'id en sous-chaine).
+            // On compare UNIQUEMENT le marqueur exact `[author:<id>]`. L'ancien
+            // fallback "id en sous-chaine libre du topic" etait une IDOR : l'ID
+            // d'un membre invite pouvait etre sous-chaine de l'ID auteur -> il
+            // fermait le ticket d'autrui. Les tickets legacy sans marqueur ne
+            // sont donc fermables que par le staff (fail-closed).
             let author_marker = format!("[author:{}]", command.user.id);
-            let is_author =
-                topic.contains(&author_marker) || topic.contains(&command.user.id.to_string());
+            let is_author = topic.contains(&author_marker);
             if !is_author {
                 return reply(
                     ctx,
