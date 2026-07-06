@@ -11,8 +11,11 @@ use crate::shared::heartbeat::ApiClientKey;
 
 /// Gere l'activation automatique du slowmode pendant un raid.
 pub struct SlowmodeManager {
-    /// guild_id -> (timestamp d'activation, ancien slowmode par channel_id)
-    active: DashMap<GuildId, (Instant, Vec<(u64, u16)>)>,
+    /// guild_id -> (timestamp d'activation, rate IMPOSE par le raid, ancien
+    /// slowmode par channel_id). Le rate impose sert au revert : on ne restaure
+    /// l'ancienne valeur que si le salon porte encore celle du raid (sinon un
+    /// modo l'a changee manuellement -> on ne l'ecrase pas).
+    active: DashMap<GuildId, (Instant, u16, Vec<(u64, u16)>)>,
 }
 
 impl SlowmodeManager {
@@ -95,7 +98,7 @@ impl SlowmodeManager {
         }
 
         self.active
-            .insert(guild_id, (Instant::now(), previous_states));
+            .insert(guild_id, (Instant::now(), slowmode_secs, previous_states));
 
         info!(
             guild_id = %guild_id,
@@ -113,15 +116,25 @@ impl SlowmodeManager {
 
     /// Desactive le slowmode via un Arc<Http> (pour les background tasks sans Context).
     pub async fn deactivate_with_http(&self, http: &serenity::http::Http, guild_id: GuildId) {
-        let entry = match self.active.remove(&guild_id) {
+        let (_, imposed, previous_states) = match self.active.remove(&guild_id) {
             Some((_, data)) => data,
             None => return,
         };
 
-        let (_, previous_states) = entry;
+        // Etat courant des salons : on ne restaure l'ancien slowmode que si le
+        // salon porte ENCORE le rate impose par le raid. Sinon un modo l'a
+        // change manuellement pendant la fenetre -> on respecte sa valeur.
+        let current = guild_id.channels(http).await.ok();
 
         for (channel_id_raw, old_rate) in &previous_states {
             let channel_id = serenity::model::id::ChannelId::new(*channel_id_raw);
+            if let Some(map) = &current {
+                if let Some(ch) = map.get(&channel_id) {
+                    if ch.rate_limit_per_user.unwrap_or(0) != imposed {
+                        continue; // valeur manuelle d'un modo : ne pas ecraser
+                    }
+                }
+            }
             let edit = EditChannel::new().rate_limit_per_user(*old_rate);
             if let Err(e) = channel_id.edit(http, edit).await {
                 error!(
