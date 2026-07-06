@@ -184,6 +184,12 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
             immune += 1;
             continue;
         }
+        // Hierarchie : ne jamais sanctionner en masse soi / le bot / l'owner /
+        // un membre de rang >= au moderateur (comptes comme "proteges").
+        if super::check_hierarchy(ctx, command, guild_id, user_id).is_err() {
+            immune += 1;
+            continue;
+        }
         match guild_id.member(&ctx.http, user_id).await {
             Ok(mut member) => {
                 let ts = std::time::SystemTime::now()
@@ -391,6 +397,12 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
             .await
             .is_some()
         {
+            immune += 1;
+            continue;
+        }
+        // Hierarchie : ne jamais sanctionner en masse soi / le bot / l'owner /
+        // un membre de rang >= au moderateur (comptes comme "proteges").
+        if super::check_hierarchy(ctx, command, guild_id, user_id).is_err() {
             immune += 1;
             continue;
         }
