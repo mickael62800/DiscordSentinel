@@ -456,6 +456,49 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
+    // GARDE ANTI-ESCALADE : on n'ATTRIBUE jamais un role privilegie / managed /
+    // introuvable via un panneau self-service — meme si un admin l'a mis dans le
+    // panneau, meme si le custom_id est forge. Discord ne bloque que les roles
+    // AU-DESSUS du bot ; sans cette garde, tout role privilegie SOUS le bot
+    // serait auto-attribuable par n'importe quel membre (escalade). Ne s'applique
+    // qu'a l'ajout (retirer un role privilegie reste permis = de-escalade).
+    if !has_role {
+        let dangerous = serenity::all::Permissions::ADMINISTRATOR
+            | serenity::all::Permissions::MANAGE_GUILD
+            | serenity::all::Permissions::MANAGE_ROLES
+            | serenity::all::Permissions::MANAGE_CHANNELS
+            | serenity::all::Permissions::MANAGE_WEBHOOKS
+            | serenity::all::Permissions::BAN_MEMBERS
+            | serenity::all::Permissions::KICK_MEMBERS
+            | serenity::all::Permissions::MODERATE_MEMBERS
+            | serenity::all::Permissions::MANAGE_MESSAGES
+            | serenity::all::Permissions::MENTION_EVERYONE
+            | serenity::all::Permissions::MANAGE_NICKNAMES
+            | serenity::all::Permissions::MANAGE_THREADS
+            | serenity::all::Permissions::MANAGE_EVENTS;
+        let safe = ctx
+            .cache
+            .guild(guild_id)
+            .map(|g| match g.roles.get(&role) {
+                Some(r) => !r.managed && (r.permissions & dangerous).is_empty(),
+                None => false, // role introuvable en cache -> refus (fail-closed)
+            })
+            .unwrap_or(false);
+        if !safe {
+            warn!(role = %role_id, user = %component.user.id, "Refus attribution d'un role privilegie/introuvable via panneau");
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .embed(
+                        neutral_embed("Role non attribuable")
+                            .description("Ce role ne peut pas etre attribue via ce panneau."),
+                    )
+                    .ephemeral(true),
+            );
+            let _ = component.create_response(&ctx.http, response).await;
+            return;
+        }
+    }
+
     let embed = if has_role {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             if let Err(e) = m.remove_role(&ctx.http, role).await {
