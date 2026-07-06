@@ -158,6 +158,25 @@ pub struct TreasuryMovementDto {
 }
 
 #[derive(Debug, Serialize)]
+pub struct OrgRankDto {
+    pub name: String,
+    pub treasury: i64,
+    pub member_count: i64,
+}
+
+impl From<sentinel_core::ports::inbound::influence::manage_organizations::OrgRankEntry>
+    for OrgRankDto
+{
+    fn from(e: sentinel_core::ports::inbound::influence::manage_organizations::OrgRankEntry) -> Self {
+        Self {
+            name: e.name,
+            treasury: e.treasury,
+            member_count: e.member_count,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
 pub struct TreasuryViewDto {
     pub org_name: String,
     pub balance: i64,

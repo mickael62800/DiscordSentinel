@@ -24,6 +24,14 @@ pub struct OrgInfo {
     pub relations: Vec<OrgRelation>,
 }
 
+/// Une ligne du palmares des organisations (`/org classement`).
+#[derive(Debug, Clone)]
+pub struct OrgRankEntry {
+    pub name: String,
+    pub treasury: i64,
+    pub member_count: i64,
+}
+
 #[async_trait]
 pub trait ManageOrganizationsUseCase: Send + Sync {
     /// Fonde une organisation : verifie le quota et le cout (debite l'Argent du
@@ -91,6 +99,9 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         other_org_name: &str,
         relation: RelationKind,
     ) -> Result<(), DomainError>;
+
+    /// Palmares des organisations du serveur, triees par tresor de guerre.
+    async fn ranking(&self, guild_id: &str) -> Result<Vec<OrgRankEntry>, DomainError>;
 
     /// Consulte la tresorerie d'une organisation (solde + derniers mouvements).
     async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError>;

@@ -11,7 +11,8 @@ use sentinel_core::domain::errors::DomainError;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::influence::dto::{
-    OrgInfoDto, OrgMemberDto, OrganizationDto, PayMemberDto, TreasuryOpDto, TreasuryViewDto,
+    OrgInfoDto, OrgMemberDto, OrgRankDto, OrganizationDto, PayMemberDto, TreasuryOpDto,
+    TreasuryViewDto,
 };
 use crate::adapters::inbound::http::state::AppState;
 
@@ -96,6 +97,15 @@ pub async fn org_members(
 ) -> Result<Json<Vec<OrgMemberDto>>, ApiError> {
     let members = state.influence_orgs_uc.members(&guild_id, &dto.name).await?;
     Ok(Json(members.into_iter().map(Into::into).collect()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/ranking — palmares par tresor de guerre.
+pub async fn org_ranking(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+) -> Result<Json<Vec<OrgRankDto>>, ApiError> {
+    let entries = state.influence_orgs_uc.ranking(&guild_id).await?;
+    Ok(Json(entries.into_iter().map(Into::into).collect()))
 }
 
 /// POST /api/influence/{guild_id}/orgs/treasury — consulte la tresorerie.

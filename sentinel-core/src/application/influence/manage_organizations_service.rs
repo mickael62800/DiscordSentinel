@@ -13,7 +13,7 @@ use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::influence::manage_organizations::{
-    ManageOrganizationsUseCase, OrgInfo, RolePrep,
+    ManageOrganizationsUseCase, OrgInfo, OrgRankEntry, RolePrep,
 };
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -406,6 +406,22 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 .await;
         }
         Ok(())
+    }
+
+    async fn ranking(&self, guild_id: &str) -> Result<Vec<OrgRankEntry>, DomainError> {
+        let mut orgs = self.orgs.list_for_guild(guild_id).await?;
+        orgs.sort_by_key(|o| std::cmp::Reverse(o.treasury));
+        orgs.truncate(15);
+        let mut out = Vec::with_capacity(orgs.len());
+        for o in orgs {
+            let member_count = self.memberships.count(o.id).await.unwrap_or(0);
+            out.push(OrgRankEntry {
+                name: o.name,
+                treasury: o.treasury,
+                member_count,
+            });
+        }
+        Ok(out)
     }
 
     async fn treasury(&self, guild_id: &str, org_name: &str) -> Result<TreasuryView, DomainError> {

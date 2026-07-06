@@ -153,6 +153,11 @@ pub fn register() -> CreateCommand {
                     .required(true),
             ),
         )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "classement",
+            "Palmarès des organisations par trésor de guerre",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -276,6 +281,36 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 Err(e) => reply_ephemeral(ctx, command, &format!("Impossible : {e}")).await,
             }
         }
+        "classement" => match api_client::org_ranking(&api, &guild_id).await {
+            Ok(orgs) => {
+                let lines = if orgs.is_empty() {
+                    "*Aucune organisation.*".to_string()
+                } else {
+                    orgs.iter()
+                        .enumerate()
+                        .map(|(i, o)| {
+                            let medal = match i {
+                                0 => "🥇",
+                                1 => "🥈",
+                                2 => "🥉",
+                                _ => "▫️",
+                            };
+                            format!(
+                                "{medal} **{}** — {} 💰 ({} membres)",
+                                o.name, o.treasury, o.member_count
+                            )
+                        })
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                };
+                let embed = CreateEmbed::new()
+                    .title("🏆 Classement des organisations")
+                    .color(0x8E44AD)
+                    .description(lines);
+                reply_ephemeral_embed(ctx, command, embed).await;
+            }
+            Err(e) => reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await,
+        },
         "tresorerie" => match api_client::get_treasury(&api, &guild_id, &name).await {
             Ok(v) => reply_ephemeral_embed(ctx, command, treasury_embed(&v)).await,
             Err(e) => reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await,

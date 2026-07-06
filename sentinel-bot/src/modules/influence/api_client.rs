@@ -162,6 +162,24 @@ pub async fn org_members(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct OrgRank {
+    pub name: String,
+    pub treasury: i64,
+    pub member_count: i64,
+}
+
+pub async fn org_ranking(
+    api: &BaseApiClient,
+    guild_id: &str,
+) -> Result<Vec<OrgRank>, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/ranking"),
+        &serde_json::json!({}),
+    )
+    .await
+}
+
+#[derive(Debug, Deserialize)]
 pub struct TreasuryMovement {
     pub kind_label: String,
     pub amount: i64,

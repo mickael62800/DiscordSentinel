@@ -29,6 +29,10 @@ fn influence_inner() -> Router<AppState> {
             post(handlers::influence::orgs::org_members),
         )
         .route(
+            "/{guild_id}/orgs/ranking",
+            post(handlers::influence::orgs::org_ranking),
+        )
+        .route(
             "/{guild_id}/orgs/treasury",
             post(handlers::influence::orgs::org_treasury),
         )
