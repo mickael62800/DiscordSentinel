@@ -243,6 +243,16 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         self.repo.list_expired_voting(limit.clamp(1, 500)).await
     }
 
+    async fn expire_stale_decided_reviews(
+        &self,
+        grace_hours: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
+        self.repo
+            .expire_stale_decided(grace_hours.clamp(1, 8760), limit.clamp(1, 1000))
+            .await
+    }
+
     async fn expired_review_cards(
         &self,
         days: i64,

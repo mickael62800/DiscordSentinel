@@ -135,6 +135,14 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
     /// Cartes de review closes (applied|ignored) resolues depuis plus de
     /// `days` jours et encore mappees a un message Discord. Retire le mapping
     /// (pour ne pas re-traiter) et retourne la liste a faire expirer cote bot.
+    /// Expire les reviews 'decided' jamais finalisees (verdict lapse) et renvoie
+    /// leurs cartes a supprimer.
+    async fn expire_stale_decided_reviews(
+        &self,
+        grace_hours: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
+
     async fn expired_review_cards(
         &self,
         days: i64,

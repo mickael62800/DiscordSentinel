@@ -106,6 +106,15 @@ pub trait AutomodReviewRepository: Send + Sync {
         limit: i64,
     ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
 
+    /// Reviews restees en 'decided' (verdict de vote calcule mais jamais
+    /// finalise par un admin) depuis plus de `grace_hours` : on les passe en
+    /// 'ignored' (le verdict lapse) et on renvoie leurs cartes a nettoyer.
+    async fn expire_stale_decided(
+        &self,
+        grace_hours: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
+
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.
     async fn find_discussion(

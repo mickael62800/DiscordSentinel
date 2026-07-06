@@ -752,6 +752,56 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn expire_stale_decided(
+        &self,
+        grace_hours: i64,
+        limit: i64,
+    ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            action_id: Uuid,
+            channel_id: String,
+            message_id: String,
+        }
+        // Passe les 'decided' trop vieux en 'ignored' (le verdict lapse faute de
+        // finalisation admin) et renvoie leurs cartes a nettoyer. Le mapping de
+        // carte est retire dans la meme CTE.
+        let rows: Vec<Row> = sqlx::query_as(
+            "WITH to_expire AS ( \
+                 SELECT id FROM automod_reviews \
+                 WHERE status = 'decided' \
+                   AND decided_at IS NOT NULL \
+                   AND decided_at < NOW() - make_interval(hours => $1) \
+                 LIMIT $2 \
+             ), expired AS ( \
+                 UPDATE automod_reviews SET status = 'ignored', resolved_at = NOW(), \
+                     resolved_source = 'auto_expired' \
+                 WHERE id IN (SELECT id FROM to_expire) \
+                 RETURNING id \
+             ), cards AS ( \
+                 DELETE FROM discord_action_messages m \
+                 USING expired e \
+                 WHERE m.action_id = e.id AND m.kind = 'automod_review' \
+                 RETURNING m.action_id, m.channel_id, m.message_id \
+             ) \
+             SELECT action_id, channel_id, message_id FROM cards",
+        )
+        .bind(grace_hours as i32)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| ExpiredReviewCard {
+                action_id: r.action_id,
+                channel_id: r.channel_id,
+                message_id: r.message_id,
+            })
+            .collect())
+    }
+
     async fn expire_review_cards(
         &self,
         days: i64,

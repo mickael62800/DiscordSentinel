@@ -177,10 +177,19 @@ pub async fn cleanup_expired_cards(
     // Le use case trouve les cartes expirees et retire leur mapping ; le
     // handler ne fait que diffuser l'event d'expiration (le bot supprime le
     // message Discord correspondant).
-    let cards = state
+    // F5 : d'abord, les reviews 'decided' jamais finalisees par un admin depuis
+    // plus de 48h -> passees en 'ignored' (le verdict lapse) pour ne plus rester
+    // bloquees. Leurs cartes sont nettoyees comme les autres.
+    let mut cards = state
         .automod_reviews_uc
-        .expired_review_cards(q.days.unwrap_or(30), 200)
+        .expire_stale_decided_reviews(48, 200)
         .await?;
+    cards.extend(
+        state
+            .automod_reviews_uc
+            .expired_review_cards(q.days.unwrap_or(30), 200)
+            .await?,
+    );
 
     let count = cards.len() as u32;
     for c in &cards {
