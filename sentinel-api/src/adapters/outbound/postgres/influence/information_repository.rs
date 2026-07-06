@@ -102,10 +102,25 @@ impl InvestigationRepository for PgInvestigationRepository {
         id: Uuid,
         status: InvestigationStatus,
         info_id: Option<Uuid>,
-    ) -> Result<(), DomainError> {
-        sqlx::query("UPDATE influence_investigations SET status = $2, info_id = $3 WHERE id = $1")
+    ) -> Result<bool, DomainError> {
+        // Garde `status = 'en_cours'` : deux resolutions concurrentes (worker +
+        // trigger HTTP) ne reclament l'enquete qu'une seule fois.
+        let r = sqlx::query(
+            "UPDATE influence_investigations SET status = $2, info_id = $3 \
+             WHERE id = $1 AND status = 'en_cours'",
+        )
+        .bind(id)
+        .bind(status.as_str())
+        .bind(info_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| pg_err_ctx("influence_investigations", e))?;
+        Ok(r.rows_affected() == 1)
+    }
+
+    async fn attach_info(&self, id: Uuid, info_id: Uuid) -> Result<(), DomainError> {
+        sqlx::query("UPDATE influence_investigations SET info_id = $2 WHERE id = $1")
             .bind(id)
-            .bind(status.as_str())
             .bind(info_id)
             .execute(&self.pool)
             .await
@@ -205,15 +220,18 @@ impl InformationRepository for PgInformationRepository {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
-    async fn reveal(&self, id: Uuid) -> Result<(), DomainError> {
-        sqlx::query(
-            "UPDATE influence_information SET revealed = TRUE, visibility = 'public' WHERE id = $1",
+    async fn reveal(&self, id: Uuid) -> Result<bool, DomainError> {
+        // Garde `revealed = FALSE` : un double /reveler (spam) ne bascule qu'une
+        // fois -> la perte de reputation / le scandale ne s'appliquent pas 2x.
+        let r = sqlx::query(
+            "UPDATE influence_information SET revealed = TRUE, visibility = 'public' \
+             WHERE id = $1 AND revealed = FALSE",
         )
         .bind(id)
         .execute(&self.pool)
         .await
         .map_err(|e| pg_err_ctx("influence_information", e))?;
-        Ok(())
+        Ok(r.rows_affected() == 1)
     }
 }
 

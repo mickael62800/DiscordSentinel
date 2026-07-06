@@ -107,7 +107,20 @@ impl CitizenRepository for PgCitizenRepository {
     }
 
     async fn adjust_money(&self, citizen_id: Uuid, delta: i64) -> Result<i64, DomainError> {
-        self.adjust_capital(citizen_id, Capital::Money, delta).await
+        // Garde atomique : l'Argent ne descend jamais sous 0. Un credit (delta>0)
+        // passe toujours ; un debit concurrent qui rendrait le solde negatif
+        // n'affecte aucune ligne -> "Solde insuffisant" (evite le solde negatif
+        // que laissait un check lu-puis-ecrit non atomique).
+        let new_value: Option<i64> = sqlx::query_scalar(
+            "UPDATE influence_citizens SET money = money + $2, updated_at = NOW() \
+             WHERE id = $1 AND money + $2 >= 0 RETURNING money",
+        )
+        .bind(citizen_id)
+        .bind(delta)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        new_value.ok_or_else(|| DomainError::Forbidden("Solde insuffisant.".into()))
     }
 
     async fn adjust_capital(

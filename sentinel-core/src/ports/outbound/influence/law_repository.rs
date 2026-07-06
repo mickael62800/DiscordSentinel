@@ -30,7 +30,10 @@ pub trait LawRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     /// Fige le resultat d'une loi.
-    async fn close(&self, id: Uuid, status: LawStatus) -> Result<(), DomainError>;
+    /// Cloture une loi. Garde sur `status = 'vote'` : renvoie `true` si CET
+    /// appel a bien cloture (false si une autre execution l'avait deja fait ->
+    /// ne pas archiver / rejouer l'effet en double).
+    async fn close(&self, id: Uuid, status: LawStatus) -> Result<bool, DomainError>;
 
     /// Lois en vote dont l'echeance est passee (scan worker).
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Law>, DomainError>;

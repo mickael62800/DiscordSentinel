@@ -155,19 +155,10 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             )));
         }
 
-        // Cree l'org d'abord (echoue avant tout debit si conflit), puis debite
-        // et inscrit le fondateur.
-        let org = self
-            .orgs
-            .create(NewOrganization {
-                guild_id,
-                kind,
-                name,
-                motto,
-                founder_id: founder.id,
-            })
-            .await?;
-        // Debite les coins (wallet partage) ; fallback capital si pas de wallet.
+        // Debite AVANT de creer : sinon un debit qui echoue apres la creation
+        // laisse une org orpheline (sans membre, nom bloque par la contrainte
+        // UNIQUE). Si la creation echoue ensuite (course sur le nom), on
+        // rembourse.
         match &self.wallet {
             Some(w) => {
                 w.debit(guild_id, founder_user_id, cost, "influence", "Creation organisation")
@@ -177,6 +168,39 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
                 self.citizens.adjust_money(founder.id, -cost).await?;
             }
         }
+        let org = match self
+            .orgs
+            .create(NewOrganization {
+                guild_id,
+                kind,
+                name,
+                motto,
+                founder_id: founder.id,
+            })
+            .await
+        {
+            Ok(o) => o,
+            Err(e) => {
+                // Remboursement best-effort.
+                match &self.wallet {
+                    Some(w) => {
+                        let _ = w
+                            .credit(
+                                guild_id,
+                                founder_user_id,
+                                cost,
+                                "influence",
+                                "Remboursement creation org echouee",
+                            )
+                            .await;
+                    }
+                    None => {
+                        let _ = self.citizens.adjust_money(founder.id, cost).await;
+                    }
+                }
+                return Err(e);
+            }
+        };
         self.memberships
             .add(org.id, founder.id, OrgRole::Fondateur)
             .await?;

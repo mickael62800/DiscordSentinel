@@ -113,14 +113,16 @@ impl LawRepository for PgLawRepository {
         Ok(())
     }
 
-    async fn close(&self, id: Uuid, status: LawStatus) -> Result<(), DomainError> {
-        sqlx::query("UPDATE influence_laws SET status = $2 WHERE id = $1")
+    async fn close(&self, id: Uuid, status: LawStatus) -> Result<bool, DomainError> {
+        // Garde `status = 'vote'` : deux clotures concurrentes (worker + trigger
+        // HTTP) n'archivent / n'appliquent l'effet qu'une seule fois.
+        let r = sqlx::query("UPDATE influence_laws SET status = $2 WHERE id = $1 AND status = 'vote'")
             .bind(id)
             .bind(status.as_str())
             .execute(&self.pool)
             .await
             .map_err(pg_err)?;
-        Ok(())
+        Ok(r.rows_affected() == 1)
     }
 
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Law>, DomainError> {

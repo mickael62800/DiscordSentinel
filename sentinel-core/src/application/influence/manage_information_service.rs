@@ -195,7 +195,11 @@ impl ManageInformationUseCase for ManageInformationService {
             return Err(DomainError::Conflict("Deja revelee.".into()));
         }
 
-        self.information.reveal(id).await?;
+        // Bascule ATOMIQUE : si false, une revelation concurrente a deja eu lieu
+        // -> on n'applique pas la perte de reputation / le scandale une 2e fois.
+        if !self.information.reveal(id).await? {
+            return Err(DomainError::Conflict("Deja revelee.".into()));
+        }
 
         // Scandale : la cible perd de la reputation.
         let loss = self.settings(guild_id).await.scandal_reputation_loss();
@@ -245,6 +249,18 @@ impl ManageInformationUseCase for ManageInformationService {
             let success_pct = self.settings(&inv.guild_id).await.investigation_success_pct();
             let roll = rand::thread_rng().gen_range(0..100);
             let success = roll < success_pct;
+            let status = if success {
+                InvestigationStatus::Reussie
+            } else {
+                InvestigationStatus::Echouee
+            };
+
+            // Reclamation ATOMIQUE : si false, une autre execution (worker vs
+            // trigger HTTP) a deja traite cette enquete -> on ne cree pas d'intel
+            // en double, on ne rejoue pas le resultat.
+            if !self.investigations.resolve(inv.id, status, None).await? {
+                continue;
+            }
 
             if success {
                 let content = format!(
@@ -262,13 +278,7 @@ impl ManageInformationUseCase for ManageInformationService {
                         content: &content,
                     })
                     .await?;
-                self.investigations
-                    .resolve(inv.id, InvestigationStatus::Reussie, Some(info_id))
-                    .await?;
-            } else {
-                self.investigations
-                    .resolve(inv.id, InvestigationStatus::Echouee, None)
-                    .await?;
+                self.investigations.attach_info(inv.id, info_id).await?;
             }
 
             results.push(ResolvedInvestigation {

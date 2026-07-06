@@ -171,7 +171,11 @@ impl ManageLawsUseCase for ManageLawsService {
             } else {
                 LawStatus::Rejetee
             };
-            self.laws.close(law.id, status).await?;
+            // Cloture ATOMIQUE : si false, une autre execution a deja cloture
+            // cette loi -> on n'archive/diffuse pas en double.
+            if !self.laws.close(law.id, status).await? {
+                continue;
+            }
             law.status = status;
 
             if let Some(arch) = &self.archives {

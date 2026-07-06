@@ -27,13 +27,18 @@ pub trait InvestigationRepository: Send + Sync {
     /// Enquetes arrivees a echeance (scan worker).
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Investigation>, DomainError>;
 
-    /// Fige le resultat (+ lien vers l'info produite si reussie).
+    /// Fige le resultat (+ lien vers l'info produite si reussie). Garde sur
+    /// `status = 'en_cours'` : renvoie `true` si CET appel a reclame l'enquete
+    /// (false si une autre execution l'avait deja resolue -> ne rien rejouer).
     async fn resolve(
         &self,
         id: Uuid,
         status: InvestigationStatus,
         info_id: Option<Uuid>,
-    ) -> Result<(), DomainError>;
+    ) -> Result<bool, DomainError>;
+
+    /// Attache l'info produite a une enquete deja reclamee (2e temps du succes).
+    async fn attach_info(&self, id: Uuid, info_id: Uuid) -> Result<(), DomainError>;
 }
 
 /// Parametres de creation d'une information.
@@ -58,8 +63,10 @@ pub trait InformationRepository: Send + Sync {
         owner_id: Uuid,
     ) -> Result<Vec<Information>, DomainError>;
 
-    /// Passe une info en public + revelee.
-    async fn reveal(&self, id: Uuid) -> Result<(), DomainError>;
+    /// Passe une info en public + revelee. Garde sur `revealed = FALSE` :
+    /// renvoie `true` si CET appel a effectue la bascule (false si deja revelee
+    /// -> l'appelant ne doit PAS rejouer le scandale / la perte de reputation).
+    async fn reveal(&self, id: Uuid) -> Result<bool, DomainError>;
 }
 
 #[async_trait]
