@@ -202,7 +202,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 
 /// Retourne true si ce custom_id est gere par le module security.
 pub fn handles_component(cid: &str) -> bool {
-    cid == captcha::CAPTCHA_BUTTON_ID
+    cid.starts_with(captcha::CAPTCHA_BUTTON_PREFIX)
         || cid.starts_with(captcha::CAPTCHA_MATH_PREFIX)
         || raid_suggest_handler::handles_component(cid)
 }

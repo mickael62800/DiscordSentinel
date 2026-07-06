@@ -440,7 +440,7 @@ async fn send_captcha(
             captcha::send_math_challenge(ctx, user_id, guild_id, guild_name, captcha_pending).await;
         }
         _ => {
-            captcha::send_challenge(ctx, user_id, guild_name).await;
+            captcha::send_challenge(ctx, user_id, guild_id, guild_name).await;
         }
     }
 }

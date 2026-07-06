@@ -10,8 +10,9 @@ use tracing::{error, info, warn};
 
 use crate::shared::embeds::info_embed;
 
-/// Identifiant du bouton de verification captcha.
-pub const CAPTCHA_BUTTON_ID: &str = "sentinel_captcha_verify";
+/// Prefixe du bouton de verification captcha simple. Le custom_id encode le
+/// guild_id : "{PREFIX}{guild_id}" -> le handler agit sur CE serveur uniquement.
+pub const CAPTCHA_BUTTON_PREFIX: &str = "sentinel_captcha_verify_";
 
 /// Prefixe des boutons captcha math.
 pub const CAPTCHA_MATH_PREFIX: &str = "sentinel_captcha_math_";
@@ -72,6 +73,15 @@ impl CaptchaPending {
     /// Supprime un captcha en attente (apres verification ou timeout).
     pub fn remove(&self, guild_id: GuildId, user_id: UserId) {
         self.pending.remove(&(guild_id, user_id));
+    }
+
+    /// Indique si un captcha MATH (non expire) est en attente pour ce couple.
+    /// Sert a interdire le bypass du math via le bouton simple.
+    pub fn is_pending(&self, guild_id: GuildId, user_id: UserId) -> bool {
+        self.pending
+            .get(&(guild_id, user_id))
+            .map(|e| e.value().1.elapsed() < std::time::Duration::from_secs(self.ttl_secs))
+            .unwrap_or(false)
     }
 
     /// Retourne les captchas expires (pour nettoyage).
@@ -202,7 +212,12 @@ pub fn generate_code() -> String {
 
 /// Envoie un message de verification en DM avec un bouton.
 /// Le code captcha est encode dans le custom_id du bouton.
-pub async fn send_challenge(ctx: &Context, user_id: UserId, guild_name: &str) -> bool {
+pub async fn send_challenge(
+    ctx: &Context,
+    user_id: UserId,
+    guild_id: GuildId,
+    guild_name: &str,
+) -> bool {
     let user = match user_id.to_user(&ctx.http).await {
         Ok(u) => u,
         Err(e) => {
@@ -219,7 +234,7 @@ pub async fn send_challenge(ctx: &Context, user_id: UserId, guild_name: &str) ->
         }
     };
 
-    let button = CreateButton::new(CAPTCHA_BUTTON_ID)
+    let button = CreateButton::new(format!("{}{}", CAPTCHA_BUTTON_PREFIX, guild_id.get()))
         .label("Je suis humain — Verifier")
         .style(serenity::all::ButtonStyle::Success);
 

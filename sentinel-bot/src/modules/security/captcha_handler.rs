@@ -14,7 +14,7 @@ use super::{CaptchaPendingKey, QuarantineKey, SecurityApiKey, SecurityConfigKey}
 /// Gere les interactions captcha (bouton + math).
 pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     let custom_id = &component.data.custom_id;
-    let is_button_captcha = custom_id == captcha::CAPTCHA_BUTTON_ID;
+    let is_button_captcha = custom_id.starts_with(captcha::CAPTCHA_BUTTON_PREFIX);
     let is_math_captcha = custom_id.starts_with(captcha::CAPTCHA_MATH_PREFIX);
 
     if !is_button_captcha && !is_math_captcha {
@@ -178,15 +178,42 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
     }
 
     // ── Captcha bouton classique ──
+    // Le guild est encode dans le custom_id -> on agit UNIQUEMENT sur ce serveur
+    // (avant : scan de tous les serveurs -> un clic liberait partout).
+    let target_guild = match custom_id
+        .strip_prefix(captcha::CAPTCHA_BUTTON_PREFIX)
+        .and_then(|s| s.parse::<u64>().ok())
+        .map(GuildId::new)
+    {
+        Some(g) => g,
+        None => return,
+    };
+
+    // Anti-bypass : si un captcha MATH est en attente pour cet utilisateur sur ce
+    // serveur, le bouton simple ne doit PAS le liberer (il doit resoudre le math)
+    // -> empeche un self-bot de sauter l'epreuve via le custom_id du bouton simple.
+    if data
+        .get::<CaptchaPendingKey>()
+        .map(|cp| cp.is_pending(target_guild, user_id))
+        .unwrap_or(false)
+    {
+        let response = serenity::builder::CreateInteractionResponse::Message(
+            serenity::builder::CreateInteractionResponseMessage::new()
+                .embed(
+                    warn_embed("\u{26a0}\u{fe0f} Captcha requis")
+                        .description("Repondez a la question du captcha ci-dessus."),
+                )
+                .ephemeral(true),
+        );
+        let _ = component.create_response(&ctx.http, response).await;
+        return;
+    }
+
     let mut released = false;
 
     {
-        let cache = &ctx.cache;
-        for guild_id in cache.guilds() {
-            if !quarantine.is_quarantined(guild_id, user_id) {
-                continue;
-            }
-
+        let guild_id = target_guild;
+        if quarantine.is_quarantined(guild_id, user_id) {
             let guild_config = match base
                 .get_guild_config_for(
                     &guild_id.to_string(),
