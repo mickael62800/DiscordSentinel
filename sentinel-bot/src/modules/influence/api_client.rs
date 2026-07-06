@@ -192,6 +192,10 @@ pub struct MotionState {
     pub pour: i64,
     pub contre: i64,
     pub abstention: i64,
+    #[serde(default)]
+    pub pour_weight: i64,
+    #[serde(default)]
+    pub contre_weight: i64,
 }
 
 #[derive(Debug, Serialize)]
@@ -360,6 +364,10 @@ pub struct LawState {
     pub pour: i64,
     pub contre: i64,
     pub abstention: i64,
+    #[serde(default)]
+    pub pour_weight: i64,
+    #[serde(default)]
+    pub contre_weight: i64,
 }
 
 #[derive(Debug, Serialize)]

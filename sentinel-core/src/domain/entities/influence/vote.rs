@@ -35,18 +35,28 @@ impl VoteChoice {
     }
 }
 
-/// Decompte des bulletins d'une motion.
+/// Decompte des bulletins d'une motion. `pour`/`contre`/`abstention` sont les
+/// NOMBRES de bulletins (affichage) ; `pour_weight`/`contre_weight` sont les
+/// memes bulletins PONDERES par l'influence du votant (adoption). Le capital
+/// central « influence » pese donc dans le resultat (cf. 04.md §3).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Tally {
     pub pour: i64,
     pub contre: i64,
     pub abstention: i64,
+    pub pour_weight: i64,
+    pub contre_weight: i64,
 }
 
 impl Tally {
-    /// Resultat a la cloture : adoptee si strictement plus de « pour » que de
-    /// « contre » (egalite = rejetee). Les abstentions ne comptent pas.
+    /// Resultat a la cloture : adoptee si le POIDS « pour » depasse le poids
+    /// « contre » (egalite = rejetee, abstentions ignorees). Repli sur les
+    /// comptes bruts si aucun poids n'est renseigne (tests / anciennes donnees).
     pub fn is_adopted(&self) -> bool {
-        self.pour > self.contre
+        if self.pour_weight != 0 || self.contre_weight != 0 {
+            self.pour_weight > self.contre_weight
+        } else {
+            self.pour > self.contre
+        }
     }
 }

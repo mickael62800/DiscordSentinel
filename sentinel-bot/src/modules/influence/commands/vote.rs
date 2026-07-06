@@ -97,7 +97,12 @@ pub fn build_embed(s: &MotionState) -> CreateEmbed {
         .field("✅ Pour", s.pour.to_string(), true)
         .field("❌ Contre", s.contre.to_string(), true)
         .field("⚪ Abstention", s.abstention.to_string(), true)
-        .field("Votants", total.to_string(), true);
+        .field("Votants", total.to_string(), true)
+        .field(
+            "⚖️ Poids (influence)",
+            format!("Pour **{}** / Contre **{}**", s.pour_weight, s.contre_weight),
+            false,
+        );
 
     embed = embed.footer(CreateEmbedFooter::new(if closed {
         "Vote clos.".to_string()

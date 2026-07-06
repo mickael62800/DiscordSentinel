@@ -140,9 +140,14 @@ impl VoteRepository for PgVoteRepository {
     }
 
     async fn tally(&self, subject_id: Uuid) -> Result<Tally, DomainError> {
-        let rows: Vec<(String, i64)> = sqlx::query_as(
-            "SELECT choice, COUNT(*) FROM influence_votes \
-             WHERE subject_id = $1 GROUP BY choice",
+        // Compte brut + poids pondere par l'influence du votant (plancher 1 :
+        // meme un citoyen sans influence garde une voix). Jointure sur le citoyen
+        // pour recuperer son influence courante.
+        let rows: Vec<(String, i64, i64)> = sqlx::query_as(
+            "SELECT v.choice, COUNT(*), COALESCE(SUM(GREATEST(c.influence, 1)), 0) \
+             FROM influence_votes v \
+             JOIN influence_citizens c ON c.id = v.voter_id \
+             WHERE v.subject_id = $1 GROUP BY v.choice",
         )
         .bind(subject_id)
         .fetch_all(&self.pool)
@@ -150,10 +155,16 @@ impl VoteRepository for PgVoteRepository {
         .map_err(|e| pg_err_ctx(TBL_V, e))?;
 
         let mut tally = Tally::default();
-        for (choice, count) in rows {
+        for (choice, count, weight) in rows {
             match choice.as_str() {
-                "pour" => tally.pour = count,
-                "contre" => tally.contre = count,
+                "pour" => {
+                    tally.pour = count;
+                    tally.pour_weight = weight;
+                }
+                "contre" => {
+                    tally.contre = count;
+                    tally.contre_weight = weight;
+                }
                 "abstention" => tally.abstention = count,
                 _ => {}
             }

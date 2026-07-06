@@ -124,8 +124,13 @@ pub fn build_embed(s: &LawState) -> CreateEmbed {
         .field("✅ Pour", s.pour.to_string(), true)
         .field("❌ Contre", s.contre.to_string(), true)
         .field("⚪ Abstention", s.abstention.to_string(), true)
+        .field(
+            "⚖️ Poids (influence)",
+            format!("Pour **{}** / Contre **{}**", s.pour_weight, s.contre_weight),
+            false,
+        )
         .footer(CreateEmbedFooter::new(if s.status == "vote" {
-            "Tous les citoyens peuvent voter. Cloture automatique a l'echeance."
+            "Le résultat est pondéré par l'influence des votants. Clôture automatique à l'échéance."
         } else {
             "Vote clos."
         }))

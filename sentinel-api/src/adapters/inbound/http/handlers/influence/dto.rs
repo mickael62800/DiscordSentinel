@@ -155,6 +155,10 @@ pub struct MotionStateDto {
     pub pour: i64,
     pub contre: i64,
     pub abstention: i64,
+    #[serde(default)]
+    pub pour_weight: i64,
+    #[serde(default)]
+    pub contre_weight: i64,
 }
 
 impl From<MotionState> for MotionStateDto {
@@ -168,6 +172,8 @@ impl From<MotionState> for MotionStateDto {
             pour: s.tally.pour,
             contre: s.tally.contre,
             abstention: s.tally.abstention,
+            pour_weight: s.tally.pour_weight,
+            contre_weight: s.tally.contre_weight,
         }
     }
 }
@@ -262,6 +268,10 @@ pub struct LawStateDto {
     pub pour: i64,
     pub contre: i64,
     pub abstention: i64,
+    #[serde(default)]
+    pub pour_weight: i64,
+    #[serde(default)]
+    pub contre_weight: i64,
 }
 
 impl From<LawState> for LawStateDto {
@@ -277,6 +287,8 @@ impl From<LawState> for LawStateDto {
             pour: s.tally.pour,
             contre: s.tally.contre,
             abstention: s.tally.abstention,
+            pour_weight: s.tally.pour_weight,
+            contre_weight: s.tally.contre_weight,
         }
     }
 }
