@@ -144,7 +144,11 @@ pub async fn send_math_challenge(
         .iter()
         .enumerate()
         .map(|(i, label)| {
-            CreateButton::new(format!("{}{}", CAPTCHA_MATH_PREFIX, i))
+            // On encode le guild_id dans le custom_id -> le handler agit sur CE
+            // serveur (avant : il scannait tous les serveurs et prenait le
+            // premier ou l'user etait quarantine -> un clic pouvait liberer un
+            // serveur arbitraire / tous les serveurs).
+            CreateButton::new(format!("{}{}_{}", CAPTCHA_MATH_PREFIX, guild_id.get(), i))
                 .label(label)
                 .style(serenity::all::ButtonStyle::Primary)
         })

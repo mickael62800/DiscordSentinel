@@ -1,7 +1,7 @@
 //! Handler des interactions captcha (bouton classique + math).
 
 use serenity::all::{ComponentInteraction, Context};
-use serenity::model::id::RoleId;
+use serenity::model::id::{GuildId, RoleId};
 use tracing::{error, warn};
 
 use crate::shared::embeds::{danger_embed, success_embed, warn_embed};
@@ -47,28 +47,29 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
             }
         };
 
-        // Extraire et valider l'index du bouton presse
-        let pressed_str = custom_id
+        // custom_id = "{PREFIX}{guild_id}_{index}" : on lit le guild ET l'index
+        // encodes -> on agit sur CE serveur (plus de scan qui liberait un
+        // serveur arbitraire).
+        let payload = custom_id
             .strip_prefix(captcha::CAPTCHA_MATH_PREFIX)
             .unwrap_or("");
-        let pressed_index: usize = match pressed_str.parse::<usize>() {
-            Ok(i) if i < 4 => i,
-            _ => {
-                tracing::warn!(user=%user_id, index=%pressed_str, "Index captcha invalide");
+        let (guild_str, index_str) = match payload.rsplit_once('_') {
+            Some(parts) => parts,
+            None => {
+                tracing::warn!(user=%user_id, payload=%payload, "custom_id captcha math invalide");
                 return;
             }
         };
-
-        // Trouver le guild_id de l'utilisateur en quarantaine
-        let mut target_guild = None;
-        for gid in ctx.cache.guilds() {
-            if quarantine.is_quarantined(gid, user_id) {
-                target_guild = Some(gid);
-                break;
+        let pressed_index: usize = match index_str.parse::<usize>() {
+            Ok(i) if i < 4 => i,
+            _ => {
+                tracing::warn!(user=%user_id, index=%index_str, "Index captcha invalide");
+                return;
             }
-        }
+        };
+        let parsed_guild = guild_str.parse::<u64>().ok().map(GuildId::new);
 
-        let guild_id = match target_guild {
+        let guild_id = match parsed_guild {
             Some(g) => g,
             None => {
                 let embed = warn_embed("\u{26a0}\u{fe0f} Deja verifie")
