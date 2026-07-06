@@ -58,6 +58,10 @@ pub struct Law {
     /// loi est ADOPTEE. `None` = loi purement narrative (aucun effet).
     pub effect_key: Option<String>,
     pub effect_value: Option<i64>,
+    /// Poids de FINANCEMENT (lobbying des orgs) ajoute a chaque camp, en plus
+    /// des votes, au moment de la cloture.
+    pub funding_pour: i64,
+    pub funding_contre: i64,
 }
 
 /// Reglages gameplay qu'une loi peut modifier (whitelist stricte : param public

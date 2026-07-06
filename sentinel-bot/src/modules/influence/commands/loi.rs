@@ -50,17 +50,118 @@ pub fn register() -> CreateCommand {
                     .required(false),
                 ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "financer",
+                "Finance une loi depuis la trésorerie de ton organisation (lobbying)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "loi", "Identifiant de la loi")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "org", "Ton organisation")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::Integer, "montant", "Montant à dépenser")
+                    .required(true),
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "camp", "Camp à soutenir")
+                    .required(true)
+                    .add_string_choice("Pour", "pour")
+                    .add_string_choice("Contre", "contre"),
+            ),
+        )
+}
+
+async fn handle_fund(
+    ctx: &Context,
+    command: &CommandInteraction,
+    guild_id: &str,
+    opts: &[serenity::all::CommandDataOption],
+) {
+    let law_id = option_str(opts, "loi").unwrap_or("");
+    let org = option_str(opts, "org").unwrap_or("");
+    let camp_pour = option_str(opts, "camp").unwrap_or("pour") != "contre";
+    let montant = opts
+        .iter()
+        .find(|o| o.name == "montant")
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::Integer(i) => Some(*i),
+            _ => None,
+        })
+        .unwrap_or(0);
+
+    let api = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+    let user_id = command.user.id.to_string();
+    match api_client::fund_law(
+        &api,
+        guild_id,
+        org,
+        law_id,
+        &user_id,
+        &command.user.name,
+        montant,
+        camp_pour,
+    )
+    .await
+    {
+        Ok(r) => {
+            let camp = if r.camp_pour { "Pour" } else { "Contre" };
+            let msg = format!(
+                "🏛️ **{}** a financé **{}** pour le camp **{}** de « {} ».\nFinancement total : Pour **{}** / Contre **{}** · Trésorerie restante : **{}** 💰",
+                org, r.amount, camp, r.law_title, r.funding_pour, r.funding_contre, r.treasury_left
+            );
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new().content(msg).ephemeral(true),
+                    ),
+                )
+                .await;
+        }
+        Err(e) => {
+            let _ = command
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!("Impossible de financer : {e}"))
+                            .ephemeral(true),
+                    ),
+                )
+                .await;
+        }
+    }
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let Some(guild_id) = require_guild_id(ctx, command).await else {
         return;
     };
-    // Sous-commande propose.
-    let opts = match command.data.options.first().map(|s| &s.value) {
-        Some(serenity::all::CommandDataOptionValue::SubCommand(o)) => o.clone(),
+    let Some(sub) = command.data.options.first() else {
+        return;
+    };
+    let sub_name = sub.name.clone();
+    let opts = match &sub.value {
+        serenity::all::CommandDataOptionValue::SubCommand(o) => o.clone(),
         _ => return,
     };
+    if sub_name == "financer" {
+        handle_fund(ctx, command, &guild_id, &opts).await;
+        return;
+    }
+    // Sous-commande propose (par defaut).
     let titre = option_str(&opts, "titre").unwrap_or("");
     let texte = option_str(&opts, "texte").unwrap_or("");
     // Effet optionnel : parametre (choix) + valeur (entier).
@@ -165,6 +266,13 @@ pub fn build_embed(s: &LawState) -> CreateEmbed {
         embed = embed.field(
             "⚙️ Effet si adoptée",
             format!("**{label}** → **{val}**"),
+            false,
+        );
+    }
+    if s.funding_pour > 0 || s.funding_contre > 0 {
+        embed = embed.field(
+            "🏛️ Financement (lobbying)",
+            format!("Pour **{}** / Contre **{}**", s.funding_pour, s.funding_contre),
             false,
         );
     }

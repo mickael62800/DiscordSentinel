@@ -40,4 +40,13 @@ pub trait LawRepository: Send + Sync {
 
     /// Lois en vote dont l'echeance est passee (scan worker).
     async fn list_due(&self, now: DateTime<Utc>) -> Result<Vec<Law>, DomainError>;
+
+    /// Ajoute du poids de financement a un camp (uniquement en statut vote).
+    /// `true` si applique (false si la loi n'est plus en vote).
+    async fn add_funding(
+        &self,
+        law_id: Uuid,
+        pour_delta: i64,
+        contre_delta: i64,
+    ) -> Result<bool, DomainError>;
 }

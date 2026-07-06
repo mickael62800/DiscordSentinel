@@ -11,8 +11,8 @@ use sentinel_core::domain::errors::DomainError;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::handlers::influence::dto::{
-    DividendResultDto, OrgInfoDto, OrgMemberDto, OrgRankDto, OrganizationDto, PayMemberDto,
-    TreasuryOpDto, TreasuryViewDto,
+    DividendResultDto, FundLawDto, FundingResultDto, OrgInfoDto, OrgMemberDto, OrgRankDto,
+    OrganizationDto, PayMemberDto, TreasuryOpDto, TreasuryViewDto,
 };
 use crate::adapters::inbound::http::state::AppState;
 
@@ -154,6 +154,27 @@ pub async fn treasury_withdraw(
         )
         .await?;
     Ok(Json(v.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/fund-law — finance une loi (lobbying).
+pub async fn fund_law(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<FundLawDto>,
+) -> Result<Json<FundingResultDto>, ApiError> {
+    let r = state
+        .influence_orgs_uc
+        .fund_law(
+            &guild_id,
+            &dto.name,
+            &dto.law_id,
+            &dto.actor_user_id,
+            &dto.actor_username,
+            dto.amount,
+            dto.camp_pour,
+        )
+        .await?;
+    Ok(Json(r.into()))
 }
 
 /// POST /api/influence/{guild_id}/orgs/treasury/dividend — verse a chaque membre.

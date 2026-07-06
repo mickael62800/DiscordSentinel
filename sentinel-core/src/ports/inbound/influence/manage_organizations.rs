@@ -45,6 +45,17 @@ pub struct DividendResult {
     pub treasury_left: i64,
 }
 
+/// Resultat du financement d'une loi par une org (`/loi financer`).
+#[derive(Debug, Clone)]
+pub struct FundingResult {
+    pub law_title: String,
+    pub amount: i64,
+    pub camp_pour: bool,
+    pub funding_pour: i64,
+    pub funding_contre: i64,
+    pub treasury_left: i64,
+}
+
 #[async_trait]
 pub trait ManageOrganizationsUseCase: Send + Sync {
     /// Fonde une organisation : verifie le quota et le cout (debite l'Argent du
@@ -115,6 +126,20 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
 
     /// Palmares des organisations du serveur, triees par tresor de guerre.
     async fn ranking(&self, guild_id: &str) -> Result<Vec<OrgRankEntry>, DomainError>;
+
+    /// Finance une loi depuis la tresorerie d'une org (Dirigeant+) : depense des
+    /// coins (puits) pour ajouter du poids a un camp. `camp_pour` = pour/contre.
+    #[allow(clippy::too_many_arguments)]
+    async fn fund_law(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        law_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+        camp_pour: bool,
+    ) -> Result<FundingResult, DomainError>;
 
     /// Verse `per_member` coins a CHAQUE membre depuis la tresorerie (Dirigeant+).
     /// S'arrete quand la tresorerie est epuisee ; renvoie le nombre paye.

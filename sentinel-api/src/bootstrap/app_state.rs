@@ -868,6 +868,13 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ),
     );
+    let influence_law_repo: Arc<
+        dyn sentinel_core::ports::outbound::influence::law_repository::LawRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::influence::law_repository::PgLawRepository::new(
+            pg_pool.clone(),
+        ),
+    );
     let influence_orgs_uc: Arc<
         dyn sentinel_core::ports::inbound::influence::manage_organizations::ManageOrganizationsUseCase,
     > = Arc::new(
@@ -879,7 +886,8 @@ pub async fn build_app_state(
         .with_bot_config_repo(bot_config_repo.clone())
         .with_relation_repo(influence_relation_repo.clone())
         .with_archive_repo(influence_archive_repo.clone())
-        .with_wallet_repo(wallet_repo.clone()),
+        .with_wallet_repo(wallet_repo.clone())
+        .with_law_repo(influence_law_repo.clone()),
     );
     let influence_archives_uc: Arc<
         dyn sentinel_core::ports::inbound::influence::read_archives::ReadArchivesUseCase,
@@ -931,13 +939,6 @@ pub async fn build_app_state(
         )
         .with_bot_config_repo(bot_config_repo.clone())
         .with_wallet_repo(wallet_repo.clone()),
-    );
-    let influence_law_repo: Arc<
-        dyn sentinel_core::ports::outbound::influence::law_repository::LawRepository,
-    > = Arc::new(
-        crate::adapters::outbound::postgres::influence::law_repository::PgLawRepository::new(
-            pg_pool.clone(),
-        ),
     );
     let influence_laws_uc: Arc<
         dyn sentinel_core::ports::inbound::influence::manage_laws::ManageLawsUseCase,

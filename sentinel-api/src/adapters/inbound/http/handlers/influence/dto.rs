@@ -185,6 +185,46 @@ impl From<sentinel_core::ports::inbound::influence::manage_organizations::OrgRan
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FundLawDto {
+    pub name: String,
+    pub law_id: String,
+    #[serde(default)]
+    pub actor_user_id: String,
+    #[serde(default)]
+    pub actor_username: String,
+    pub amount: i64,
+    #[serde(default)]
+    pub camp_pour: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct FundingResultDto {
+    pub law_title: String,
+    pub amount: i64,
+    pub camp_pour: bool,
+    pub funding_pour: i64,
+    pub funding_contre: i64,
+    pub treasury_left: i64,
+}
+
+impl From<sentinel_core::ports::inbound::influence::manage_organizations::FundingResult>
+    for FundingResultDto
+{
+    fn from(
+        r: sentinel_core::ports::inbound::influence::manage_organizations::FundingResult,
+    ) -> Self {
+        Self {
+            law_title: r.law_title,
+            amount: r.amount,
+            camp_pour: r.camp_pour,
+            funding_pour: r.funding_pour,
+            funding_contre: r.funding_contre,
+            treasury_left: r.treasury_left,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct DividendResultDto {
     pub paid_count: i64,
@@ -387,6 +427,10 @@ pub struct LawStateDto {
     /// Effet mecanique lisible si la loi est adoptee (None = loi narrative).
     pub effect_label: Option<String>,
     pub effect_value: Option<i64>,
+    #[serde(default)]
+    pub funding_pour: i64,
+    #[serde(default)]
+    pub funding_contre: i64,
 }
 
 impl From<LawState> for LawStateDto {
@@ -410,6 +454,8 @@ impl From<LawState> for LawStateDto {
                 .as_deref()
                 .and_then(|k| law_effect_label(k).map(str::to_string)),
             effect_value: s.law.effect_value,
+            funding_pour: s.law.funding_pour,
+            funding_contre: s.law.funding_contre,
         }
     }
 }

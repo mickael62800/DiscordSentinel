@@ -12,8 +12,9 @@ use crate::domain::entities::influence::org_membership::{OrgMemberView, OrgRole}
 use crate::domain::entities::influence::organization::Organization;
 use crate::domain::enums::influence::organization_kind::OrganizationKind;
 use crate::domain::errors::DomainError;
+use crate::ports::outbound::influence::law_repository::LawRepository;
 use crate::ports::inbound::influence::manage_organizations::{
-    DividendResult, ManageOrganizationsUseCase, OrgInfo, OrgRankEntry, RolePrep,
+    DividendResult, FundingResult, ManageOrganizationsUseCase, OrgInfo, OrgRankEntry, RolePrep,
 };
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::influence::citizen_repository::CitizenRepository;
@@ -37,6 +38,7 @@ pub struct ManageOrganizationsService {
     archives: Option<Arc<dyn ArchiveRepository>>,
     wallet: Option<Arc<dyn WalletRepository>>,
     cfg_repo: Option<Arc<dyn BotConfigRepository>>,
+    laws: Option<Arc<dyn LawRepository>>,
 }
 
 impl ManageOrganizationsService {
@@ -53,11 +55,17 @@ impl ManageOrganizationsService {
             archives: None,
             wallet: None,
             cfg_repo: None,
+            laws: None,
         }
     }
 
     pub fn with_wallet_repo(mut self, repo: Arc<dyn WalletRepository>) -> Self {
         self.wallet = Some(repo);
+        self
+    }
+
+    pub fn with_law_repo(mut self, repo: Arc<dyn LawRepository>) -> Self {
+        self.laws = Some(repo);
         self
     }
 
@@ -428,6 +436,80 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
             });
         }
         Ok(out)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn fund_law(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        law_id: &str,
+        actor_user_id: &str,
+        actor_username: &str,
+        amount: i64,
+        camp_pour: bool,
+    ) -> Result<FundingResult, DomainError> {
+        validate_positive(amount, "Le financement")?;
+        let Some(laws) = &self.laws else {
+            return Err(DomainError::Internal("Lois indisponibles.".into()));
+        };
+        let law_uuid = uuid::Uuid::parse_str(law_id)
+            .map_err(|_| DomainError::ValidationError("Identifiant de loi invalide.".into()))?;
+        let law = laws
+            .get(law_uuid)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("Loi introuvable.".into()))?;
+        let org = self.require_org(guild_id, org_name).await?;
+        let settings = self.settings(guild_id).await;
+        let actor = self
+            .citizens
+            .get_or_create(guild_id, actor_user_id, actor_username, settings.start_money())
+            .await?;
+        let can = self
+            .memberships
+            .get(org.id, actor.id)
+            .await?
+            .map(|m| m.role.can_manage_treasury())
+            .unwrap_or(false);
+        if !can {
+            return Err(DomainError::Forbidden(
+                "Seuls le fondateur et les dirigeants peuvent financer une loi.".into(),
+            ));
+        }
+        // Depense la tresorerie (puits : les coins sont consommes en lobbying,
+        // credites a personne). Retrait garde.
+        if self
+            .orgs
+            .withdraw_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+            .await?
+            .is_none()
+        {
+            return Err(DomainError::Forbidden(
+                "Tresorerie insuffisante pour ce financement.".into(),
+            ));
+        }
+        let (pour_delta, contre_delta) = if camp_pour { (amount, 0) } else { (0, amount) };
+        // Ajoute le poids ; si la loi n'est plus en vote, rembourse la tresorerie.
+        if !laws.add_funding(law_uuid, pour_delta, contre_delta).await? {
+            let _ = self
+                .orgs
+                .deposit_treasury(org.id, guild_id, amount, actor_user_id, actor_username)
+                .await;
+            return Err(DomainError::Conflict("Le vote de cette loi est clos.".into()));
+        }
+        let updated = laws.get(law_uuid).await?;
+        let (funding_pour, funding_contre) = updated
+            .map(|l| (l.funding_pour, l.funding_contre))
+            .unwrap_or((pour_delta, contre_delta));
+        let treasury_left = self.orgs.get(org.id).await?.map(|o| o.treasury).unwrap_or(0);
+        Ok(FundingResult {
+            law_title: law.title,
+            amount,
+            camp_pour,
+            funding_pour,
+            funding_contre,
+            treasury_left,
+        })
     }
 
     async fn distribute_dividend(

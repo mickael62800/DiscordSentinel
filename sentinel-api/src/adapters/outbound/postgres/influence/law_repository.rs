@@ -39,6 +39,8 @@ struct Row {
     message_id: Option<String>,
     effect_key: Option<String>,
     effect_value: Option<i64>,
+    funding_pour: i64,
+    funding_contre: i64,
 }
 
 impl TryFrom<Row> for Law {
@@ -58,12 +60,14 @@ impl TryFrom<Row> for Law {
             message_id: r.message_id,
             effect_key: r.effect_key,
             effect_value: r.effect_value,
+            funding_pour: r.funding_pour,
+            funding_contre: r.funding_contre,
         })
     }
 }
 
 const COLS: &str = "id, guild_id, title, body, status, author_id, expires_at, \
-     channel_id, message_id, effect_key, effect_value";
+     channel_id, message_id, effect_key, effect_value, funding_pour, funding_contre";
 
 #[async_trait]
 impl LawRepository for PgLawRepository {
@@ -131,6 +135,27 @@ impl LawRepository for PgLawRepository {
             .execute(&self.pool)
             .await
             .map_err(pg_err)?;
+        Ok(r.rows_affected() == 1)
+    }
+
+    async fn add_funding(
+        &self,
+        law_id: Uuid,
+        pour_delta: i64,
+        contre_delta: i64,
+    ) -> Result<bool, DomainError> {
+        // Financement possible uniquement tant que la loi est en vote.
+        let r = sqlx::query(
+            "UPDATE influence_laws \
+             SET funding_pour = funding_pour + $2, funding_contre = funding_contre + $3 \
+             WHERE id = $1 AND status = 'vote'",
+        )
+        .bind(law_id)
+        .bind(pour_delta)
+        .bind(contre_delta)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(r.rows_affected() == 1)
     }
 

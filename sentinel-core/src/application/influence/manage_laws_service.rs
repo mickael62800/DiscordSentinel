@@ -186,7 +186,10 @@ impl ManageLawsUseCase for ManageLawsService {
         let due = self.laws.list_due(Utc::now()).await?;
         let mut closed = Vec::new();
         for mut law in due {
-            let tally = self.votes.tally(law.id).await?;
+            let mut tally = self.votes.tally(law.id).await?;
+            // Le financement (lobbying des orgs) s'ajoute au poids des votes.
+            tally.pour_weight += law.funding_pour;
+            tally.contre_weight += law.funding_contre;
             let status = if tally.is_adopted() {
                 LawStatus::Adoptee
             } else {

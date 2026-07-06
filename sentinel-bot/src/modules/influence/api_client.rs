@@ -257,6 +257,51 @@ pub struct DividendResult {
     pub treasury_left: i64,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct FundingResult {
+    pub law_title: String,
+    pub amount: i64,
+    pub camp_pour: bool,
+    pub funding_pour: i64,
+    pub funding_contre: i64,
+    pub treasury_left: i64,
+}
+
+#[derive(Debug, Serialize)]
+struct FundLawBody<'a> {
+    name: &'a str,
+    law_id: &'a str,
+    actor_user_id: &'a str,
+    actor_username: &'a str,
+    amount: i64,
+    camp_pour: bool,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn fund_law(
+    api: &BaseApiClient,
+    guild_id: &str,
+    org_name: &str,
+    law_id: &str,
+    actor_user_id: &str,
+    actor_username: &str,
+    amount: i64,
+    camp_pour: bool,
+) -> Result<FundingResult, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/fund-law"),
+        &FundLawBody {
+            name: org_name,
+            law_id,
+            actor_user_id,
+            actor_username,
+            amount,
+            camp_pour,
+        },
+    )
+    .await
+}
+
 pub async fn treasury_dividend(
     api: &BaseApiClient,
     guild_id: &str,
@@ -518,6 +563,10 @@ pub struct LawState {
     pub effect_label: Option<String>,
     #[serde(default)]
     pub effect_value: Option<i64>,
+    #[serde(default)]
+    pub funding_pour: i64,
+    #[serde(default)]
+    pub funding_contre: i64,
 }
 
 #[derive(Debug, Serialize)]
