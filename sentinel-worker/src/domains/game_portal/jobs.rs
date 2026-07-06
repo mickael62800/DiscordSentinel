@@ -44,8 +44,13 @@ pub struct GamePortalIntervals {
 pub fn start(api_url: String, intervals: GamePortalIntervals) {
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
+    // 60s etait trop court (C) : health-check / idle-shutdown / reconcile font
+    // un appel RCON sequentiel par serveur (jusqu'a rcon_timeout_secs chacun) ;
+    // sur une flotte un peu grande le cumul depassait 60s -> job en echec +
+    // execution partielle (les derniers serveurs jamais traites). MissedTick
+    // Skip empeche le chevauchement, donc un timeout large est sur.
     let http = match reqwest::Client::builder()
-        .timeout(Duration::from_secs(60))
+        .timeout(Duration::from_secs(240))
         .build()
     {
         Ok(c) => c,

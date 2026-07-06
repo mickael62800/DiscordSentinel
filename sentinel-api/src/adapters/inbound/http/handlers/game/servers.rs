@@ -52,12 +52,19 @@ pub async fn create_server(
     )
     .await?;
 
+    // F6 : l'owner est le createur AUTHENTIFIE (RoleContext) si present ; on ne
+    // laisse un owner arbitraire du DTO que pour les appels internes/bot (pas de
+    // RoleContext) -> evite d'attribuer un serveur a un tiers.
+    let owner_user_id = match &rbac {
+        Some(Extension(ctx)) => ctx.discord_user_id.clone(),
+        None => dto.owner_user_id,
+    };
     let cmd = CreateGameServerCommand {
         guild_id: guild_id.clone(),
         template_slug: dto.template_slug,
         name: dto.name,
         allocated_memory_mb: dto.memory_mb,
-        owner_user_id: dto.owner_user_id,
+        owner_user_id,
         initial_config: dto.config,
     };
     let server = state.game_servers_uc.create(cmd).await?;

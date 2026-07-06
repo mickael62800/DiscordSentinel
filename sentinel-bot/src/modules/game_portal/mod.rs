@@ -185,15 +185,36 @@ async fn on_started(ctx: &Context, guild_id: GuildId, server_id: &str) {
 
     let Some(text_ch) = text_ch else { return };
 
-    // 7. Enregistre les salons cote API (pour la suppression a l'arret).
-    base.patch_fire_and_forget(
-        &format!("/api/games/servers/{server_id}/session-channels"),
-        &serde_json::json!({
-            "text_channel_id": text_ch.to_string(),
-            "voice_channel_id": voice_ch.map(|c| c.to_string()),
-        }),
-    )
-    .await;
+    // 7. Enregistre les salons cote API : CLAIM garde anti-doublon (D). Si le
+    // claim echoue (claimed=false), des salons etaient deja enregistres (event
+    // de demarrage rejoue) -> on supprime ceux qu'on vient de creer et on
+    // s'arrete (pas de 2e panneau/ping). Une erreur reseau (Err) laisse les
+    // salons en place (comportement d'avant, pas de suppression a tort).
+    match base
+        .patch_json::<_, serde_json::Value>(
+            &format!("/api/games/servers/{server_id}/session-channels"),
+            &serde_json::json!({
+                "text_channel_id": text_ch.to_string(),
+                "voice_channel_id": voice_ch.map(|c| c.to_string()),
+            }),
+        )
+        .await
+    {
+        Ok(v) => {
+            let claimed = v.get("claimed").and_then(|c| c.as_bool()).unwrap_or(true);
+            if !claimed {
+                let _ = text_ch.delete(&ctx.http).await;
+                if let Some(vc) = voice_ch {
+                    let _ = vc.delete(&ctx.http).await;
+                }
+                tracing::warn!(server_id, "game-portal: salons deja enregistres (event rejoue) -> doublons supprimes");
+                return;
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, server_id, "game-portal: echec enregistrement salons (salons conserves)");
+        }
+    }
 
     // 8. Panneau epingle + bouton d'inscription.
     let embed = build_panel_embed(&game_name, &server.name, &[], server.ip_reveal_at.as_deref(), server.ip_revealed, server.host_port);

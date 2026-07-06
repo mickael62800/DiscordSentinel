@@ -393,10 +393,15 @@ impl GameServerRepository for PgGameServerRepository {
         id: Uuid,
         text_channel_id: Option<&str>,
         voice_channel_id: Option<&str>,
-    ) -> Result<(), DomainError> {
-        sqlx::query(
+    ) -> Result<bool, DomainError> {
+        // Claim garde (D) : quand on POSE des salons (valeur non nulle), on ne
+        // le fait QUE si le serveur n'en a pas deja -> sur redelivrance de
+        // l'event de demarrage, la 2e tentative echoue le claim (le bot pourra
+        // supprimer ses salons dupliques). L'effacement (valeur nulle, a l'arret)
+        // n'est pas garde.
+        let res = sqlx::query(
             "UPDATE game_servers SET text_channel_id = $2, voice_channel_id = $3, updated_at = NOW() \
-             WHERE id = $1",
+             WHERE id = $1 AND ($2 IS NULL OR text_channel_id IS NULL)",
         )
         .bind(id)
         .bind(text_channel_id)
@@ -404,7 +409,7 @@ impl GameServerRepository for PgGameServerRepository {
         .execute(&self.pool)
         .await
         .map_err(pg_ctx("set_session_channels"))?;
-        Ok(())
+        Ok(res.rows_affected() == 1)
     }
 
     async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError> {

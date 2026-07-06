@@ -202,7 +202,7 @@ pub async fn set_session_channels(
     if let Some(c) = dto.voice_channel_id.as_deref() {
         validation::validate_discord_id("voice_channel_id", c).map_err(ApiError)?;
     }
-    state
+    let claimed = state
         .game_server_repo
         .set_session_channels(
             server_id,
@@ -210,5 +210,7 @@ pub async fn set_session_channels(
             dto.voice_channel_id.as_deref(),
         )
         .await?;
-    Ok(Json(serde_json::json!({ "ok": true })))
+    // `claimed = false` -> des salons etaient deja enregistres (event rejoue) :
+    // le bot appelant doit supprimer ceux qu'il vient de creer en double.
+    Ok(Json(serde_json::json!({ "ok": true, "claimed": claimed })))
 }

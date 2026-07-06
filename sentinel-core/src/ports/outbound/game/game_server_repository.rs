@@ -64,12 +64,15 @@ pub trait GameServerRepository: Send + Sync {
     async fn template_usage(&self, template_id: uuid::Uuid) -> Result<TemplateUsage, DomainError>;
 
     /// Enregistre les salons Discord (texte + vocal) crees pour la session.
+    /// Pose/efface les salons de session. Renvoie `true` si l'ecriture a bien
+    /// eu lieu ; quand on POSE des salons (valeur non nulle) c'est un claim garde
+    /// qui echoue (`false`) si des salons sont deja enregistres (anti-doublon).
     async fn set_session_channels(
         &self,
         id: Uuid,
         text_channel_id: Option<&str>,
         voice_channel_id: Option<&str>,
-    ) -> Result<(), DomainError>;
+    ) -> Result<bool, DomainError>;
 
     /// Marque l'IP comme revelee (le job de revelation l'a publiee).
     async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError>;

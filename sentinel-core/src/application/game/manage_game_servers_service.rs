@@ -424,6 +424,29 @@ impl ManageGameServersUseCase for ManageGameServersService {
             .await?
             .ok_or_else(|| DomainError::NotFound(format!("game_server {id} introuvable")))?;
 
+        // Claim ATOMIQUE du delete (F4) : passe un etat STABLE -> Deleted en une
+        // requete. Refuse si le serveur est en pleine transition (Starting/
+        // Stopping) -> evite la course delete-pendant-start qui laissait un
+        // conteneur + volume orphelins et des ports fuites.
+        let claimed = self
+            .server_repo
+            .try_transition_status(
+                id,
+                &[
+                    GameServerStatus::Created,
+                    GameServerStatus::Running,
+                    GameServerStatus::Stopped,
+                    GameServerStatus::Error,
+                ],
+                GameServerStatus::Deleted,
+            )
+            .await?;
+        if !claimed {
+            return Err(DomainError::Conflict(
+                "operation deja en cours sur ce serveur (delete)".into(),
+            ));
+        }
+
         // Stop si actif (best-effort).
         if let Some(cid) = &server.container_id {
             if server.status.is_active() {
