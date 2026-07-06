@@ -14,11 +14,27 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serenity::all::{ButtonStyle, Color, ComponentInteraction, ReactionType};
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateEmbed, CreateEmbedAuthor, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage,
+    CreateActionRow, CreateAllowedMentions, CreateButton, CreateEmbed, CreateEmbedAuthor,
+    CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
 };
-use serenity::model::id::ChannelId;
+use serenity::model::id::{ChannelId, RoleId};
 use serenity::prelude::*;
+
+/// Extrait les RoleId des mentions `<@&123>` d'un texte (le prefix d'annonce,
+/// construit cote serveur), pour n'autoriser que ces roles dans AllowedMentions.
+fn extract_role_ids(s: &str) -> Vec<RoleId> {
+    let mut ids = Vec::new();
+    let mut rest = s;
+    while let Some(pos) = rest.find("<@&") {
+        let after = &rest[pos + 3..];
+        let digits: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
+        if let Ok(id) = digits.parse::<u64>() {
+            ids.push(RoleId::new(id));
+        }
+        rest = after;
+    }
+    ids
+}
 use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
@@ -303,6 +319,17 @@ async fn post_to_channel(
 
     // body est juste un Result vide pour absorber les erreurs eventuelles
     let _ = body;
+
+    // AllowedMentions derive du PREFIX (construit cote serveur a partir des flags
+    // de l'annonce) : on n'autorise @everyone/@here et un role QUE s'ils sont
+    // reellement presents dans le prefix voulu. Sans cela (aucun AllowedMentions),
+    // Discord parse et declenche TOUTES les mentions du content_text arbitraire
+    // -> un mod sans permission "mention everyone" pouvait pinguer tout le serveur.
+    let allow_everyone = prefix.contains("@everyone") || prefix.contains("@here");
+    let allowed = CreateAllowedMentions::new()
+        .everyone(allow_everyone)
+        .roles(extract_role_ids(prefix));
+    msg = msg.allowed_mentions(allowed);
 
     // Ajout des boutons (max 1 row Discord = 5 boutons)
     let rows = build_action_rows(&payload.buttons, &payload.announcement_id, &payload.run_id);
