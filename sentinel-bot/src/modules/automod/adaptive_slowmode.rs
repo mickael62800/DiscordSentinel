@@ -9,6 +9,9 @@ pub struct SlowmodeTracker {
     counters: DashMap<ChannelId, Vec<Instant>>,
     /// channels en cours d'activation (evite les activations multiples)
     activating: DashSet<ChannelId>,
+    /// channels dont l'automod a REELLEMENT active un slowmode (pour ne
+    /// desactiver que ceux-la, jamais un slowmode manuel de moderateur).
+    active: DashSet<ChannelId>,
     window: Duration,
 }
 
@@ -17,8 +20,16 @@ impl SlowmodeTracker {
         Self {
             counters: DashMap::new(),
             activating: DashSet::new(),
+            active: DashSet::new(),
             window: Duration::from_secs(window_secs),
         }
+    }
+
+    /// Marque un salon comme ayant un slowmode adaptatif actif (a appeler apres
+    /// avoir pose le slowmode). Ne touche PAS au compteur (sinon le salon
+    /// disparait du suivi et ne peut plus etre desactive).
+    pub fn mark_active(&self, channel_id: ChannelId) {
+        self.active.insert(channel_id);
     }
 
     /// Enregistre un message et retourne le nombre de messages dans la fenetre.
@@ -84,19 +95,31 @@ impl SlowmodeTracker {
     /// Ces channels devraient avoir leur slowmode desactive.
     pub fn channels_to_deactivate(&self, threshold: usize) -> Vec<ChannelId> {
         let now = Instant::now();
-        self.counters
-            .iter()
-            .filter(|entry| {
-                let active_count = entry
-                    .value()
-                    .iter()
-                    .filter(|t| now.duration_since(**t) < self.window)
-                    .count();
-                // Si l'activite est retombee sous la moitie du seuil, desactiver
-                active_count < threshold / 2
-            })
-            .map(|entry| *entry.key())
-            .collect()
+        let floor = (threshold / 2).max(1);
+        // On n'examine QUE les salons actives par l'automod (jamais les
+        // slowmodes manuels des modos).
+        let mut out = Vec::new();
+        for ch in self.active.iter() {
+            let ch = *ch.key();
+            let count = self
+                .counters
+                .get(&ch)
+                .map(|e| {
+                    e.value()
+                        .iter()
+                        .filter(|t| now.duration_since(**t) < self.window)
+                        .count()
+                })
+                .unwrap_or(0);
+            if count < floor {
+                out.push(ch);
+            }
+        }
+        // Ces salons vont etre desactives : on les retire de l'ensemble actif.
+        for ch in &out {
+            self.active.remove(ch);
+        }
+        out
     }
 
     /// Retourne le nombre de messages dans la fenetre pour un channel.
@@ -246,6 +269,7 @@ mod tests {
     fn deactivate_returns_quiet_channels() {
         let tracker = SlowmodeTracker::new(60);
         let ch = ChannelId::new(1);
+        tracker.mark_active(ch); // slowmode active par l'automod
         // 2 messages = sous la moitie de 10 (seuil/2 = 5)
         tracker.record_message(ch);
         tracker.record_message(ch);
@@ -258,6 +282,7 @@ mod tests {
     fn deactivate_ignores_active_channels() {
         let tracker = SlowmodeTracker::new(60);
         let ch = ChannelId::new(1);
+        tracker.mark_active(ch);
         // 8 messages = au-dessus de seuil/2 = 5
         for _ in 0..8 {
             tracker.record_message(ch);
@@ -266,10 +291,22 @@ mod tests {
     }
 
     #[test]
+    fn deactivate_only_automod_activated() {
+        // Un salon NON active par l'automod (slowmode manuel d'un modo) ne doit
+        // jamais etre desactive, meme calme.
+        let tracker = SlowmodeTracker::new(60);
+        let manual = ChannelId::new(9);
+        tracker.record_message(manual); // calme, mais pas mark_active
+        assert!(tracker.channels_to_deactivate(10).is_empty());
+    }
+
+    #[test]
     fn deactivate_mixed_channels() {
         let tracker = SlowmodeTracker::new(60);
         let quiet = ChannelId::new(1);
         let active = ChannelId::new(2);
+        tracker.mark_active(quiet);
+        tracker.mark_active(active);
         tracker.record_message(quiet);
         for _ in 0..8 {
             tracker.record_message(active);

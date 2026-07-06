@@ -423,10 +423,13 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         let adaptive_enabled =
             BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
         if adaptive_enabled {
+            // Seuil >= 1 (un 0 activerait le slowmode des le 1er message) ;
+            // secondes bornees a la limite Discord (21600).
             let threshold =
-                BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
-            let slowmode_secs =
-                BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5) as u16;
+                (BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15).max(1))
+                    as usize;
+            let slowmode_secs = BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5)
+                .clamp(1, 21600) as u16;
 
             let data = ctx.data.read().await;
             if let Some(tracker) = data.get::<SlowmodeTrackerKey>() {
@@ -440,7 +443,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                         warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
                     } else {
                         info!(channel_id = %msg.channel_id, slowmode_secs, "Slowmode adaptatif active");
-                        tracker.reset(msg.channel_id);
+                        // Marque le salon comme actif (sans effacer le compteur,
+                        // sinon il ne pourrait plus etre desactive -> slowmode
+                        // colle a vie).
+                        tracker.mark_active(msg.channel_id);
                     }
                     tracker.finish_activation(msg.channel_id);
                 }
