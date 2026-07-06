@@ -276,7 +276,7 @@ fn build_svg(d: &CardData) -> String {
             None => format!(
                 r##"<circle cx="450" cy="290" r="120" fill="#{species_color}"/>
   <text x="450" y="335" text-anchor="middle" font-family="DejaVu Sans" font-weight="bold" font-size="120" fill="#ffffff" opacity="0.9">{initial}</text>"##,
-                species_color = d.species_color,
+                species_color = esc(&d.species_color),
                 initial = esc(&initial),
             ),
         }

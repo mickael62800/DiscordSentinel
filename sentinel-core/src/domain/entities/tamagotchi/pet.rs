@@ -191,13 +191,21 @@ impl Pet {
 
         let before = (self.hunger, self.happiness, self.energy, self.status);
 
-        self.hunger =
-            clamp_gauge(self.hunger - (cfg.hunger_decay_per_hour as f64 * hours).round() as i32);
-        self.happiness = clamp_gauge(
-            self.happiness - (cfg.happiness_decay_per_hour as f64 * hours).round() as i32,
+        // saturating_sub : sans lui, une config decay negative + un `hours` grand
+        // (worker down longtemps) faisait deborder `gauge - decay` en i32 (panic
+        // debug / wrap release). clamp_gauge borne ensuite a [0, 100].
+        self.hunger = clamp_gauge(
+            self.hunger
+                .saturating_sub((cfg.hunger_decay_per_hour as f64 * hours).round() as i32),
         );
-        self.energy =
-            clamp_gauge(self.energy - (cfg.energy_decay_per_hour as f64 * hours).round() as i32);
+        self.happiness = clamp_gauge(
+            self.happiness
+                .saturating_sub((cfg.happiness_decay_per_hour as f64 * hours).round() as i32),
+        );
+        self.energy = clamp_gauge(
+            self.energy
+                .saturating_sub((cfg.energy_decay_per_hour as f64 * hours).round() as i32),
+        );
 
         // Suivi "faim a 0".
         if self.hunger == 0 {
