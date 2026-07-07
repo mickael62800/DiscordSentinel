@@ -8,6 +8,7 @@ pub mod manage_oauth;
 pub mod manage_quarantine;
 pub mod manage_rbac;
 pub mod manage_rotation;
+pub mod manage_slowmode;
 pub mod manage_security_audit;
 pub mod manage_server_events;
 pub mod manage_system_logs;

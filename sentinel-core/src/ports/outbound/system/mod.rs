@@ -22,5 +22,6 @@ pub mod security_audit_repository;
 pub mod security_log_repository;
 pub mod server_event_repository;
 pub mod service_registry;
+pub mod slowmode_repository;
 pub mod ticket_repository;
 pub mod tls_cert_reader;

@@ -3459,6 +3459,25 @@ impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCa
     }
 }
 
+pub struct StubSlowmode;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase
+    for StubSlowmode
+{
+    async fn activate(
+        &self,
+        _: &str,
+        _: serde_json::Value,
+        _: i64,
+        _: i32,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn deactivate(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 pub struct StubComponentVisibility;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase
@@ -4243,6 +4262,7 @@ fn base_state() -> AppState {
         oauth_uc: Arc::new(StubOAuth),
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
+        slowmode_uc: Arc::new(StubSlowmode),
         component_visibility_uc: Arc::new(StubComponentVisibility),
         bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),

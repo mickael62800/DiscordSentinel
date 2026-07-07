@@ -10,6 +10,7 @@ pub mod manage_quarantine_service;
 pub mod manage_rbac_service;
 pub mod manage_rotation_service;
 pub mod manage_security_audit_service;
+pub mod manage_slowmode_service;
 pub mod manage_server_events_service;
 pub mod manage_system_logs_service;
 pub mod manage_tickets_service;

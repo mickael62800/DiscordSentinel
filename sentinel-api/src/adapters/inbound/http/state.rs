@@ -139,6 +139,8 @@ pub struct AppState {
         Arc<dyn crate::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase>,
     pub lockdown_uc:
         Arc<dyn crate::ports::inbound::system::manage_lockdown::ManageLockdownUseCase>,
+    pub slowmode_uc:
+        Arc<dyn crate::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase>,
     pub component_visibility_uc: Arc<
         dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase,
     >,

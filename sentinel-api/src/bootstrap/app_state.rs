@@ -571,6 +571,16 @@ pub async fn build_app_state(
             lockdown_repo,
         ));
 
+    // Slowmode de securite manuel : repo Postgres (SQL security_slowmode_active) +
+    // use case (calcul de l'expiration). Le handler ne fait que parse/RBAC/map.
+    // Distinct de l'automod adaptatif (moderation).
+    let slowmode_repo: Arc<dyn crate::ports::outbound::system::slowmode_repository::SlowmodeRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::slowmode_repository::PgSlowmodeRepository::new(pg_pool.clone()));
+    let slowmode_uc: Arc<dyn crate::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase> =
+        Arc::new(sentinel_core::application::system::manage_slowmode_service::ManageSlowmodeService::new(
+            slowmode_repo,
+        ));
+
     // Visibilite des composants UI par role : repo Postgres (SQL
     // rbac_component_visibility + transaction batch) + use case. Le handler ne
     // fait que parse/RBAC/valider/map.
@@ -1210,6 +1220,7 @@ pub async fn build_app_state(
         invitations_uc,
         quarantine_uc,
         lockdown_uc,
+        slowmode_uc,
         component_visibility_uc,
         bot_persistence_uc,
         server_events_uc,
