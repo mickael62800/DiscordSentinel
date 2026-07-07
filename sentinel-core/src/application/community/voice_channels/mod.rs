@@ -188,6 +188,18 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         self.delete_channel_impl(channel_id).await
     }
 
+    async fn find_guild_id(&self, channel_id: &str) -> Result<Option<String>, DomainError> {
+        self.find_guild_id_impl(channel_id).await
+    }
+
+    async fn purge_channel(&self, channel_id: &str) -> Result<bool, DomainError> {
+        self.purge_channel_impl(channel_id).await
+    }
+
+    async fn purge_history(&self, guild_id: &str) -> Result<u64, DomainError> {
+        self.purge_history_impl(guild_id).await
+    }
+
     async fn update_channel(&self, cmd: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
         self.update_channel_impl(cmd).await
     }

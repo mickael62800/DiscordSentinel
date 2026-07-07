@@ -113,6 +113,50 @@ impl ManageVoiceChannelsService {
         self.close_channel_impl(channel_id).await
     }
 
+    pub(super) async fn find_guild_id_impl(
+        &self,
+        channel_id: &str,
+    ) -> Result<Option<String>, DomainError> {
+        Ok(self
+            .repo
+            .find_by_channel_id(channel_id)
+            .await?
+            .map(|c| c.guild_id.as_str().to_string()))
+    }
+
+    pub(super) async fn purge_channel_impl(&self, channel_id: &str) -> Result<bool, DomainError> {
+        // On resout la guild AVANT la suppression pour pouvoir invalider le cache.
+        let guild_id = self
+            .repo
+            .find_by_channel_id(channel_id)
+            .await?
+            .map(|c| c.guild_id.as_str().to_string());
+
+        let deleted = self
+            .repo
+            .hard_delete_closed_by_channel_id(channel_id)
+            .await?;
+
+        if deleted > 0 {
+            if let Some(guild_id) = guild_id {
+                self.invalidate_cache(&guild_id, channel_id).await;
+            }
+        }
+        Ok(deleted > 0)
+    }
+
+    pub(super) async fn purge_history_impl(&self, guild_id: &str) -> Result<u64, DomainError> {
+        let count = self.repo.hard_delete_closed_by_guild(guild_id).await?;
+        if let Err(e) = self
+            .cache
+            .invalidate(&format!("voice_channels:{guild_id}"))
+            .await
+        {
+            tracing::warn!(error = %e, guild_id, "Echec invalidation cache voice_channels apres purge historique");
+        }
+        Ok(count)
+    }
+
     pub(super) async fn update_channel_impl(
         &self,
         cmd: UpdateVoiceChannelCommand,

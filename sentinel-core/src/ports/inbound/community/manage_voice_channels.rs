@@ -126,6 +126,17 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     ) -> Result<VoiceChannel, DomainError>;
     async fn close_channel(&self, channel_id: &str) -> Result<(), DomainError>;
     async fn delete_channel(&self, channel_id: &str) -> Result<(), DomainError>;
+    /// Resout le `guild_id` associe a un salon (via son `channel_id`). Renvoie
+    /// `None` si aucun salon ne correspond. Utilise par les gardes RBAC du
+    /// handler pour scoper l'autorisation a la guilde du salon.
+    async fn find_guild_id(&self, channel_id: &str) -> Result<Option<String>, DomainError>;
+    /// Purge (hard-delete) un salon archive via son `channel_id`. Renvoie `true`
+    /// si une ligne a ete supprimee, `false` si le salon est introuvable ou
+    /// encore ouvert.
+    async fn purge_channel(&self, channel_id: &str) -> Result<bool, DomainError>;
+    /// Purge (hard-delete) tous les salons fermes d'une guild. Renvoie le nombre
+    /// de salons supprimes.
+    async fn purge_history(&self, guild_id: &str) -> Result<u64, DomainError>;
     async fn update_channel(&self, cmd: UpdateVoiceChannelCommand) -> Result<(), DomainError>;
     async fn transfer_ownership(&self, cmd: TransferOwnershipCommand) -> Result<(), DomainError>;
 

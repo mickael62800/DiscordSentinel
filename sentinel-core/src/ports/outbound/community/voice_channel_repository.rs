@@ -31,6 +31,16 @@ pub trait VoiceChannelStore: Send + Sync {
     async fn close(&self, id: Uuid) -> Result<(), DomainError>;
     async fn close_by_channel_id(&self, channel_id: &str) -> Result<(), DomainError>;
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
+    /// Hard-delete d'un salon archive (`channel_status = 'closed'`) via son
+    /// `channel_id`. Retourne le nombre de lignes supprimees (0 si le salon est
+    /// introuvable ou toujours ouvert).
+    async fn hard_delete_closed_by_channel_id(
+        &self,
+        channel_id: &str,
+    ) -> Result<u64, DomainError>;
+    /// Hard-delete de tous les salons fermes d'une guild. Retourne le nombre de
+    /// lignes supprimees.
+    async fn hard_delete_closed_by_guild(&self, guild_id: &str) -> Result<u64, DomainError>;
     async fn update_visibility(&self, id: Uuid, visibility: &str) -> Result<(), DomainError>;
     async fn update_locked(&self, id: Uuid, locked: bool) -> Result<(), DomainError>;
     async fn update_queue_enabled(&self, id: Uuid, queue_enabled: bool) -> Result<(), DomainError>;

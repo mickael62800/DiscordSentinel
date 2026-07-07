@@ -49,14 +49,7 @@ async fn gate_by_channel_id(
     if rbac.is_none() {
         return Ok(());
     }
-    let row: Option<(String,)> =
-        sqlx::query_as("SELECT guild_id FROM voice_channels WHERE channel_id = $1")
-            .bind(channel_id)
-            .fetch_optional(&state.pg_pool)
-            .await
-            .map_err(sqlx_internal("fetch voice channel guild"))?;
-
-    if let Some((guild_id,)) = row {
+    if let Some(guild_id) = state.voice_channels_uc.find_guild_id(channel_id).await? {
         check_role_for_guild(state, rbac, &guild_id, required, label).await?;
     }
     Ok(())
@@ -201,13 +194,7 @@ pub async fn purge_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Resolution component-gate par lookup guild via channel_id puis check.
     if rbac.is_some() {
-        if let Ok(Some((gid,))) = sqlx::query_as::<_, (String,)>(
-            "SELECT guild_id FROM voice_channels WHERE channel_id = $1",
-        )
-        .bind(&channel_id)
-        .fetch_optional(&state.pg_pool)
-        .await
-        {
+        if let Some(gid) = state.voice_channels_uc.find_guild_id(&channel_id).await? {
             crate::adapters::inbound::http::middleware::component_gates::check_component_role(
                 &state,
                 &rbac,
@@ -219,15 +206,9 @@ pub async fn purge_channel(
         }
     }
 
-    let res = sqlx::query(
-        "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
-    )
-    .bind(&channel_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("purge voice channel"))?;
+    let deleted = state.voice_channels_uc.purge_channel(&channel_id).await?;
 
-    if res.rows_affected() == 0 {
+    if !deleted {
         return Err(ApiError(DomainError::ValidationError(
             "salon introuvable ou encore ouvert (fermez-le d'abord)".into(),
         )));
@@ -257,19 +238,14 @@ pub async fn purge_history(
     )
     .await?;
 
-    let res =
-        sqlx::query("DELETE FROM voice_channels WHERE guild_id = $1 AND channel_status = 'closed'")
-            .bind(&guild_id)
-            .execute(&state.pg_pool)
-            .await
-            .map_err(sqlx_internal("purge history"))?;
+    let deleted = state.voice_channels_uc.purge_history(&guild_id).await?;
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
         serde_json::json!({ "guild_id": &guild_id, "purged_all": true }),
     );
 
-    Ok(Json(serde_json::json!({ "deleted": res.rows_affected() })))
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
 /// GET /api/voice-channels/by-channel/{channel_id}/events

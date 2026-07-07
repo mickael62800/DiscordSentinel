@@ -203,6 +203,15 @@ impl ManageVoiceChannelsUseCase for MockVoiceUc {
         self.delete_calls.lock().unwrap().push(id.into());
         Ok(())
     }
+    async fn find_guild_id(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn purge_channel(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn purge_history(&self, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn update_channel(&self, cmd: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
         self.update_calls.lock().unwrap().push(cmd);
         Ok(())

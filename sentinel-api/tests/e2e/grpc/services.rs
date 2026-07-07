@@ -1142,6 +1142,15 @@ impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
     async fn delete_channel(&self, _: &str) -> Result<(), DomainError> {
         unimplemented!()
     }
+    async fn find_guild_id(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
+    async fn purge_channel(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(false)
+    }
+    async fn purge_history(&self, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
         unimplemented!()
     }

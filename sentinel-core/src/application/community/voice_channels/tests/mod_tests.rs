@@ -395,6 +395,12 @@ impl VoiceChannelStore for MockVoiceRepo {
     async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn hard_delete_closed_by_channel_id(&self, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn hard_delete_closed_by_guild(&self, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
     async fn update_visibility(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
         Ok(())
     }

@@ -193,6 +193,33 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         self.close(id).await
     }
 
+    async fn hard_delete_closed_by_channel_id(
+        &self,
+        channel_id: &str,
+    ) -> Result<u64, DomainError> {
+        let res = sqlx::query(
+            "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
+        )
+        .bind(channel_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(res.rows_affected())
+    }
+
+    async fn hard_delete_closed_by_guild(&self, guild_id: &str) -> Result<u64, DomainError> {
+        let res = sqlx::query(
+            "DELETE FROM voice_channels WHERE guild_id = $1 AND channel_status = 'closed'",
+        )
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(res.rows_affected())
+    }
+
     async fn update_visibility(&self, id: Uuid, visibility: &str) -> Result<(), DomainError> {
         sqlx::query("UPDATE voice_channels SET visibility = $1 WHERE id = $2")
             .bind(visibility)
