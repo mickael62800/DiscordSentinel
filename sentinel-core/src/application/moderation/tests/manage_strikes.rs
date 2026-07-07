@@ -177,16 +177,16 @@ async fn add_strike_picks_highest_matching_threshold() {
     );
     let svc = build_service_with_config(config);
 
-    for _ in 0..5 {
+    // 4 premiers strikes (mute se declenche au 3e).
+    for _ in 0..4 {
         svc.add_strike(make_cmd("g1", "u1")).await.unwrap();
     }
 
-    let active = svc.get_active_strikes("g1", "u1").await.unwrap();
-    assert_eq!(active.len(), 5);
-
-    // The 5th strike should have triggered "ban" (not "mute")
+    // Le 5e strike franchit le seuil "ban" (plus haut seuil correspondant, pas
+    // "mute"). L'escalade n'est emise qu'au franchissement (fire-on-change), donc
+    // c'est bien ce 5e strike qui porte l'action "ban", pas les suivants.
     let result = svc.add_strike(make_cmd("g1", "u1")).await.unwrap();
-    assert_eq!(result.active_count, 6);
+    assert_eq!(result.active_count, 5);
     assert_eq!(result.escalation_action.as_deref(), Some("ban"));
     assert_eq!(result.escalation_duration, None);
 }

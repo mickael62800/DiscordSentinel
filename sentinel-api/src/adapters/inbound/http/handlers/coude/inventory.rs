@@ -202,7 +202,7 @@ pub async fn expire_insurance(
     State(state): State<AppState>,
     Path(insurance_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let id = validation::parse_uuid("insurance_id", &insurance_id).map_err(ApiError)?;
+    let id = validation::parse_uuid("assurance", &insurance_id).map_err(ApiError)?;
     state.coude_inventory_uc.expire_insurance(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
