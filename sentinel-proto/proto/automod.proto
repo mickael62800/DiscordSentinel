@@ -13,6 +13,22 @@ service AutomodService {
   // (tracker rate en memoire) puis demande la decision ici : la regle
   // (seuil severe, toggle) vit cote serveur.
   rpc EvaluateFlood(EvaluateFloodRequest) returns (EvaluateFloodResponse);
+  // Verdict sur des pieces jointes suspectes. Le bot envoie les noms de
+  // fichiers ; la regle (extensions dangereuses + config) vit cote serveur.
+  rpc EvaluateAttachments(EvaluateAttachmentsRequest) returns (EvaluateAttachmentsResponse);
+}
+
+message EvaluateAttachmentsRequest {
+  string guild_id = 1;
+  repeated string filenames = 2;
+}
+
+message EvaluateAttachmentsResponse {
+  bool suspicious = 1;
+  Action action = 2;
+  string reason = 3;
+  double score = 4;
+  string filename = 5;
 }
 
 message EvaluateFloodRequest {
@@ -25,6 +41,8 @@ message EvaluateFloodRequest {
 message EvaluateFloodResponse {
   bool severe = 1;
   int64 mute_duration_secs = 2;
+  // Score de confiance affiche sur la carte (fabrique cote serveur).
+  double score = 3;
 }
 
 message DetectionFlags {

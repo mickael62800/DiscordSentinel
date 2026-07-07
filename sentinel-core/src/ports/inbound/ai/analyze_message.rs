@@ -36,6 +36,26 @@ pub struct FloodDecision {
     pub severe: bool,
     /// Duree du mute a appliquer si `severe` (secondes).
     pub mute_duration_secs: i64,
+    /// Score de confiance a afficher sur la carte de review (0.0..1.0). Fabrique
+    /// cote serveur — le bot ne l'invente plus.
+    pub score: f64,
+}
+
+/// Decision d'analyse d'une piece jointe suspecte, prise cote serveur. La regle
+/// (liste des extensions dangereuses + `suspicious_file_extensions` config +
+/// toggle `suspicious_files_enabled`) vit dans le core ; le bot envoie les noms
+/// de fichiers et n'EXECUTE que l'action renvoyee.
+pub struct AttachmentDecision {
+    /// True si au moins une piece jointe est jugee suspecte.
+    pub suspicious: bool,
+    /// Action arbitree (Delete si suspecte, None sinon).
+    pub action: crate::domain::enums::moderation::action::Action,
+    /// Raison lisible (inclut le nom du fichier fautif).
+    pub reason: String,
+    /// Score de confiance a afficher sur la carte de review.
+    pub score: f64,
+    /// Nom du fichier fautif (vide si aucun).
+    pub filename: String,
 }
 
 #[async_trait]
@@ -51,4 +71,12 @@ pub trait AnalyzeMessageUseCase: Send + Sync {
         guild_id: &str,
         flood_count: i32,
     ) -> Result<FloodDecision, DomainError>;
+
+    /// Evalue une liste de pieces jointes (noms de fichiers) et renvoie la
+    /// decision. La regle (extensions dangereuses + config) vit cote serveur.
+    async fn evaluate_attachments(
+        &self,
+        guild_id: &str,
+        filenames: Vec<String>,
+    ) -> Result<AttachmentDecision, DomainError>;
 }

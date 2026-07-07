@@ -123,6 +123,29 @@ impl AutomodService for AutomodGrpc {
         Ok(Response::new(proto::EvaluateFloodResponse {
             severe: decision.severe,
             mute_duration_secs: decision.mute_duration_secs,
+            score: decision.score,
+        }))
+    }
+
+    async fn evaluate_attachments(
+        &self,
+        request: Request<proto::EvaluateAttachmentsRequest>,
+    ) -> Result<Response<proto::EvaluateAttachmentsResponse>, Status> {
+        let req = request.into_inner();
+        if req.guild_id.is_empty() || req.guild_id.len() > 20 {
+            return Err(Status::invalid_argument("guild_id invalide"));
+        }
+        let decision = self
+            .uc
+            .evaluate_attachments(&req.guild_id, req.filenames)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::EvaluateAttachmentsResponse {
+            suspicious: decision.suspicious,
+            action: action_to_proto(decision.action),
+            reason: decision.reason,
+            score: decision.score,
+            filename: decision.filename,
         }))
     }
 }

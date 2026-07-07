@@ -61,6 +61,14 @@ impl AnalyzeMessageUseCase for MockAnalyzeUC {
     {
         unimplemented!()
     }
+    async fn evaluate_attachments(
+        &self,
+        _: &str,
+        _: Vec<String>,
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
+    {
+        unimplemented!()
+    }
 }
 
 fn build_app(uc: MockAnalyzeUC) -> axum::Router {

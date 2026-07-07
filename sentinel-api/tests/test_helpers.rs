@@ -119,6 +119,14 @@ impl AnalyzeMessageUseCase for StubAnalyzeMessage {
     async fn evaluate_flood(&self, _: &str, _: i32) -> Result<FloodDecision, DomainError> {
         unimplemented!()
     }
+    async fn evaluate_attachments(
+        &self,
+        _: &str,
+        _: Vec<String>,
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
+    {
+        unimplemented!()
+    }
 }
 
 pub struct StubAnalyzeImage;

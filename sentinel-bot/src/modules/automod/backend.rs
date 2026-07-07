@@ -558,8 +558,9 @@ pub(super) async fn execute_action(
 ///   - vision_max_image_size_mb : taille max d une image traitee (defaut 14 Mo)
 ///   - vision_scan_embeds       : analyse aussi les images dans les embeds
 ///   - vision_queue_max_retries : nombre de retries sur echec de submission
-///   - vision_auto_delete_nsfw  : force delete si la raison contient "nsfw"
-///   - vision_auto_delete_illicit : force delete si la raison contient "illicit"
+///
+/// Les toggles vision_auto_delete_nsfw / vision_auto_delete_illicit sont
+/// appliques COTE API (AnalyzeImageService renvoie l'action deja arbitree).
 pub(super) async fn analyze_message_images(
     ctx: &Context,
     msg: &Message,
@@ -601,16 +602,9 @@ pub(super) async fn analyze_message_images(
         "vision_queue_max_retries",
         3,
     ) as usize;
-    let auto_delete_nsfw = crate::shared::api_client::BaseApiClient::config_bool(
-        &config,
-        "vision_auto_delete_nsfw",
-        false,
-    );
-    let auto_delete_illicit = crate::shared::api_client::BaseApiClient::config_bool(
-        &config,
-        "vision_auto_delete_illicit",
-        true,
-    );
+    // Les toggles vision_auto_delete_nsfw / vision_auto_delete_illicit sont
+    // desormais appliques COTE API (AnalyzeImageService) : le bot n'a plus a
+    // reinterpreter la `reason` pour re-decider une suppression.
 
     // Collecte des URLs : pieces jointes + (optionnel) images dans embeds.
     let mut image_urls: Vec<String> = msg
@@ -795,27 +789,16 @@ pub(super) async fn analyze_message_images(
             .and_then(|v| v.as_str())
             .unwrap_or("Image detectee");
 
-        let api_action = match action_str {
+        // L'action est DEJA arbitree cote API : la vision (`AnalyzeImageService`)
+        // applique les toggles `vision_auto_delete_nsfw` / `vision_auto_delete_illicit`
+        // et renvoie l'action finale. Le bot n'interprete plus la `reason` : il
+        // se contente d'EXECUTER l'action renvoyee.
+        let action = match action_str {
             "warn" => Action::Warn,
             "delete" => Action::Delete,
             "mute" => Action::Mute,
             "ban" => Action::Ban,
             _ => Action::None,
-        };
-
-        // Override : si la raison signale NSFW / illicit ET le toggle correspondant
-        // est ON, force la suppression meme si l action API retournee etait moins
-        // severe. Garde les actions plus severes (mute/ban) telles quelles.
-        let reason_lower = reason.to_lowercase();
-        let action = if (auto_delete_nsfw && reason_lower.contains("nsfw"))
-            || (auto_delete_illicit && reason_lower.contains("illicit"))
-        {
-            match api_action {
-                Action::None | Action::Warn => Action::Delete,
-                other => other,
-            }
-        } else {
-            api_action
         };
 
         if action == Action::None {

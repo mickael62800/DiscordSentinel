@@ -108,6 +108,13 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
     ) -> Result<crate::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
         unimplemented!()
     }
+    async fn evaluate_attachments(
+        &self,
+        _: &str,
+        _: Vec<String>,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn make_req(guild_id: &str, user_id: &str, content: &str) -> Request<proto::AnalyzeMessageRequest> {

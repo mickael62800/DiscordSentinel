@@ -61,6 +61,13 @@ struct VisionConfig {
     per_channel_threshold: std::collections::HashMap<String, f32>,
     hash_cache_enabled: bool,
     hash_cache_ttl_secs: u64,
+    /// Toggle : force la suppression si une image NSFW est detectee, meme si le
+    /// score baseline ne suffit pas a atteindre le seuil `delete`. La DECISION
+    /// vit ici (core), plus dans le bot : ce dernier n'EXECUTE que l'action
+    /// deja arbitree. Defaut `false` (miroir de l'ancien defaut cote bot).
+    auto_delete_nsfw: bool,
+    /// Idem pour les images illicites. Defaut `true` (miroir cote bot).
+    auto_delete_illicit: bool,
 }
 
 /// Defaut TTL cache : 24h. Une image identique repostee dans la fenetre
@@ -77,9 +84,19 @@ fn parse_vision_config(
         per_channel_threshold: std::collections::HashMap::new(),
         hash_cache_enabled: true,
         hash_cache_ttl_secs: DEFAULT_HASH_CACHE_TTL_SECS,
+        auto_delete_nsfw: false,
+        auto_delete_illicit: true,
     };
     for e in entries {
         match e.config_key.as_str() {
+            "vision_auto_delete_nsfw" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.auto_delete_nsfw = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "vision_auto_delete_illicit" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.auto_delete_illicit = matches!(v.as_str(), "true" | "1" | "yes");
+            }
             "vision_enabled" => {
                 let v = e.config_value.to_ascii_lowercase();
                 cfg.enabled = matches!(v.as_str(), "true" | "1" | "yes");
@@ -336,6 +353,21 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             (Action::Warn, None)
         } else {
             (Action::None, None)
+        };
+
+        // Override NSFW / illicit (DECIDE = API) : si le toggle correspondant est
+        // actif et que le label est detecte, on force la suppression meme si le
+        // score baseline retombait sur None/Warn. Les actions plus severes
+        // (Mute/Ban) sont preservees. Cette decision etait auparavant refaite
+        // dans le bot a partir du texte de la `reason` — elle vit desormais ici,
+        // le bot ne fait qu'EXECUTER l'action arbitree.
+        let (action, duration) = if matches!(action, Action::None | Action::Warn)
+            && ((vcfg.auto_delete_nsfw && detected_labels.contains(&FlagType::Nsfw))
+                || (vcfg.auto_delete_illicit && detected_labels.contains(&FlagType::Illicit)))
+        {
+            (Action::Delete, None)
+        } else {
+            (action, duration)
         };
 
         let reason = format!(

@@ -59,11 +59,8 @@ pub(super) fn build_detector_config(
             "suspicious_files_enabled",
             true,
         ),
-        suspicious_file_extensions: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
-            config,
-            "suspicious_file_extensions",
-            "",
-        )),
+        // `suspicious_file_extensions` n'est plus lu ici : la regle vit cote API
+        // (`evaluate_attachments`), qui lit cette cle depuis la config guild.
         unicode_enabled: BaseApiClient::config_bool(config, "unicode_detection_enabled", true),
         unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3).max(1)
             as usize,

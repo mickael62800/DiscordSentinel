@@ -323,10 +323,87 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let severe_max = num("severe_flood_max_messages", flood_max * 2);
         let mute_dur = num("mute_duration_secs", 600);
         let severe = auto_protect && (flood_count.max(0) as u64) >= severe_max;
+        // Score de confiance affiche sur la carte : fabrique cote serveur
+        // (auparavant code en dur dans le bot : 0.99 severe / 0.9 sinon).
+        let score = if severe { 0.99 } else { 0.9 };
         Ok(FloodDecision {
             severe,
             mute_duration_secs: mute_dur as i64,
+            score,
         })
+    }
+
+    async fn evaluate_attachments(
+        &self,
+        guild_id: &str,
+        filenames: Vec<String>,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
+        use crate::ports::inbound::ai::analyze_message::AttachmentDecision;
+
+        // Liste des extensions intrinsequement dangereuses (executables /
+        // scripts). Auparavant codee en dur DANS le bot — la regle vit
+        // desormais cote serveur.
+        const DANGEROUS_EXTENSIONS: &[&str] = &[
+            "exe", "bat", "cmd", "scr", "ps1", "vbs", "js", "jar", "com", "pif", "msi", "dll",
+            "reg", "hta",
+        ];
+
+        let none = || AttachmentDecision {
+            suspicious: false,
+            action: Action::None,
+            reason: String::new(),
+            score: 0.0,
+            filename: String::new(),
+        };
+
+        let entries = self
+            .bot_config_repo
+            .get_config(guild_id, "automod-bot")
+            .await
+            .unwrap_or_default();
+
+        // Toggle `suspicious_files_enabled` (defaut true) : si desactive, aucune
+        // piece jointe n'est jugee suspecte.
+        let enabled = entries
+            .iter()
+            .find(|e| e.config_key == "suspicious_files_enabled")
+            .map(|e| {
+                let v = e.config_value.to_ascii_lowercase();
+                matches!(v.as_str(), "true" | "1" | "yes")
+            })
+            .unwrap_or(true);
+        if !enabled {
+            return Ok(none());
+        }
+
+        // Extensions supplementaires configurees par serveur (CSV).
+        let extra: Vec<String> = entries
+            .iter()
+            .find(|e| e.config_key == "suspicious_file_extensions")
+            .map(|e| {
+                e.config_value
+                    .split(',')
+                    .map(|s| s.trim().to_ascii_lowercase())
+                    .filter(|s| !s.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        for filename in &filenames {
+            let name_lower = filename.to_lowercase();
+            let ext = name_lower.rsplit('.').next().unwrap_or("");
+            if DANGEROUS_EXTENSIONS.contains(&ext) || extra.iter().any(|e| e == ext) {
+                return Ok(AttachmentDecision {
+                    suspicious: true,
+                    action: Action::Delete,
+                    reason: format!("Piece jointe suspecte : {filename}"),
+                    score: 1.0,
+                    filename: filename.clone(),
+                });
+            }
+        }
+
+        Ok(none())
     }
 
     async fn analyze(&self, cmd: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError> {

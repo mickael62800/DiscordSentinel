@@ -198,6 +198,14 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
     ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
         unimplemented!()
     }
+    async fn evaluate_attachments(
+        &self,
+        _: &str,
+        _: Vec<String>,
+    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
+    {
+        unimplemented!()
+    }
 }
 
 #[tokio::test]

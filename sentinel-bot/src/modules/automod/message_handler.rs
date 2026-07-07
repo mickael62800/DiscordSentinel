@@ -128,73 +128,92 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
     // Detection pieces jointes suspectes
     let files_review = BaseApiClient::config_bool(&config, "files_review_mode", true);
+    // Detection + DECISION "fichier suspect" cote API : le bot envoie les noms
+    // de pieces jointes ; la regle (extensions dangereuses + config) et l'action
+    // sont arbitrees cote serveur (`evaluate_attachments`). Le bot n'EXECUTE que
+    // le verdict. Le gate `suspicious_files_enabled` local evite un appel inutile
+    // quand la detection est desactivee.
     if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
-        const DANGEROUS_EXTENSIONS: &[&str] = &[
-            "exe", "bat", "cmd", "scr", "ps1", "vbs", "js", "jar", "com", "pif", "msi", "dll",
-            "reg", "hta",
-        ];
+        let filenames: Vec<String> = msg
+            .attachments
+            .iter()
+            .map(|a| a.filename.clone())
+            .collect();
 
-        let suspicious = msg.attachments.iter().find(|a| {
-            let name_lower = a.filename.to_lowercase();
-            let ext = name_lower.rsplit('.').next().unwrap_or("");
-            DANGEROUS_EXTENSIONS.contains(&ext)
-                || detector_config
-                    .suspicious_file_extensions
-                    .iter()
-                    .any(|e| e == ext)
-        });
-
-        if let Some(attachment) = suspicious {
-            info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect detecte");
-            let reason = format!("Piece jointe suspecte : {}", attachment.filename);
-
-            if (files_review || human_only) && log_channel_id != 0 {
-                let flags = detectors::DetectionFlags {
-                    spam: false,
-                    insult: false,
-                    link: false,
-                    phishing: false,
-                };
-                send_review_card(
-                    ctx,
-                    msg,
-                    &Action::Delete,
-                    &reason,
-                    1.0,
-                    &flags,
-                    log_channel_id,
-                    &colors,
-                    None,
-                    false,
-                )
-                .await;
-            } else if human_only {
-                // Modération humaine sans salon de review : on ne supprime pas.
-                warn!(user = %msg.author.name, "Fichier suspect + human_only sans salon review : suppression bloquee");
-            } else {
-                let embed = moderate_embed("Fichier suspect supprime")
-                    .color(colors.delete)
-                    .field("Raison", &reason, false)
-                    .field("Fichier", &attachment.filename, false)
-                    .thumbnail(msg.author.face());
-                let builder = serenity::builder::CreateMessage::new().embed(embed);
-                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
-                    warn!(error = %e, "Echec envoi notification fichier suspect");
-                }
-                if let Err(e) = msg.delete(&ctx.http).await {
-                    warn!(error = %e, message_id = %msg.id, "Echec suppression message fichier suspect");
-                }
-            }
-
-            let log_msg = format!(
-                "Fichier suspect -- {} : {}",
-                msg.author.name, attachment.filename
-            );
+        let (base_opt, grpc_opt) = {
             let data = ctx.data.read().await;
-            if let Some(base) = data.get::<ApiClientKey>() {
-                base.send_log("warn", &guild_id, &log_msg);
+            (
+                data.get::<ApiClientKey>().cloned(),
+                data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                    .cloned(),
+            )
+        };
+
+        let verdict = match (base_opt.clone(), grpc_opt) {
+            (Some(base), Some(grpc)) => {
+                let api = super::api_client::ApiClient::new(base, grpc);
+                match api.evaluate_attachments(&guild_id, filenames).await {
+                    Ok(v) => Some(v),
+                    Err(e) => {
+                        warn!(error = %e, "evaluate_attachments gRPC echoue -- fichier laisse passer");
+                        None
+                    }
+                }
             }
-            return;
+            _ => None,
+        };
+
+        if let Some(verdict) = verdict {
+            if verdict.suspicious {
+                info!(user = %msg.author.name, filename = %verdict.filename, "Fichier suspect detecte (verdict API)");
+
+                if (files_review || human_only) && log_channel_id != 0 {
+                    let flags = detectors::DetectionFlags {
+                        spam: false,
+                        insult: false,
+                        link: false,
+                        phishing: false,
+                    };
+                    send_review_card(
+                        ctx,
+                        msg,
+                        &verdict.action,
+                        &verdict.reason,
+                        verdict.score,
+                        &flags,
+                        log_channel_id,
+                        &colors,
+                        None,
+                        false,
+                    )
+                    .await;
+                } else if human_only {
+                    // Modération humaine sans salon de review : on ne supprime pas.
+                    warn!(user = %msg.author.name, "Fichier suspect + human_only sans salon review : suppression bloquee");
+                } else {
+                    let embed = moderate_embed("Fichier suspect supprime")
+                        .color(colors.delete)
+                        .field("Raison", &verdict.reason, false)
+                        .field("Fichier", &verdict.filename, false)
+                        .thumbnail(msg.author.face());
+                    let builder = serenity::builder::CreateMessage::new().embed(embed);
+                    if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                        warn!(error = %e, "Echec envoi notification fichier suspect");
+                    }
+                    if let Err(e) = msg.delete(&ctx.http).await {
+                        warn!(error = %e, message_id = %msg.id, "Echec suppression message fichier suspect");
+                    }
+                }
+
+                let log_msg = format!(
+                    "Fichier suspect -- {} : {}",
+                    msg.author.name, verdict.filename
+                );
+                if let Some(base) = &base_opt {
+                    base.send_log("warn", &guild_id, &log_msg);
+                }
+                return;
+            }
         }
     }
 
@@ -237,7 +256,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             // toggle auto_protect) vit dans la config serveur, plus dans le bot.
             // Le tracker de rate reste local (legitime). Fallback sur le seuil
             // local uniquement si l'API est indisponible (resilience).
-            let severe = {
+            // `flood_card_score` : score affiche sur la carte, fabrique COTE API
+            // (`evaluate_flood`). Le fallback local (0.99/0.9) ne sert qu'en cas
+            // d'API indisponible.
+            let (severe, flood_card_score) = {
                 let (base, grpc) = {
                     let data = ctx.data.read().await;
                     (
@@ -246,6 +268,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                         data.get::<crate::shared::grpc_client::GrpcClientKey>()
                             .cloned(),
                     )
+                };
+                let local_fallback = || {
+                    let sev = auto_protect && flood_count >= severe_flood_max;
+                    (sev, if sev { 0.99 } else { 0.9 })
                 };
                 match (base, grpc) {
                     (Some(base), Some(grpc)) => {
@@ -260,14 +286,14 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                             )
                             .await
                         {
-                            Ok((severe, _dur)) => severe,
+                            Ok((severe, _dur, score)) => (severe, score),
                             Err(e) => {
                                 warn!(error = %e, "evaluate_flood gRPC echoue, fallback seuil local");
-                                auto_protect && flood_count >= severe_flood_max
+                                local_fallback()
                             }
                         }
                     }
-                    _ => auto_protect && flood_count >= severe_flood_max,
+                    _ => local_fallback(),
                 }
             };
             info!(user = %msg.author.name, count = flood_count, severe, "Flood detecte");
@@ -308,7 +334,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                     msg,
                     &suggested,
                     reason,
-                    if severe { 0.99 } else { 0.9 },
+                    flood_card_score,
                     &flags,
                     log_channel_id,
                     &colors,

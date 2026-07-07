@@ -148,7 +148,7 @@ impl ApiClient {
         user_id: &str,
         channel_id: &str,
         flood_count: i32,
-    ) -> Result<(bool, i64), String> {
+    ) -> Result<(bool, i64, f64), String> {
         let req = proto::EvaluateFloodRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -156,10 +156,42 @@ impl ApiClient {
             flood_count,
         };
         let resp = crate::grpc_call!(self.grpc, automod, evaluate_flood, req)?;
-        Ok((resp.severe, resp.mute_duration_secs))
+        Ok((resp.severe, resp.mute_duration_secs, resp.score))
+    }
+
+    /// gRPC `AutomodService.EvaluateAttachments` : verdict sur des pieces
+    /// jointes suspectes. La regle (extensions dangereuses + config) vit cote
+    /// serveur ; le bot n'EXECUTE que l'action renvoyee.
+    pub async fn evaluate_attachments(
+        &self,
+        guild_id: &str,
+        filenames: Vec<String>,
+    ) -> Result<AttachmentVerdict, String> {
+        let req = proto::EvaluateAttachmentsRequest {
+            guild_id: guild_id.to_string(),
+            filenames,
+        };
+        let resp = crate::grpc_call!(self.grpc, automod, evaluate_attachments, req)?;
+        Ok(AttachmentVerdict {
+            suspicious: resp.suspicious,
+            action: proto_action_to_action(resp.action),
+            reason: resp.reason,
+            score: resp.score,
+            filename: resp.filename,
+        })
     }
 
     // analyze_image supprime -- migre vers ai-worker (async queue + Redis).
+}
+
+/// Verdict d'analyse de pieces jointes renvoye par l'API.
+#[derive(Debug)]
+pub struct AttachmentVerdict {
+    pub suspicious: bool,
+    pub action: Action,
+    pub reason: String,
+    pub score: f64,
+    pub filename: String,
 }
 
 fn proto_action_to_action(value: i32) -> Action {
