@@ -21,23 +21,6 @@ pub fn parse_pipe_lines(raw: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// Parse des lignes "id:value" ou id est un u64 et value est un f64.
-/// Ignore les lignes invalides.
-pub fn parse_id_f64_lines(raw: &str) -> Vec<(u64, f64)> {
-    raw.lines()
-        .filter_map(|line| {
-            let line = line.trim();
-            if line.is_empty() {
-                return None;
-            }
-            let (id_str, val_str) = line.split_once(':')?;
-            let id: u64 = id_str.trim().parse().ok()?;
-            let val: f64 = val_str.trim().parse().ok()?;
-            Some((id, val))
-        })
-        .collect()
-}
-
 /// Parse des lignes "id:value" ou id est un u64 et value est un u64.
 pub fn parse_id_u64_lines(raw: &str) -> Vec<(u64, u64)> {
     raw.lines()
@@ -60,15 +43,6 @@ pub fn split_csv(s: &str) -> Vec<String> {
         .map(|v| v.trim().to_lowercase())
         .filter(|v| !v.is_empty())
         .collect()
-}
-
-/// Lookup dans un Vec<(u64, f64)> par id, retourne le defaut si non trouve.
-pub fn lookup_f64(entries: &[(u64, f64)], id: u64, default: f64) -> f64 {
-    entries
-        .iter()
-        .find(|(k, _)| *k == id)
-        .map(|(_, v)| *v)
-        .unwrap_or(default)
 }
 
 /// Lookup dans un Vec<(u64, u64)> par id.
@@ -128,17 +102,6 @@ mod tests {
     }
 
     #[test]
-    fn id_f64_simple() {
-        let r = parse_id_f64_lines("123:2.0\n456:1.5");
-        assert_eq!(r, vec![(123, 2.0), (456, 1.5)]);
-    }
-
-    #[test]
-    fn id_f64_ignores_invalid() {
-        assert_eq!(parse_id_f64_lines("abc:1.0\n123:abc\n456:1.5").len(), 1);
-    }
-
-    #[test]
     fn id_u64_simple() {
         let r = parse_id_u64_lines("111:3600\n222:86400");
         assert_eq!(r, vec![(111, 3600), (222, 86400)]);
@@ -153,16 +116,6 @@ mod tests {
     #[test]
     fn csv_empty() {
         assert!(split_csv("").is_empty());
-    }
-
-    #[test]
-    fn lookup_f64_found() {
-        assert_eq!(lookup_f64(&[(1, 2.0)], 1, 1.0), 2.0);
-    }
-
-    #[test]
-    fn lookup_f64_default() {
-        assert_eq!(lookup_f64(&[(1, 2.0)], 99, 1.0), 1.0);
     }
 
     #[test]

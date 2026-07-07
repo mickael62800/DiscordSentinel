@@ -6,13 +6,10 @@ pub mod api_client;
 pub mod classement_cmd;
 pub mod level_channel;
 pub mod level_cmd;
-pub mod multipliers;
 pub mod nickname;
 pub mod resync_cmd;
 pub mod stats_cmd;
-pub mod streaks;
 pub mod tracker;
-pub mod xp_cooldown;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -33,9 +30,7 @@ use crate::shared::embeds::success_embed;
 use crate::shared::heartbeat::ApiClientKey;
 
 use api_client::ApiClient;
-use streaks::StreakTracker;
 use tracker::StatsTracker;
-use xp_cooldown::XpCooldown;
 
 // ── TypeMapKeys ──
 
@@ -49,19 +44,13 @@ impl TypeMapKey for TrackerKey {
     type Value = StatsTracker;
 }
 
-pub struct XpCooldownKey;
-impl TypeMapKey for XpCooldownKey {
-    type Value = XpCooldown;
-}
-
-pub struct StreakTrackerKey;
-impl TypeMapKey for StreakTrackerKey {
-    type Value = StreakTracker;
-}
-
 // ── Init TypeMapKeys ──
 
 /// Insere les TypeMapKeys du module progression dans le TypeMap partage.
+///
+/// Depuis le refactor P0, le bot n'accumule plus d'etat de calcul XP
+/// (cooldown, streak) : ces logiques sont remontees dans l'API. Il ne reste
+/// que le tracker de SESSION vocale (secondes brutes) et le client API.
 pub fn init_typemap(
     data: &mut serenity::prelude::TypeMap,
     api: &Arc<crate::shared::api_client::BaseApiClient>,
@@ -72,8 +61,6 @@ pub fn init_typemap(
         Arc::clone(grpc),
     ));
     data.insert::<TrackerKey>(tracker::StatsTracker::new());
-    data.insert::<XpCooldownKey>(xp_cooldown::XpCooldown::new());
-    data.insert::<StreakTrackerKey>(streaks::StreakTracker::new());
 }
 
 /// Hydrate les sessions vocales depuis les voice_states Discord apres le boot.
@@ -230,29 +217,16 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
         return Ok(());
     }
 
+    // On garde `base` uniquement pour eventuels usages futurs ; le calcul XP
+    // (config serveur, multiplicateurs) est desormais entierement cote API.
+    let _ = &base;
+
     for (guild_id, user_id, seconds, channel_id) in credits {
-        let gc = base
-            .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
-            .await
-            .unwrap_or_default();
-        if !BaseApiClient::config_bool(&gc, "enabled", true) {
+        if seconds == 0 {
             continue;
         }
-        let xp_per_minute = BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
-
-        let channel_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
-            &gc,
-            "xp_channel_multipliers",
-            "",
-        ));
-        let role_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
-            &gc,
-            "xp_role_multipliers",
-            "",
-        ));
-        let channel_mult = multipliers::get_channel_multiplier(&channel_mults, channel_id);
-
-        let user_roles: Vec<u64> = ctx
+        // Roles de l'utilisateur (fait brut envoye a l'API pour ses multiplicateurs).
+        let role_ids: Vec<u64> = ctx
             .cache
             .guild(serenity::model::id::GuildId::new(guild_id))
             .and_then(|g| {
@@ -261,21 +235,7 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
                     .map(|m| m.roles.iter().map(|r| r.get()).collect())
             })
             .unwrap_or_default();
-        let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
-        let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
-        let xp_amount =
-            // clamp_max aligne sur le cap serveur (add_xp rejette > 10000) : au-dela,
-            // l'XP vocal etait entierement PERDU (l'appel API echouait).
-            multipliers::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 10_000.0);
-        info!(
-            guild = %guild_id, user = %user_id, channel = %channel_id,
-            seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
-            "voice xp tick calc"
-        );
-        if xp_amount <= 0 {
-            continue;
-        }
         let username = UserId::new(user_id)
             .to_user(&ctx.http)
             .await
@@ -284,17 +244,19 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
 
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<StatsApiKey>() {
+            // FAIT BRUT : N secondes vocales dans le salon. L'API calcule l'XP.
             if let Err(e) = api
-                .add_xp(
+                .record_voice_activity(
                     &guild_id.to_string(),
                     &user_id.to_string(),
                     &username,
-                    xp_amount,
-                    "voice",
+                    channel_id,
+                    &role_ids,
+                    seconds,
                 )
                 .await
             {
-                warn!(error = %e, guild = %guild_id, user = %user_id, "progression: add_xp tick echoue");
+                warn!(error = %e, guild = %guild_id, user = %user_id, "progression: record_voice_activity tick echoue");
             }
         }
         drop(data);
@@ -393,131 +355,28 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         warn!(error = %e, "Impossible d'envoyer les stats messages au backend");
     }
 
-    let cooldown_secs = BaseApiClient::config_u64(&guild_config, "xp_cooldown_secs", 60);
-    // Reservation ATOMIQUE (check-and-set) : evite que deux messages concurrents
-    // du meme user passent tous deux le cooldown avant l'enregistrement.
-    let can_gain = if let Some(cooldown) = data.get::<XpCooldownKey>() {
-        cooldown.try_claim(guild_id.get(), msg.author.id.get(), cooldown_secs)
-    } else {
-        true
-    };
-
-    if !can_gain {
-        return;
-    }
-
-    let streak_enabled = BaseApiClient::config_bool(&guild_config, "streak_enabled", true);
-    let streak_mult = if streak_enabled {
-        if let Some(streak_tracker) = data.get::<StreakTrackerKey>() {
-            if !streak_tracker.has(guild_id.get(), msg.author.id.get()) {
-                if let Ok(streak_data) = api
-                    .get_streak(&guild_id.to_string(), &msg.author.id.to_string())
-                    .await
-                {
-                    streak_tracker.seed(
-                        guild_id.get(),
-                        msg.author.id.get(),
-                        streak_data.streak_current,
-                        streak_data.streak_best,
-                        streak_data.streak_last_day,
-                        streak_data.streak_last_year,
-                    );
-                }
-            }
-
-            let now = time::OffsetDateTime::now_utc();
-            let update = streak_tracker.record_activity(
-                guild_id.get(),
-                msg.author.id.get(),
-                now.ordinal() as u32,
-                now.year(),
-            );
-
-            if update.new_day {
-                let (current, best) =
-                    streak_tracker.get_streak(guild_id.get(), msg.author.id.get());
-                api.update_streak(
-                    &guild_id.to_string(),
-                    &msg.author.id.to_string(),
-                    current,
-                    best,
-                    now.ordinal() as u32,
-                    now.year(),
-                )
-                .await;
-                if let Some(base) = data.get::<ApiClientKey>() {
-                    base.publish_event(
-                        "streak_updated",
-                        serde_json::json!({
-                            "guild_id": guild_id.to_string(),
-                            "user_id": msg.author.id.to_string(),
-                            "username": msg.author.name,
-                            "streak_current": current,
-                            "streak_best": best,
-                        }),
-                    );
-                }
-            }
-
-            // Le multiplicateur de streak est reglable par serveur (config
-            // `progression-bot`) : bonus par semaine + plafond. Defauts =
-            // valeurs historiques (0.1 / 1.5) -> aucun changement tant que non
-            // reconfigure. La fonction reste pure : on lui passe les valeurs.
-            let bonus_per_week = guild_config
-                .get("streak_bonus_per_week")
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(streaks::DEFAULT_STREAK_BONUS_PER_WEEK);
-            let max_multiplier = guild_config
-                .get("streak_max_multiplier")
-                .and_then(|v| v.parse::<f64>().ok())
-                .unwrap_or(streaks::DEFAULT_STREAK_MAX_MULTIPLIER);
-            streaks::streak_multiplier_with(update.current_streak, bonus_per_week, max_multiplier)
-        } else {
-            1.0
-        }
-    } else {
-        1.0
-    };
-
-    let channel_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
-        &guild_config,
-        "xp_channel_multipliers",
-        "",
-    ));
-    let role_mults = multipliers::parse_multipliers(&BaseApiClient::config_or(
-        &guild_config,
-        "xp_role_multipliers",
-        "",
-    ));
-
-    let channel_mult = multipliers::get_channel_multiplier(&channel_mults, msg.channel_id.get());
+    // FAIT BRUT : "un message qualifiant a eu lieu". L'API calcule tout l'XP
+    // (cooldown anti-farm, streak, multiplicateurs channel/role, clamp).
     let user_roles: Vec<u64> = msg
         .member
         .as_ref()
         .map(|m| m.roles.iter().map(|r| r.get()).collect())
         .unwrap_or_default();
-    let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
-
-    let base_xp = BaseApiClient::config_u64(&guild_config, "xp_per_message", 15) as f64;
-    let final_xp =
-        multipliers::calc_xp_amount(base_xp, channel_mult, role_mult, streak_mult, 1.0, 1000.0);
-    info!(
-        guild = %guild_id, user = %msg.author.id, channel = %msg.channel_id,
-        base_xp, channel_mult, role_mult, streak_mult, final_xp,
-        "text xp calc"
-    );
 
     match api
-        .add_xp(
+        .record_text_activity(
             &guild_id.to_string(),
             &msg.author.id.to_string(),
             &msg.author.name,
-            final_xp,
-            "text",
+            msg.channel_id.get(),
+            &user_roles,
         )
         .await
     {
         Ok(result) => {
+            if result.skipped {
+                return;
+            }
             if result.leveled_up {
                 announce_level_up(
                     ctx,
@@ -537,7 +396,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             }
         }
         Err(e) => {
-            tracing::debug!(error = %e, "Erreur ajout XP message");
+            tracing::debug!(error = %e, "Erreur record_text_activity");
         }
     }
 }
@@ -639,60 +498,27 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                             warn!(error = %e, "Impossible d'envoyer les stats vocal au backend");
                         }
 
-                        let (xp_per_minute, channel_mult, role_mult) = if let Some(base) =
-                            data.get::<ApiClientKey>()
+                        // FAIT BRUT : `seconds` secondes vocales dans le salon
+                        // quitte + roles de l'utilisateur. L'API calcule l'XP.
+                        let ch_id_u64 = channel_id_str.parse::<u64>().unwrap_or(0);
+                        let role_ids: Vec<u64> = old
+                            .as_ref()
+                            .and_then(|s| s.member.as_ref())
+                            .map(|m| m.roles.iter().map(|r| r.get()).collect())
+                            .unwrap_or_default();
+                        match api
+                            .record_voice_activity(
+                                &guild_id.to_string(),
+                                &user_id.to_string(),
+                                &username,
+                                ch_id_u64,
+                                &role_ids,
+                                seconds,
+                            )
+                            .await
                         {
-                            let gc = base
-                                .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
-                                .await
-                                .unwrap_or_default();
-                            let xpm =
-                                BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as f64;
-                            let ch_mults = multipliers::parse_multipliers(
-                                &BaseApiClient::config_or(&gc, "xp_channel_multipliers", ""),
-                            );
-                            let r_mults = multipliers::parse_multipliers(
-                                &BaseApiClient::config_or(&gc, "xp_role_multipliers", ""),
-                            );
-                            let ch_id_u64 = channel_id_str.parse::<u64>().unwrap_or(0);
-                            let ch_mult = multipliers::get_channel_multiplier(&ch_mults, ch_id_u64);
-                            let user_roles: Vec<u64> = old
-                                .as_ref()
-                                .and_then(|s| s.member.as_ref())
-                                .map(|m| m.roles.iter().map(|r| r.get()).collect())
-                                .unwrap_or_default();
-                            let r_mult = multipliers::get_role_multiplier(&r_mults, &user_roles);
-                            (xpm, ch_mult, r_mult)
-                        } else {
-                            (5.0, 1.0, 1.0)
-                        };
-                        let base_voice = (seconds as f64 / 60.0) * xp_per_minute;
-                        let xp_amount = multipliers::calc_xp_amount(
-                            base_voice,
-                            channel_mult,
-                            role_mult,
-                            1.0,
-                            0.0,
-                            // Aligne sur le cap serveur (10000) : au-dela l'XP etait perdu.
-                            10_000.0,
-                        );
-                        info!(
-                            guild = %guild_id, user = %user_id, channel = %channel_id_str,
-                            seconds, xp_per_minute, channel_mult, role_mult, xp_amount,
-                            "voice xp leave calc"
-                        );
-                        if xp_amount > 0 {
-                            match api
-                                .add_xp(
-                                    &guild_id.to_string(),
-                                    &user_id.to_string(),
-                                    &username,
-                                    xp_amount,
-                                    "voice",
-                                )
-                                .await
-                            {
-                                Ok(result) => {
+                            Ok(result) => {
+                                if !result.skipped {
                                     if result.leveled_up {
                                         let voice_guild_config =
                                             if let Some(base) = data.get::<ApiClientKey>() {
@@ -725,9 +551,9 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                         .await;
                                     }
                                 }
-                                Err(e) => {
-                                    tracing::debug!(error = %e, "Erreur ajout XP vocal");
-                                }
+                            }
+                            Err(e) => {
+                                tracing::debug!(error = %e, "Erreur record_voice_activity");
                             }
                         }
                     }

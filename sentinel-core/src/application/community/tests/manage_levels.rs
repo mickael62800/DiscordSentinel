@@ -69,10 +69,60 @@ impl LevelRepository for MockRepo {
     async fn refresh_leaderboard_view(&self) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn get_streak(
+        &self,
+        _g: &str,
+        _u: &str,
+    ) -> Result<
+        Option<crate::domain::entities::community::progression_calc::StreakState>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+    async fn update_streak(
+        &self,
+        _g: &str,
+        _u: &str,
+        _s: crate::domain::entities::community::progression_calc::StreakState,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+struct MockBotConfig;
+#[async_trait]
+impl crate::ports::outbound::system::bot_config_repository::BotConfigRepository for MockBotConfig {
+    async fn get_definitions(
+        &self,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(
+        &self,
+        _g: &str,
+        _b: &str,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(
+        &self,
+        _g: &str,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 fn make_svc() -> ManageLevelsService {
-    ManageLevelsService::new(std::sync::Arc::new(MockRepo::new()))
+    ManageLevelsService::new(
+        std::sync::Arc::new(MockRepo::new()),
+        std::sync::Arc::new(MockBotConfig),
+    )
 }
 
 #[tokio::test]

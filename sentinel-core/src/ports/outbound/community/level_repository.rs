@@ -2,10 +2,25 @@ use async_trait::async_trait;
 
 use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
+use crate::domain::entities::community::progression_calc::StreakState;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait LevelRepository: Send + Sync {
+    /// Lit l'etat de streak persiste (jours consecutifs) d'un utilisateur.
+    /// `None` si l'utilisateur n'a pas encore de ligne de progression.
+    async fn get_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<StreakState>, DomainError>;
+    /// Met a jour l'etat de streak persiste d'un utilisateur.
+    async fn update_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        state: StreakState,
+    ) -> Result<(), DomainError>;
     async fn get_user_level(
         &self,
         guild_id: &str,

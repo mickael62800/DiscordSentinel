@@ -16,6 +16,9 @@ use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_levels::RecordActivityResult;
+use crate::ports::inbound::community::manage_levels::RecordTextActivityCommand;
+use crate::ports::inbound::community::manage_levels::RecordVoiceActivityCommand;
 use sentinel_core::domain::entities::community::level::xp_progress;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
@@ -59,6 +62,81 @@ impl ProgressionService for ProgressionGrpc {
         );
 
         Ok(Response::new(add_xp_result_to_proto(result)))
+    }
+
+    async fn record_text_activity(
+        &self,
+        request: Request<proto::RecordTextActivityRequest>,
+    ) -> Result<Response<proto::RecordActivityResponse>, Status> {
+        let req = request.into_inner();
+        let guild_id = req.guild_id.clone();
+        let user_id = req.user_id.clone();
+        let role_ids = parse_ids(&req.role_ids);
+        let channel_id = req.channel_id.parse::<u64>().unwrap_or(0);
+
+        let result = self
+            .levels_uc
+            .record_text_activity(RecordTextActivityCommand {
+                guild_id: req.guild_id.into(),
+                user_id: req.user_id.into(),
+                username: req.username,
+                channel_id,
+                role_ids,
+            })
+            .await
+            .map_err(domain_to_status)?;
+
+        if !result.skipped {
+            self.broadcaster.broadcast(
+                "xp_gained",
+                serde_json::json!({
+                    "guild_id": &guild_id,
+                    "user_id": &user_id,
+                    "amount": result.xp_gained,
+                    "source": result.source.as_str(),
+                }),
+            );
+        }
+
+        Ok(Response::new(record_activity_result_to_proto(result)))
+    }
+
+    async fn record_voice_activity(
+        &self,
+        request: Request<proto::RecordVoiceActivityRequest>,
+    ) -> Result<Response<proto::RecordActivityResponse>, Status> {
+        let req = request.into_inner();
+        let guild_id = req.guild_id.clone();
+        let user_id = req.user_id.clone();
+        let role_ids = parse_ids(&req.role_ids);
+        let channel_id = req.channel_id.parse::<u64>().unwrap_or(0);
+
+        let result = self
+            .levels_uc
+            .record_voice_activity(RecordVoiceActivityCommand {
+                guild_id: req.guild_id.into(),
+                user_id: req.user_id.into(),
+                username: req.username,
+                channel_id,
+                role_ids,
+                seconds: req.seconds,
+            })
+            .await
+            .map_err(domain_to_status)?;
+
+        if !result.skipped {
+            self.broadcaster.broadcast(
+                "xp_gained",
+                serde_json::json!({
+                    "guild_id": &guild_id,
+                    "user_id": &user_id,
+                    "amount": result.xp_gained,
+                    "source": result.source.as_str(),
+                }),
+            );
+        }
+
+        Ok(Response::new(record_activity_result_to_proto(result)))
     }
 
     async fn get_user_level(
@@ -149,6 +227,23 @@ fn user_level_to_proto(u: UserLevel) -> proto::UserLevel {
         xp_voice_current,
         xp_voice_needed,
         last_xp_at: u.last_xp_at.to_rfc3339(),
+    }
+}
+
+fn parse_ids(raw: &[String]) -> Vec<u64> {
+    raw.iter().filter_map(|s| s.parse::<u64>().ok()).collect()
+}
+
+fn record_activity_result_to_proto(r: RecordActivityResult) -> proto::RecordActivityResponse {
+    proto::RecordActivityResponse {
+        user: Some(user_level_to_proto(r.user_level)),
+        leveled_up: r.leveled_up,
+        old_level: r.old_level,
+        old_level_global: r.old_level_global,
+        source: xp_source_to_proto(r.source),
+        xp_gained: r.xp_gained,
+        skipped: r.skipped,
+        streak_current: r.streak_current,
     }
 }
 

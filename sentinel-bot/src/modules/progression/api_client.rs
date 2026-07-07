@@ -1,10 +1,11 @@
 //! Client API specifique au progression-bot.
 //!
-//! - Les endpoints **levels** (`add_xp`, `get_user_level`, `get_level_leaderboard`)
-//!   et **stats** (`record_messages`, `record_voice`, `get_user_stats`,
-//!   `get_guild_overview`, `get_leaderboard`) passent par gRPC via
-//!   `SentinelGrpcClient`.
-//! - Les endpoints sans equivalent proto (`get_streak`, `update_streak`,
+//! - Les endpoints **levels** (`record_text_activity`, `record_voice_activity`,
+//!   `get_user_level`, `get_level_leaderboard`) et **stats** (`record_messages`,
+//!   `record_voice`, `get_user_stats`, `get_guild_overview`, `get_leaderboard`)
+//!   passent par gRPC via `SentinelGrpcClient`. Depuis le refactor P0, le bot
+//!   n'envoie que des FAITS BRUTS : c'est l'API qui calcule tout l'XP.
+//! - Les endpoints sans equivalent proto (`force_monthly_ranking`,
 //!   `get_infractions`) restent sur `BaseApiClient` HTTP.
 
 use std::sync::Arc;
@@ -31,19 +32,6 @@ pub struct Infraction {
     pub reason: Option<String>,
     pub score: f64,
     pub created_at: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct StreakResponse {
-    #[serde(default)]
-    pub streak_current: u32,
-    #[serde(default)]
-    pub streak_best: u32,
-    #[serde(default)]
-    pub streak_last_day: u32,
-    #[serde(default)]
-    pub streak_last_year: i32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -104,16 +92,17 @@ pub struct UserLevelResponse {
     pub streak_best: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
+
+/// Reponse a un fait d'activite (texte/vocal) : l'API a calcule tout l'XP.
+#[derive(Debug)]
 #[allow(dead_code)]
-pub struct AddXpResponse {
+pub struct RecordActivityResponse {
     pub user: UserLevelResponse,
     pub leveled_up: bool,
-    pub old_level: i32,
-    #[serde(default)]
     pub old_level_global: i32,
-    #[serde(default)]
-    pub source: Option<String>,
+    pub xp_gained: i64,
+    pub skipped: bool,
+    pub streak_current: u32,
 }
 
 #[derive(Debug, Deserialize)]
@@ -240,23 +229,48 @@ impl ApiClient {
 
     // ── Levels / XP (gRPC) ──
 
-    pub async fn add_xp(
+    /// Envoie un FAIT BRUT texte : "un message qualifiant a eu lieu". L'API
+    /// calcule le montant d'XP (multiplicateurs channel/role, streak, cooldown).
+    pub async fn record_text_activity(
         &self,
         guild_id: &str,
         user_id: &str,
         username: &str,
-        amount: i64,
-        source: &str,
-    ) -> Result<AddXpResponse, String> {
-        let req = proto_prog::AddXpRequest {
+        channel_id: u64,
+        role_ids: &[u64],
+    ) -> Result<RecordActivityResponse, String> {
+        let req = proto_prog::RecordTextActivityRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
             username: username.to_string(),
-            amount,
-            source: xp_source_str_to_proto(source),
+            channel_id: channel_id.to_string(),
+            role_ids: role_ids.iter().map(|r| r.to_string()).collect(),
         };
-        let resp = crate::grpc_call!(self.grpc, progression, add_xp, req)?;
-        Ok(proto_add_xp_to_response(resp))
+        let resp = crate::grpc_call!(self.grpc, progression, record_text_activity, req)?;
+        Ok(proto_record_activity_to_response(resp))
+    }
+
+    /// Envoie un FAIT BRUT vocal : `seconds` secondes creditables dans le
+    /// salon. L'API calcule le montant d'XP (multiplicateurs channel/role).
+    pub async fn record_voice_activity(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        channel_id: u64,
+        role_ids: &[u64],
+        seconds: u64,
+    ) -> Result<RecordActivityResponse, String> {
+        let req = proto_prog::RecordVoiceActivityRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            username: username.to_string(),
+            channel_id: channel_id.to_string(),
+            role_ids: role_ids.iter().map(|r| r.to_string()).collect(),
+            seconds,
+        };
+        let resp = crate::grpc_call!(self.grpc, progression, record_voice_activity, req)?;
+        Ok(proto_record_activity_to_response(resp))
     }
 
     pub async fn get_user_level(
@@ -314,38 +328,6 @@ impl ApiClient {
             .await
     }
 
-    pub async fn get_streak(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<StreakResponse, String> {
-        self.base
-            .get_json(&format!("/api/levels/{guild_id}/{user_id}/streak"))
-            .await
-    }
-
-    pub async fn update_streak(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        current: u32,
-        best: u32,
-        last_day: u32,
-        last_year: i32,
-    ) {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/levels/{guild_id}/{user_id}/streak"),
-                &serde_json::json!({
-                    "streak_current": current,
-                    "streak_best": best,
-                    "streak_last_day": last_day,
-                    "streak_last_year": last_year,
-                }),
-            )
-            .await;
-    }
-
     pub async fn get_infractions(&self, guild_id: &str) -> Result<Vec<Infraction>, String> {
         self.base
             .get_json(&format!("/infractions/{guild_id}"))
@@ -359,13 +341,6 @@ fn xp_source_str_to_proto(s: &str) -> i32 {
     match s {
         "voice" => proto_common::XpSource::Voice as i32,
         _ => proto_common::XpSource::Text as i32,
-    }
-}
-
-fn proto_xp_source_to_string(value: i32) -> String {
-    match proto_common::XpSource::try_from(value).unwrap_or(proto_common::XpSource::Unspecified) {
-        proto_common::XpSource::Voice => "voice".to_string(),
-        _ => "text".to_string(),
     }
 }
 
@@ -390,9 +365,10 @@ fn proto_user_level_to_response(u: proto_prog::UserLevel) -> UserLevelResponse {
     }
 }
 
-fn proto_add_xp_to_response(r: proto_prog::AddXpResponse) -> AddXpResponse {
-    AddXpResponse {
-        old_level_global: r.old_level_global,
+fn proto_record_activity_to_response(
+    r: proto_prog::RecordActivityResponse,
+) -> RecordActivityResponse {
+    RecordActivityResponse {
         user: r
             .user
             .map(proto_user_level_to_response)
@@ -415,8 +391,10 @@ fn proto_add_xp_to_response(r: proto_prog::AddXpResponse) -> AddXpResponse {
                 streak_best: None,
             }),
         leveled_up: r.leveled_up,
-        old_level: r.old_level,
-        source: Some(proto_xp_source_to_string(r.source)),
+        old_level_global: r.old_level_global,
+        xp_gained: r.xp_gained,
+        skipped: r.skipped,
+        streak_current: r.streak_current,
     }
 }
 

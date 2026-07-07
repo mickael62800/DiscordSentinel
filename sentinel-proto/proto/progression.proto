@@ -8,8 +8,42 @@ import "common.proto";
 // Wrappe les use-cases ManageLevelsService cote API.
 service ProgressionService {
   rpc AddXp(AddXpRequest) returns (AddXpResponse);
+  // Faits bruts : le bot signale une activite, l'API calcule tout l'XP
+  // (multiplicateurs channel/role, streak, cooldown, clamp).
+  rpc RecordTextActivity(RecordTextActivityRequest) returns (RecordActivityResponse);
+  rpc RecordVoiceActivity(RecordVoiceActivityRequest) returns (RecordActivityResponse);
   rpc GetUserLevel(GetUserLevelRequest) returns (UserLevel);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (Leaderboard);
+}
+
+message RecordTextActivityRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  string channel_id = 4;
+  repeated string role_ids = 5;
+}
+
+message RecordVoiceActivityRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  string channel_id = 4;
+  repeated string role_ids = 5;
+  uint64 seconds = 6;
+}
+
+message RecordActivityResponse {
+  UserLevel user = 1;
+  bool leveled_up = 2;
+  int32 old_level = 3;
+  int32 old_level_global = 4;
+  sentinel.common.v1.XpSource source = 5;
+  // XP effectivement credite (0 si skipped).
+  int64 xp_gained = 6;
+  // true si aucun XP credite (cooldown, module off, montant nul).
+  bool skipped = 7;
+  uint32 streak_current = 8;
 }
 
 message AddXpRequest {

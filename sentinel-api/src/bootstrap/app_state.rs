@@ -312,7 +312,7 @@ pub async fn build_app_state(
     let analytics_repo = Arc::new(PgAnalyticsRepository::new(pg_pool.clone()));
     let daily_activity_repo = Arc::new(PgDailyActivityRepository::new(pg_pool.clone()));
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
-    let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
+    let levels_uc = Arc::new(ManageLevelsService::new(level_repo, bot_config_repo.clone()));
     let announcement_repo = Arc::new(crate::adapters::outbound::postgres::community::announcement_repository::PgAnnouncementRepository::new(pg_pool.clone()));
     let announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase> = Arc::new(crate::application::community::manage_announcements_service::ManageAnnouncementsService::new(announcement_repo, bot_config_repo.clone()));
     let confession_repo = Arc::new(crate::adapters::outbound::postgres::community::confession_repository::PgConfessionRepository::new(pg_pool.clone()));

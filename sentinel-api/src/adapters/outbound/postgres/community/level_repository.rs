@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::ports::outbound::community::level_repository::LevelRepository;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
+use sentinel_core::domain::entities::community::progression_calc::StreakState;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgLevelRepository {
@@ -191,6 +192,52 @@ impl LevelRepository for PgLevelRepository {
             .execute(&self.pool)
             .await
             .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn get_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<StreakState>, DomainError> {
+        let row: Option<(i32, i32, i32, i32)> = sqlx::query_as(
+            "SELECT streak_current, streak_best, streak_last_day, streak_last_year \
+             FROM user_levels WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(row.map(|(current, best, last_day, last_year)| StreakState {
+            current: current.max(0) as u32,
+            best: best.max(0) as u32,
+            last_day: last_day.max(0) as u32,
+            last_year,
+        }))
+    }
+
+    async fn update_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        state: StreakState,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE user_levels SET streak_current = $3, streak_best = $4, \
+             streak_last_day = $5, streak_last_year = $6, updated_at = NOW() \
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(state.current as i32)
+        .bind(state.best as i32)
+        .bind(state.last_day as i32)
+        .bind(state.last_year)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(())
     }
 }

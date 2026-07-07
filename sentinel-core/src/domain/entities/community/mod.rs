@@ -7,5 +7,6 @@ pub mod guild_member;
 pub mod guild_member_reset;
 pub mod level;
 pub mod monthly_ranking;
+pub mod progression_calc;
 pub mod role_panel;
 pub mod voice_channel;
