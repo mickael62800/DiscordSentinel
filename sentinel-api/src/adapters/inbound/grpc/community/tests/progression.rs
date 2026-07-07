@@ -147,6 +147,20 @@ struct MockLevelsUc {
 
 #[async_trait]
 impl ManageLevelsUseCase for MockLevelsUc {
+    async fn record_text_activity(
+        &self,
+        _: crate::ports::inbound::community::manage_levels::RecordTextActivityCommand,
+    ) -> Result<crate::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
+    {
+        unimplemented!()
+    }
+    async fn record_voice_activity(
+        &self,
+        _: crate::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
+    ) -> Result<crate::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
+    {
+        unimplemented!()
+    }
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         let source = cmd.source;
         self.add_xp_calls.lock().unwrap().push(cmd);

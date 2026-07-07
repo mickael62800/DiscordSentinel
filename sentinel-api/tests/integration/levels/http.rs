@@ -63,6 +63,24 @@ fn default_user(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
 
 #[async_trait]
 impl ManageLevelsUseCase for MockLevelsUC {
+    async fn record_text_activity(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_levels::RecordTextActivityCommand,
+    ) -> Result<
+        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn record_voice_activity(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
+    ) -> Result<
+        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        DomainError,
+    > {
+        unimplemented!()
+    }
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
         let user_level = default_user(&cmd.guild_id, &cmd.user_id, cmd.amount);
         Ok(AddXpResult {

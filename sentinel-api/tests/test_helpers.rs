@@ -437,6 +437,18 @@ impl sentinel_core::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseC
 pub struct StubLevels;
 #[async_trait]
 impl ManageLevelsUseCase for StubLevels {
+    async fn record_text_activity(
+        &self,
+        _: manage_levels::RecordTextActivityCommand,
+    ) -> Result<manage_levels::RecordActivityResult, DomainError> {
+        unimplemented!()
+    }
+    async fn record_voice_activity(
+        &self,
+        _: manage_levels::RecordVoiceActivityCommand,
+    ) -> Result<manage_levels::RecordActivityResult, DomainError> {
+        unimplemented!()
+    }
     async fn add_xp(
         &self,
         _: manage_levels::AddXpCommand,
