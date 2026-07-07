@@ -159,6 +159,37 @@ impl ManageTicketsUseCase for MockTicketsUC {
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn moderated_guilds(
+        &self,
+        _: &str,
+    ) -> Result<std::collections::HashSet<String>, DomainError> {
+        Ok(std::collections::HashSet::new())
+    }
+    async fn bulk_delete_tickets(
+        &self,
+        author_id: Option<&str>,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        // Ces tests inserent des tickets dans la vraie DB test puis verifient le
+        // comptage : le mock delegue donc a la meme DB via une connexion directe.
+        let p = pool().await;
+        let res = sqlx::query(
+            r#"
+            DELETE FROM tickets
+            WHERE ($1::text IS NULL OR author_id = $1)
+              AND ($2::timestamptz IS NULL OR created_at >= $2)
+              AND ($3::timestamptz IS NULL OR created_at <= $3)
+            "#,
+        )
+        .bind(author_id)
+        .bind(from)
+        .bind(to)
+        .execute(&p)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(res.rows_affected())
+    }
 }
 
 // ══════════════════════════════════════════════════════════

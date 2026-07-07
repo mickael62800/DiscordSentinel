@@ -14,7 +14,6 @@ use crate::adapters::inbound::http::dto::system::tickets::TicketResponseDto;
 use crate::adapters::inbound::http::dto::system::tickets::UpdateStatusDto;
 use crate::adapters::inbound::http::dto::system::tickets::UpdateTicketChannelDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
@@ -86,26 +85,6 @@ async fn require_ticket_web(
     Ok(Some((gid, role)))
 }
 
-/// Ensemble des guilds ou le caller est Moderator+ (pour scoper `list_tickets`).
-/// Lit `api_user_guilds` (format de role stocke en minuscules : viewer/moderator/
-/// admin/owner).
-async fn moderated_guilds(
-    state: &AppState,
-    user_id: &str,
-) -> Result<std::collections::HashSet<String>, ApiError> {
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT guild_id, role FROM api_user_guilds WHERE discord_user_id = $1")
-            .bind(user_id)
-            .fetch_all(&state.pg_pool)
-            .await
-            .map_err(sqlx_internal("moderated_guilds"))?;
-    Ok(rows
-        .into_iter()
-        .filter(|(_, r)| Role::from_str(r).is_some_and(|role| role.satisfies(Role::Moderator)))
-        .map(|(g, _)| g)
-        .collect())
-}
-
 pub async fn list_tickets(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -142,7 +121,10 @@ pub async fn list_tickets(
             {
                 tickets
             } else {
-                let allowed = moderated_guilds(&state, &ctx.discord_user_id).await?;
+                let allowed = state
+                    .tickets_uc
+                    .moderated_guilds(&ctx.discord_user_id)
+                    .await?;
                 tickets
                     .into_iter()
                     .filter(|t| t.guild_id.as_ref().is_some_and(|g| allowed.contains(g)))
@@ -460,25 +442,10 @@ pub async fn bulk_delete_tickets(
         .transpose()
         .map_err(ApiError)?;
 
-    // DELETE avec filtres dynamiques. sqlx ne gere pas les WHERE conditionnels,
-    // donc on construit une clause COALESCE-based qui est neutre si le param
-    // est NULL.
-    let res = sqlx::query(
-        r#"
-        DELETE FROM tickets
-        WHERE ($1::text IS NULL OR author_id = $1)
-          AND ($2::timestamptz IS NULL OR created_at >= $2)
-          AND ($3::timestamptz IS NULL OR created_at <= $3)
-        "#,
-    )
-    .bind(params.author_id.as_deref())
-    .bind(from_dt)
-    .bind(to_dt)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("bulk_delete_tickets"))?;
-
-    let deleted = res.rows_affected();
+    let deleted = state
+        .tickets_uc
+        .bulk_delete_tickets(params.author_id.as_deref(), from_dt, to_dt)
+        .await?;
     tracing::info!(
         deleted,
         author_id = ?params.author_id,

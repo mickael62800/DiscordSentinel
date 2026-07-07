@@ -115,6 +115,20 @@ impl TicketRepository for MockTicketRepo {
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn find_user_guild_roles(
+        &self,
+        _user_id: &str,
+    ) -> Result<Vec<(String, String)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn bulk_delete(
+        &self,
+        _author_id: Option<&str>,
+        _from: Option<chrono::DateTime<chrono::Utc>>,
+        _to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 #[derive(Default)]

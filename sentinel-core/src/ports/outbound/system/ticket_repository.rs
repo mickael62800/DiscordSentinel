@@ -45,4 +45,22 @@ pub trait TicketRepository: Send + Sync {
         resolved_at: Option<&str>,
         satisfaction_rating: Option<i32>,
     ) -> Result<(), DomainError>;
+
+    /// Roles applicatifs (`api_user_guilds`) d'un utilisateur : liste de
+    /// `(guild_id, role)`. Sert a scoper `list_tickets` aux guilds ou le caller
+    /// est habilite. Le filtrage par niveau de role est fait dans le use case.
+    async fn find_user_guild_roles(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<(String, String)>, DomainError>;
+
+    /// Suppression en masse avec filtres optionnels combinables (AND) :
+    /// `author_id`, borne basse et borne haute de `created_at`. Renvoie le
+    /// nombre de tickets supprimes.
+    async fn bulk_delete(
+        &self,
+        author_id: Option<&str>,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError>;
 }

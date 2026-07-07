@@ -229,6 +229,20 @@ impl ManageTicketsUseCase for StubTickets {
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn moderated_guilds(
+        &self,
+        _: &str,
+    ) -> Result<std::collections::HashSet<String>, DomainError> {
+        Ok(std::collections::HashSet::new())
+    }
+    async fn bulk_delete_tickets(
+        &self,
+        _: Option<&str>,
+        _: Option<chrono::DateTime<chrono::Utc>>,
+        _: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 pub struct StubSecurity;

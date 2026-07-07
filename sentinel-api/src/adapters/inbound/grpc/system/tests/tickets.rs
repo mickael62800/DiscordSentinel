@@ -204,6 +204,20 @@ impl ManageTicketsUseCase for MockTicketsUc {
         ));
         Ok(())
     }
+    async fn moderated_guilds(
+        &self,
+        _user_id: &str,
+    ) -> Result<std::collections::HashSet<String>, DomainError> {
+        Ok(std::collections::HashSet::new())
+    }
+    async fn bulk_delete_tickets(
+        &self,
+        _author_id: Option<&str>,
+        _from: Option<chrono::DateTime<chrono::Utc>>,
+        _to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 fn grpc(uc: Arc<MockTicketsUc>) -> TicketsGrpc {

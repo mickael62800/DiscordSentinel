@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::domain::entities::system::ticket::Ticket;
 use crate::domain::entities::system::ticket::TicketDetail;
 use crate::domain::entities::system::ticket::TicketMessage;
+use crate::domain::enums::system::role::Role;
 use crate::domain::enums::system::ticket_status::TicketStatus;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
@@ -281,6 +282,31 @@ impl ManageTicketsUseCase for ManageTicketsService {
             .update_sla(id, first_response_at, resolved_at, satisfaction_rating)
             .await?;
         Ok(())
+    }
+
+    async fn moderated_guilds(
+        &self,
+        user_id: &str,
+    ) -> Result<std::collections::HashSet<String>, DomainError> {
+        let rows = self.ticket_repo.find_user_guild_roles(user_id).await?;
+        Ok(rows
+            .into_iter()
+            .filter(|(_, r)| Role::from_str(r).is_some_and(|role| role.satisfies(Role::Moderator)))
+            .map(|(g, _)| g)
+            .collect())
+    }
+
+    async fn bulk_delete_tickets(
+        &self,
+        author_id: Option<&str>,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        let deleted = self.ticket_repo.bulk_delete(author_id, from, to).await?;
+        if deleted > 0 {
+            self.invalidate_tickets_cache().await;
+        }
+        Ok(deleted)
     }
 }
 

@@ -343,4 +343,41 @@ impl TicketRepository for PgTicketRepository {
         }
         Ok(())
     }
+
+    async fn find_user_guild_roles(
+        &self,
+        user_id: &str,
+    ) -> Result<Vec<(String, String)>, DomainError> {
+        let rows: Vec<(String, String)> =
+            sqlx::query_as("SELECT guild_id, role FROM api_user_guilds WHERE discord_user_id = $1")
+                .bind(user_id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(pg_err)?;
+        Ok(rows)
+    }
+
+    async fn bulk_delete(
+        &self,
+        author_id: Option<&str>,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError> {
+        // DELETE avec filtres dynamiques via clauses COALESCE-neutres si NULL.
+        let res = sqlx::query(
+            r#"
+            DELETE FROM tickets
+            WHERE ($1::text IS NULL OR author_id = $1)
+              AND ($2::timestamptz IS NULL OR created_at >= $2)
+              AND ($3::timestamptz IS NULL OR created_at <= $3)
+            "#,
+        )
+        .bind(author_id)
+        .bind(from)
+        .bind(to)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(res.rows_affected())
+    }
 }

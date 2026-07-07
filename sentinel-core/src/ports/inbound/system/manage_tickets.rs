@@ -67,4 +67,21 @@ pub trait ManageTicketsUseCase: Send + Sync {
         resolved_at: Option<&str>,
         satisfaction_rating: Option<i32>,
     ) -> Result<(), DomainError>;
+
+    /// Ensemble des guilds ou l'utilisateur est Moderator+ (scope web de
+    /// `list_tickets`). Applique le filtre de niveau de role sur les roles
+    /// applicatifs stockes.
+    async fn moderated_guilds(
+        &self,
+        user_id: &str,
+    ) -> Result<std::collections::HashSet<String>, DomainError>;
+
+    /// Suppression en masse des tickets selon des filtres optionnels
+    /// (`author_id`, plage `created_at`). Renvoie le nombre de tickets supprimes.
+    async fn bulk_delete_tickets(
+        &self,
+        author_id: Option<&str>,
+        from: Option<chrono::DateTime<chrono::Utc>>,
+        to: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<u64, DomainError>;
 }
