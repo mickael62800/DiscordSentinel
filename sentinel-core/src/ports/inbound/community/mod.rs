@@ -1,3 +1,4 @@
+pub mod check_eligibility;
 pub mod manage_announcements;
 pub mod manage_bump;
 pub mod evaluate_age_declaration;

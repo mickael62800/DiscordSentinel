@@ -9,6 +9,7 @@ pub mod automod;
 pub mod bot;
 pub mod bot_persistence;
 pub mod bump;
+pub mod community;
 pub mod coude;
 pub mod dashboard;
 pub mod game_portal;

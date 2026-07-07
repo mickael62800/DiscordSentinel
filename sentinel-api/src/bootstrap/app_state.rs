@@ -438,6 +438,17 @@ pub async fn build_app_state(
             ),
         );
 
+    // Eligibilite Community : decisions server-side (prerequis de role +
+    // validation de parrainage). Lit la config via bot_config_repo ; regles
+    // pures dans le domaine. Le bot ne fournit que les donnees Discord.
+    let eligibility_uc: Arc<
+        dyn crate::ports::inbound::community::check_eligibility::CheckEligibilityUseCase,
+    > = Arc::new(
+        crate::application::community::check_eligibility_service::CheckEligibilityService::new(
+            bot_config_repo.clone(),
+        ),
+    );
+
     // Classement mensuel : repo Postgres (deltas d'XP + baselines) + use case
     // (gates de publication, assemblage des tops, pose des baselines). Le
     // handler HTTP ne fait que RBAC + envoi Discord.
@@ -1298,6 +1309,7 @@ pub async fn build_app_state(
         role_panels_uc,
         notes_uc,
         bump_uc,
+        eligibility_uc,
         monthly_ranking_uc,
         reminders_uc,
         strikes_uc,

@@ -20,6 +20,29 @@ use sentinel_proto::roles::v1 as proto;
 
 // ── DTOs (surface inchangee) ──
 
+/// Decision d'eligibilite renvoyee par l'API (role ou parrainage).
+#[derive(Debug, Deserialize)]
+pub struct EligibilityDecision {
+    pub allowed: bool,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct RoleEligibilityBody {
+    role_id: u64,
+    user_roles: Vec<u64>,
+    joined_at_unix: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+struct SponsorshipEligibilityBody {
+    sponsor_id: u64,
+    sponsored_id: u64,
+    sponsor_joined_at_unix: Option<i64>,
+    sponsored_joined_at_unix: Option<i64>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TempRoleApiEntry {
     pub guild_id: String,
@@ -83,10 +106,8 @@ pub struct SyncRole {
 }
 
 pub struct ApiClient {
-    // Phase 7A.opt F.3 : `base` n'est plus utilise — tous les appels metier
-    // du community-bot sont en gRPC (role panels + sponsorships + temp roles).
-    // Conserve pour le heartbeat via TypeMap.
-    #[allow(dead_code)]
+    // gRPC pour les appels metier (role panels + sponsorships + temp roles) ;
+    // HTTP (`base`) pour les DECISIONS d'eligibilite server-side + heartbeat.
     pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
@@ -94,6 +115,52 @@ pub struct ApiClient {
 impl ApiClient {
     pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
         Self { base, grpc }
+    }
+
+    // ── Eligibilite (HTTP) — DECISION server-side ──
+
+    /// POST /api/community/eligibility/{guild}/role — decide de l'eligibilite
+    /// au role. Le bot fournit les donnees Discord (roles actuels + join).
+    pub async fn check_role_eligibility(
+        &self,
+        guild_id: &str,
+        role_id: u64,
+        user_roles: Vec<u64>,
+        joined_at_unix: Option<i64>,
+    ) -> Result<EligibilityDecision, String> {
+        self.base
+            .post_json(
+                &format!("/api/community/eligibility/{guild_id}/role"),
+                &RoleEligibilityBody {
+                    role_id,
+                    user_roles,
+                    joined_at_unix,
+                },
+            )
+            .await
+    }
+
+    /// POST /api/community/eligibility/{guild}/sponsorship — valide un
+    /// parrainage (anti-self + seuils). Le bot fournit les `joined_at` Discord.
+    pub async fn validate_sponsorship_eligibility(
+        &self,
+        guild_id: &str,
+        sponsor_id: u64,
+        sponsored_id: u64,
+        sponsor_joined_at_unix: Option<i64>,
+        sponsored_joined_at_unix: Option<i64>,
+    ) -> Result<EligibilityDecision, String> {
+        self.base
+            .post_json(
+                &format!("/api/community/eligibility/{guild_id}/sponsorship"),
+                &SponsorshipEligibilityBody {
+                    sponsor_id,
+                    sponsored_id,
+                    sponsor_joined_at_unix,
+                    sponsored_joined_at_unix,
+                },
+            )
+            .await
     }
 
     // ── Role panels (gRPC) ──

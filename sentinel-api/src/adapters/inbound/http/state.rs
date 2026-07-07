@@ -66,6 +66,8 @@ pub struct AppState {
     pub role_panels_uc: Arc<dyn ManageRolePanelsUseCase>,
     pub notes_uc: Arc<dyn ManageNotesUseCase>,
     pub bump_uc: Arc<dyn ManageBumpUseCase>,
+    pub eligibility_uc:
+        Arc<dyn crate::ports::inbound::community::check_eligibility::CheckEligibilityUseCase>,
     pub monthly_ranking_uc:
         Arc<dyn crate::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRankingUseCase>,
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,

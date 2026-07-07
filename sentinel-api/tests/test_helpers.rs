@@ -3380,6 +3380,31 @@ impl sentinel_core::ports::inbound::community::manage_bump::ManageBumpUseCase fo
     }
 }
 
+pub struct StubEligibility;
+#[async_trait]
+impl sentinel_core::ports::inbound::community::check_eligibility::CheckEligibilityUseCase
+    for StubEligibility
+{
+    async fn check_role_eligibility(
+        &self,
+        _: sentinel_core::ports::inbound::community::check_eligibility::CheckRoleEligibilityCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::community::eligibility::EligibilityDecision,
+        DomainError,
+    > {
+        Ok(sentinel_core::domain::entities::community::eligibility::EligibilityDecision::allow())
+    }
+    async fn validate_sponsorship(
+        &self,
+        _: sentinel_core::ports::inbound::community::check_eligibility::ValidateSponsorshipCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::community::eligibility::EligibilityDecision,
+        DomainError,
+    > {
+        Ok(sentinel_core::domain::entities::community::eligibility::EligibilityDecision::allow())
+    }
+}
+
 pub struct StubDataset;
 #[async_trait]
 impl sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase for StubDataset {
@@ -4385,6 +4410,7 @@ fn base_state() -> AppState {
         game_rcon_client: Arc::new(StubRconClient),
         game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
+        eligibility_uc: Arc::new(StubEligibility),
         manage_sponsorships_uc: Arc::new(StubSponsorships),
         dataset_uc: Arc::new(StubDataset),
         ai_jobs_uc: Arc::new(StubAiJobs),

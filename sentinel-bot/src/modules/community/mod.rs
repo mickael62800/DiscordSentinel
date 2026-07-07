@@ -6,7 +6,6 @@ pub const MODULE_BOT_NAME: &str = "community-bot";
 pub mod api_client;
 pub mod cooldown;
 pub mod exclusive_groups;
-pub mod prerequisites;
 pub mod roles_panel;
 pub mod sponsor;
 pub mod sponsorship;
@@ -508,21 +507,45 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         neutral_embed("\u{21a9}\u{fe0f} Role retire")
             .description(format!("Le role <@&{}> vous a ete retire.", role_id))
     } else {
-        // Verifier les prerequis
-        let prereqs_raw = BaseApiClient::config_or(&guild_config, "role_prerequisites", "");
-        let prereqs = prerequisites::parse_prerequisites(&prereqs_raw);
+        // Verifier les prerequis : DECISION server-side. Le bot ne fournit que
+        // les donnees Discord (roles actuels + date de join) ; l'API lit la
+        // config (`role_prerequisites`) et evalue les regles.
         let user_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
-        let joined_days = member
-            .joined_at
-            .map(|j| {
-                let now = serenity::model::Timestamp::now().unix_timestamp();
-                ((now - j.unix_timestamp()) / 86400).max(0) as u64
-            })
-            .unwrap_or(0);
+        let joined_at_unix = member.joined_at.map(|j| j.unix_timestamp());
 
-        if let Err(msg) =
-            prerequisites::check_prerequisites(&prereqs, role_id, &user_roles, joined_days)
-        {
+        let decision = {
+            let data = ctx.data.read().await;
+            match data.get::<RolesApiKey>() {
+                Some(api) => api
+                    .check_role_eligibility(
+                        &guild_id.to_string(),
+                        role_id,
+                        user_roles,
+                        joined_at_unix,
+                    )
+                    .await
+                    .unwrap_or_else(|e| {
+                        // Fail-closed : en cas d'erreur API, on refuse l'ajout.
+                        warn!(error = %e, "Echec API check_role_eligibility — refus");
+                        crate::modules::community::api_client::EligibilityDecision {
+                            allowed: false,
+                            reason: Some(
+                                "Verification des prerequis indisponible, reessaie plus tard."
+                                    .to_string(),
+                            ),
+                        }
+                    }),
+                None => crate::modules::community::api_client::EligibilityDecision {
+                    allowed: true,
+                    reason: None,
+                },
+            }
+        };
+
+        if !decision.allowed {
+            let msg = decision
+                .reason
+                .unwrap_or_else(|| "Prerequis non remplis.".to_string());
             let embed = neutral_embed("Prerequis non remplis").description(msg);
             let response = CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()

@@ -462,12 +462,7 @@ async fn validate_sponsorship(
     target_id: serenity::model::id::UserId,
     guild_id: serenity::model::id::GuildId,
 ) -> Result<(), String> {
-    // 1. Anti self-sponsor
-    if target_id == parrain_id {
-        return Err("\u{274c} Vous ne pouvez pas vous parrainer vous-meme.".to_string());
-    }
-
-    // 2. Target != bot
+    // 1. Target != bot (donnee Discord — reste cote bot)
     let target_user = target_id
         .to_user(&ctx.http)
         .await
@@ -476,71 +471,54 @@ async fn validate_sponsorship(
         return Err("\u{274c} Vous ne pouvez pas parrainer un bot.".to_string());
     }
 
-    // 3. Target doit etre membre actuel du serveur
+    // 2. Target doit etre membre actuel du serveur (donnee Discord)
     let target_member = guild_id
         .member(&ctx.http, target_id)
         .await
         .map_err(|_| "\u{274c} Ce membre n'est pas (ou plus) sur le serveur.".to_string())?;
 
-    // 4. Parrain doit etre membre actuel
+    // 3. Parrain doit etre membre actuel (donnee Discord)
     let parrain_member = guild_id
         .member(&ctx.http, parrain_id)
         .await
         .map_err(|_| "\u{274c} Le parrain n'est plus sur le serveur.".to_string())?;
 
-    // Lire la config guild
-    let (min_parrain_days, max_filleul_days) = {
+    // 4. DECISION server-side : anti-self + seuils d'anciennete. Le bot ne
+    // fournit que les `joined_at` Discord (zone grise legitime : seul le bot a
+    // l'info) ; l'API lit la config (seuils) et decide.
+    let parrain_joined_at_unix = parrain_member.joined_at.map(|j| j.unix_timestamp());
+    let target_joined_at_unix = target_member.joined_at.map(|j| j.unix_timestamp());
+
+    let decision = {
         let data = ctx.data.read().await;
-        if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base
-                .get_guild_config_for(
+        match data.get::<super::RolesApiKey>() {
+            Some(api) => api
+                .validate_sponsorship_eligibility(
                     &guild_id.to_string(),
-                    crate::modules::community::MODULE_BOT_NAME,
+                    parrain_id.get(),
+                    target_id.get(),
+                    parrain_joined_at_unix,
+                    target_joined_at_unix,
                 )
                 .await
-                .unwrap_or_default();
-            (
-                BaseApiClient::config_u64(&gc, "sponsor_min_parrain_days", 7),
-                BaseApiClient::config_u64(&gc, "sponsor_max_filleul_days", 30),
-            )
-        } else {
-            (7, 30)
+                .map_err(|e| {
+                    warn!(error = %e, "Echec API validate_sponsorship — refus");
+                    "\u{274c} Verification du parrainage indisponible, reessaie plus tard."
+                        .to_string()
+                })?,
+            None => crate::modules::community::api_client::EligibilityDecision {
+                allowed: true,
+                reason: None,
+            },
         }
     };
-
-    // 5. Parrain doit etre sur le serveur depuis >= min_parrain_days jours
-    let parrain_joined_days = parrain_member
-        .joined_at
-        .map(|j| {
-            let now = serenity::model::Timestamp::now().unix_timestamp();
-            ((now - j.unix_timestamp()) / 86400).max(0) as u64
-        })
-        .unwrap_or(0);
-    if parrain_joined_days < min_parrain_days {
-        let remaining = min_parrain_days - parrain_joined_days;
-        return Err(format!(
-            "\u{274c} Le parrain doit etre membre depuis au moins **{min_parrain_days} jours**. \
-             Encore **{remaining}** jour(s) a attendre."
-        ));
+    if !decision.allowed {
+        return Err(decision
+            .reason
+            .unwrap_or_else(|| "\u{274c} Parrainage non eligible.".to_string()));
     }
 
-    // 6. Target doit etre un membre recent (< max_filleul_days jours)
-    let target_joined_days = target_member
-        .joined_at
-        .map(|j| {
-            let now = serenity::model::Timestamp::now().unix_timestamp();
-            ((now - j.unix_timestamp()) / 86400).max(0) as u64
-        })
-        .unwrap_or(u64::MAX);
-    if target_joined_days > max_filleul_days {
-        return Err(format!(
-            "\u{274c} <@{}> est sur le serveur depuis plus de **{max_filleul_days} jours**, \
-             il n'est plus eligible au parrainage.",
-            target_id.get()
-        ));
-    }
-
-    // 7. Le filleul n'a pas deja un parrain (verification in-memory)
+    // 5. Le filleul n'a pas deja un parrain (verification in-memory)
     {
         let data = ctx.data.read().await;
         if let Some(tracker) = data.get::<SponsorshipKey>() {

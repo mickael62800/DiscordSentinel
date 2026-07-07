@@ -3,6 +3,7 @@ pub mod announcements;
 pub mod bump;
 pub mod confessions;
 pub mod discord_roles;
+pub mod eligibility;
 pub mod guild_channels;
 pub mod guild_members;
 pub mod levels;
