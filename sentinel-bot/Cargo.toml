@@ -8,6 +8,7 @@ description = "Bot Discord unifie DiscordSentinel — tous les modules en un seu
 hmac = "0.12"
 sha2 = "0.10"
 sentinel-proto = { workspace = true }
+sentinel-core = { workspace = true }
 prost = { workspace = true }
 thiserror = { workspace = true }
 serenity = { workspace = true }

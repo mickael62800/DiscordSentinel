@@ -39,10 +39,11 @@ fn command_module(name: &str) -> &'static str {
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "ban-sursis" | "unban" | "history"
         | "note" | "call" | "signalement" | "context" | "appeal" | "expirations" | "compare"
-        | "modstats" | "evidence" | "review" | "template" | "transcript" | "export" | "massmute"
-        | "massban" | "copilote" => "moderation",
+        | "modstats" | "evidence" | "review" | "template" | "transcript" | "export"
+        | "massmute" | "massban" | "copilote" => "moderation",
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
+        "backup" => "guild_backup",
         _ if modules::coude::handles_command(name) => "coude",
         _ if modules::influence::handles_command(name) => "influence",
         _ => "unknown",
@@ -607,15 +608,14 @@ impl EventHandler for Handler {
                         | "history" | "note" | "call" | "signalement" | "context" | "appeal"
                         | "expirations" | "compare" | "modstats" | "evidence" | "review"
                         | "template" | "transcript" | "export" | "massmute" | "massban"
-                        | "copilote" => {
-                            modules::moderation::handle_command(&ctx, &command).await
-                        }
+                        | "copilote" => modules::moderation::handle_command(&ctx, &command).await,
                         "ticket" | "ticket-admin" => {
                             modules::tickets::handle_command(&ctx, &command).await
                         }
                         "confess" | "confess-admin" => {
                             modules::confessions::handle_command(&ctx, &command).await
                         }
+                        "backup" => modules::guild_backup::handle_command(&ctx, &command).await,
                         _ if modules::coude::handles_command(name) => {
                             modules::coude::handle_command(&ctx, &command).await
                         }
@@ -707,6 +707,8 @@ impl EventHandler for Handler {
                     modules::coude::on_component(&ctx, &component).await;
                 } else if modules::tickets::handles_component(cid) {
                     modules::tickets::on_component(&ctx, &component).await;
+                } else if modules::guild_backup::handles_component(cid) {
+                    modules::guild_backup::on_component(&ctx, &component).await;
                 }
             }
             Interaction::Modal(modal) => {

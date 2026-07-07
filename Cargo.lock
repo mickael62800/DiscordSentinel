@@ -3213,6 +3213,7 @@ dependencies = [
  "regex",
  "reqwest",
  "resvg",
+ "sentinel-core",
  "sentinel-proto",
  "serde",
  "serde_json",
