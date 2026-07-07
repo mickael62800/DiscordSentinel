@@ -109,6 +109,16 @@ impl SnapshotRepository for PgSnapshotRepository {
         Ok(res.rows_affected() > 0)
     }
 
+    async fn rename(&self, id: Uuid, label: &str) -> Result<bool, DomainError> {
+        let res = sqlx::query("UPDATE guild_snapshots SET label = $2 WHERE id = $1")
+            .bind(id)
+            .bind(label)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_ctx(TBL))?;
+        Ok(res.rows_affected() > 0)
+    }
+
     async fn count(&self, guild_id: &str) -> Result<u32, DomainError> {
         let n: i64 =
             sqlx::query_scalar("SELECT COUNT(*) FROM guild_snapshots WHERE guild_id = $1")

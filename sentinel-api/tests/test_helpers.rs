@@ -2743,6 +2743,13 @@ impl sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildS
     ) -> Result<bool, DomainError> {
         unimplemented!()
     }
+    async fn rename_snapshot(
+        &self,
+        _: sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotId,
+        _: &str,
+    ) -> Result<bool, DomainError> {
+        unimplemented!()
+    }
 }
 
 pub struct StubPendingRoleGrants;

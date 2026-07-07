@@ -26,6 +26,10 @@ pub trait SnapshotRepository: Send + Sync {
     /// Supprime une sauvegarde. Renvoie `true` si une ligne existait.
     async fn delete(&self, id: Uuid) -> Result<bool, DomainError>;
 
+    /// Met a jour le label d'une sauvegarde. Renvoie `true` si une ligne
+    /// existait.
+    async fn rename(&self, id: Uuid, label: &str) -> Result<bool, DomainError>;
+
     /// Nombre de sauvegardes d'une guild (borne du quota par guild).
     async fn count(&self, guild_id: &str) -> Result<u32, DomainError>;
 

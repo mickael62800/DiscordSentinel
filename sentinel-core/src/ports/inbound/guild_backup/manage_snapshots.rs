@@ -44,4 +44,12 @@ pub trait ManageGuildSnapshotsUseCase: Send + Sync {
 
     /// Supprime une sauvegarde. Renvoie `true` si une ligne a ete supprimee.
     async fn delete_snapshot(&self, snapshot_id: SnapshotId) -> Result<bool, DomainError>;
+
+    /// Renomme une sauvegarde (label). Renvoie `true` si une ligne a ete mise
+    /// a jour. Le label ne doit pas etre vide.
+    async fn rename_snapshot(
+        &self,
+        snapshot_id: SnapshotId,
+        label: &str,
+    ) -> Result<bool, DomainError>;
 }

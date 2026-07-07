@@ -80,6 +80,23 @@ impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
     async fn delete_snapshot(&self, snapshot_id: SnapshotId) -> Result<bool, DomainError> {
         self.repo.delete(snapshot_id).await
     }
+
+    async fn rename_snapshot(
+        &self,
+        snapshot_id: SnapshotId,
+        label: &str,
+    ) -> Result<bool, DomainError> {
+        let label = label.trim();
+        if label.is_empty() {
+            return Err(DomainError::ValidationError("label requis".into()));
+        }
+        if label.chars().count() > MAX_LABEL_LEN {
+            return Err(DomainError::ValidationError(format!(
+                "label trop long (max {MAX_LABEL_LEN} caracteres)"
+            )));
+        }
+        self.repo.rename(snapshot_id, label).await
+    }
 }
 
 #[cfg(test)]
@@ -147,6 +164,16 @@ mod tests {
                 .iter()
                 .filter(|(_, s)| s.guild_id == guild_id)
                 .count() as u32)
+        }
+        async fn rename(&self, id: Uuid, label: &str) -> Result<bool, DomainError> {
+            let mut rows = self.rows.lock().unwrap();
+            match rows.iter_mut().find(|(rid, _)| *rid == id) {
+                Some((_, s)) => {
+                    s.meta.label = label.to_string();
+                    Ok(true)
+                }
+                None => Ok(false),
+            }
         }
         async fn oldest_id(&self, guild_id: &str) -> Result<Option<Uuid>, DomainError> {
             Ok(self
@@ -231,6 +258,28 @@ mod tests {
         let id = svc.store_snapshot(snapshot("g1", "a")).await.unwrap();
         assert!(svc.delete_snapshot(id).await.unwrap());
         assert!(!svc.delete_snapshot(id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn rename_updates_label() {
+        let (svc, _) = service();
+        let id = svc.store_snapshot(snapshot("g1", "old")).await.unwrap();
+        assert!(svc.rename_snapshot(id, "new").await.unwrap());
+        assert_eq!(svc.get_snapshot(id).await.unwrap().meta.label, "new");
+    }
+
+    #[tokio::test]
+    async fn rename_rejects_empty_label() {
+        let (svc, _) = service();
+        let id = svc.store_snapshot(snapshot("g1", "old")).await.unwrap();
+        let err = svc.rename_snapshot(id, "  ").await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+    }
+
+    #[tokio::test]
+    async fn rename_missing_returns_false() {
+        let (svc, _) = service();
+        assert!(!svc.rename_snapshot(Uuid::new_v4(), "x").await.unwrap());
     }
 
     #[tokio::test]

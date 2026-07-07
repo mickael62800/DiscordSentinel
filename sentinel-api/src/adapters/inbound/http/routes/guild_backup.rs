@@ -17,7 +17,18 @@ fn inner() -> Router<AppState> {
         .route(
             "/snapshots/{snapshot_id}",
             get(handlers::guild_backup::snapshots::get_snapshot)
+                .patch(handlers::guild_backup::snapshots::rename_snapshot)
                 .delete(handlers::guild_backup::snapshots::delete_snapshot),
+        )
+        // Declencheurs : publient un event Redis consomme par le bot (le web ne
+        // peut pas agir sur Discord).
+        .route(
+            "/{guild_id}/capture",
+            post(handlers::guild_backup::snapshots::request_capture),
+        )
+        .route(
+            "/snapshots/{snapshot_id}/restore",
+            post(handlers::guild_backup::snapshots::request_restore),
         )
         // Re-attribution des roles aux membres de retour (pending_role_grants).
         .route(

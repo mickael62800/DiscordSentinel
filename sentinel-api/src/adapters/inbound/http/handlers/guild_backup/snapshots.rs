@@ -10,7 +10,7 @@
 
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
@@ -112,6 +112,90 @@ pub async fn delete_snapshot(
     check_role_for_guild(&state, &rbac, &snapshot.guild_id, Role::Owner, OWNER_REQUIRED).await?;
     state.guild_snapshots_uc.delete_snapshot(id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Deserialize)]
+pub struct RenameSnapshotBody {
+    pub label: String,
+}
+
+/// PATCH /api/guild-backup/snapshots/{snapshot_id} — renomme une capture.
+/// Owner de la guild concernee requis (bypass interne bot).
+pub async fn rename_snapshot(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(snapshot_id): Path<String>,
+    Json(body): Json<RenameSnapshotBody>,
+) -> Result<StatusCode, ApiError> {
+    let id = parse_id(&snapshot_id)?;
+    // On charge d'abord pour connaitre le guild_id (RBAC) et distinguer 404.
+    let snapshot = state.guild_snapshots_uc.get_snapshot(id).await?;
+    check_role_for_guild(&state, &rbac, &snapshot.guild_id, Role::Owner, OWNER_REQUIRED).await?;
+    state.guild_snapshots_uc.rename_snapshot(id, &body.label).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Corps de `POST /{guild_id}/capture` — demande de capture (executee par le bot).
+#[derive(Debug, Deserialize)]
+pub struct CaptureRequestBody {
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+/// POST /api/guild-backup/{guild_id}/capture — publie un event Redis pour que
+/// le bot capture le serveur. Le web ne peut pas agir sur Discord : l'API se
+/// contente de publier `guild_backup:capture_requested`. Owner requis.
+pub async fn request_capture(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(body): Json<CaptureRequestBody>,
+) -> Result<StatusCode, ApiError> {
+    check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, OWNER_REQUIRED).await?;
+    state.broadcaster.broadcast(
+        "guild_backup:capture_requested",
+        serde_json::json!({
+            "guild_id": guild_id,
+            "label": body.label,
+            "requested_by": body.requested_by,
+        }),
+    );
+    Ok(StatusCode::ACCEPTED)
+}
+
+/// Corps de `POST /snapshots/{snapshot_id}/restore` — demande de restauration.
+#[derive(Debug, Deserialize)]
+pub struct RestoreRequestBody {
+    #[serde(default)]
+    pub wipe: bool,
+    #[serde(default)]
+    pub requested_by: Option<String>,
+}
+
+/// POST /api/guild-backup/snapshots/{snapshot_id}/restore — publie un event
+/// Redis pour que le bot restaure le serveur depuis la capture. Owner requis.
+pub async fn request_restore(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(snapshot_id): Path<String>,
+    Json(body): Json<RestoreRequestBody>,
+) -> Result<StatusCode, ApiError> {
+    let id = parse_id(&snapshot_id)?;
+    // On charge la capture pour resoudre le guild_id (RBAC + payload event).
+    let snapshot = state.guild_snapshots_uc.get_snapshot(id).await?;
+    check_role_for_guild(&state, &rbac, &snapshot.guild_id, Role::Owner, OWNER_REQUIRED).await?;
+    state.broadcaster.broadcast(
+        "guild_backup:restore_requested",
+        serde_json::json!({
+            "guild_id": snapshot.guild_id,
+            "snapshot_id": id.to_string(),
+            "wipe": body.wipe,
+            "requested_by": body.requested_by,
+        }),
+    );
+    Ok(StatusCode::ACCEPTED)
 }
 
 fn parse_id(raw: &str) -> Result<SnapshotId, ApiError> {
