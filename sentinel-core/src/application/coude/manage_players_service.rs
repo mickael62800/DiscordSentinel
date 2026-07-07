@@ -9,15 +9,46 @@ use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::coude::manage_players::MilestoneView;
+use crate::ports::inbound::coude::manage_players::PlayerProgression;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+
+/// Cle de config du cooldown /repos (defaut 12h). Mirror de la lecture bot.
+const REPOS_COOLDOWN_KEY: &str = "repos_cooldown_hours";
+const REPOS_COOLDOWN_DEFAULT: i64 = 12;
 
 pub struct ManageCoudePlayersService {
     repo: Arc<dyn PlayerRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudePlayersService {
     pub fn new(repo: Arc<dyn PlayerRepository>) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche le repo de config bot : lecture server-side du cooldown /repos
+    /// configure par guild (progression / cooldown effectif).
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
+    }
+
+    /// Cooldown /repos configure par la guild (defaut 12h). Sans repo de
+    /// config : valeur par defaut historique.
+    async fn base_repos_cooldown_hours(&self, guild_id: &str) -> i64 {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::GuildSettings::load(&**repo, guild_id)
+                    .await
+                    .get_i64(REPOS_COOLDOWN_KEY, REPOS_COOLDOWN_DEFAULT)
+            }
+            None => REPOS_COOLDOWN_DEFAULT,
+        }
     }
 
     async fn require_player(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
@@ -248,6 +279,59 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         self.repo
             .regen_hp_tick(rate_0_25, rate_25_50, rate_50_75, rate_75_100)
             .await
+    }
+
+    async fn effective_repos_cooldown_hours(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<i64, DomainError> {
+        let player = self.require_player(guild_id, user_id).await?;
+        let base = self.base_repos_cooldown_hours(guild_id).await;
+        Ok(
+            crate::domain::services::coude::milestones::effective_repos_cooldown_hours(
+                base,
+                player.level,
+            ),
+        )
+    }
+
+    async fn get_progression(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<PlayerProgression, DomainError> {
+        use crate::domain::services::coude::{achievements, milestones};
+
+        let player = self.require_player(guild_id, user_id).await?;
+        let base = self.base_repos_cooldown_hours(guild_id).await;
+
+        let unlocked_achievements = achievements::unlocked_keys(&player)
+            .into_iter()
+            .map(str::to_string)
+            .collect();
+
+        let to_view = |m: &milestones::Milestone| MilestoneView {
+            level: m.level,
+            key: m.key.to_string(),
+            label: m.label.to_string(),
+            emoji: m.emoji.to_string(),
+            description: m.description.to_string(),
+            unlocked: milestones::is_unlocked(m, player.level),
+        };
+        let milestone_views = milestones::MILESTONES.iter().map(to_view).collect();
+        let next_milestone = milestones::next_for(player.level).map(to_view);
+
+        Ok(PlayerProgression {
+            unlocked_achievements,
+            total_achievements: achievements::total_achievements() as i32,
+            milestones: milestone_views,
+            next_milestone,
+            effective_repos_cooldown_hours: milestones::effective_repos_cooldown_hours(
+                base,
+                player.level,
+            ),
+        })
     }
 }
 

@@ -87,15 +87,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         });
 
     let source_id = command.user.id.to_string();
-    let cost = match prank_type.as_str() {
-        "braquage" => config.prank_braquage_cost(),
-        "scoop" => config.prank_scoop_cost(),
-        "appel" => config.prank_appel_cost(),
-        _ => {
-            reply_ephemeral(ctx, command, "Type de prank inconnu.").await;
-            return;
-        }
-    };
+    if !matches!(prank_type.as_str(), "braquage" | "scoop" | "appel") {
+        reply_ephemeral(ctx, command, "Type de prank inconnu.").await;
+        return;
+    }
 
     // Validations dependant du type.
     let target_user = if matches!(prank_type.as_str(), "scoop" | "appel") {
@@ -121,29 +116,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
-    let player = match api
-        .get_or_create_player(&guild_id, &source_id, &command.user.name)
-        .await
-    {
-        Ok(p) => p,
+    // Cout lu ET debite server-side (debit economique atomique, plus pilote
+    // par le client). Le bot ne connait plus le bareme des couts.
+    match api.prank_debit(&guild_id, &source_id, &prank_type).await {
+        Ok(crate::modules::coude::api_client::PrankDebitOutcome::Debited { .. }) => {}
+        Ok(crate::modules::coude::api_client::PrankDebitOutcome::InsufficientFunds {
+            cost,
+            ..
+        }) => {
+            reply_ephemeral(
+                ctx,
+                command,
+                &format!("Pas assez de coins ! Il te faut {cost}c."),
+            )
+            .await;
+            return;
+        }
         Err(e) => {
             reply_api_err(ctx, command, e).await;
             return;
         }
-    };
-    if player.coins < cost {
-        reply_ephemeral(
-            ctx,
-            command,
-            &format!("Pas assez de coins ! Il te faut {cost}c."),
-        )
-        .await;
-        return;
-    }
-
-    if let Err(e) = api.update_player_coins(&guild_id, &source_id, -cost).await {
-        reply_api_err(ctx, command, e).await;
-        return;
     }
 
     match prank_type.as_str() {

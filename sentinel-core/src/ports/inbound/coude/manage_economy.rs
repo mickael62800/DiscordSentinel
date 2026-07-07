@@ -28,6 +28,25 @@ pub struct GiftOutcome {
     pub taunt_events: Vec<TauntEvent>,
 }
 
+/// Resultat d'un debit de prank (cout lu server-side depuis la config).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrankDebitResult {
+    /// Debit applique : `cost` preleve, `new_balance` = solde restant.
+    Debited { cost: i64, new_balance: i64 },
+    /// Solde insuffisant : `cost` requis, `balance` courant.
+    InsufficientFunds { cost: i64, balance: i64 },
+}
+
+/// Resultat de l'annulation d'un combat avec penalite (calcul + debit
+/// server-side). `penalty` = coins reellement debites, `penalty_percent` =
+/// pourcentage applique (pour l'affichage), `new_balance` = solde restant.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CancelPenaltyOutcome {
+    pub penalty: i64,
+    pub penalty_percent: i32,
+    pub new_balance: i64,
+}
+
 /// Use case "gérer l'économie Coup de Coude".
 ///
 /// Couvre les transferts inter-joueurs, le vol, le casino et les compteurs
@@ -122,4 +141,28 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
     ) -> Result<i64, DomainError>;
 
     async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError>;
+
+    /// Debit d'un prank communautaire. Le cout est lu server-side depuis la
+    /// config guild (`prank_<type>_cost`), le debit du wallet est atomique.
+    /// `prank_type` ∈ {"braquage","scoop","appel"}. Default `unimplemented!()`.
+    async fn prank_debit(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _prank_type: &str,
+    ) -> Result<PrankDebitResult, DomainError> {
+        unimplemented!("prank_debit not implemented")
+    }
+
+    /// Applique la penalite d'annulation de combat : lit le pourcentage
+    /// (`cancel_penalty`) server-side, calcule `max(1, coins * pct)`, DEBITE
+    /// reellement le wallet (atomique) et met a jour `total_lost`. Retourne le
+    /// montant preleve + le solde restant. Default `unimplemented!()`.
+    async fn apply_cancel_penalty(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<CancelPenaltyOutcome, DomainError> {
+        unimplemented!("apply_cancel_penalty not implemented")
+    }
 }

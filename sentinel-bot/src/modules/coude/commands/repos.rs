@@ -7,7 +7,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let Some((guild_id, config, api)) = crate::modules::coude::command_prelude::coude_prelude(
+    let Some((guild_id, _config, api)) = crate::modules::coude::command_prelude::coude_prelude(
         ctx,
         command,
         |c| c.channel_profil(),
@@ -31,13 +31,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    // Cooldown effectif : palier "Convalescence" (niveau 15+) reduit le
-    // cooldown a 8h max (cf. COUPE_AMELIORATIONS 3.2).
-    let base_cooldown_hours = config.repos_cooldown_hours();
-    let cooldown_hours = crate::modules::coude::milestones::effective_repos_cooldown_hours(
-        base_cooldown_hours,
-        player.level,
-    );
+    // Cooldown effectif resolu server-side (palier "Convalescence" niveau 15+
+    // -> plafond 8h). Le bot ne calcule plus la regle.
+    let cooldown_hours = match api
+        .effective_repos_cooldown_hours(&guild_id, &user_id)
+        .await
+    {
+        Ok(h) => h,
+        Err(e) => {
+            reply_api_err(ctx, command, e).await;
+            return;
+        }
+    };
     if let Some(ref last_used) = player.repos_last_used {
         if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(last_used) {
             let elapsed = chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));

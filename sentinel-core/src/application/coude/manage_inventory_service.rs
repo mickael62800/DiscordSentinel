@@ -10,11 +10,15 @@ use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_inventory::UsePotionResult;
 use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
+use crate::ports::outbound::coude::inventory_repository::UsePotionTxOutcome;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 pub struct ManageCoudeInventoryService {
     repo: Arc<dyn InventoryRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
+    player_repo: Option<Arc<dyn PlayerRepository>>,
 }
 
 impl ManageCoudeInventoryService {
@@ -22,11 +26,19 @@ impl ManageCoudeInventoryService {
         Self {
             repo,
             bot_config_repo: None,
+            player_repo: None,
         }
     }
 
     pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
         self.bot_config_repo = Some(repo);
+        self
+    }
+
+    /// Branche le repo player pour l'usage de potion hors combat (lecture des
+    /// HP courants pour la regle anti-gaspillage).
+    pub fn with_player_repo(mut self, repo: Arc<dyn PlayerRepository>) -> Self {
+        self.player_repo = Some(repo);
         self
     }
 }
@@ -67,6 +79,57 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         item_key: &str,
     ) -> Result<bool, DomainError> {
         self.repo.has_item(guild_id, user_id, item_key).await
+    }
+
+    async fn use_potion(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        item_key: &str,
+    ) -> Result<UsePotionResult, DomainError> {
+        use crate::domain::services::coude::potion::{evaluate, PotionEvaluation};
+
+        let player_repo = self.player_repo.as_ref().ok_or_else(|| {
+            DomainError::Internal("player_repo non branche pour use_potion".into())
+        })?;
+
+        let player = player_repo
+            .get(guild_id, user_id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("Joueur introuvable".into()))?;
+
+        // Bareme + regle anti-gaspillage + clamp : domain pur.
+        match evaluate(item_key, player.hp_current, player.hp_max) {
+            PotionEvaluation::NotAPotion => Ok(UsePotionResult::NotAPotion),
+            PotionEvaluation::AlreadyFull => Ok(UsePotionResult::AlreadyFull),
+            PotionEvaluation::Wasteful {
+                hp_missing,
+                heal_amount,
+            } => Ok(UsePotionResult::Wasteful {
+                hp_missing,
+                heal_amount,
+            }),
+            PotionEvaluation::Ok { heal_amount, .. } => {
+                // Consommation item + heal (clamp re-applique) en UNE tx.
+                match self
+                    .repo
+                    .use_potion_atomic(guild_id, user_id, item_key, heal_amount)
+                    .await?
+                {
+                    UsePotionTxOutcome::Healed {
+                        actually_healed,
+                        new_hp,
+                        hp_max,
+                    } => Ok(UsePotionResult::Healed {
+                        actually_healed,
+                        new_hp,
+                        hp_max,
+                    }),
+                    UsePotionTxOutcome::NoItem => Ok(UsePotionResult::NoItem),
+                    UsePotionTxOutcome::AlreadyFull => Ok(UsePotionResult::AlreadyFull),
+                }
+            }
+        }
     }
 
     async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {

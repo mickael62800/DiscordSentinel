@@ -5,7 +5,6 @@ use serenity::all::{
 
 use crate::shared::discord_helpers::component_reply_ephemeral as respond_ephemeral;
 
-use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
 pub const CANCEL_PREFIX: &str = "coude_cancel:";
@@ -47,27 +46,6 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     let guild_id = combat.guild_id.clone();
 
-    drop(data);
-    let config = load_guild_config(ctx, &guild_id).await;
-    let penalty_pct = config.cancel_penalty();
-
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
-
-    let attacker = match api
-        .get_or_create_player(&guild_id, &combat.attacker_id, &combat.attacker_name)
-        .await
-    {
-        Ok(p) => p,
-        Err(e) => {
-            respond_ephemeral(ctx, component, &e).await;
-            return;
-        }
-    };
-
-    let penalty = (attacker.coins as f64 * penalty_pct).max(1.0) as i64;
-    let penalty_display = (penalty_pct * 100.0) as i32;
-
     // Annuler le combat — utilise Cancel (gate status='pending') plutot
     // qu Expire (ecrase tout), pour eviter d annuler un combat qui vient
     // d etre accepte par le defenseur en parallele.
@@ -76,14 +54,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Retirer la penalite + comptabiliser dans total_lost
-    if let Err(e) = api
-        .record_coins_lost(&guild_id, &combat.attacker_id, penalty)
-        .await
-    {
-        respond_ephemeral(ctx, component, &format!("Erreur penalite : {e}")).await;
-        return;
-    }
+    // Penalite calculee ET debitee server-side de facon atomique (le bot ne
+    // calcule plus le barème ni ne pilote le debit ; corrige aussi le bug ou
+    // `record_coins_lost` ne debitait pas reellement le wallet).
+    let penalty_outcome = match api.apply_cancel_penalty(&guild_id, &combat.attacker_id).await {
+        Ok(o) => o,
+        Err(e) => {
+            respond_ephemeral(ctx, component, &format!("Erreur penalite : {e}")).await;
+            return;
+        }
+    };
 
     // Rembourser les paris
     if let Err(e) = api.refund_bets(&combat_id).await {
@@ -98,9 +78,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             Solde restant : {} coins",
             combat.attacker_id,
             combat.defender_id,
-            penalty,
-            penalty_display,
-            attacker.coins - penalty,
+            penalty_outcome.penalty,
+            penalty_outcome.penalty_percent,
+            penalty_outcome.new_balance,
         ))
         .color(0x95A5A6)
         .footer(CreateEmbedFooter::new(

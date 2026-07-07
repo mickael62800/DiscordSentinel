@@ -177,6 +177,49 @@ impl CoudeEconomyService for EconomyGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Int64Value { value: v }))
     }
+
+    async fn prank_debit(
+        &self,
+        request: Request<proto::PrankDebitRequest>,
+    ) -> Result<Response<proto::PrankDebitResponse>, Status> {
+        use crate::ports::inbound::coude::manage_economy::PrankDebitResult;
+        let req = request.into_inner();
+        let result = self
+            .uc
+            .prank_debit(&req.guild_id, &req.user_id, &req.prank_type)
+            .await
+            .map_err(domain_to_status)?;
+        let resp = match result {
+            PrankDebitResult::Debited { cost, new_balance } => proto::PrankDebitResponse {
+                success: true,
+                cost,
+                balance: new_balance,
+            },
+            PrankDebitResult::InsufficientFunds { cost, balance } => proto::PrankDebitResponse {
+                success: false,
+                cost,
+                balance,
+            },
+        };
+        Ok(Response::new(resp))
+    }
+
+    async fn apply_cancel_penalty(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::CancelPenaltyResponse>, Status> {
+        let req = request.into_inner();
+        let outcome = self
+            .uc
+            .apply_cancel_penalty(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::CancelPenaltyResponse {
+            penalty: outcome.penalty,
+            penalty_percent: outcome.penalty_percent,
+            new_balance: outcome.new_balance,
+        }))
+    }
 }
 
 #[cfg(test)]

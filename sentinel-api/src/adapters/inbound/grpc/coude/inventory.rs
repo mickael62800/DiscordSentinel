@@ -123,6 +123,56 @@ impl CoudeInventoryService for InventoryGrpc {
         Ok(Response::new(proto::BoolValue { value: v }))
     }
 
+    async fn use_potion(
+        &self,
+        request: Request<proto::UseItemRequest>,
+    ) -> Result<Response<proto::UsePotionResponse>, Status> {
+        use crate::ports::inbound::coude::manage_inventory::UsePotionResult;
+        use proto::UsePotionOutcomeKind as K;
+        let req = request.into_inner();
+        let result = self
+            .uc
+            .use_potion(&req.guild_id, &req.user_id, &req.item_key)
+            .await
+            .map_err(domain_to_status)?;
+        let resp = match result {
+            UsePotionResult::Healed {
+                actually_healed,
+                new_hp,
+                hp_max,
+            } => proto::UsePotionResponse {
+                kind: K::Healed as i32,
+                actually_healed,
+                new_hp,
+                hp_max,
+                hp_missing: 0,
+                heal_amount: 0,
+            },
+            UsePotionResult::NotAPotion => proto::UsePotionResponse {
+                kind: K::NotAPotion as i32,
+                ..Default::default()
+            },
+            UsePotionResult::AlreadyFull => proto::UsePotionResponse {
+                kind: K::AlreadyFull as i32,
+                ..Default::default()
+            },
+            UsePotionResult::Wasteful {
+                hp_missing,
+                heal_amount,
+            } => proto::UsePotionResponse {
+                kind: K::Wasteful as i32,
+                hp_missing,
+                heal_amount,
+                ..Default::default()
+            },
+            UsePotionResult::NoItem => proto::UsePotionResponse {
+                kind: K::NoItem as i32,
+                ..Default::default()
+            },
+        };
+        Ok(Response::new(resp))
+    }
+
     async fn purchase_item(
         &self,
         request: Request<proto::PurchaseItemRequest>,

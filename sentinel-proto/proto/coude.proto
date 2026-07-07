@@ -21,6 +21,27 @@ service CoudePlayerService {
   rpc UpdateHp(UpdateHpRequest) returns (Empty);
   // Phase 4 : tick batch regeneration passive des HP (appele par coude-worker).
   rpc HpRegenTick(HpRegenTickRequest) returns (HpRegenTickResponse);
+  // Progression derivee server-side (succes + paliers + cooldown effectif).
+  rpc GetProgression(GetPlayerRequest) returns (PlayerProgression);
+  // Cooldown /repos effectif (heures) pour le hot path /repos.
+  rpc GetEffectiveReposCooldownHours(GetPlayerRequest) returns (Int64Value);
+}
+
+message MilestoneInfo {
+  int32 level = 1;
+  string key = 2;
+  string label = 3;
+  string emoji = 4;
+  string description = 5;
+  bool unlocked = 6;
+}
+
+message PlayerProgression {
+  repeated string unlocked_achievements = 1;
+  int32 total_achievements = 2;
+  repeated MilestoneInfo milestones = 3;
+  optional MilestoneInfo next_milestone = 4;
+  int64 effective_repos_cooldown_hours = 5;
 }
 
 message HpRegenTickRequest {
@@ -413,6 +434,28 @@ service CoudeEconomyService {
   rpc CountCasinoToday(UserInGuildRequest) returns (Int64Value);
   rpc SumCasinoGainsToday(UserInGuildRequest) returns (Int64Value);
   rpc CountStealToday(UserInGuildRequest) returns (Int64Value);
+  // Debit d'un prank communautaire (cout lu server-side, debit atomique).
+  rpc PrankDebit(PrankDebitRequest) returns (PrankDebitResponse);
+  // Penalite d'annulation de combat (calcul + debit server-side).
+  rpc ApplyCancelPenalty(UserInGuildRequest) returns (CancelPenaltyResponse);
+}
+
+message PrankDebitRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string prank_type = 3;
+}
+
+message PrankDebitResponse {
+  bool success = 1;
+  int64 cost = 2;
+  int64 balance = 3;
+}
+
+message CancelPenaltyResponse {
+  int64 penalty = 1;
+  int32 penalty_percent = 2;
+  int64 new_balance = 3;
 }
 
 message Int64Value { int64 value = 1; }
@@ -517,6 +560,8 @@ service CoudeInventoryService {
   rpc AddItem(AddItemRequest) returns (Empty);
   rpc UseItem(UseItemRequest) returns (UseItemResponse);
   rpc HasItem(HasItemRequest) returns (BoolValue);
+  // Usage d'une potion hors combat (bareme + heal + clamp atomiques).
+  rpc UsePotion(UseItemRequest) returns (UsePotionResponse);
 
   // Achat boutique atomique server-side : verif prix serveur + debit wallet +
   // ajout item + alimentation cashbox, le tout dans une seule transaction.
@@ -587,6 +632,23 @@ message PurchaseItemResponse {
 
 message UseItemResponse {
   bool consumed = 1;
+}
+
+enum UsePotionOutcomeKind {
+  USE_POTION_OUTCOME_KIND_HEALED = 0;
+  USE_POTION_OUTCOME_KIND_NOT_A_POTION = 1;
+  USE_POTION_OUTCOME_KIND_ALREADY_FULL = 2;
+  USE_POTION_OUTCOME_KIND_WASTEFUL = 3;
+  USE_POTION_OUTCOME_KIND_NO_ITEM = 4;
+}
+
+message UsePotionResponse {
+  UsePotionOutcomeKind kind = 1;
+  int32 actually_healed = 2;
+  int32 new_hp = 3;
+  int32 hp_max = 4;
+  int32 hp_missing = 5;
+  int32 heal_amount = 6;
 }
 
 message HasItemRequest {

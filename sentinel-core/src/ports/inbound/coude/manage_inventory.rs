@@ -7,9 +7,42 @@ use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 
+/// Resultat de l'usage d'une potion de soin hors combat (bareme + heal
+/// resolus server-side). Le bot n'a plus qu'a rendre le message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UsePotionResult {
+    /// L'item n'est pas une potion utilisable.
+    NotAPotion,
+    /// Le joueur est deja a pleine sante.
+    AlreadyFull,
+    /// Gaspillage : la potion soigne bien plus que le manque de HP.
+    Wasteful { hp_missing: i32, heal_amount: i32 },
+    /// Le joueur n'a pas la potion en inventaire.
+    NoItem,
+    /// Potion consommee + heal applique (clamp au HP max).
+    Healed {
+        actually_healed: i32,
+        new_hp: i32,
+        hp_max: i32,
+    },
+}
+
 /// Use case "gérer l'inventaire/primes/assurances Coup de Coude".
 #[async_trait]
 pub trait ManageCoudeInventoryUseCase: Send + Sync {
+    /// Utilise une potion de soin hors combat. Resout le bareme (montant de
+    /// heal), applique la regle anti-gaspillage et le clamp au HP max, puis
+    /// consomme l'item + met a jour les HP dans UNE transaction atomique.
+    /// Default `unimplemented!()` pour ne pas casser les mocks existants.
+    async fn use_potion(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _item_key: &str,
+    ) -> Result<UsePotionResult, DomainError> {
+        unimplemented!("use_potion not implemented")
+    }
+
     // ── Items ──
     async fn list_inventory(
         &self,

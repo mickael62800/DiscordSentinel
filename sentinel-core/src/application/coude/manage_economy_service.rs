@@ -68,6 +68,18 @@ impl ManageCoudeEconomyService {
         self
     }
 
+    /// Lit une cle de config guild entiere (defaut si repo absent/cle absente).
+    async fn config_i64(&self, guild_id: &str, key: &str, default: i64) -> i64 {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::GuildSettings::load(&**repo, guild_id)
+                    .await
+                    .get_i64(key, default)
+            }
+            None => default,
+        }
+    }
+
     async fn leaky_wallet_fee(&self, guild_id: &str) -> i64 {
         match &self.bot_config_repo {
             Some(repo) => {
@@ -480,6 +492,88 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
 
     async fn count_steal_today(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
         self.repo.count_steal_today(guild_id, user_id).await
+    }
+
+    async fn prank_debit(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        prank_type: &str,
+    ) -> Result<crate::ports::inbound::coude::manage_economy::PrankDebitResult, DomainError> {
+        use crate::ports::inbound::coude::manage_economy::PrankDebitResult;
+
+        // Cout lu server-side (config guild, defauts historiques du bot).
+        let (config_key, default) = match prank_type {
+            "braquage" => ("prank_braquage_cost", 100),
+            "scoop" => ("prank_scoop_cost", 200),
+            "appel" => ("prank_appel_cost", 50),
+            _ => {
+                return Err(DomainError::ValidationError(
+                    "Type de prank inconnu.".into(),
+                ))
+            }
+        };
+        let cost = self.config_i64(guild_id, config_key, default).await;
+
+        let balance = self.wallet_uc.get_balance(guild_id, user_id).await?;
+        if balance < cost {
+            return Ok(PrankDebitResult::InsufficientFunds { cost, balance });
+        }
+
+        let mutation = self
+            .wallet_uc
+            .debit(guild_id, user_id, cost, "coude_prank", "Prank communautaire")
+            .await?;
+        Ok(PrankDebitResult::Debited {
+            cost,
+            new_balance: mutation.new_balance,
+        })
+    }
+
+    async fn apply_cancel_penalty(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<crate::ports::inbound::coude::manage_economy::CancelPenaltyOutcome, DomainError> {
+        use crate::ports::inbound::coude::manage_economy::CancelPenaltyOutcome;
+
+        // Pourcentage lu server-side (stocke en entier, defaut 5%).
+        let penalty_pct_int = self.config_i64(guild_id, "cancel_penalty", 5).await;
+        let penalty_pct = penalty_pct_int as f64 / 100.0;
+
+        let balance = self.wallet_uc.get_balance(guild_id, user_id).await?;
+        // Mirror du calcul bot : max(1, coins * pct), clamp au solde reel pour
+        // pouvoir reellement debiter (le legacy ne debitait pas -> bug corrige).
+        let nominal = (balance as f64 * penalty_pct).max(1.0) as i64;
+        let effective = nominal.min(balance).max(0);
+
+        if effective > 0 {
+            self.wallet_uc
+                .debit(
+                    guild_id,
+                    user_id,
+                    effective,
+                    "coude_cancel_penalty",
+                    "Penalite annulation combat",
+                )
+                .await?;
+            // Compteur stats total_lost (best-effort, hors wallet) — mirror
+            // exact du legacy annuler (`record_coins_lost`).
+            if let Some(player_repo) = &self.player_repo {
+                if let Err(e) = player_repo
+                    .record_coins_lost(guild_id, user_id, effective)
+                    .await
+                {
+                    tracing::warn!(error = %e, user_id, "Echec record total_lost penalite annulation");
+                }
+            }
+        }
+
+        Ok(CancelPenaltyOutcome {
+            penalty: effective,
+            penalty_percent: penalty_pct_int as i32,
+            new_balance: balance - effective,
+        })
     }
 }
 

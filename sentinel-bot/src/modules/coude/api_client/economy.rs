@@ -12,7 +12,66 @@ use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, ApiClient};
 
+/// Resultat d'un debit de prank (cout lu server-side).
+#[derive(Debug, Clone)]
+pub enum PrankDebitOutcome {
+    Debited { cost: i64, new_balance: i64 },
+    InsufficientFunds { cost: i64, balance: i64 },
+}
+
+/// Resultat de la penalite d'annulation de combat (calcul + debit server-side).
+#[derive(Debug, Clone)]
+pub struct CancelPenaltyOutcome {
+    pub penalty: i64,
+    pub penalty_percent: i32,
+    pub new_balance: i64,
+}
+
 impl ApiClient {
+    /// Debit d'un prank : cout lu server-side (config guild), debit atomique.
+    pub async fn prank_debit(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        prank_type: &str,
+    ) -> Result<PrankDebitOutcome, String> {
+        let req = proto_coude::PrankDebitRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            prank_type: prank_type.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, coude_economy, prank_debit, req)?;
+        Ok(if r.success {
+            PrankDebitOutcome::Debited {
+                cost: r.cost,
+                new_balance: r.balance,
+            }
+        } else {
+            PrankDebitOutcome::InsufficientFunds {
+                cost: r.cost,
+                balance: r.balance,
+            }
+        })
+    }
+
+    /// Annulation de combat : penalite calculee ET debitee server-side.
+    pub async fn apply_cancel_penalty(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<CancelPenaltyOutcome, String> {
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, coude_economy, apply_cancel_penalty, req)?;
+        Ok(CancelPenaltyOutcome {
+            penalty: r.penalty,
+            penalty_percent: r.penalty_percent,
+            new_balance: r.new_balance,
+        })
+    }
+
     pub async fn record_casino_win(
         &self,
         guild_id: &str,

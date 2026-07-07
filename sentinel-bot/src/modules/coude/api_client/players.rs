@@ -19,6 +19,27 @@ use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, proto_player_to_dto, ApiClient, CowardiceResponse, Player};
 
+/// Un palier de niveau (donnees d'affichage + statut), resolu server-side.
+#[derive(Debug, Clone)]
+pub struct MilestoneInfo {
+    pub level: i32,
+    pub key: String,
+    pub label: String,
+    pub emoji: String,
+    pub description: String,
+    pub unlocked: bool,
+}
+
+/// Etat de progression derive server-side (succes + paliers + cooldown).
+#[derive(Debug, Clone)]
+pub struct PlayerProgression {
+    pub unlocked_achievements: Vec<String>,
+    pub total_achievements: i32,
+    pub milestones: Vec<MilestoneInfo>,
+    pub next_milestone: Option<MilestoneInfo>,
+    pub effective_repos_cooldown_hours: i64,
+}
+
 impl ApiClient {
     pub async fn get_or_create_player(
         &self,
@@ -79,6 +100,55 @@ impl ApiClient {
         };
         let r = crate::grpc_call!(self.grpc, coude_players, add_xp, req)?;
         Ok((r.new_xp, r.new_level, r.leveled_up, r.stat_points_gained))
+    }
+
+    /// Progression derivee server-side (succes debloques + paliers + cooldown
+    /// /repos effectif). Le bareme vit dans l'API ; le bot ne fait que rendre.
+    pub async fn get_progression(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<PlayerProgression, String> {
+        let req = proto_coude::GetPlayerRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, coude_players, get_progression, req)?;
+        let map = |m: proto_coude::MilestoneInfo| MilestoneInfo {
+            level: m.level,
+            key: m.key,
+            label: m.label,
+            emoji: m.emoji,
+            description: m.description,
+            unlocked: m.unlocked,
+        };
+        Ok(PlayerProgression {
+            unlocked_achievements: r.unlocked_achievements,
+            total_achievements: r.total_achievements,
+            milestones: r.milestones.into_iter().map(map).collect(),
+            next_milestone: r.next_milestone.map(map),
+            effective_repos_cooldown_hours: r.effective_repos_cooldown_hours,
+        })
+    }
+
+    /// Cooldown /repos effectif (heures) pour ce joueur (regle palier niveau
+    /// 15 appliquee server-side).
+    pub async fn effective_repos_cooldown_hours(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<i64, String> {
+        let req = proto_coude::GetPlayerRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let r = crate::grpc_call!(
+            self.grpc,
+            coude_players,
+            get_effective_repos_cooldown_hours,
+            req
+        )?;
+        Ok(r.value)
     }
 
     // ── Players : HTTP legacy (pas d'equivalent proto) ──

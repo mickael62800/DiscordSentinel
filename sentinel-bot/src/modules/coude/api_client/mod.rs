@@ -536,6 +536,13 @@ mod taunts;
 mod tout_ou_rien;
 mod utility;
 pub use tout_ou_rien::PlayToutOuRienResp;
+pub use economy::PrankDebitOutcome;
+#[allow(unused_imports)]
+pub use economy::CancelPenaltyOutcome;
+pub use inventory::UsePotionOutcome;
+pub use players::PlayerProgression;
+#[allow(unused_imports)]
+pub use players::MilestoneInfo;
 mod flavor;
 mod friendly_duel;
 mod prank;

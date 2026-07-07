@@ -12,6 +12,7 @@ use sentinel_core::domain::errors::DomainError;
 
 use super::super::pg_err;
 use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
+use crate::ports::outbound::coude::inventory_repository::UsePotionTxOutcome;
 
 pub struct PgInventoryRepository {
     pool: PgPool,
@@ -153,6 +154,72 @@ impl InventoryRepository for PgInventoryRepository {
         .await
         .map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
+    }
+
+    async fn use_potion_atomic(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        item_key: &str,
+        heal_amount: i32,
+    ) -> Result<UsePotionTxOutcome, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        // Verrouille la ligne joueur pour lire l'etat HP courant.
+        let player: Option<(i32, i32)> = sqlx::query_as(
+            "SELECT hp_current, hp_max FROM coude_players
+             WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        let Some((hp_current, hp_max)) = player else {
+            tx.rollback().await.map_err(pg_err)?;
+            return Ok(UsePotionTxOutcome::NoItem);
+        };
+
+        if hp_current >= hp_max {
+            tx.rollback().await.map_err(pg_err)?;
+            return Ok(UsePotionTxOutcome::AlreadyFull);
+        }
+
+        // Consomme l'item (atomique avec le heal).
+        let consumed = sqlx::query(
+            r#"UPDATE coude_inventory SET quantity = quantity - 1
+               WHERE guild_id = $1 AND user_id = $2 AND item_key = $3 AND quantity > 0"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(item_key)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        if consumed.rows_affected() == 0 {
+            tx.rollback().await.map_err(pg_err)?;
+            return Ok(UsePotionTxOutcome::NoItem);
+        }
+
+        let new_hp = (hp_current + heal_amount).min(hp_max);
+        sqlx::query(
+            "UPDATE coude_players SET hp_current = $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(new_hp)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
+        Ok(UsePotionTxOutcome::Healed {
+            actually_healed: new_hp - hp_current,
+            new_hp,
+            hp_max,
+        })
     }
 
     async fn has_item(

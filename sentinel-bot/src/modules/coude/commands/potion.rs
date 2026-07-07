@@ -83,67 +83,50 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         data.get::<CatalogCacheKey>().unwrap().clone()
     };
 
-    if !catalog.is_potion(&potion_key) {
-        followup_info(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
-        return;
-    }
-
-    let heal_amount = catalog.potion_heal_amount(&potion_key);
-    if heal_amount <= 0 {
-        followup_info(ctx, command, "Potion invalide.").await;
-        return;
-    }
-
-    // Charger le player pour connaitre HP actuels
-    let player = match api
-        .get_or_create_player(&guild_id, &user_id, &command.user.name)
+    // Le bot ne calcule plus le bareme/heal/clamp ni l'anti-gaspillage : tout
+    // est resolu server-side de facon ATOMIQUE (consommation item + heal).
+    let (actually_healed, new_hp, hp_max) = match api
+        .use_potion(&guild_id, &user_id, &potion_key)
         .await
     {
-        Ok(p) => p,
-        Err(e) => {
-            followup_info(ctx, command, &e).await;
+        Ok(crate::modules::coude::api_client::UsePotionOutcome::Healed {
+            actually_healed,
+            new_hp,
+            hp_max,
+        }) => (actually_healed, new_hp, hp_max),
+        Ok(crate::modules::coude::api_client::UsePotionOutcome::NotAPotion) => {
+            followup_info(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
             return;
         }
-    };
-
-    let hp_max = player.hp_max.unwrap_or(100);
-    let hp_current = player.hp_current.unwrap_or(hp_max);
-
-    if hp_current >= hp_max {
-        followup_info(
-            ctx,
-            command,
-            "\u{2764}\u{fe0f} Tu es deja a pleine sante ! Inutile de gaspiller une potion.",
-        )
-        .await;
-        return;
-    }
-
-    // Protection anti-gaspillage : si la potion heal beaucoup plus que
-    // le manque de HP (ex. potion_majeure +80 alors qu'il manque 10 HP),
-    // on refuse l'usage et on propose la plus petite.
-    let hp_missing = hp_max - hp_current;
-    if heal_amount > hp_missing * 3 && heal_amount > 40 {
-        let item_name = catalog
-            .get_item(&potion_key)
-            .map(|i| i.name.clone())
-            .unwrap_or_else(|| "cette potion".into());
-        followup_info(
-            ctx,
-            command,
-            &format!(
-                "\u{26a0}\u{fe0f} Gaspillage ! Il ne te manque que **{}** HP, la **{}** en heal {}. Utilise une Potion de Soin (+30) ou attends davantage avant de l'utiliser.",
-                hp_missing, item_name, heal_amount
-            ),
-        )
-        .await;
-        return;
-    }
-
-    // Verifier que le joueur a bien la potion
-    match api.has_item(&guild_id, &user_id, &potion_key).await {
-        Ok(true) => {}
-        Ok(false) => {
+        Ok(crate::modules::coude::api_client::UsePotionOutcome::AlreadyFull) => {
+            followup_info(
+                ctx,
+                command,
+                "\u{2764}\u{fe0f} Tu es deja a pleine sante ! Inutile de gaspiller une potion.",
+            )
+            .await;
+            return;
+        }
+        Ok(crate::modules::coude::api_client::UsePotionOutcome::Wasteful {
+            hp_missing,
+            heal_amount,
+        }) => {
+            let item_name = catalog
+                .get_item(&potion_key)
+                .map(|i| i.name.clone())
+                .unwrap_or_else(|| "cette potion".into());
+            followup_info(
+                ctx,
+                command,
+                &format!(
+                    "\u{26a0}\u{fe0f} Gaspillage ! Il ne te manque que **{}** HP, la **{}** en heal {}. Utilise une Potion de Soin (+30) ou attends davantage avant de l'utiliser.",
+                    hp_missing, item_name, heal_amount
+                ),
+            )
+            .await;
+            return;
+        }
+        Ok(crate::modules::coude::api_client::UsePotionOutcome::NoItem) => {
             let name = catalog
                 .get_item(&potion_key)
                 .map(|i| i.name.clone())
@@ -160,33 +143,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             followup_info(ctx, command, &e).await;
             return;
         }
-    }
-
-    // Consommer l'item : on N'APPLIQUE le heal QUE si l'item a reellement ete
-    // consomme (consumed == true). Avant, seul `Err` etait teste -> un `Ok(false)`
-    // (plus de potion, ou 2e clic concurrent qui perd la course de consommation)
-    // soignait quand meme -> heal gratuit/infini.
-    match api.use_item(&guild_id, &user_id, &potion_key).await {
-        Ok(true) => {}
-        Ok(false) => {
-            followup_info(ctx, command, "Tu n'as plus de potion a utiliser.").await;
-            return;
-        }
-        Err(e) => {
-            followup_info(ctx, command, &e).await;
-            return;
-        }
-    }
-
-    // Calculer le soin effectif (clamp au HP max)
-    let new_hp = (hp_current + heal_amount).min(hp_max);
-    let actually_healed = new_hp - hp_current;
-
-    // Mettre a jour les HP
-    if let Err(e) = api.update_hp(&guild_id, &user_id, new_hp, hp_max).await {
-        followup_info(ctx, command, &e).await;
-        return;
-    }
+    };
 
     let item = catalog.get_item(&potion_key);
     let (emoji, name) = item

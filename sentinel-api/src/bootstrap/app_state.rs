@@ -388,7 +388,10 @@ pub async fn build_app_state(
     // `blackjack_svc` est instancie plus bas, apres la construction de
     // `wallet_uc` (dependance de la migration #4).
     let coude_player_repo = Arc::new(PgPlayerRepository::new(pg_pool.clone()));
-    let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo.clone()));
+    let coude_players_uc = Arc::new(
+        ManageCoudePlayersService::new(coude_player_repo.clone())
+            .with_bot_config_repo(bot_config_repo.clone()),
+    );
     let coude_combat_repo = Arc::new(PgCombatRepository::new(pg_pool.clone()));
     let coude_combats_uc: Arc<
         dyn crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase,
@@ -776,7 +779,8 @@ pub async fn build_app_state(
     let coude_inventory_repo = Arc::new(PgInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(
         ManageCoudeInventoryService::new(coude_inventory_repo)
-            .with_bot_config_repo(bot_config_repo.clone()),
+            .with_bot_config_repo(bot_config_repo.clone())
+            .with_player_repo(coude_player_repo.clone()),
     );
     let coude_social_repo: Arc<
         dyn crate::ports::outbound::coude::social_repository::SocialRepository,

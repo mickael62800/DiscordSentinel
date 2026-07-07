@@ -67,16 +67,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Inventaire + assurance active (best-effort : une erreur ne bloque pas l'affichage du profil).
     // Les 4 lectures sont independantes → on les lance en parallele (1 latence au lieu de 4).
     let tid = target.id.to_string();
-    let (inventory, active_insurance, active_curse, tor_stats) = tokio::join!(
+    let (inventory, active_insurance, active_curse, tor_stats, progression) = tokio::join!(
         api.get_inventory(&guild_id, &tid),
         api.get_active_insurance(&guild_id, &tid),
         api.get_active_curse(&guild_id, &tid),
         api.get_user_tout_ou_rien_stats(&guild_id, &tid),
+        // Progression (succes + paliers) resolue server-side : le bareme ne
+        // vit plus dans le bot, qui ne fait que rendre les emojis/labels.
+        api.get_progression(&guild_id, &tid),
     );
     let inventory = inventory.unwrap_or_default();
     let active_insurance = active_insurance.ok().flatten();
     let active_curse = active_curse.ok().flatten();
     let tor_stats = tor_stats.unwrap_or_default();
+    let progression = progression.ok();
 
     let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = catalog.title_for_level(player.level).to_string();
@@ -179,9 +183,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
     }
 
-    // Paliers visibles (cf. COUPE_AMELIORATIONS 3.2) — debloques par
-    // niveau, declaratif uniquement pour l instant.
-    let milestones_text = crate::modules::coude::milestones::format_profile_section(player.level);
+    // Paliers visibles (cf. COUPE_AMELIORATIONS 3.2) — la liste + le statut de
+    // deblocage viennent de l'API (le bot ne porte plus la table MILESTONES).
+    let milestones_text = progression
+        .as_ref()
+        .map(crate::modules::coude::milestones::format_profile_section)
+        .unwrap_or_else(|| "_Indisponible._".to_string());
     embed = embed.field("\u{1f4ca} Paliers", milestones_text, false);
 
     // Stats /tout-ou-rien (cf. COUPE_AMELIORATIONS 6.1) — affichees
@@ -217,9 +224,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         embed = embed.field("\u{1f3b2} Tout-ou-rien", lines.join("\n"), false);
     }
 
-    // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — derives de
-    // l etat actuel du joueur, aucune persistance dediee.
-    let achievements_text = crate::modules::coude::achievements::format_unlocked_compact(&player);
+    // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — la liste debloquee est
+    // derivee server-side (bareme cote API), le bot ne fait que l'affichage.
+    let achievements_text = progression
+        .as_ref()
+        .map(crate::modules::coude::achievements::format_unlocked_compact)
+        .unwrap_or_else(|| "_Indisponible._".to_string());
     embed = embed.field("\u{1f3c5} Succes", achievements_text, false);
 
     // Theme de la saison courante (cf. COUPE_AMELIORATIONS 6.3) —

@@ -6,8 +6,6 @@
 //!
 //! Aucun avantage gameplay, juste des badges affiches dans `/profil`.
 
-use crate::modules::coude::api_client::Player;
-
 /// Un succes : identite stable + libelle + emoji + critere de deblocage.
 ///
 /// `label` et `description` ne sont pas consommes par le runtime du bot
@@ -226,77 +224,38 @@ pub const ACHIEVEMENTS: &[Achievement] = &[
     },
 ];
 
-/// Retourne `true` si le joueur a debloque ce succes.
-pub fn is_unlocked(ach: &Achievement, p: &Player) -> bool {
-    match ach.key {
-        // Combat
-        "first_blood" => p.total_wins >= 1,
-        "veteran" => p.total_wins >= 10,
-        "butcher" => p.total_wins >= 50,
-        "legend" => p.total_wins >= 100,
-        "punching_ball" => p.total_losses >= 10,
-        "tapis" => p.total_losses >= 50,
-        "diplomat" => p.total_draws >= 20,
-        "no_quarter" => p.total_wins >= 20 && p.total_draws == 0,
-        // Lachete / Chaos
-        "coward_obvious" => p.cowardice_count >= 5,
-        "coward_notorious" => p.cowardice_count >= 20,
-        "chaos_king" => p.chaos_events >= 10,
-        "chaos_master" => p.chaos_events >= 50,
-        // Vol
-        "first_heist" => p.total_stolen >= 1,
-        "pickpocket" => p.total_stolen >= 1_000,
-        "pro_thief" => p.total_stolen >= 10_000,
-        "bank_robber" => p.total_stolen >= 100_000,
-        // Economie
-        "rich" => p.coins >= 10_000,
-        "millionaire" => p.coins >= 100_000,
-        "magnate" => p.coins >= 1_000_000,
-        "investor" => p.total_earned >= 200_000,
-        "bankrupt" => p.total_lost >= 100_000,
-        // Casino
-        "casino_addict" => (p.casino_wins + p.casino_losses) >= 10,
-        "lucky" => p.casino_wins >= 20,
-        "casino_cursed" => p.casino_losses >= 20,
-        // Niveau
-        "apprentice" => p.level >= 5,
-        "veteran_play" => p.level >= 10,
-        "guardian" => p.level >= 15,
-        "ascetic" => p.level >= 20,
-        "master" => p.level >= 25,
-        // Stats
-        "tank" => p.def >= 50,
-        "brute" => p.atk >= 50,
-        "specialist" => matches!(&p.class, Some(c) if !c.is_empty()),
-        _ => false,
-    }
-}
-
-/// Retourne tous les succes debloques par le joueur (ordre du catalogue).
-pub fn unlocked_for(player: &Player) -> Vec<Achievement> {
+/// Emoji d'affichage pour une clef de succes (None si clef inconnue).
+///
+/// Le bareme (quels succes sont debloques) est resolu server-side ; le bot ne
+/// conserve ce catalogue que pour mapper les clefs recues vers leurs emojis.
+pub fn emoji_for_key(key: &str) -> Option<&'static str> {
     ACHIEVEMENTS
         .iter()
-        .filter(|a| is_unlocked(a, player))
-        .copied()
-        .collect()
+        .find(|a| a.key == key)
+        .map(|a| a.emoji)
 }
 
 /// Resume compact pour /profil : "🩸 🎖️ 💰 ..." ou "_Aucun_" si vide.
-pub fn format_unlocked_compact(player: &Player) -> String {
-    let unlocked = unlocked_for(player);
-    if unlocked.is_empty() {
+///
+/// La liste des clefs debloquees vient de l'API (`PlayerProgression`) ; le bot
+/// ne fait que la rendre.
+pub fn format_unlocked_compact(
+    progression: &crate::modules::coude::api_client::PlayerProgression,
+) -> String {
+    if progression.unlocked_achievements.is_empty() {
         "_Aucun encore — joue pour en debloquer !_".into()
     } else {
-        let line = unlocked
+        let line = progression
+            .unlocked_achievements
             .iter()
-            .map(|a| a.emoji)
+            .filter_map(|k| emoji_for_key(k))
             .collect::<Vec<_>>()
             .join(" ");
         format!(
             "{}\n_{} / {} succes_",
             line,
-            unlocked.len(),
-            ACHIEVEMENTS.len()
+            progression.unlocked_achievements.len(),
+            progression.total_achievements,
         )
     }
 }

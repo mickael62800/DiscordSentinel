@@ -7,6 +7,33 @@ use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 
+/// Vue transport d'un palier de niveau (donnees d'affichage + statut).
+#[derive(Debug, Clone)]
+pub struct MilestoneView {
+    pub level: i32,
+    pub key: String,
+    pub label: String,
+    pub emoji: String,
+    pub description: String,
+    pub unlocked: bool,
+}
+
+/// Etat de progression derive (succes + paliers + cooldown effectif), resolu
+/// entierement server-side. Le bot ne fait que l'affichage.
+#[derive(Debug, Clone)]
+pub struct PlayerProgression {
+    /// Clefs des succes debloques (le bot mappe vers emoji/label pour affichage).
+    pub unlocked_achievements: Vec<String>,
+    /// Nombre total de succes disponibles (pour l'affichage "n / total").
+    pub total_achievements: i32,
+    /// Tous les paliers avec leur statut de deblocage.
+    pub milestones: Vec<MilestoneView>,
+    /// Prochain palier a viser (None si tout est debloque).
+    pub next_milestone: Option<MilestoneView>,
+    /// Cooldown /repos effectif (heures) pour ce joueur.
+    pub effective_repos_cooldown_hours: i64,
+}
+
 /// Use case "gérer les joueurs Coup de Coude".
 ///
 /// Englobe le cycle de vie d'un joueur (CRUD), la progression (XP/level/stats),
@@ -124,6 +151,31 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
     ) -> Result<(), DomainError>;
 
     async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+
+    // ── Progression derivee (succes / paliers / cooldown) ──
+
+    /// Cooldown /repos effectif (heures) pour ce joueur : lit le cooldown
+    /// configure (`repos_cooldown_hours`, defaut 12) et applique le palier
+    /// "Convalescence" (niveau 15+ -> plafond 8h). Bareme resolu server-side.
+    /// Default `unimplemented!()` pour ne pas casser les mocks.
+    async fn effective_repos_cooldown_hours(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<i64, DomainError> {
+        unimplemented!("effective_repos_cooldown_hours not implemented")
+    }
+
+    /// Etat de progression complet (succes debloques + paliers + cooldown
+    /// effectif), derive server-side depuis les stats du joueur.
+    /// Default `unimplemented!()` pour ne pas casser les mocks.
+    async fn get_progression(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<PlayerProgression, DomainError> {
+        unimplemented!("get_progression not implemented")
+    }
 
     /// Phase 4 : tick batch de regeneration passive des HP. Retourne le nombre
     /// de joueurs mis a jour.

@@ -7,11 +7,41 @@ use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::errors::DomainError;
 
+/// Resultat de la consommation atomique d'une potion (item + heal en une tx).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UsePotionTxOutcome {
+    /// Item consomme et HP mis a jour.
+    Healed {
+        actually_healed: i32,
+        new_hp: i32,
+        hp_max: i32,
+    },
+    /// Le joueur n'avait pas la potion (aucune quantite consommee).
+    NoItem,
+    /// Le joueur etait deja a pleine sante (aucun item consomme).
+    AlreadyFull,
+}
+
 /// Repository consolidé pour les 3 "stocks" persistants d'un joueur Coup de Coude :
 /// son inventaire d'items, les primes placées sur lui et ses assurances actives.
 #[async_trait]
 pub trait InventoryRepository: Send + Sync {
     // ── Items ──
+
+    /// Consomme une potion et applique le heal (clamp au HP max) dans UNE
+    /// transaction atomique : decremente l'item ET met a jour les HP du
+    /// joueur, ou rien du tout. Le montant nominal `heal_amount` est fourni
+    /// par le service (bareme domain). Default `unimplemented!()` pour que
+    /// les mocks qui ne l'appellent pas continuent de compiler.
+    async fn use_potion_atomic(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _item_key: &str,
+        _heal_amount: i32,
+    ) -> Result<UsePotionTxOutcome, DomainError> {
+        unimplemented!("use_potion_atomic not implemented")
+    }
 
     async fn list_inventory(
         &self,

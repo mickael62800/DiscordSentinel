@@ -146,6 +146,51 @@ impl CoudePlayerService for PlayerGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::HpRegenTickResponse { updated }))
     }
+
+    async fn get_progression(
+        &self,
+        request: Request<proto::GetPlayerRequest>,
+    ) -> Result<Response<proto::PlayerProgression>, Status> {
+        let req = request.into_inner();
+        let p = self
+            .players_uc
+            .get_progression(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::PlayerProgression {
+            unlocked_achievements: p.unlocked_achievements,
+            total_achievements: p.total_achievements,
+            milestones: p.milestones.into_iter().map(milestone_to_proto).collect(),
+            next_milestone: p.next_milestone.map(milestone_to_proto),
+            effective_repos_cooldown_hours: p.effective_repos_cooldown_hours,
+        }))
+    }
+
+    async fn get_effective_repos_cooldown_hours(
+        &self,
+        request: Request<proto::GetPlayerRequest>,
+    ) -> Result<Response<proto::Int64Value>, Status> {
+        let req = request.into_inner();
+        let value = self
+            .players_uc
+            .effective_repos_cooldown_hours(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Int64Value { value }))
+    }
+}
+
+fn milestone_to_proto(
+    m: crate::ports::inbound::coude::manage_players::MilestoneView,
+) -> proto::MilestoneInfo {
+    proto::MilestoneInfo {
+        level: m.level,
+        key: m.key,
+        label: m.label,
+        emoji: m.emoji,
+        description: m.description,
+        unlocked: m.unlocked,
+    }
 }
 
 pub(super) fn coude_player_to_proto(p: Player) -> proto::Player {
