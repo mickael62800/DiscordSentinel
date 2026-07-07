@@ -382,6 +382,41 @@ impl ManageAuditLogsUseCase for StubAuditLogs {
     }
 }
 
+pub struct StubSnapshots;
+#[async_trait]
+impl sentinel_core::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseCase
+    for StubSnapshots
+{
+    async fn snapshot_daily_all(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::audit::snapshot::JobReport, DomainError> {
+        Ok(sentinel_core::domain::entities::audit::snapshot::JobReport::ok(0, 0))
+    }
+    async fn snapshot_hourly_all(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::audit::snapshot::JobReport, DomainError> {
+        Ok(sentinel_core::domain::entities::audit::snapshot::JobReport::ok(0, 0))
+    }
+    async fn retention_cleanup_all(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::audit::snapshot::JobReport, DomainError> {
+        Ok(sentinel_core::domain::entities::audit::snapshot::JobReport::ok(0, 0))
+    }
+    async fn plan_top_publications(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::audit::snapshot::TopPublishPlan, DomainError> {
+        Ok(
+            sentinel_core::domain::entities::audit::snapshot::TopPublishPlan {
+                publications: Vec::new(),
+                skipped: 0,
+            },
+        )
+    }
+    async fn mark_top_published(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 pub struct StubLevels;
 #[async_trait]
 impl ManageLevelsUseCase for StubLevels {
@@ -3161,6 +3196,7 @@ fn base_state() -> AppState {
         voice_channels_uc: Arc::new(StubVoiceChannels),
         watched_users_uc: Arc::new(StubWatchedUsers),
         audit_logs_uc: Arc::new(StubAuditLogs),
+        snapshots_uc: Arc::new(StubSnapshots),
         levels_uc: Arc::new(StubLevels),
         announcements_uc: Arc::new(StubAnnouncements),
         confessions_uc: Arc::new(StubConfessions),

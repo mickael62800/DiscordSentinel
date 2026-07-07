@@ -376,6 +376,24 @@ pub async fn build_app_state(
             ),
         );
 
+    // Snapshots analytics : repo Postgres (SQL des jobs) + use case (config par
+    // guild, deltas de baseline, filtres de publication). Les handlers HTTP ne
+    // font que declencher/RBAC/poster.
+    let snapshot_repo = Arc::new(
+        crate::adapters::outbound::postgres::audit::snapshot_repository::PgSnapshotRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let snapshots_uc: Arc<
+        dyn crate::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseCase,
+    > = Arc::new(
+        crate::application::audit::manage_snapshots_service::ManageSnapshotsService::new(
+            bot_config_repo.clone(),
+            snapshot_repo,
+            analytics_repo.clone(),
+        ),
+    );
+
     // Invitations : repo Postgres + use case (generation code unique, octroi de
     // role atomique au redeem). Le SQL vit dans le repo, la regle metier dans le
     // service, le handler HTTP ne fait que parse/RBAC/map.
@@ -1089,6 +1107,7 @@ pub async fn build_app_state(
         voice_channels_uc,
         watched_users_uc,
         audit_logs_uc,
+        snapshots_uc,
         levels_uc,
         announcements_uc,
         confessions_uc,
