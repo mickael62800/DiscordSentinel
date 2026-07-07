@@ -6,8 +6,10 @@
 //! (visibilite). `/me/{guild_id}` est accessible a tout role (y compris
 //! `viewer`) pour permettre au desktop de savoir quoi afficher.
 //!
-//! Pattern : direct sqlx (comme `bot_persistence.rs`, `rbac` simple, pas de
-//! logique metier complexe, pas besoin de use-case).
+//! Pattern hexagonal : le handler reste mince (gate RBAC + parse DTO + map),
+//! toute la persistance et les garde-fous metier passent par le use case
+//! `rbac_admin_uc` (`ManageRbacUseCase`). Le SQL vit dans l'adapter Postgres
+//! `RbacRepository`. Distinct du middleware RBAC (`middleware/rbac.rs`).
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
@@ -20,6 +22,9 @@ use axum::Extension;
 use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::enums::system::role::Role;
+use sentinel_core::ports::inbound::system::manage_rbac::{
+    GrantRoleCommand, RevokeRoleCommand, UpdateRoleCommand,
+};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -77,55 +82,26 @@ pub async fn grant_role(
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour grant"))?;
 
     let role = parse_role(&dto.role)?;
-    let display_name = sentinel_core::domain::entities::system::rbac::truncate_display_name(
-        dto.display_name.as_deref().unwrap_or("user"),
-    );
 
-    // Upsert api_users (garantit la FK)
-    sqlx::query(
-        "INSERT INTO api_users (discord_user_id, display_name) \
-         VALUES ($1, $2) \
-         ON CONFLICT (discord_user_id) DO NOTHING",
-    )
-    .bind(&user_id)
-    .bind(&display_name)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("upsert api_users: {e}")))?;
+    let grant = state
+        .rbac_admin_uc
+        .grant_role(GrantRoleCommand {
+            guild_id: guild_id.clone(),
+            user_id,
+            role,
+            granted_by: ctx.discord_user_id,
+            display_name: dto.display_name,
+        })
+        .await
+        .map_err(ApiError)?;
 
-    // Insert api_user_guilds. Si deja existe (doublon grant), on retourne 409.
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        granted_at: chrono::DateTime<chrono::Utc>,
-    }
-
-    let res: Result<Row, sqlx::Error> = sqlx::query_as::<_, Row>(
-        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role, granted_by) \
-         VALUES ($1, $2, $3, $4) \
-         RETURNING granted_at",
-    )
-    .bind(&user_id)
-    .bind(&guild_id)
-    .bind(role.as_str())
-    .bind(&ctx.discord_user_id)
-    .fetch_one(&state.pg_pool)
-    .await;
-
-    match res {
-        Ok(row) => Ok(Json(UserRoleDto {
-            discord_user_id: user_id,
-            guild_id: guild_id.into(),
-            role: role.as_str().to_string(),
-            granted_at: row.granted_at.to_rfc3339(),
-            granted_by: Some(ctx.discord_user_id),
-        })),
-        Err(sqlx::Error::Database(db)) if db.is_unique_violation() => Err(ApiError(
-            sentinel_core::domain::errors::DomainError::ValidationError(
-                "user a deja un role sur cette guild, utiliser PATCH pour modifier".into(),
-            ),
-        )),
-        Err(e) => Err(internal(format!("insert api_user_guilds: {e}"))),
-    }
+    Ok(Json(UserRoleDto {
+        discord_user_id: grant.discord_user_id,
+        guild_id: guild_id.into(),
+        role: grant.role,
+        granted_at: grant.granted_at.to_rfc3339(),
+        granted_by: grant.granted_by,
+    }))
 }
 
 /// PATCH /api/rbac/guilds/{guild_id}/users/{user_id}
@@ -139,39 +115,18 @@ pub async fn update_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour update"))?;
 
-    // Regle metier : anti-lockout du dernier owner-caller.
-    if sentinel_core::domain::entities::system::rbac::is_owner_self_demotion(
-        &ctx.discord_user_id,
-        &user_id,
-        &dto.role,
-    ) {
-        return Err(ApiError(
-            sentinel_core::domain::errors::DomainError::ValidationError(
-                "un owner ne peut pas se retrograder (lockout risk)".into(),
-            ),
-        ));
-    }
-
     let role = parse_role(&dto.role)?;
 
-    let res = sqlx::query(
-        "UPDATE api_user_guilds SET role = $1 \
-         WHERE discord_user_id = $2 AND guild_id = $3",
-    )
-    .bind(role.as_str())
-    .bind(&user_id)
-    .bind(&guild_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("update role: {e}")))?;
-
-    if res.rows_affected() == 0 {
-        return Err(ApiError(
-            sentinel_core::domain::errors::DomainError::NotFound(
-                "user n'a pas de role sur cette guild".into(),
-            ),
-        ));
-    }
+    state
+        .rbac_admin_uc
+        .update_role(UpdateRoleCommand {
+            guild_id,
+            user_id,
+            caller_id: ctx.discord_user_id,
+            role,
+        })
+        .await
+        .map_err(ApiError)?;
 
     Ok(Json(
         serde_json::json!({ "ok": true, "role": role.as_str() }),
@@ -189,53 +144,11 @@ pub async fn revoke_role(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| status_to_err(s, "owner requis pour revoke"))?;
 
-    // Garde-fou : verifier que ce n'est pas le dernier owner
-    let (total_owners,): (i64,) = sqlx::query_as(
-        "SELECT COUNT(*)::bigint FROM api_user_guilds \
-         WHERE guild_id = $1 AND role = 'owner'",
-    )
-    .bind(&guild_id)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("count owners: {e}")))?;
-
-    // Si le user a supprimer est owner ET c'est le dernier → refus
-    let (is_target_owner,): (bool,) = sqlx::query_as(
-        "SELECT EXISTS(SELECT 1 FROM api_user_guilds \
-         WHERE discord_user_id = $1 AND guild_id = $2 AND role = 'owner')",
-    )
-    .bind(&user_id)
-    .bind(&guild_id)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("check target owner: {e}")))?;
-
-    if sentinel_core::domain::entities::system::rbac::would_revoke_last_owner(
-        is_target_owner,
-        total_owners,
-    ) {
-        return Err(ApiError(
-            sentinel_core::domain::errors::DomainError::ValidationError(
-                "impossible de revoquer le dernier owner de la guild".into(),
-            ),
-        ));
-    }
-
-    let res =
-        sqlx::query("DELETE FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2")
-            .bind(&user_id)
-            .bind(&guild_id)
-            .execute(&state.pg_pool)
-            .await
-            .map_err(|e| internal(format!("delete role: {e}")))?;
-
-    if res.rows_affected() == 0 {
-        return Err(ApiError(
-            sentinel_core::domain::errors::DomainError::NotFound(
-                "user n'a pas de role sur cette guild".into(),
-            ),
-        ));
-    }
+    state
+        .rbac_admin_uc
+        .revoke_role(RevokeRoleCommand { guild_id, user_id })
+        .await
+        .map_err(ApiError)?;
 
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -250,35 +163,11 @@ pub async fn list_guild_users(
 ) -> Result<Json<Vec<GuildUserEntryDto>>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|s| status_to_err(s, "admin+ requis pour lister"))?;
 
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        discord_user_id: String,
-        display_name: String,
-        avatar_url: Option<String>,
-        role: String,
-        granted_at: chrono::DateTime<chrono::Utc>,
-        granted_by: Option<String>,
-    }
-
-    let rows: Vec<Row> = sqlx::query_as::<_, Row>(
-        "SELECT u.discord_user_id, u.display_name, u.avatar_url, \
-                g.role, g.granted_at, g.granted_by \
-         FROM api_user_guilds g \
-         INNER JOIN api_users u ON u.discord_user_id = g.discord_user_id \
-         WHERE g.guild_id = $1 \
-         ORDER BY \
-            CASE g.role \
-                WHEN 'owner' THEN 0 \
-                WHEN 'admin' THEN 1 \
-                WHEN 'moderator' THEN 2 \
-                WHEN 'viewer' THEN 3 \
-            END, \
-            u.display_name ASC",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| internal(format!("list guild users: {e}")))?;
+    let rows = state
+        .rbac_admin_uc
+        .list_guild_users(&guild_id)
+        .await
+        .map_err(ApiError)?;
 
     Ok(Json(
         rows.into_iter()
@@ -344,10 +233,6 @@ fn parse_role(s: &str) -> Result<Role, ApiError> {
             format!("role invalide: {s} (attendu: owner|admin|moderator|viewer)"),
         ))
     })
-}
-
-fn internal(msg: String) -> ApiError {
-    ApiError(sentinel_core::domain::errors::DomainError::Internal(msg))
 }
 
 fn status_to_err(status: StatusCode, context: &str) -> ApiError {

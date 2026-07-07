@@ -1,0 +1,51 @@
+//! Port outbound : persistance du RBAC applicatif (`api_users`,
+//! `api_user_guilds`). Tout le SQL vit dans l'adapter Postgres.
+
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+
+use crate::domain::entities::system::rbac::GuildUserEntry;
+use crate::domain::errors::DomainError;
+
+#[async_trait]
+pub trait RbacRepository: Send + Sync {
+    /// Upsert de la ligne `api_users` (garantit la FK avant l'attribution).
+    /// Ne touche pas au display_name existant (ON CONFLICT DO NOTHING).
+    async fn upsert_user(&self, user_id: &str, display_name: &str) -> Result<(), DomainError>;
+
+    /// Insere une attribution `api_user_guilds`. Renvoie `Some(granted_at)` si
+    /// insere, `None` si le membre a deja un role sur la guild (unique
+    /// violation) — le use case mappe ce cas en conflit.
+    async fn insert_grant(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+        role: &str,
+        granted_by: &str,
+    ) -> Result<Option<DateTime<Utc>>, DomainError>;
+
+    /// Met a jour le role d'un membre. Renvoie le nombre de lignes affectees
+    /// (0 = le membre n'a pas de role sur la guild).
+    async fn update_role(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+        role: &str,
+    ) -> Result<u64, DomainError>;
+
+    /// Nombre d'owners de la guild (garde-fou dernier owner).
+    async fn count_owners(&self, guild_id: &str) -> Result<i64, DomainError>;
+
+    /// `true` si le membre est owner de la guild.
+    async fn is_owner(&self, user_id: &str, guild_id: &str) -> Result<bool, DomainError>;
+
+    /// Supprime l'attribution. Renvoie le nombre de lignes affectees
+    /// (0 = le membre n'a pas de role sur la guild).
+    async fn delete_grant(&self, user_id: &str, guild_id: &str) -> Result<u64, DomainError>;
+
+    /// Liste les membres ayant un role sur la guild (tri par role puis nom).
+    async fn list_guild_users(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<GuildUserEntry>, DomainError>;
+}

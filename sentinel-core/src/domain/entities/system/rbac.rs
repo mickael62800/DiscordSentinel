@@ -14,6 +14,31 @@
 //! - Display name : tronque a `RBAC_DISPLAY_NAME_MAX` chars pour
 //!   respecter la colonne `api_users.display_name`.
 
+use chrono::{DateTime, Utc};
+
+/// Attribution d'un role a un membre sur une guild, telle que retournee apres
+/// un grant (ligne `api_user_guilds`).
+#[derive(Debug, Clone)]
+pub struct UserRoleGrant {
+    pub discord_user_id: String,
+    pub guild_id: String,
+    pub role: String,
+    pub granted_at: DateTime<Utc>,
+    pub granted_by: Option<String>,
+}
+
+/// Entree de la liste des membres ayant un role sur une guild (jointure
+/// `api_user_guilds` x `api_users`).
+#[derive(Debug, Clone)]
+pub struct GuildUserEntry {
+    pub discord_user_id: String,
+    pub display_name: String,
+    pub avatar_url: Option<String>,
+    pub role: String,
+    pub granted_at: DateTime<Utc>,
+    pub granted_by: Option<String>,
+}
+
 /// Longueur max du `display_name` stocke dans `api_users`. Le handler
 /// tronque en `chars()` (pas en bytes) pour etre unicode-safe.
 pub const RBAC_DISPLAY_NAME_MAX: usize = 100;

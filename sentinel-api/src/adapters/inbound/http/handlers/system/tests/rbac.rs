@@ -33,12 +33,6 @@ fn parse_role_rejects_empty() {
 }
 
 #[test]
-fn internal_wraps_into_domain_error() {
-    let err = internal("boom".into());
-    matches!(err.0, DomainError::Internal(ref s) if s == "boom");
-}
-
-#[test]
 fn status_to_err_forbidden_becomes_domain_forbidden() {
     let err = status_to_err(StatusCode::FORBIDDEN, "admin requis");
     match err.0 {

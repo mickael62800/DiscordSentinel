@@ -124,6 +124,10 @@ pub struct AppState {
     pub security_logs_uc: Arc<dyn crate::ports::inbound::system::read_security_logs::ReadSecurityLogsUseCase>,
     pub security_audit_uc: Arc<dyn crate::ports::inbound::system::manage_security_audit::ManageSecurityAuditUseCase>,
     pub oauth_uc: Arc<dyn crate::ports::inbound::system::manage_oauth::ManageOAuthUseCase>,
+    /// CRUD RBAC applicatif (endpoints owner). Nomme `rbac_admin_uc` pour ne pas
+    /// confondre avec le middleware RBAC (`middleware/rbac.rs`), qui a sa propre
+    /// logique de resolution de role.
+    pub rbac_admin_uc: Arc<dyn crate::ports::inbound::system::manage_rbac::ManageRbacUseCase>,
     pub tls_cert_uc: Arc<dyn crate::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase>,
     pub geoip_uc: Arc<dyn crate::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase>,
     pub export_uc: Arc<dyn crate::application::system::export_service::ExecuteExportUseCase>,

@@ -473,6 +473,17 @@ pub async fn build_app_state(
             oauth_session_repo,
         ));
 
+    // RBAC applicatif (CRUD roles owner) : repo Postgres + use case. Le SQL
+    // (api_users / api_user_guilds) vit dans l'adapter, les garde-fous metier
+    // (anti-lockout, dernier owner) dans le service ; le handler ne fait que
+    // gate/parse/map. Distinct du middleware RBAC (resolution de role).
+    let rbac_repo: Arc<dyn crate::ports::outbound::system::rbac_repository::RbacRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::rbac_repository::PgRbacRepository::new(pg_pool.clone()));
+    let rbac_admin_uc: Arc<dyn crate::ports::inbound::system::manage_rbac::ManageRbacUseCase> =
+        Arc::new(sentinel_core::application::system::manage_rbac_service::ManageRbacService::new(
+            rbac_repo,
+        ));
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -1129,6 +1140,7 @@ pub async fn build_app_state(
         security_logs_uc,
         security_audit_uc,
         oauth_uc,
+        rbac_admin_uc,
         tls_cert_uc,
         geoip_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
