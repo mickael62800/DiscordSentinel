@@ -4083,6 +4083,28 @@ impl sentinel_core::ports::outbound::game::game_session_repository::GameSessionR
 // TestAppState builder
 // ══════════════════════════════════════════════════════════
 
+struct StubSponsorships;
+#[async_trait]
+impl crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase
+    for StubSponsorships
+{
+    async fn create_sponsorship(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_sponsorships(&self, _: &str) -> Result<Vec<Sponsorship>, DomainError> {
+        Ok(vec![])
+    }
+    async fn create_temp_role(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_temp_roles(&self, _: &str) -> Result<Vec<TempRole>, DomainError> {
+        Ok(vec![])
+    }
+    async fn delete_temp_role(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 /// Construit un AppState de base avec tous les stubs.
 fn base_state() -> AppState {
     // On branche sur le compose de test (6380/5433) pour que les branches
@@ -4213,6 +4235,7 @@ fn base_state() -> AppState {
         game_rcon_client: Arc::new(StubRconClient),
         game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
+        manage_sponsorships_uc: Arc::new(StubSponsorships),
         dataset_uc: Arc::new(StubDataset),
         ai_jobs_uc: Arc::new(StubAiJobs),
         monthly_ranking_uc: Arc::new(StubMonthlyRanking),

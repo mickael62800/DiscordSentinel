@@ -579,6 +579,8 @@ pub async fn build_app_state(
     let component_visibility_uc: Arc<dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase> =
         Arc::new(sentinel_core::application::system::manage_component_visibility_service::ManageComponentVisibilityService::new(
             component_visibility_repo,
+        ));
+
     // Persistance fire-and-forget des bots (streaks, etc.) : repo Postgres
     // (SQL user_levels) + use case pass-through. Le handler ne fait que
     // parser/valider/mapper.
