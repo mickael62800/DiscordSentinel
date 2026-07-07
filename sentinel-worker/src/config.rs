@@ -139,6 +139,11 @@ const DEFAULT_MONTHLY_RANKING_CHECK_SECS: u64 = SECS_PER_HOUR;
 /// Tick horaire ; le job n'agit que dans la fenetre dimanche >= 23h UTC.
 const DEFAULT_TOURNAMENT_CHECK_SECS: u64 = SECS_PER_HOUR;
 
+// ── Defauts guild_backup (auto-backup periodique) ──
+/// Cadence de VERIFICATION du worker (30 min). L'intervalle FIN est par guild
+/// (`auto_backup_interval_hours`, defaut 24h) lu dans bot_guild_config.
+const DEFAULT_GUILD_BACKUP_AUTO_CHECK_SECS: u64 = 30 * SECS_PER_MINUTE;
+
 #[derive(Clone)]
 pub struct WorkerConfig {
     pub database_url: String,
@@ -244,6 +249,9 @@ pub struct WorkerConfig {
 
     // ── Tournoi (coude) ──
     pub tournament_check_secs: u64,
+
+    // ── Guild backup (auto-backup periodique) ──
+    pub guild_backup_auto_check_secs: u64,
 }
 
 impl WorkerConfig {
@@ -474,6 +482,12 @@ impl WorkerConfig {
 
             // tournoi (coude)
             tournament_check_secs: load_env("TOURNAMENT_CHECK_SECS", DEFAULT_TOURNAMENT_CHECK_SECS),
+
+            // guild backup (auto-backup periodique)
+            guild_backup_auto_check_secs: load_env(
+                "GUILD_BACKUP_AUTO_CHECK_SECS",
+                DEFAULT_GUILD_BACKUP_AUTO_CHECK_SECS,
+            ),
         }
     }
 
@@ -866,6 +880,14 @@ impl WorkerConfig {
             "tournament_check_secs",
             "TOURNAMENT_CHECK_SECS",
             DEFAULT_TOURNAMENT_CHECK_SECS,
+        );
+
+        // guild backup — cadence de verification de l'auto-backup.
+        self.guild_backup_auto_check_secs = config_or_env(
+            db,
+            "guild_backup_auto_check_secs",
+            "GUILD_BACKUP_AUTO_CHECK_SECS",
+            DEFAULT_GUILD_BACKUP_AUTO_CHECK_SECS,
         );
     }
 }

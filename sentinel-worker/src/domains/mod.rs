@@ -16,6 +16,7 @@ pub mod coude;
 pub mod discord_audit_sync;
 pub mod export;
 pub mod game_portal;
+pub mod guild_backup;
 pub mod influence;
 pub mod moderation;
 pub mod monitoring;

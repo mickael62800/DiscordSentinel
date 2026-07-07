@@ -304,6 +304,29 @@ pub fn start(
     );
 
     // ─────────────────────────────────────────────────────────────
+    // Domaine : guild_backup (auto-backup periodique)
+    // Le worker publie `guild_backup:capture_requested` pour les guilds dont
+    // l'intervalle configure est ecoule ; le bot fait la capture reelle. La
+    // cadence ici n'est qu'une frequence de VERIFICATION (30 min par defaut) —
+    // l'intervalle FIN est par guild (`auto_backup_interval_hours`).
+    // ─────────────────────────────────────────────────────────────
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "guild_backup_auto",
+            config.guild_backup_auto_check_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "guild-backup-bot",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move { domains::guild_backup::auto_backup::run(&pool, &redis).await })
+            },
+        );
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // Domaine : temp_roles (expiration des roles temporaires)
     // Porte de l'ancien temp-roles-worker.
     // ─────────────────────────────────────────────────────────────
