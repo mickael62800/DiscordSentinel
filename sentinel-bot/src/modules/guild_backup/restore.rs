@@ -59,7 +59,7 @@ impl<'a> Progress<'a> {
         Self { ctx, component }
     }
 
-    async fn set(&self, text: &str) {
+    pub async fn set(&self, text: &str) {
         let _ = self
             .component
             .edit_response(

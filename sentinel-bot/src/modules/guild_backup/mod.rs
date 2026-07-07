@@ -11,6 +11,7 @@
 pub mod api_client;
 pub mod capture;
 pub mod restore;
+pub mod wipe;
 
 use std::sync::Arc;
 
@@ -27,6 +28,11 @@ use crate::shared::heartbeat::ApiClientKey;
 
 const CONFIRM_PREFIX: &str = "gbackup:confirm:";
 const CANCEL_ID: &str = "gbackup:cancel";
+/// Suffixes du `custom_id` de confirmation encodant le mode wipe. Le custom_id
+/// prend la forme `gbackup:confirm:<id>:wipe` ou `...:nowipe` afin que le
+/// handler de bouton sache s'il doit d'abord vider le serveur.
+const WIPE_SUFFIX: &str = ":wipe";
+const NOWIPE_SUFFIX: &str = ":nowipe";
 
 // ── Interface module ──
 
@@ -64,7 +70,12 @@ pub fn register_commands() -> Vec<CreateCommand> {
                     "ID de la sauvegarde a restaurer",
                 )
                 .required(true),
-            ),
+            )
+            .add_sub_option(CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "wipe",
+                "⚠️ DESTRUCTIF : vide le serveur (salons/roles/emojis) AVANT de restaurer",
+            )),
         )
         .add_option(
             CreateCommandOption::new(
@@ -194,6 +205,16 @@ fn opt_string(opts: &[CommandDataOption], name: &str) -> Option<String> {
         })
 }
 
+fn opt_bool(opts: &[CommandDataOption], name: &str) -> bool {
+    opts.iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::Boolean(b) => Some(*b),
+            _ => None,
+        })
+        .unwrap_or(false)
+}
+
 // ── Dispatch commande ──
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
@@ -221,7 +242,9 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     match sub {
         "create" => cmd_create(ctx, command, guild_id, opt_string(opts, "label")).await,
         "list" => cmd_list(ctx, command, guild_id).await,
-        "restore" => cmd_restore_prompt(ctx, command, opt_string(opts, "id")).await,
+        "restore" => {
+            cmd_restore_prompt(ctx, command, opt_string(opts, "id"), opt_bool(opts, "wipe")).await
+        }
         "delete" => cmd_delete(ctx, command, opt_string(opts, "id")).await,
         _ => reply(ctx, command, "Sous-commande inconnue.").await,
     }
@@ -310,26 +333,48 @@ async fn cmd_list(ctx: &Context, command: &CommandInteraction, guild_id: GuildId
     }
 }
 
-async fn cmd_restore_prompt(ctx: &Context, command: &CommandInteraction, id: Option<String>) {
+async fn cmd_restore_prompt(
+    ctx: &Context,
+    command: &CommandInteraction,
+    id: Option<String>,
+    wipe: bool,
+) {
     let Some(id) = id else {
         return reply(ctx, command, "ID manquant.").await;
     };
-    let confirm = CreateButton::new(format!("{CONFIRM_PREFIX}{id}"))
-        .label("Confirmer la restauration")
+    // Le flag wipe est encode dans le custom_id du bouton (survit a l'aller-retour).
+    let suffix = if wipe { WIPE_SUFFIX } else { NOWIPE_SUFFIX };
+    let confirm = CreateButton::new(format!("{CONFIRM_PREFIX}{id}{suffix}"))
+        .label(if wipe {
+            "⚠️ VIDER puis restaurer"
+        } else {
+            "Confirmer la restauration"
+        })
         .style(ButtonStyle::Danger);
     let cancel = CreateButton::new(CANCEL_ID)
         .label("Annuler")
         .style(ButtonStyle::Secondary);
+    // Confirmation RENFORCEE en mode wipe : le message est explicite et alarmant.
+    let content = if wipe {
+        format!(
+            "⚠️ **DESTRUCTIF — Restauration de `{id}` avec WIPE**\n\nCeci va **SUPPRIMER \
+             tous les salons, roles et emojis actuels** du serveur AVANT de restaurer le \
+             snapshot, pour repartir d'un serveur vierge.\n\n**Action irreversible.** Les \
+             bans existants ne sont pas touches. Confirme uniquement si tu es certain."
+        )
+    } else {
+        format!(
+            "⚠️ **Restauration de `{id}`**\n\nCette action va **recreer** roles, \
+             salons et reglages sur ce serveur (elle n'efface PAS l'existant : \
+             nettoie manuellement avant si besoin). Confirme pour continuer."
+        )
+    };
     let _ = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
-                    .content(format!(
-                        "⚠️ **Restauration de `{id}`**\n\nCette action va **recreer** roles, \
-                         salons et reglages sur ce serveur (elle n'efface PAS l'existant : \
-                         nettoie manuellement avant si besoin). Confirme pour continuer."
-                    ))
+                    .content(content)
                     .ephemeral(true)
                     .components(vec![CreateActionRow::Buttons(vec![confirm, cancel])]),
             ),
@@ -377,10 +422,18 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
             .await;
         return;
     }
-    let Some(snapshot_id) = cid.strip_prefix(CONFIRM_PREFIX) else {
+    let Some(rest) = cid.strip_prefix(CONFIRM_PREFIX) else {
         return;
     };
-    let snapshot_id = snapshot_id.to_string();
+    // Decode le flag wipe encode en suffixe du custom_id.
+    let (snapshot_id, wipe) = if let Some(id) = rest.strip_suffix(WIPE_SUFFIX) {
+        (id.to_string(), true)
+    } else if let Some(id) = rest.strip_suffix(NOWIPE_SUFFIX) {
+        (id.to_string(), false)
+    } else {
+        // Retrocompat : ancien custom_id sans suffixe -> pas de wipe.
+        (rest.to_string(), false)
+    };
 
     let Some(guild_id) = component.guild_id else {
         return;
@@ -460,6 +513,14 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     }
 
     let progress = restore::Progress::new(ctx, component);
+
+    // Phase de WIPE optionnelle : vide le serveur avant recreation.
+    let wipe_report = if wipe {
+        Some(wipe::wipe(ctx, guild_id, &progress).await)
+    } else {
+        None
+    };
+
     let report = restore::restore(ctx, guild_id, &snapshot, &progress).await;
 
     // Persiste les re-attributions pour TOUS les membres (les absents seront
@@ -486,6 +547,12 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         report.bans_applied,
         report.members_updated,
     );
+    if let Some(w) = wipe_report {
+        txt.push_str(&format!(
+            "\n🧨 Wipe : {} salon(s) / {} role(s) / {} emoji(s) supprimes.",
+            w.channels_deleted, w.roles_deleted, w.emojis_deleted
+        ));
+    }
     if report.emojis_total > 0 {
         txt.push_str(&format!(
             "\nEmojis : {}/{}.",
