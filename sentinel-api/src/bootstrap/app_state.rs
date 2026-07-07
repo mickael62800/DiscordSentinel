@@ -571,6 +571,16 @@ pub async fn build_app_state(
             lockdown_repo,
         ));
 
+    // Visibilite des composants UI par role : repo Postgres (SQL
+    // rbac_component_visibility + transaction batch) + use case. Le handler ne
+    // fait que parse/RBAC/valider/map.
+    let component_visibility_repo: Arc<dyn crate::ports::outbound::system::component_visibility_repository::ComponentVisibilityRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::component_visibility_repository::PgComponentVisibilityRepository::new(pg_pool.clone()));
+    let component_visibility_uc: Arc<dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase> =
+        Arc::new(sentinel_core::application::system::manage_component_visibility_service::ManageComponentVisibilityService::new(
+            component_visibility_repo,
+        ));
+
     // Audit serveur (server_events) : repo Postgres + use case (bornage des
     // filtres de lecture). Le handler ne fait que parse/RBAC/map.
     let server_event_repo: Arc<dyn crate::ports::outbound::system::server_event_repository::ServerEventRepository> =
@@ -1190,6 +1200,7 @@ pub async fn build_app_state(
         invitations_uc,
         quarantine_uc,
         lockdown_uc,
+        component_visibility_uc,
         server_events_uc,
         security_uc,
         moderation_uc,

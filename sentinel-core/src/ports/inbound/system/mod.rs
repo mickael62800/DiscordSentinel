@@ -1,4 +1,5 @@
 pub mod lookup_geoip;
+pub mod manage_component_visibility;
 pub mod manage_invitations;
 pub mod manage_lockdown;
 pub mod manage_ip_bans;

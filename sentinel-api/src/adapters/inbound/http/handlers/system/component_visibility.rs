@@ -1,14 +1,15 @@
 //! GET/PUT /api/rbac/component-visibility/{guild_id} — gestion des overrides
-//! de visibilite des composants UI par role.
+//! de visibilite des composants UI par role (adaptateur ENTRANT mince).
 //!
 //! Lecture : ouverte a tout role authentifie (chaque utilisateur recupere
 //! la liste pour appliquer les overrides cote front).
 //! Ecriture : Owner+ (modifie ce que les modos/admins voient).
+//!
+//! Ici : parse/RBAC/validation -> use case -> map. Le SQL (dont la transaction
+//! batch) vit dans `ComponentVisibilityRepository`.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::State;
-use axum::http::StatusCode;
 use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
@@ -18,6 +19,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::entities::system::component_visibility::VisibilityEntry;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -33,35 +35,19 @@ pub struct VisibilityBatchDto {
     pub entries: Vec<VisibilityEntryDto>,
 }
 
-fn forbid(s: StatusCode, msg: &str) -> ApiError {
-    ApiError(if s == StatusCode::FORBIDDEN {
-        DomainError::Forbidden(msg.into())
-    } else {
-        DomainError::Internal(msg.into())
-    })
-}
-
 /// GET — liste tous les overrides de visibilite pour la guild.
 pub async fn list_visibility(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<VisibilityEntryDto>>, ApiError> {
-    let rows = sqlx::query_as::<_, (String, String, bool)>(
-        "SELECT component_key, role, visible \
-         FROM rbac_component_visibility \
-         WHERE guild_id = $1",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("db"))?;
+    let entries = state.component_visibility_uc.list(&guild_id).await?;
 
-    let out: Vec<VisibilityEntryDto> = rows
+    let out: Vec<VisibilityEntryDto> = entries
         .into_iter()
-        .map(|(component_key, role, visible)| VisibilityEntryDto {
-            component_key,
-            role,
-            visible,
+        .map(|e| VisibilityEntryDto {
+            component_key: e.component_key,
+            role: e.role,
+            visible: e.visible,
         })
         .collect();
     Ok(Json(out))
@@ -76,8 +62,11 @@ pub async fn upsert_visibility(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<VisibilityBatchDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    require_role(&ctx, Role::Owner)
-        .map_err(|s| forbid(s, "owner+ requis pour modifier la visibilite"))?;
+    require_role(&ctx, Role::Owner).map_err(|_| {
+        ApiError(DomainError::Forbidden(
+            "owner+ requis pour modifier la visibilite".into(),
+        ))
+    })?;
 
     let valid_roles = ["viewer", "moderator", "admin", "owner"];
     for e in &body.entries {
@@ -94,31 +83,20 @@ pub async fn upsert_visibility(
         }
     }
 
-    let mut tx = state.pg_pool.begin().await.map_err(sqlx_internal("tx"))?;
+    let entries: Vec<VisibilityEntry> = body
+        .entries
+        .into_iter()
+        .map(|e| VisibilityEntry {
+            component_key: e.component_key,
+            role: e.role,
+            visible: e.visible,
+        })
+        .collect();
 
-    for e in &body.entries {
-        sqlx::query(
-            "INSERT INTO rbac_component_visibility \
-                 (guild_id, component_key, role, visible, updated_at, updated_by) \
-             VALUES ($1, $2, $3, $4, NOW(), $5) \
-             ON CONFLICT (guild_id, component_key, role) DO UPDATE SET \
-                 visible = EXCLUDED.visible, \
-                 updated_at = NOW(), \
-                 updated_by = EXCLUDED.updated_by",
-        )
-        .bind(&guild_id)
-        .bind(&e.component_key)
-        .bind(&e.role)
-        .bind(e.visible)
-        .bind(&ctx.discord_user_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(sqlx_internal("upsert"))?;
-    }
+    let count = state
+        .component_visibility_uc
+        .upsert_batch(&guild_id, entries, &ctx.discord_user_id)
+        .await?;
 
-    tx.commit().await.map_err(sqlx_internal("commit"))?;
-
-    Ok(Json(
-        serde_json::json!({ "ok": true, "count": body.entries.len() }),
-    ))
+    Ok(Json(serde_json::json!({ "ok": true, "count": count })))
 }

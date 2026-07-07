@@ -3445,6 +3445,30 @@ impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCa
     }
 }
 
+pub struct StubComponentVisibility;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase
+    for StubComponentVisibility
+{
+    async fn list(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::component_visibility::VisibilityEntry>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn upsert_batch(
+        &self,
+        _: &str,
+        _: Vec<sentinel_core::domain::entities::system::component_visibility::VisibilityEntry>,
+        _: &str,
+    ) -> Result<usize, DomainError> {
+        Ok(0)
+    }
+}
+
 pub struct StubServerEvents;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_server_events::ManageServerEventsUseCase
@@ -4167,6 +4191,7 @@ fn base_state() -> AppState {
         oauth_uc: Arc::new(StubOAuth),
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
+        component_visibility_uc: Arc::new(StubComponentVisibility),
         server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),
         tournaments_uc: Arc::new(StubTournaments),

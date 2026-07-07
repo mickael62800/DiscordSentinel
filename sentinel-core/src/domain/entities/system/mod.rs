@@ -1,6 +1,7 @@
 pub mod admin_rotation;
 pub mod analytics;
 pub mod bot_config;
+pub mod component_visibility;
 pub mod config_parsers;
 pub mod discord_ids;
 pub mod discord_role;
