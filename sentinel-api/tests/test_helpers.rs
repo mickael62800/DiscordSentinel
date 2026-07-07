@@ -1694,6 +1694,26 @@ impl manage_steal_boosts::ManageCoudeStealBoostsUseCase for StubCoudeStealBoosts
     }
 }
 
+pub struct StubCoudeStealAttempts;
+#[async_trait]
+impl manage_steal_attempts::ManageStealAttemptsUseCase for StubCoudeStealAttempts {
+    async fn create_attempt(
+        &self,
+        _: manage_steal_attempts::CreateStealAttempt,
+    ) -> Result<
+        sentinel_core::domain::entities::coude::steal::attempt::CreatedStealAttempt,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn mark_defended(&self, _: uuid::Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn claim_resolved(&self, _: uuid::Uuid) -> Result<bool, DomainError> {
+        unimplemented!()
+    }
+}
+
 pub struct StubCoudeTaunts;
 #[async_trait]
 impl manage_taunts::ManageCoudeTauntsUseCase for StubCoudeTaunts {
@@ -3927,6 +3947,7 @@ fn base_state() -> AppState {
         coude_cashbox_uc: Arc::new(StubCoudeCashbox),
         coude_steal_protections_uc: Arc::new(StubCoudeStealProtections),
         coude_steal_boosts_uc: Arc::new(StubCoudeStealBoosts),
+        coude_steal_attempts_uc: Arc::new(StubCoudeStealAttempts),
         coude_taunts_uc: Arc::new(StubCoudeTaunts),
         coude_heist_uc: Arc::new(StubCoudeHeist),
         coude_curses_uc: Arc::new(StubCoudeCurses),

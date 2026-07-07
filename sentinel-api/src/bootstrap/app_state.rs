@@ -40,6 +40,7 @@ use crate::adapters::outbound::postgres::coude::refusal_count_repository::PgRefu
 use crate::adapters::outbound::postgres::coude::safety_net_repository::PgSafetyNetRepository;
 use crate::adapters::outbound::postgres::coude::social_repository::PgSocialRepository;
 use crate::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
+use crate::adapters::outbound::postgres::coude::steal_attempt_repository::PgStealAttemptRepository;
 use crate::adapters::outbound::postgres::coude::steal_boost_repository::PgStealBoostRepository;
 use crate::adapters::outbound::postgres::coude::steal_protection_repository::PgStealProtectionRepository;
 use crate::adapters::outbound::postgres::coude::taunts_repository::PgTauntsRepository;
@@ -86,6 +87,7 @@ use crate::application::coude::manage_safety_net_service::ManageCoudeSafetyNetSe
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
 use crate::application::coude::manage_taunts_service::ManageCoudeTauntsService;
 use crate::application::coude::play_tout_ou_rien_service::PlayToutOuRienService;
+use crate::application::coude::steal::manage_attempts::ManageStealAttemptsService;
 use crate::application::coude::steal::manage_boosts::ManageCoudeStealBoostsService;
 use crate::application::coude::steal::manage_protections::ManageCoudeStealProtectionsService;
 use crate::application::coude::steal::roll::RollStealService;
@@ -767,6 +769,13 @@ pub async fn build_app_state(
         ManageCoudeStealBoostsService::new(coude_steal_boost_repo)
             .with_bot_config_repo(bot_config_repo.clone()),
     );
+    // Phase 5 — tentatives /voler persistees (repo outbound + use case).
+    let coude_steal_attempt_repo: Arc<
+        dyn crate::ports::outbound::coude::steal_attempt_repository::StealAttemptRepository,
+    > = Arc::new(PgStealAttemptRepository::new(pg_pool.clone()));
+    let coude_steal_attempts_uc: Arc<
+        dyn crate::ports::inbound::coude::manage_steal_attempts::ManageStealAttemptsUseCase,
+    > = Arc::new(ManageStealAttemptsService::new(coude_steal_attempt_repo));
     let resolve_combat_now_uc: Arc<
         dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase,
     > = Arc::new(
@@ -1154,6 +1163,7 @@ pub async fn build_app_state(
         coude_cashbox_uc,
         coude_steal_protections_uc,
         coude_steal_boosts_uc,
+        coude_steal_attempts_uc,
         coude_taunts_uc,
         coude_heist_uc,
         coude_curses_uc,

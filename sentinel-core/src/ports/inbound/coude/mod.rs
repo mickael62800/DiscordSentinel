@@ -10,6 +10,7 @@ pub mod manage_inventory;
 pub mod manage_players;
 pub mod manage_safety_net;
 pub mod manage_social;
+pub mod manage_steal_attempts;
 pub mod manage_steal_boosts;
 pub mod manage_steal_protections;
 pub mod manage_taunts;

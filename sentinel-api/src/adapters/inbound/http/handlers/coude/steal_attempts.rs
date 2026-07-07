@@ -6,13 +6,10 @@
 //! expires et publie un event Redis pour declencher la resolution AFK
 //! cote bot.
 //!
-//! Implementation pragmatique : SQL direct dans le handler (pas de
-//! port/adapter/use case). Acceptable parce que :
-//!   - Pas de logique metier ici, juste persistance simple.
-//!   - Pattern aligne avec `bot_persistence.rs` qui fait pareil pour
-//!     les heartbeats / lifecycle logs.
+//! Adaptateur ENTRANT mince : parse + map. Le calcul de la fenetre de
+//! defense et les transitions de statut vivent dans
+//! `ManageStealAttemptsUseCase` ; le SQL dans `StealAttemptRepository`.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -23,6 +20,8 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+
+use sentinel_core::ports::inbound::coude::manage_steal_attempts::CreateStealAttempt;
 
 #[derive(Deserialize)]
 pub struct CreateStealAttemptDto {
@@ -46,26 +45,22 @@ pub async fn create_steal_attempt(
     State(state): State<AppState>,
     Json(dto): Json<CreateStealAttemptDto>,
 ) -> Result<Json<StealAttemptDto>, ApiError> {
-    let id = Uuid::new_v4();
-    let expires_at = Utc::now() + chrono::Duration::seconds(dto.window_secs.max(1));
+    let created = state
+        .coude_steal_attempts_uc
+        .create_attempt(CreateStealAttempt {
+            guild_id: dto.guild_id,
+            thief_id: dto.thief_id,
+            target_id: dto.target_id,
+            message_id: dto.message_id,
+            channel_id: dto.channel_id,
+            window_secs: dto.window_secs,
+        })
+        .await?;
 
-    sqlx::query(
-        "INSERT INTO coude_steal_attempts \
-         (id, guild_id, thief_id, target_id, message_id, channel_id, expires_at, status) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending')",
-    )
-    .bind(id)
-    .bind(&dto.guild_id)
-    .bind(&dto.thief_id)
-    .bind(&dto.target_id)
-    .bind(&dto.message_id)
-    .bind(&dto.channel_id)
-    .bind(expires_at)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("create steal_attempt"))?;
-
-    Ok(Json(StealAttemptDto { id, expires_at }))
+    Ok(Json(StealAttemptDto {
+        id: created.id,
+        expires_at: created.expires_at,
+    }))
 }
 
 /// PATCH /api/coude/steals/{id}/defend — la victime a clique le bouton.
@@ -74,20 +69,9 @@ pub async fn mark_defended(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    let res = sqlx::query(
-        "UPDATE coude_steal_attempts SET status = 'defended' \
-         WHERE id = $1 AND status = 'pending'",
-    )
-    .bind(id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("mark defended"))?;
-
-    if res.rows_affected() == 0 {
-        // Soit deja defended/expired, soit id inconnu. Retourne 200
-        // quand meme — l'idempotence cote bot evite de re-resoudre.
-        return Ok(StatusCode::NO_CONTENT);
-    }
+    // Idempotent cote bot : qu'il y ait eu transition ou non (deja
+    // defended/expired ou id inconnu), on renvoie 204.
+    state.coude_steal_attempts_uc.mark_defended(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -101,13 +85,6 @@ pub async fn mark_resolved(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let res = sqlx::query(
-        "UPDATE coude_steal_attempts SET status = 'resolved', resolved_at = NOW() \
-         WHERE id = $1 AND status IN ('pending','defended','expired')",
-    )
-    .bind(id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("mark resolved"))?;
-    Ok(Json(serde_json::json!({ "claimed": res.rows_affected() == 1 })))
+    let claimed = state.coude_steal_attempts_uc.claim_resolved(id).await?;
+    Ok(Json(serde_json::json!({ "claimed": claimed })))
 }

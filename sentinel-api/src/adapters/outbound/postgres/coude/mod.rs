@@ -11,6 +11,7 @@ pub mod refusal_count_repository;
 pub mod safety_net_repository;
 pub mod social_repository;
 pub mod sponsorship_repository;
+pub mod steal_attempt_repository;
 pub mod steal_boost_repository;
 pub mod steal_protection_repository;
 pub mod taunts_repository;

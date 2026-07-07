@@ -94,6 +94,8 @@ pub struct AppState {
     pub coude_steal_protections_uc:
         Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
     pub coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
+    pub coude_steal_attempts_uc:
+        Arc<dyn crate::ports::inbound::coude::manage_steal_attempts::ManageStealAttemptsUseCase>,
     pub coude_taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase>,
     pub coude_heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
     pub coude_curses_uc: Arc<dyn crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase>,
