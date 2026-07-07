@@ -69,4 +69,17 @@ pub trait AnnouncementRepository: Send + Sync {
         announcement_id: Uuid,
         limit: i64,
     ) -> Result<Vec<ButtonInteraction>, DomainError>;
+
+    // ── Retention ───────────────────────────────────────────────────────
+
+    /// Liste les identifiants de toutes les guilds (pour les jobs globaux).
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError>;
+
+    /// Supprime les runs d'annonces plus vieux que `days` jours pour une
+    /// guild. Retourne le nombre de lignes supprimees.
+    async fn delete_runs_older_than(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<u64, DomainError>;
 }

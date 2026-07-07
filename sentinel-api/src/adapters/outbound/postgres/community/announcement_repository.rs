@@ -452,4 +452,28 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             })
             .collect())
     }
+
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> {
+        let rows: Vec<(String,)> = sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(rows.into_iter().map(|(g,)| g).collect())
+    }
+
+    async fn delete_runs_older_than(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<u64, DomainError> {
+        let res = sqlx::query(
+            "DELETE FROM scheduled_announcement_runs WHERE guild_id = $1 AND ran_at < NOW() - ($2::int * INTERVAL '1 day')",
+        )
+        .bind(guild_id)
+        .bind(days)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(res.rows_affected())
+    }
 }

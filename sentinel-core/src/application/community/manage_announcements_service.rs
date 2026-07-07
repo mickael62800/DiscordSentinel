@@ -11,7 +11,7 @@ use crate::domain::entities::community::announcement::{
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, ManageAnnouncementsUseCase, RenderedAnnouncement, RenderedEmbed,
-    UpdateAnnouncementCommand,
+    RetentionCleanupSummary, UpdateAnnouncementCommand,
 };
 use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -50,6 +50,17 @@ impl ManageAnnouncementsService {
             })
             .unwrap_or(DEFAULT_FETCH_LIMIT_PER_GUILD);
         cap.clamp(1, 500)
+    }
+
+    /// Lit une cle de config du guild (bot_name='announcements').
+    async fn read_config_value(&self, guild_id: &str, key: &str) -> Option<String> {
+        self.bot_config_repo
+            .get_config(guild_id, ANNOUNCEMENTS_BOT)
+            .await
+            .ok()?
+            .into_iter()
+            .find(|c| c.config_key == key)
+            .map(|c| c.config_value)
     }
 
     fn validate_create(&self, cmd: &CreateAnnouncementCommand) -> Result<(), DomainError> {
@@ -451,5 +462,52 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         self.repo
             .list_button_interactions(announcement_id, limit)
             .await
+    }
+
+    async fn retention_cleanup_all(&self) -> Result<RetentionCleanupSummary, DomainError> {
+        let guild_ids = self.repo.list_guild_ids().await?;
+
+        let mut guilds_processed = 0u64;
+        let mut guilds_skipped = 0u64;
+        let mut rows_deleted: i64 = 0;
+
+        for guild_id in &guild_ids {
+            // Module actif ?
+            let enabled = self.read_config_value(guild_id, "enabled").await;
+            let active = !matches!(enabled.as_deref(), Some("false") | Some("0"));
+            if !active {
+                guilds_skipped += 1;
+                continue;
+            }
+            // history_retention_days (defaut 90). <= 0 = illimite -> skip.
+            let retention = self
+                .read_config_value(guild_id, "history_retention_days")
+                .await
+                .and_then(|s| s.parse::<i64>().ok())
+                .unwrap_or(90);
+            if retention <= 0 {
+                guilds_skipped += 1;
+                continue;
+            }
+            match self
+                .repo
+                .delete_runs_older_than(guild_id, retention as i32)
+                .await
+            {
+                Ok(deleted) => {
+                    rows_deleted += deleted as i64;
+                    guilds_processed += 1;
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, guild = %guild_id, "retention announcement_runs echec");
+                }
+            }
+        }
+
+        Ok(RetentionCleanupSummary {
+            guilds_processed,
+            guilds_skipped,
+            rows_deleted,
+        })
     }
 }

@@ -82,6 +82,15 @@ pub struct RenderedEmbed {
     pub thumbnail_url: Option<String>,
 }
 
+/// Resultat d'une passe de purge de l'historique (`announcement_runs`)
+/// sur l'ensemble des guilds.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RetentionCleanupSummary {
+    pub guilds_processed: u64,
+    pub guilds_skipped: u64,
+    pub rows_deleted: i64,
+}
+
 #[async_trait]
 pub trait ManageAnnouncementsUseCase: Send + Sync {
     async fn create(
@@ -142,4 +151,9 @@ pub trait ManageAnnouncementsUseCase: Send + Sync {
         announcement_id: Uuid,
         limit: i64,
     ) -> Result<Vec<ButtonInteraction>, DomainError>;
+
+    /// Purge l'historique des runs plus vieux que `history_retention_days`
+    /// (defaut 90j) pour chaque guild dont le module annonces est actif.
+    /// Une valeur <= 0 = illimite (guild skip).
+    async fn retention_cleanup_all(&self) -> Result<RetentionCleanupSummary, DomainError>;
 }

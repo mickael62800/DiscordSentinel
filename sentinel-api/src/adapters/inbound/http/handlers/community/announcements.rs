@@ -397,54 +397,11 @@ pub async fn fetch_due(
 pub async fn retention_cleanup_all(
     State(state): State<AppState>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let guilds: Vec<(String,)> = sqlx::query_as("SELECT guild_id FROM guilds ORDER BY name")
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
-
-    let mut processed = 0u64;
-    let mut skipped = 0u64;
-    let mut deleted_total: i64 = 0;
-
-    for (guild_id,) in &guilds {
-        // Module actif ?
-        let enabled = read_cfg(&state, guild_id, "enabled").await;
-        let active = !matches!(enabled.as_deref(), Some("false") | Some("0"));
-        if !active {
-            skipped += 1;
-            continue;
-        }
-        let retention = parse_i64(
-            read_cfg(&state, guild_id, "history_retention_days").await,
-            90,
-        );
-        if retention <= 0 {
-            skipped += 1;
-            continue;
-        }
-        let r = retention as i32;
-        let res = sqlx::query(
-            "DELETE FROM announcement_runs WHERE guild_id = $1 AND ran_at < NOW() - ($2::int * INTERVAL '1 day')"
-        )
-            .bind(guild_id)
-            .bind(r)
-            .execute(&state.pg_pool)
-            .await;
-        match res {
-            Ok(r) => {
-                deleted_total += r.rows_affected() as i64;
-                processed += 1;
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, guild = %guild_id, "retention announcement_runs echec");
-            }
-        }
-    }
-
+    let summary = state.announcements_uc.retention_cleanup_all().await?;
     Ok(Json(serde_json::json!({
-        "guilds_processed": processed,
-        "guilds_skipped": skipped,
-        "rows_deleted": deleted_total,
+        "guilds_processed": summary.guilds_processed,
+        "guilds_skipped": summary.guilds_skipped,
+        "rows_deleted": summary.rows_deleted,
         "status": "ok",
     })))
 }
