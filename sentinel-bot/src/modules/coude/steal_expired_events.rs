@@ -15,9 +15,7 @@ use serenity::all::{ChannelId, Context, EditMessage, MessageId};
 use tracing::{info, warn};
 use uuid::Uuid;
 
-use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::commands::voler::resolve_steal_attempt;
-use crate::modules::coude::load_guild_config;
 use crate::modules::coude::taunts_dispatch;
 use crate::modules::coude::GameApiKey;
 
@@ -108,10 +106,6 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     // a quand meme passe en expired (race), on respecte tout de meme la
     // resolution AFK — le row a deja ete UPDATE en 'expired' cote SQL,
     // donc le bouton ne fera plus rien (bot le check via mark_steal_defended).
-    let config = load_guild_config(ctx, guild_id).await;
-    let failure_penalty_pct = config.steal_failure_penalty_pct();
-    let afk_defender_malus = config.afk_defender_malus();
-
     let bot_data = ctx.data.read().await;
     let api = match bot_data.get::<GameApiKey>() {
         Some(a) => a,
@@ -120,28 +114,17 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             return;
         }
     };
-    let catalog = match bot_data.get::<CatalogCacheKey>() {
-        Some(c) => c.clone(),
-        None => {
-            warn!("CatalogCacheKey absent du TypeMap, skip");
-            return;
-        }
-    };
 
-    let thief_player = match api.get_or_create_player(guild_id, thief_id, "").await {
-        Ok(p) => p,
-        Err(e) => {
-            warn!(error = %e, "Echec get_or_create_player thief (steal_expired)");
-            return;
-        }
-    };
-    let target_player = match api.get_or_create_player(guild_id, target_id, "").await {
-        Ok(p) => p,
-        Err(e) => {
-            warn!(error = %e, "Echec get_or_create_player target (steal_expired)");
-            return;
-        }
-    };
+    // Garantit l'existence des deux joueurs (la resolution serveur relit
+    // leur solde/DEF/classe). Le calcul est 100% serveur-side.
+    if let Err(e) = api.get_or_create_player(guild_id, thief_id, "").await {
+        warn!(error = %e, "Echec get_or_create_player thief (steal_expired)");
+        return;
+    }
+    if let Err(e) = api.get_or_create_player(guild_id, target_id, "").await {
+        warn!(error = %e, "Echec get_or_create_player target (steal_expired)");
+        return;
+    }
 
     // CLAIM atomique AVANT de resoudre : si la victime a clique "Se defendre"
     // entre-temps (ou un autre tick worker), le claim echoue et on n'applique
@@ -151,16 +134,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     }
 
     let (result_embed, taunt_events) = resolve_steal_attempt(
-        api,
-        &catalog,
-        guild_id,
-        thief_id,
-        target_id,
-        &thief_player,
-        &target_player,
-        true, // AFK
-        failure_penalty_pct,
-        afk_defender_malus,
+        api, guild_id, thief_id, target_id, true, // AFK
     )
     .await;
 

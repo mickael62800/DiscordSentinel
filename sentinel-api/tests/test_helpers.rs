@@ -1653,6 +1653,17 @@ impl roll_steal::RollStealUseCase for StubRollSteal {
     }
 }
 
+pub struct StubResolveSteal;
+#[async_trait]
+impl resolve_steal::ResolveStealUseCase for StubResolveSteal {
+    async fn resolve_steal(
+        &self,
+        _: resolve_steal::ResolveStealCommand,
+    ) -> Result<resolve_steal::ResolveStealOutput, DomainError> {
+        unimplemented!()
+    }
+}
+
 pub struct StubCoudeFlavorTemplates;
 #[async_trait]
 impl FlavorTemplatesRepository for StubCoudeFlavorTemplates {
@@ -4293,6 +4304,7 @@ fn base_state() -> AppState {
         resolve_friendly_duel_uc: Arc::new(StubResolveFriendlyDuel),
         play_tout_ou_rien_uc: Arc::new(StubPlayToutOuRien),
         roll_steal_uc: Arc::new(StubRollSteal),
+        resolve_steal_uc: Arc::new(StubResolveSteal),
         coude_flavor_templates_repo: Arc::new(StubCoudeFlavorTemplates),
         user_activity_repo: Arc::new(StubUserActivityRepo),
         welcome_config_uc: Arc::new(

@@ -90,6 +90,7 @@ use crate::application::coude::play_tout_ou_rien_service::PlayToutOuRienService;
 use crate::application::coude::steal::manage_attempts::ManageStealAttemptsService;
 use crate::application::coude::steal::manage_boosts::ManageCoudeStealBoostsService;
 use crate::application::coude::steal::manage_protections::ManageCoudeStealProtectionsService;
+use crate::application::coude::steal::resolve::ResolveStealService;
 use crate::application::coude::steal::roll::RollStealService;
 use crate::application::moderation::manage_infractions_service::ManageInfractionsService;
 use crate::application::moderation::manage_moderation_service::ManageModerationService;
@@ -877,6 +878,23 @@ pub async fn build_app_state(
         ManageCoudeStealBoostsService::new(coude_steal_boost_repo)
             .with_bot_config_repo(bot_config_repo.clone()),
     );
+    // Resolution serveur-side complete du vol (ResolveStealUseCase) :
+    // decide l'issue + calcule butin/penalite + mute les wallets. Le bot
+    // devient un adaptateur mince (rend l'embed + dispatch railleries).
+    let resolve_steal_uc: Arc<
+        dyn crate::ports::inbound::coude::resolve_steal::ResolveStealUseCase,
+    > = Arc::new(ResolveStealService::new(
+        roll_steal_uc.clone(),
+        coude_players_uc.clone()
+            as Arc<dyn crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase>,
+        coude_economy_uc.clone(),
+        coude_taunts_uc.clone(),
+        coude_steal_protections_uc.clone(),
+        coude_steal_boosts_uc.clone(),
+        coude_flavor_templates_repo.clone(),
+        bot_config_repo.clone(),
+    ));
+
     // Phase 5 — tentatives /voler persistees (repo outbound + use case).
     let coude_steal_attempt_repo: Arc<
         dyn crate::ports::outbound::coude::steal_attempt_repository::StealAttemptRepository,
@@ -1290,6 +1308,7 @@ pub async fn build_app_state(
         coude_tout_ou_rien_repo,
         play_tout_ou_rien_uc,
         roll_steal_uc,
+        resolve_steal_uc,
         coude_flavor_templates_repo,
         discord_action_messages_uc,
         coude_refusal_count_repo,

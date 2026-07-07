@@ -353,6 +353,11 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/steal/roll",
             post(handlers::coude::steal_roll::roll_steal),
         )
+        // Resolution serveur-side complete du vol (issue + butin + penalite).
+        .route(
+            "/{guild_id}/steal/resolve",
+            post(handlers::coude::steal_resolve::resolve_steal),
+        )
         // Phase 5 — persistance des tentatives /voler (timer 60s deplace
         // dans sentinel-worker).
         .route(

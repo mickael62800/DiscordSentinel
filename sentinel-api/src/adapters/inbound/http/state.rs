@@ -111,6 +111,7 @@ pub struct AppState {
     pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository>,
     pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase>,
     pub roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase>,
+    pub resolve_steal_uc: Arc<dyn crate::ports::inbound::coude::resolve_steal::ResolveStealUseCase>,
     pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository>,
     pub discord_action_messages_uc:
         Arc<dyn crate::ports::inbound::audit::manage_discord_action_messages::ManageDiscordActionMessagesUseCase>,

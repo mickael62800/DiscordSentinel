@@ -9,48 +9,10 @@ use uuid::Uuid;
 use crate::shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::api_client::ApiClient;
-use crate::modules::coude::catalog::{CatalogCache, CatalogCacheKey};
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
 pub const STEAL_DEFEND_PREFIX: &str = "steal_defend:";
-
-/// Verifie si la cible a une protection anti-vol active (Phase 9 Part B).
-///
-/// Depuis le refactor en abonnements temps-base, ce check est delegue a
-/// l'API : elle liste les protections actives, roll les dés, et retourne
-/// celle qui a bloque (ou None). Le bot ne fait qu'afficher le resultat.
-/// Les items NE SONT PLUS consommes — c'est un abonnement.
-async fn try_trigger_protection(
-    api: &ApiClient,
-    guild_id: &str,
-    target_id: &str,
-) -> Option<(String, String, u32, u32)> {
-    match api.try_trigger_steal_protection(guild_id, target_id).await {
-        Ok(Some(trigger)) => Some((
-            trigger.item_key,
-            trigger.item_name,
-            trigger.rolled_value,
-            trigger.block_chance_percent,
-        )),
-        Ok(None) => None,
-        Err(e) => {
-            tracing::warn!(error = %e, "Echec try_trigger_steal_protection API");
-            None
-        }
-    }
-}
-
-// Templates STEAL_SUCCESS_AFK / STEAL_SUCCESS_FIGHT / STEAL_FAIL migres
-// dans `coude_flavor_templates` (Phase 3 #9 audit). Le bot consomme via
-// `api.random_flavor`. Pas de fallback local.
-
-fn format_msg(template: &str, voleur: &str, victime: &str, montant: i64) -> String {
-    template
-        .replace("{voleur}", voleur)
-        .replace("{victime}", victime)
-        .replace("{montant}", &montant.to_string())
-}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("voler")
@@ -317,33 +279,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
-/// Resout une tentative de vol. Centralise la logique pour les deux
-/// chemins (clic "Se defendre" ou timeout AFK).
+/// Resout une tentative de vol. Adaptateur MINCE : l'issue (gagne/perdu/
+/// bloque), le butin et la penalite sont desormais decides SERVEUR-SIDE
+/// (`ResolveStealUseCase`, cf. `POST /api/coude/{guild}/steal/resolve`).
+/// Le bot ne fait plus AUCUN calcul (bonus classe/DEF/boost, totals,
+/// stolen, lost) : il rend l'embed pret a poster et dispatche les
+/// railleries.
 ///
-/// - `afk = true` → malus de `afk_defender_malus` sur le roll du
-///   defenseur, plage de coins voles 10-15% (moins que le defendu actif).
-/// - `afk = false` → roll normal, plage 15-25%.
-///
-/// Dans les deux cas, les items anti-vol de la cible peuvent bloquer
-/// le vol apres le roll (un item tire sa chance et se consume au blocage).
+/// - `afk = true` → cible n'a pas clique "Se defendre" (malus defenseur +
+///   plage de butin plus faible, applique cote serveur).
+/// - `afk = false` → defense active.
 pub(crate) async fn resolve_steal_attempt(
     api: &ApiClient,
-    catalog: &CatalogCache,
     guild_id: &str,
     thief_id: &str,
     target_id: &str,
-    thief_player: &crate::modules::coude::api_client::Player,
-    target_player: &crate::modules::coude::api_client::Player,
     afk: bool,
-    failure_penalty_pct: u64,
-    afk_defender_malus: i32,
 ) -> (
     CreateEmbed,
     Vec<crate::modules::coude::api_client::TauntEvent>,
 ) {
-    // Phase 2 #4 audit : tirage RNG (d20 thief/victim + % wallet) cote API.
-    // Pas de fallback local : si l'API est down on retourne une erreur.
-    let api_roll = match api.roll_steal(guild_id, afk).await {
+    let resolved = match api.resolve_steal(guild_id, thief_id, target_id, afk).await {
         Ok(r) => r,
         Err(_) => {
             let embed = CreateEmbed::new()
@@ -353,255 +309,16 @@ pub(crate) async fn resolve_steal_attempt(
             return (embed, Vec::new());
         }
     };
-    let (thief_roll, target_roll): (i32, i32) = (api_roll.thief_d20, api_roll.victim_d20);
-    let class_bonus = if thief_player.class.as_deref() == Some("fourbe") {
-        4
-    } else {
-        0
-    };
-    // Phase 9 Part C : somme des items de boost voleur actifs.
-    let boost_bonus = api
-        .get_steal_boost_total(guild_id, thief_id)
-        .await
-        .unwrap_or(0);
-    let thief_bonus = class_bonus + boost_bonus;
 
-    let mut target_bonus = target_player.def / 10;
-    if afk {
-        target_bonus -= afk_defender_malus;
-    }
-    let thief_total = thief_roll + thief_bonus;
-    let target_total = target_roll + target_bonus;
-
-    // Detail du roll : on explicite le boost_bonus separement seulement
-    // s'il est non nul, pour ne pas leaker quand le voleur n'a rien
-    // depense (afficher toujours "+boost: 0" donnerait l'info aux
-    // curieux).
-    let thief_detail = if boost_bonus > 0 {
-        format!(
-            "d20: {} + class: {} + boost: {}",
-            thief_roll, class_bonus, boost_bonus
-        )
-    } else {
-        format!("d20: {} + bonus: {}", thief_roll, class_bonus)
-    };
-    let roll_detail = format!(
-        "\n\n\u{1f3b2} Voleur: {} ({}) vs Victime: {} (d20: {} + DEF bonus: {}{})",
-        thief_total,
-        thief_detail,
-        target_total,
-        target_roll,
-        target_bonus + if afk { afk_defender_malus } else { 0 },
-        if afk {
-            format!(" - AFK: {}", afk_defender_malus)
-        } else {
-            String::new()
-        },
-    );
-
-    let mut taunt_events: Vec<crate::modules::coude::api_client::TauntEvent> = Vec::new();
-
-    if thief_total > target_total {
-        // Le voleur a gagne le roll — mais une protection active peut
-        // encore bloquer le vol (Phase 9 Part B : abonnements temps-base,
-        // plus de consommation d'item).
-        if let Some((_key, name, rolled, chance)) =
-            try_trigger_protection(api, guild_id, target_id).await
-        {
-            // Phase 9 Part D : blocage reussi → reset le victim streak.
-            if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
-                tracing::warn!(error = %e, "Echec track_steal_defended");
-            }
-
-            // Ligne explicite : le voleur AVAIT gagne le roll des des, mais
-            // la protection a bloque grace au tirage % (rolled <= chance).
-            let protection_detail = format!(
-                "\n\u{1f3b2} Le voleur avait gagne le combat ({} > {}), mais la protection a fait un jet de **{}/100** (seuil **{}%**) → \u{2705} bloque !",
-                thief_total, target_total, rolled, chance
-            );
-
-            let block_msg = format!(
-                "\u{1f6e1}\u{fe0f} <@{}> etait protege par **{}** qui a bloque la tentative de vol de <@{}> !",
-                target_id, name, thief_id
-            );
-            // La victime gagne +3 XP comme pour une defense reussie.
-            let mut xp_line = String::new();
-            if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-                api.add_xp(guild_id, target_id, 3).await
-            {
-                xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +3 XP pour <@{}>", target_id));
-                if leveled_up {
-                    let title = catalog.title_for_level(new_level).to_string();
-                    xp_line.push_str(&format!(
-                        "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                        new_level, title, stat_points
-                    ));
-                }
-            }
-            let embed = CreateEmbed::new()
-                .title("\u{1f6e1}\u{fe0f} Vol bloque !")
-                .description(format!(
-                    "{}{}{}{}",
-                    block_msg, roll_detail, protection_detail, xp_line
-                ))
-                .color(0x3498DB)
-                .footer(CreateEmbedFooter::new(
-                    crate::shared::branding::COUDE_TAGLINE_SHORT,
-                ))
-                .timestamp(serenity::model::Timestamp::now());
-            return (embed, taunt_events);
-        }
-
-        // Pas de protection : le vol reussit. % vole tire cote API plus haut.
-        let steal_pct: f64 = (api_roll.steal_pct_bp as f64) / 10_000.0;
-        let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
-
-        // Migration wallet unifie : record_steal delegue a
-        // ManageWalletUseCase::transfer cote API (faillite victime +
-        // jackpot voleur auto-detectes). Retourne le montant
-        // effectivement vole (clamp serveur) + TauntEvents a
-        // dispatcher.
-        let stolen = match api
-            .record_steal(guild_id, thief_id, target_id, stolen)
-            .await
-        {
-            Ok((actual_stolen, wallet_taunts)) => {
-                taunt_events.extend(wallet_taunts);
-                actual_stolen
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Echec API record_steal");
-                stolen
-            }
-        };
-
-        // Phase 9 Part D : incremente le victim streak + collecte taunt event.
-        // Reste separe du record_steal car depend du nombre de vols
-        // subis et non du montant.
-        match api.track_steal_victim(guild_id, target_id).await {
-            Ok(Some(ev)) => taunt_events.push(ev),
-            Ok(None) => {}
-            Err(e) => tracing::warn!(error = %e, "Echec track_steal_victim"),
-        }
-
-        let mut xp_line = String::new();
-        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            api.add_xp(guild_id, thief_id, 5).await
-        {
-            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
-            if leveled_up {
-                let title = catalog.title_for_level(new_level).to_string();
-                xp_line.push_str(&format!(
-                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                    new_level, title, stat_points
-                ));
-            }
-        }
-
-        // Phase 3 #9 audit : tirage du template via l'API (catalogue
-        // editable runtime). Pas de fallback local.
-        let key = if afk {
-            "steal_success_afk"
-        } else {
-            "steal_success_fight"
-        };
-        let template_str: String = match api.random_flavor(key, "fr").await {
-            Ok(Some(s)) => s,
-            Ok(None) | Err(_) => {
-                let embed = CreateEmbed::new()
-                    .title("\u{26a0}\u{fe0f} API indisponible")
-                    .description("Veuillez reessayer plus tard.")
-                    .color(0x95A5A6);
-                return (embed, taunt_events);
-            }
-        };
-        let msg_text = format_msg(
-            &template_str,
-            &format!("<@{}>", thief_id),
-            &format!("<@{}>", target_id),
-            stolen,
-        );
-
-        let embed = CreateEmbed::new()
-            .title("\u{1f4b0} Vol reussi !")
-            .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
-            .color(0x57F287)
-            .footer(CreateEmbedFooter::new(
-                crate::shared::branding::COUDE_TAGLINE_SHORT,
-            ))
-            .timestamp(serenity::model::Timestamp::now());
-        (embed, taunt_events)
-    } else {
-        // Vol echoue : le voleur perd `steal_failure_penalty_pct`% de
-        // ses coins, victime +3 XP.
-        let lost =
-            ((thief_player.coins as f64 * (failure_penalty_pct as f64 / 100.0)) as i64).max(1);
-
-        // Migration wallet unifie : delegue la penalite a
-        // record_steal_fail_penalty (wallet_uc.debit + faillite
-        // auto-detectee cote voleur). Le montant reellement perdu peut
-        // etre clamp au solde du voleur cote serveur ; le message
-        // affiche utilise la valeur du serveur pour coherence.
-        let lost = match api
-            .record_steal_fail_penalty(guild_id, thief_id, lost)
-            .await
-        {
-            Ok((actual_lost, wallet_taunts)) => {
-                taunt_events.extend(wallet_taunts);
-                actual_lost.max(1)
-            }
-            Err(e) => {
-                tracing::warn!(error = %e, "Echec API record_steal_fail_penalty");
-                lost
-            }
-        };
-
-        // Phase 9 Part D : vol rate = victime a "resiste", reset son streak.
-        if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
-            tracing::warn!(error = %e, "Echec track_steal_defended (fail path)");
-        }
-
-        let mut xp_line = String::new();
-        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            api.add_xp(guild_id, target_id, 3).await
-        {
-            xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +3 XP pour <@{}>", target_id));
-            if leveled_up {
-                let title = catalog.title_for_level(new_level).to_string();
-                xp_line.push_str(&format!(
-                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                    new_level, title, stat_points
-                ));
-            }
-        }
-
-        let template_str: String = match api.random_flavor("steal_fail", "fr").await {
-            Ok(Some(s)) => s,
-            Ok(None) | Err(_) => {
-                let embed = CreateEmbed::new()
-                    .title("\u{26a0}\u{fe0f} API indisponible")
-                    .description("Veuillez reessayer plus tard.")
-                    .color(0x95A5A6);
-                return (embed, taunt_events);
-            }
-        };
-        let msg_text = format_msg(
-            &template_str,
-            &format!("<@{}>", thief_id),
-            &format!("<@{}>", target_id),
-            lost,
-        );
-
-        let embed = CreateEmbed::new()
-            .title("\u{1f6a8} Vol rate !")
-            .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
-            .color(0xED4245)
-            .footer(CreateEmbedFooter::new(
-                crate::shared::branding::COUDE_TAGLINE_SHORT,
-            ))
-            .timestamp(serenity::model::Timestamp::now());
-        (embed, taunt_events)
-    }
+    let embed = CreateEmbed::new()
+        .title(resolved.title)
+        .description(resolved.description)
+        .color(resolved.color)
+        .footer(CreateEmbedFooter::new(
+            crate::shared::branding::COUDE_TAGLINE_SHORT,
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+    (embed, resolved.taunt_events)
 }
 
 /// Handle the defend button click from a steal attempt.
@@ -689,13 +406,8 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         tracing::warn!(error = %e, "Echec defer handle_defend");
     }
 
-    let config = load_guild_config(ctx, guild_id).await;
-    let failure_penalty_pct = config.steal_failure_penalty_pct();
-    let afk_defender_malus = config.afk_defender_malus();
-
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
-    let catalog_defend = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Phase 5 — marque l'attempt 'defended' cote DB pour que le worker
     // ne le passe pas en 'expired' apres coup. Fire-and-forget : meme
@@ -704,23 +416,22 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         api.mark_steal_defended(attempt_id).await;
     }
 
-    // Fetch both players
-    let thief_player = match api.get_or_create_player(guild_id, thief_id, "").await {
-        Ok(p) => p,
-        Err(e) => {
-            let _ = component
-                .create_followup(
-                    &ctx.http,
-                    serenity::all::CreateInteractionResponseFollowup::new()
-                        .content(e)
-                        .ephemeral(true),
-                )
-                .await;
-            return;
-        }
-    };
+    // Garantit l'existence des deux joueurs cote DB (la resolution
+    // serveur relit leur solde/DEF/classe via `players_uc.get`). On ne se
+    // sert plus des donnees ici : le calcul est 100% serveur-side.
+    if let Err(e) = api.get_or_create_player(guild_id, thief_id, "").await {
+        let _ = component
+            .create_followup(
+                &ctx.http,
+                serenity::all::CreateInteractionResponseFollowup::new()
+                    .content(e)
+                    .ephemeral(true),
+            )
+            .await;
+        return;
+    }
 
-    let target_player = match api
+    let _ = match api
         .get_or_create_player(guild_id, target_id, &component.user.name)
         .await
     {
@@ -756,16 +467,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     }
 
     let (embed, taunt_events) = resolve_steal_attempt(
-        api,
-        &catalog_defend,
-        guild_id,
-        thief_id,
-        target_id,
-        &thief_player,
-        &target_player,
-        false, // defense active
-        failure_penalty_pct,
-        afk_defender_malus,
+        api, guild_id, thief_id, target_id, false, // defense active
     )
     .await;
 

@@ -20,4 +20,5 @@ pub mod purchase_item;
 pub mod resolve_betting_batch;
 pub mod resolve_combat_now;
 pub mod resolve_friendly_duel;
+pub mod resolve_steal;
 pub mod roll_steal;

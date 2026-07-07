@@ -24,6 +24,7 @@ pub mod prank;
 pub mod refusal;
 pub mod social;
 pub mod steal_attempts;
+pub mod steal_resolve;
 pub mod steal_roll;
 pub mod taunts;
 pub mod tournaments;
