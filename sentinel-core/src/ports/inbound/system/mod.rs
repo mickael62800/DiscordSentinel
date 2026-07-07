@@ -1,4 +1,5 @@
 pub mod lookup_geoip;
+pub mod manage_invitations;
 pub mod manage_ip_bans;
 pub mod manage_oauth;
 pub mod manage_rotation;

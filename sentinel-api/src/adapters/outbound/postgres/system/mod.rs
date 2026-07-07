@@ -3,6 +3,7 @@ pub mod bot_config_repository;
 pub mod export_repository;
 pub mod guild_repository;
 pub mod guild_reset_repository;
+pub mod invitation_repository;
 pub mod ip_ban_repository;
 pub mod log_repository;
 pub mod oauth_session_repository;

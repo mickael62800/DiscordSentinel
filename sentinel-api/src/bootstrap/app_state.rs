@@ -374,6 +374,22 @@ pub async fn build_app_state(
             ),
         );
 
+    // Invitations : repo Postgres + use case (generation code unique, octroi de
+    // role atomique au redeem). Le SQL vit dans le repo, la regle metier dans le
+    // service, le handler HTTP ne fait que parse/RBAC/map.
+    let invitation_repo = Arc::new(
+        crate::adapters::outbound::postgres::system::invitation_repository::PgInvitationRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let invitations_uc: Arc<
+        dyn crate::ports::inbound::system::manage_invitations::ManageInvitationsUseCase,
+    > = Arc::new(
+        crate::application::system::manage_invitations_service::ManageInvitationsService::new(
+            invitation_repo,
+        ),
+    );
+
     // Tamagotchi : repo + use case (debite les coins via le wallet partage).
     let pet_repo: Arc<dyn crate::ports::outbound::tamagotchi::pet_repository::PetRepository> =
         Arc::new(
@@ -1041,6 +1057,7 @@ pub async fn build_app_state(
         rules_uc,
         infractions_uc,
         tickets_uc,
+        invitations_uc,
         security_uc,
         moderation_uc,
         modstats_uc,

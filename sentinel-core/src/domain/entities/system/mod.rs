@@ -7,6 +7,7 @@ pub mod discord_role;
 pub mod geoip;
 pub mod guild;
 pub mod host_probe;
+pub mod invitation;
 pub mod ip_ban;
 pub mod job_whitelists;
 pub mod log_entry;
