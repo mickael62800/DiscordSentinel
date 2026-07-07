@@ -168,17 +168,13 @@ impl ApiClient {
             .await
     }
 
-    /// HTTP : pas dans les use cases exposes.
-    pub async fn reset_stats(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        cost: i64,
-    ) -> Result<Player, String> {
+    /// HTTP : pas dans les use cases exposes. Le cout du reset
+    /// (`reset_stats_cost`) est lu server-side depuis la config guild.
+    pub async fn reset_stats(&self, guild_id: &str, user_id: &str) -> Result<Player, String> {
         self.base
             .post_json(
                 &format!("/api/coude/{guild_id}/players/{user_id}/reset-stats"),
-                &serde_json::json!({ "cost": cost }),
+                &serde_json::json!({}),
             )
             .await
     }

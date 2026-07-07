@@ -19,7 +19,6 @@ use super::dto::RandomPlayersQuery;
 use super::dto::RecordDrawDto;
 use super::dto::RecordLossDto;
 use super::dto::RecordWinDto;
-use super::dto::ResetStatsDto;
 use super::dto::SpendStatDto;
 use super::dto::UpdateClassDto;
 use super::dto::UpdateHpDto;
@@ -173,7 +172,6 @@ pub async fn reset_stats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
-    Json(dto): Json<ResetStatsDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state,
@@ -185,7 +183,7 @@ pub async fn reset_stats(
     .await?;
     let player = state
         .coude_players_uc
-        .reset_stats(&guild_id, &user_id, dto.cost)
+        .reset_stats(&guild_id, &user_id)
         .await?;
     Ok(Json(player.into()))
 }

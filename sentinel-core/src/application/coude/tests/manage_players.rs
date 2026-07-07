@@ -245,25 +245,63 @@ async fn list_uses_limit_200() {
 
 // ── reset_stats validation ──
 
+// Mock config renvoyant `reset_stats_cost` = valeur configuree (server-side).
+struct CostConfig(i64);
+
+#[async_trait::async_trait]
+impl crate::ports::outbound::system::bot_config_repository::BotConfigRepository for CostConfig {
+    async fn get_definitions(
+        &self,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(
+        &self,
+        guild_id: &str,
+        bot_name: &str,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> {
+        Ok(vec![crate::domain::entities::system::bot_config::BotGuildConfig {
+            id: uuid::Uuid::new_v4(),
+            guild_id: guild_id.into(),
+            bot_name: bot_name.into(),
+            config_key: "reset_stats_cost".into(),
+            config_value: self.0.to_string(),
+            updated_at: Utc::now(),
+        }])
+    }
+    async fn get_all_config(
+        &self,
+        _: &str,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 #[tokio::test]
 async fn reset_stats_rejects_negative_cost() {
-    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    // Cout lu server-side : un cout negatif en config doit etre rejete.
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()))
+        .with_bot_config_repo(Arc::new(CostConfig(-1)));
     assert!(matches!(
-        svc.reset_stats("g", "u", -1).await,
-        Err(DomainError::ValidationError(_))
-    ));
-    assert!(matches!(
-        svc.reset_stats("g", "u", -999).await,
+        svc.reset_stats("g", "u").await,
         Err(DomainError::ValidationError(_))
     ));
 }
 
 #[tokio::test]
 async fn reset_stats_accepts_zero_cost() {
+    // Cout server-side = 0 : le reset delegue au repo (ici Some => Ok).
     let repo = MockRepo::default();
     *repo.reset_stats_returns_some.lock().unwrap() = true;
-    let svc = ManageCoudePlayersService::new(Arc::new(repo));
-    assert!(svc.reset_stats("g", "u", 0).await.is_ok());
+    let svc = ManageCoudePlayersService::new(Arc::new(repo))
+        .with_bot_config_repo(Arc::new(CostConfig(0)));
+    assert!(svc.reset_stats("g", "u").await.is_ok());
 }
 
 // ── spend_stat_point maps None to ValidationError ──
@@ -510,7 +548,7 @@ async fn increment_chaos_false_returns_not_found() {
 async fn reset_stats_none_returns_validation_error() {
     // MockRepo default : reset_stats_returns_some == false → None → ValidationError.
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
-    let err = svc.reset_stats("g", "u", 100).await.unwrap_err();
+    let err = svc.reset_stats("g", "u").await.unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
 }
 

@@ -627,7 +627,7 @@ impl ManageCoudePlayersUseCase for StubPlayersUc {
     ) -> Result<Player, DomainError> {
         unimplemented!()
     }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> {
+    async fn reset_stats(&self, _: &str, _: &str) -> Result<Player, DomainError> {
         unimplemented!()
     }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> {

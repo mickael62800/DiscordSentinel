@@ -135,12 +135,17 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
             })
     }
 
-    async fn reset_stats(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        cost: i64,
-    ) -> Result<Player, DomainError> {
+    async fn reset_stats(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
+        // Cout lu server-side (config guild `reset_stats_cost`, defaut 300 —
+        // meme cle et defaut que l'ancien bot).
+        let cost = match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::GuildSettings::load(&**repo, guild_id)
+                    .await
+                    .get_i64("reset_stats_cost", 300)
+            }
+            None => 300,
+        };
         if cost < 0 {
             return Err(DomainError::ValidationError(
                 "Le cout ne peut pas etre negatif".into(),

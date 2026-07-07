@@ -107,18 +107,12 @@ fn add_xp_dto_deserializes() {
     assert_eq!(dto.amount, 100);
 }
 
-// ── SpendStatDto / ResetStatsDto ──
+// ── SpendStatDto ──
 
 #[test]
 fn spend_stat_dto_deserializes() {
     let dto: SpendStatDto = serde_json::from_str(r#"{"stat":"atk"}"#).unwrap();
     assert_eq!(dto.stat, "atk");
-}
-
-#[test]
-fn reset_stats_dto_deserializes() {
-    let dto: ResetStatsDto = serde_json::from_str(r#"{"cost":500}"#).unwrap();
-    assert_eq!(dto.cost, 500);
 }
 
 // ── Record{Win,Loss,Draw}Dto ──
@@ -563,22 +557,12 @@ fn leaderboard_query_params_deserializes() {
 // ── BuyInsuranceDto ──
 
 #[test]
-fn buy_insurance_dto_default_duration_zero() {
+fn buy_insurance_dto_deserializes() {
+    // La duree n'est plus transmise : lue server-side depuis la config guild.
     let dto: BuyInsuranceDto =
         serde_json::from_value(serde_json::json!({"user_id": "u", "is_scam": true})).unwrap();
     assert_eq!(dto.user_id, "u".into());
     assert!(dto.is_scam);
-    // Default est 0 avec #[serde(default)] (i64::default()).
-    assert_eq!(dto.duration_seconds, 0);
-}
-
-#[test]
-fn buy_insurance_dto_with_duration() {
-    let dto: BuyInsuranceDto = serde_json::from_value(
-        serde_json::json!({"user_id": "u", "is_scam": false, "duration_seconds": 7200}),
-    )
-    .unwrap();
-    assert_eq!(dto.duration_seconds, 7200);
 }
 
 // ── CreatePrimeDto / ClaimPrimesDto / UseItemDto ──

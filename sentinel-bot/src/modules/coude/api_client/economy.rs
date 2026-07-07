@@ -72,6 +72,28 @@ impl ApiClient {
         })
     }
 
+    /// Refus de combat : penalite calculee (depuis la mise) ET debitee
+    /// server-side de facon atomique. `mise` est le vrai input (le taux
+    /// `refusal_penalty` est lu cote API).
+    pub async fn apply_refusal_penalty(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        mise: i64,
+    ) -> Result<CancelPenaltyOutcome, String> {
+        let req = proto_coude::RefusalPenaltyRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            mise,
+        };
+        let r = crate::grpc_call!(self.grpc, coude_economy, apply_refusal_penalty, req)?;
+        Ok(CancelPenaltyOutcome {
+            penalty: r.penalty,
+            penalty_percent: r.penalty_percent,
+            new_balance: r.new_balance,
+        })
+    }
+
     pub async fn record_casino_win(
         &self,
         guild_id: &str,
@@ -172,24 +194,21 @@ impl ApiClient {
             .collect())
     }
 
-    /// Don de coins taxe : la taxe et le solde minimum sont calcules cote
-    /// API. Retourne `(received, tax, taunt_events)`.
+    /// Don de coins taxe : la taxe, le taux et le solde minimum sont lus et
+    /// calcules cote API (config guild server-side). Retourne
+    /// `(received, tax, taunt_events)`.
     pub async fn gift_coins(
         &self,
         guild_id: &str,
         donor_id: &str,
         target_id: &str,
         amount: i64,
-        tax_rate: f64,
-        min_coins_after: i64,
     ) -> Result<(i64, i64, Vec<super::TauntEvent>), String> {
         let req = proto_coude::GiftCoinsRequest {
             guild_id: guild_id.to_string(),
             donor_id: donor_id.to_string(),
             target_id: target_id.to_string(),
             amount,
-            tax_rate,
-            min_coins_after,
         };
         let resp = crate::grpc_call!(self.grpc, coude_economy, gift_coins, req)?;
         Ok((

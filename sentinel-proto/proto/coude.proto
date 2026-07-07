@@ -438,6 +438,15 @@ service CoudeEconomyService {
   rpc PrankDebit(PrankDebitRequest) returns (PrankDebitResponse);
   // Penalite d'annulation de combat (calcul + debit server-side).
   rpc ApplyCancelPenalty(UserInGuildRequest) returns (CancelPenaltyResponse);
+  // Penalite de refus de combat (calcul depuis la mise + debit server-side).
+  rpc ApplyRefusalPenalty(RefusalPenaltyRequest) returns (CancelPenaltyResponse);
+}
+
+message RefusalPenaltyRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  // Mise du combat refuse (vrai input : la penalite = max(1, mise * pct)).
+  int64 mise = 3;
 }
 
 message PrankDebitRequest {
@@ -481,15 +490,16 @@ message TransferResponse {
 }
 
 // Don de coins taxe : la taxe (= amount - received) et la validation du
-// solde minimum sont calculees cote serveur. `tax_rate` et `min_coins_after`
-// viennent de la config guild (transmis par le bot).
+// solde minimum sont calculees cote serveur. Le taux de taxe
+// (`gift_tax_percent`) et le solde minimum (`gift_min_coins_after`) sont lus
+// server-side depuis la config guild — le bot ne les transmet plus.
 message GiftCoinsRequest {
   string guild_id = 1;
   string donor_id = 2;
   string target_id = 3;
   int64 amount = 4;
-  double tax_rate = 5;
-  int64 min_coins_after = 6;
+  reserved 5, 6;
+  reserved "tax_rate", "min_coins_after";
 }
 
 message GiftCoinsResponse {
@@ -711,9 +721,10 @@ message BuyInsuranceRequest {
   string guild_id = 1;
   string user_id = 2;
   bool is_scam = 3;
-  // Duree en secondes. 0 ou absent = defaut 3600 (1h) pour
-  // retrocompat. Valeurs typiques : 86400 (1j), 604800 (1s), 2592000 (30j).
-  int64 duration_seconds = 4;
+  // La duree (`insurance_duration_secs`) est lue server-side depuis la config
+  // guild — plus transmise par le bot.
+  reserved 4;
+  reserved "duration_seconds";
   // Niveau du joueur (cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 :
   // 2 emplacements d'assurance au lieu d'1). 0 = retrocompat (= 1 slot).
   int32 level = 5;

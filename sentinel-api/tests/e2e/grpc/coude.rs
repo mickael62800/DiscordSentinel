@@ -193,7 +193,7 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
     ) -> Result<Player, DomainError> {
         unimplemented!()
     }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> {
+    async fn reset_stats(&self, _: &str, _: &str) -> Result<Player, DomainError> {
         unimplemented!()
     }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> {
@@ -693,8 +693,6 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
         _: &str,
         _: &str,
         _: i64,
-        _: f64,
-        _: i64,
     ) -> Result<sentinel_api::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
         unimplemented!()
     }
@@ -791,7 +789,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
         unimplemented!()
     }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<bool, DomainError> {
         unimplemented!()
     }
     async fn get_active_insurance(

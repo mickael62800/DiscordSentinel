@@ -69,47 +69,40 @@ impl ApiClient {
         Ok(r.value)
     }
 
+    /// La duree (`insurance_duration_secs`) est lue server-side depuis la
+    /// config guild — plus transmise par le bot.
     pub async fn buy_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
-        duration_seconds: i64,
         level: i32,
     ) -> Result<(), String> {
         let req = proto_coude::BuyInsuranceRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
             is_scam,
-            duration_seconds,
             level,
         };
         crate::grpc_call!(@unit self.grpc, coude_inventory, buy_insurance, req)
     }
 
-    /// Phase 2 #3 audit : RNG scam decide cote API. Le bot envoie le taux
-    /// + duree + level, l'API roule + persiste + retourne `is_scam`.
+    /// Phase 2 #3 audit : RNG scam decide cote API. Le taux de scam et la
+    /// duree (`insurance_scam_rate`, `insurance_duration_secs`) sont lus
+    /// server-side ; le bot n'envoie plus que le niveau. L'API roule +
+    /// persiste + retourne `is_scam`.
     pub async fn buy_insurance_with_roll(
         &self,
         guild_id: &str,
         user_id: &str,
-        scam_rate_pct: u32,
-        duration_seconds: i64,
         level: i32,
     ) -> Result<BuyInsuranceResolved, String> {
         #[derive(serde::Serialize)]
         struct Body<'a> {
             user_id: &'a str,
-            scam_rate_pct: u32,
-            duration_seconds: i64,
             level: i32,
         }
-        let body = Body {
-            user_id,
-            scam_rate_pct,
-            duration_seconds,
-            level,
-        };
+        let body = Body { user_id, level };
         self.base
             .post_json(
                 &format!("/api/coude/{guild_id}/insurance/buy-with-roll"),

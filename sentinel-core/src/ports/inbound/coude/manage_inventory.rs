@@ -92,12 +92,13 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
     // ── Assurances ──
     /// Retourne `true` si l'assurance a ete creee, `false` si une assurance
     /// active existait deja (dans quel cas l'appelant doit rembourser).
+    /// La duree (`insurance_duration_secs`) est lue server-side depuis la
+    /// config guild — plus transmise par l'appelant.
     async fn buy_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
-        duration_seconds: i64,
     ) -> Result<bool, DomainError>;
 
     /// Variante de `buy_insurance` avec niveau du joueur passe explicitement
@@ -108,16 +109,15 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
-        duration_seconds: i64,
         _level: i32,
     ) -> Result<bool, DomainError> {
-        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds)
-            .await
+        self.buy_insurance(guild_id, user_id, is_scam).await
     }
 
     /// Phase 2 #3 audit : decide cote API si l'assurance est un scam
-    /// (`gen_range(1..=100) <= scam_rate_pct`) et persiste avec le verdict.
-    /// Le bot ne fait plus de RNG.
+    /// (`gen_range(1..=100) <= insurance_scam_rate`) et persiste avec le
+    /// verdict. Le bot ne fait plus de RNG. Le taux de scam et la duree
+    /// (`insurance_scam_rate`, `insurance_duration_secs`) sont lus server-side.
     ///
     /// Retourne `(created, is_scam)`. `created == false` => assurance active
     /// existait deja, le caller doit rembourser.
@@ -126,8 +126,6 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         &self,
         _guild_id: &str,
         _user_id: &str,
-        _scam_rate_pct: u32,
-        _duration_seconds: i64,
         _level: i32,
     ) -> Result<(bool, bool), DomainError> {
         Err(DomainError::NotImplemented(

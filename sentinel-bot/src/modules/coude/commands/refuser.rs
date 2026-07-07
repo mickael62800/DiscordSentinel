@@ -67,14 +67,30 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Penalite depuis la config
-    let penalty = (combat_record.mise as f64 * config.refusal_penalty()).max(1.0) as i64;
-
-    // Tirage du shame_msg cote API (catalogue editable runtime).
+    // Tirage du shame_msg cote API (catalogue editable runtime). Fait avant
+    // le debit pour ne rien prelever si l'API est indisponible.
     let shame_msg = match api.random_flavor("combat_refused", "fr").await {
         Ok(Some(s)) => s,
         Ok(None) | Err(_) => {
             reply_ephemeral(ctx, component, "API indispo, veuillez reessayer plus tard.").await;
+            return;
+        }
+    };
+
+    // Penalite calculee (depuis la mise) ET debitee server-side de facon
+    // atomique : le bot ne calcule plus le barème (taux `refusal_penalty` lu
+    // cote API) ni ne pilote le debit en deux appels separes.
+    let penalty = match api
+        .apply_refusal_penalty(
+            &combat_record.guild_id,
+            &combat_record.defender_id,
+            combat_record.mise,
+        )
+        .await
+    {
+        Ok(o) => o.penalty,
+        Err(e) => {
+            reply_ephemeral(ctx, component, &e).await;
             return;
         }
     };
@@ -84,6 +100,8 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         combat_record.defender_id, shame_msg, penalty
     );
 
+    // Enregistre la resolution du combat (le debit est deja fait ci-dessus ;
+    // `coins_transferred` sert au bookkeeping/historique du combat).
     if let Err(e) = api
         .resolve_combat(
             &combat_id,
@@ -101,17 +119,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Retirer les coins et incrementer la lachete
-    if let Err(e) = api
-        .update_player_coins(
-            &combat_record.guild_id,
-            &combat_record.defender_id,
-            -penalty,
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec API update_player_coins refus");
-    }
+    // Incrementer la lachete
     let cowardice = api
         .increment_cowardice(&combat_record.guild_id, &combat_record.defender_id)
         .await

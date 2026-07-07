@@ -40,8 +40,6 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
         _d: &str,
         _t: &str,
         _a: i64,
-        _r: f64,
-        _m: i64,
     ) -> Result<crate::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
         unimplemented!()
     }

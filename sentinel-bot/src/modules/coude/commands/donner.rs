@@ -213,14 +213,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         // appliques **cote API** (gift_coins). Le bot ne calcule plus la regle.
         // L'API retourne (received, tax, taunts).
         let (received, tax, transfer_taunts) = match api
-            .gift_coins(
-                &guild_id,
-                &donor_id,
-                &target_id_str,
-                amount,
-                config.gift_tax_rate(),
-                config.gift_min_coins_after(),
-            )
+            .gift_coins(&guild_id, &donor_id, &target_id_str, amount)
             .await
         {
             Ok(r) => r,

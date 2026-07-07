@@ -136,7 +136,7 @@ pub async fn buy_insurance(
 ) -> Result<StatusCode, ApiError> {
     let inserted = state
         .coude_inventory_uc
-        .buy_insurance(&guild_id, &dto.user_id, dto.is_scam, dto.duration_seconds)
+        .buy_insurance(&guild_id, &dto.user_id, dto.is_scam)
         .await?;
     if !inserted {
         return Err(ApiError(
@@ -151,8 +151,6 @@ pub async fn buy_insurance(
 #[derive(Debug, serde::Deserialize)]
 pub struct BuyInsuranceWithRollDto {
     pub user_id: UserId,
-    pub scam_rate_pct: u32,
-    pub duration_seconds: i64,
     pub level: i32,
 }
 
@@ -164,9 +162,10 @@ pub struct BuyInsuranceResolvedDto {
 
 /// POST /api/coude/{guild_id}/insurance/buy-with-roll
 ///
-/// Phase 2 #3 audit : RNG `scam` migre cote API. Le bot envoie le taux
-/// de scam (config guild) et le niveau, l'API roule + persiste + retourne
-/// le verdict.
+/// Phase 2 #3 audit : RNG `scam` migre cote API. Le taux de scam et la duree
+/// (`insurance_scam_rate`, `insurance_duration_secs`) sont lus server-side ;
+/// le bot n'envoie plus que le niveau. L'API roule + persiste + retourne le
+/// verdict.
 pub async fn buy_insurance_with_roll(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
@@ -174,13 +173,7 @@ pub async fn buy_insurance_with_roll(
 ) -> Result<Json<BuyInsuranceResolvedDto>, ApiError> {
     let (created, is_scam) = state
         .coude_inventory_uc
-        .buy_insurance_with_scam_roll(
-            &guild_id,
-            &dto.user_id,
-            dto.scam_rate_pct,
-            dto.duration_seconds,
-            dto.level,
-        )
+        .buy_insurance_with_scam_roll(&guild_id, &dto.user_id, dto.level)
         .await?;
     if !created {
         return Err(ApiError(

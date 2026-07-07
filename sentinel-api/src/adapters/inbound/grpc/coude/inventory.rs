@@ -259,13 +259,7 @@ impl CoudeInventoryService for InventoryGrpc {
         let req = request.into_inner();
         let inserted = self
             .uc
-            .buy_insurance_for_level(
-                &req.guild_id,
-                &req.user_id,
-                req.is_scam,
-                req.duration_seconds,
-                req.level,
-            )
+            .buy_insurance_for_level(&req.guild_id, &req.user_id, req.is_scam, req.level)
             .await
             .map_err(domain_to_status)?;
         if !inserted {

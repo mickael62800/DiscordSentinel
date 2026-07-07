@@ -84,12 +84,9 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
         stat: CombatStat,
     ) -> Result<Player, DomainError>;
 
-    async fn reset_stats(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        cost: i64,
-    ) -> Result<Player, DomainError>;
+    /// Reset atomique des stats. Le cout (`reset_stats_cost`) est lu
+    /// server-side depuis la config guild — plus transmis par l'appelant.
+    async fn reset_stats(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError>;
 
     // ── Compteurs combat ──
 

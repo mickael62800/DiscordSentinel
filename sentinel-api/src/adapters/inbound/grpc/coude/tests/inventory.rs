@@ -83,7 +83,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.claim_return.lock().unwrap())
     }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<bool, DomainError> {
         Ok(*self.buy_insurance_return.lock().unwrap())
     }
     async fn get_active_insurance(
@@ -422,7 +422,6 @@ async fn buy_insurance_returns_empty_on_success() {
             guild_id: "g".into(),
             user_id: "u".into(),
             is_scam: false,
-            duration_seconds: 86400,
             level: 0,
         }))
         .await
@@ -443,7 +442,6 @@ async fn buy_insurance_already_active_returns_already_exists() {
             guild_id: "g".into(),
             user_id: "u".into(),
             is_scam: false,
-            duration_seconds: 86400,
             level: 0,
         }))
         .await

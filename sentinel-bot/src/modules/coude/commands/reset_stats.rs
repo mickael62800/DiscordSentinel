@@ -70,11 +70,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Reset atomique cote API : deduit le cout, remet ATK/DEF a 0,
     // et restitue les points dans stat_points en une seule UPDATE.
     if let Err(e) = api
-        .reset_stats(
-            &guild_id,
-            &command.user.id.to_string(),
-            config.reset_stats_cost(),
-        )
+        .reset_stats(&guild_id, &command.user.id.to_string())
         .await
     {
         reply_api_err(ctx, command, e).await;

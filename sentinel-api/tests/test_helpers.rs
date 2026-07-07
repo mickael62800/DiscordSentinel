@@ -1360,7 +1360,7 @@ impl manage_inventory::ManageCoudeInventoryUseCase for StubCoudeInventory {
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
         unimplemented!()
     }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<bool, DomainError> {
         unimplemented!()
     }
     async fn get_active_insurance(
@@ -1401,8 +1401,6 @@ impl manage_economy::ManageCoudeEconomyUseCase for StubCoudeEconomy {
         _: &str,
         _: &str,
         _: &str,
-        _: i64,
-        _: f64,
         _: i64,
     ) -> Result<manage_economy::GiftOutcome, DomainError> {
         unimplemented!()
@@ -1542,7 +1540,7 @@ impl manage_players::ManageCoudePlayersUseCase for StubCoudePlayers {
     ) -> Result<Player, DomainError> {
         unimplemented!()
     }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> {
+    async fn reset_stats(&self, _: &str, _: &str) -> Result<Player, DomainError> {
         unimplemented!()
     }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> {

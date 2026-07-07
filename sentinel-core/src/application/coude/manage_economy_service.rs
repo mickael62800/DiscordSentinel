@@ -80,6 +80,19 @@ impl ManageCoudeEconomyService {
         }
     }
 
+    /// Lit une cle de config guild en ratio de pourcentage (stockee en
+    /// entier, ex. 10 => 0.10). Defaut si repo absent/cle absente.
+    async fn config_percent_ratio(&self, guild_id: &str, key: &str, default_pct: i64) -> f64 {
+        match &self.bot_config_repo {
+            Some(repo) => {
+                crate::application::coude::guild_settings::GuildSettings::load(&**repo, guild_id)
+                    .await
+                    .get_percent_ratio(key, default_pct)
+            }
+            None => default_pct as f64 / 100.0,
+        }
+    }
+
     async fn leaky_wallet_fee(&self, guild_id: &str) -> i64 {
         match &self.bot_config_repo {
             Some(repo) => {
@@ -227,8 +240,6 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         donor_id: &str,
         target_id: &str,
         amount: i64,
-        tax_rate: f64,
-        min_coins_after: i64,
     ) -> Result<GiftOutcome, DomainError> {
         require_positive(amount)?;
         if donor_id == target_id {
@@ -236,6 +247,13 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
                 "Impossible de se donner a soi-meme".into(),
             ));
         }
+
+        // Invariants economiques lus server-side (config guild, memes cles et
+        // defauts que l'ancien bot : `gift_tax_percent`=10, `gift_min_coins_after`=50).
+        let tax_rate = self
+            .config_percent_ratio(guild_id, "gift_tax_percent", 10)
+            .await;
+        let min_coins_after = self.config_i64(guild_id, "gift_min_coins_after", 50).await;
 
         // Regle metier : conserver un solde minimum apres le don (validee
         // cote serveur, plus dans le bot).
@@ -565,6 +583,53 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
                     .await
                 {
                     tracing::warn!(error = %e, user_id, "Echec record total_lost penalite annulation");
+                }
+            }
+        }
+
+        Ok(CancelPenaltyOutcome {
+            penalty: effective,
+            penalty_percent: penalty_pct_int as i32,
+            new_balance: balance - effective,
+        })
+    }
+
+    async fn apply_refusal_penalty(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        mise: i64,
+    ) -> Result<crate::ports::inbound::coude::manage_economy::CancelPenaltyOutcome, DomainError>
+    {
+        use crate::ports::inbound::coude::manage_economy::CancelPenaltyOutcome;
+
+        // Pourcentage lu server-side (stocke en entier, defaut 20%).
+        let penalty_pct_int = self.config_i64(guild_id, "refusal_penalty", 20).await;
+        let penalty_pct = penalty_pct_int as f64 / 100.0;
+
+        let balance = self.wallet_uc.get_balance(guild_id, user_id).await?;
+        // Mirror du calcul bot : max(1, mise * pct), clamp au solde reel pour
+        // pouvoir reellement debiter de facon atomique.
+        let nominal = (mise.max(0) as f64 * penalty_pct).max(1.0) as i64;
+        let effective = nominal.min(balance).max(0);
+
+        if effective > 0 {
+            self.wallet_uc
+                .debit(
+                    guild_id,
+                    user_id,
+                    effective,
+                    "coude_refusal_penalty",
+                    "Penalite refus de combat",
+                )
+                .await?;
+            // Compteur stats total_lost (best-effort, hors wallet).
+            if let Some(player_repo) = &self.player_repo {
+                if let Err(e) = player_repo
+                    .record_coins_lost(guild_id, user_id, effective)
+                    .await
+                {
+                    tracing::warn!(error = %e, user_id, "Echec record total_lost penalite refus");
                 }
             }
         }

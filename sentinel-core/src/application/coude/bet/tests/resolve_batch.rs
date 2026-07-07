@@ -512,7 +512,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.primes_amount.lock().unwrap())
     }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<bool, DomainError> {
         Ok(true)
     }
     async fn get_active_insurance(

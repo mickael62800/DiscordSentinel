@@ -112,8 +112,6 @@ impl ManageCoudeEconomyUseCase for MockEconomy {
         _: &str,
         _: &str,
         _: i64,
-        _: f64,
-        _: i64,
     ) -> Result<sentinel_api::ports::inbound::coude::manage_economy::GiftOutcome, DomainError> {
         unimplemented!()
     }

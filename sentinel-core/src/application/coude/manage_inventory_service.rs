@@ -41,6 +41,18 @@ impl ManageCoudeInventoryService {
         self.player_repo = Some(repo);
         self
     }
+
+    /// Duree d'une assurance lue server-side (config guild
+    /// `insurance_duration_secs`, defaut 3600 = 1h — meme cle/defaut que
+    /// l'ancien bot).
+    async fn insurance_duration_secs(&self, guild_id: &str) -> i64 {
+        match &self.bot_config_repo {
+            Some(repo) => GuildSettings::load(&**repo, guild_id)
+                .await
+                .get_i64("insurance_duration_secs", 3600),
+            None => 3600,
+        }
+    }
 }
 
 #[async_trait]
@@ -167,8 +179,8 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
-        duration_seconds: i64,
     ) -> Result<bool, DomainError> {
+        let duration_seconds = self.insurance_duration_secs(guild_id).await;
         self.repo
             .buy_insurance(guild_id, user_id, is_scam, duration_seconds)
             .await
@@ -179,9 +191,10 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
-        duration_seconds: i64,
         level: i32,
     ) -> Result<bool, DomainError> {
+        // Duree lue server-side (config guild `insurance_duration_secs`).
+        let duration_seconds = self.insurance_duration_secs(guild_id).await;
         // Cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 (configurable via
         // `assurance_extra_slot_level`, default 5).
         let unlock_level = match &self.bot_config_repo {
@@ -200,21 +213,26 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         &self,
         guild_id: &str,
         user_id: &str,
-        scam_rate_pct: u32,
-        duration_seconds: i64,
         level: i32,
     ) -> Result<(bool, bool), DomainError> {
+        // Taux de scam et duree lus server-side (config guild
+        // `insurance_scam_rate`=5, `insurance_duration_secs`=3600).
+        let (scam_rate_pct, duration_seconds, unlock_level) = match &self.bot_config_repo {
+            Some(repo) => {
+                let s = GuildSettings::load(&**repo, guild_id).await;
+                (
+                    s.get_i64("insurance_scam_rate", 5).clamp(0, 100) as u32,
+                    s.get_i64("insurance_duration_secs", 3600),
+                    s.get_i32("assurance_extra_slot_level", 5),
+                )
+            }
+            None => (5, 3600, 5),
+        };
         // Roll RNG cote serveur. Phase 2 #3 audit : le bot ne decide plus.
         let is_scam = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
             rng.gen_range(1..=100) <= scam_rate_pct.min(100)
-        };
-        let unlock_level = match &self.bot_config_repo {
-            Some(repo) => GuildSettings::load(&**repo, guild_id)
-                .await
-                .get_i32("assurance_extra_slot_level", 5),
-            None => 5,
         };
         let max_slots = if level >= unlock_level { 2 } else { 1 };
         let created = self

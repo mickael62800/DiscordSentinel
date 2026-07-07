@@ -354,7 +354,8 @@ async fn buy_insurance_delegates_args() {
     let repo = Arc::new(RichMockRepo::default());
     *repo.buy_insurance_return.lock().unwrap() = true;
     let svc = ManageCoudeInventoryService::new(repo.clone());
-    assert!(svc.buy_insurance("g", "u", true, 3600).await.unwrap());
+    // Duree lue server-side : sans config repo => defaut 3600 passe au repo.
+    assert!(svc.buy_insurance("g", "u", true).await.unwrap());
     assert_eq!(
         repo.buy_calls.lock().unwrap()[0],
         ("g".into(), "u".into(), true, 3600)

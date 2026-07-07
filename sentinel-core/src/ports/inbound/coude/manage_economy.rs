@@ -69,7 +69,9 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
     ) -> Result<Vec<TauntEvent>, DomainError>;
 
     /// Don de coins avec taxe — la regle vit cote serveur (plus dans le bot).
-    /// Valide le solde minimum a conserver (`balance - amount >= min_coins_after`),
+    /// Le taux de taxe (`gift_tax_percent`) et le solde minimum a conserver
+    /// (`gift_min_coins_after`) sont lus server-side depuis la config guild.
+    /// Valide le solde minimum (`balance - amount >= min_coins_after`),
     /// calcule `tax = ceil(amount * tax_rate)` et `received = amount - tax`,
     /// transfere `received` au destinataire (atomique) puis debite la taxe a
     /// l'emetteur. Retourne `GiftOutcome`. La taxe est a deposer en cashbox
@@ -80,8 +82,6 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
         donor_id: &str,
         target_id: &str,
         amount: i64,
-        tax_rate: f64,
-        min_coins_after: i64,
     ) -> Result<GiftOutcome, DomainError>;
 
     /// Vol reussi : debite la victime et credite le voleur de min(amount,
@@ -164,5 +164,20 @@ pub trait ManageCoudeEconomyUseCase: Send + Sync {
         _user_id: &str,
     ) -> Result<CancelPenaltyOutcome, DomainError> {
         unimplemented!("apply_cancel_penalty not implemented")
+    }
+
+    /// Applique la penalite de refus de combat : lit le pourcentage
+    /// (`refusal_penalty`, defaut 20) server-side, calcule `max(1, mise * pct)`,
+    /// DEBITE reellement le wallet (atomique, clamp au solde) et met a jour
+    /// `total_lost`. `mise` est la mise du combat refuse (vrai input, pas un
+    /// invariant de config). Retourne le montant preleve + le solde restant.
+    /// Default `unimplemented!()`.
+    async fn apply_refusal_penalty(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _mise: i64,
+    ) -> Result<CancelPenaltyOutcome, DomainError> {
+        unimplemented!("apply_refusal_penalty not implemented")
     }
 }

@@ -102,7 +102,7 @@ impl ManageCoudeInventoryUseCase for MockInventory {
             .push((g.into(), t.into(), c.into(), n.into()));
         Ok(750)
     }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<bool, DomainError> {
         let r = *self.buy_insurance_inserted.lock().unwrap();
         *self.insurance_bought.lock().unwrap() = r;
         Ok(r)

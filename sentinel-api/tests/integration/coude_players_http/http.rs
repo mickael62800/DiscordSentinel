@@ -66,7 +66,7 @@ struct MockPlayers {
     xp_added: Mutex<Vec<(String, String, i64)>>,
     class_updates: Mutex<Vec<(String, String, String)>>,
     stat_spends: Mutex<Vec<(String, String, CombatStat)>>,
-    reset_stats: Mutex<Vec<(String, String, i64)>>,
+    reset_stats: Mutex<Vec<(String, String)>>,
     wins: Mutex<Vec<(String, String, i64, i64)>>,
     losses: Mutex<Vec<(String, String, i64)>>,
     draws: Mutex<Vec<(String, String, i64)>>,
@@ -145,11 +145,8 @@ impl ManageCoudePlayersUseCase for MockPlayers {
             .push((g.into(), u.into(), s));
         Ok(sample_player(g, u))
     }
-    async fn reset_stats(&self, g: &str, u: &str, cost: i64) -> Result<Player, DomainError> {
-        self.reset_stats
-            .lock()
-            .unwrap()
-            .push((g.into(), u.into(), cost));
+    async fn reset_stats(&self, g: &str, u: &str) -> Result<Player, DomainError> {
+        self.reset_stats.lock().unwrap().push((g.into(), u.into()));
         Ok(sample_player(g, u))
     }
     async fn record_win(&self, g: &str, u: &str, e: i64, s: i64) -> Result<(), DomainError> {
@@ -470,19 +467,20 @@ async fn spend_stat_invalid_returns_422() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn reset_stats_forwards_cost() {
+async fn reset_stats_forwards_to_uc() {
     let p = Arc::new(MockPlayers::default());
     let app = router::build_for_test(state_with(p.clone(), Arc::new(MockWallet::default())));
-    let body = serde_json::json!({ "cost": 300 });
+    // Le cout est lu server-side : le bot n'envoie plus de body.
     let (s, _) = req_json(
         app,
         "POST",
         "/api/coude/999/players/111/reset-stats",
-        Some(body),
+        Some(serde_json::json!({})),
     )
     .await;
     assert_eq!(s, StatusCode::OK);
-    assert_eq!(p.reset_stats.lock().unwrap()[0].2, 300);
+    let calls = p.reset_stats.lock().unwrap();
+    assert_eq!(calls[0], ("999".into(), "111".into()));
 }
 
 // ── Stats recording ──

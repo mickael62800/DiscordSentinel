@@ -43,14 +43,7 @@ impl CoudeEconomyService for EconomyGrpc {
         let req = request.into_inner();
         let outcome = self
             .uc
-            .gift_coins(
-                &req.guild_id,
-                &req.donor_id,
-                &req.target_id,
-                req.amount,
-                req.tax_rate,
-                req.min_coins_after,
-            )
+            .gift_coins(&req.guild_id, &req.donor_id, &req.target_id, req.amount)
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::GiftCoinsResponse {
@@ -212,6 +205,23 @@ impl CoudeEconomyService for EconomyGrpc {
         let outcome = self
             .uc
             .apply_cancel_penalty(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::CancelPenaltyResponse {
+            penalty: outcome.penalty,
+            penalty_percent: outcome.penalty_percent,
+            new_balance: outcome.new_balance,
+        }))
+    }
+
+    async fn apply_refusal_penalty(
+        &self,
+        request: Request<proto::RefusalPenaltyRequest>,
+    ) -> Result<Response<proto::CancelPenaltyResponse>, Status> {
+        let req = request.into_inner();
+        let outcome = self
+            .uc
+            .apply_refusal_penalty(&req.guild_id, &req.user_id, req.mise)
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::CancelPenaltyResponse {
