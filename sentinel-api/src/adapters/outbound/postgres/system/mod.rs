@@ -12,4 +12,5 @@ pub mod quarantine_repository;
 pub mod rbac_repository;
 pub mod security_audit_repository;
 pub mod security_log_repository;
+pub mod server_event_repository;
 pub mod ticket_repository;

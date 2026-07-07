@@ -83,7 +83,7 @@ fn audit_docker(
         target = target,
         "docker admin action"
     );
-    let pool = state.pg_pool.clone();
+    let uc = state.server_events_uc.clone();
     let actor_owned = actor.clone();
     let action_owned = format!("docker.{}", action);
     let target_owned = target.to_string();
@@ -95,7 +95,7 @@ fn audit_docker(
     let sev_owned = severity.to_string();
     tokio::spawn(async move {
         crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
-            &pool,
+            &uc,
             &actor_owned,
             None,
             &action_owned,

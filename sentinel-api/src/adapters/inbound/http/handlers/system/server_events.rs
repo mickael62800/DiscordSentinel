@@ -1,9 +1,12 @@
 //! Audit serveur : actions admin sur l'infra (vs audit_logs = events Discord).
 //!
-//! Helper `record_server_event` insere une row dans la table `server_events`.
-//! Endpoint `GET /api/security/server-events` lit la table avec filtres.
+//! Adaptateur ENTRANT mince : le SQL vit dans `ServerEventRepository`, le bornage
+//! des filtres dans `ManageServerEventsUseCase`. Ici : parse -> RBAC -> use case.
+//! Helper `record_server_event` : ecriture best-effort (log l'erreur sans bloquer
+//! l'action principale de l'appelant).
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
+use std::sync::Arc;
+
 use axum::extract::Query;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -11,13 +14,13 @@ use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
-use sqlx::PgPool;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
 use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
+use crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
@@ -39,15 +42,15 @@ fn gate_admin(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result
     require_role(ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))
 }
 
-/// Insere un event serveur en BDD. Best-effort : si echec DB, on log l'erreur
-/// mais on ne bloque pas l'action principale qui appelle ce helper.
+/// Insere un event serveur via le use case. Best-effort : si echec, on log
+/// l'erreur mais on ne bloque pas l'action principale qui appelle ce helper.
 ///
 /// Severities :
 /// - "info"     : action normale d'admin (start container, cleanup logs)
 /// - "warn"     : action a surveiller (force prune, role grant a un nouveau)
 /// - "critical" : action destructive importante (delete volume, prune system)
 pub async fn record_server_event(
-    pool: &PgPool,
+    uc: &Arc<dyn ManageServerEventsUseCase>,
     actor: &str,
     actor_name: Option<&str>,
     action: &str,
@@ -55,19 +58,10 @@ pub async fn record_server_event(
     severity: &str,
     details: serde_json::Value,
 ) {
-    let res = sqlx::query(
-        "INSERT INTO server_events (actor, actor_name, action, target, severity, details) \
-         VALUES ($1, $2, $3, $4, $5, $6)",
-    )
-    .bind(actor)
-    .bind(actor_name)
-    .bind(action)
-    .bind(target)
-    .bind(severity)
-    .bind(&details)
-    .execute(pool)
-    .await;
-    if let Err(e) = res {
+    if let Err(e) = uc
+        .record(actor, actor_name, action, target, severity, details)
+        .await
+    {
         tracing::warn!(error = %e, action = action, "Echec insert server_events");
     }
 }
@@ -99,65 +93,24 @@ pub async fn list_server_events(
     Query(q): Query<ServerEventsQuery>,
 ) -> Result<Json<Vec<ServerEventDto>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
-    let mut sql = String::from(
-        "SELECT id::text, \
-                to_char(timestamp, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), \
-                actor, actor_name, action, target, severity, details \
-         FROM server_events WHERE 1=1",
-    );
-    let mut idx = 1;
-    if q.action_prefix.is_some() {
-        sql.push_str(&format!(" AND action LIKE ${idx} || '%'"));
-        idx += 1;
-    }
-    if q.severity.is_some() {
-        sql.push_str(&format!(" AND severity = ${idx}"));
-        idx += 1;
-    }
-    sql.push_str(&format!(" ORDER BY timestamp DESC LIMIT ${idx}"));
+    let events = state
+        .server_events_uc
+        .list(q.action_prefix, q.severity, q.limit)
+        .await?;
 
-    let mut q_builder = sqlx::query_as::<
-        _,
-        (
-            String,
-            String,
-            Option<String>,
-            Option<String>,
-            String,
-            Option<String>,
-            String,
-            serde_json::Value,
-        ),
-    >(&sql);
-    if let Some(p) = &q.action_prefix {
-        q_builder = q_builder.bind(p);
-    }
-    if let Some(s) = &q.severity {
-        q_builder = q_builder.bind(s);
-    }
-    q_builder = q_builder.bind(limit);
-
-    let rows = q_builder
-        .fetch_all(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("query"))?;
-
-    let out = rows
+    let out = events
         .into_iter()
-        .map(
-            |(id, ts, actor, actor_name, action, target, severity, details)| ServerEventDto {
-                id,
-                timestamp: ts,
-                actor,
-                actor_name,
-                action,
-                target,
-                severity,
-                details,
-            },
-        )
+        .map(|e| ServerEventDto {
+            id: e.id,
+            timestamp: e.timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string(),
+            actor: e.actor,
+            actor_name: e.actor_name,
+            action: e.action,
+            target: e.target,
+            severity: e.severity,
+            details: e.details,
+        })
         .collect();
     Ok(Json(out))
 }

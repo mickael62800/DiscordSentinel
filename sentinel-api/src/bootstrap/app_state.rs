@@ -566,6 +566,15 @@ pub async fn build_app_state(
             lockdown_repo,
         ));
 
+    // Audit serveur (server_events) : repo Postgres + use case (bornage des
+    // filtres de lecture). Le handler ne fait que parse/RBAC/map.
+    let server_event_repo: Arc<dyn crate::ports::outbound::system::server_event_repository::ServerEventRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::server_event_repository::PgServerEventRepository::new(pg_pool.clone()));
+    let server_events_uc: Arc<dyn crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase> =
+        Arc::new(sentinel_core::application::system::manage_server_events_service::ManageServerEventsService::new(
+            server_event_repo,
+        ));
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -1176,6 +1185,7 @@ pub async fn build_app_state(
         invitations_uc,
         quarantine_uc,
         lockdown_uc,
+        server_events_uc,
         security_uc,
         moderation_uc,
         modstats_uc,

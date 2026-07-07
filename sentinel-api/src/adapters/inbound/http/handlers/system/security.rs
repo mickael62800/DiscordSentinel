@@ -285,7 +285,7 @@ pub async fn ban_ip(
 
     let ip = dto.ip.trim();
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
-        &state.pg_pool,
+        &state.server_events_uc,
         &actor,
         None,
         "security.ban_ip",
@@ -326,7 +326,7 @@ pub async fn unban_ip(
 
     let ip = dto.ip.trim();
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
-        &state.pg_pool,
+        &state.server_events_uc,
         &actor,
         None,
         "security.unban_ip",
@@ -914,7 +914,7 @@ pub async fn cleanup_security_logs(
         "security cleanup executed"
     );
     crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
-        &state.pg_pool,
+        &state.server_events_uc,
         actor,
         None,
         "security.cleanup",

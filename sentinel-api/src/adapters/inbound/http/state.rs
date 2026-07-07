@@ -137,6 +137,8 @@ pub struct AppState {
         Arc<dyn crate::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase>,
     pub lockdown_uc:
         Arc<dyn crate::ports::inbound::system::manage_lockdown::ManageLockdownUseCase>,
+    pub server_events_uc:
+        Arc<dyn crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase>,
     /// CRUD RBAC applicatif (endpoints owner). Nomme `rbac_admin_uc` pour ne pas
     /// confondre avec le middleware RBAC (`middleware/rbac.rs`), qui a sa propre
     /// logique de resolution de role.

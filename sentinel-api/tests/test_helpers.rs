@@ -3425,6 +3425,35 @@ impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCa
     }
 }
 
+pub struct StubServerEvents;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_server_events::ManageServerEventsUseCase
+    for StubServerEvents
+{
+    async fn record(
+        &self,
+        _: &str,
+        _: Option<&str>,
+        _: &str,
+        _: Option<&str>,
+        _: &str,
+        _: serde_json::Value,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list(
+        &self,
+        _: Option<String>,
+        _: Option<String>,
+        _: Option<i64>,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::server_event::ServerEvent>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+}
+
 pub struct StubRbac;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for StubRbac {
@@ -4114,6 +4143,7 @@ fn base_state() -> AppState {
         oauth_uc: Arc::new(StubOAuth),
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
+        server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),
         tournaments_uc: Arc::new(StubTournaments),
         sursis_uc: Arc::new(StubSursis),
