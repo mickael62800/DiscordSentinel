@@ -1,4 +1,5 @@
 pub mod manage_announcements_service;
+pub mod manage_bump_service;
 pub mod manage_confessions_service;
 pub mod manage_levels_service;
 pub mod manage_members_service;

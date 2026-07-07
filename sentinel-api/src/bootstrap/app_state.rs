@@ -358,6 +358,22 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
         ));
 
+    // Bump : repo Postgres + use case (recompense graduee, cooldown atomique,
+    // credit wallet, seuil VIP). Toute la regle metier vit dans le service.
+    let bump_repo = Arc::new(
+        crate::adapters::outbound::postgres::community::bump_repository::PgBumpRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let bump_uc: Arc<dyn crate::ports::inbound::community::manage_bump::ManageBumpUseCase> =
+        Arc::new(
+            crate::application::community::manage_bump_service::ManageBumpService::new(
+                bot_config_repo.clone(),
+                bump_repo,
+                wallet_uc.clone(),
+            ),
+        );
+
     // Tamagotchi : repo + use case (debite les coins via le wallet partage).
     let pet_repo: Arc<dyn crate::ports::outbound::tamagotchi::pet_repository::PetRepository> =
         Arc::new(
@@ -1027,6 +1043,7 @@ pub async fn build_app_state(
         confessions_uc,
         role_panels_uc,
         notes_uc,
+        bump_uc,
         reminders_uc,
         strikes_uc,
         moderation_copilot_uc,

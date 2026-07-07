@@ -1,5 +1,6 @@
 pub mod age_ban;
 pub mod announcement;
+pub mod bump;
 pub mod confession;
 pub mod daily_activity;
 pub mod guild_member;

@@ -13,6 +13,7 @@ use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::community::manage_bump::ManageBumpUseCase;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
@@ -58,6 +59,7 @@ pub struct AppState {
     pub confessions_uc: Arc<dyn crate::ports::inbound::community::manage_confessions::ManageConfessionsUseCase>,
     pub role_panels_uc: Arc<dyn ManageRolePanelsUseCase>,
     pub notes_uc: Arc<dyn ManageNotesUseCase>,
+    pub bump_uc: Arc<dyn ManageBumpUseCase>,
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,
     pub strikes_uc: Arc<dyn ManageStrikesUseCase>,
     pub moderation_copilot_uc:
