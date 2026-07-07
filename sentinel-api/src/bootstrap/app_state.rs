@@ -222,6 +222,29 @@ pub async fn build_app_state(
     ));
     let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
 
+    // Detection d'anomalie de moderation (mass ban/delete/role). Le CALCUL
+    // (fenetre glissante) vit dans un adapter memoire serveur ; la DECISION
+    // (seuil + reset) dans le service coeur. Le bot n'agrege/ne decide plus.
+    let anomaly_max_buffer = std::env::var("ANOMALY_DETECTOR_MAX_BUFFER_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(500usize);
+    let anomaly_eviction_target = std::env::var("ANOMALY_DETECTOR_EVICTION_TARGET")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100usize);
+    let anomaly_counter = Arc::new(
+        crate::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(
+            anomaly_max_buffer,
+            anomaly_eviction_target,
+        ),
+    );
+    let detect_anomaly_uc = Arc::new(
+        sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
+            anomaly_counter,
+        ),
+    );
+
     let user_activity_repo: Arc<
         dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository,
     > = Arc::new(PgUserActivityRepository::new(pg_pool.clone()));
@@ -1260,6 +1283,7 @@ pub async fn build_app_state(
         voice_channels_uc,
         watched_users_uc,
         audit_logs_uc,
+        detect_anomaly_uc,
         snapshots_uc,
         levels_uc,
         announcements_uc,

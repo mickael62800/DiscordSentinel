@@ -90,4 +90,38 @@ impl ApiClient {
         let _: serde_json::Value = self.base.post_json("/api/audit-logs", event).await?;
         Ok(())
     }
+
+    /// Envoie un evenement de moderation a l'API, qui agrege sur sa fenetre
+    /// glissante serveur, decide s'il y a anomalie et renvoie l'alerte a
+    /// afficher le cas echeant. La DECISION est server-side : le bot ne fait
+    /// qu'afficher l'embed URGENT si `alert` est present.
+    ///
+    /// `category` : "ban" | "kick" | "delete" | "role_change".
+    /// `increment` : nombre d'evenements (> 1 pour une purge bulk).
+    pub async fn detect_moderation_anomaly(
+        &self,
+        guild_id: &str,
+        category: &str,
+        increment: usize,
+        window_secs: u64,
+        thresholds: &super::anomaly::AnomalyThresholds,
+    ) -> Result<Option<super::anomaly::AnomalyAlert>, String> {
+        let payload = serde_json::json!({
+            "guild_id": guild_id,
+            "category": category,
+            "increment": increment,
+            "window_secs": window_secs,
+            "mass_ban": thresholds.mass_ban,
+            "mass_delete": thresholds.mass_delete,
+            "mass_role_change": thresholds.mass_role_change,
+        });
+        let resp: DetectAnomalyResponse =
+            self.base.post_json("/api/moderation-anomaly", &payload).await?;
+        Ok(resp.alert)
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+struct DetectAnomalyResponse {
+    alert: Option<super::anomaly::AnomalyAlert>,
 }

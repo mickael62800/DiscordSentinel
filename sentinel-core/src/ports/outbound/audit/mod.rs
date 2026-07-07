@@ -1,6 +1,7 @@
 pub mod analytics_repository;
 pub mod audit_log_repository;
 pub mod discord_action_message_repository;
+pub mod moderation_anomaly_counter;
 pub mod modstats_repository;
 pub mod security_event_repository;
 pub mod snapshot_repository;

@@ -4249,6 +4249,11 @@ fn base_state() -> AppState {
         voice_channels_uc: Arc::new(StubVoiceChannels),
         watched_users_uc: Arc::new(StubWatchedUsers),
         audit_logs_uc: Arc::new(StubAuditLogs),
+        detect_anomaly_uc: Arc::new(
+            sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
+                Arc::new(sentinel_api::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(500, 100)),
+            ),
+        ),
         snapshots_uc: Arc::new(StubSnapshots),
         levels_uc: Arc::new(StubLevels),
         announcements_uc: Arc::new(StubAnnouncements),

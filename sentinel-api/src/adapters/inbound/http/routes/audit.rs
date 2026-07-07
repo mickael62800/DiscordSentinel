@@ -21,6 +21,11 @@ pub fn routes() -> Router<AppState> {
             "/api/audit-logs/{guild_id}",
             delete(handlers::audit::audit_logs::purge_audit_logs),
         )
+        // Detection d'anomalie de moderation (decision server-side).
+        .route(
+            "/api/moderation-anomaly",
+            post(handlers::audit::moderation_anomaly::detect_moderation_anomaly),
+        )
         // Watched users
         .route(
             "/api/watched-users",

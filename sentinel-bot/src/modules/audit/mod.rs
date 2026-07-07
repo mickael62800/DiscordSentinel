@@ -49,11 +49,6 @@ impl TypeMapKey for MessageCacheKey {
     type Value = message_cache::MessageCache;
 }
 
-pub struct AnomalyDetectorKey;
-impl TypeMapKey for AnomalyDetectorKey {
-    type Value = anomaly::AnomalyDetector;
-}
-
 pub struct WeeklyTrackerKey;
 impl TypeMapKey for WeeklyTrackerKey {
     type Value = weekly_report::WeeklyTracker;
@@ -78,8 +73,6 @@ pub struct AuditConfig {
     pub anomaly_mass_ban_threshold: usize,
     pub anomaly_mass_delete_threshold: usize,
     pub anomaly_mass_role_threshold: usize,
-    pub anomaly_detector_max_buffer_size: usize,
-    pub anomaly_detector_eviction_target: usize,
 }
 
 impl Default for AuditConfig {
@@ -93,14 +86,6 @@ impl Default for AuditConfig {
                 20,
             ),
             anomaly_mass_role_threshold: crate::shared::config::load_env("ANOMALY_MASS_ROLE", 10),
-            anomaly_detector_max_buffer_size: crate::shared::config::load_env(
-                "ANOMALY_DETECTOR_MAX_BUFFER_SIZE",
-                500,
-            ),
-            anomaly_detector_eviction_target: crate::shared::config::load_env(
-                "ANOMALY_DETECTOR_EVICTION_TARGET",
-                100,
-            ),
         }
     }
 }
@@ -112,16 +97,6 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     let audit_config = AuditConfig::default();
     data.insert::<MessageCacheKey>(message_cache::MessageCache::new(
         audit_config.message_cache_size,
-    ));
-    data.insert::<AnomalyDetectorKey>(anomaly::AnomalyDetector::new(
-        audit_config.anomaly_window_secs,
-        anomaly::AnomalyThresholds {
-            mass_ban: audit_config.anomaly_mass_ban_threshold,
-            mass_delete: audit_config.anomaly_mass_delete_threshold,
-            mass_role_change: audit_config.anomaly_mass_role_threshold,
-        },
-        audit_config.anomaly_detector_max_buffer_size,
-        audit_config.anomaly_detector_eviction_target,
     ));
     data.insert::<WeeklyTrackerKey>(weekly_report::WeeklyTracker::new());
     data.insert::<ConfigKey>(audit_config);
@@ -196,6 +171,42 @@ pub async fn anomaly_thresholds_for(ctx: &Context, guild_id: &str) -> anomaly::A
             .get("anomaly_mass_role_threshold")
             .and_then(|v| v.parse().ok())
             .unwrap_or(default.mass_role_change),
+    }
+}
+
+/// Envoie un evenement de moderation a l'API pour DECISION d'anomalie.
+/// L'API agrege sur sa fenetre glissante serveur, applique les seuils
+/// (resolus per-guild ici) et renvoie une alerte a afficher le cas echeant.
+/// Le bot ne decide plus : il ne fait que relayer l'event et afficher.
+///
+/// `category` : "ban" | "kick" | "delete" | "role_change".
+/// `increment` : nombre d'evenements (> 1 pour une purge bulk).
+pub async fn detect_anomaly(
+    ctx: &Context,
+    guild_id: &str,
+    category: &str,
+    increment: usize,
+) -> Option<anomaly::AnomalyAlert> {
+    let thresholds = anomaly_thresholds_for(ctx, guild_id).await;
+    let (base, window_secs) = {
+        let data = ctx.data.read().await;
+        let base = data.get::<ApiClientKey>()?.clone();
+        let window_secs = data
+            .get::<ConfigKey>()
+            .map(|c| c.anomaly_window_secs)
+            .unwrap_or(60);
+        (base, window_secs)
+    };
+    let api = ApiClient::new(base);
+    match api
+        .detect_moderation_anomaly(guild_id, category, increment, window_secs, &thresholds)
+        .await
+    {
+        Ok(alert) => alert,
+        Err(e) => {
+            warn!(error = %e, category = %category, "Erreur detection anomalie via API");
+            None
+        }
     }
 }
 

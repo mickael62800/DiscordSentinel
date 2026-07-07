@@ -1,6 +1,7 @@
 pub mod audit_log;
 pub mod dashboard_stats;
 pub mod discord_action_message;
+pub mod moderation_anomaly;
 pub mod security_event;
 pub mod snapshot;
 pub mod user_activity;

@@ -3,6 +3,7 @@ pub mod audit_logs;
 pub mod dashboard;
 pub mod dashboard_charts;
 pub mod discord_action_messages;
+pub mod moderation_anomaly;
 pub mod security;
 pub mod snapshots;
 pub mod stats;

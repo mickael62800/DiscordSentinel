@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod batching;
 pub mod discord_api;
 pub mod game_runtime;

@@ -1,3 +1,4 @@
+pub mod detect_moderation_anomaly;
 pub mod manage_audit_logs;
 pub mod manage_discord_action_messages;
 pub mod manage_security;

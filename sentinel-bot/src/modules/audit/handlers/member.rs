@@ -10,8 +10,8 @@ use tracing::warn;
 
 use super::weekly_report::StatField;
 use super::{audit_event, watched_users};
+use super::WeeklyTrackerKey;
 use super::{log, post_to_channel, send_event};
-use super::{AnomalyDetectorKey, WeeklyTrackerKey};
 
 pub async fn handle_addition(ctx: &Context, new_member: &Member) {
     let gid = new_member.guild_id;
@@ -118,17 +118,12 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
     )
     .await;
 
-    // Anomaly detection (kick pattern). Thresholds per-guild.
-    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
-    let alert_opt = {
-        let data = ctx.data.read().await;
-        data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(guild_id, "kick", Some(&thresholds)))
-    };
+    // Anomaly detection (kick pattern). DECISION server-side : l'API agrege
+    // sur sa fenetre glissante, applique les seuils per-guild et renvoie
+    // l'alerte a afficher. Le bot ne decide plus.
+    let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "kick", 1).await;
     if let Some(alert) = alert_opt {
-        // Guard sub-feature : anomaly_enabled (defaut true). On a deja
-        // record l'event in-memory (gratuit), seul le post Discord est
-        // gate -> rare event, le HTTP call est OK.
+        // Guard sub-feature : anomaly_enabled (defaut true).
         if !crate::shared::discord_helpers::is_feature_enabled(
             ctx,
             &gid_str,
@@ -213,13 +208,8 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
     )
     .await;
 
-    // Anomaly detection (ban pattern). Thresholds per-guild.
-    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
-    let alert_opt = {
-        let data = ctx.data.read().await;
-        data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(guild_id, "ban", Some(&thresholds)))
-    };
+    // Anomaly detection (ban pattern). DECISION server-side.
+    let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "ban", 1).await;
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
             ctx,

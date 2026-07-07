@@ -8,7 +8,7 @@ use crate::shared::embeds::{critical_embed, info_embed, moderate_embed};
 use super::weekly_report::StatField;
 use super::{audit_event, watched_users};
 use super::{log, post_to_channel, send_event};
-use super::{AnomalyDetectorKey, MessageCacheKey, WeeklyTrackerKey};
+use super::{MessageCacheKey, WeeklyTrackerKey};
 
 /// Formate un contenu de message pour un field embed : tronque a `max`,
 /// neutralise les mentions de masse et les blocs ``` pour eviter le bris de
@@ -196,14 +196,8 @@ pub async fn handle_delete(
         }
     }
 
-    // Anomaly detection (on release le lock data d'abord pour pouvoir poster).
-    // Thresholds per-guild.
-    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
-    let alert_opt = {
-        let data = ctx.data.read().await;
-        data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(gid, "delete", Some(&thresholds)))
-    };
+    // Anomaly detection (delete pattern). DECISION server-side.
+    let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "delete", 1).await;
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
             ctx,
@@ -467,22 +461,10 @@ pub async fn handle_delete_bulk(
     )
     .await;
 
-    // Anomaly : compter comme N deletes, capturer l'alerte eventuelle sans
-    // tenir le lock pendant l'envoi Discord. Thresholds per-guild.
-    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
-    let alert_opt = {
-        let data = ctx.data.read().await;
-        let mut found = None;
-        if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
-            for _ in 0..count {
-                if let Some(alert) = anomaly.record(gid, "delete", Some(&thresholds)) {
-                    found = Some(alert);
-                    break;
-                }
-            }
-        }
-        found
-    };
+    // Anomaly : compter comme N deletes en un seul appel (increment=count).
+    // DECISION server-side : l'API rejoue la fenetre event par event et
+    // s'arrete au premier franchissement de seuil.
+    let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "delete", count).await;
 
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(

@@ -6,7 +6,7 @@ use super::audit_event;
 use super::permission_diff;
 use super::weekly_report::StatField;
 use super::{log, post_to_channel, send_event};
-use super::{AnomalyDetectorKey, WeeklyTrackerKey};
+use super::WeeklyTrackerKey;
 
 pub async fn handle_create(ctx: &Context, new: &Role) {
     let gid = new.guild_id;
@@ -143,13 +143,8 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
     )
     .await;
 
-    // Anomaly detection. Thresholds per-guild.
-    let thresholds = super::super::anomaly_thresholds_for(ctx, &gid_str).await;
-    let alert_opt = {
-        let data = ctx.data.read().await;
-        data.get::<AnomalyDetectorKey>()
-            .and_then(|anomaly| anomaly.record(gid, "role_change", Some(&thresholds)))
-    };
+    // Anomaly detection (role_change pattern). DECISION server-side.
+    let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "role_change", 1).await;
 
     if let Some(alert) = alert_opt {
         if !crate::shared::discord_helpers::is_feature_enabled(
