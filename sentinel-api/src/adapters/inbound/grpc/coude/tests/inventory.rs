@@ -170,6 +170,26 @@ impl ManageCoudeStealBoostsUseCase for MockBoostsUc {
     }
 }
 
+#[derive(Default)]
+struct MockPurchaseUc;
+
+#[async_trait]
+impl crate::ports::inbound::coude::purchase_item::PurchaseItemUseCase for MockPurchaseUc {
+    async fn purchase_item(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<crate::ports::inbound::coude::purchase_item::PurchaseResult, DomainError> {
+        Ok(
+            crate::ports::inbound::coude::purchase_item::PurchaseResult::Success {
+                price: 0,
+                new_balance: 0,
+            },
+        )
+    }
+}
+
 fn grpc(
     uc: Arc<MockInventoryUc>,
     p: Arc<MockProtectionsUc>,
@@ -177,6 +197,7 @@ fn grpc(
 ) -> InventoryGrpc {
     InventoryGrpc {
         uc,
+        purchase_uc: Arc::new(MockPurchaseUc),
         steal_protections_uc: p,
         steal_boosts_uc: b,
     }

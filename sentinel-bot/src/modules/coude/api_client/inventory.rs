@@ -7,7 +7,7 @@
 
 use sentinel_proto::coude::v1 as proto_coude;
 
-use super::{grpc_err_to_string, ApiClient, InventoryItem};
+use super::{grpc_err_to_string, ApiClient, InventoryItem, PurchaseOutcome};
 
 impl ApiClient {
     pub async fn add_item(
@@ -22,6 +22,37 @@ impl ApiClient {
             item_key: item_key.to_string(),
         };
         crate::grpc_call!(@unit self.grpc, coude_inventory, add_item, req)
+    }
+
+    /// Achat boutique atomique server-side. L'API valide le prix (config
+    /// serveur), debite le wallet, ajoute l'item et alimente la cashbox dans
+    /// UNE transaction. Le bot n'a plus qu'a rendre le resultat.
+    ///
+    /// Retourne `PurchaseOutcome` : succes (avec prix paye + solde restant)
+    /// ou solde insuffisant (avec prix requis + solde courant).
+    pub async fn purchase_item(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        item_key: &str,
+    ) -> Result<PurchaseOutcome, String> {
+        let req = proto_coude::PurchaseItemRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            item_key: item_key.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, coude_inventory, purchase_item, req)?;
+        Ok(if r.success {
+            PurchaseOutcome::Success {
+                price: r.price,
+                new_balance: r.balance,
+            }
+        } else {
+            PurchaseOutcome::InsufficientFunds {
+                price: r.price,
+                balance: r.balance,
+            }
+        })
     }
 
     pub async fn get_inventory(

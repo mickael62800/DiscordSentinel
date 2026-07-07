@@ -16,6 +16,7 @@ pub mod manage_steal_protections;
 pub mod manage_taunts;
 pub mod manage_tournaments;
 pub mod play_tout_ou_rien;
+pub mod purchase_item;
 pub mod resolve_betting_batch;
 pub mod resolve_combat_now;
 pub mod resolve_friendly_duel;

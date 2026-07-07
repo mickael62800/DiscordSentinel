@@ -29,6 +29,7 @@ use super::parse_uuid;
 
 pub struct InventoryGrpc {
     pub uc: Arc<dyn ManageCoudeInventoryUseCase>,
+    pub purchase_uc: Arc<dyn crate::ports::inbound::coude::purchase_item::PurchaseItemUseCase>,
     pub steal_protections_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
     pub steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
 }
@@ -120,6 +121,32 @@ impl CoudeInventoryService for InventoryGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::BoolValue { value: v }))
+    }
+
+    async fn purchase_item(
+        &self,
+        request: Request<proto::PurchaseItemRequest>,
+    ) -> Result<Response<proto::PurchaseItemResponse>, Status> {
+        use crate::ports::inbound::coude::purchase_item::PurchaseResult;
+        let req = request.into_inner();
+        let result = self
+            .purchase_uc
+            .purchase_item(&req.guild_id, &req.user_id, &req.item_key)
+            .await
+            .map_err(domain_to_status)?;
+        let resp = match result {
+            PurchaseResult::Success { price, new_balance } => proto::PurchaseItemResponse {
+                success: true,
+                price,
+                balance: new_balance,
+            },
+            PurchaseResult::InsufficientFunds { price, balance } => proto::PurchaseItemResponse {
+                success: false,
+                price,
+                balance,
+            },
+        };
+        Ok(Response::new(resp))
     }
 
     async fn create_prime(

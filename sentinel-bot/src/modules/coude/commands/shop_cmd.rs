@@ -17,6 +17,7 @@ use crate::shared::discord_helpers::{
     reply_api_err, reply_embed, reply_ephemeral, require_guild_id,
 };
 
+use crate::modules::coude::api_client::PurchaseOutcome;
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
@@ -157,72 +158,38 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 return;
             }
 
-            let player = match api
-                .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
+            // ── Achat atomique server-side ──
+            // Toute la logique economique (prix serveur, verif solde, debit
+            // wallet, ajout item, depot cashbox) est executee cote API dans
+            // UNE transaction. Le bot appelle un seul endpoint puis rend le
+            // resultat : plus de sequence debit/add/rollback ici (donc plus
+            // de risque de perte de coins).
+            let outcome = match api
+                .purchase_item(&guild_id, &command.user.id.to_string(), &key)
                 .await
             {
-                Ok(p) => p,
+                Ok(o) => o,
                 Err(e) => {
                     reply_api_err(ctx, command, e).await;
                     return;
                 }
             };
 
-            let price = config.shop_price(&item.key);
-
-            if player.coins < price {
-                reply_ephemeral(
-                    ctx,
-                    command,
-                    &format!(
-                        "Pas assez de coins ! Tu as {} coins, il en faut {}.",
-                        player.coins, price
-                    ),
-                )
-                .await;
-                return;
-            }
-
-            // Deduire les coins
-            if let Err(e) = api
-                .update_player_coins(&guild_id, &command.user.id.to_string(), -price)
-                .await
-            {
-                reply_api_err(ctx, command, e).await;
-                return;
-            }
-
-            // Ajouter l'item — rollback si l'add_item echoue.
-            if let Err(e) = api
-                .add_item(&guild_id, &command.user.id.to_string(), &key)
-                .await
-            {
-                if let Err(e2) = api
-                    .update_player_coins(&guild_id, &command.user.id.to_string(), price)
-                    .await
-                {
-                    tracing::error!(
-                        error = %e2,
-                        user = %command.user.id,
-                        price,
-                        "Echec rollback coins apres echec add_item shop : coins perdus"
-                    );
+            let price = match outcome {
+                PurchaseOutcome::InsufficientFunds { price, balance } => {
+                    reply_ephemeral(
+                        ctx,
+                        command,
+                        &format!(
+                            "Pas assez de coins ! Tu as {} coins, il en faut {}.",
+                            balance, price
+                        ),
+                    )
+                    .await;
+                    return;
                 }
-                reply_api_err(ctx, command, e).await;
-                return;
-            }
-
-            // Phase 9 : depot caisse communautaire.
-            if let Err(e) = api
-                .deposit_cashbox(
-                    &guild_id,
-                    price,
-                    crate::modules::coude::api_client::CashboxDepositSource::ShopPurchase,
-                )
-                .await
-            {
-                tracing::warn!(error = %e, guild_id, "Echec deposit cashbox shop");
-            }
+                PurchaseOutcome::Success { price, .. } => price,
+            };
 
             let embed = CreateEmbed::new()
                 .title(format!("{} Achat reussi !", item.emoji))

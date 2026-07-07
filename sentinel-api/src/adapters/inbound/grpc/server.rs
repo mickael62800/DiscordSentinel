@@ -113,8 +113,24 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let coude_economy = EconomyGrpc {
         uc: state.coude_economy_uc.clone(),
     };
+    // Achat boutique atomique : use case pur (sentinel-core) branche sur le
+    // repo Postgres transactionnel + la config bot (prix serveur). Construit
+    // ici a partir des dependances deja presentes dans l'AppState.
+    let coude_purchase_uc: std::sync::Arc<
+        dyn crate::ports::inbound::coude::purchase_item::PurchaseItemUseCase,
+    > = std::sync::Arc::new(
+        sentinel_core::application::coude::purchase_item::PurchaseItemService::new(
+            std::sync::Arc::new(
+                crate::adapters::outbound::postgres::coude::purchase_repository::PgPurchaseRepository::new(
+                    state.pg_pool.clone(),
+                ),
+            ),
+            state.bot_config_repo.clone(),
+        ),
+    );
     let coude_inventory = InventoryGrpc {
         uc: state.coude_inventory_uc.clone(),
+        purchase_uc: coude_purchase_uc,
         steal_protections_uc: state.coude_steal_protections_uc.clone(),
         steal_boosts_uc: state.coude_steal_boosts_uc.clone(),
     };

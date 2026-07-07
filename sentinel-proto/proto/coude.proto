@@ -518,6 +518,10 @@ service CoudeInventoryService {
   rpc UseItem(UseItemRequest) returns (UseItemResponse);
   rpc HasItem(HasItemRequest) returns (BoolValue);
 
+  // Achat boutique atomique server-side : verif prix serveur + debit wallet +
+  // ajout item + alimentation cashbox, le tout dans une seule transaction.
+  rpc PurchaseItem(PurchaseItemRequest) returns (PurchaseItemResponse);
+
   // Primes
   rpc CreatePrime(CreatePrimeRequest) returns (Prime);
   rpc ListActivePrimes(ListActivePrimesRequest) returns (PrimeList);
@@ -564,6 +568,21 @@ message UseItemRequest {
   string guild_id = 1;
   string user_id = 2;
   string item_key = 3;
+}
+
+message PurchaseItemRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string item_key = 3;
+}
+
+message PurchaseItemResponse {
+  // false = solde insuffisant (aucune mutation cote serveur).
+  bool success = 1;
+  // Prix serveur de l'item (config guild / catalogue domain).
+  int64 price = 2;
+  // Solde du wallet : APRES debit si success, courant sinon.
+  int64 balance = 3;
 }
 
 message UseItemResponse {

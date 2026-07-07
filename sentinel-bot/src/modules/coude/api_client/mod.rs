@@ -213,6 +213,15 @@ pub struct InventoryItem {
     pub quantity: i32,
 }
 
+/// Resultat d'un achat boutique atomique (RPC `PurchaseItem`).
+#[derive(Debug, Clone)]
+pub enum PurchaseOutcome {
+    /// Achat reussi : `price` debite, solde restant `new_balance`.
+    Success { price: i64, new_balance: i64 },
+    /// Solde insuffisant : `balance` courant < `price` requis (aucune mutation).
+    InsufficientFunds { price: i64, balance: i64 },
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct ServerEvent {

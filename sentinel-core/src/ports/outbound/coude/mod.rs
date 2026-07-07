@@ -8,6 +8,7 @@ pub mod flavor_templates_repository;
 pub mod heist_repository;
 pub mod inventory_repository;
 pub mod player_repository;
+pub mod purchase_repository;
 pub mod refusal_count_repository;
 pub mod safety_net_repository;
 pub mod social_repository;
