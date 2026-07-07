@@ -532,6 +532,15 @@ pub async fn build_app_state(
             quarantine_repo,
         ));
 
+    // Lockdown de securite : repo Postgres (SQL security_lockdown_active) + use
+    // case (calcul de l'expiration). Le handler ne fait que parse/RBAC/map.
+    let lockdown_repo: Arc<dyn crate::ports::outbound::system::lockdown_repository::LockdownRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::lockdown_repository::PgLockdownRepository::new(pg_pool.clone()));
+    let lockdown_uc: Arc<dyn crate::ports::inbound::system::manage_lockdown::ManageLockdownUseCase> =
+        Arc::new(sentinel_core::application::system::manage_lockdown_service::ManageLockdownService::new(
+            lockdown_repo,
+        ));
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -1136,6 +1145,7 @@ pub async fn build_app_state(
         tickets_uc,
         invitations_uc,
         quarantine_uc,
+        lockdown_uc,
         security_uc,
         moderation_uc,
         modstats_uc,

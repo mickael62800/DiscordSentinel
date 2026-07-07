@@ -1,15 +1,14 @@
-//! Phase 5G — Endpoints pour `security_lockdown_active`.
-//! SQL direct (meme principe que steal_attempts / quarantine).
+//! Phase 5G — Endpoints `security_lockdown_active` (adaptateur ENTRANT mince).
+//! La regle metier (calcul de l'expiration) vit dans `ManageLockdownUseCase`, le
+//! SQL dans `LockdownRepository`. Ici : parse -> use case -> map.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::state::AppState;
 
 #[derive(Deserialize)]
@@ -27,21 +26,10 @@ pub async fn create_lockdown(
     State(state): State<AppState>,
     Json(dto): Json<CreateLockdownDto>,
 ) -> Result<StatusCode, ApiError> {
-    let expires_at: DateTime<Utc> =
-        Utc::now() + chrono::Duration::seconds(dto.duration_secs.max(1));
-    sqlx::query(
-        "INSERT INTO security_lockdown_active (guild_id, saved_states, expires_at) \
-         VALUES ($1, $2, $3) \
-         ON CONFLICT (guild_id) DO UPDATE SET \
-             saved_states = EXCLUDED.saved_states, \
-             expires_at = EXCLUDED.expires_at",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.saved_states)
-    .bind(expires_at)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("upsert lockdown"))?;
+    state
+        .lockdown_uc
+        .activate(&dto.guild_id, dto.saved_states, dto.duration_secs)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -51,10 +39,6 @@ pub async fn delete_lockdown(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
-    sqlx::query("DELETE FROM security_lockdown_active WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("delete lockdown"))?;
+    state.lockdown_uc.deactivate(&guild_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
