@@ -142,6 +142,8 @@ pub struct AppState {
     pub component_visibility_uc: Arc<
         dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase,
     >,
+    pub bot_persistence_uc:
+        Arc<dyn crate::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase>,
     pub server_events_uc:
         Arc<dyn crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase>,
     /// CRUD RBAC applicatif (endpoints owner). Nomme `rbac_admin_uc` pour ne pas

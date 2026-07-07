@@ -579,6 +579,14 @@ pub async fn build_app_state(
     let component_visibility_uc: Arc<dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase> =
         Arc::new(sentinel_core::application::system::manage_component_visibility_service::ManageComponentVisibilityService::new(
             component_visibility_repo,
+    // Persistance fire-and-forget des bots (streaks, etc.) : repo Postgres
+    // (SQL user_levels) + use case pass-through. Le handler ne fait que
+    // parser/valider/mapper.
+    let bot_persistence_repo: Arc<dyn crate::ports::outbound::system::bot_persistence_repository::BotPersistenceRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::bot_persistence_repository::PgBotPersistenceRepository::new(pg_pool.clone()));
+    let bot_persistence_uc: Arc<dyn crate::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase> =
+        Arc::new(sentinel_core::application::system::manage_bot_persistence_service::ManageBotPersistenceService::new(
+            bot_persistence_repo,
         ));
 
     // Audit serveur (server_events) : repo Postgres + use case (bornage des
@@ -1201,6 +1209,7 @@ pub async fn build_app_state(
         quarantine_uc,
         lockdown_uc,
         component_visibility_uc,
+        bot_persistence_uc,
         server_events_uc,
         security_uc,
         moderation_uc,

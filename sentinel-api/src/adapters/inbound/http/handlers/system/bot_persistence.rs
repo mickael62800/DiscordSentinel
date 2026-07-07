@@ -146,25 +146,21 @@ pub async fn update_streak(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Validation
-
-    sqlx::query(
-        "UPDATE user_levels SET streak_current = $1, streak_best = $2, \
-         streak_last_day = $3, streak_last_year = $4, updated_at = NOW() \
-         WHERE guild_id = $5 AND user_id = $6",
-    )
-    .bind(dto.streak_current)
-    .bind(dto.streak_best)
-    .bind(dto.streak_last_day)
-    .bind(dto.streak_last_year)
-    .bind(&guild_id)
-    .bind(&user_id)
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(
-        |e| warn!(error = %e, guild_id = %guild_id, user_id = %user_id, "Echec update streak"),
-    )
-    .ok();
+    state
+        .bot_persistence_uc
+        .update_streak(
+            &guild_id,
+            &user_id,
+            dto.streak_current,
+            dto.streak_best,
+            dto.streak_last_day,
+            dto.streak_last_year,
+        )
+        .await
+        .inspect_err(
+            |e| warn!(error = %e, guild_id = %guild_id, user_id = %user_id, "Echec update streak"),
+        )
+        .ok();
 
     Ok(ok_response())
 }

@@ -3466,6 +3466,21 @@ impl sentinel_core::ports::inbound::system::manage_component_visibility::ManageC
         _: &str,
     ) -> Result<usize, DomainError> {
         Ok(0)
+pub struct StubBotPersistence;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase
+    for StubBotPersistence
+{
+    async fn update_streak(
+        &self,
+        _: &str,
+        _: &str,
+        _: i32,
+        _: i32,
+        _: i32,
+        _: i32,
+    ) -> Result<(), DomainError> {
+        Ok(())
     }
 }
 
@@ -4192,6 +4207,7 @@ fn base_state() -> AppState {
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
         component_visibility_uc: Arc::new(StubComponentVisibility),
+        bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),
         tournaments_uc: Arc::new(StubTournaments),
