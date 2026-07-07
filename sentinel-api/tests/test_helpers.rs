@@ -3655,6 +3655,16 @@ impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for S
     async fn is_whitelisted(&self, _: &str) -> Result<bool, DomainError> {
         Ok(true)
     }
+    async fn role_for_guild(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<sentinel_core::domain::enums::system::role::Role>, DomainError> {
+        Ok(None)
+    }
+    async fn record_user_seen(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 pub struct StubMonthlyRanking;

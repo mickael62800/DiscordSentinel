@@ -333,17 +333,13 @@ async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<St
         .await
         .map_err(|e| format!("Discord API: {e}"))?;
 
-    // Upsert api_users (best-effort — on ne bloque pas sur une erreur DB)
-    let _ = sqlx::query(
-        "INSERT INTO api_users (discord_user_id, display_name) \
-         VALUES ($1, $2) \
-         ON CONFLICT (discord_user_id) \
-         DO UPDATE SET display_name = EXCLUDED.display_name, last_seen_at = NOW()",
-    )
-    .bind(&user.id)
-    .bind(&user.username)
-    .execute(&state.pg_pool)
-    .await;
+    // Upsert api_users (best-effort — on ne bloque pas sur une erreur DB).
+    // Le SQL vit dans l'adapter Postgres via le use case RBAC ; on ignore
+    // volontairement le resultat (comportement inchange).
+    let _ = state
+        .rbac_admin_uc
+        .record_user_seen(&user.id, &user.username)
+        .await;
 
     // Cache (best-effort)
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
@@ -386,22 +382,14 @@ pub(crate) async fn lookup_role_row(
     user_id: &str,
     guild_id: &str,
 ) -> Result<Option<Role>, String> {
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT role FROM api_user_guilds \
-         WHERE discord_user_id = $1 AND guild_id = $2",
-    )
-    .bind(user_id)
-    .bind(guild_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| format!("lookup role: {e}"))?;
-
-    match row {
-        Some((role_str,)) => Role::from_str(&role_str)
-            .map(Some)
-            .ok_or_else(|| format!("role DB invalide: {role_str}")),
-        None => Ok(None),
-    }
+    // Le SQL vit desormais dans l'adapter Postgres, expose via le use case RBAC.
+    // Semantique preservee : `Ok(None)` = aucune row `api_user_guilds` (le caller
+    // applique le fallback `Viewer`), `Err` = VRAIE erreur (DB ou role invalide).
+    state
+        .rbac_admin_uc
+        .role_for_guild(user_id, guild_id)
+        .await
+        .map_err(|e| format!("lookup role: {e}"))
 }
 
 /// Heuristique : on prend le premier segment du path qui ressemble a un

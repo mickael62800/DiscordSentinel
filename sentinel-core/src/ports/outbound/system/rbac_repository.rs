@@ -39,6 +39,15 @@ pub trait RbacRepository: Send + Sync {
     /// `true` si le membre est owner de la guild.
     async fn is_owner(&self, user_id: &str, guild_id: &str) -> Result<bool, DomainError>;
 
+    /// Role brut (chaine DB) du user sur la guild, ou `None` si aucune ligne
+    /// `api_user_guilds` n'existe pour ce couple (user, guild). Le use case
+    /// decide du fallback ; le repo ne fait que remonter la valeur telle quelle.
+    async fn role_for_guild(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<Option<String>, DomainError>;
+
     /// `true` si le user possede au moins une attribution (n'importe quelle
     /// guild, n'importe quel role) dans `api_user_guilds`. Sert au gate de
     /// whitelist global (defense en profondeur sur l'auth Discord).
@@ -53,6 +62,15 @@ pub trait RbacRepository: Send + Sync {
         &self,
         guild_id: &str,
     ) -> Result<Vec<GuildUserEntry>, DomainError>;
+
+    /// Upsert de la ligne `api_users` avec rafraichissement : cree la ligne si
+    /// absente, sinon met a jour `display_name` (= valeur fournie) et
+    /// `last_seen_at = NOW()`. Distinct de `upsert_user` (qui fait `DO NOTHING`).
+    async fn record_user_seen(
+        &self,
+        user_id: &str,
+        display_name: &str,
+    ) -> Result<(), DomainError>;
 
     /// Auto-grant idempotent du proprietaire Discord comme `owner` RBAC au
     /// premier enregistrement de la guild (`ON CONFLICT DO NOTHING`) : si un

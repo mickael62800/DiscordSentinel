@@ -121,6 +121,23 @@ impl RbacRepository for PgRbacRepository {
         Ok(exists)
     }
 
+    async fn role_for_guild(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<Option<String>, DomainError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT role FROM api_user_guilds \
+             WHERE discord_user_id = $1 AND guild_id = $2",
+        )
+        .bind(user_id)
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row.map(|(role,)| role))
+    }
+
     async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError> {
         let (exists,): (bool,) = sqlx::query_as(
             "SELECT EXISTS(SELECT 1 FROM api_user_guilds WHERE discord_user_id = $1)",
@@ -178,6 +195,25 @@ impl RbacRepository for PgRbacRepository {
                 granted_by: r.granted_by,
             })
             .collect())
+    }
+
+    async fn record_user_seen(
+        &self,
+        user_id: &str,
+        display_name: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO api_users (discord_user_id, display_name) \
+             VALUES ($1, $2) \
+             ON CONFLICT (discord_user_id) \
+             DO UPDATE SET display_name = EXCLUDED.display_name, last_seen_at = NOW()",
+        )
+        .bind(user_id)
+        .bind(display_name)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
     }
 
     async fn grant_owner_if_absent(

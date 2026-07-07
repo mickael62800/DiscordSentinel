@@ -60,6 +60,27 @@ pub trait ManageRbacUseCase: Send + Sync {
     /// guild). Alimente le gate de whitelist global du middleware d'auth Discord.
     async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError>;
 
+    /// Role applicatif du user sur la guild d'apres `api_user_guilds`.
+    /// `Ok(None)` si le user n'a AUCUNE attribution sur la guild (le caller
+    /// decide du fallback, ex. `Viewer` moindre privilege) ; `Err` reservee aux
+    /// VRAIES erreurs (DB indisponible, role DB invalide). Alimente le lookup de
+    /// role du middleware RBAC.
+    async fn role_for_guild(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<Option<Role>, DomainError>;
+
+    /// Enregistre le passage d'un user (upsert `api_users`) : cree la ligne si
+    /// absente, sinon rafraichit `display_name` et `last_seen_at`. Best-effort
+    /// cote appelant (le middleware ignore l'erreur). Alimente la resolution
+    /// d'identite du middleware RBAC.
+    async fn record_user_seen(
+        &self,
+        user_id: &str,
+        display_name: &str,
+    ) -> Result<(), DomainError>;
+
     /// Auto-grant idempotent du proprietaire Discord comme `owner` RBAC au
     /// premier enregistrement de la guild. N'ecrase aucun role existant.
     async fn ensure_owner_grant(

@@ -10,6 +10,7 @@ use crate::domain::entities::system::rbac::{
     is_owner_self_demotion, truncate_display_name, would_revoke_last_owner, GuildUserEntry,
     UserRoleGrant,
 };
+use crate::domain::enums::system::role::Role;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::system::manage_rbac::{
     GrantRoleCommand, ManageRbacUseCase, RevokeRoleCommand, UpdateRoleCommand,
@@ -102,6 +103,30 @@ impl ManageRbacUseCase for ManageRbacService {
 
     async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError> {
         self.repo.is_whitelisted(user_id).await
+    }
+
+    async fn role_for_guild(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<Option<Role>, DomainError> {
+        // Row absente => None (le caller applique son fallback). Une row avec un
+        // role DB non parsable est une VRAIE erreur (integrite compromise),
+        // remontee telle quelle, jamais silencieusement degradee.
+        match self.repo.role_for_guild(user_id, guild_id).await? {
+            Some(role_str) => Role::from_str(&role_str)
+                .map(Some)
+                .ok_or_else(|| DomainError::Internal(format!("role DB invalide: {role_str}"))),
+            None => Ok(None),
+        }
+    }
+
+    async fn record_user_seen(
+        &self,
+        user_id: &str,
+        display_name: &str,
+    ) -> Result<(), DomainError> {
+        self.repo.record_user_seen(user_id, display_name).await
     }
 
     async fn ensure_owner_grant(
