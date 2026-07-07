@@ -132,8 +132,8 @@ impl ManageTicketsUseCase for MockTicketsUC {
     async fn reply_ticket(&self, _: ReplyTicketCommand) -> Result<(), DomainError> {
         Ok(())
     }
-    async fn close_ticket(&self, _: &str) -> Result<(), DomainError> {
-        Ok(())
+    async fn close_ticket(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
     }
     async fn assign_ticket(&self, _: AssignTicketCommand) -> Result<(), DomainError> {
         Ok(())

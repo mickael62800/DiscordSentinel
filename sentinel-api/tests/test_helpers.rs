@@ -199,8 +199,8 @@ impl ManageTicketsUseCase for StubTickets {
     async fn reply_ticket(&self, _: ReplyTicketCommand) -> Result<(), DomainError> {
         unimplemented!()
     }
-    async fn close_ticket(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
+    async fn close_ticket(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
     }
     async fn assign_ticket(&self, _: AssignTicketCommand) -> Result<(), DomainError> {
         unimplemented!()
@@ -2125,6 +2125,16 @@ impl sentinel_api::ports::outbound::moderation::automod_review_repository::Autom
     > {
         Err(DomainError::Internal("stub".into()))
     }
+    async fn expire_stale_decided(
+        &self,
+        _: i64,
+        _: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::review::automod::ExpiredReviewCard>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
     async fn find_discussion(
         &self,
         _: Uuid,
@@ -2957,6 +2967,37 @@ impl sentinel_core::ports::outbound::game::game_server_repository::GameServerRep
     > {
         unimplemented!()
     }
+    async fn set_session_channels(
+        &self,
+        _: Uuid,
+        _: Option<&str>,
+        _: Option<&str>,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_ip_reveal_due(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_awaiting_reveal_no_ping_today(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_ip_reveal_at(
+        &self,
+        _: Uuid,
+        _: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 pub struct StubGameTemplateRepo;
@@ -3167,6 +3208,636 @@ impl sentinel_core::ports::outbound::game::port_allocator::PortAllocator for Stu
 }
 
 // ══════════════════════════════════════════════════════════
+// Stubs additionnels (champs AppState recents)
+// ══════════════════════════════════════════════════════════
+
+pub struct StubBump;
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_bump::ManageBumpUseCase for StubBump {
+    async fn record_bump(
+        &self,
+        _: sentinel_core::ports::inbound::community::manage_bump::RecordBumpCommand,
+    ) -> Result<sentinel_core::domain::entities::community::bump::BumpReward, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn due_reminders(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::bump::DueReminder>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn mark_reminder_sent(
+        &self,
+        _: &str,
+        _: Option<String>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+pub struct StubInvitations;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_invitations::ManageInvitationsUseCase
+    for StubInvitations
+{
+    async fn create_invitation(
+        &self,
+        _: sentinel_core::ports::inbound::system::manage_invitations::CreateInvitationCommand,
+    ) -> Result<sentinel_core::domain::entities::system::invitation::Invitation, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn list_invitations(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::invitation::Invitation>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn find_invitation(
+        &self,
+        _: &str,
+    ) -> Result<Option<sentinel_core::domain::entities::system::invitation::Invitation>, DomainError>
+    {
+        Ok(None)
+    }
+    async fn revoke_invitation(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn check_access(
+        &self,
+        _: &str,
+        _: bool,
+    ) -> Result<sentinel_core::domain::entities::system::invitation::AccessStatus, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn redeem_invitation(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::system::invitation::RedeemedInvitation, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+}
+
+pub struct StubOAuth;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase for StubOAuth {
+    async fn record_login(
+        &self,
+        _: sentinel_core::domain::entities::system::oauth::LoginTrace,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn create_session(
+        &self,
+        _: sentinel_core::domain::entities::system::oauth::NewOAuthSession,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn get_session(
+        &self,
+        _: Uuid,
+    ) -> Result<Option<sentinel_core::domain::entities::system::oauth::OAuthSession>, DomainError>
+    {
+        Ok(None)
+    }
+    async fn touch_session(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_tokens(
+        &self,
+        _: sentinel_core::domain::entities::system::oauth::SessionTokenUpdate,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_session(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+pub struct StubRbac;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for StubRbac {
+    async fn grant_role(
+        &self,
+        _: sentinel_core::ports::inbound::system::manage_rbac::GrantRoleCommand,
+    ) -> Result<sentinel_core::domain::entities::system::rbac::UserRoleGrant, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn update_role(
+        &self,
+        _: sentinel_core::ports::inbound::system::manage_rbac::UpdateRoleCommand,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn revoke_role(
+        &self,
+        _: sentinel_core::ports::inbound::system::manage_rbac::RevokeRoleCommand,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_guild_users(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::rbac::GuildUserEntry>, DomainError>
+    {
+        Ok(vec![])
+    }
+}
+
+pub struct StubTournaments;
+#[async_trait]
+impl sentinel_core::ports::inbound::coude::manage_tournaments::ManageTournamentsUseCase
+    for StubTournaments
+{
+    async fn current_tournament(
+        &self,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::coude::tournament::CurrentTournament, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn tournament_history(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::coude::tournament::PastTournament>, DomainError>
+    {
+        Ok(vec![])
+    }
+}
+
+pub struct StubSursis;
+#[async_trait]
+impl sentinel_core::ports::inbound::moderation::manage_sursis::ManageSursisUseCase for StubSursis {
+    async fn create(
+        &self,
+        _: sentinel_core::ports::inbound::moderation::manage_sursis::CreateSursisCommand,
+    ) -> Result<sentinel_core::domain::entities::moderation::sursis::Sursis, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+    ) -> Result<Option<sentinel_core::domain::entities::moderation::sursis::Sursis>, DomainError>
+    {
+        Ok(None)
+    }
+    async fn resolve(
+        &self,
+        _: Uuid,
+        _: sentinel_core::domain::entities::moderation::sursis::SursisStatus,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn list_due(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::moderation::sursis::Sursis>, DomainError> {
+        Ok(vec![])
+    }
+}
+
+pub struct StubInfluenceViewProfile;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::view_profile::ViewProfileUseCase
+    for StubInfluenceViewProfile
+{
+    async fn view(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::view_profile::ProfileView, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+}
+
+pub struct StubInfluenceOrgs;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::manage_organizations::ManageOrganizationsUseCase
+    for StubInfluenceOrgs
+{
+    async fn create(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::enums::influence::organization_kind::OrganizationKind,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::influence::organization::Organization, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn info(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_organizations::OrgInfo, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn join(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::influence::organization::Organization, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn members(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::influence::org_membership::OrgMemberView>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn prepare_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: bool,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_organizations::RolePrep, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn set_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: bool,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_relation(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::entities::influence::archive::RelationKind,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn ranking(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::inbound::influence::manage_organizations::OrgRankEntry>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn fund_law(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+        _: bool,
+    ) -> Result<
+        sentinel_core::ports::inbound::influence::manage_organizations::FundingResult,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn distribute_dividend(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<
+        sentinel_core::ports::inbound::influence::manage_organizations::DividendResult,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn treasury(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::influence::treasury::TreasuryView, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn deposit_treasury(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<sentinel_core::domain::entities::influence::treasury::TreasuryView, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn withdraw_treasury(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<sentinel_core::domain::entities::influence::treasury::TreasuryView, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn pay_member(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: i64,
+    ) -> Result<sentinel_core::domain::entities::influence::treasury::TreasuryView, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+}
+
+pub struct StubInfluenceVotes;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::manage_votes::ManageVotesUseCase
+    for StubInfluenceVotes
+{
+    async fn create_motion(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_votes::MotionState, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn cast_vote(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::entities::influence::vote::VoteChoice,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_votes::MotionState, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn close_motion(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_votes::MotionState, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn get_state(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_votes::MotionState, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+}
+
+pub struct StubInfluenceCapital;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::manage_capital::ManageCapitalUseCase
+    for StubInfluenceCapital
+{
+    async fn view(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::influence::manage_capital::CapitalOverview,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn convert(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::entities::influence::conversion::ConversionKind,
+        _: i64,
+    ) -> Result<
+        sentinel_core::ports::inbound::influence::manage_capital::ConversionOutcome,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+}
+
+pub struct StubInfluenceLaws;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::manage_laws::ManageLawsUseCase for StubInfluenceLaws {
+    async fn propose(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+        _: Option<i64>,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_laws::LawState, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn vote(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::entities::influence::vote::VoteChoice,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_laws::LawState, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn get_state(
+        &self,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::influence::manage_laws::LawState, DomainError> {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn list_active(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::ports::inbound::influence::manage_laws::LawState>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn set_message(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn close_due(
+        &self,
+    ) -> Result<Vec<sentinel_core::ports::inbound::influence::manage_laws::LawState>, DomainError>
+    {
+        Ok(vec![])
+    }
+}
+
+pub struct StubInfluenceInformation;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::manage_information::ManageInformationUseCase
+    for StubInfluenceInformation
+{
+    async fn open_investigation(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::influence::information::Investigation, DomainError>
+    {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn list_intel(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::influence::information::Information>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn reveal(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::influence::manage_information::RevealOutcome,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn resolve_due(
+        &self,
+    ) -> Result<
+        Vec<sentinel_core::ports::inbound::influence::manage_information::ResolvedInvestigation>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+}
+
+pub struct StubInfluenceArchives;
+#[async_trait]
+impl sentinel_core::ports::inbound::influence::read_archives::ReadArchivesUseCase
+    for StubInfluenceArchives
+{
+    async fn list(
+        &self,
+        _: &str,
+        _: Option<i64>,
+    ) -> Result<Vec<sentinel_core::domain::entities::influence::archive::ArchiveEntry>, DomainError>
+    {
+        Ok(vec![])
+    }
+}
+
+pub struct StubAdaptiveSlowmodeRepo;
+#[async_trait]
+impl sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository
+    for StubAdaptiveSlowmodeRepo
+{
+    async fn mark(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn unmark(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_all(&self) -> Result<Vec<(String, String)>, DomainError> {
+        Ok(vec![])
+    }
+}
+
+pub struct StubGameTemplateSettingsRepo;
+#[async_trait]
+impl sentinel_core::ports::outbound::game::game_session_repository::GameTemplateSettingsRepository
+    for StubGameTemplateSettingsRepo
+{
+    async fn get(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::game::session::GameTemplateSettings>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+    async fn list(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::game::session::GameTemplateSettings>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn set_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
+pub struct StubGameSessionRegRepo;
+#[async_trait]
+impl sentinel_core::ports::outbound::game::game_session_repository::GameSessionRegistrationRepository
+    for StubGameSessionRegRepo
+{
+    async fn register(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn unregister(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list(
+        &self,
+        _: Uuid,
+    ) -> Result<Vec<sentinel_core::domain::entities::game::session::GameSessionRegistration>, DomainError>
+    {
+        Ok(vec![])
+    }
+}
+
+// ══════════════════════════════════════════════════════════
 // TestAppState builder
 // ══════════════════════════════════════════════════════════
 
@@ -3297,6 +3968,22 @@ fn base_state() -> AppState {
         game_container_runtime: Arc::new(StubContainerRuntime),
         game_rcon_client: Arc::new(StubRconClient),
         game_port_allocator: Arc::new(StubPortAllocator),
+        bump_uc: Arc::new(StubBump),
+        invitations_uc: Arc::new(StubInvitations),
+        oauth_uc: Arc::new(StubOAuth),
+        rbac_admin_uc: Arc::new(StubRbac),
+        tournaments_uc: Arc::new(StubTournaments),
+        sursis_uc: Arc::new(StubSursis),
+        influence_view_profile_uc: Arc::new(StubInfluenceViewProfile),
+        influence_orgs_uc: Arc::new(StubInfluenceOrgs),
+        influence_votes_uc: Arc::new(StubInfluenceVotes),
+        influence_capital_uc: Arc::new(StubInfluenceCapital),
+        influence_laws_uc: Arc::new(StubInfluenceLaws),
+        influence_information_uc: Arc::new(StubInfluenceInformation),
+        influence_archives_uc: Arc::new(StubInfluenceArchives),
+        automod_adaptive_slowmode_repo: Arc::new(StubAdaptiveSlowmodeRepo),
+        game_template_settings_repo: Arc::new(StubGameTemplateSettingsRepo),
+        game_session_reg_repo: Arc::new(StubGameSessionRegRepo),
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
