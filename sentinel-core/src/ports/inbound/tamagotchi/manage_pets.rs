@@ -1,8 +1,10 @@
 //! Use case du jeu Tamagotchi.
 //!
-//! Le bot lit la config guild (couts/gains/cooldowns) et les passe dans les
-//! commandes ; l'API applique de facon atomique (debit coins via le wallet
-//! partage, cooldown stocke en base, XP/niveau, transitions de sante).
+//! La balance (couts/deltas/recompenses/cooldowns/poids de combat) est LUE et
+//! CALCULEE server-side depuis la config de la guild (`bot_guild_config`,
+//! composant `tamagotchi-bot`). Les commandes ne transportent plus que
+//! l'action + les identifiants ; le service applique de facon atomique (debit
+//! coins via le wallet partage, cooldown stocke en base, XP/niveau).
 
 use async_trait::async_trait;
 use uuid::Uuid;
@@ -19,25 +21,13 @@ pub struct CreatePetCommand {
     pub species: String,
 }
 
-/// Effets/couts d'une action de soin (issus de la config guild).
+/// Action de soin ou d'achat boutique. Les effets/couts sont calcules
+/// server-side depuis la config de la guild (cf. `balance::TamaBalance`).
 #[derive(Debug, Clone)]
 pub struct CareCommand {
     pub pet_id: Uuid,
-    /// Action : "feed" | "play" | "sleep" | "cuddle".
+    /// Action : "feed" | "play" | "sleep" | "cuddle" | "buy_<item>".
     pub action: String,
-    /// Cout en coins (debite du wallet partage). 0 = gratuit.
-    pub coin_cost: i64,
-    /// Variations de jauges (peuvent etre negatives).
-    pub hunger_delta: i32,
-    pub happiness_delta: i32,
-    pub energy_delta: i32,
-    /// XP gagne.
-    pub xp_gain: i64,
-    /// Cooldown a appliquer (secondes).
-    pub cooldown_secs: i64,
-    /// Si true, guerit la maladie (potion de soin) : statut -> healthy.
-    #[allow(dead_code)]
-    pub cure: bool,
 }
 
 /// Visite du compagnon d'un autre joueur (recompense le visite).
@@ -47,10 +37,6 @@ pub struct VisitCommand {
     pub visitor_id: String,
     pub visitor_name: String,
     pub target_id: String,
-    pub xp_reward: i64,
-    pub coins_reward: i64,
-    pub cooldown_secs: i64,
-    pub max_per_day: i64,
 }
 
 /// Resultat d'une visite (pour le message de confirmation).
@@ -68,15 +54,6 @@ pub struct CombatCommand {
     pub attacker_id: String,
     pub attacker_name: String,
     pub target_id: String,
-    pub energy_cost: i32,
-    pub cooldown_secs: i64,
-    pub elo_k: i32,
-    pub xp_win: i64,
-    pub xp_loss: i64,
-    pub w_str: i32,
-    pub w_vit: i32,
-    pub w_agi: i32,
-    pub random_max: i32,
 }
 
 /// Resultat d'un combat (pour le message).
@@ -96,10 +73,6 @@ pub struct TrainCommand {
     pub pet_id: Uuid,
     /// "str" | "vit" | "agi".
     pub stat: String,
-    pub energy_cost: i32,
-    pub coin_cost: i64,
-    pub stat_gain: i32,
-    pub cooldown_secs: i64,
 }
 
 #[async_trait]

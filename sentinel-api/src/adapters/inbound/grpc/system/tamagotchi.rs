@@ -82,13 +82,6 @@ impl TamagotchiService for TamagotchiGrpc {
             .care(CareCommand {
                 pet_id: parse_uuid(&req.pet_id)?,
                 action: req.action,
-                coin_cost: req.coin_cost,
-                hunger_delta: req.hunger_delta,
-                happiness_delta: req.happiness_delta,
-                energy_delta: req.energy_delta,
-                xp_gain: req.xp_gain,
-                cooldown_secs: req.cooldown_secs,
-                cure: req.cure,
             })
             .await
             .map_err(domain_to_status)?;
@@ -105,10 +98,6 @@ impl TamagotchiService for TamagotchiGrpc {
             .train(TrainCommand {
                 pet_id: parse_uuid(&req.pet_id)?,
                 stat: req.stat,
-                energy_cost: req.energy_cost,
-                coin_cost: req.coin_cost,
-                stat_gain: req.stat_gain,
-                cooldown_secs: req.cooldown_secs,
             })
             .await
             .map_err(domain_to_status)?;
@@ -127,10 +116,6 @@ impl TamagotchiService for TamagotchiGrpc {
                 visitor_id: req.visitor_id,
                 visitor_name: req.visitor_name,
                 target_id: req.target_id,
-                xp_reward: req.xp_reward,
-                coins_reward: req.coins_reward,
-                cooldown_secs: req.cooldown_secs,
-                max_per_day: req.max_per_day,
             })
             .await
             .map_err(domain_to_status)?;
@@ -153,15 +138,6 @@ impl TamagotchiService for TamagotchiGrpc {
                 attacker_id: req.attacker_id,
                 attacker_name: req.attacker_name,
                 target_id: req.target_id,
-                energy_cost: req.energy_cost,
-                cooldown_secs: req.cooldown_secs,
-                elo_k: req.elo_k,
-                xp_win: req.xp_win,
-                xp_loss: req.xp_loss,
-                w_str: req.w_str,
-                w_vit: req.w_vit,
-                w_agi: req.w_agi,
-                random_max: req.random_max,
             })
             .await
             .map_err(domain_to_status)?;

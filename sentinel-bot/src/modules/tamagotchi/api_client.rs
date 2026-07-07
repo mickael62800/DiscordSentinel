@@ -84,25 +84,15 @@ pub struct CardData {
     pub pet: PetData,
 }
 
-/// Arguments d'une action de soin (effets/couts calcules cote bot depuis la
-/// config guild — appliques atomiquement cote API).
+/// Arguments d'une action de soin. La balance (effets/couts/cooldown) est
+/// LUE et CALCULEE server-side depuis la config de la guild : le bot n'envoie
+/// que l'action.
 pub struct CareArgs {
     pub action: String,
-    pub coin_cost: i64,
-    pub hunger_delta: i32,
-    pub happiness_delta: i32,
-    pub energy_delta: i32,
-    pub xp_gain: i64,
-    pub cooldown_secs: i64,
-    pub cure: bool,
 }
 
 pub struct TrainArgs {
     pub stat: String,
-    pub energy_cost: i32,
-    pub coin_cost: i64,
-    pub stat_gain: i32,
-    pub cooldown_secs: i64,
 }
 
 pub struct VisitArgs {
@@ -110,10 +100,6 @@ pub struct VisitArgs {
     pub visitor_id: String,
     pub visitor_name: String,
     pub target_id: String,
-    pub xp_reward: i64,
-    pub coins_reward: i64,
-    pub cooldown_secs: i64,
-    pub max_per_day: i64,
 }
 
 pub struct CombatArgs {
@@ -121,15 +107,6 @@ pub struct CombatArgs {
     pub attacker_id: String,
     pub attacker_name: String,
     pub target_id: String,
-    pub energy_cost: i32,
-    pub cooldown_secs: i64,
-    pub elo_k: i32,
-    pub xp_win: i64,
-    pub xp_loss: i64,
-    pub w_str: i32,
-    pub w_vit: i32,
-    pub w_agi: i32,
-    pub random_max: i32,
 }
 
 /// Client gRPC tamagotchi. Cloneable (Channel = Arc en interne).
@@ -175,13 +152,6 @@ impl TamaApi {
         let req = proto::CareRequest {
             pet_id: pet_id.to_string(),
             action: args.action,
-            coin_cost: args.coin_cost,
-            hunger_delta: args.hunger_delta,
-            happiness_delta: args.happiness_delta,
-            energy_delta: args.energy_delta,
-            xp_gain: args.xp_gain,
-            cooldown_secs: args.cooldown_secs,
-            cure: args.cure,
         };
         crate::grpc_call!(@raw self.grpc, tamagotchi, care_pet, req)
             .map(PetData::from)
@@ -192,10 +162,6 @@ impl TamaApi {
         let req = proto::TrainRequest {
             pet_id: pet_id.to_string(),
             stat: args.stat,
-            energy_cost: args.energy_cost,
-            coin_cost: args.coin_cost,
-            stat_gain: args.stat_gain,
-            cooldown_secs: args.cooldown_secs,
         };
         crate::grpc_call!(@raw self.grpc, tamagotchi, train_pet, req)
             .map(PetData::from)
@@ -208,10 +174,6 @@ impl TamaApi {
             visitor_id: args.visitor_id,
             visitor_name: args.visitor_name,
             target_id: args.target_id,
-            xp_reward: args.xp_reward,
-            coins_reward: args.coins_reward,
-            cooldown_secs: args.cooldown_secs,
-            max_per_day: args.max_per_day,
         };
         crate::grpc_call!(@raw self.grpc, tamagotchi, visit, req)
             .map(|r| VisitData {
@@ -228,15 +190,6 @@ impl TamaApi {
             attacker_id: args.attacker_id,
             attacker_name: args.attacker_name,
             target_id: args.target_id,
-            energy_cost: args.energy_cost,
-            cooldown_secs: args.cooldown_secs,
-            elo_k: args.elo_k,
-            xp_win: args.xp_win,
-            xp_loss: args.xp_loss,
-            w_str: args.w_str,
-            w_vit: args.w_vit,
-            w_agi: args.w_agi,
-            random_max: args.random_max,
         };
         crate::grpc_call!(@raw self.grpc, tamagotchi, combat, req)
             .map(|r| CombatData {

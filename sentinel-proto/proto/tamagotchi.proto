@@ -68,25 +68,18 @@ message GetPetResponse {
   optional Pet pet = 1;
 }
 
+// La balance (couts/deltas/recompenses/cooldowns/poids) est LUE et CALCULEE
+// server-side depuis `bot_guild_config`. Le bot n'envoie que l'action + les
+// identifiants (plus aucun parametre de balance).
 message CareRequest {
   string pet_id = 1;
+  // "feed" | "play" | "sleep" | "cuddle" | "buy_<item>".
   string action = 2;
-  int64 coin_cost = 3;
-  int32 hunger_delta = 4;
-  int32 happiness_delta = 5;
-  int32 energy_delta = 6;
-  int64 xp_gain = 7;
-  int64 cooldown_secs = 8;
-  bool cure = 9;
 }
 
 message TrainRequest {
   string pet_id = 1;
   string stat = 2;
-  int32 energy_cost = 3;
-  int64 coin_cost = 4;
-  int32 stat_gain = 5;
-  int64 cooldown_secs = 6;
 }
 
 message VisitRequest {
@@ -94,10 +87,6 @@ message VisitRequest {
   string visitor_id = 2;
   string visitor_name = 3;
   string target_id = 4;
-  int64 xp_reward = 5;
-  int64 coins_reward = 6;
-  int64 cooldown_secs = 7;
-  int64 max_per_day = 8;
 }
 
 message VisitResult {
@@ -111,15 +100,6 @@ message CombatRequest {
   string attacker_id = 2;
   string attacker_name = 3;
   string target_id = 4;
-  int32 energy_cost = 5;
-  int64 cooldown_secs = 6;
-  int32 elo_k = 7;
-  int64 xp_win = 8;
-  int64 xp_loss = 9;
-  int32 w_str = 10;
-  int32 w_vit = 11;
-  int32 w_agi = 12;
-  int32 random_max = 13;
 }
 
 message CombatResult {

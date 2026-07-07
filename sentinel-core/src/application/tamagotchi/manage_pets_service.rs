@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
+use crate::application::tamagotchi::balance::{TamaBalance, BOT_NAME};
 use crate::domain::entities::tamagotchi::pet::{
     combat_power, elo_update, Health, NewPet, Pet, PetEvent, TickConfig, TickOutcome,
 };
@@ -16,16 +17,37 @@ use crate::ports::inbound::tamagotchi::manage_pets::{
     CareCommand, CombatCommand, CombatResult, CreatePetCommand, ManagePetsUseCase, TrainCommand,
     VisitCommand, VisitResult,
 };
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::tamagotchi::pet_repository::PetRepository;
 
 pub struct ManagePetsService {
     repo: Arc<dyn PetRepository>,
     wallet: Arc<dyn ManageWalletUseCase>,
+    config: Arc<dyn BotConfigRepository>,
 }
 
 impl ManagePetsService {
-    pub fn new(repo: Arc<dyn PetRepository>, wallet: Arc<dyn ManageWalletUseCase>) -> Self {
-        Self { repo, wallet }
+    pub fn new(
+        repo: Arc<dyn PetRepository>,
+        wallet: Arc<dyn ManageWalletUseCase>,
+        config: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        Self {
+            repo,
+            wallet,
+            config,
+        }
+    }
+
+    /// Charge la balance (regles de jeu) de la guild. Config absente / erreur
+    /// de lecture -> defauts serveur (identiques aux defauts bot historiques).
+    async fn balance(&self, guild_id: &str) -> TamaBalance {
+        let entries = self
+            .config
+            .get_config(guild_id, BOT_NAME)
+            .await
+            .unwrap_or_default();
+        TamaBalance::new(entries)
     }
 }
 
@@ -137,18 +159,26 @@ impl ManagePetsUseCase for ManagePetsService {
             return Err(DomainError::Conflict("ton compagnon est mort".into()));
         }
 
+        // Balance server-side : effets/couts calcules depuis la config de la
+        // guild (le bot n'envoie que l'action).
+        let effect = self
+            .balance(&pet.guild_id)
+            .await
+            .care_effect(&cmd.action)
+            .ok_or_else(|| DomainError::ValidationError(format!("action inconnue : {}", cmd.action)))?;
+
         let now = Utc::now();
         // Reservation ATOMIQUE du cooldown (CAS) AVANT tout debit : bloque le
         // double-declenchement (double-clic / rejeu / appels concurrents) au niveau
         // DB, la ou le couple lecture+set_cooldown+save laissait une fenetre de
         // course (deux care lisaient cooldown=0 et debitaient deux fois).
-        if cmd.cooldown_secs > 0 {
+        if effect.cooldown_secs > 0 {
             if !self
                 .repo
-                .try_claim_cooldown(pet.id, &cmd.action, now, cmd.cooldown_secs)
+                .try_claim_cooldown(pet.id, &cmd.action, now, effect.cooldown_secs)
                 .await?
             {
-                let remaining = pet.cooldown_remaining_secs(&cmd.action, now, cmd.cooldown_secs);
+                let remaining = pet.cooldown_remaining_secs(&cmd.action, now, effect.cooldown_secs);
                 return Err(DomainError::Conflict(format!(
                     "action en cooldown ({remaining}s restantes)"
                 )));
@@ -159,7 +189,7 @@ impl ManagePetsUseCase for ManagePetsService {
         }
 
         // Debit coins (wallet partage) si l'action a un cout. Montant borne serveur.
-        let coin_cost = cmd.coin_cost.clamp(0, MAX_TAMA_COINS);
+        let coin_cost = effect.coin_cost.clamp(0, MAX_TAMA_COINS);
         if coin_cost > 0 {
             self.wallet
                 .debit(
@@ -173,15 +203,15 @@ impl ManagePetsUseCase for ManagePetsService {
         }
 
         // Applique les effets.
-        pet.hunger = clamp_gauge(pet.hunger + cmd.hunger_delta);
-        pet.happiness = clamp_gauge(pet.happiness + cmd.happiness_delta);
-        pet.energy = clamp_gauge(pet.energy + cmd.energy_delta);
-        if cmd.xp_gain > 0 {
-            pet.xp = pet.xp.saturating_add(cmd.xp_gain);
+        pet.hunger = clamp_gauge(pet.hunger + effect.hunger_delta);
+        pet.happiness = clamp_gauge(pet.happiness + effect.happiness_delta);
+        pet.energy = clamp_gauge(pet.energy + effect.energy_delta);
+        if effect.xp_gain > 0 {
+            pet.xp = pet.xp.saturating_add(effect.xp_gain);
             pet.refresh_level();
         }
         // Potion de soin : guerit la maladie.
-        if cmd.cure && pet.status == Health::Sick {
+        if effect.cure && pet.status == Health::Sick {
             pet.status = Health::Healthy;
             pet.sick_since = None;
         }
@@ -208,25 +238,27 @@ impl ManagePetsUseCase for ManagePetsService {
         if pet.status == Health::Dead {
             return Err(DomainError::Conflict("ton compagnon est mort".into()));
         }
+        // Balance server-side (cout energie, cout coins, gain, cooldown).
+        let effect = self.balance(&pet.guild_id).await.train_effect();
         let now = Utc::now();
         // Reservation atomique du cooldown (CAS) avant le debit (cf. care).
-        if cmd.cooldown_secs > 0 {
+        if effect.cooldown_secs > 0 {
             if !self
                 .repo
-                .try_claim_cooldown(pet.id, "train", now, cmd.cooldown_secs)
+                .try_claim_cooldown(pet.id, "train", now, effect.cooldown_secs)
                 .await?
             {
-                let remaining = pet.cooldown_remaining_secs("train", now, cmd.cooldown_secs);
+                let remaining = pet.cooldown_remaining_secs("train", now, effect.cooldown_secs);
                 return Err(DomainError::Conflict(format!(
                     "entrainement en cooldown ({remaining}s restantes)"
                 )));
             }
             pet.set_cooldown("train", now);
         }
-        if pet.energy < cmd.energy_cost {
+        if pet.energy < effect.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
         }
-        let coin_cost = cmd.coin_cost.clamp(0, MAX_TAMA_COINS);
+        let coin_cost = effect.coin_cost.clamp(0, MAX_TAMA_COINS);
         if coin_cost > 0 {
             self.wallet
                 .debit(
@@ -238,10 +270,10 @@ impl ManagePetsUseCase for ManagePetsService {
                 )
                 .await?;
         }
-        pet.energy = clamp_gauge(pet.energy - cmd.energy_cost);
+        pet.energy = clamp_gauge(pet.energy - effect.energy_cost);
         // saturating_add + gain borne a >= 0 : evite l'overflow i32 (gain enorme
         // via config) et qu'un stat_gain negatif ne devienne une baisse detournee.
-        let gain = cmd.stat_gain.max(0);
+        let gain = effect.stat_gain.max(0);
         match cmd.stat.as_str() {
             "str" => pet.str_ = pet.str_.saturating_add(gain),
             "vit" => pet.vit = pet.vit.saturating_add(gain),
@@ -259,7 +291,7 @@ impl ManagePetsUseCase for ManagePetsService {
             .add_event(
                 saved.id,
                 "train",
-                &format!("Entrainement : +{} {}", cmd.stat_gain, cmd.stat),
+                &format!("Entrainement : +{} {}", effect.stat_gain, cmd.stat),
             )
             .await;
         Ok(saved)
@@ -271,6 +303,8 @@ impl ManagePetsUseCase for ManagePetsService {
                 "tu ne peux pas te visiter toi-meme".into(),
             ));
         }
+        // Balance server-side (recompenses, cooldown, limite/jour).
+        let effect = self.balance(&cmd.guild_id).await.visit_effect();
         // Compagnon du visiteur (pour cooldown + limite/jour).
         let mut visitor = self
             .repo
@@ -281,22 +315,22 @@ impl ManagePetsUseCase for ManagePetsService {
         let now = Utc::now();
         // Reservation ATOMIQUE du cooldown visiteur (CAS) : bloque le rejeu/double
         // AVANT tout credit vers la cible (le credit = creation de monnaie).
-        if cmd.cooldown_secs > 0
+        if effect.cooldown_secs > 0
             && !self
                 .repo
-                .try_claim_cooldown(visitor.id, "visit", now, cmd.cooldown_secs)
+                .try_claim_cooldown(visitor.id, "visit", now, effect.cooldown_secs)
                 .await?
         {
-            let remaining = visitor.cooldown_remaining_secs("visit", now, cmd.cooldown_secs);
+            let remaining = visitor.cooldown_remaining_secs("visit", now, effect.cooldown_secs);
             return Err(DomainError::Conflict(format!(
                 "visite en cooldown ({remaining}s restantes)"
             )));
         }
         let today = now.format("%Y-%m-%d").to_string();
-        if cmd.max_per_day > 0 && visitor.daily_counter("visit", &today) >= cmd.max_per_day {
+        if effect.max_per_day > 0 && visitor.daily_counter("visit", &today) >= effect.max_per_day {
             return Err(DomainError::Conflict(format!(
                 "limite de {} visites par jour atteinte",
-                cmd.max_per_day
+                effect.max_per_day
             )));
         }
 
@@ -323,8 +357,8 @@ impl ManagePetsUseCase for ManagePetsService {
 
         // Recompense la cible : coins (wallet) + XP. Montants bornes SERVEUR
         // (anti forge d'une recompense colossale via un appel gRPC direct).
-        let coins_reward = cmd.coins_reward.clamp(0, MAX_TAMA_COINS);
-        let xp_reward = cmd.xp_reward.clamp(0, MAX_TAMA_COINS);
+        let coins_reward = effect.coins_reward.clamp(0, MAX_TAMA_COINS);
+        let xp_reward = effect.xp_reward.clamp(0, MAX_TAMA_COINS);
         if coins_reward > 0 {
             self.wallet
                 .credit(
@@ -366,6 +400,8 @@ impl ManagePetsUseCase for ManagePetsService {
                 "tu ne peux pas te combattre toi-meme".into(),
             ));
         }
+        // Balance server-side (cout energie, cooldown, poids, ELO, XP, alea).
+        let effect = self.balance(&cmd.guild_id).await.combat_effect();
         let mut att = self
             .repo
             .get_by_owner(&cmd.guild_id, &cmd.attacker_id)
@@ -377,20 +413,20 @@ impl ManagePetsUseCase for ManagePetsService {
         let now = Utc::now();
         // Reservation atomique du cooldown combat (CAS) : evite le farm XP/ELO par
         // double-declenchement concurrent.
-        if cmd.cooldown_secs > 0 {
+        if effect.cooldown_secs > 0 {
             if !self
                 .repo
-                .try_claim_cooldown(att.id, "combat", now, cmd.cooldown_secs)
+                .try_claim_cooldown(att.id, "combat", now, effect.cooldown_secs)
                 .await?
             {
-                let remaining = att.cooldown_remaining_secs("combat", now, cmd.cooldown_secs);
+                let remaining = att.cooldown_remaining_secs("combat", now, effect.cooldown_secs);
                 return Err(DomainError::Conflict(format!(
                     "combat en cooldown ({remaining}s restantes)"
                 )));
             }
             att.set_cooldown("combat", now);
         }
-        if att.energy < cmd.energy_cost {
+        if att.energy < effect.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
         }
         let mut def = self
@@ -408,38 +444,50 @@ impl ManagePetsUseCase for ManagePetsService {
         let (roll_a, roll_d) = {
             use rand::Rng;
             let mut rng = rand::thread_rng();
-            let max = cmd.random_max.max(0);
+            let max = effect.random_max.max(0);
             let hi = if max == 0 { 0 } else { rng.gen_range(0..=max) };
             let lo = if max == 0 { 0 } else { rng.gen_range(0..=max) };
             (hi, lo)
         };
         let power_a = combat_power(
-            att.str_, att.vit, att.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_a,
+            att.str_,
+            att.vit,
+            att.agi,
+            effect.w_str,
+            effect.w_vit,
+            effect.w_agi,
+            roll_a,
         );
         let power_d = combat_power(
-            def.str_, def.vit, def.agi, cmd.w_str, cmd.w_vit, cmd.w_agi, roll_d,
+            def.str_,
+            def.vit,
+            def.agi,
+            effect.w_str,
+            effect.w_vit,
+            effect.w_agi,
+            roll_d,
         );
         let attacker_won = power_a >= power_d;
 
-        att.energy = clamp_gauge(att.energy - cmd.energy_cost);
+        att.energy = clamp_gauge(att.energy - effect.energy_cost);
         let old_att_elo = att.elo;
 
         if attacker_won {
-            let (nw, nl) = elo_update(att.elo, def.elo, cmd.elo_k);
+            let (nw, nl) = elo_update(att.elo, def.elo, effect.elo_k);
             att.elo = nw;
             def.elo = nl;
             att.wins += 1;
             def.losses += 1;
-            att.xp = att.xp.saturating_add(cmd.xp_win.max(0));
-            def.xp = def.xp.saturating_add(cmd.xp_loss.max(0));
+            att.xp = att.xp.saturating_add(effect.xp_win.max(0));
+            def.xp = def.xp.saturating_add(effect.xp_loss.max(0));
         } else {
-            let (nw, nl) = elo_update(def.elo, att.elo, cmd.elo_k);
+            let (nw, nl) = elo_update(def.elo, att.elo, effect.elo_k);
             def.elo = nw;
             att.elo = nl;
             att.losses += 1;
             def.wins += 1;
-            att.xp = att.xp.saturating_add(cmd.xp_loss.max(0));
-            def.xp = def.xp.saturating_add(cmd.xp_win.max(0));
+            att.xp = att.xp.saturating_add(effect.xp_loss.max(0));
+            def.xp = def.xp.saturating_add(effect.xp_win.max(0));
         }
         att.refresh_level();
         def.refresh_level();

@@ -495,6 +495,7 @@ pub async fn build_app_state(
             sentinel_core::application::tamagotchi::manage_pets_service::ManagePetsService::new(
                 pet_repo.clone(),
                 wallet_uc.clone(),
+                bot_config_repo.clone(),
             ),
         );
 

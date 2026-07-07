@@ -344,51 +344,11 @@ pub async fn handle_action(ctx: &Context, component: &ComponentInteraction) {
     };
     let pet_id = pet.id.clone();
 
-    let cfg = api
-        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
-        .await
-        .unwrap_or_default();
-    let xp = BaseApiClient::config_u64(&cfg, "xp_per_action", 5) as i64;
+    // Balance (couts/deltas/cooldown) calculee server-side : on n'envoie que
+    // l'action. On valide juste que l'action est connue cote bot.
     let args = match action.as_str() {
-        "feed" => CareArgs {
-            action: "feed".into(),
-            coin_cost: BaseApiClient::config_u64(&cfg, "feed_cost", 20) as i64,
-            hunger_delta: BaseApiClient::config_u64(&cfg, "feed_hunger_gain", 40) as i32,
-            happiness_delta: 0,
-            energy_delta: 0,
-            xp_gain: xp,
-            cooldown_secs: BaseApiClient::config_u64(&cfg, "feed_cooldown_secs", 1800) as i64,
-            cure: false,
-        },
-        "play" => CareArgs {
-            action: "play".into(),
-            coin_cost: 0,
-            hunger_delta: 0,
-            happiness_delta: BaseApiClient::config_u64(&cfg, "play_happiness_gain", 30) as i32,
-            energy_delta: -(BaseApiClient::config_u64(&cfg, "play_energy_cost", 10) as i32),
-            xp_gain: xp,
-            cooldown_secs: BaseApiClient::config_u64(&cfg, "play_cooldown_secs", 1800) as i64,
-            cure: false,
-        },
-        "sleep" => CareArgs {
-            action: "sleep".into(),
-            coin_cost: 0,
-            hunger_delta: 0,
-            happiness_delta: 0,
-            energy_delta: BaseApiClient::config_u64(&cfg, "sleep_energy_gain", 60) as i32,
-            xp_gain: 0,
-            cooldown_secs: BaseApiClient::config_u64(&cfg, "sleep_cooldown_secs", 1020) as i64,
-            cure: false,
-        },
-        "cuddle" => CareArgs {
-            action: "cuddle".into(),
-            coin_cost: 0,
-            hunger_delta: 0,
-            happiness_delta: BaseApiClient::config_u64(&cfg, "cuddle_happiness_gain", 15) as i32,
-            energy_delta: 0,
-            xp_gain: xp,
-            cooldown_secs: BaseApiClient::config_u64(&cfg, "cuddle_cooldown_secs", 3600) as i64,
-            cure: false,
+        "feed" | "play" | "sleep" | "cuddle" => CareArgs {
+            action: action.clone(),
         },
         _ => return,
     };
@@ -458,17 +418,8 @@ pub async fn handle_train(ctx: &Context, component: &ComponentInteraction) {
         Some(p) => p.id,
         None => return,
     };
-    let cfg = api
-        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
-        .await
-        .unwrap_or_default();
-    let args = TrainArgs {
-        stat,
-        energy_cost: BaseApiClient::config_u64(&cfg, "train_energy_cost", 25) as i32,
-        coin_cost: BaseApiClient::config_u64(&cfg, "train_cost", 0) as i64,
-        stat_gain: BaseApiClient::config_u64(&cfg, "train_stat_gain", 1) as i32,
-        cooldown_secs: BaseApiClient::config_u64(&cfg, "train_cooldown_secs", 7200) as i64,
-    };
+    // Balance (cout energie/coins, gain, cooldown) calculee server-side.
+    let args = TrainArgs { stat };
     match tama.train(&pet_id, args).await {
         Ok(p) => {
             let resp = update_from_card(&api, &guild_id, &user_id, &p).await;
@@ -558,10 +509,6 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
         .map(|g| g.to_string())
         .unwrap_or_default();
     let user_id = component.user.id.to_string();
-    let api = match get_api(ctx).await {
-        Some(a) => a,
-        None => return,
-    };
     let tama = match get_tama(ctx).await {
         Some(t) => t,
         None => return,
@@ -570,68 +517,18 @@ pub async fn handle_buy(ctx: &Context, component: &ComponentInteraction) {
         Some(p) => p.id,
         None => return,
     };
-    let cfg = api
-        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
-        .await
-        .unwrap_or_default();
-    let price = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
-    // Effets (gains de jauges) configurables par serveur ; clampes 0..=100
-    // (les jauges vont de 0 a 100, un gain negatif n'a pas de sens).
-    let gain = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d).min(100) as i32;
-
-    // Prix ET effets configurables (defauts = valeurs historiques).
-    let (cost, hunger, happiness, energy, cure, label) = match item.as_str() {
-        "croquettes" => (
-            price("shop_croquettes_price", 15),
-            gain("shop_croquettes_hunger_gain", 25),
-            0,
-            0,
-            false,
-            "Croquettes",
-        ),
-        "repas" => (
-            price("shop_repas_price", 40),
-            gain("shop_repas_hunger_gain", 60),
-            0,
-            0,
-            false,
-            "Repas premium",
-        ),
-        "boisson" => (
-            price("shop_boisson_price", 25),
-            0,
-            0,
-            gain("shop_boisson_energy_gain", 40),
-            false,
-            "Boisson energisante",
-        ),
-        "jouet" => (
-            price("shop_jouet_price", 20),
-            0,
-            gain("shop_jouet_happiness_gain", 35),
-            0,
-            false,
-            "Jouet",
-        ),
-        "potion" => (
-            price("shop_potion_price", 100),
-            gain("shop_potion_hunger_gain", 10),
-            gain("shop_potion_happiness_gain", 10),
-            gain("shop_potion_energy_gain", 10),
-            true,
-            "Potion de soin",
-        ),
+    // Prix ET effets calcules server-side : on n'envoie que l'action
+    // (`buy_<item>`). Le label ne sert qu'au message de confirmation.
+    let label = match item.as_str() {
+        "croquettes" => "Croquettes",
+        "repas" => "Repas premium",
+        "boisson" => "Boisson energisante",
+        "jouet" => "Jouet",
+        "potion" => "Potion de soin",
         _ => return,
     };
     let args = CareArgs {
         action: format!("buy_{item}"),
-        coin_cost: cost,
-        hunger_delta: hunger,
-        happiness_delta: happiness,
-        energy_delta: energy,
-        xp_gain: 0,
-        cooldown_secs: 0,
-        cure,
     };
     match tama.care(&pet_id, args).await {
         Ok(_) => reply_ephemeral(ctx, component, &format!("✅ {label} achete et utilise !")).await,
@@ -684,28 +581,17 @@ pub async fn handle_visit_select(ctx: &Context, component: &ComponentInteraction
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = match get_api(ctx).await {
-        Some(a) => a,
-        None => return,
-    };
     let tama = match get_tama(ctx).await {
         Some(t) => t,
         None => return,
     };
-    let cfg = api
-        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
-        .await
-        .unwrap_or_default();
 
+    // Recompenses/cooldown/limite calcules server-side.
     let args = VisitArgs {
         guild_id: guild_id.clone(),
         visitor_id: component.user.id.to_string(),
         visitor_name: component.user.name.clone(),
         target_id: target.to_string(),
-        xp_reward: BaseApiClient::config_u64(&cfg, "visit_xp_reward", 5) as i64,
-        coins_reward: BaseApiClient::config_u64(&cfg, "visit_coins_reward", 5) as i64,
-        cooldown_secs: BaseApiClient::config_u64(&cfg, "visit_cooldown_secs", 6600) as i64,
-        max_per_day: BaseApiClient::config_u64(&cfg, "visit_max_per_day", 10) as i64,
     };
 
     match tama.visit(args).await {
@@ -769,38 +655,20 @@ pub async fn handle_combat_select(ctx: &Context, component: &ComponentInteractio
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = match get_api(ctx).await {
-        Some(a) => a,
-        None => return,
-    };
     let tama = match get_tama(ctx).await {
         Some(t) => t,
         None => return,
     };
-    let cfg = api
-        .get_guild_config_for(&guild_id, MODULE_BOT_NAME)
-        .await
-        .unwrap_or_default();
-    let n = |k: &str, d: u64| BaseApiClient::config_u64(&cfg, k, d) as i64;
-
     // Niveau de l'attaquant AVANT le combat (pour detecter une evolution apres).
     let user_id = component.user.id.to_string();
     let before_level = fetch_pet(&tama, &guild_id, &user_id).await.map(|p| p.level);
 
+    // Cout/cooldown/poids/ELO/XP/alea calcules server-side.
     let args = CombatArgs {
         guild_id: guild_id.clone(),
         attacker_id: component.user.id.to_string(),
         attacker_name: component.user.name.clone(),
         target_id: target.to_string(),
-        energy_cost: n("combat_energy_cost", 20) as i32,
-        cooldown_secs: n("combat_cooldown_secs", 3600),
-        elo_k: n("combat_elo_k", 32) as i32,
-        xp_win: n("combat_xp_win", 50),
-        xp_loss: n("combat_xp_loss", 15),
-        w_str: n("combat_w_str", 3) as i32,
-        w_vit: n("combat_w_vit", 2) as i32,
-        w_agi: n("combat_w_agi", 2) as i32,
-        random_max: n("combat_random_max", 30) as i32,
     };
 
     match tama.combat(args).await {
