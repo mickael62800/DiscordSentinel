@@ -121,6 +121,17 @@ impl RbacRepository for PgRbacRepository {
         Ok(exists)
     }
 
+    async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError> {
+        let (exists,): (bool,) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM api_user_guilds WHERE discord_user_id = $1)",
+        )
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(exists)
+    }
+
     async fn delete_grant(&self, user_id: &str, guild_id: &str) -> Result<u64, DomainError> {
         let res =
             sqlx::query("DELETE FROM api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2")

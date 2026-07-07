@@ -39,6 +39,11 @@ pub trait RbacRepository: Send + Sync {
     /// `true` si le membre est owner de la guild.
     async fn is_owner(&self, user_id: &str, guild_id: &str) -> Result<bool, DomainError>;
 
+    /// `true` si le user possede au moins une attribution (n'importe quelle
+    /// guild, n'importe quel role) dans `api_user_guilds`. Sert au gate de
+    /// whitelist global (defense en profondeur sur l'auth Discord).
+    async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError>;
+
     /// Supprime l'attribution. Renvoie le nombre de lignes affectees
     /// (0 = le membre n'a pas de role sur la guild).
     async fn delete_grant(&self, user_id: &str, guild_id: &str) -> Result<u64, DomainError>;

@@ -91,17 +91,16 @@ pub async fn whitelist_middleware(
         }
     }
 
-    // 5. Lookup DB : EXISTS au moins une row dans api_user_guilds.
-    let exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM api_user_guilds WHERE discord_user_id = $1)",
-    )
-    .bind(&ctx.discord_user_id)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!(error = %e, "whitelist: lookup DB error -> 503");
-        StatusCode::SERVICE_UNAVAILABLE
-    })?;
+    // 5. Lookup via le use case : EXISTS au moins une row dans api_user_guilds.
+    //    Le SQL vit desormais dans l'adapter Postgres (`PgRbacRepository`).
+    let exists: bool = state
+        .rbac_admin_uc
+        .is_whitelisted(&ctx.discord_user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "whitelist: lookup DB error -> 503");
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
 
     // Cache du resultat (best-effort).
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {

@@ -56,6 +56,10 @@ pub trait ManageRbacUseCase: Send + Sync {
     async fn list_guild_users(&self, guild_id: &str)
         -> Result<Vec<GuildUserEntry>, DomainError>;
 
+    /// `true` si le user possede au moins une attribution RBAC (n'importe quelle
+    /// guild). Alimente le gate de whitelist global du middleware d'auth Discord.
+    async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError>;
+
     /// Auto-grant idempotent du proprietaire Discord comme `owner` RBAC au
     /// premier enregistrement de la guild. N'ecrase aucun role existant.
     async fn ensure_owner_grant(

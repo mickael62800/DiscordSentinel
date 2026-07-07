@@ -100,6 +100,10 @@ impl ManageRbacUseCase for ManageRbacService {
         self.repo.list_guild_users(guild_id).await
     }
 
+    async fn is_whitelisted(&self, user_id: &str) -> Result<bool, DomainError> {
+        self.repo.is_whitelisted(user_id).await
+    }
+
     async fn ensure_owner_grant(
         &self,
         guild_id: &str,
