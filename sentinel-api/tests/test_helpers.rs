@@ -4327,6 +4327,11 @@ fn base_state() -> AppState {
         reminders_uc: Arc::new(StubReminders),
         strikes_uc: Arc::new(StubStrikes),
         moderation_copilot_uc: Arc::new(StubModerationCopilot),
+        assess_target_risk_uc: Arc::new(
+            sentinel_api::application::moderation::assess_target_risk_service::AssessTargetRiskService::new(
+                Arc::new(StubBotConfigRepo),
+            ),
+        ),
         analytics_repo: Arc::new(StubAnalyticsRepo),
         daily_activity_repo: Arc::new(StubDailyActivityRepo),
         age_ban_repo: Arc::new(

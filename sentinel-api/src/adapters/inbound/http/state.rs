@@ -75,6 +75,10 @@ pub struct AppState {
     pub strikes_uc: Arc<dyn ManageStrikesUseCase>,
     pub moderation_copilot_uc:
         Arc<dyn crate::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase>,
+    /// Evaluation server-side du risque d'une cible (seuil + politique de
+    /// confirmation). Le bot fournit les faits Discord, l'API decide.
+    pub assess_target_risk_uc:
+        Arc<dyn crate::ports::inbound::moderation::assess_target_risk::AssessTargetRiskUseCase>,
     pub members_uc: Arc<dyn ManageMembersUseCase>,
     pub analytics_repo: Arc<dyn AnalyticsRepository>,
     pub daily_activity_repo: Arc<dyn DailyActivityRepository>,

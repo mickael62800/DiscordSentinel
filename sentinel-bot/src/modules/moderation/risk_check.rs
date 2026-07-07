@@ -7,8 +7,8 @@ use serenity::all::{Context, GuildId, User};
 use serenity::prelude::TypeMapKey;
 use tracing::warn;
 
-/// Age minimum d'un compte avant de considerer qu'il n'est plus "recent".
-const RECENT_ACCOUNT_DAYS: i64 = 7;
+use super::api_client::TargetRiskFacts;
+use super::ModerationApiKey;
 
 /// Custom ID prefix pour les boutons "Confirmer" (suivi du pending_id).
 pub const CONFIRM_PREFIX: &str = "sentinel_mod_risky_confirm_";
@@ -54,41 +54,33 @@ impl TypeMapKey for RiskyPendingKey {
 }
 
 /// Inspecte une cible et retourne un libelle du risque si applicable.
+///
+/// Le bot ne fait que COLLECTER les faits Discord (age du compte, cible=bot,
+/// scan des permissions de moderation). La DECISION (seuil d'age + politique)
+/// est prise server-side par l'API (`assess_target_risk`). Le seuil et la regle
+/// ne vivent plus dans le bot.
 pub async fn check_target_risk(ctx: &Context, guild_id: GuildId, target: &User) -> Option<String> {
-    // 1. Compte Discord recent (cree il y a moins de N jours)
-    let created_days_ago = account_age_days(target);
-    if created_days_ago < RECENT_ACCOUNT_DAYS {
-        return Some(format!(
-            "compte Discord cree il y a seulement {} jour(s)",
-            created_days_ago.max(0)
-        ));
-    }
+    // Collecte des faits Discord de la cible.
+    let account_age_days = account_age_days(target);
+    let is_bot = target.bot;
 
-    // 2. Bot — sanctionner un bot est souvent une erreur
-    if target.bot {
-        return Some("cible est un bot".to_string());
-    }
-
-    // 3. Membre de l'equipe de moderation (role avec MODERATE_MEMBERS)
-    match guild_id.member(&ctx.http, target.id).await {
+    // Scan des permissions de moderation. Un cache-miss guild empeche de statuer
+    // sur les perms : c'est un probleme de DONNEES Discord (pas de politique),
+    // on force donc la confirmation localement (fail-safe historique).
+    let has_mod_perms = match guild_id.member(&ctx.http, target.id).await {
         Ok(member) => match guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()) {
-            Some(guild) => {
-                let is_moderator = member.roles.iter().any(|role_id| {
-                    guild
-                        .roles
-                        .get(role_id)
-                        .map(|r| {
-                            r.permissions.moderate_members()
-                                || r.permissions.ban_members()
-                                || r.permissions.kick_members()
-                                || r.permissions.administrator()
-                        })
-                        .unwrap_or(false)
-                });
-                if is_moderator {
-                    return Some("cible fait partie de l'equipe de moderation".to_string());
-                }
-            }
+            Some(guild) => member.roles.iter().any(|role_id| {
+                guild
+                    .roles
+                    .get(role_id)
+                    .map(|r| {
+                        r.permissions.moderate_members()
+                            || r.permissions.ban_members()
+                            || r.permissions.kick_members()
+                            || r.permissions.administrator()
+                    })
+                    .unwrap_or(false)
+            }),
             None => {
                 warn!(
                     guild_id = %guild_id,
@@ -100,10 +92,35 @@ pub async fn check_target_risk(ctx: &Context, guild_id: GuildId, target: &User) 
         },
         Err(e) => {
             warn!(error = %e, target_id = %target.id, "risk check: member fetch failed");
+            false
+        }
+    };
+
+    // DECISION server-side : l'API applique le seuil + la politique.
+    let api = {
+        let data = ctx.data.read().await;
+        data.get::<ModerationApiKey>().cloned()
+    };
+    let api = match api {
+        Some(a) => a,
+        None => {
+            warn!("risk check: ModerationApiKey manquant, confirmation forcee (fail-safe)");
+            return Some("impossible d'evaluer le risque (client API indisponible)".to_string());
+        }
+    };
+
+    let facts = TargetRiskFacts {
+        account_age_days,
+        is_bot,
+        has_mod_perms,
+    };
+    match api.assess_target_risk(&guild_id.to_string(), &facts).await {
+        Ok(decision) => decision.reason.filter(|_| decision.risky),
+        Err(e) => {
+            warn!(error = %e, "risk check: appel API echoue, confirmation forcee (fail-safe)");
+            Some("impossible d'evaluer le risque (API indisponible)".to_string())
         }
     }
-
-    None
 }
 
 fn account_age_days(user: &User) -> i64 {
@@ -185,10 +202,10 @@ mod tests {
     }
 
     #[test]
-    fn account_age_exactly_recent_threshold() {
+    fn account_age_seven_days() {
         let now = 1_700_000_000_i64;
-        let created = now - (RECENT_ACCOUNT_DAYS * DAY_SECS);
-        assert_eq!(account_age_days_from_ts(created, now), RECENT_ACCOUNT_DAYS);
+        let created = now - (7 * DAY_SECS);
+        assert_eq!(account_age_days_from_ts(created, now), 7);
     }
 
     #[test]

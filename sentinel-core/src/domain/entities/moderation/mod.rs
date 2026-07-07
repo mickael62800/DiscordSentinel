@@ -5,5 +5,6 @@ pub mod infraction;
 pub mod modstats;
 pub mod purge;
 pub mod sursis;
+pub mod target_risk;
 pub mod review;
 pub mod user_note;

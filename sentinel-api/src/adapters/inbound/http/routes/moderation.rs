@@ -55,6 +55,10 @@ fn moderation_inner() -> Router<AppState> {
             get(handlers::moderation::copilot::get_member_context),
         )
         .route(
+            "/{guild_id}/assess-target-risk",
+            post(handlers::moderation::target_risk::assess_target_risk),
+        )
+        .route(
             "/modstats/{guild_id}",
             get(handlers::moderation::actions::get_modstats),
         )

@@ -158,6 +158,21 @@ pub struct MemberContext {
     pub suggestion: CopilotSuggestion,
 }
 
+/// Faits Discord d'une cible envoyes a l'API pour l'evaluation de risque.
+#[derive(Debug, Serialize)]
+pub struct TargetRiskFacts {
+    pub account_age_days: i64,
+    pub is_bot: bool,
+    pub has_mod_perms: bool,
+}
+
+/// Decision de risque renvoyee par l'API (seuil + politique server-side).
+#[derive(Debug, Deserialize)]
+pub struct TargetRiskDecision {
+    pub risky: bool,
+    pub reason: Option<String>,
+}
+
 /// Client API de la moderation.
 pub struct ApiClient {
     base: Arc<BaseApiClient>,
@@ -295,6 +310,22 @@ impl ApiClient {
                 precedent_count: suggestion.precedent_count,
             },
         })
+    }
+
+    /// Evalue server-side le risque d'une cible (garde-fou UX confirmation).
+    /// Le bot fournit les FAITS Discord ; l'API applique le seuil + la politique
+    /// et renvoie `{risky, reason}`.
+    pub async fn assess_target_risk(
+        &self,
+        guild_id: &str,
+        facts: &TargetRiskFacts,
+    ) -> Result<TargetRiskDecision, String> {
+        self.base
+            .post_json(
+                &format!("/api/moderation/{}/assess-target-risk", guild_id),
+                facts,
+            )
+            .await
     }
 
     /// Supprime une action de moderation par son ID (unwarn).

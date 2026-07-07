@@ -1,3 +1,4 @@
+pub mod assess_target_risk_service;
 pub mod manage_automod_reviews_service;
 pub mod manage_infractions_service;
 pub mod manage_moderation_copilot_service;

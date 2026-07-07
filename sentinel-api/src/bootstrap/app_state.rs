@@ -361,6 +361,16 @@ pub async fn build_app_state(
             moderation_copilot_repo,
         ),
     );
+    // Evaluation server-side du risque de cible (garde-fou UX confirmation) :
+    // lit le seuil `risk_recent_account_days` (moderation-bot, defaut 7j) et
+    // applique la politique. Le bot ne fournit que les faits Discord.
+    let assess_target_risk_uc: Arc<
+        dyn crate::ports::inbound::moderation::assess_target_risk::AssessTargetRiskUseCase,
+    > = Arc::new(
+        crate::application::moderation::assess_target_risk_service::AssessTargetRiskService::new(
+            bot_config_repo.clone(),
+        ),
+    );
     let moderation_uc = Arc::new(
         ManageModerationService::new(moderation_repo.clone(), strike_repo.clone(), cache.clone())
             .with_strikes_uc(strikes_uc.clone()
@@ -1327,6 +1337,7 @@ pub async fn build_app_state(
         reminders_uc,
         strikes_uc,
         moderation_copilot_uc,
+        assess_target_risk_uc,
         members_uc,
         analytics_repo,
         daily_activity_repo,
