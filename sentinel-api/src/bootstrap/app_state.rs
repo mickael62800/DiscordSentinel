@@ -378,6 +378,23 @@ pub async fn build_app_state(
             ),
         );
 
+    // Classement mensuel : repo Postgres (deltas d'XP + baselines) + use case
+    // (gates de publication, assemblage des tops, pose des baselines). Le
+    // handler HTTP ne fait que RBAC + envoi Discord.
+    let monthly_ranking_repo = Arc::new(
+        crate::adapters::outbound::postgres::community::monthly_ranking_repository::PgMonthlyRankingRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let monthly_ranking_uc: Arc<
+        dyn crate::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRankingUseCase,
+    > = Arc::new(
+        crate::application::community::manage_monthly_ranking_service::ManageMonthlyRankingService::new(
+            bot_config_repo.clone(),
+            monthly_ranking_repo,
+        ),
+    );
+
     // Snapshots analytics : repo Postgres (SQL des jobs) + use case (config par
     // guild, deltas de baseline, filtres de publication). Les handlers HTTP ne
     // font que declencher/RBAC/poster.
@@ -1133,6 +1150,7 @@ pub async fn build_app_state(
         role_panels_uc,
         notes_uc,
         bump_uc,
+        monthly_ranking_uc,
         reminders_uc,
         strikes_uc,
         moderation_copilot_uc,

@@ -3387,6 +3387,34 @@ impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for S
     }
 }
 
+pub struct StubMonthlyRanking;
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRankingUseCase
+    for StubMonthlyRanking
+{
+    async fn force_ranking(
+        &self,
+        _: &str,
+        _: Option<String>,
+    ) -> Result<
+        sentinel_core::domain::entities::community::monthly_ranking::MonthlyRankingData,
+        DomainError,
+    > {
+        Err(DomainError::Internal("stub".into()))
+    }
+    async fn plan_and_baseline(
+        &self,
+    ) -> Result<
+        sentinel_core::domain::entities::community::monthly_ranking::MonthlyPublishPlan,
+        DomainError,
+    > {
+        Ok(Default::default())
+    }
+    async fn mark_published(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 pub struct StubTournaments;
 #[async_trait]
 impl sentinel_core::ports::inbound::coude::manage_tournaments::ManageTournamentsUseCase
@@ -4011,6 +4039,7 @@ fn base_state() -> AppState {
         game_rcon_client: Arc::new(StubRconClient),
         game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
+        monthly_ranking_uc: Arc::new(StubMonthlyRanking),
         invitations_uc: Arc::new(StubInvitations),
         oauth_uc: Arc::new(StubOAuth),
         quarantine_uc: Arc::new(StubQuarantine),

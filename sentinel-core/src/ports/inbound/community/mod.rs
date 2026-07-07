@@ -3,6 +3,7 @@ pub mod manage_bump;
 pub mod manage_confessions;
 pub mod manage_levels;
 pub mod manage_members;
+pub mod manage_monthly_ranking;
 pub mod manage_role_panels;
 pub mod manage_voice_channels;
 pub mod manage_welcome_config;
