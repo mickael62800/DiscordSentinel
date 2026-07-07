@@ -1,5 +1,6 @@
 pub mod manage_announcements_service;
 pub mod manage_bump_service;
+pub mod evaluate_age_declaration_service;
 pub mod manage_confessions_service;
 pub mod manage_levels_service;
 pub mod manage_members_service;

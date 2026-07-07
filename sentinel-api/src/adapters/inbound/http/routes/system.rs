@@ -57,6 +57,11 @@ pub fn routes() -> Router<AppState> {
             "/api/welcome/{guild_id}/rules/publish",
             post(handlers::community::welcome::publish_rules),
         )
+        // Verification d'age : DECISION server-side (seuil pass/ban + duree).
+        .route(
+            "/api/welcome/{guild_id}/age-check",
+            post(handlers::community::welcome::age_check),
+        )
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
         .route("/api/ai/jobs", post(handlers::ai::ai_jobs::create_ai_job))
         .route("/api/ai/jobs/{id}", get(handlers::ai::ai_jobs::get_ai_job))

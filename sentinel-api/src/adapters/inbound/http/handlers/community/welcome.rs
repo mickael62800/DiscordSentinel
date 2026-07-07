@@ -4,6 +4,7 @@ use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Rol
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_core::domain::entities::community::age_check::AgeCheckDecision;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
@@ -253,6 +254,73 @@ pub async fn publish_rules(
         serde_json::json!({ "guild_id": guild_id }),
     );
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// Corps de `POST /api/welcome/{guild_id}/age-check` : le bot transmet l'age
+/// declare (deja borne cote saisie) et l'utilisateur concerne.
+#[derive(Debug, Deserialize)]
+pub struct AgeCheckRequestDto {
+    pub user_id: String,
+    pub declared_age: i32,
+}
+
+/// Decision server-side renvoyee au bot. Le bot n'execute que l'action Discord
+/// correspondante (grant role / ban + deban programme) et le rendu des messages.
+#[derive(Debug, Serialize)]
+#[serde(tag = "decision", rename_all = "snake_case")]
+pub enum AgeCheckDecisionDto {
+    /// Age suffisant -> le bot assigne le role membre.
+    Grant,
+    /// Age insuffisant -> le bot bannit jusqu'a `unban_at`.
+    Ban {
+        years: i32,
+        /// Date de deban (RFC3339).
+        unban_at: String,
+        reason: String,
+    },
+}
+
+impl From<AgeCheckDecision> for AgeCheckDecisionDto {
+    fn from(d: AgeCheckDecision) -> Self {
+        match d {
+            AgeCheckDecision::Grant => AgeCheckDecisionDto::Grant,
+            AgeCheckDecision::Ban {
+                years,
+                unban_at,
+                reason,
+            } => AgeCheckDecisionDto::Ban {
+                years,
+                unban_at: unban_at.to_rfc3339(),
+                reason,
+            },
+        }
+    }
+}
+
+/// POST /api/welcome/{guild_id}/age-check
+/// Decide l'issue de la verification d'age (seuil pass/ban + duree de ban)
+/// server-side. Le bot applique ensuite l'action Discord.
+pub async fn age_check(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<AgeCheckRequestDto>,
+) -> Result<Json<AgeCheckDecisionDto>, ApiError> {
+    // Le bot passe en Internal -> bypass RBAC ; un appelant web doit etre
+    // moderateur+ du serveur (parite avec l'enregistrement age-ban).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour la verification d'age",
+    )
+    .await?;
+    let decision = state
+        .age_check_uc
+        .evaluate(&guild_id, &dto.user_id, dto.declared_age)
+        .await?;
+    Ok(Json(decision.into()))
 }
 
 fn dto_to_patch(dto: SaveWelcomeConfigDto) -> WelcomeConfigPatch {

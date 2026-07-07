@@ -127,6 +127,8 @@ pub struct AppState {
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository>,
     pub welcome_config_uc: Arc<dyn crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase>,
+    /// Verification d'age : decision server-side (seuil pass/ban + duree de ban).
+    pub age_check_uc: Arc<dyn crate::ports::inbound::community::evaluate_age_declaration::EvaluateAgeDeclarationUseCase>,
     pub automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase>,
     pub automod_adaptive_slowmode_repo: Arc<dyn crate::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository>,
     pub reset_guild_uc: Arc<dyn crate::ports::inbound::system::reset_guild::ResetGuildUseCase>,

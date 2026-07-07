@@ -4329,6 +4329,11 @@ fn base_state() -> AppState {
                 Arc::new(StubWelcomeConfigRepo),
             ),
         ),
+        age_check_uc: Arc::new(
+            sentinel_api::application::community::evaluate_age_declaration_service::EvaluateAgeDeclarationService::new(
+                Arc::new(StubWelcomeConfigRepo),
+            ),
+        ),
         automod_reviews_uc: Arc::new(
             sentinel_api::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
                 Arc::new(StubAutomodReviewRepo),

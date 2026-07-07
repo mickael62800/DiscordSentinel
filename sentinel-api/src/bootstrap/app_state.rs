@@ -257,6 +257,12 @@ pub async fn build_app_state(
         Arc::new(crate::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
             welcome_config_repo.clone(),
         ));
+    // Verification d'age : DECISION server-side (le bot n'execute que l'action
+    // Discord). Lit la config welcome du serveur via le meme repo.
+    let age_check_uc: Arc<dyn crate::ports::inbound::community::evaluate_age_declaration::EvaluateAgeDeclarationUseCase> =
+        Arc::new(crate::application::community::evaluate_age_declaration_service::EvaluateAgeDeclarationService::new(
+            welcome_config_repo.clone(),
+        ));
     // Automod reviews (sync Discord <-> web).
     let automod_review_repo: Arc<dyn crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository> = Arc::new(
         crate::adapters::outbound::postgres::moderation::automod_review_repository::PgAutomodReviewRepository::new(pg_pool.clone()),
@@ -1345,6 +1351,7 @@ pub async fn build_app_state(
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
+        age_check_uc,
         automod_reviews_uc,
         automod_adaptive_slowmode_repo,
         reset_guild_uc,

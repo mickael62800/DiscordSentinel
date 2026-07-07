@@ -23,6 +23,23 @@ pub const AGE_MODAL_ID: &str = "sentinel_age_modal";
 /// custom_id du champ de saisie de l'age dans le modal.
 pub const AGE_INPUT_ID: &str = "age";
 
+/// Reponse de `POST /api/welcome/{guild}/age-check` : DECISION prise
+/// server-side (seuil pass/ban + duree du ban). Le bot n'execute que l'action
+/// Discord correspondante. Miroir de `AgeCheckDecisionDto` cote API.
+#[derive(Debug, serde::Deserialize)]
+#[serde(tag = "decision", rename_all = "snake_case")]
+enum AgeCheckDecisionResponse {
+    /// Age suffisant -> assignation du role membre.
+    Grant,
+    /// Age insuffisant -> ban temporaire jusqu'a `unban_at`.
+    Ban {
+        years: i32,
+        /// Date de deban (RFC3339).
+        unban_at: String,
+        reason: String,
+    },
+}
+
 /// Appele quand un nouveau membre rejoint.
 /// Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur le
 /// compte approximatif Discord (qui inclut les bots) si le cache est vide.
@@ -859,9 +876,10 @@ pub async fn handle_age_modal(
         None => return,
     };
 
-    // Reglages reglables par serveur (bornes de saisie + multiplicateur de ban).
-    // Lus via la config guild welcome-bot ; defaut = valeurs historiques.
-    let (age_min, age_max, ban_days_per_year, age_ban_log_channel) = {
+    // Bornes de saisie (validation d'entree) + salon de log : restent cote bot.
+    // La DECISION age-check (seuil pass/ban + duree du ban) est server-side :
+    // `age_ban_days_per_year` n'est donc plus lu ici.
+    let (age_min, age_max, age_ban_log_channel) = {
         use crate::shared::api_client::BaseApiClient;
         let cfg = {
             let data = ctx.data.read().await;
@@ -884,15 +902,13 @@ pub async fn handle_age_modal(
         } else {
             (5, 120)
         };
-        let ban_days_per_year =
-            BaseApiClient::config_u64(&cfg, "age_ban_days_per_year", 365).max(1);
         // Salon de log des bans de verification d'age (optionnel, configurable).
         let log_channel = BaseApiClient::config_or(&cfg, "age_ban_log_channel_id", "")
             .parse::<u64>()
             .ok()
             .filter(|id| *id > 0)
             .map(ChannelId::new);
-        (age_min, age_max, ban_days_per_year, log_channel)
+        (age_min, age_max, log_channel)
     };
 
     // Parse de l'age saisi.
@@ -915,10 +931,118 @@ pub async fn handle_age_modal(
         }
     };
 
+    // DECISION age-check server-side : le bot delegue la regle metier (seuil
+    // pass/ban + duree du ban) a l'API et n'execute que l'action Discord.
+    let decision = {
+        let base = {
+            let data = ctx.data.read().await;
+            data.get::<ApiClientKey>().map(Arc::clone)
+        };
+        let base = match base {
+            Some(b) => b,
+            None => {
+                warn!(guild = %guild_id, "API indisponible pour la verification d'age");
+                reply_modal(ctx, modal, "Verification d'age indisponible, reessaie plus tard.")
+                    .await;
+                return;
+            }
+        };
+        let body = serde_json::json!({
+            "user_id": user_id.to_string(),
+            "declared_age": age,
+        });
+        let path = format!("/api/welcome/{guild_id}/age-check");
+        match base.post_json::<_, AgeCheckDecisionResponse>(&path, &body).await {
+            Ok(d) => d,
+            Err(e) => {
+                warn!(error = %e, guild = %guild_id, "Echec decision age-check server-side");
+                reply_modal(ctx, modal, "Verification d'age indisponible, reessaie plus tard.")
+                    .await;
+                return;
+            }
+        }
+    };
+
+    // Age insuffisant -> ban temporaire (duree decidee server-side).
+    if let AgeCheckDecisionResponse::Ban {
+        years,
+        unban_at,
+        reason,
+    } = &decision
+    {
+        let years = *years;
+        let unban_at = match chrono::DateTime::parse_from_rfc3339(unban_at) {
+            Ok(dt) => dt.with_timezone(&chrono::Utc),
+            Err(e) => {
+                warn!(error = %e, "unban_at invalide dans la decision age-check");
+                return;
+            }
+        };
+        let message = config
+            .age_ban_message
+            .replace("{min}", &config.age_minimum.to_string())
+            .replace("{annees}", &years.to_string());
+
+        // On repond AVANT le ban (l'interaction serait perdue sinon).
+        reply_modal(ctx, modal, &message).await;
+
+        if let Err(e) = guild_id
+            .ban_with_reason(&ctx.http, user_id, 0, reason)
+            .await
+        {
+            warn!(error = %e, user = %user_id, "Echec ban verification d'age");
+            return;
+        }
+
+        // Enregistre le ban (source de verite du deban automatique par le worker).
+        if let Some(base) = {
+            let data = ctx.data.read().await;
+            data.get::<ApiClientKey>().map(Arc::clone)
+        } {
+            let body = serde_json::json!({
+                "guild_id": guild_id.to_string(),
+                "user_id": user_id.to_string(),
+                "declared_age": age,
+                "unban_at": unban_at.to_rfc3339(),
+            });
+            let res: Result<serde_json::Value, String> =
+                base.post_json("/api/age-bans", &body).await;
+            if let Err(e) = res {
+                warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
+            }
+        }
+
+        // Log staff : card informant qu'un membre a ete banni par la verification
+        // d'age (salon configurable `age_ban_log_channel_id`, sinon rien). Best-effort.
+        if let Some(channel) = age_ban_log_channel {
+            let total_days = (unban_at - chrono::Utc::now()).num_days().max(0);
+            let embed = CreateEmbed::new().color(0xE74C3Cu32).description(format!(
+                "\u{1f51e} **Ban verification d'age** \u{2014} <@{uid}> (`{uid}`)\n\
+                 Age declare : **{age} ans** (minimum {min}) \u{00b7} duree : **{years} an(s)** \
+                 (~{days} j) \u{00b7} deban auto <t:{ts}:R>",
+                uid = user_id.get(),
+                age = age,
+                min = config.age_minimum,
+                years = years,
+                days = total_days,
+                ts = unban_at.timestamp(),
+            ));
+            if let Err(e) = channel
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                .await
+            {
+                warn!(error = %e, "Echec log ban verification d'age");
+            }
+        }
+
+        info!(user = %modal.user.name, guild = %guild_id, age, years, "Age insuffisant -> ban temporaire");
+        return;
+    }
+
     // Age suffisant -> donne le role Membre PUIS retire le role temporaire.
     // Ordre important : on ajoute Membre avant de retirer le temporaire pour
     // qu'il n'y ait jamais d'instant ou le membre n'a aucun role d'acces.
-    if age >= config.age_minimum {
+    {
         let assigned =
             assign_roles_csv(ctx, guild_id, user_id, config.rules_role_id.as_deref()).await;
 
@@ -949,71 +1073,7 @@ pub async fn handle_age_modal(
             .await;
             warn!(guild = %guild_id, "Age verifie mais aucun role Membre (rules_role_id) configure");
         }
-        return;
     }
-
-    // Age insuffisant -> ban temporaire jusqu'aux age_minimum ans.
-    let years = (config.age_minimum - age).max(1);
-    let unban_at =
-        chrono::Utc::now() + chrono::Duration::days(i64::from(years) * ban_days_per_year as i64);
-    let message = config
-        .age_ban_message
-        .replace("{min}", &config.age_minimum.to_string())
-        .replace("{annees}", &years.to_string());
-
-    // On repond AVANT le ban (l'interaction serait perdue sinon).
-    reply_modal(ctx, modal, &message).await;
-
-    let reason = format!("Verification d'age : {age} ans (<{}).", config.age_minimum);
-    if let Err(e) = guild_id
-        .ban_with_reason(&ctx.http, user_id, 0, &reason)
-        .await
-    {
-        warn!(error = %e, user = %user_id, "Echec ban verification d'age");
-        return;
-    }
-
-    // Enregistre le ban (source de verite du deban automatique par le worker).
-    if let Some(base) = {
-        let data = ctx.data.read().await;
-        data.get::<ApiClientKey>().map(Arc::clone)
-    } {
-        let body = serde_json::json!({
-            "guild_id": guild_id.to_string(),
-            "user_id": user_id.to_string(),
-            "declared_age": age,
-            "unban_at": unban_at.to_rfc3339(),
-        });
-        let res: Result<serde_json::Value, String> = base.post_json("/api/age-bans", &body).await;
-        if let Err(e) = res {
-            warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
-        }
-    }
-
-    // Log staff : card informant qu'un membre a ete banni par la verification
-    // d'age (salon configurable `age_ban_log_channel_id`, sinon rien). Best-effort.
-    if let Some(channel) = age_ban_log_channel {
-        let total_days = i64::from(years) * ban_days_per_year as i64;
-        let embed = CreateEmbed::new().color(0xE74C3Cu32).description(format!(
-            "\u{1f51e} **Ban verification d'age** \u{2014} <@{uid}> (`{uid}`)\n\
-             Age declare : **{age} ans** (minimum {min}) \u{00b7} duree : **{years} an(s)** \
-             (~{days} j) \u{00b7} deban auto <t:{ts}:R>",
-            uid = user_id.get(),
-            age = age,
-            min = config.age_minimum,
-            years = years,
-            days = total_days,
-            ts = unban_at.timestamp(),
-        ));
-        if let Err(e) = channel
-            .send_message(&ctx.http, CreateMessage::new().embed(embed))
-            .await
-        {
-            warn!(error = %e, "Echec log ban verification d'age");
-        }
-    }
-
-    info!(user = %modal.user.name, guild = %guild_id, age, years, "Age insuffisant -> ban temporaire");
 }
 
 async fn reply_modal(

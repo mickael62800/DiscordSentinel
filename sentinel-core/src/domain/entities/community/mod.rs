@@ -1,4 +1,5 @@
 pub mod age_ban;
+pub mod age_check;
 pub mod announcement;
 pub mod bump;
 pub mod confession;
