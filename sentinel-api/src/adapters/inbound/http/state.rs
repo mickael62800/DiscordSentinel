@@ -8,6 +8,7 @@ use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::casino::blackjack_service::BlackjackService;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use crate::ports::inbound::ai::manage_dataset::ManageDatasetUseCase;
 use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
@@ -44,6 +45,7 @@ use crate::ports::outbound::system::log_repository::LogRepository;
 pub struct AppState {
     pub analyze_uc: Arc<dyn AnalyzeMessageUseCase>,
     pub analyze_image_uc: Arc<dyn AnalyzeImageUseCase>,
+    pub dataset_uc: Arc<dyn ManageDatasetUseCase>,
     pub rules_uc: Arc<dyn ManageRulesUseCase>,
     pub infractions_uc: Arc<dyn ManageInfractionsUseCase>,
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,

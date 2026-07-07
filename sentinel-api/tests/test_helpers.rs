@@ -3255,6 +3255,26 @@ impl sentinel_core::ports::inbound::community::manage_bump::ManageBumpUseCase fo
     }
 }
 
+pub struct StubDataset;
+#[async_trait]
+impl sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase for StubDataset {
+    async fn list_messages(
+        &self,
+        _: sentinel_core::ports::inbound::ai::manage_dataset::ListDatasetQuery,
+    ) -> Result<sentinel_core::domain::entities::ai::dataset::DatasetPage, DomainError> {
+        Ok(sentinel_core::domain::entities::ai::dataset::DatasetPage {
+            items: vec![],
+            total: 0,
+        })
+    }
+    async fn bulk_delete(
+        &self,
+        _: sentinel_core::ports::inbound::ai::manage_dataset::BulkDeleteCommand,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+}
+
 pub struct StubInvitations;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_invitations::ManageInvitationsUseCase
@@ -4057,6 +4077,7 @@ fn base_state() -> AppState {
         game_rcon_client: Arc::new(StubRconClient),
         game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
+        dataset_uc: Arc::new(StubDataset),
         monthly_ranking_uc: Arc::new(StubMonthlyRanking),
         invitations_uc: Arc::new(StubInvitations),
         oauth_uc: Arc::new(StubOAuth),

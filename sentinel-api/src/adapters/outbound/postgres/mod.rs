@@ -5,6 +5,7 @@ pub mod types;
 pub mod uow;
 
 // Bounded contexts (mirror de ports/outbound/).
+pub mod ai;
 pub mod audit;
 pub mod casino;
 pub mod community;

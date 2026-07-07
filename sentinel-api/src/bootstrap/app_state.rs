@@ -177,6 +177,18 @@ pub async fn build_app_state(
         bot_config_repo.clone(),
         inference_limiter.clone(),
     ));
+    // Dataset IA : repo Postgres (SQL ai_dataset_messages) + use case (bornage
+    // des filtres, validation des ids). Le handler ne fait que RBAC + map.
+    let dataset_repo = Arc::new(
+        crate::adapters::outbound::postgres::ai::dataset_repository::PgDatasetRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let dataset_uc: Arc<dyn crate::ports::inbound::ai::manage_dataset::ManageDatasetUseCase> =
+        Arc::new(
+            crate::application::ai::manage_dataset_service::ManageDatasetService::new(dataset_repo),
+        );
+
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
     let tickets_uc = Arc::new(ManageTicketsService::new(
@@ -1140,6 +1152,7 @@ pub async fn build_app_state(
     AppState {
         analyze_uc,
         analyze_image_uc,
+        dataset_uc,
         rules_uc,
         infractions_uc,
         tickets_uc,
