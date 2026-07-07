@@ -13,6 +13,7 @@ pub mod invitation_repository;
 pub mod ip_ban_repository;
 pub mod log_repository;
 pub mod oauth_session_repository;
+pub mod quarantine_repository;
 pub mod rbac_repository;
 pub mod security_audit_repository;
 pub mod security_log_repository;

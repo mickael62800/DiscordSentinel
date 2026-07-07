@@ -3,6 +3,7 @@ pub mod lookup_geoip_service;
 pub mod manage_invitations_service;
 pub mod manage_ip_bans_service;
 pub mod manage_oauth_service;
+pub mod manage_quarantine_service;
 pub mod manage_rbac_service;
 pub mod manage_rotation_service;
 pub mod manage_security_audit_service;

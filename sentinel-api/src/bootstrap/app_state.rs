@@ -504,6 +504,15 @@ pub async fn build_app_state(
             rbac_repo,
         ));
 
+    // Quarantaine de securite : repo Postgres (SQL security_quarantine_pending) +
+    // use case (calcul du delai avant kick). Le handler ne fait que parse/RBAC/map.
+    let quarantine_repo: Arc<dyn crate::ports::outbound::system::quarantine_repository::QuarantineRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::quarantine_repository::PgQuarantineRepository::new(pg_pool.clone()));
+    let quarantine_uc: Arc<dyn crate::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase> =
+        Arc::new(sentinel_core::application::system::manage_quarantine_service::ManageQuarantineService::new(
+            quarantine_repo,
+        ));
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -1100,6 +1109,7 @@ pub async fn build_app_state(
         infractions_uc,
         tickets_uc,
         invitations_uc,
+        quarantine_uc,
         security_uc,
         moderation_uc,
         modstats_uc,

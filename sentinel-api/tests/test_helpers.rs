@@ -3316,6 +3316,27 @@ impl sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase for
     }
 }
 
+pub struct StubQuarantine;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase
+    for StubQuarantine
+{
+    async fn quarantine_user(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_active(
+        &self,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::quarantine::ActiveQuarantine>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn lift(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 pub struct StubRbac;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for StubRbac {
@@ -3971,6 +3992,7 @@ fn base_state() -> AppState {
         bump_uc: Arc::new(StubBump),
         invitations_uc: Arc::new(StubInvitations),
         oauth_uc: Arc::new(StubOAuth),
+        quarantine_uc: Arc::new(StubQuarantine),
         rbac_admin_uc: Arc::new(StubRbac),
         tournaments_uc: Arc::new(StubTournaments),
         sursis_uc: Arc::new(StubSursis),
