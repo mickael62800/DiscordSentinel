@@ -806,10 +806,24 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     }
 }
 
+struct MockPurchaseUc;
+#[async_trait]
+impl sentinel_api::ports::inbound::coude::purchase_item::PurchaseItemUseCase for MockPurchaseUc {
+    async fn purchase_item(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_api::ports::inbound::coude::purchase_item::PurchaseResult, DomainError> {
+        unimplemented!()
+    }
+}
+
 #[tokio::test]
 async fn coude_inventory_list_and_has_item_round_trip() {
     let svc = CoudeInventoryServiceServer::new(InventoryGrpc {
         uc: Arc::new(MockInventoryUc),
+        purchase_uc: Arc::new(MockPurchaseUc),
         steal_protections_uc: Arc::new(test_helpers::StubCoudeStealProtections),
         steal_boosts_uc: Arc::new(test_helpers::StubCoudeStealBoosts),
     });
