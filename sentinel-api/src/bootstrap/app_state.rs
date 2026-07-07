@@ -189,6 +189,18 @@ pub async fn build_app_state(
             crate::application::ai::manage_dataset_service::ManageDatasetService::new(dataset_repo),
         );
 
+    // File de jobs IA : repo Postgres (SQL ai_jobs) + use case (validation
+    // job_type/guild_id). Le handler ne fait que parse/map.
+    let ai_job_repo = Arc::new(
+        crate::adapters::outbound::postgres::ai::ai_job_repository::PgAiJobRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let ai_jobs_uc: Arc<dyn crate::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase> =
+        Arc::new(
+            crate::application::ai::manage_ai_jobs_service::ManageAiJobsService::new(ai_job_repo),
+        );
+
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
     let tickets_uc = Arc::new(ManageTicketsService::new(
@@ -1157,6 +1169,7 @@ pub async fn build_app_state(
         analyze_uc,
         analyze_image_uc,
         dataset_uc,
+        ai_jobs_uc,
         rules_uc,
         infractions_uc,
         tickets_uc,

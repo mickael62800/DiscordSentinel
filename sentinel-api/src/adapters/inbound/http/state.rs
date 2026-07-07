@@ -46,6 +46,7 @@ pub struct AppState {
     pub analyze_uc: Arc<dyn AnalyzeMessageUseCase>,
     pub analyze_image_uc: Arc<dyn AnalyzeImageUseCase>,
     pub dataset_uc: Arc<dyn ManageDatasetUseCase>,
+    pub ai_jobs_uc: Arc<dyn crate::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase>,
     pub rules_uc: Arc<dyn ManageRulesUseCase>,
     pub infractions_uc: Arc<dyn ManageInfractionsUseCase>,
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,

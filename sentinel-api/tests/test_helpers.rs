@@ -3288,6 +3288,23 @@ impl sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase for
     }
 }
 
+pub struct StubAiJobs;
+#[async_trait]
+impl sentinel_core::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase for StubAiJobs {
+    async fn create_job(
+        &self,
+        _: sentinel_core::domain::entities::ai::ai_job::NewAiJob,
+    ) -> Result<Uuid, DomainError> {
+        Ok(Uuid::new_v4())
+    }
+    async fn get_job(
+        &self,
+        _: Uuid,
+    ) -> Result<sentinel_core::domain::entities::ai::ai_job::AiJob, DomainError> {
+        Err(DomainError::NotFound("ai_job stub".into()))
+    }
+}
+
 pub struct StubInvitations;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_invitations::ManageInvitationsUseCase
@@ -4091,6 +4108,7 @@ fn base_state() -> AppState {
         game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
         dataset_uc: Arc::new(StubDataset),
+        ai_jobs_uc: Arc::new(StubAiJobs),
         monthly_ranking_uc: Arc::new(StubMonthlyRanking),
         invitations_uc: Arc::new(StubInvitations),
         oauth_uc: Arc::new(StubOAuth),

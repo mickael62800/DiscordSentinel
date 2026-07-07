@@ -5,10 +5,10 @@
 //! L'ai-worker depile et appelle les services d'inference. Les bots peuvent
 //! soit poll `GET /api/ai/jobs/:id`, soit ecouter Redis `ai_result:{job_id}`.
 //!
-//! Pragmatique : sqlx direct (comme bot_persistence.rs) — la couche est triviale
-//! et pas couverte par une use case business.
+//! Adaptateur ENTRANT mince : parse/map uniquement. La validation
+//! (job_type whitelist, guild_id) vit dans `ManageAiJobsUseCase` ; le SQL
+//! dans `AiJobRepository`.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -20,7 +20,7 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::domain::errors::DomainError;
+use sentinel_core::domain::entities::ai::ai_job::NewAiJob;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAiJobDto {
@@ -36,7 +36,7 @@ pub struct AiJobCreatedDto {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct AiJobStatusDto {
     pub id: Uuid,
     pub guild_id: String,
@@ -56,29 +56,14 @@ pub async fn create_ai_job(
     State(state): State<AppState>,
     Json(dto): Json<CreateAiJobDto>,
 ) -> Result<(StatusCode, Json<AiJobCreatedDto>), ApiError> {
-    if !sentinel_core::domain::entities::system::job_whitelists::is_valid_ai_job_type(&dto.job_type)
-    {
-        return Err(ApiError::from(DomainError::ValidationError(format!(
-            "job_type invalide : '{}', attendu 'analyze_text' ou 'analyze_image'",
-            dto.job_type
-        ))));
-    }
-    if dto.guild_id.is_empty() {
-        return Err(ApiError::from(DomainError::ValidationError(
-            "guild_id requis".into(),
-        )));
-    }
-
-    let id: Uuid = sqlx::query_scalar(
-        "INSERT INTO ai_jobs (guild_id, job_type, input_payload) \
-         VALUES ($1, $2, $3) RETURNING id",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.job_type)
-    .bind(&dto.input_payload)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("ai_jobs insert"))?;
+    let id = state
+        .ai_jobs_uc
+        .create_job(NewAiJob {
+            guild_id: dto.guild_id,
+            job_type: dto.job_type,
+            input_payload: dto.input_payload,
+        })
+        .await?;
 
     Ok((
         StatusCode::ACCEPTED,
@@ -96,18 +81,21 @@ pub async fn get_ai_job(
 ) -> Result<Json<AiJobStatusDto>, ApiError> {
     let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;
 
-    let job = sqlx::query_as::<_, AiJobStatusDto>(
-        "SELECT id, guild_id, job_type, status, input_payload, result_payload, \
-                error_message, retries, created_at, started_at, completed_at \
-         FROM ai_jobs WHERE id = $1",
-    )
-    .bind(uuid)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("ai_jobs select"))?
-    .ok_or_else(|| ApiError::from(DomainError::NotFound(format!("ai_job {id}"))))?;
+    let job = state.ai_jobs_uc.get_job(uuid).await?;
 
-    Ok(Json(job))
+    Ok(Json(AiJobStatusDto {
+        id: job.id,
+        guild_id: job.guild_id,
+        job_type: job.job_type,
+        status: job.status,
+        input_payload: job.input_payload,
+        result_payload: job.result_payload,
+        error_message: job.error_message,
+        retries: job.retries,
+        created_at: job.created_at,
+        started_at: job.started_at,
+        completed_at: job.completed_at,
+    }))
 }
 
 #[cfg(test)]
