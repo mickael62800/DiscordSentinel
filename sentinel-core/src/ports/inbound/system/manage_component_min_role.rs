@@ -15,6 +15,15 @@ pub trait ManageComponentMinRoleUseCase: Send + Sync {
         guild_id: &str,
     ) -> Result<Vec<ComponentMinRoleOverride>, DomainError>;
 
+    /// Lit l'override brut (`min_role` string) d'un composant pour une guild,
+    /// s'il existe. `None` = pas d'override (le gate applique alors le default).
+    /// Utilise par le middleware `component_gates` pour resoudre le role effectif.
+    async fn get_override(
+        &self,
+        guild_id: &str,
+        component_key: &str,
+    ) -> Result<Option<String>, DomainError>;
+
     /// UPSERT idempotent d'un override (guild + component_key -> min_role).
     /// `updated_by` = discord user id de l'auteur.
     async fn upsert(

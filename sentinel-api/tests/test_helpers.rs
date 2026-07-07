@@ -3502,6 +3502,9 @@ impl sentinel_core::ports::inbound::system::manage_component_min_role::ManageCom
     > {
         Ok(vec![])
     }
+    async fn get_override(&self, _: &str, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
     async fn upsert(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
         Ok(())
     }

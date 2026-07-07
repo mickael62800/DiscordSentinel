@@ -30,6 +30,14 @@ impl ManageComponentMinRoleUseCase for ManageComponentMinRoleService {
         self.repo.list_for_guild(guild_id).await
     }
 
+    async fn get_override(
+        &self,
+        guild_id: &str,
+        component_key: &str,
+    ) -> Result<Option<String>, DomainError> {
+        self.repo.get_override(guild_id, component_key).await
+    }
+
     async fn upsert(
         &self,
         guild_id: &str,

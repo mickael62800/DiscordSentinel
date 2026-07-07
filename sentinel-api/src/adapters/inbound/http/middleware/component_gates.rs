@@ -217,18 +217,17 @@ async fn resolve_min_role(state: &AppState, guild_id: &str, component_key: &str)
         }
     }
 
-    let row: Option<(String,)> = sqlx::query_as(
-        "SELECT min_role FROM rbac_component_min_role \
-         WHERE guild_id = $1 AND component_key = $2",
-    )
-    .bind(guild_id)
-    .bind(component_key)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .ok()
-    .flatten();
+    // Lecture de l'override via le use case (SQL confine cote adapter Postgres).
+    // On preserve la semantique historique : une erreur DB est traitee comme
+    // "pas d'override" (`.ok().flatten()`), donc fallback vers `default_role`.
+    let row: Option<String> = state
+        .component_min_role_uc
+        .get_override(guild_id, component_key)
+        .await
+        .ok()
+        .flatten();
 
-    let role = match row.and_then(|(s,)| Role::from_str(&s)) {
+    let role = match row.and_then(|s| Role::from_str(&s)) {
         Some(override_role) => clamp_to_floor(override_role, def),
         None => def.default_role,
     };

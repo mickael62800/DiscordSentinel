@@ -43,6 +43,24 @@ impl ComponentMinRoleRepository for PgComponentMinRoleRepository {
             .collect())
     }
 
+    async fn get_override(
+        &self,
+        guild_id: &str,
+        component_key: &str,
+    ) -> Result<Option<String>, DomainError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT min_role FROM rbac_component_min_role \
+             WHERE guild_id = $1 AND component_key = $2",
+        )
+        .bind(guild_id)
+        .bind(component_key)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(row.map(|(min_role,)| min_role))
+    }
+
     async fn upsert(
         &self,
         guild_id: &str,

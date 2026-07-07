@@ -14,6 +14,14 @@ pub trait ComponentMinRoleRepository: Send + Sync {
         guild_id: &str,
     ) -> Result<Vec<ComponentMinRoleOverride>, DomainError>;
 
+    /// Lit l'override brut (`min_role` string) d'un composant pour une guild,
+    /// s'il existe. `None` = pas d'override (retour au default cote gate).
+    async fn get_override(
+        &self,
+        guild_id: &str,
+        component_key: &str,
+    ) -> Result<Option<String>, DomainError>;
+
     /// UPSERT idempotent d'un override (guild + component_key -> min_role).
     async fn upsert(
         &self,
