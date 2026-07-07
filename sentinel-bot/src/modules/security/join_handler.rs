@@ -13,7 +13,7 @@ use super::api_client::{MemberPayload, RecentJoinEntry};
 use super::detectors::captcha::{self, CaptchaPending};
 use super::detectors::raid_analyzer::JoinInfo;
 use super::{
-    AccountCheckerKey, AltDetectorKey, CaptchaPendingKey, LockdownKey, QuarantineKey,
+    CaptchaPendingKey, LockdownKey, QuarantineKey,
     RaidDetectorKey, RaidSuggestGuardKey, RecentJoinsKey, SecurityApiKey, SecurityConfigKey,
     SlowmodeKey,
 };
@@ -88,13 +88,6 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
             return;
         }
     };
-    let _account_checker = match data.get::<AccountCheckerKey>() {
-        Some(a) => a,
-        None => {
-            error!(guild_id = %guild_id, "AccountCheckerKey manquant");
-            return;
-        }
-    };
     let env_config = match data.get::<SecurityConfigKey>() {
         Some(a) => a,
         None => {
@@ -134,13 +127,6 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         Some(a) => a,
         None => {
             error!(guild_id = %guild_id, "CaptchaPendingKey manquant");
-            return;
-        }
-    };
-    let _alt_detector = match data.get::<AltDetectorKey>() {
-        Some(a) => a,
-        None => {
-            error!(guild_id = %guild_id, "AltDetectorKey manquant");
             return;
         }
     };

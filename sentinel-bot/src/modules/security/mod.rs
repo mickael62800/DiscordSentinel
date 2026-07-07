@@ -28,8 +28,6 @@ use crate::shared::discord_helpers::{
 use crate::shared::heartbeat::ApiClientKey;
 
 use api_client::{ApiClient, MemberPayload, SyncMembersPayload, UpdateMemberPayload};
-use detectors::account_checker::AccountChecker;
-use detectors::alt_detector::AltDetector;
 use detectors::captcha::{self, CaptchaPending};
 use detectors::lockdown::LockdownManager;
 use detectors::quarantine::QuarantineManager;
@@ -50,11 +48,6 @@ impl TypeMapKey for SecurityApiKey {
 pub struct RaidDetectorKey;
 impl TypeMapKey for RaidDetectorKey {
     type Value = RaidDetector;
-}
-
-pub struct AccountCheckerKey;
-impl TypeMapKey for AccountCheckerKey {
-    type Value = AccountChecker;
 }
 
 pub struct SecurityConfigKey;
@@ -87,11 +80,6 @@ impl TypeMapKey for CaptchaPendingKey {
     type Value = CaptchaPending;
 }
 
-pub struct AltDetectorKey;
-impl TypeMapKey for AltDetectorKey {
-    type Value = AltDetector;
-}
-
 pub struct RaidSuggestGuardKey;
 impl TypeMapKey for RaidSuggestGuardKey {
     type Value = RaidSuggestGuard;
@@ -116,8 +104,6 @@ pub struct SecurityConfig {
     pub lockdown_enabled: bool,
     pub lockdown_duration_secs: u64,
     pub alt_detection_enabled: bool,
-    pub alt_retention_secs: u64,
-    pub alt_name_distance: usize,
     pub raid_pattern_enabled: bool,
     pub raid_pattern_score_threshold: u32,
 }
@@ -146,8 +132,6 @@ impl SecurityConfig {
             lockdown_enabled: load_env_bool("LOCKDOWN_ENABLED", false),
             lockdown_duration_secs: load_env("LOCKDOWN_DURATION_SECS", 300),
             alt_detection_enabled: load_env_bool("ALT_DETECTION_ENABLED", false),
-            alt_retention_secs: load_env("ALT_RETENTION_SECS", 604_800),
-            alt_name_distance: load_env("ALT_NAME_DISTANCE", 2),
             raid_pattern_enabled: load_env_bool("RAID_PATTERN_ENABLED", true),
             raid_pattern_score_threshold: load_env("RAID_PATTERN_SCORE_THRESHOLD", 60),
         }
@@ -170,17 +154,11 @@ pub fn init_typemap(
         sec_config.raid_join_threshold,
         sec_config.raid_join_window_secs,
     ));
-    data.insert::<AccountCheckerKey>(AccountChecker::new(sec_config.min_account_age_secs));
     data.insert::<QuarantineKey>(QuarantineManager::new());
     data.insert::<SlowmodeKey>(SlowmodeManager::new());
     data.insert::<LockdownKey>(LockdownManager::new());
     data.insert::<RecentJoinsKey>(RecentJoinsTracker::new(sec_config.raid_join_window_secs));
     data.insert::<CaptchaPendingKey>(CaptchaPending::new());
-    data.insert::<AltDetectorKey>(AltDetector::new(
-        sec_config.alt_retention_secs,
-        sec_config.alt_name_distance,
-        3600,
-    ));
     data.insert::<RaidSuggestGuardKey>(RaidSuggestGuard::new());
     data.insert::<SecurityConfigKey>(sec_config);
 }
@@ -338,15 +316,6 @@ pub async fn on_ban_add(
             "warn",
             &guild_id.to_string(),
             &format!("Membre banni : {} ({})", banned_user.name, banned_user.id),
-        );
-    }
-
-    // Enregistrer le ban pour la detection d'alt accounts
-    if let Some(alt_detector) = data.get::<AltDetectorKey>() {
-        alt_detector.record_ban(
-            guild_id,
-            banned_user.name.clone(),
-            banned_user.created_at().unix_timestamp(),
         );
     }
 }
