@@ -54,6 +54,7 @@ impl LogRepository for MockLogRepo {
         &self,
         _category: Option<&str>,
         _level: Option<&str>,
+        _guild_id: Option<&str>,
         _limit: i64,
     ) -> Result<Vec<LogEntry>, DomainError> {
         Ok(self.entries.lock().unwrap().clone())

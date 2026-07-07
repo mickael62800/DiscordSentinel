@@ -282,7 +282,17 @@ mod community_grpc {
     use tonic::Request;
 
     fn grpc(p: PgPool) -> CommunityGrpc {
-        CommunityGrpc { pg_pool: p }
+        // Le service gRPC detient desormais un use case (hexagonal) au lieu du
+        // pg_pool ; on branche le vrai service sur les repos du pool de test pour
+        // conserver le round-trip DB de ces tests.
+        use std::sync::Arc;
+        let uc = Arc::new(
+            sentinel_api::application::community::manage_sponsorships_service::ManageSponsorshipsService::new(
+                Arc::new(sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository::new(p.clone())),
+                Arc::new(sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository::new(p.clone())),
+            ),
+        );
+        CommunityGrpc { uc }
     }
 
     #[tokio::test]

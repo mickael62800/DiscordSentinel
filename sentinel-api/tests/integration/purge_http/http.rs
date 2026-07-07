@@ -96,6 +96,7 @@ impl LogRepository for MockLogRepo {
         &self,
         _: Option<&str>,
         _: Option<&str>,
+        _: Option<&str>,
         _: i64,
     ) -> Result<Vec<LogEntry>, DomainError> {
         unimplemented!()
