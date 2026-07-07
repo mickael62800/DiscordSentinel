@@ -127,6 +127,24 @@ impl AutomodService for AutomodGrpc {
         }))
     }
 
+    async fn evaluate_caps(
+        &self,
+        request: Request<proto::EvaluateCapsRequest>,
+    ) -> Result<Response<proto::EvaluateCapsResponse>, Status> {
+        let req = request.into_inner();
+        if req.guild_id.is_empty() || req.guild_id.len() > 20 {
+            return Err(Status::invalid_argument("guild_id invalide"));
+        }
+        let decision = self
+            .uc
+            .evaluate_caps(&req.guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::EvaluateCapsResponse {
+            score: decision.score,
+        }))
+    }
+
     async fn evaluate_attachments(
         &self,
         request: Request<proto::EvaluateAttachmentsRequest>,

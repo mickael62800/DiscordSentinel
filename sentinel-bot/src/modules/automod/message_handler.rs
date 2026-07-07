@@ -87,6 +87,12 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     // applique une mesure reversible (mute + suppression) MEME en human_only, puis
     // poste toujours la carte. `severe_flood_max_messages` = seuil "gros flood".
     let auto_protect = BaseApiClient::config_bool(&config, "auto_protect_enabled", true);
+    // Seuil "gros flood". AUTORITE = API : la decision severe nominale est prise
+    // cote serveur (`evaluate_flood`, qui lit `severe_flood_max_messages` avec le
+    // defaut server-side `flood_max * 2`). La valeur ci-dessous n'est utilisee
+    // QUE par le fallback local quand l'API est injoignable (resilience
+    // VOLONTAIRE) : elle reflete simplement la meme config/defaut pour que la
+    // degradation reste fidele. Le bot ne DECIDE plus le seuil severe en nominal.
     let severe_flood_max = BaseApiClient::config_u64(
         &config,
         "severe_flood_max_messages",
@@ -417,12 +423,40 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 link: false,
                 phishing: false,
             };
+            // Score affiche : fabrique COTE API (`evaluate_caps`). Le bot ne
+            // l'invente plus (avant : 0.8 code en dur). Fallback local 0.8
+            // uniquement si l'API est injoignable (resilience VOLONTAIRE).
+            let caps_card_score = {
+                let (base, grpc) = {
+                    let data = ctx.data.read().await;
+                    (
+                        data.get::<crate::shared::heartbeat::ApiClientKey>()
+                            .cloned(),
+                        data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                            .cloned(),
+                    )
+                };
+                match (base, grpc) {
+                    (Some(base), Some(grpc)) => {
+                        let api = crate::modules::automod::api_client::ApiClient::new(base, grpc);
+                        let gid = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+                        match api.evaluate_caps(&gid).await {
+                            Ok(score) => score,
+                            Err(e) => {
+                                warn!(error = %e, "evaluate_caps gRPC echoue, fallback score local");
+                                0.8
+                            }
+                        }
+                    }
+                    _ => 0.8,
+                }
+            };
             send_review_card(
                 ctx,
                 msg,
                 &Action::Warn,
                 "Abus de majuscules detecte.",
-                0.8,
+                caps_card_score,
                 &flags,
                 log_channel_id,
                 &colors,

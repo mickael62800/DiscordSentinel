@@ -58,6 +58,15 @@ pub struct AttachmentDecision {
     pub filename: String,
 }
 
+/// Decision de score pour une detection de CAPS (majuscules), prise cote
+/// serveur. La detection (forme/longueur) reste locale au bot ; seul le SCORE
+/// de confiance affiche vient d'ici — le bot ne le fabrique plus (avant : 0.8
+/// code en dur cote bot).
+pub struct CapsDecision {
+    /// Score de confiance a afficher sur la carte de review / l'embed (0.0..1.0).
+    pub score: f64,
+}
+
 #[async_trait]
 pub trait AnalyzeMessageUseCase: Send + Sync {
     async fn analyze(&self, command: AnalyzeMessageCommand)
@@ -79,4 +88,8 @@ pub trait AnalyzeMessageUseCase: Send + Sync {
         guild_id: &str,
         filenames: Vec<String>,
     ) -> Result<AttachmentDecision, DomainError>;
+
+    /// Renvoie le score de confiance a afficher pour une detection de CAPS.
+    /// La detection reste locale au bot ; le SCORE affiche vit cote serveur.
+    async fn evaluate_caps(&self, guild_id: &str) -> Result<CapsDecision, DomainError>;
 }

@@ -115,6 +115,12 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
     ) -> Result<crate::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
         unimplemented!()
     }
+    async fn evaluate_caps(
+        &self,
+        _: &str,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn make_req(guild_id: &str, user_id: &str, content: &str) -> Request<proto::AnalyzeMessageRequest> {

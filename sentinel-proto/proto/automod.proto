@@ -16,6 +16,19 @@ service AutomodService {
   // Verdict sur des pieces jointes suspectes. Le bot envoie les noms de
   // fichiers ; la regle (extensions dangereuses + config) vit cote serveur.
   rpc EvaluateAttachments(EvaluateAttachmentsRequest) returns (EvaluateAttachmentsResponse);
+  // Score de confiance a afficher pour une detection de CAPS (majuscules).
+  // La detection reste locale (rate/forme) mais le SCORE affiche est fabrique
+  // cote serveur : le bot ne l'invente plus (avant : 0.8 code en dur).
+  rpc EvaluateCaps(EvaluateCapsRequest) returns (EvaluateCapsResponse);
+}
+
+message EvaluateCapsRequest {
+  string guild_id = 1;
+}
+
+message EvaluateCapsResponse {
+  // Score de confiance affiche sur la carte / l'embed (fabrique cote serveur).
+  double score = 1;
 }
 
 message EvaluateAttachmentsRequest {

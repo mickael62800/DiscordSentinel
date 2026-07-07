@@ -206,6 +206,12 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
     {
         unimplemented!()
     }
+    async fn evaluate_caps(
+        &self,
+        _: &str,
+    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 #[tokio::test]

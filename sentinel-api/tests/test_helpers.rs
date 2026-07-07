@@ -127,6 +127,12 @@ impl AnalyzeMessageUseCase for StubAnalyzeMessage {
     {
         unimplemented!()
     }
+    async fn evaluate_caps(
+        &self,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 pub struct StubAnalyzeImage;

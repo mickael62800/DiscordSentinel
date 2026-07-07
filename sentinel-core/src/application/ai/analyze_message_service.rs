@@ -406,6 +406,29 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         Ok(none())
     }
 
+    async fn evaluate_caps(
+        &self,
+        guild_id: &str,
+    ) -> Result<crate::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+        use crate::ports::inbound::ai::analyze_message::CapsDecision;
+        // Score de confiance affiche pour une detection de CAPS : fabrique cote
+        // serveur (auparavant code en dur dans le bot : 0.8). Lu depuis la config
+        // guild (`caps_confidence_score`) avec le defaut historique 0.8, borne
+        // a [0.0, 1.0]. La detection (forme/longueur) reste locale au bot.
+        let entries = self
+            .bot_config_repo
+            .get_config(guild_id, "automod-bot")
+            .await
+            .unwrap_or_default();
+        let score = entries
+            .iter()
+            .find(|e| e.config_key == "caps_confidence_score")
+            .and_then(|e| e.config_value.parse::<f64>().ok())
+            .map(|v| v.clamp(0.0, 1.0))
+            .unwrap_or(0.8);
+        Ok(CapsDecision { score })
+    }
+
     async fn analyze(&self, cmd: AnalyzeMessageCommand) -> Result<MessageAnalysis, DomainError> {
         // 1. Charger les règles (cache → DB)
         let rules = match self.cache.get_rules(&cmd.guild_id).await? {

@@ -181,6 +181,17 @@ impl ApiClient {
         })
     }
 
+    /// gRPC `AutomodService.EvaluateCaps` : score de confiance a afficher pour
+    /// une detection de CAPS. La detection reste locale (rate/forme) ; le SCORE
+    /// affiche est fabrique cote serveur (avant : 0.8 code en dur dans le bot).
+    pub async fn evaluate_caps(&self, guild_id: &str) -> Result<f64, String> {
+        let req = proto::EvaluateCapsRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, automod, evaluate_caps, req)?;
+        Ok(resp.score)
+    }
+
     // analyze_image supprime -- migre vers ai-worker (async queue + Redis).
 }
 

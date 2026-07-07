@@ -69,6 +69,12 @@ impl AnalyzeMessageUseCase for MockAnalyzeUC {
     {
         unimplemented!()
     }
+    async fn evaluate_caps(
+        &self,
+        _: &str,
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn build_app(uc: MockAnalyzeUC) -> axum::Router {
