@@ -146,6 +146,17 @@ impl AutomodReviewRepository for MockRepo {
     > {
         Ok(vec![])
     }
+    async fn fp_terminal_reviews(
+        &self,
+        _g: &str,
+        _d: i64,
+        _l: i64,
+    ) -> Result<
+        Vec<crate::domain::entities::moderation::review::automod::FpTerminalReview>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
     async fn find_discussion(
         &self,
         _id: Uuid,

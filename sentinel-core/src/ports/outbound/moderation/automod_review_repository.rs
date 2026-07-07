@@ -5,6 +5,7 @@ use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
 use crate::domain::entities::moderation::review::automod::DiscussionMessage;
 use crate::domain::entities::moderation::review::automod::ExpiredReviewCard;
+use crate::domain::entities::moderation::review::automod::FpTerminalReview;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
@@ -114,6 +115,16 @@ pub trait AutomodReviewRepository: Send + Sync {
         grace_hours: i64,
         limit: i64,
     ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
+
+    /// Charge les reviews terminales (statut applied|ignored|decided) de la
+    /// fenetre glissante `days`, bornees a `limit`, pour l'agregation des faux
+    /// positifs (over-block). Ordre : plus recentes d'abord.
+    async fn fp_terminal_reviews(
+        &self,
+        guild_id: &str,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<FpTerminalReview>, DomainError>;
 
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.

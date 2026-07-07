@@ -340,6 +340,180 @@ pub fn can_open_discussion(f: &ModeratorFacts) -> bool {
     is_moderator(f)
 }
 
+// ── Mesure des faux positifs (over-block) de l'automod ───────────────────
+
+/// Plafond d'echantillon pour l'agregation FP : au-dela on tronque et on
+/// signale `capped=true`.
+pub const FP_STATS_MAX_ROWS: i64 = 5000;
+
+/// Ligne terminale (statut applied|ignored|decided) chargee pour mesurer le
+/// taux de faux positifs. Donnee brute cote repo, agregee en Rust.
+#[derive(Debug, Clone)]
+pub struct FpTerminalReview {
+    pub suggested_action: String,
+    pub applied_action: Option<String>,
+    pub decided_action: Option<String>,
+    /// Objet JSONB de booleens (flags detecteurs actifs).
+    pub flags: serde_json::Value,
+}
+
+/// Severite unifiee (echelle AppliedAction : ignore=0 < prevention < warn <
+/// delete < mute < ban). Valeur absente/inconnue vaut 0 (= aucune sanction).
+fn fp_severity(action: Option<&str>) -> u8 {
+    action
+        .and_then(AppliedAction::from_str)
+        .map(|a| a.severity())
+        .unwrap_or(0)
+}
+
+#[derive(Default, Clone)]
+struct FpAcc {
+    total: i64,
+    overturned: i64,
+    ignored: i64,
+}
+
+impl FpAcc {
+    fn add(&mut self, overturned: bool, ignored: bool) {
+        self.total += 1;
+        if overturned {
+            self.overturned += 1;
+        }
+        if ignored {
+            self.ignored += 1;
+        }
+    }
+    fn rate(&self) -> f64 {
+        if self.total > 0 {
+            self.overturned as f64 / self.total as f64
+        } else {
+            0.0
+        }
+    }
+}
+
+/// Stat globale (over-block agrege).
+#[derive(Debug, Clone)]
+pub struct FpBucket {
+    pub total: i64,
+    pub overturned: i64,
+    pub ignored: i64,
+    pub fp_rate: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct FpFlagStat {
+    pub flag: String,
+    pub total: i64,
+    pub overturned: i64,
+    pub ignored: i64,
+    pub fp_rate: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct FpActionStat {
+    pub suggested_action: String,
+    pub total: i64,
+    pub overturned: i64,
+    pub ignored: i64,
+    pub fp_rate: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct FpStats {
+    pub days: i64,
+    /// True si l'echantillon a ete tronque a `FP_STATS_MAX_ROWS`.
+    pub capped: bool,
+    pub overall: FpBucket,
+    pub by_flag: Vec<FpFlagStat>,
+    pub by_suggested_action: Vec<FpActionStat>,
+}
+
+/// Agrege les reviews terminales et mesure le taux de faux positifs
+/// (over-block) global, par flag detecteur et par action suggeree.
+///
+/// Une review est un "faux positif" quand l'automod a SUGGERE une vraie
+/// sanction mais que la decision humaine terminale est plus clemente
+/// (downgrade ou "ignore").
+pub fn compute_fp_stats(days: i64, rows: &[FpTerminalReview], capped: bool) -> FpStats {
+    use std::collections::BTreeMap;
+
+    let mut overall = FpAcc::default();
+    // Ordre stable (alpha) pour un rendu deterministe.
+    let mut by_flag: BTreeMap<String, FpAcc> = BTreeMap::new();
+    let mut by_action: BTreeMap<String, FpAcc> = BTreeMap::new();
+
+    for r in rows {
+        let suggested_sev = fp_severity(Some(&r.suggested_action));
+        // Action humaine terminale : la resolution (applied_action) prime, sinon
+        // le verdict de vote (decided_action). Absente => aucune sanction (0).
+        let terminal = r.applied_action.as_deref().or(r.decided_action.as_deref());
+        let terminal_sev = fp_severity(terminal);
+
+        // Over-block : l'automod a suggere une vraie sanction ET l'humain a
+        // tranche plus clement (downgrade ou ignore).
+        let overturned = suggested_sev > 0 && terminal_sev < suggested_sev;
+        let ignored = terminal == Some("ignore") || terminal.is_none();
+
+        overall.add(overturned, ignored);
+        by_action
+            .entry(r.suggested_action.clone())
+            .or_default()
+            .add(overturned, ignored);
+
+        // Explose les flags detecteurs actifs (objet JSONB de booleens).
+        if let Some(map) = r.flags.as_object() {
+            for (flag, val) in map {
+                if val.as_bool() == Some(true) {
+                    by_flag.entry(flag.clone()).or_default().add(overturned, ignored);
+                }
+            }
+        }
+    }
+
+    let mut by_flag_dto: Vec<FpFlagStat> = by_flag
+        .into_iter()
+        .map(|(flag, a)| FpFlagStat {
+            flag,
+            total: a.total,
+            overturned: a.overturned,
+            ignored: a.ignored,
+            fp_rate: a.rate(),
+        })
+        .collect();
+    // Tri par taux de FP decroissant (les detecteurs les plus "bruyants" en tete).
+    by_flag_dto.sort_by(|a, b| {
+        b.fp_rate
+            .partial_cmp(&a.fp_rate)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then(b.total.cmp(&a.total))
+    });
+
+    let by_action_dto: Vec<FpActionStat> = by_action
+        .into_iter()
+        .map(|(suggested_action, a)| FpActionStat {
+            suggested_action,
+            total: a.total,
+            overturned: a.overturned,
+            ignored: a.ignored,
+            fp_rate: a.rate(),
+        })
+        .collect();
+
+    FpStats {
+        days,
+        capped,
+        overall: FpBucket {
+            total: overall.total,
+            overturned: overall.overturned,
+            ignored: overall.ignored,
+            fp_rate: overall.rate(),
+        },
+        by_flag: by_flag_dto,
+        by_suggested_action: by_action_dto,
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct NewAutomodReview {
     pub guild_id: GuildId,

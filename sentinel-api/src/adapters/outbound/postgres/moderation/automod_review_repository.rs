@@ -10,6 +10,7 @@ use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
 use sentinel_core::domain::entities::moderation::review::automod::ExpiredReviewCard;
+use sentinel_core::domain::entities::moderation::review::automod::FpTerminalReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
@@ -646,6 +647,45 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
         .await
         .map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn fp_terminal_reviews(
+        &self,
+        guild_id: &str,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<FpTerminalReview>, DomainError> {
+        #[derive(sqlx::FromRow)]
+        struct TerminalRow {
+            suggested_action: String,
+            applied_action: Option<String>,
+            decided_action: Option<String>,
+            flags: serde_json::Value,
+        }
+        let rows: Vec<TerminalRow> = sqlx::query_as(
+            "SELECT suggested_action, applied_action, decided_action, flags \
+             FROM automod_reviews \
+             WHERE guild_id = $1 \
+               AND status IN ('applied','ignored','decided') \
+               AND created_at >= NOW() - make_interval(days => $2) \
+             ORDER BY created_at DESC \
+             LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(days as i32)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|r| FpTerminalReview {
+                suggested_action: r.suggested_action,
+                applied_action: r.applied_action,
+                decided_action: r.decided_action,
+                flags: r.flags,
+            })
+            .collect())
     }
 
     async fn find_discussion(

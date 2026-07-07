@@ -10,6 +10,7 @@ use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::DiscussionChannel;
 use crate::domain::entities::moderation::review::automod::DiscussionMessage;
 use crate::domain::entities::moderation::review::automod::ExpiredReviewCard;
+use crate::domain::entities::moderation::review::automod::FpStats;
 use crate::domain::entities::moderation::review::automod::ModeratorFacts;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
@@ -148,6 +149,11 @@ pub trait ManageAutomodReviewsUseCase: Send + Sync {
         days: i64,
         limit: i64,
     ) -> Result<Vec<ExpiredReviewCard>, DomainError>;
+
+    /// Mesure les faux positifs (over-block) de l'automod sur la fenetre
+    /// glissante `days` (clampe 1..=365) : taux global, par flag detecteur et
+    /// par action suggeree. Lecture seule, agregation locale.
+    async fn fp_stats(&self, guild_id: &str, days: i64) -> Result<FpStats, DomainError>;
 
     // ── Salon de discussion ──
     /// Salon de discussion deja ouvert pour cette review, le cas echeant.

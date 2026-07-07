@@ -263,6 +263,32 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
             .await
     }
 
+    async fn fp_stats(
+        &self,
+        guild_id: &str,
+        days: i64,
+    ) -> Result<crate::domain::entities::moderation::review::automod::FpStats, DomainError> {
+        use crate::domain::entities::moderation::review::automod::{
+            compute_fp_stats, FP_STATS_MAX_ROWS,
+        };
+        crate::application::validation::validate_guild_id(guild_id)?;
+        let days = days.clamp(1, 365);
+        let rows = self
+            .repo
+            .fp_terminal_reviews(guild_id, days, FP_STATS_MAX_ROWS)
+            .await?;
+        let capped = rows.len() as i64 >= FP_STATS_MAX_ROWS;
+        if capped {
+            tracing::warn!(
+                guild_id,
+                days,
+                max = FP_STATS_MAX_ROWS,
+                "fp-stats : echantillon tronque, stats approximatives"
+            );
+        }
+        Ok(compute_fp_stats(days, &rows, capped))
+    }
+
     async fn get_discussion(
         &self,
         review_id: Uuid,
