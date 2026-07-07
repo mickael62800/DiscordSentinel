@@ -541,6 +541,20 @@ pub async fn build_app_state(
             ),
         );
 
+    // Sauvegarde / restauration de serveur (guild_backup) : repo + use case.
+    let snapshot_repo: Arc<dyn crate::ports::outbound::guild_backup::snapshot_repository::SnapshotRepository> =
+        Arc::new(
+            crate::adapters::outbound::postgres::guild_backup::snapshot_repository::PgSnapshotRepository::new(
+                pg_pool.clone(),
+            ),
+        );
+    let guild_snapshots_uc: Arc<dyn crate::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase> =
+        Arc::new(
+            sentinel_core::application::guild_backup::manage_snapshots_service::ManageGuildSnapshotsService::new(
+                snapshot_repo.clone(),
+            ),
+        );
+
     // Administrateur tournant : repo + use case.
     let rotation_repo: Arc<dyn crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository> =
         Arc::new(crate::adapters::outbound::postgres::system::admin_rotation_repository::PgAdminRotationRepository::new(pg_pool.clone()));
@@ -1396,6 +1410,7 @@ pub async fn build_app_state(
         automod_adaptive_slowmode_repo,
         reset_guild_uc,
         pets_uc,
+        guild_snapshots_uc,
         rotation_uc,
         ip_bans_uc,
         host_probe_uc,

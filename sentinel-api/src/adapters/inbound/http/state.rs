@@ -140,6 +140,10 @@ pub struct AppState {
     pub automod_adaptive_slowmode_repo: Arc<dyn crate::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository>,
     pub reset_guild_uc: Arc<dyn crate::ports::inbound::system::reset_guild::ResetGuildUseCase>,
     pub pets_uc: Arc<dyn crate::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase>,
+    /// Sauvegarde / restauration de serveur (domaine `guild_backup`).
+    pub guild_snapshots_uc: Arc<
+        dyn crate::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase,
+    >,
     pub rotation_uc: Arc<dyn crate::ports::inbound::system::manage_rotation::ManageRotationUseCase>,
     pub ip_bans_uc: Arc<dyn crate::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase>,
     pub host_probe_uc: Arc<dyn crate::ports::inbound::system::read_host_probe::ReadHostProbeUseCase>,

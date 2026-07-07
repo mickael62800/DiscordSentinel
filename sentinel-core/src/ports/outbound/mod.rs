@@ -6,6 +6,7 @@ pub mod community;
 pub mod coude;
 pub mod discord_api;
 pub mod game;
+pub mod guild_backup;
 pub mod influence;
 pub mod moderation;
 pub mod system;

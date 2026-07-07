@@ -13,6 +13,7 @@ pub mod community;
 pub mod coude;
 pub mod dashboard;
 pub mod game_portal;
+pub mod guild_backup;
 pub mod influence;
 pub mod games;
 pub mod members;

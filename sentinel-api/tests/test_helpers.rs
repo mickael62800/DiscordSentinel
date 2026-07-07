@@ -2705,6 +2705,46 @@ impl BlackjackTableRepository for StubBlackjackTableRepo {
 
 // ── Stubs Tamagotchi / Systeme securite / Game Portal ──
 
+pub struct StubGuildSnapshots;
+#[async_trait]
+impl sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase
+    for StubGuildSnapshots
+{
+    async fn store_snapshot(
+        &self,
+        _: sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot,
+    ) -> Result<
+        sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotId,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn list_snapshots(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotSummary>,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn get_snapshot(
+        &self,
+        _: sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotId,
+    ) -> Result<
+        sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot,
+        DomainError,
+    > {
+        unimplemented!()
+    }
+    async fn delete_snapshot(
+        &self,
+        _: sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotId,
+    ) -> Result<bool, DomainError> {
+        unimplemented!()
+    }
+}
+
 pub struct StubPets;
 #[async_trait]
 impl sentinel_core::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase for StubPets {
@@ -4421,6 +4461,7 @@ fn base_state() -> AppState {
         pending_action_repo: Arc::new(StubPendingActionRepo),
         blackjack_table_repo: Arc::new(StubBlackjackTableRepo),
         pets_uc: Arc::new(StubPets),
+        guild_snapshots_uc: Arc::new(StubGuildSnapshots),
         rotation_uc: Arc::new(StubRotation),
         ip_bans_uc: Arc::new(StubIpBans),
         host_probe_uc: Arc::new(StubHostProbe),
