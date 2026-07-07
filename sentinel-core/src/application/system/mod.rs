@@ -1,6 +1,7 @@
 pub mod export_service;
 pub mod lookup_geoip_service;
 pub mod manage_ip_bans_service;
+pub mod manage_oauth_service;
 pub mod manage_rotation_service;
 pub mod manage_security_audit_service;
 pub mod manage_tickets_service;

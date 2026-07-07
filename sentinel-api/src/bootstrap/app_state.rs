@@ -447,6 +447,16 @@ pub async fn build_app_state(
     let security_audit_uc: Arc<dyn crate::ports::inbound::system::manage_security_audit::ManageSecurityAuditUseCase> =
         Arc::new(sentinel_core::application::system::manage_security_audit_service::ManageSecurityAuditService::new(security_audit_repo));
 
+    // OAuth Discord web : repo Postgres (sessions + logins) + use case. Le SQL
+    // vit dans l'adapter ; l'echange HTTP avec Discord + CSRF/cookies restent
+    // au handler (concern HTTP).
+    let oauth_session_repo: Arc<dyn crate::ports::outbound::system::oauth_session_repository::OAuthSessionRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::oauth_session_repository::PgOAuthSessionRepository::new(pg_pool.clone()));
+    let oauth_uc: Arc<dyn crate::ports::inbound::system::manage_oauth::ManageOAuthUseCase> =
+        Arc::new(sentinel_core::application::system::manage_oauth_service::ManageOAuthService::new(
+            oauth_session_repo,
+        ));
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -1101,6 +1111,7 @@ pub async fn build_app_state(
         host_probe_uc,
         security_logs_uc,
         security_audit_uc,
+        oauth_uc,
         tls_cert_uc,
         geoip_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(

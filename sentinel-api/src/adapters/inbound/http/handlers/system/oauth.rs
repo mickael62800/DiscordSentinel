@@ -13,6 +13,14 @@
 //!      navigateur vers `${WEB_FRONT_URL}/auth/callback#token=…&id=…&username=…`.
 //!      Le fragment `#…` (pas la query string) evite que le token n'apparaisse
 //!      dans les logs serveur / referer.
+//!
+//! Archi hexagonale : tout le SQL (sessions `web_oauth_sessions`, trace de login
+//! `successful_logins`) est extrait derriere le port `ManageOAuthUseCase` (via
+//! `state.oauth_uc`). L'echange HTTP avec Discord (reqwest : /oauth2/token,
+//! /users/@me, refresh_token) RESTE volontairement dans le handler : il est
+//! indissociable du flux CSRF/state Redis et des cookies (concerns HTTP purs),
+//! n'a pas d'etat metier a persister, et le sortir sans les cookies/CSRF
+//! n'apporterait qu'une indirection. Priorite du refactor : sortir le SQL.
 
 use axum::{
     extract::{Query, State},
@@ -23,6 +31,9 @@ use redis::AsyncCommands;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::entities::system::oauth::{
+    LoginTrace, NewOAuthSession, SessionTokenUpdate,
+};
 
 const STATE_TTL_SECS: u64 = 600;
 const STATE_PREFIX: &str = "oauth:web:state:";
@@ -332,21 +343,15 @@ pub async fn callback(
         .and_then(|v| v.to_str().ok())
         .map(|s| s.chars().take(500).collect::<String>())
         .unwrap_or_default();
-    let pool = state.pg_pool.clone();
-    let user_id = me.id.clone();
-    let username = me.username.clone();
+    let oauth_uc = state.oauth_uc.clone();
+    let trace = LoginTrace {
+        discord_user_id: me.id.clone(),
+        username: me.username.clone(),
+        client_ip,
+        user_agent,
+    };
     tokio::spawn(async move {
-        let res = sqlx::query(
-            "INSERT INTO successful_logins (discord_user_id, username, client_ip, user_agent) \
-             VALUES ($1, $2, $3, $4)",
-        )
-        .bind(&user_id)
-        .bind(&username)
-        .bind(&client_ip)
-        .bind(&user_agent)
-        .execute(&pool)
-        .await;
-        if let Err(e) = res {
+        if let Err(e) = oauth_uc.record_login(trace).await {
             tracing::warn!(error = %e, "Echec insert successful_logins");
         }
     });
@@ -358,21 +363,19 @@ pub async fn callback(
         let session_id = uuid::Uuid::new_v4();
         let expires_in = token.expires_in.unwrap_or(604800).max(0);
         let access_exp = chrono::Utc::now() + chrono::Duration::seconds(expires_in);
-        let res = sqlx::query(
-            "INSERT INTO web_oauth_sessions \
-                (id, discord_user_id, username, global_name, avatar, access_token, refresh_token, access_expires_at) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)",
-        )
-        .bind(session_id)
-        .bind(&me.id)
-        .bind(&me.username)
-        .bind(&me.global_name)
-        .bind(&me.avatar)
-        .bind(&token.access_token)
-        .bind(refresh)
-        .bind(access_exp)
-        .execute(&state.pg_pool)
-        .await;
+        let res = state
+            .oauth_uc
+            .create_session(NewOAuthSession {
+                id: session_id,
+                discord_user_id: me.id.clone(),
+                username: me.username.clone(),
+                global_name: me.global_name.clone(),
+                avatar: me.avatar.clone(),
+                access_token: token.access_token.clone(),
+                refresh_token: refresh.to_string(),
+                access_expires_at: access_exp,
+            })
+            .await;
         match res {
             Ok(_) => Some(build_session_cookie(
                 &session_id.to_string(),
@@ -407,17 +410,6 @@ pub async fn callback(
     }
 }
 
-#[derive(sqlx::FromRow)]
-struct SessionRow {
-    discord_user_id: String,
-    username: String,
-    global_name: Option<String>,
-    avatar: Option<String>,
-    access_token: String,
-    refresh_token: String,
-    access_expires_at: chrono::DateTime<chrono::Utc>,
-}
-
 #[derive(serde::Serialize)]
 struct RefreshResponse {
     token: String,
@@ -448,26 +440,15 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
         Err(_) => return unauthorized_clear_cookie(),
     };
 
-    let row: Option<SessionRow> = sqlx::query_as(
-        "SELECT discord_user_id, username, global_name, avatar, access_token, refresh_token, access_expires_at \
-         FROM web_oauth_sessions WHERE id = $1",
-    )
-    .bind(session_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .unwrap_or(None);
-
-    let Some(s) = row else {
-        return unauthorized_clear_cookie();
+    let s = match state.oauth_uc.get_session(session_id).await {
+        Ok(Some(s)) => s,
+        _ => return unauthorized_clear_cookie(),
     };
 
     // Token encore valide (marge 60s) -> on le renvoie tel quel.
     let now = chrono::Utc::now();
     if s.access_expires_at > now + chrono::Duration::seconds(60) {
-        let _ = sqlx::query("UPDATE web_oauth_sessions SET last_used_at = NOW() WHERE id = $1")
-            .bind(session_id)
-            .execute(&state.pg_pool)
-            .await;
+        let _ = state.oauth_uc.touch_session(session_id).await;
         return axum::Json(RefreshResponse {
             token: s.access_token,
             id: s.discord_user_id,
@@ -496,10 +477,7 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
         Ok(r) if r.status().is_success() => r,
         Ok(r) => {
             tracing::warn!(status = %r.status(), "Refresh Discord refuse -> session invalidee");
-            let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")
-                .bind(session_id)
-                .execute(&state.pg_pool)
-                .await;
+            let _ = state.oauth_uc.delete_session(session_id).await;
             return unauthorized_clear_cookie();
         }
         Err(e) => {
@@ -519,16 +497,15 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
     let new_exp = now + chrono::Duration::seconds(expires_in);
     // Discord peut faire tourner le refresh_token : on garde le nouveau s'il existe.
     let new_refresh = token.refresh_token.clone().unwrap_or(s.refresh_token);
-    let _ = sqlx::query(
-        "UPDATE web_oauth_sessions SET access_token = $2, refresh_token = $3, \
-            access_expires_at = $4, last_used_at = NOW() WHERE id = $1",
-    )
-    .bind(session_id)
-    .bind(&token.access_token)
-    .bind(&new_refresh)
-    .bind(new_exp)
-    .execute(&state.pg_pool)
-    .await;
+    let _ = state
+        .oauth_uc
+        .update_tokens(SessionTokenUpdate {
+            id: session_id,
+            access_token: token.access_token.clone(),
+            refresh_token: new_refresh,
+            access_expires_at: new_exp,
+        })
+        .await;
 
     axum::Json(RefreshResponse {
         token: token.access_token,
@@ -544,10 +521,7 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
 pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
     if let Some(sid) = cookie_value(&headers, SESSION_COOKIE) {
         if let Ok(session_id) = uuid::Uuid::parse_str(&sid) {
-            let _ = sqlx::query("DELETE FROM web_oauth_sessions WHERE id = $1")
-                .bind(session_id)
-                .execute(&state.pg_pool)
-                .await;
+            let _ = state.oauth_uc.delete_session(session_id).await;
         }
     }
     let mut resp_headers = HeaderMap::new();

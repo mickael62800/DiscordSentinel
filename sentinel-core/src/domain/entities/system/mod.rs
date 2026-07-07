@@ -10,6 +10,7 @@ pub mod host_probe;
 pub mod ip_ban;
 pub mod job_whitelists;
 pub mod log_entry;
+pub mod oauth;
 pub mod rbac;
 pub mod rule;
 pub mod security_audit;
