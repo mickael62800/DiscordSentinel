@@ -158,6 +158,8 @@ pub struct AppState {
     pub tls_cert_uc: Arc<dyn crate::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase>,
     pub geoip_uc: Arc<dyn crate::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase>,
     pub export_uc: Arc<dyn crate::application::system::export_service::ExecuteExportUseCase>,
+    pub export_jobs_uc:
+        Arc<dyn crate::ports::inbound::system::manage_export_jobs::ManageExportJobsUseCase>,
     pub evidence_repo: Arc<dyn crate::ports::outbound::moderation::evidence_repository::EvidenceRepository>,
     pub review_repo: Arc<dyn crate::ports::outbound::moderation::review_repository::ReviewRepository>,
     pub modstats_repo: Arc<dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository>,

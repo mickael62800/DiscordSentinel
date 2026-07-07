@@ -1319,6 +1319,15 @@ pub async fn build_app_state(
                 pg_pool.clone(),
             ),
         ))),
+        export_jobs_uc: Arc::new(
+            sentinel_core::application::system::manage_export_jobs_service::ManageExportJobsService::new(
+                Arc::new(
+                    crate::adapters::outbound::postgres::system::export_job_repository::PgExportJobRepository::new(
+                        pg_pool.clone(),
+                    ),
+                ),
+            ),
+        ),
         evidence_repo: Arc::new(PgEvidenceRepository::new(pg_pool.clone())),
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),
         modstats_repo,

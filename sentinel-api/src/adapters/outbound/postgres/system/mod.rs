@@ -3,6 +3,7 @@ pub mod bot_config_repository;
 pub mod component_min_role_repository;
 pub mod component_visibility_repository;
 pub mod bot_persistence_repository;
+pub mod export_job_repository;
 pub mod export_repository;
 pub mod guild_repository;
 pub mod guild_reset_repository;

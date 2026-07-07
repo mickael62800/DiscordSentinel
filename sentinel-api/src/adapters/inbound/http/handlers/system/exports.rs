@@ -18,7 +18,6 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
@@ -26,6 +25,7 @@ use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::system::export_job_repository::{ExportJobRecord, NewExportJob};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateExportJobDto {
@@ -45,7 +45,7 @@ pub struct ExportJobCreatedDto {
     pub status: String,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct ExportJobStatusDto {
     pub id: Uuid,
     pub guild_id: String,
@@ -60,6 +60,26 @@ pub struct ExportJobStatusDto {
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
     pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+impl From<ExportJobRecord> for ExportJobStatusDto {
+    fn from(r: ExportJobRecord) -> Self {
+        ExportJobStatusDto {
+            id: r.id,
+            guild_id: r.guild_id,
+            requested_by: r.requested_by,
+            job_type: r.job_type,
+            format: r.format,
+            status: r.status,
+            result: r.result,
+            result_rows: r.result_rows,
+            error_message: r.error_message,
+            retries: r.retries,
+            created_at: r.created_at,
+            started_at: r.started_at,
+            completed_at: r.completed_at,
+        }
+    }
 }
 
 /// POST /api/exports/jobs — enqueue un job d'export. Retourne 202.
@@ -100,18 +120,16 @@ pub async fn create_export_job(
     )
     .await?;
 
-    let id: Uuid = sqlx::query_scalar(
-        "INSERT INTO export_jobs (guild_id, requested_by, job_type, format, filters) \
-         VALUES ($1, $2, $3, $4, $5) RETURNING id",
-    )
-    .bind(dto.guild_id.as_str())
-    .bind(&dto.requested_by)
-    .bind(&dto.job_type)
-    .bind(&dto.format)
-    .bind(&dto.filters)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("export_jobs insert"))?;
+    let id = state
+        .export_jobs_uc
+        .enqueue(NewExportJob {
+            guild_id: dto.guild_id.as_str().to_string(),
+            requested_by: dto.requested_by,
+            job_type: dto.job_type,
+            format: dto.format,
+            filters: dto.filters,
+        })
+        .await?;
 
     Ok((
         StatusCode::ACCEPTED,
@@ -129,18 +147,13 @@ pub async fn get_export_job(
 ) -> Result<Json<ExportJobStatusDto>, ApiError> {
     let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;
 
-    let job = sqlx::query_as::<_, ExportJobStatusDto>(
-        "SELECT id, guild_id, requested_by, job_type, format, status, result, result_rows, \
-                error_message, retries, created_at, started_at, completed_at \
-         FROM export_jobs WHERE id = $1",
-    )
-    .bind(uuid)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("export_jobs select"))?
-    .ok_or_else(|| ApiError(DomainError::NotFound(format!("export_job {id}"))))?;
+    let job = state
+        .export_jobs_uc
+        .get(uuid)
+        .await?
+        .ok_or_else(|| ApiError(DomainError::NotFound(format!("export_job {id}"))))?;
 
-    Ok(Json(job))
+    Ok(Json(ExportJobStatusDto::from(job)))
 }
 
 #[cfg(test)]

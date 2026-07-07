@@ -2,6 +2,7 @@ pub mod lookup_geoip;
 pub mod manage_component_min_role;
 pub mod manage_component_visibility;
 pub mod manage_bot_persistence;
+pub mod manage_export_jobs;
 pub mod manage_invitations;
 pub mod manage_lockdown;
 pub mod manage_ip_bans;

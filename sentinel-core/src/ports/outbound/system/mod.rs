@@ -6,6 +6,7 @@ pub mod component_min_role_repository;
 pub mod component_visibility_repository;
 pub mod cache_helpers;
 pub mod event_broadcaster;
+pub mod export_job_repository;
 pub mod export_repository;
 pub mod geoip_lookup;
 pub mod guild_repository;

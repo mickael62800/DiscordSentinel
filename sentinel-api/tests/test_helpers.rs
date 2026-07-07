@@ -578,6 +578,20 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
     > {
         unimplemented!()
     }
+    async fn retention_cleanup_all(
+        &self,
+    ) -> Result<
+        sentinel_core::ports::inbound::community::manage_announcements::RetentionCleanupSummary,
+        DomainError,
+    > {
+        Ok(
+            sentinel_core::ports::inbound::community::manage_announcements::RetentionCleanupSummary {
+                guilds_processed: 0,
+                guilds_skipped: 0,
+                rows_deleted: 0,
+            },
+        )
+    }
 }
 
 #[allow(dead_code)]
@@ -2178,6 +2192,17 @@ impl sentinel_api::ports::outbound::moderation::automod_review_repository::Autom
     > {
         Err(DomainError::Internal("stub".into()))
     }
+    async fn fp_terminal_reviews(
+        &self,
+        _: &str,
+        _: i64,
+        _: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::review::automod::FpTerminalReview>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
     async fn create_or_merge(
         &self,
         _: sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview,
@@ -2382,6 +2407,28 @@ impl sentinel_api::application::system::export_service::ExecuteExportUseCase for
                 row_count: 0,
             },
         )
+    }
+}
+
+pub struct StubExportJobsUC;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_export_jobs::ManageExportJobsUseCase
+    for StubExportJobsUC
+{
+    async fn enqueue(
+        &self,
+        _: sentinel_core::ports::outbound::system::export_job_repository::NewExportJob,
+    ) -> Result<Uuid, DomainError> {
+        Ok(Uuid::new_v4())
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+    ) -> Result<
+        Option<sentinel_core::ports::outbound::system::export_job_repository::ExportJobRecord>,
+        DomainError,
+    > {
+        Ok(None)
     }
 }
 
@@ -3521,6 +3568,9 @@ impl sentinel_core::ports::inbound::system::manage_component_visibility::ManageC
         _: &str,
     ) -> Result<usize, DomainError> {
         Ok(0)
+    }
+}
+
 pub struct StubBotPersistence;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase
@@ -4126,7 +4176,7 @@ impl sentinel_core::ports::outbound::game::game_session_repository::GameSessionR
 
 struct StubSponsorships;
 #[async_trait]
-impl crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase
+impl sentinel_api::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase
     for StubSponsorships
 {
     async fn create_sponsorship(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
@@ -4250,6 +4300,7 @@ fn base_state() -> AppState {
             ),
         ),
         export_uc: Arc::new(StubExportUC),
+        export_jobs_uc: Arc::new(StubExportJobsUC),
         evidence_repo: Arc::new(StubEvidenceRepo),
         review_repo: Arc::new(StubReviewRepo),
         modstats_repo: Arc::new(StubModstatsRepo),
