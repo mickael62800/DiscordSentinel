@@ -70,4 +70,11 @@ pub trait BlackjackTableRepository: Send + Sync {
     async fn get_guild_id(&self, table_id: &str) -> Result<Option<String>, DomainError>;
     async fn close(&self, table_id: &str) -> Result<(), DomainError>;
     async fn list_games(&self, table_id: &str) -> Result<Vec<serde_json::Value>, DomainError>;
+
+    /// Purge admin : supprime TOUTES les tables de la guild (les
+    /// `blackjack_table_players` partent en CASCADE). Renvoie le nombre de
+    /// tables supprimees. Default no-op pour preserver les mocks existants.
+    async fn purge_guild(&self, _guild_id: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }

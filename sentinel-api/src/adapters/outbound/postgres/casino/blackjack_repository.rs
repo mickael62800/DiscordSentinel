@@ -284,4 +284,13 @@ impl BlackjackRepository for PgBlackjackRepository {
         );
         Ok(())
     }
+
+    async fn purge_guild(&self, guild_id: &str) -> Result<u64, DomainError> {
+        let res = sqlx::query("DELETE FROM blackjack_games WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_ctx("purge blackjack_games "))?;
+        Ok(res.rows_affected())
+    }
 }

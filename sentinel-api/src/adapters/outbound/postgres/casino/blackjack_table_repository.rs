@@ -199,6 +199,19 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
         }).collect())
     }
 
+    async fn purge_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<u64, sentinel_core::domain::errors::DomainError> {
+        // `blackjack_table_players` est en CASCADE sur `blackjack_tables`.
+        let res = sqlx::query("DELETE FROM blackjack_tables WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(res.rows_affected())
+    }
+
     async fn list_open_by_guild(
         &self,
         guild_id: &str,

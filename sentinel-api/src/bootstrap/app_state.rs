@@ -315,6 +315,7 @@ pub async fn build_app_state(
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pg_pool.clone()));
     let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
+    let blackjack_table_repo = Arc::new(PgBlackjackTableRepository::new(pg_pool.clone()));
     // `blackjack_svc` est instancie plus bas, apres la construction de
     // `wallet_uc` (dependance de la migration #4).
     let coude_player_repo = Arc::new(PgPlayerRepository::new(pg_pool.clone()));
@@ -590,12 +591,15 @@ pub async fn build_app_state(
     // double down) par `wallet_uc` pour centralisation + detection auto des
     // taunts (faillite, jackpot). `wallet_repo` reste injecte pour
     // `get_or_create` au demarrage de la toute premiere partie.
-    let blackjack_svc = Arc::new(BlackjackService::new(
-        blackjack_repo,
-        wallet_repo.clone(),
-        wallet_uc.clone(),
-        bot_config_repo.clone(),
-    ));
+    let blackjack_svc = Arc::new(
+        BlackjackService::new(
+            blackjack_repo,
+            wallet_repo.clone(),
+            wallet_uc.clone(),
+            bot_config_repo.clone(),
+        )
+        .with_table_repo(blackjack_table_repo.clone()),
+    );
 
     // Slot machine — nouvelle feature (migration 157).
     let slot_repo = Arc::new(
@@ -1249,7 +1253,7 @@ pub async fn build_app_state(
         sponsorship_repo: Arc::new(PgSponsorshipRepository::new(pg_pool.clone())),
         temp_role_repo: Arc::new(PgTempRoleRepository::new(pg_pool.clone())),
         pending_action_repo: Arc::new(PgPendingActionRepository::new(pg_pool.clone())),
-        blackjack_table_repo: Arc::new(PgBlackjackTableRepository::new(pg_pool.clone())),
+        blackjack_table_repo,
         game_servers_uc,
         game_templates_uc,
         game_server_repo: game_server_repo_dyn,

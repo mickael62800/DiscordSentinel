@@ -3,7 +3,6 @@
 //! Tous délèguent à `state.blackjack_svc` et broadcastent un événement
 //! `blackjack_result` via le broadcaster quand la partie se termine.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::Path;
 use axum::extract::State;
@@ -197,22 +196,11 @@ pub async fn purge_all(
     )
     .await?;
 
-    let games = sqlx::query("DELETE FROM blackjack_games WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("purge blackjack_games"))?;
-
-    // blackjack_table_players est en CASCADE sur blackjack_tables.
-    let tables = sqlx::query("DELETE FROM blackjack_tables WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("purge blackjack_tables"))?;
+    let (deleted_games, deleted_tables) = state.blackjack_svc.reset_guild(&guild_id).await?;
 
     Ok(Json(serde_json::json!({
-        "deleted_games": games.rows_affected(),
-        "deleted_tables": tables.rows_affected(),
+        "deleted_games": deleted_games,
+        "deleted_tables": deleted_tables,
     })))
 }
 

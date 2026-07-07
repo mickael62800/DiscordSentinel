@@ -14,6 +14,7 @@ use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
@@ -66,6 +67,9 @@ pub struct BlackjackService {
     wallet_repo: Arc<dyn WalletRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    /// Repo des tables multi, optionnel. Injecte via `with_table_repo` pour
+    /// que `reset_guild` (purge admin) puisse aussi vider `blackjack_tables`.
+    table_repo: Option<Arc<dyn BlackjackTableRepository>>,
 }
 
 impl BlackjackService {
@@ -80,7 +84,28 @@ impl BlackjackService {
             wallet_repo,
             wallet_uc,
             bot_config_repo,
+            table_repo: None,
         }
+    }
+
+    /// Injecte le repo des tables multi (builder) pour permettre a
+    /// `reset_guild` de purger `blackjack_tables` en plus des parties.
+    pub fn with_table_repo(mut self, table_repo: Arc<dyn BlackjackTableRepository>) -> Self {
+        self.table_repo = Some(table_repo);
+        self
+    }
+
+    /// Purge admin : vide totalement le blackjack d'une guild (parties +
+    /// tables multi). Renvoie `(parties_supprimees, tables_supprimees)`.
+    /// `blackjack_table_players` part en CASCADE cote DB. Si aucun repo de
+    /// tables n'est injecte, seules les parties sont purgees.
+    pub async fn reset_guild(&self, guild_id: &str) -> Result<(u64, u64), DomainError> {
+        let deleted_games = self.repo.purge_guild(guild_id).await?;
+        let deleted_tables = match &self.table_repo {
+            Some(repo) => repo.purge_guild(guild_id).await?,
+            None => 0,
+        };
+        Ok((deleted_games, deleted_tables))
     }
 
     /// Charge le seuil de tirage du dealer (`dealer_hit_threshold`) depuis la

@@ -27,4 +27,10 @@ pub trait BlackjackRepository: Send + Sync {
     /// la mise au joueur via le wallet. Renvoie le solde rembourse.
     /// Erreur 409 si la partie est deja terminee.
     async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError>;
+
+    /// Purge admin : supprime TOUTES les parties de la guild. Renvoie le
+    /// nombre de lignes supprimees. Default no-op pour preserver les mocks.
+    async fn purge_guild(&self, _guild_id: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
