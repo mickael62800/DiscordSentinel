@@ -3649,6 +3649,9 @@ impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for S
     async fn ensure_owner_grant(&self, _: &str, _: &str) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn is_whitelisted(&self, _: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
 }
 
 pub struct StubMonthlyRanking;
