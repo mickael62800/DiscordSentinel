@@ -11,5 +11,6 @@ pub mod manage_players_service;
 pub mod manage_safety_net_service;
 pub mod manage_social_service;
 pub mod manage_taunts_service;
+pub mod manage_tournaments_service;
 pub mod play_tout_ou_rien_service;
 pub mod steal;

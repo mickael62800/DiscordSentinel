@@ -14,4 +14,5 @@ pub mod sponsorship_repository;
 pub mod steal_boost_repository;
 pub mod steal_protection_repository;
 pub mod taunts_repository;
+pub mod tournament_repository;
 pub mod tout_ou_rien_repository;

@@ -13,6 +13,7 @@ pub mod manage_social;
 pub mod manage_steal_boosts;
 pub mod manage_steal_protections;
 pub mod manage_taunts;
+pub mod manage_tournaments;
 pub mod play_tout_ou_rien;
 pub mod resolve_betting_batch;
 pub mod resolve_combat_now;

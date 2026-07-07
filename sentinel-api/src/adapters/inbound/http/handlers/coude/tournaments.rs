@@ -1,15 +1,12 @@
 //! Handlers HTTP pour le tournoi hebdomadaire (migration 139).
 //!
-//! Endpoints minimalistes :
+//! Adaptateur ENTRANT mince : parse + map. L'assemblage du classement, le
+//! calcul des rangs et l'estimation du prize pool vivent dans
+//! `ManageTournamentsUseCase` ; le SQL d'agregation dans `TournamentRepository`.
+//!
 //!   - GET /api/coude/{guild_id}/tournaments/current
 //!   - GET /api/coude/{guild_id}/tournaments/history
-//!
-//! Pragmatique : on lit directement le pool via `state.pg_pool` plutot
-//! que de passer par un use case / repository dedie. La logique metier
-//! (resolution, distribution du prix) vit dans le coude-worker, pas ici.
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::State;
 use axum::Json;
 use chrono::DateTime;
@@ -17,7 +14,14 @@ use chrono::Utc;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::state::AppState;
+
+use sentinel_core::domain::entities::coude::tournament::CurrentTournament;
+use sentinel_core::domain::entities::coude::tournament::PastTournament;
+use sentinel_core::domain::entities::coude::tournament::TournamentStanding;
+use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Serialize)]
 pub struct StandingDto {
@@ -27,6 +31,17 @@ pub struct StandingDto {
     pub rank: i32,
 }
 
+impl From<TournamentStanding> for StandingDto {
+    fn from(s: TournamentStanding) -> Self {
+        Self {
+            user_id: s.user_id.into(),
+            username: s.username,
+            net_gain: s.net_gain,
+            rank: s.rank,
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct CurrentTournamentDto {
     pub guild_id: GuildId,
@@ -34,6 +49,18 @@ pub struct CurrentTournamentDto {
     pub week_end: DateTime<Utc>,
     pub prize_pool_estimated: i64,
     pub standings: Vec<StandingDto>,
+}
+
+impl From<CurrentTournament> for CurrentTournamentDto {
+    fn from(t: CurrentTournament) -> Self {
+        Self {
+            guild_id: t.guild_id.into(),
+            week_start: t.week_start,
+            week_end: t.week_end,
+            prize_pool_estimated: t.prize_pool_estimated,
+            standings: t.standings.into_iter().map(StandingDto::from).collect(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -50,84 +77,30 @@ pub struct PastTournamentDto {
     pub resolved_at: Option<DateTime<Utc>>,
 }
 
-// Bornes de semaine + prize_pool : regles metier extraites vers
-// `domain/entities/coude_tournament.rs` (purement testables).
-use sentinel_core::domain::entities::coude::tournament::current_week_bounds;
-use sentinel_core::domain::entities::coude::tournament::estimate_tournament_prize_pool;
-use sentinel_core::domain::entities::system::discord_ids::GuildId;
-use sentinel_core::domain::entities::system::discord_ids::UserId;
+impl From<PastTournament> for PastTournamentDto {
+    fn from(t: PastTournament) -> Self {
+        Self {
+            id: t.id,
+            guild_id: t.guild_id.into(),
+            week_start: t.week_start,
+            week_end: t.week_end,
+            winner_user_id: t.winner_user_id,
+            winner_username: t.winner_username,
+            winner_net_gain: t.winner_net_gain,
+            prize_amount: t.prize_amount,
+            status: t.status,
+            resolved_at: t.resolved_at,
+        }
+    }
+}
+
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<CurrentTournamentDto>, ApiError> {
-    let (week_start, week_end) = current_week_bounds();
-
-    // Sum des wallet_transactions par user sur la semaine.
-    // Positif = net gain sur la periode.
-    let rows = sqlx::query_as::<_, (String, i64)>(
-        r#"
-        SELECT wt.user_id, COALESCE(SUM(wt.amount), 0)::BIGINT AS net
-        FROM wallet_transactions wt
-        WHERE wt.guild_id = $1
-          AND wt.created_at >= $2
-          AND wt.created_at <= $3
-        GROUP BY wt.user_id
-        ORDER BY net DESC
-        LIMIT 10
-        "#,
-    )
-    .bind(&guild_id)
-    .bind(week_start)
-    .bind(week_end)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("tournaments query"))?;
-
-    // Lookup usernames via user_wallets.
-    let mut standings = Vec::with_capacity(rows.len());
-    for (idx, (user_id, net)) in rows.into_iter().enumerate() {
-        let username: Option<String> = sqlx::query_scalar(
-            "SELECT username FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(&guild_id)
-        .bind(&user_id)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(sqlx_internal("username lookup"))?;
-
-        standings.push(StandingDto {
-            user_id: user_id.into(),
-            username: username.unwrap_or_else(|| "?".to_string()),
-            net_gain: net,
-            rank: (idx + 1) as i32,
-        });
-    }
-
-    // Prize pool estime : `tournament_prize_pool_pct` % de la caisse
-    // communautaire (defaut 10%), reglable par serveur via `coude-bot`.
-    let cashbox: Option<i64> =
-        sqlx::query_scalar("SELECT balance FROM coude_cashbox WHERE guild_id = $1")
-            .bind(&guild_id)
-            .fetch_optional(&state.pg_pool)
-            .await
-            .ok()
-            .flatten();
-
-    let econ = sentinel_core::application::coude::guild_settings::load_economy_config(
-        state.bot_config_repo.as_ref(),
-        &guild_id,
-    )
-    .await;
-    let prize_pool_estimated = estimate_tournament_prize_pool(cashbox, &econ);
-
-    Ok(Json(CurrentTournamentDto {
-        guild_id: guild_id.into(),
-        week_start,
-        week_end,
-        prize_pool_estimated,
-        standings,
-    }))
+    let tournament = state.tournaments_uc.current_tournament(&guild_id).await?;
+    Ok(Json(tournament.into()))
 }
 
 /// GET /api/coude/{guild_id}/tournaments/history
@@ -135,67 +108,10 @@ pub async fn get_tournament_history(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<PastTournamentDto>>, ApiError> {
-    let rows = sqlx::query_as::<
-        _,
-        (
-            sqlx::types::Uuid,
-            String,
-            DateTime<Utc>,
-            DateTime<Utc>,
-            Option<String>,
-            Option<String>,
-            Option<i64>,
-            i64,
-            String,
-            Option<DateTime<Utc>>,
-        ),
-    >(
-        r#"
-        SELECT id, guild_id, week_start, week_end, winner_user_id,
-               winner_username, winner_net_gain, prize_amount, status, resolved_at
-        FROM coude_weekly_tournaments
-        WHERE guild_id = $1
-        ORDER BY week_start DESC
-        LIMIT 20
-        "#,
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("history query"))?;
-
-    let out = rows
-        .into_iter()
-        .map(
-            |(
-                id,
-                guild_id,
-                week_start,
-                week_end,
-                winner_user_id,
-                winner_username,
-                winner_net_gain,
-                prize_amount,
-                status,
-                resolved_at,
-            )| {
-                PastTournamentDto {
-                    id: id.to_string(),
-                    guild_id: guild_id.into(),
-                    week_start,
-                    week_end,
-                    winner_user_id,
-                    winner_username,
-                    winner_net_gain: winner_net_gain.unwrap_or(0),
-                    prize_amount,
-                    status,
-                    resolved_at,
-                }
-            },
-        )
-        .collect();
-
-    Ok(Json(out))
+    let history = state.tournaments_uc.tournament_history(&guild_id).await?;
+    Ok(Json(
+        history.into_iter().map(PastTournamentDto::from).collect(),
+    ))
 }
 
 #[cfg(test)]

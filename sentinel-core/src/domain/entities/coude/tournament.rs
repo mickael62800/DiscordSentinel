@@ -42,6 +42,66 @@ pub fn estimate_tournament_prize_pool(
     (balance * pct / 100) as i64
 }
 
+/// Une ligne de classement du tournoi courant : un membre, son gain net sur la
+/// semaine et son rang (1 = tete du classement).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TournamentStanding {
+    pub user_id: String,
+    pub username: String,
+    pub net_gain: i64,
+    pub rank: i32,
+}
+
+/// Etat du tournoi hebdomadaire courant : bornes de semaine, prize pool estime
+/// et classement (top N) des gains nets de la periode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CurrentTournament {
+    pub guild_id: String,
+    pub week_start: DateTime<Utc>,
+    pub week_end: DateTime<Utc>,
+    pub prize_pool_estimated: i64,
+    pub standings: Vec<TournamentStanding>,
+}
+
+/// Un tournoi passe (resolu ou en attente) tel que stocke dans
+/// `coude_weekly_tournaments`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PastTournament {
+    pub id: String,
+    pub guild_id: String,
+    pub week_start: DateTime<Utc>,
+    pub week_end: DateTime<Utc>,
+    pub winner_user_id: Option<String>,
+    pub winner_username: Option<String>,
+    pub winner_net_gain: i64,
+    pub prize_amount: i64,
+    pub status: String,
+    pub resolved_at: Option<DateTime<Utc>>,
+}
+
+/// Assemble le classement du tournoi courant a partir des gains nets bruts
+/// (deja tries par net decroissant) et d'un resolveur de pseudo. Regle metier :
+/// le rang est l'index 1-based dans la liste triee, le pseudo manquant est
+/// remplace par `"?"`.
+pub fn build_standings(
+    net_gains: Vec<(String, i64)>,
+    mut username_of: impl FnMut(&str) -> Option<String>,
+) -> Vec<TournamentStanding> {
+    net_gains
+        .into_iter()
+        .enumerate()
+        .map(|(idx, (user_id, net_gain))| {
+            let username = username_of(&user_id).unwrap_or_else(|| "?".to_string());
+            TournamentStanding {
+                user_id,
+                username,
+                net_gain,
+                rank: (idx + 1) as i32,
+            }
+        })
+        .collect()
+}
+
 #[cfg(test)]
 #[path = "tests/tournament.rs"]
 mod tests;

@@ -28,6 +28,7 @@ use crate::adapters::outbound::postgres::community::voice_channel_repository::Pg
 use crate::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
 use crate::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
 use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
+use crate::adapters::outbound::postgres::coude::tournament_repository::PgTournamentRepository;
 use crate::adapters::outbound::postgres::coude::combat_repository::PgCombatRepository;
 use crate::adapters::outbound::postgres::coude::curses_repository::PgCursesRepository;
 use crate::adapters::outbound::postgres::coude::economy_repository::PgEconomyRepository;
@@ -74,6 +75,7 @@ use crate::application::coude::combat::expire_batch::ExpireCombatsBatchService;
 use crate::application::coude::combat::manage::ManageCoudeCombatsService;
 use crate::application::coude::combat::resolve_now::ResolveCombatNowService;
 use crate::application::coude::manage_cashbox_service::ManageCoudeCashboxService;
+use crate::application::coude::manage_tournaments_service::ManageTournamentsService;
 use crate::application::coude::manage_catalog_service::ManageCoudeCatalogService;
 use crate::application::coude::manage_curses_service::ManageCoudeCursesService;
 use crate::application::coude::manage_economy_service::ManageCoudeEconomyService;
@@ -628,6 +630,17 @@ pub async fn build_app_state(
         wallet_repo.clone(),
     ));
 
+    // Tournoi hebdomadaire — repo d'agregation + use case (assemblage classement).
+    let tournament_repo: Arc<
+        dyn crate::ports::outbound::coude::tournament_repository::TournamentRepository,
+    > = Arc::new(PgTournamentRepository::new(pg_pool.clone()));
+    let tournaments_uc: Arc<
+        dyn crate::ports::inbound::coude::manage_tournaments::ManageTournamentsUseCase,
+    > = Arc::new(ManageTournamentsService::new(
+        tournament_repo,
+        bot_config_repo.clone(),
+    ));
+
     // Phase 10 — heist UC (depend de cashbox_repo + inventory_uc + wallet_repo).
     let coude_heist_uc: Arc<
         dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase,
@@ -1116,6 +1129,7 @@ pub async fn build_app_state(
         coude_heist_uc,
         coude_curses_uc,
         coude_safety_net_uc,
+        tournaments_uc,
         coude_tout_ou_rien_repo,
         play_tout_ou_rien_uc,
         roll_steal_uc,
