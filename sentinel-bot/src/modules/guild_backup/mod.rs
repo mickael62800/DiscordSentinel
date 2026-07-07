@@ -87,6 +87,53 @@ pub fn handles_component(cid: &str) -> bool {
     cid.starts_with(CONFIRM_PREFIX) || cid == CANCEL_ID
 }
 
+/// Hook (re)join : si le membre a des roles en attente (persistes lors d'un
+/// restore), les lui re-attribue puis purge l'entree (atomique cote API).
+///
+/// Best-effort : n'impacte pas les autres handlers de join. Aucun effet (aucun
+/// appel Discord) si le membre n'a pas d'entree en attente.
+pub async fn on_member_add(ctx: &Context, member: &serenity::all::Member) {
+    let Some(api) = api(ctx).await else {
+        return;
+    };
+    let guild_id = member.guild_id.to_string();
+    let user_id = member.user.id.to_string();
+
+    let role_ids = match api_client::consume_pending_roles(&api, &guild_id, &user_id).await {
+        Ok(ids) => ids,
+        Err(e) => {
+            warn!(error = %e, user = %user_id, "guild_backup: consume pending-roles impossible");
+            return;
+        }
+    };
+    if role_ids.is_empty() {
+        return; // Cas nominal : rien en attente.
+    }
+
+    // Traduit les role_id (chaines) en RoleId serenity.
+    let roles: Vec<serenity::all::RoleId> = role_ids
+        .iter()
+        .filter_map(|r| r.parse::<u64>().ok())
+        .map(serenity::all::RoleId::new)
+        .collect();
+    if roles.is_empty() {
+        return;
+    }
+
+    // Attribution best-effort : roles disparus / permission manquante -> log.
+    match member.add_roles(&ctx.http, &roles).await {
+        Ok(()) => tracing::info!(
+            guild = %guild_id,
+            user = %user_id,
+            count = roles.len(),
+            "guild_backup: roles re-attribues au retour"
+        ),
+        Err(e) => {
+            warn!(error = %e, user = %user_id, "guild_backup: echec re-attribution roles au retour")
+        }
+    }
+}
+
 // ── Helpers ──
 
 async fn api(ctx: &Context) -> Option<Arc<BaseApiClient>> {
@@ -405,8 +452,28 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
+    // Repart propre : purge d'eventuelles re-attributions en attente d'un
+    // restore precedent (best-effort, ne bloque pas la restauration).
+    let gid = guild_id.to_string();
+    if let Err(e) = api_client::clear_pending_roles(&api, &gid).await {
+        warn!(error = %e, "guild_backup: purge des pending-roles impossible");
+    }
+
     let progress = restore::Progress::new(ctx, component);
     let report = restore::restore(ctx, guild_id, &snapshot, &progress).await;
+
+    // Persiste les re-attributions pour TOUS les membres (les absents seront
+    // re-rolises a leur retour via le hook de join).
+    if !report.pending_grants.is_empty() {
+        match api_client::save_pending_roles(&api, &gid, &report.pending_grants).await {
+            Ok(n) => {
+                tracing::info!(guild = %gid, saved = n, "guild_backup: pending-roles enregistres")
+            }
+            Err(e) => {
+                warn!(error = %e, "guild_backup: enregistrement des pending-roles impossible")
+            }
+        }
+    }
 
     let mut txt = format!(
         "✅ **Restauration terminee**\n{} role(s) créé(s) ({} echec), {} categorie(s), \

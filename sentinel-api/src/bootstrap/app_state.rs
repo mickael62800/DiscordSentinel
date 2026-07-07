@@ -554,6 +554,19 @@ pub async fn build_app_state(
                 snapshot_repo.clone(),
             ),
         );
+    // Re-attribution des roles aux membres de retour (pending_role_grants).
+    let pending_role_grant_repo: Arc<dyn crate::ports::outbound::guild_backup::pending_role_grant_repository::PendingRoleGrantRepository> =
+        Arc::new(
+            crate::adapters::outbound::postgres::guild_backup::pending_role_grant_repository::PgPendingRoleGrantRepository::new(
+                pg_pool.clone(),
+            ),
+        );
+    let pending_role_grants_uc: Arc<dyn crate::ports::inbound::guild_backup::manage_pending_role_grants::ManagePendingRoleGrantsUseCase> =
+        Arc::new(
+            sentinel_core::application::guild_backup::manage_pending_role_grants_service::ManagePendingRoleGrantsService::new(
+                pending_role_grant_repo.clone(),
+            ),
+        );
 
     // Administrateur tournant : repo + use case.
     let rotation_repo: Arc<dyn crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository> =
@@ -1411,6 +1424,7 @@ pub async fn build_app_state(
         reset_guild_uc,
         pets_uc,
         guild_snapshots_uc,
+        pending_role_grants_uc,
         rotation_uc,
         ip_bans_uc,
         host_probe_uc,

@@ -5,7 +5,7 @@
 //! restauration. L'authentification reste la cle API interne (Bearer) posee
 //! par [`BaseApiClient::auth`].
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot;
 
@@ -60,6 +60,73 @@ pub async fn list_snapshots(
 pub async fn get_snapshot(api: &BaseApiClient, snapshot_id: &str) -> Result<GuildSnapshot, String> {
     api.get_json(&format!("/api/guild-backup/snapshots/{snapshot_id}"))
         .await
+}
+
+/// Une re-attribution de roles en attente (envoyee au restore).
+#[derive(Debug, Serialize)]
+pub struct PendingRoleGrant {
+    pub user_id: String,
+    pub role_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct SavedGrantsDto {
+    saved: u64,
+}
+
+#[derive(Debug, Deserialize)]
+struct ConsumedGrantDto {
+    role_ids: Vec<String>,
+}
+
+/// POST /api/guild-backup/{guild_id}/pending-roles — enregistre les grants a
+/// re-attribuer aux membres a leur retour. Renvoie le nombre d'entrees ecrites.
+pub async fn save_pending_roles(
+    api: &BaseApiClient,
+    guild_id: &str,
+    grants: &[PendingRoleGrant],
+) -> Result<u64, String> {
+    let dto: SavedGrantsDto = api
+        .post_json(
+            &format!("/api/guild-backup/{guild_id}/pending-roles"),
+            &grants,
+        )
+        .await?;
+    Ok(dto.saved)
+}
+
+/// POST /api/guild-backup/{guild_id}/pending-roles/{user_id}/consume — lit ET
+/// supprime (atomique) les roles en attente d'un membre. Vecteur vide si aucun.
+pub async fn consume_pending_roles(
+    api: &BaseApiClient,
+    guild_id: &str,
+    user_id: &str,
+) -> Result<Vec<String>, String> {
+    let dto: ConsumedGrantDto = api
+        .post_json(
+            &format!("/api/guild-backup/{guild_id}/pending-roles/{user_id}/consume"),
+            &serde_json::json!({}),
+        )
+        .await?;
+    Ok(dto.role_ids)
+}
+
+/// DELETE /api/guild-backup/{guild_id}/pending-roles — purge les grants d'une
+/// guild (repartir propre avant un nouveau restore). Best-effort.
+pub async fn clear_pending_roles(api: &BaseApiClient, guild_id: &str) -> Result<(), String> {
+    let path = format!("/api/guild-backup/{guild_id}/pending-roles");
+    let req = api.client().delete(format!("{}{}", api.base_url(), path));
+    let resp = api
+        .auth(req)
+        .send()
+        .await
+        .map_err(|e| format!("Purge impossible : {e}"))?;
+    if !resp.status().is_success() {
+        let status = resp.status();
+        let body = resp.text().await.unwrap_or_default();
+        return Err(format!("Purge refusee ({status}) : {body}"));
+    }
+    Ok(())
 }
 
 /// DELETE /api/guild-backup/snapshots/{snapshot_id} — supprime une capture.

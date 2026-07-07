@@ -24,6 +24,8 @@ use tracing::{info, warn};
 
 use sentinel_core::domain::entities::guild_backup::snapshot::{GuildSnapshot, SnapshotChannel};
 
+use super::api_client::PendingRoleGrant;
+
 /// Rapport de restauration (compteurs pour le feedback final).
 #[derive(Debug, Default)]
 pub struct RestoreReport {
@@ -39,6 +41,10 @@ pub struct RestoreReport {
     /// `Some(true)` = icone restauree, `Some(false)` = echec, `None` = pas d'icone.
     pub icon_restored: Option<bool>,
     pub notes: Vec<String>,
+    /// Re-attributions a persister cote API : pour TOUS les membres captures
+    /// (presents ET absents), la liste des NOUVEAUX role_id (remappes). Les
+    /// membres absents recuperent ainsi leurs roles a leur retour (hook join).
+    pub pending_grants: Vec<PendingRoleGrant>,
 }
 
 /// Rapporteur de progression : edite le message deferre de l'interaction pour
@@ -224,20 +230,20 @@ pub async fn restore(
         );
     }
 
-    // ── 7. member_roles (membres PRESENTS uniquement) ──
+    // ── 7. member_roles (TOUS les membres) ──
+    //
+    // Pour chaque membre capture on traduit ses old_role_id -> nouveaux RoleId.
+    // On enregistre TOUJOURS la re-attribution dans `pending_grants` (persistee
+    // cote API par l'appelant) afin que les membres ABSENTS recuperent leurs
+    // roles a leur retour. Les membres PRESENTS sont en plus re-rolises tout de
+    // suite (l'entree pending sera consommee/purgee a leur prochain join, sans
+    // effet visible).
     if !snapshot.member_roles.is_empty() {
         progress.set("♻️ Restauration… roles des membres").await;
         let mut absents = 0usize;
         for (user_id, old_roles) in &snapshot.member_roles {
             let Ok(uid) = user_id.parse::<u64>() else {
                 continue;
-            };
-            let member = match guild_id.member(&ctx.http, UserId::new(uid)).await {
-                Ok(m) => m,
-                Err(_) => {
-                    absents += 1;
-                    continue;
-                }
             };
             let new_roles: Vec<RoleId> = old_roles
                 .iter()
@@ -248,17 +254,26 @@ pub async fn restore(
             if new_roles.is_empty() {
                 continue;
             }
-            match member.add_roles(&ctx.http, &new_roles).await {
-                Ok(()) => report.members_updated += 1,
-                Err(e) => {
-                    warn!(error = %e, user = %user_id, "guild_backup: echec attribution roles membre")
-                }
+            // Persistance de la re-attribution (nouveaux role_id en chaines).
+            report.pending_grants.push(PendingRoleGrant {
+                user_id: user_id.clone(),
+                role_ids: new_roles.iter().map(|r| r.get().to_string()).collect(),
+            });
+            // Application immediate si le membre est present.
+            match guild_id.member(&ctx.http, UserId::new(uid)).await {
+                Ok(member) => match member.add_roles(&ctx.http, &new_roles).await {
+                    Ok(()) => report.members_updated += 1,
+                    Err(e) => {
+                        warn!(error = %e, user = %user_id, "guild_backup: echec attribution roles membre")
+                    }
+                },
+                Err(_) => absents += 1,
             }
         }
         if absents > 0 {
-            report
-                .notes
-                .push(format!("{absents} membre(s) absent(s) non re-rolises"));
+            report.notes.push(format!(
+                "{absents} membre(s) absent(s) : roles re-attribues a leur retour"
+            ));
         }
     }
 

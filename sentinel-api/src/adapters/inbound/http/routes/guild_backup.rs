@@ -19,6 +19,16 @@ fn inner() -> Router<AppState> {
             get(handlers::guild_backup::snapshots::get_snapshot)
                 .delete(handlers::guild_backup::snapshots::delete_snapshot),
         )
+        // Re-attribution des roles aux membres de retour (pending_role_grants).
+        .route(
+            "/{guild_id}/pending-roles",
+            post(handlers::guild_backup::pending_roles::save_pending_roles)
+                .delete(handlers::guild_backup::pending_roles::clear_pending_roles),
+        )
+        .route(
+            "/{guild_id}/pending-roles/{user_id}/consume",
+            post(handlers::guild_backup::pending_roles::consume_pending_roles),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

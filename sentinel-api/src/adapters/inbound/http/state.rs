@@ -144,6 +144,10 @@ pub struct AppState {
     pub guild_snapshots_uc: Arc<
         dyn crate::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase,
     >,
+    /// Re-attribution des roles aux membres a leur retour (`guild_backup`).
+    pub pending_role_grants_uc: Arc<
+        dyn crate::ports::inbound::guild_backup::manage_pending_role_grants::ManagePendingRoleGrantsUseCase,
+    >,
     pub rotation_uc: Arc<dyn crate::ports::inbound::system::manage_rotation::ManageRotationUseCase>,
     pub ip_bans_uc: Arc<dyn crate::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase>,
     pub host_probe_uc: Arc<dyn crate::ports::inbound::system::read_host_probe::ReadHostProbeUseCase>,

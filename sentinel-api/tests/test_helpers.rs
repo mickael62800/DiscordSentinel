@@ -2745,6 +2745,30 @@ impl sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildS
     }
 }
 
+pub struct StubPendingRoleGrants;
+#[async_trait]
+impl sentinel_core::ports::inbound::guild_backup::manage_pending_role_grants::ManagePendingRoleGrantsUseCase
+    for StubPendingRoleGrants
+{
+    async fn save_grants(
+        &self,
+        _: &str,
+        _: Vec<sentinel_core::domain::entities::guild_backup::pending_role_grant::PendingRoleGrant>,
+    ) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
+    async fn take_grant(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Option<Vec<String>>, DomainError> {
+        unimplemented!()
+    }
+    async fn clear_guild(&self, _: &str) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
+}
+
 pub struct StubPets;
 #[async_trait]
 impl sentinel_core::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase for StubPets {
@@ -4462,6 +4486,7 @@ fn base_state() -> AppState {
         blackjack_table_repo: Arc::new(StubBlackjackTableRepo),
         pets_uc: Arc::new(StubPets),
         guild_snapshots_uc: Arc::new(StubGuildSnapshots),
+        pending_role_grants_uc: Arc::new(StubPendingRoleGrants),
         rotation_uc: Arc::new(StubRotation),
         ip_bans_uc: Arc::new(StubIpBans),
         host_probe_uc: Arc::new(StubHostProbe),

@@ -17,6 +17,8 @@
 //! et construit une table de correspondance `old_id -> new_id` pour recabler
 //! les references (parent de salon, cible d'overwrite, roles d'un membre...).
 
+pub mod pending_role_grant;
 pub mod snapshot;
 
+pub use pending_role_grant::*;
 pub use snapshot::*;
