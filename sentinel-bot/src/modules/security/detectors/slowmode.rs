@@ -189,7 +189,11 @@ mod tests {
 
         manager.active.insert(
             guild,
-            (Instant::now() - std::time::Duration::from_secs(600), vec![]),
+            (
+                Instant::now() - std::time::Duration::from_secs(600),
+                0u16,
+                vec![],
+            ),
         );
 
         let expired = manager.expired_guilds(300);
