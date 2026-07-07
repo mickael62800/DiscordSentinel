@@ -210,6 +210,19 @@ impl MemberRepository for MockMemberRepo {
     async fn is_left(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
         Ok(false)
     }
+    async fn reset_member(
+        &self,
+        _g: &str,
+        _u: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn mark_left(&self, _g: &str, _u: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn mark_rejoined(&self, _g: &str, _u: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 struct MockBotConfigRepo;

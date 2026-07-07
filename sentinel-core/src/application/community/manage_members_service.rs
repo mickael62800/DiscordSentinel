@@ -201,6 +201,22 @@ impl ManageMembersUseCase for ManageMembersService {
         }
         self.member_repo.upsert(&member).await
     }
+
+    async fn reset_member(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        self.member_repo.reset_member(guild_id, user_id).await
+    }
+
+    async fn leave_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
+        self.member_repo.mark_left(guild_id, user_id).await
+    }
+
+    async fn rejoin_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
+        self.member_repo.mark_rejoined(guild_id, user_id).await
+    }
 }
 
 #[cfg(test)]

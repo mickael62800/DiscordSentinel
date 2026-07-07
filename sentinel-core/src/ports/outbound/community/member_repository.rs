@@ -20,4 +20,22 @@ pub trait MemberRepository: Send + Sync {
     /// False si actif OU si pas de ligne dans guild_members (jamais sync,
     /// par defaut on considere actif pour ne pas bloquer les anciens players).
     async fn is_left(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
+
+    /// Purge TOUTES les donnees de moderation d'un membre en une seule
+    /// transaction atomique (voir `MEMBER_RESET_TABLES`). Renvoie, pour chaque
+    /// table, la cle de reponse et le nombre de lignes supprimees. En cas
+    /// d'erreur sur un DELETE, rollback complet (etat DB coherent).
+    async fn reset_member(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError>;
+
+    /// Marque un membre comme parti (guild_members.left_at = NOW(), idempotent)
+    /// et remet son wallet a 0. Renvoie le nombre de lignes guild_members MAJ.
+    async fn mark_left(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
+
+    /// Marque un membre comme revenu (left_at = NULL, joined_at = NOW()).
+    /// Renvoie le nombre de lignes guild_members MAJ.
+    async fn mark_rejoined(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
 }

@@ -138,6 +138,19 @@ impl ManageMembersUseCase for MockMembersUC {
         self.updated.lock().unwrap().push(cmd);
         Ok(())
     }
+    async fn reset_member(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn leave_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(1)
+    }
+    async fn rejoin_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(1)
+    }
 }
 
 fn build_state(uc: Arc<MockMembersUC>) -> AppState {

@@ -450,6 +450,19 @@ impl ManageMembersUseCase for MockMembersUc {
     async fn update_member(&self, _: UpdateMemberCommand) -> Result<(), DomainError> {
         unimplemented!()
     }
+    async fn reset_member(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        unimplemented!()
+    }
+    async fn leave_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
+    async fn rejoin_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        unimplemented!()
+    }
 }
 
 fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {

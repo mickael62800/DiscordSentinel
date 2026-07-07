@@ -6,6 +6,7 @@ use sqlx::PgPool;
 
 use crate::ports::outbound::community::member_repository::MemberRepository;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgMemberRepository {
@@ -197,5 +198,87 @@ impl MemberRepository for PgMemberRepository {
         .await
         .map_err(pg_ctx("is_left"))?;
         Ok(row.map(|(b,)| b).unwrap_or(false))
+    }
+
+    async fn reset_member(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(pg_ctx("begin tx reset_member"))?;
+
+        // Liste des tables a purger : regle metier dans
+        // `domain/entities/community/guild_member_reset.rs::MEMBER_RESET_TABLES`.
+        let mut totals = Vec::with_capacity(MEMBER_RESET_TABLES.len());
+        for entry in MEMBER_RESET_TABLES {
+            let sql = format!(
+                "DELETE FROM {} WHERE guild_id = $1 AND {} = $2",
+                entry.sql_table, entry.user_column,
+            );
+            let res = sqlx::query(&sql)
+                .bind(guild_id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    DomainError::Internal(format!("reset_member {}: {e}", entry.sql_table))
+                })?;
+            totals.push((entry.response_key, res.rows_affected()));
+        }
+
+        tx.commit()
+            .await
+            .map_err(pg_ctx("commit tx reset_member"))?;
+        Ok(totals)
+    }
+
+    async fn mark_left(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(pg_ctx("mark_left begin"))?;
+
+        // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
+        let res = sqlx::query(
+            "UPDATE guild_members SET left_at = COALESCE(left_at, NOW()) \
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_ctx("mark_left update"))?;
+
+        // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
+        sqlx::query(
+            "UPDATE user_wallets SET coins = 0, total_spent = total_spent + coins, updated_at = NOW() \
+             WHERE guild_id = $1 AND user_id = $2 AND coins > 0",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_ctx("mark_left wallet reset"))?;
+
+        tx.commit().await.map_err(pg_ctx("mark_left commit"))?;
+        Ok(res.rows_affected())
+    }
+
+    async fn mark_rejoined(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
+        let res = sqlx::query(
+            "UPDATE guild_members SET left_at = NULL, joined_at = NOW(), last_seen_at = NOW() \
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_ctx("mark_rejoined update"))?;
+        Ok(res.rows_affected())
     }
 }

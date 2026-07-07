@@ -37,4 +37,20 @@ pub trait ManageMembersUseCase: Send + Sync {
     async fn register_member(&self, cmd: RegisterMemberCommand) -> Result<(), DomainError>;
     async fn remove_member(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
     async fn update_member(&self, cmd: UpdateMemberCommand) -> Result<(), DomainError>;
+
+    /// Reinitialise TOUTES les donnees de moderation d'un membre (transaction
+    /// atomique). Renvoie, par table, la cle de reponse et le nombre de lignes
+    /// supprimees.
+    async fn reset_member(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError>;
+
+    /// Marque un membre comme parti (idempotent) + reset wallet. Renvoie le
+    /// nombre de lignes guild_members MAJ.
+    async fn leave_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
+
+    /// Marque un membre comme revenu. Renvoie le nombre de lignes MAJ.
+    async fn rejoin_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
 }

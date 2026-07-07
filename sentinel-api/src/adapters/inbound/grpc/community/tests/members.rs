@@ -153,6 +153,19 @@ impl ManageMembersUseCase for MockMembersUc {
         self.update_calls.lock().unwrap().push(cmd);
         Ok(())
     }
+    async fn reset_member(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn leave_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn rejoin_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 fn grpc(uc: Arc<MockMembersUc>) -> MembersGrpc {

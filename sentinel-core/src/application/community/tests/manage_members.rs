@@ -70,6 +70,19 @@ impl MemberRepository for MockMemberRepo {
     async fn is_left(&self, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(false)
     }
+    async fn reset_member(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(&'static str, u64)>, DomainError> {
+        Ok(vec![])
+    }
+    async fn mark_left(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+    async fn mark_rejoined(&self, _: &str, _: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }
 
 // ── Stubs minimaux pour les use cases satellites (non utilises ici) ──

@@ -1,4 +1,3 @@
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use axum::extract::State;
 use axum::Extension;
@@ -22,7 +21,6 @@ use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
 use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
-use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
@@ -200,37 +198,13 @@ pub async fn reset_member(
     )
     .await?;
 
-    let mut tx = state
-        .pg_pool
-        .begin()
-        .await
-        .map_err(sqlx_internal("begin tx reset"))?;
-
-    // Liste des tables a purger : regle metier dans
-    // `domain/entities/guild_member_reset.rs::MEMBER_RESET_TABLES`.
-    let mut totals = serde_json::Map::new();
-    for entry in MEMBER_RESET_TABLES {
-        let sql = format!(
-            "DELETE FROM {} WHERE guild_id = $1 AND {} = $2",
-            entry.sql_table, entry.user_column,
-        );
-        let res = sqlx::query(&sql)
-            .bind(&guild_id)
-            .bind(&user_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                ApiError(DomainError::Internal(format!(
-                    "reset_member {}: {e}",
-                    entry.sql_table,
-                )))
-            })?;
-        totals.insert(entry.response_key.into(), res.rows_affected().into());
-    }
-
-    tx.commit()
-        .await
-        .map_err(sqlx_internal("commit tx reset"))?;
+    let totals: serde_json::Map<String, serde_json::Value> = state
+        .members_uc
+        .reset_member(&guild_id, &user_id)
+        .await?
+        .into_iter()
+        .map(|(key, rows)| (key.to_string(), rows.into()))
+        .collect();
 
     tracing::info!(
         guild_id = %guild_id,
@@ -279,41 +253,11 @@ pub async fn leave_member(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let mut tx = state
-        .pg_pool
-        .begin()
-        .await
-        .map_err(sqlx_internal("leave_member begin"))?;
-
-    // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
-    let res = sqlx::query(
-        "UPDATE guild_members SET left_at = COALESCE(left_at, NOW()) \
-         WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(sqlx_internal("leave_member update"))?;
-
-    // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
-    let _ = sqlx::query(
-        "UPDATE user_wallets SET coins = 0, total_spent = total_spent + coins, updated_at = NOW() \
-         WHERE guild_id = $1 AND user_id = $2 AND coins > 0",
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(sqlx_internal("leave_member wallet reset"))?;
-
-    tx.commit()
-        .await
-        .map_err(sqlx_internal("leave_member commit"))?;
+    let rows_affected = state.members_uc.leave_member(&guild_id, &user_id).await?;
 
     Ok(Json(serde_json::json!({
         "ok": true,
-        "rows_affected": res.rows_affected(),
+        "rows_affected": rows_affected,
     })))
 }
 
@@ -332,19 +276,11 @@ pub async fn rejoin_member(
     State(state): State<AppState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let res = sqlx::query(
-        "UPDATE guild_members SET left_at = NULL, joined_at = NOW(), last_seen_at = NOW() \
-         WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("rejoin_member update"))?;
+    let rows_affected = state.members_uc.rejoin_member(&guild_id, &user_id).await?;
 
     Ok(Json(serde_json::json!({
         "ok": true,
-        "rows_affected": res.rows_affected(),
+        "rows_affected": rows_affected,
     })))
 }
 
