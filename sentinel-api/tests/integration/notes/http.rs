@@ -87,6 +87,13 @@ impl ManageNotesUseCase for MockNotesUC {
     async fn delete_note(&self, _: &str) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn note_guild_id(&self, note_id: &str) -> Result<Option<String>, DomainError> {
+        Ok(self
+            .notes
+            .iter()
+            .find(|n| n.id.to_string() == note_id)
+            .map(|n| n.guild_id.as_str().to_string()))
+    }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -311,7 +318,11 @@ async fn delete_note_with_rbac_moderator_succeeds() {
     sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
         .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
 
-    let app = build_app(MockNotesUC::new());
+    // Seed le mock UC avec la note (id + guild) : le handler lit desormais le
+    // guild_id via le use case (plus de SQL inline).
+    let mut seed = make_note(&guild_id, "0", "x", "general");
+    seed.id = note_id;
+    let app = build_app(MockNotesUC::new().with_note(seed));
     let req = test_helpers::request_with_rbac(
         "DELETE",
         &format!("/api/notes/{note_id}"),
@@ -478,7 +489,9 @@ async fn delete_note_with_rbac_viewer_forbidden() {
     .await
     .unwrap();
 
-    let app = build_app(MockNotesUC::new());
+    let mut seed = make_note(&guild_id, "0", "x", "general");
+    seed.id = note_id;
+    let app = build_app(MockNotesUC::new().with_note(seed));
     let req = test_helpers::request_with_rbac(
         "DELETE",
         &format!("/api/notes/{note_id}"),

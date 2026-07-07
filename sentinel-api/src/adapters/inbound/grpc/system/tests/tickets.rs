@@ -163,9 +163,9 @@ impl ManageTicketsUseCase for MockTicketsUc {
         self.reply_calls.lock().unwrap().push(cmd);
         Ok(())
     }
-    async fn close_ticket(&self, id: &str) -> Result<(), DomainError> {
+    async fn close_ticket(&self, id: &str) -> Result<bool, DomainError> {
         self.close_calls.lock().unwrap().push(id.into());
-        Ok(())
+        Ok(true)
     }
     async fn assign_ticket(&self, cmd: AssignTicketCommand) -> Result<(), DomainError> {
         self.assign_calls.lock().unwrap().push(cmd);

@@ -52,6 +52,10 @@ impl ManageNotesUseCase for ManageNotesService {
         self.repo.find_by_user(guild_id, user_id).await
     }
 
+    async fn note_guild_id(&self, note_id: &str) -> Result<Option<String>, DomainError> {
+        self.repo.find_guild_id(note_id).await
+    }
+
     async fn delete_note(&self, note_id: &str) -> Result<(), DomainError> {
         self.repo.delete(note_id).await
     }

@@ -55,6 +55,18 @@ impl NotesRepository for InMemoryNotesRepo {
         notes.retain(|n| n.id != uuid);
         Ok(())
     }
+
+    async fn find_guild_id(&self, note_id: &str) -> Result<Option<String>, DomainError> {
+        let uuid = match Uuid::parse_str(note_id) {
+            Ok(u) => u,
+            Err(_) => return Ok(None),
+        };
+        let notes = self.notes.lock().await;
+        Ok(notes
+            .iter()
+            .find(|n| n.id == uuid)
+            .map(|n| n.guild_id.as_str().to_string()))
+    }
 }
 
 // ══════════════════════════════════════════════════════════

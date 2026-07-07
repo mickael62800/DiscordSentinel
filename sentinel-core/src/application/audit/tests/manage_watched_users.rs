@@ -184,6 +184,9 @@ impl ManageNotesUseCase for StubNotes {
     async fn delete_note(&self, _: &str) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn note_guild_id(&self, _: &str) -> Result<Option<String>, DomainError> {
+        Ok(None)
+    }
 }
 
 // Stats pas utilise par WatchedUsersService, on laisse tomber.

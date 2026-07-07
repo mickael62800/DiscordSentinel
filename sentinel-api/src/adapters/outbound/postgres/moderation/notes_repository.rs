@@ -99,4 +99,18 @@ impl NotesRepository for PgNotesRepository {
             .map_err(pg_ctx("delete_note"))?;
         Ok(())
     }
+
+    async fn find_guild_id(&self, note_id: &str) -> Result<Option<String>, DomainError> {
+        let uuid = match Uuid::parse_str(note_id) {
+            Ok(u) => u,
+            Err(_) => return Ok(None),
+        };
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT guild_id FROM user_notes WHERE id = $1")
+                .bind(uuid)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(pg_ctx("find_note_guild_id"))?;
+        Ok(row.map(|(g,)| g))
+    }
 }

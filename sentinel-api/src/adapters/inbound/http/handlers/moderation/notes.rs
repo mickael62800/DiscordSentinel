@@ -1,7 +1,6 @@
 use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
@@ -67,19 +66,14 @@ pub async fn delete_note(
     rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ requis. L'`id` de la note ne contient
-    // pas le guild_id, donc on fetch d'abord en direct sqlx (pattern
-    // "ressource-id-based" — plus simple qu'ajouter une methode au repo).
+    // Gate RBAC : moderator+ requis. L'`id` de la note ne porte pas le guild_id,
+    // on le recupere via le USE CASE (plus de SQL inline dans le handler ->
+    // respect ports/adapters).
     if rbac.is_some() {
-        let note_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
-        let row: Option<(String,)> =
-            sqlx::query_as("SELECT guild_id FROM user_notes WHERE id = $1")
-                .bind(note_uuid)
-                .fetch_optional(&state.pg_pool)
-                .await
-                .map_err(sqlx_internal("fetch note guild_id"))?;
-
-        if let Some((guild_id,)) = row {
+        // Validation de format (422 si l'id n'est pas un UUID) reste un concern
+        // du handler ; le lookup guild_id passe par le use case.
+        validation::parse_uuid("id", &id).map_err(ApiError)?;
+        if let Some(guild_id) = state.notes_uc.note_guild_id(&id).await? {
             check_role_for_guild(
                 &state,
                 &rbac,
