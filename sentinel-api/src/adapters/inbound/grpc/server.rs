@@ -136,7 +136,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         uc: state.export_uc.clone(),
     };
     let community = CommunityGrpc {
-        pg_pool: state.pg_pool.clone(),
+        uc: state.manage_sponsorships_uc.clone(),
     };
     let members = MembersGrpc {
         uc: state.members_uc.clone(),

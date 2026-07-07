@@ -5,5 +5,6 @@ pub mod manage_levels_service;
 pub mod manage_members_service;
 pub mod manage_monthly_ranking_service;
 pub mod manage_role_panels_service;
+pub mod manage_sponsorships_service;
 pub mod manage_welcome_config_service;
 pub mod voice_channels;

@@ -157,6 +157,8 @@ pub struct AppState {
     pub game_repo: Arc<dyn crate::ports::outbound::casino::game_repository::GameRepository>,
     pub sponsorship_repo: Arc<dyn crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository>,
     pub temp_role_repo: Arc<dyn crate::ports::outbound::community::temp_role_repository::TempRoleRepository>,
+    /// Use case Community (sponsorships + temp-roles) derriere le service gRPC.
+    pub manage_sponsorships_uc: Arc<dyn crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase>,
     pub pending_action_repo: Arc<dyn crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository>,
     pub blackjack_table_repo: Arc<dyn crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository>,
     /// Game Portal : use cases lifecycle serveurs Docker.
