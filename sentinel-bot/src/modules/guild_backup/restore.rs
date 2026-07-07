@@ -25,6 +25,7 @@ use tracing::{info, warn};
 use sentinel_core::domain::entities::guild_backup::snapshot::{GuildSnapshot, SnapshotChannel};
 
 use super::api_client::PendingRoleGrant;
+use super::progress::ProgressSink;
 
 /// Rapport de restauration (compteurs pour le feedback final).
 #[derive(Debug, Default)]
@@ -45,29 +46,6 @@ pub struct RestoreReport {
     /// (presents ET absents), la liste des NOUVEAUX role_id (remappes). Les
     /// membres absents recuperent ainsi leurs roles a leur retour (hook join).
     pub pending_grants: Vec<PendingRoleGrant>,
-}
-
-/// Rapporteur de progression : edite le message deferre de l'interaction pour
-/// afficher l'avancement ("Restauration… X/Y salons").
-pub struct Progress<'a> {
-    ctx: &'a Context,
-    component: &'a serenity::all::ComponentInteraction,
-}
-
-impl<'a> Progress<'a> {
-    pub fn new(ctx: &'a Context, component: &'a serenity::all::ComponentInteraction) -> Self {
-        Self { ctx, component }
-    }
-
-    pub async fn set(&self, text: &str) {
-        let _ = self
-            .component
-            .edit_response(
-                &self.ctx.http,
-                serenity::all::EditInteractionResponse::new().content(text),
-            )
-            .await;
-    }
 }
 
 /// Parse un bitfield de permissions (chaine) vers [`Permissions`].
@@ -92,7 +70,7 @@ pub async fn restore(
     ctx: &Context,
     guild_id: GuildId,
     snapshot: &GuildSnapshot,
-    progress: &Progress<'_>,
+    progress: &ProgressSink<'_>,
 ) -> RestoreReport {
     let mut report = RestoreReport::default();
 

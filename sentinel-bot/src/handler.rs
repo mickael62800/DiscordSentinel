@@ -245,6 +245,10 @@ impl EventHandler for Handler {
         modules::game_portal::spawn(ctx.clone());
         modules::influence::spawn(ctx.clone());
 
+        // Guild backup : consumer Redis pour piloter capture/restore/wipe depuis
+        // le web (events guild_backup:capture_requested / :restore_requested).
+        modules::guild_backup::spawn(ctx.clone());
+
         // AI dataset : task de collecte (client-streaming gRPC longue duree).
         modules::ai_dataset::spawn_collector(ctx.clone()).await;
     }

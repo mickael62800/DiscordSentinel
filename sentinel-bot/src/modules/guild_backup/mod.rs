@@ -10,8 +10,13 @@
 
 pub mod api_client;
 pub mod capture;
+pub mod events;
+pub mod guild_config;
+pub mod progress;
 pub mod restore;
 pub mod wipe;
+
+pub use events::spawn;
 
 use std::sync::Arc;
 
@@ -512,7 +517,7 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         warn!(error = %e, "guild_backup: purge des pending-roles impossible");
     }
 
-    let progress = restore::Progress::new(ctx, component);
+    let progress = progress::ProgressSink::interaction(ctx, component);
 
     // Phase de WIPE optionnelle : vide le serveur avant recreation.
     let wipe_report = if wipe {

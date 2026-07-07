@@ -18,7 +18,7 @@
 use serenity::all::{Context, GuildId};
 use tracing::{info, warn};
 
-use super::restore::Progress;
+use super::progress::ProgressSink;
 
 /// Compteurs de la phase de wipe (inclus au rapport final de restauration).
 #[derive(Debug, Default, Clone, Copy)]
@@ -32,7 +32,7 @@ pub struct WipeReport {
 ///
 /// Ordre volontaire : salons d'abord (leurs overwrites référençant des rôles
 /// disparaissent avec eux), puis rôles, puis emojis.
-pub async fn wipe(ctx: &Context, guild_id: GuildId, progress: &Progress<'_>) -> WipeReport {
+pub async fn wipe(ctx: &Context, guild_id: GuildId, progress: &ProgressSink<'_>) -> WipeReport {
     let mut report = WipeReport::default();
 
     // ── 1. Salons + catégories ──
