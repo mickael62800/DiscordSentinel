@@ -419,6 +419,18 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         report.bans_applied,
         report.members_updated,
     );
+    if report.emojis_total > 0 {
+        txt.push_str(&format!(
+            "\nEmojis : {}/{}.",
+            report.emojis_created, report.emojis_total
+        ));
+    }
+    if let Some(ok) = report.icon_restored {
+        txt.push_str(&format!(
+            "\nIcone : {}.",
+            if ok { "ok" } else { "echec" }
+        ));
+    }
     if !report.notes.is_empty() {
         txt.push_str("\n\n⚠️ Notes : ");
         txt.push_str(&report.notes.join(" ; "));

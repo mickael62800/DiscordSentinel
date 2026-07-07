@@ -9,14 +9,14 @@
 //! echoue est loggee et n'interrompt pas la restauration). Ne parallelise pas
 //! (serenity gere les rate limits sur des appels sequentiels).
 //!
-//! Best-effort documente : l'icone du serveur et les emojis ne sont PAS
-//! restaures (images) — seulement logges. Les membres ABSENTS ne peuvent pas
-//! recevoir leurs roles.
+//! Best-effort documente : l'icone du serveur et les emojis sont telecharges
+//! depuis les URLs CDN du snapshot puis recrees (echec logge sans interrompre).
+//! Les membres ABSENTS ne peuvent pas recevoir leurs roles.
 
 use std::collections::HashMap;
 
 use serenity::all::{
-    AfkTimeout, ChannelId, ChannelType, Colour, Context, CreateChannel,
+    AfkTimeout, ChannelId, ChannelType, Colour, Context, CreateAttachment, CreateChannel,
     DefaultMessageNotificationLevel, EditGuild, EditRole, ExplicitContentFilter, GuildId,
     PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId, UserId, VerificationLevel,
 };
@@ -34,6 +34,10 @@ pub struct RestoreReport {
     pub channels_failed: usize,
     pub bans_applied: usize,
     pub members_updated: usize,
+    pub emojis_created: usize,
+    pub emojis_total: usize,
+    /// `Some(true)` = icone restauree, `Some(false)` = echec, `None` = pas d'icone.
+    pub icon_restored: Option<bool>,
     pub notes: Vec<String>,
 }
 
@@ -173,14 +177,51 @@ pub async fn restore(
         }
     }
 
-    // ── 6. Emojis (best-effort : NON restaures, images) ──
+    // ── 6. Emojis (best-effort : telecharge l'image CDN puis recree l'emoji) ──
     if !snapshot.emojis.is_empty() {
-        let note = format!(
-            "{} emoji(s) non restaures (images non recreees dans cette version)",
-            snapshot.emojis.len()
+        report.emojis_total = snapshot.emojis.len();
+        let total = snapshot.emojis.len();
+        // `full` : une fois la limite du serveur atteinte (erreur Discord), on
+        // arrete d'essayer pour ne pas spammer l'API inutilement.
+        let mut full = false;
+        for (i, emoji) in snapshot.emojis.iter().enumerate() {
+            if i % 3 == 0 {
+                progress
+                    .set(&format!("♻️ Restauration… emojis {}/{}", i, total))
+                    .await;
+            }
+            if full {
+                break;
+            }
+            let Some(bytes) = download_bytes(ctx, &emoji.image_ref).await else {
+                warn!(emoji = %emoji.name, url = %emoji.image_ref, "guild_backup: echec download emoji");
+                continue;
+            };
+            // Discord attend une image en data URI base64.
+            let data_uri = CreateAttachment::bytes(bytes, "emoji").to_base64();
+            match guild_id.create_emoji(&ctx.http, &emoji.name, &data_uri).await {
+                Ok(_) => report.emojis_created += 1,
+                Err(e) => {
+                    let msg = e.to_string();
+                    warn!(error = %e, emoji = %emoji.name, "guild_backup: echec creation emoji");
+                    // Limite d'emojis atteinte : inutile de continuer.
+                    if msg.contains("Maximum number of emojis") || msg.contains("30008") {
+                        full = true;
+                    }
+                }
+            }
+        }
+        if full {
+            report
+                .notes
+                .push("limite d'emojis du serveur atteinte".to_string());
+        }
+        info!(
+            guild = %guild_id,
+            created = report.emojis_created,
+            total = report.emojis_total,
+            "guild_backup: emojis restaures"
         );
-        info!(guild = %guild_id, "guild_backup: {note}");
-        report.notes.push(note);
     }
 
     // ── 7. member_roles (membres PRESENTS uniquement) ──
@@ -303,7 +344,7 @@ async fn create_channel(
     }
 }
 
-/// Applique les reglages generaux (best-effort). L'icone n'est PAS restauree.
+/// Applique les reglages generaux (best-effort), icone du serveur incluse.
 async fn apply_settings(
     ctx: &Context,
     guild_id: GuildId,
@@ -330,15 +371,50 @@ async fn apply_settings(
         builder = builder.system_channel_id(channel_map.get(old).copied());
     }
 
+    // Icone : si presente, telecharge les bytes et applique via EditGuild::icon.
+    // On l'ajoute au meme builder pour n'emettre qu'une requete edit.
+    let mut icon_attachment: Option<CreateAttachment> = None;
+    if let Some(icon_url) = &s.icon {
+        match download_bytes(ctx, icon_url).await {
+            Some(bytes) => icon_attachment = Some(CreateAttachment::bytes(bytes, "icon.png")),
+            None => {
+                warn!(guild = %guild_id, url = %icon_url, "guild_backup: echec download icone");
+                report.icon_restored = Some(false);
+                report.notes.push("icone non restauree (download)".to_string());
+            }
+        }
+    }
+    if let Some(att) = &icon_attachment {
+        builder = builder.icon(Some(att));
+    }
+
     if let Err(e) = guild_id.edit(&ctx.http, builder).await {
         warn!(error = %e, "guild_backup: echec application des reglages");
         report
             .notes
             .push("reglages du serveur partiellement appliques".to_string());
+        if icon_attachment.is_some() {
+            report.icon_restored = Some(false);
+        }
+    } else if icon_attachment.is_some() {
+        report.icon_restored = Some(true);
+        info!(guild = %guild_id, "guild_backup: icone restauree");
     }
+}
 
-    if s.icon.is_some() {
-        info!(guild = %guild_id, "guild_backup: icone non restauree (image non recreee)");
-        report.notes.push("icone non restauree".to_string());
+/// Telecharge des bytes depuis une URL (CDN Discord) via le client reqwest
+/// partage du bot (pooling + timeouts coherents). Best-effort : `None` en cas
+/// d'echec reseau, statut non-2xx ou absence de client.
+async fn download_bytes(ctx: &Context, url: &str) -> Option<Vec<u8>> {
+    let client = {
+        let data = ctx.data.read().await;
+        let base = data.get::<crate::shared::heartbeat::ApiClientKey>()?;
+        base.client().clone()
+    };
+    let resp = client.get(url).send().await.ok()?;
+    if !resp.status().is_success() {
+        warn!(status = %resp.status(), url, "guild_backup: download non-success");
+        return None;
     }
+    resp.bytes().await.ok().map(|b| b.to_vec())
 }
