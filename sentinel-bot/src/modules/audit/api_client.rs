@@ -1,7 +1,23 @@
 use std::sync::Arc;
 
 use crate::shared::api_client::BaseApiClient;
+use serde::Deserialize;
 use serde::Serialize;
+
+/// Rapport hebdomadaire agrege server-side (fenetre 7 jours), renvoye par
+/// l'API. Le bot ne fait que rendre l'embed a partir de ces compteurs.
+#[derive(Debug, Default, Deserialize)]
+pub struct WeeklyReport {
+    pub member_joins: u64,
+    pub member_leaves: u64,
+    pub bans: u64,
+    pub messages_deleted: u64,
+    pub messages_edited: u64,
+    pub role_changes: u64,
+    pub channel_changes: u64,
+    pub voice_events: u64,
+    pub anomalies: u64,
+}
 
 #[derive(Debug, Serialize)]
 pub struct AuditEvent {
@@ -84,6 +100,13 @@ impl ApiClient {
             .post_fire_and_forget("/api/user-activity", &payload)
             .await;
         Ok(())
+    }
+
+    /// Recupere le rapport d'activite hebdomadaire agrege server-side pour un
+    /// guild (comptage des events d'audit persistes sur 7 jours).
+    pub async fn get_weekly_report(&self, guild_id: &str) -> Result<WeeklyReport, String> {
+        let path = format!("/api/audit-weekly-report/{}", guild_id);
+        self.base.get_json(&path).await
     }
 
     pub async fn send_audit_event(&self, event: &AuditEvent) -> Result<(), String> {

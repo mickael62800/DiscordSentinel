@@ -5,10 +5,9 @@ use serenity::prelude::*;
 
 use crate::shared::embeds::{critical_embed, info_embed, moderate_embed};
 
-use super::weekly_report::StatField;
 use super::{audit_event, watched_users};
 use super::{log, post_to_channel, send_event};
-use super::{MessageCacheKey, WeeklyTrackerKey};
+use super::MessageCacheKey;
 
 /// Formate un contenu de message pour un field embed : tronque a `max`,
 /// neutralise les mentions de masse et les blocs ``` pour eviter le bris de
@@ -188,14 +187,6 @@ pub async fn handle_delete(
         .await;
     }
 
-    // Weekly stats
-    {
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(gid, StatField::MessageDeleted);
-        }
-    }
-
     // Anomaly detection (delete pattern). DECISION server-side.
     let alert_opt = super::super::detect_anomaly(ctx, &gid_str, "delete", 1).await;
     if let Some(alert) = alert_opt {
@@ -243,11 +234,6 @@ pub async fn handle_delete(
             ),
         )
         .await;
-
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(gid, StatField::Anomaly);
-        }
     }
 }
 
@@ -416,14 +402,6 @@ pub async fn handle_update(
         )
         .await;
     }
-
-    // Weekly stats
-    let data = ctx.data.read().await;
-    if let Some(guild_id) = event.guild_id {
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(guild_id, StatField::MessageEdited);
-        }
-    }
 }
 
 pub async fn handle_delete_bulk(
@@ -511,17 +489,6 @@ pub async fn handle_delete_bulk(
             ),
         )
         .await;
-
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(gid, StatField::Anomaly);
-        }
-    }
-
-    // Weekly stats
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment_deleted(gid, count as u64);
     }
 }
 

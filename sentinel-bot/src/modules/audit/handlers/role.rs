@@ -4,9 +4,7 @@ use serenity::prelude::*;
 
 use super::audit_event;
 use super::permission_diff;
-use super::weekly_report::StatField;
 use super::{log, post_to_channel, send_event};
-use super::WeeklyTrackerKey;
 
 pub async fn handle_create(ctx: &Context, new: &Role) {
     let gid = new.guild_id;
@@ -38,11 +36,6 @@ pub async fn handle_create(ctx: &Context, new: &Role) {
             })),
     )
     .await;
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::RoleChange);
-    }
 }
 
 pub async fn handle_delete(
@@ -70,11 +63,6 @@ pub async fn handle_delete(
         audit_event::simple(gid_str, "role_delete").with_target(removed_role_id, &role_name),
     )
     .await;
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(guild_id, StatField::RoleChange);
-    }
 }
 
 pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
@@ -196,15 +184,5 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
             ),
         )
         .await;
-
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(gid, StatField::Anomaly);
-        }
-    }
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::RoleChange);
     }
 }

@@ -2,8 +2,7 @@ use serenity::model::channel::{GuildChannel, Message};
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::weekly_report::StatField;
-use super::{log, send_event, WeeklyTrackerKey};
+use super::{log, send_event};
 
 pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
     let gid = channel.guild_id;
@@ -27,11 +26,6 @@ pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
             })),
     )
     .await;
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::ChannelChange);
-    }
 }
 
 pub async fn handle_delete(ctx: &Context, channel: &GuildChannel, _messages: Option<Vec<Message>>) {
@@ -53,9 +47,4 @@ pub async fn handle_delete(ctx: &Context, channel: &GuildChannel, _messages: Opt
             .with_channel(channel.id, Some(channel.name.clone())),
     )
     .await;
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::ChannelChange);
-    }
 }

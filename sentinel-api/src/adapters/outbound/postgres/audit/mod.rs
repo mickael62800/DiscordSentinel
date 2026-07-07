@@ -1,4 +1,5 @@
 pub mod analytics_repository;
+pub mod audit_event_counter;
 pub mod audit_log_repository;
 pub mod discord_action_message_repository;
 pub mod modstats_repository;

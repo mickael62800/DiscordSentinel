@@ -6,3 +6,4 @@ pub mod moderation_anomaly;
 pub mod security;
 pub mod stats;
 pub mod watched_users;
+pub mod weekly_report;

@@ -9,3 +9,4 @@ pub mod snapshots;
 pub mod stats;
 pub mod user_activity;
 pub mod watched_users;
+pub mod weekly_report;

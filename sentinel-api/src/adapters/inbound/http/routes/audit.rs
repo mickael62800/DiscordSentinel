@@ -26,6 +26,11 @@ pub fn routes() -> Router<AppState> {
             "/api/moderation-anomaly",
             post(handlers::audit::moderation_anomaly::detect_moderation_anomaly),
         )
+        // Rapport hebdomadaire agrege server-side (fenetre 7 jours).
+        .route(
+            "/api/audit-weekly-report/{guild_id}",
+            get(handlers::audit::weekly_report::get_weekly_report),
+        )
         // Watched users
         .route(
             "/api/watched-users",

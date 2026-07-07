@@ -8,7 +8,6 @@ use crate::shared::embeds::info_embed;
 use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ApiClient;
-use super::WeeklyTrackerKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("audit")
@@ -191,12 +190,19 @@ async fn handle_stats(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let data = ctx.data.read().await;
+    // Agregation server-side : l'API compte les events d'audit persistes sur
+    // 7 jours. Le bot ne fait que rendre l'embed a partir de ces compteurs.
+    let base = {
+        let data = ctx.data.read().await;
+        match data.get::<ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+    let api = ApiClient::new(base);
 
-    let stats_text = if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        // Read current stats without draining
-        let snapshot = tracker.snapshot(guild_id);
-        format!(
+    let stats_text = match api.get_weekly_report(&guild_id.to_string()).await {
+        Ok(report) => format!(
             "\
 Membres: +{} / -{}\n\
 Bans: {}\n\
@@ -206,18 +212,17 @@ Changements de roles: {}\n\
 Changements de channels: {}\n\
 Evenements vocaux: {}\n\
 Anomalies detectees: {}",
-            snapshot.member_joins,
-            snapshot.member_leaves,
-            snapshot.bans,
-            snapshot.messages_deleted,
-            snapshot.messages_edited,
-            snapshot.role_changes,
-            snapshot.channel_changes,
-            snapshot.voice_events,
-            snapshot.anomalies,
-        )
-    } else {
-        "Tracker non disponible.".to_string()
+            report.member_joins,
+            report.member_leaves,
+            report.bans,
+            report.messages_deleted,
+            report.messages_edited,
+            report.role_changes,
+            report.channel_changes,
+            report.voice_events,
+            report.anomalies,
+        ),
+        Err(e) => format!("Erreur recuperation du rapport : {}", e),
     };
 
     let embed = info_embed("Audit -- Statistiques hebdomadaires").description(stats_text);

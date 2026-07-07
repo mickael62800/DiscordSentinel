@@ -5,7 +5,6 @@
 //! - `audit_event` : builder fluent pour AuditEvent
 //! - `message_cache` : cache LRU des messages (pour retrouver les deletes)
 //! - `anomaly` : detection d'anomalies (mass ban/delete/role)
-//! - `weekly_report` : stats hebdomadaires par guild
 //! - `permission_diff` : diff lisible de permissions Discord
 //! - `watched_users` : bootstrap + refresh cache utilisateurs surveilles
 //! - `handlers` : sous-handlers par type d'event (message, member, ...)
@@ -22,7 +21,6 @@ pub mod message_cache;
 pub mod permission_diff;
 pub mod role_card;
 pub mod watched_users;
-pub mod weekly_report;
 
 use std::sync::Arc;
 
@@ -47,11 +45,6 @@ use api_client::{ApiClient, AuditEvent};
 pub struct MessageCacheKey;
 impl TypeMapKey for MessageCacheKey {
     type Value = message_cache::MessageCache;
-}
-
-pub struct WeeklyTrackerKey;
-impl TypeMapKey for WeeklyTrackerKey {
-    type Value = weekly_report::WeeklyTracker;
 }
 
 pub struct ConfigKey;
@@ -98,7 +91,6 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     data.insert::<MessageCacheKey>(message_cache::MessageCache::new(
         audit_config.message_cache_size,
     ));
-    data.insert::<WeeklyTrackerKey>(weekly_report::WeeklyTracker::new());
     data.insert::<ConfigKey>(audit_config);
     data.insert::<WatchedUserIdsKey>(Arc::new(DashSet::new()));
     data.insert::<role_card::RoleCardTrackerKey>(Arc::new(

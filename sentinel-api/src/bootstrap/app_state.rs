@@ -245,6 +245,18 @@ pub async fn build_app_state(
         ),
     );
 
+    // Rapport hebdomadaire agrege server-side : comptage postgres par event_type
+    // sur 7 jours (remonte de l'ancien WeeklyTracker RAM du bot).
+    let weekly_report_uc = Arc::new(
+        sentinel_core::application::audit::get_weekly_report_service::GetWeeklyReportService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::audit::audit_event_counter::PgAuditEventCounter::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+
     let user_activity_repo: Arc<
         dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository,
     > = Arc::new(PgUserActivityRepository::new(pg_pool.clone()));
@@ -1302,6 +1314,7 @@ pub async fn build_app_state(
         watched_users_uc,
         audit_logs_uc,
         detect_anomaly_uc,
+        weekly_report_uc,
         snapshots_uc,
         levels_uc,
         announcements_uc,

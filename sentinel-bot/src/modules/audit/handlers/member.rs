@@ -8,9 +8,7 @@ use crate::shared::heartbeat::ApiClientKey;
 
 use tracing::warn;
 
-use super::weekly_report::StatField;
 use super::{audit_event, watched_users};
-use super::WeeklyTrackerKey;
 use super::{log, post_to_channel, send_event};
 
 pub async fn handle_addition(ctx: &Context, new_member: &Member) {
@@ -69,11 +67,6 @@ pub async fn handle_addition(ctx: &Context, new_member: &Member) {
         serde_json::json!({"account_created_at": new_member.user.created_at().to_string()}),
     )
     .await;
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(gid, StatField::MemberJoin);
-    }
 }
 
 pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
@@ -173,16 +166,6 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
             ),
         )
         .await;
-
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(guild_id, StatField::Anomaly);
-        }
-    }
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(guild_id, StatField::MemberLeave);
     }
 }
 
@@ -260,16 +243,6 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
             ),
         )
         .await;
-
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(guild_id, StatField::Anomaly);
-        }
-    }
-
-    let data = ctx.data.read().await;
-    if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-        tracker.increment(guild_id, StatField::Ban);
     }
 }
 
@@ -520,12 +493,6 @@ pub async fn handle_update(ctx: &Context, old: Option<Member>, new_member: &Memb
             serde_json::json!({"old_roles": old_roles, "new_roles": new_roles}),
         )
         .await;
-
-        // Weekly stats
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(gid, StatField::RoleChange);
-        }
     }
 
     // Timeout (mute) detecte

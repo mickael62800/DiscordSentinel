@@ -7,3 +7,4 @@ pub mod snapshot;
 pub mod user_activity;
 pub mod user_stats;
 pub mod watched_user;
+pub mod weekly_report;

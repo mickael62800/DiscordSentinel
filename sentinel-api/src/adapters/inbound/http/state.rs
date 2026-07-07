@@ -59,6 +59,7 @@ pub struct AppState {
     pub watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>,
     pub audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>,
     pub detect_anomaly_uc: Arc<dyn crate::ports::inbound::audit::detect_moderation_anomaly::DetectModerationAnomalyUseCase>,
+    pub weekly_report_uc: Arc<dyn crate::ports::inbound::audit::get_weekly_report::GetWeeklyReportUseCase>,
     pub snapshots_uc: Arc<dyn crate::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseCase>,
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase>,

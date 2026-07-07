@@ -3,9 +3,8 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 
 use super::audit_event;
-use super::weekly_report::StatField;
+use super::watched_users;
 use super::{log, post_to_channel, send_event};
-use super::{watched_users, WeeklyTrackerKey};
 
 /// Salons de log vocal : cle dediee puis fallback log_channel_id (gere par
 /// post_to_channel).
@@ -101,11 +100,4 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         Some(&voice_msg),
         serde_json::json!({"from": old_channel.map(|c| c.to_string()), "to": new_channel.map(|c| c.to_string())}),
     ).await;
-
-    if let Some(guild_id) = new.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-            tracker.increment(guild_id, StatField::VoiceEvent);
-        }
-    }
 }

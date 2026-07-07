@@ -407,6 +407,20 @@ impl ManageAuditLogsUseCase for StubAuditLogs {
     }
 }
 
+pub struct StubAuditEventCounter;
+#[async_trait]
+impl sentinel_core::ports::outbound::audit::audit_event_counter::AuditEventCounter
+    for StubAuditEventCounter
+{
+    async fn count_by_event_type(
+        &self,
+        _guild_id: &str,
+        _days: u32,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        Ok(Vec::new())
+    }
+}
+
 pub struct StubSnapshots;
 #[async_trait]
 impl sentinel_core::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseCase
@@ -4297,6 +4311,11 @@ fn base_state() -> AppState {
         detect_anomaly_uc: Arc::new(
             sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
                 Arc::new(sentinel_api::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(500, 100)),
+            ),
+        ),
+        weekly_report_uc: Arc::new(
+            sentinel_core::application::audit::get_weekly_report_service::GetWeeklyReportService::new(
+                Arc::new(StubAuditEventCounter),
             ),
         ),
         snapshots_uc: Arc::new(StubSnapshots),
