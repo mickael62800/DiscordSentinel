@@ -79,9 +79,12 @@ impl LogRepository for BatchedPgLogRepository {
         &self,
         category: Option<&str>,
         level: Option<&str>,
+        guild_id: Option<&str>,
         limit: i64,
     ) -> Result<Vec<LogEntry>, DomainError> {
-        self.inner.find_filtered(category, level, limit).await
+        self.inner
+            .find_filtered(category, level, guild_id, limit)
+            .await
     }
 
     async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError> {

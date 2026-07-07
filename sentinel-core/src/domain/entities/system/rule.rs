@@ -39,6 +39,42 @@ impl Rule {
         }
     }
 
+    /// Jeu de regles de moderation par defaut seede a l'enregistrement d'une
+    /// guild. Valeurs metier (poids + seuils) — la persistance idempotente
+    /// (`ON CONFLICT (guild_id, flag_type) DO NOTHING`) vit dans `RuleRepository`.
+    pub fn default_seed(guild_id: &GuildId) -> Vec<Rule> {
+        // (flag_type, weight, warn, delete, mute, ban)
+        const DEFAULTS: [(FlagType, f64, f64, f64, f64, f64); 10] = [
+            (FlagType::Spam, 2.0, 2.0, 4.0, 6.0, 9.0),
+            (FlagType::Insult, 2.0, 2.0, 4.0, 6.0, 8.0),
+            (FlagType::Link, 1.0, 3.0, 5.0, 7.0, 9.0),
+            (FlagType::Phishing, 3.5, 1.0, 2.5, 4.0, 6.0),
+            (FlagType::Nsfw, 3.0, 1.5, 3.0, 5.0, 8.0),
+            (FlagType::Illicit, 3.5, 1.0, 2.5, 4.0, 6.0),
+            (FlagType::Threat, 3.5, 1.0, 2.0, 4.0, 6.0),
+            (FlagType::Rage, 2.5, 2.0, 3.5, 5.0, 7.0),
+            (FlagType::Anger, 2.0, 2.5, 4.0, 6.0, 8.0),
+            (FlagType::Harassment, 3.0, 1.5, 2.5, 4.5, 7.0),
+        ];
+        let now = Utc::now();
+        DEFAULTS
+            .into_iter()
+            .map(|(flag_type, weight, warn, delete, mute, ban)| Rule {
+                id: Uuid::new_v4(),
+                guild_id: guild_id.clone(),
+                flag_type,
+                weight,
+                threshold_warn: warn,
+                threshold_delete: delete,
+                threshold_mute: mute,
+                threshold_ban: ban,
+                enabled: true,
+                created_at: now,
+                updated_at: now,
+            })
+            .collect()
+    }
+
     fn default_weight_for(flag_type: &FlagType) -> f64 {
         match flag_type {
             FlagType::Spam => 3.0,

@@ -168,4 +168,22 @@ impl RbacRepository for PgRbacRepository {
             })
             .collect())
     }
+
+    async fn grant_owner_if_absent(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO api_user_guilds (discord_user_id, guild_id, role, granted_by) \
+             VALUES ($1, $2, 'owner', $1) \
+             ON CONFLICT (discord_user_id, guild_id) DO NOTHING",
+        )
+        .bind(user_id)
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
 }

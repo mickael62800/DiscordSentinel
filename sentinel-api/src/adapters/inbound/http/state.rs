@@ -76,6 +76,8 @@ pub struct AppState {
     pub daily_activity_repo: Arc<dyn DailyActivityRepository>,
     pub age_ban_repo: Arc<dyn crate::ports::outbound::community::age_ban_repository::AgeBanRepository>,
     pub log_repo: Arc<dyn LogRepository>,
+    pub system_logs_uc:
+        Arc<dyn crate::ports::inbound::system::manage_system_logs::ManageSystemLogsUseCase>,
     pub guild_repo: Arc<dyn GuildRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,

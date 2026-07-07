@@ -132,6 +132,11 @@ pub async fn build_app_state(
         pg_pool.clone(),
         BatchWriterConfig::default(),
     ));
+    // Use case lecture/purge des logs systeme — reutilise le meme repo batche.
+    let system_logs_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_system_logs::ManageSystemLogsUseCase> =
+        Arc::new(sentinel_core::application::system::manage_system_logs_service::ManageSystemLogsService::new(
+            log_repo.clone(),
+        ));
     let notes_repo = Arc::new(PgNotesRepository::new(pg_pool.clone()));
     let reminder_repo = Arc::new(PgReminderRepository::new(pg_pool.clone()));
     let strike_repo = Arc::new(PgStrikeRepository::new(pg_pool.clone()));
@@ -1209,6 +1214,7 @@ pub async fn build_app_state(
         daily_activity_repo,
         age_ban_repo,
         log_repo,
+        system_logs_uc,
         guild_repo,
         bot_config_repo,
         discord_role_repo,

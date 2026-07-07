@@ -94,6 +94,12 @@ impl RuleRepository for MockRuleRepo {
     async fn delete(&self, _: uuid::Uuid) -> Result<(), crate::domain::errors::DomainError> {
         Ok(())
     }
+    async fn seed_defaults(
+        &self,
+        _: &[crate::domain::entities::system::rule::Rule],
+    ) -> Result<(), crate::domain::errors::DomainError> {
+        Ok(())
+    }
 }
 
 struct MockInfractionRepo;

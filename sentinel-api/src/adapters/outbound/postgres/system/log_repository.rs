@@ -85,21 +85,25 @@ impl LogRepository for PgLogRepository {
         &self,
         category: Option<&str>,
         level: Option<&str>,
+        guild_id: Option<&str>,
         limit: i64,
     ) -> Result<Vec<LogEntry>, DomainError> {
         // Filtre dynamique : on construit la WHERE clause en fonction des
-        // filtres optionnels (category / level). Permet a la page Logs systeme
-        // de charger 200 lignes PAR colonne (bot, worker, api, websocket)
-        // au lieu de partager un seul pool de 200 toutes-categories.
+        // filtres optionnels (category / level / guild). Le filtre `guild_id`
+        // est une clause SQL (`server = $3`) — plus de filtrage post-fetch en
+        // Rust. Permet a la page Logs systeme de charger 200 lignes PAR colonne
+        // (bot, worker, api, websocket) au lieu de partager un seul pool de 200.
         let rows = sqlx::query_as::<_, LogRow>(
             "SELECT id, timestamp, level, bot, server, message, category, details \
              FROM logs \
              WHERE ($1::text IS NULL OR category = $1) \
                AND ($2::text IS NULL OR level = $2) \
-             ORDER BY timestamp DESC LIMIT $3",
+               AND ($3::text IS NULL OR server = $3) \
+             ORDER BY timestamp DESC LIMIT $4",
         )
         .bind(category)
         .bind(level)
+        .bind(guild_id)
         .bind(limit)
         .fetch_all(&self.pool)
         .await

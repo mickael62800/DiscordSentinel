@@ -193,6 +193,9 @@ impl ManageRulesUseCase for MockRulesUC {
     async fn delete_rule(&self, _: &str, _: Uuid) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn seed_default_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════

@@ -92,6 +92,15 @@ impl ManageRulesUseCase for ManageRulesService {
         }
         Ok(())
     }
+
+    async fn seed_default_rules(&self, guild_id: &str) -> Result<(), DomainError> {
+        let rules = Rule::default_seed(&guild_id.to_string().into());
+        self.rule_repo.seed_defaults(&rules).await?;
+        if let Err(e) = self.cache.invalidate_rules(guild_id).await {
+            warn!(error = %e, guild_id = %guild_id, "Echec invalidation cache rules");
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

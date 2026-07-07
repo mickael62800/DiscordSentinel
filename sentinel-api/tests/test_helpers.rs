@@ -147,6 +147,9 @@ impl ManageRulesUseCase for StubRules {
     async fn delete_rule(&self, _: &str, _: Uuid) -> Result<(), DomainError> {
         unimplemented!()
     }
+    async fn seed_default_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 pub struct StubInfractions;
@@ -958,6 +961,7 @@ impl LogRepository for StubLogRepo {
         &self,
         _: Option<&str>,
         _: Option<&str>,
+        _: Option<&str>,
         _: i64,
     ) -> Result<Vec<LogEntry>, DomainError> {
         Ok(vec![])
@@ -966,6 +970,22 @@ impl LogRepository for StubLogRepo {
         Ok(0)
     }
     async fn delete_older_than_days(&self, _: i32) -> Result<u64, DomainError> {
+        Ok(0)
+    }
+}
+
+pub struct StubSystemLogs;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_system_logs::ManageSystemLogsUseCase
+    for StubSystemLogs
+{
+    async fn list_logs(
+        &self,
+        _: sentinel_core::ports::inbound::system::manage_system_logs::SystemLogFilters,
+    ) -> Result<Vec<LogEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn purge_category(&self, _: &str) -> Result<u64, DomainError> {
         Ok(0)
     }
 }
@@ -3482,6 +3502,9 @@ impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for S
     {
         Ok(vec![])
     }
+    async fn ensure_owner_grant(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 pub struct StubMonthlyRanking;
@@ -4050,6 +4073,7 @@ fn base_state() -> AppState {
             ),
         ),
         log_repo: Arc::new(StubLogRepo),
+        system_logs_uc: Arc::new(StubSystemLogs),
         guild_repo: Arc::new(StubGuildRepo),
         bot_config_repo: Arc::new(StubBotConfigRepo),
         discord_role_repo: Arc::new(StubDiscordRoleRepo),

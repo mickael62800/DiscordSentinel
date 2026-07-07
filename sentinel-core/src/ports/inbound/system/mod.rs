@@ -8,6 +8,7 @@ pub mod manage_rbac;
 pub mod manage_rotation;
 pub mod manage_security_audit;
 pub mod manage_server_events;
+pub mod manage_system_logs;
 pub mod manage_tickets;
 pub mod read_host_probe;
 pub mod read_security_logs;

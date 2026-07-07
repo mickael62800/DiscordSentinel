@@ -146,4 +146,31 @@ impl RuleRepository for PgRuleRepository {
 
         Ok(())
     }
+
+    async fn seed_defaults(&self, rules: &[Rule]) -> Result<(), DomainError> {
+        // Insertion idempotente ligne a ligne : les regles deja presentes
+        // (guild_id, flag_type) ne sont pas ecrasees. Couvre les nouvelles
+        // guilds + le retro-seed des anciennes au prochain startup du bot.
+        for rule in rules {
+            sqlx::query(
+                "INSERT INTO rules (id, guild_id, flag_type, weight, threshold_warn, \
+                 threshold_delete, threshold_mute, threshold_ban, enabled) \
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
+                 ON CONFLICT (guild_id, flag_type) DO NOTHING",
+            )
+            .bind(rule.id)
+            .bind(rule.guild_id.as_str())
+            .bind(rule.flag_type.as_str())
+            .bind(rule.weight)
+            .bind(rule.threshold_warn)
+            .bind(rule.threshold_delete)
+            .bind(rule.threshold_mute)
+            .bind(rule.threshold_ban)
+            .bind(rule.enabled)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        }
+        Ok(())
+    }
 }

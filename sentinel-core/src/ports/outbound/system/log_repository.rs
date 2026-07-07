@@ -11,6 +11,7 @@ pub trait LogRepository: Send + Sync {
         &self,
         category: Option<&str>,
         level: Option<&str>,
+        guild_id: Option<&str>,
         limit: i64,
     ) -> Result<Vec<LogEntry>, DomainError>;
     async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError>;

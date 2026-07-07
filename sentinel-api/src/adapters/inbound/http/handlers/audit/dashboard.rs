@@ -40,14 +40,18 @@ pub async fn get_dashboard_stats(
 /// - Sans `category` : on retombe sur Postgres (warn/error uniquement
 ///   sont persistes — voir create_log).
 ///
-/// Le filtre `guild_id` reste applique post-fetch pour les deux sources.
+/// Filtre `guild_id` :
+/// - Postgres : clause SQL (`server = ...`) portee par le use case.
+/// - Redis : la stream n'est pas indexee par guild, le filtre reste post-fetch
+///   sur le resultat du cache (adapter `redis_log_stream`).
 pub async fn get_logs(
     State(state): State<AppState>,
     Query(params): Query<GuildFilterParams>,
 ) -> Result<Json<Vec<LogEntryDto>>, ApiError> {
     let limit = params.limit.unwrap_or(200).clamp(1, 1000);
 
-    let logs = if let Some(cat) = params.category.as_deref() {
+    let dtos: Vec<LogEntryDto> = if let Some(cat) = params.category.as_deref() {
+        // Cache Redis (adapter) : filtre guild post-fetch faute d'index.
         redis_log_stream::xrevrange_logs(
             &state.redis_client,
             cat,
@@ -55,19 +59,29 @@ pub async fn get_logs(
             limit as usize,
         )
         .await
-    } else {
-        state
-            .log_repo
-            .find_filtered(None, params.level.as_deref(), limit)
-            .await?
-    };
-
-    let filtered: Vec<LogEntryDto> = logs
         .into_iter()
         .filter(|l| params.guild_id.as_ref().is_none_or(|gid| l.server == *gid))
         .map(LogEntryDto::from)
-        .collect();
-    Ok(Json(filtered))
+        .collect()
+    } else {
+        // Postgres : le use case pousse le filtre guild dans la requete.
+        let filters =
+            crate::ports::inbound::system::manage_system_logs::SystemLogFilters {
+                category: None,
+                level: params.level.clone(),
+                guild_id: params.guild_id.clone(),
+                limit,
+            };
+        state
+            .system_logs_uc
+            .list_logs(filters)
+            .await?
+            .into_iter()
+            .map(LogEntryDto::from)
+            .collect()
+    };
+
+    Ok(Json(dtos))
 }
 
 /// DELETE /api/logs/{category} — supprimer tous les logs d'une categorie
@@ -76,15 +90,11 @@ pub async fn delete_logs_by_category(
     State(state): State<AppState>,
     Path(category): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    if category == "discord" {
-        return Err(ApiError(
-            sentinel_core::domain::errors::DomainError::ValidationError(
-                "Impossible de supprimer les journaux Discord".into(),
-            ),
-        ));
-    }
+    // La garde "discord non purgeable" vit desormais dans le use case : on
+    // purge Postgres d'abord (erreur avant tout effet pour `discord`), puis on
+    // vide la stream Redis (cache).
+    let count = state.system_logs_uc.purge_category(&category).await?;
     redis_log_stream::delete_stream(&state.redis_client, &category).await;
-    let count = state.log_repo.delete_by_category(&category).await?;
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
 
@@ -294,47 +304,16 @@ pub async fn register_guild(
     state.guild_repo.upsert(&guild).await?;
 
     // Auto-grant le proprietaire Discord comme `owner` RBAC au premier
-    // enregistrement. ON CONFLICT DO NOTHING : si quelqu un est deja defini
-    // (meme en viewer), on ne l ecrase pas.
+    // enregistrement (idempotent, ne remplace aucun role existant).
     if let Some(owner) = owner_id {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO api_user_guilds (discord_user_id, guild_id, role, granted_by) \
-             VALUES ($1, $2, 'owner', $1) \
-             ON CONFLICT (discord_user_id, guild_id) DO NOTHING",
-        )
-        .bind(&owner)
-        .bind(guild_id.as_str())
-        .execute(&state.pg_pool)
-        .await
-        {
+        if let Err(e) = state.rbac_admin_uc.ensure_owner_grant(&guild_id, &owner).await {
             warn!(error = %e, guild_id = %guild_id, owner_id = %owner, "Echec auto-grant owner RBAC");
         }
     }
 
-    // Seed des regles de moderation par defaut. Idempotent via
-    // ON CONFLICT (guild_id, flag_type) DO NOTHING : les regles deja
-    // presentes (eventuellement modifiees par l'admin) ne sont pas
-    // ecrasees. Couvre nouvelles guilds + retro-seed des anciennes au
-    // prochain bot startup.
-    if let Err(e) = sqlx::query(
-        "INSERT INTO rules (id, guild_id, flag_type, weight, threshold_warn, threshold_delete, threshold_mute, threshold_ban, enabled) \
-         VALUES \
-            (gen_random_uuid(), $1, 'spam',       2.0, 2.0, 4.0, 6.0, 9.0, true), \
-            (gen_random_uuid(), $1, 'insult',     2.0, 2.0, 4.0, 6.0, 8.0, true), \
-            (gen_random_uuid(), $1, 'link',       1.0, 3.0, 5.0, 7.0, 9.0, true), \
-            (gen_random_uuid(), $1, 'phishing',   3.5, 1.0, 2.5, 4.0, 6.0, true), \
-            (gen_random_uuid(), $1, 'nsfw',       3.0, 1.5, 3.0, 5.0, 8.0, true), \
-            (gen_random_uuid(), $1, 'illicit',    3.5, 1.0, 2.5, 4.0, 6.0, true), \
-            (gen_random_uuid(), $1, 'threat',     3.5, 1.0, 2.0, 4.0, 6.0, true), \
-            (gen_random_uuid(), $1, 'rage',       2.5, 2.0, 3.5, 5.0, 7.0, true), \
-            (gen_random_uuid(), $1, 'anger',      2.0, 2.5, 4.0, 6.0, 8.0, true), \
-            (gen_random_uuid(), $1, 'harassment', 3.0, 1.5, 2.5, 4.5, 7.0, true) \
-         ON CONFLICT (guild_id, flag_type) DO NOTHING",
-    )
-    .bind(guild_id.as_str())
-    .execute(&state.pg_pool)
-    .await
-    {
+    // Seed des regles de moderation par defaut (idempotent). Couvre les
+    // nouvelles guilds + le retro-seed des anciennes au prochain bot startup.
+    if let Err(e) = state.rules_uc.seed_default_rules(&guild_id).await {
         warn!(error = %e, guild_id = %guild_id, "Echec seed rules par defaut");
     }
 

@@ -24,4 +24,7 @@ pub trait ManageRulesUseCase: Send + Sync {
     async fn toggle_rule(&self, rule_id: Uuid, enabled: bool) -> Result<bool, DomainError>;
     async fn create_or_update_rule(&self, command: CreateRuleCommand) -> Result<Rule, DomainError>;
     async fn delete_rule(&self, guild_id: &str, rule_id: Uuid) -> Result<(), DomainError>;
+    /// Seede les regles de moderation par defaut d'une guild (idempotent).
+    /// Appele a l'enregistrement de la guild.
+    async fn seed_default_rules(&self, guild_id: &str) -> Result<(), DomainError>;
 }

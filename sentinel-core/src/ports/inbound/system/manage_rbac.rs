@@ -55,4 +55,12 @@ pub trait ManageRbacUseCase: Send + Sync {
     /// Liste les membres ayant un role sur la guild (tri par role puis nom).
     async fn list_guild_users(&self, guild_id: &str)
         -> Result<Vec<GuildUserEntry>, DomainError>;
+
+    /// Auto-grant idempotent du proprietaire Discord comme `owner` RBAC au
+    /// premier enregistrement de la guild. N'ecrase aucun role existant.
+    async fn ensure_owner_grant(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<(), DomainError>;
 }

@@ -12,4 +12,8 @@ pub trait RuleRepository: Send + Sync {
     async fn save(&self, rule: &Rule) -> Result<Rule, DomainError>;
     async fn toggle(&self, id: Uuid, enabled: bool) -> Result<(), DomainError>;
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
+    /// Insere les regles par defaut d'une guild de maniere idempotente
+    /// (`ON CONFLICT (guild_id, flag_type) DO NOTHING`) : ne touche pas aux
+    /// regles deja presentes (eventuellement modifiees par l'admin).
+    async fn seed_defaults(&self, rules: &[Rule]) -> Result<(), DomainError>;
 }

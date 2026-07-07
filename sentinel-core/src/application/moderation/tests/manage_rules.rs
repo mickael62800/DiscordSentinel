@@ -38,6 +38,12 @@ impl RuleRepository for MockRuleRepo {
         self.delete_calls.lock().unwrap().push(id);
         Ok(())
     }
+    async fn seed_defaults(
+        &self,
+        _: &[crate::domain::entities::system::rule::Rule],
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]

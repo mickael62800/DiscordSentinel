@@ -91,6 +91,9 @@ impl ManageRulesUseCase for MockRulesUC {
             .retain(|r| !(r.guild_id.as_str() == guild_id && r.id == rule_id));
         Ok(())
     }
+    async fn seed_default_rules(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 // ══════════════════════════════════════════════════════════

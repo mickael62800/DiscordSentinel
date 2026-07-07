@@ -48,4 +48,13 @@ pub trait RbacRepository: Send + Sync {
         &self,
         guild_id: &str,
     ) -> Result<Vec<GuildUserEntry>, DomainError>;
+
+    /// Auto-grant idempotent du proprietaire Discord comme `owner` RBAC au
+    /// premier enregistrement de la guild (`ON CONFLICT DO NOTHING`) : si un
+    /// role existe deja (meme viewer), on ne l'ecrase pas.
+    async fn grant_owner_if_absent(
+        &self,
+        user_id: &str,
+        guild_id: &str,
+    ) -> Result<(), DomainError>;
 }

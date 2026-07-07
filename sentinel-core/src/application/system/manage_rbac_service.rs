@@ -99,4 +99,12 @@ impl ManageRbacUseCase for ManageRbacService {
     ) -> Result<Vec<GuildUserEntry>, DomainError> {
         self.repo.list_guild_users(guild_id).await
     }
+
+    async fn ensure_owner_grant(
+        &self,
+        guild_id: &str,
+        owner_id: &str,
+    ) -> Result<(), DomainError> {
+        self.repo.grant_owner_if_absent(owner_id, guild_id).await
+    }
 }
