@@ -82,6 +82,9 @@ impl ManageSecurityUseCase for MockSecurityUc {
         self.report_calls.lock().unwrap().push(cmd);
         Ok(event)
     }
+    async fn purge_events(&self, _: &str) -> Result<(u64, u64), DomainError> {
+        Ok((0, 0))
+    }
     async fn list_events(&self, guild_id: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         self.list_calls
             .lock()

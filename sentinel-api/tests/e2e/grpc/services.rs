@@ -361,6 +361,9 @@ impl ManageSecurityUseCase for MockSecurityUc {
     {
         unimplemented!()
     }
+    async fn purge_events(&self, _: &str) -> Result<(u64, u64), DomainError> {
+        Ok((0, 0))
+    }
     async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(vec![SecurityEvent {
             id: Uuid::nil(),

@@ -56,6 +56,9 @@ impl SecurityEventRepository for MockSecurityRepo {
     async fn find_all(&self) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(self.all_returns.lock().unwrap().clone())
     }
+    async fn purge_guild(&self, _: &str) -> Result<(u64, u64), DomainError> {
+        Ok((0, 0))
+    }
     async fn find_by_guild(&self, _: &str) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(self.by_guild_returns.lock().unwrap().clone())
     }

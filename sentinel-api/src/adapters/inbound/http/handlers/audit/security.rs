@@ -2,7 +2,6 @@ use crate::adapters::inbound::http::dto::audit::security::ReportEventDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseDto;
 use crate::adapters::inbound::http::dto::audit::security::SecurityQueryParams;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
@@ -73,33 +72,12 @@ pub async fn purge_events(
     )
     .await?;
 
-    // Phase 4 : on supprime depuis audit_logs (la table security_events est
-    // deprecated, plus de writes). On vire aussi les anciennes lignes legacy.
-    let events_audit =
-        sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'")
-            .bind(&guild_id)
-            .execute(&state.pg_pool)
-            .await
-            .map_err(sqlx_internal("purge audit security"))?;
-
-    let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await;
-
-    let events = events_audit;
-
-    let watched = sqlx::query(
-        "DELETE FROM manual_watched_users WHERE guild_id = $1 AND added_by = 'security_event'",
-    )
-    .bind(&guild_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("purge auto watch"))?;
+    // La purge (SQL) vit dans le use case / repo (plus de SQL inline).
+    let (deleted_events, deleted_watches) = state.security_uc.purge_events(&guild_id).await?;
 
     Ok(Json(serde_json::json!({
-        "deleted_events": events.rows_affected(),
-        "deleted_watches": watched.rows_affected(),
+        "deleted_events": deleted_events,
+        "deleted_watches": deleted_watches,
     })))
 }
 

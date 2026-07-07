@@ -56,6 +56,9 @@ pub trait ManageSecurityUseCase: Send + Sync {
         command: ReportSecurityEventCommand,
     ) -> Result<SecurityEvent, DomainError>;
     async fn list_events(&self, guild_id: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError>;
+    /// Purge les evenements de securite d'une guilde (+ auto-watches). Renvoie
+    /// (nb_events_supprimes, nb_watches_supprimes).
+    async fn purge_events(&self, guild_id: &str) -> Result<(u64, u64), DomainError>;
 
     /// Analyse un nouveau membre : raid, compte suspect, alt detection.
     /// L'API decide de tout et retourne les actions a executer par le bot.

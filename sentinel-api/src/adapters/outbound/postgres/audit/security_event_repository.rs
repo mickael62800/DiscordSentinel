@@ -89,6 +89,34 @@ impl SecurityEventRepository for PgSecurityEventRepository {
 
         Ok(rows.into_iter().map(SecurityEvent::from).collect())
     }
+
+    async fn purge_guild(&self, guild_id: &str) -> Result<(u64, u64), DomainError> {
+        // Source de verite : audit_logs (event_type 'security_%'). La table
+        // security_events est deprecated (best-effort, plus de writes).
+        let events =
+            sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'")
+                .bind(guild_id)
+                .execute(&self.pool)
+                .await
+                .map_err(pg_err)?
+                .rows_affected();
+
+        let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&self.pool)
+            .await;
+
+        let watched = sqlx::query(
+            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND added_by = 'security_event'",
+        )
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?
+        .rows_affected();
+
+        Ok((events, watched))
+    }
 }
 
 /// Phase 2 helper : ligne audit_logs (event_type `security_*`) reconstruite

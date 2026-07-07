@@ -325,6 +325,10 @@ impl ManageSecurityUseCase for ManageSecurityService {
         })
         .await
     }
+
+    async fn purge_events(&self, guild_id: &str) -> Result<(u64, u64), DomainError> {
+        self.repo.purge_guild(guild_id).await
+    }
 }
 
 impl ManageSecurityService {
