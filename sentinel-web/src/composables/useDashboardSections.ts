@@ -80,6 +80,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
+  { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
   // Logs systeme : place dans le groupe admin/config (bots/workers/API/WS),
   // pas dans le groupe Journaux (qui est metier Discord uniquement).
   { key: "config.system-logs", path: "/system-logs", label: "Logs système", icon: "list" },

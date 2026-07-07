@@ -89,6 +89,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "config.rbac", label: "Bouton Config RBAC", category: "Dashboard", minRole: "owner" },
   { key: "config.system-ops", label: "Bouton System Ops", category: "Dashboard", minRole: "admin" },
   { key: "config.server-health", label: "Bouton État serveur (config)", category: "Dashboard", minRole: "admin" },
+  { key: "config.guild-backup", label: "Bouton Sauvegardes serveur", category: "Dashboard", minRole: "admin" },
   { key: "config.system-logs", label: "Bouton Logs système (bots/workers/API/WS)", category: "Dashboard", minRole: "admin" },
 
   // ── Docker ──

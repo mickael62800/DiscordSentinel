@@ -647,6 +647,16 @@ export interface ComponentVisibilityEntry {
   visible: boolean;
 }
 
+// ── Guild Backup (snapshots serveur : roles + salons) ──
+
+export interface SnapshotSummary {
+  id: string;
+  label: string;
+  created_at: string;
+  role_count: number;
+  channel_count: number;
+}
+
 // ═══════════════════════════════════════════════════
 // Phase 8 — Wallet partage + Blackjack admin
 // ═══════════════════════════════════════════════════
