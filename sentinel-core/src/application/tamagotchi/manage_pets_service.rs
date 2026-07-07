@@ -29,6 +29,11 @@ impl ManagePetsService {
     }
 }
 
+/// Plafond dur d'un montant de coins par action tamagotchi (cout ou recompense).
+/// Les montants viennent de la commande (config guilde cote bot) ; ce plafond
+/// SERVEUR empeche un appel gRPC direct de forger un cout/recompense colossal.
+const MAX_TAMA_COINS: i64 = 1_000_000;
+
 fn clamp_gauge(v: i32) -> i32 {
     v.clamp(0, 100)
 }
@@ -153,13 +158,14 @@ impl ManagePetsUseCase for ManagePetsService {
             pet.set_cooldown(&cmd.action, now);
         }
 
-        // Debit coins (wallet partage) si l'action a un cout.
-        if cmd.coin_cost > 0 {
+        // Debit coins (wallet partage) si l'action a un cout. Montant borne serveur.
+        let coin_cost = cmd.coin_cost.clamp(0, MAX_TAMA_COINS);
+        if coin_cost > 0 {
             self.wallet
                 .debit(
                     &pet.guild_id,
                     &pet.owner_id,
-                    cmd.coin_cost,
+                    coin_cost,
                     "tamagotchi",
                     &format!("Tamagotchi : {}", cmd.action),
                 )
@@ -220,12 +226,13 @@ impl ManagePetsUseCase for ManagePetsService {
         if pet.energy < cmd.energy_cost {
             return Err(DomainError::Conflict("ton compagnon est epuise".into()));
         }
-        if cmd.coin_cost > 0 {
+        let coin_cost = cmd.coin_cost.clamp(0, MAX_TAMA_COINS);
+        if coin_cost > 0 {
             self.wallet
                 .debit(
                     &pet.guild_id,
                     &pet.owner_id,
-                    cmd.coin_cost,
+                    coin_cost,
                     "tamagotchi",
                     "Tamagotchi : entrainement",
                 )
@@ -314,20 +321,23 @@ impl ManagePetsUseCase for ManagePetsService {
         visitor.bump_daily_counter("visit", &today);
         self.repo.save(&visitor).await?;
 
-        // Recompense la cible : coins (wallet) + XP.
-        if cmd.coins_reward > 0 {
+        // Recompense la cible : coins (wallet) + XP. Montants bornes SERVEUR
+        // (anti forge d'une recompense colossale via un appel gRPC direct).
+        let coins_reward = cmd.coins_reward.clamp(0, MAX_TAMA_COINS);
+        let xp_reward = cmd.xp_reward.clamp(0, MAX_TAMA_COINS);
+        if coins_reward > 0 {
             self.wallet
                 .credit(
                     &cmd.guild_id,
                     &cmd.target_id,
-                    cmd.coins_reward,
+                    coins_reward,
                     "tamagotchi",
                     "Visite recue",
                 )
                 .await?;
         }
-        if cmd.xp_reward > 0 {
-            target.xp = target.xp.saturating_add(cmd.xp_reward);
+        if xp_reward > 0 {
+            target.xp = target.xp.saturating_add(xp_reward);
             target.refresh_level();
             self.repo.save(&target).await?;
         }
@@ -338,15 +348,15 @@ impl ManagePetsUseCase for ManagePetsService {
                 "visit",
                 &format!(
                     "{} a recu une visite de {} (+{} XP +{} coins)",
-                    target.name, cmd.visitor_name, cmd.xp_reward, cmd.coins_reward
+                    target.name, cmd.visitor_name, xp_reward, coins_reward
                 ),
             )
             .await;
 
         Ok(VisitResult {
             target_name: target.name,
-            xp_reward: cmd.xp_reward,
-            coins_reward: cmd.coins_reward,
+            xp_reward,
+            coins_reward,
         })
     }
 
@@ -520,11 +530,17 @@ impl ManagePetsUseCase for ManagePetsService {
             Some(p) => p,
             None => return Ok(TickOutcome::Unchanged),
         };
+        let old_decay = pet.last_decay_at;
         let outcome = pet.apply_tick(Utc::now(), &cfg);
         if outcome == TickOutcome::Unchanged {
             return Ok(outcome);
         }
-        self.repo.save(&pet).await?;
+        // Sauvegarde GARDEE (verrou optimiste sur last_decay_at) : si un autre tick
+        // concurrent a deja avance ce pet, on n'ecrit rien et on ne notifie pas ->
+        // pas de double DM/broadcast de transition (mort/maladie).
+        if !self.repo.try_save_tick(&pet, old_decay).await? {
+            return Ok(TickOutcome::Unchanged);
+        }
         let detail = match outcome {
             TickOutcome::FellSick => Some(format!("{} est tombe malade !", pet.name)),
             TickOutcome::Died => Some(format!("{} est mort... 🪦", pet.name)),

@@ -230,6 +230,49 @@ impl PetRepository for PgPetRepository {
         Ok(claimed.is_some())
     }
 
+    async fn try_save_tick(
+        &self,
+        p: &Pet,
+        expected_last_decay_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<bool, DomainError> {
+        // Verrou optimiste : la mise a jour ne passe que si last_decay_at n'a pas
+        // bouge depuis la lecture -> un seul tick concurrent gagne (RETURNING id),
+        // les autres voient rows=0 et n'emettent pas de DM/broadcast en double.
+        let updated: Option<Uuid> = sqlx::query_scalar(
+            "UPDATE pets SET \
+                name = $2, level = $3, xp = $4, hunger = $5, happiness = $6, energy = $7, \
+                status = $8, hunger_zero_since = $9, sick_since = $10, died_at = $11, \
+                str = $12, vit = $13, agi = $14, stat_points = $15, elo = $16, wins = $17, \
+                losses = $18, cooldowns = $19, last_decay_at = $20, updated_at = NOW() \
+             WHERE id = $1 AND last_decay_at = $21 RETURNING id",
+        )
+        .bind(p.id)
+        .bind(&p.name)
+        .bind(p.level)
+        .bind(p.xp)
+        .bind(p.hunger)
+        .bind(p.happiness)
+        .bind(p.energy)
+        .bind(p.status.as_str())
+        .bind(p.hunger_zero_since)
+        .bind(p.sick_since)
+        .bind(p.died_at)
+        .bind(p.str_)
+        .bind(p.vit)
+        .bind(p.agi)
+        .bind(p.stat_points)
+        .bind(p.elo)
+        .bind(p.wins)
+        .bind(p.losses)
+        .bind(&p.cooldowns)
+        .bind(p.last_decay_at)
+        .bind(expected_last_decay_at)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(updated.is_some())
+    }
+
     async fn list_alive(
         &self,
         limit: i64,

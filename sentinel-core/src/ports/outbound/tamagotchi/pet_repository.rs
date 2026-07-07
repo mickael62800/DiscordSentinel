@@ -33,6 +33,15 @@ pub trait PetRepository: Send + Sync {
         now: chrono::DateTime<chrono::Utc>,
         cd_secs: i64,
     ) -> Result<bool, DomainError>;
+    /// Persiste l'etat post-tick UNIQUEMENT si `last_decay_at` en base vaut encore
+    /// `expected` (verrou optimiste). Renvoie `true` si la ligne a ete mise a jour,
+    /// `false` si un autre tick l'a deja avance. Empeche deux ticks concurrents
+    /// d'appliquer/notifier deux fois la meme transition (double DM mort/maladie).
+    async fn try_save_tick(
+        &self,
+        pet: &Pet,
+        expected_last_decay_at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<bool, DomainError>;
     /// Compagnons vivants a faire decroitre (job worker), pagine par curseur
     /// `id` croissant. `after_id = None` pour la premiere page ; passer le
     /// dernier id recu pour la page suivante. Tri par `id` (stable malgre les
