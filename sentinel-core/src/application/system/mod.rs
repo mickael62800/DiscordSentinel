@@ -1,5 +1,6 @@
 pub mod export_service;
 pub mod lookup_geoip_service;
+pub mod manage_component_min_role_service;
 pub mod manage_component_visibility_service;
 pub mod manage_bot_persistence_service;
 pub mod manage_invitations_service;

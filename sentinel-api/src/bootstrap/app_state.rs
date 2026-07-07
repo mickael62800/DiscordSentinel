@@ -591,6 +591,16 @@ pub async fn build_app_state(
             component_visibility_repo,
         ));
 
+    // Overrides RBAC de min_role par composant sensible : repo Postgres (SQL
+    // rbac_component_min_role) + use case. Le handler ne fait que RBAC/valider
+    // (registry component_gates) puis mapper ; le cache Redis reste au handler.
+    let component_min_role_repo: Arc<dyn crate::ports::outbound::system::component_min_role_repository::ComponentMinRoleRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::component_min_role_repository::PgComponentMinRoleRepository::new(pg_pool.clone()));
+    let component_min_role_uc: Arc<dyn crate::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase> =
+        Arc::new(sentinel_core::application::system::manage_component_min_role_service::ManageComponentMinRoleService::new(
+            component_min_role_repo,
+        ));
+
     // Persistance fire-and-forget des bots (streaks, etc.) : repo Postgres
     // (SQL user_levels) + use case pass-through. Le handler ne fait que
     // parser/valider/mapper.
@@ -1222,6 +1232,7 @@ pub async fn build_app_state(
         lockdown_uc,
         slowmode_uc,
         component_visibility_uc,
+        component_min_role_uc,
         bot_persistence_uc,
         server_events_uc,
         security_uc,

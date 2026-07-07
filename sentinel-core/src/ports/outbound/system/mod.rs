@@ -2,6 +2,7 @@ pub mod admin_rotation_repository;
 pub mod bot_config_repository;
 pub mod bot_persistence_repository;
 pub mod cache;
+pub mod component_min_role_repository;
 pub mod component_visibility_repository;
 pub mod cache_helpers;
 pub mod event_broadcaster;

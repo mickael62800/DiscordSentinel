@@ -4,7 +4,6 @@
 //! Lecture : ouverte aux Admin+ (visualiser la config).
 //! Ecriture : Owner+ (la config c'est de la securite).
 
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::State;
@@ -57,21 +56,14 @@ pub async fn list_min_roles(
     require_role(&ctx, Role::Admin)
         .map_err(|s| forbid(s, "admin+ requis pour lister les gates"))?;
 
-    let overrides: Vec<(String, String)> = sqlx::query_as(
-        "SELECT component_key, min_role FROM rbac_component_min_role \
-         WHERE guild_id = $1",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("db"))?;
+    let overrides = state.component_min_role_uc.list_overrides(&guild_id).await?;
 
     let mut out = Vec::new();
     for (key, def) in component_gates::list_gates() {
         let override_role = overrides
             .iter()
-            .find(|(k, _)| k == key)
-            .map(|(_, r)| r.clone());
+            .find(|o| o.component_key == key)
+            .map(|o| o.min_role.clone());
         let effective_role = override_role
             .as_deref()
             .and_then(Role::from_str)
@@ -118,22 +110,15 @@ pub async fn upsert_min_role(
         ))));
     }
 
-    sqlx::query(
-        "INSERT INTO rbac_component_min_role \
-             (guild_id, component_key, min_role, updated_at, updated_by) \
-         VALUES ($1, $2, $3, NOW(), $4) \
-         ON CONFLICT (guild_id, component_key) DO UPDATE SET \
-             min_role = EXCLUDED.min_role, \
-             updated_at = NOW(), \
-             updated_by = EXCLUDED.updated_by",
-    )
-    .bind(&guild_id)
-    .bind(&dto.component_key)
-    .bind(&dto.min_role)
-    .bind(&ctx.discord_user_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("upsert"))?;
+    state
+        .component_min_role_uc
+        .upsert(
+            &guild_id,
+            &dto.component_key,
+            &dto.min_role,
+            &ctx.discord_user_id,
+        )
+        .await?;
 
     component_gates::invalidate_cache(&state, &guild_id, &dto.component_key).await;
 
@@ -150,15 +135,10 @@ pub async fn delete_min_role(
         .map_err(|s| forbid(s, "owner+ requis pour supprimer l'override"))?;
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
-    sqlx::query(
-        "DELETE FROM rbac_component_min_role \
-         WHERE guild_id = $1 AND component_key = $2",
-    )
-    .bind(&guild_id)
-    .bind(&component_key)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("delete"))?;
+    state
+        .component_min_role_uc
+        .delete(&guild_id, &component_key)
+        .await?;
 
     component_gates::invalidate_cache(&state, &guild_id, &component_key).await;
 

@@ -3441,6 +3441,28 @@ impl sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineU
     }
 }
 
+pub struct StubComponentMinRole;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase
+    for StubComponentMinRole
+{
+    async fn list_overrides(
+        &self,
+        _: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::component_min_role::ComponentMinRoleOverride>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+    async fn upsert(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 pub struct StubLockdown;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase
@@ -4264,6 +4286,7 @@ fn base_state() -> AppState {
         lockdown_uc: Arc::new(StubLockdown),
         slowmode_uc: Arc::new(StubSlowmode),
         component_visibility_uc: Arc::new(StubComponentVisibility),
+        component_min_role_uc: Arc::new(StubComponentMinRole),
         bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),
