@@ -789,6 +789,99 @@ pub async fn prune_system(
     }))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct PruneBuildCacheQuery {
+    /// Si `true` (defaut) : purge TOUT le build cache (`docker builder prune -a`).
+    /// Si `false` : seulement les entrees inutilisees/non ancrees.
+    #[serde(default)]
+    pub all: Option<bool>,
+}
+
+/// POST /api/docker/prune/build-cache — purge le build cache Docker (buildkit).
+///
+/// Note : bollard 0.18 n'expose PAS l'endpoint `POST /build/prune`, on tape donc
+/// le socket Docker en HTTP/1 directement (voir `prune_build_cache_call`).
+pub async fn prune_build_cache(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Query(q): Query<PruneBuildCacheQuery>,
+) -> Result<Json<PruneResultDto>, ApiError> {
+    gate_super(&state, &rbac)?;
+    let all = q.all.unwrap_or(true);
+    audit_docker(
+        &state,
+        &rbac,
+        "prune.build_cache",
+        if all { "all=true" } else { "all=false" },
+    );
+    let resp = prune_build_cache_call(all).await?;
+    Ok(Json(PruneResultDto {
+        deleted: resp.caches_deleted.unwrap_or_default(),
+        space_reclaimed_bytes: resp.space_reclaimed.unwrap_or(0) as u64,
+    }))
+}
+
+/// Appel bas niveau de `POST /build/prune` sur le socket Docker (absent de bollard
+/// 0.18). Ouvre une connexion HTTP/1 sur `/var/run/docker.sock` via hyper.
+#[cfg(unix)]
+async fn prune_build_cache_call(
+    all: bool,
+) -> Result<bollard::models::BuildPruneResponse, ApiError> {
+    use http_body_util::BodyExt;
+    use http_body_util::Empty;
+    use hyper::body::Bytes;
+
+    let err = |m: String| ApiError(DomainError::Internal(m));
+
+    let stream = tokio::net::UnixStream::connect("/var/run/docker.sock")
+        .await
+        .map_err(|e| err(format!("docker socket: {e}")))?;
+    let io = hyper_util::rt::TokioIo::new(stream);
+    let (mut sender, conn) = hyper::client::conn::http1::handshake(io)
+        .await
+        .map_err(|e| err(format!("docker http handshake: {e}")))?;
+    tokio::spawn(async move {
+        let _ = conn.await;
+    });
+
+    let req = hyper::Request::builder()
+        .method("POST")
+        .uri(format!("/build/prune?all={all}"))
+        .header(hyper::header::HOST, "localhost")
+        .body(Empty::<Bytes>::new())
+        .map_err(|e| err(format!("docker request: {e}")))?;
+
+    let res = sender
+        .send_request(req)
+        .await
+        .map_err(|e| err(format!("docker /build/prune: {e}")))?;
+    let status = res.status();
+    let body = res
+        .into_body()
+        .collect()
+        .await
+        .map_err(|e| err(format!("docker /build/prune body: {e}")))?
+        .to_bytes();
+
+    if !status.is_success() {
+        return Err(err(format!(
+            "docker /build/prune HTTP {}: {}",
+            status.as_u16(),
+            String::from_utf8_lossy(&body)
+        )));
+    }
+    serde_json::from_slice(&body).map_err(|e| err(format!("docker /build/prune decode: {e}")))
+}
+
+#[cfg(not(unix))]
+async fn prune_build_cache_call(
+    _all: bool,
+) -> Result<bollard::models::BuildPruneResponse, ApiError> {
+    Err(ApiError(DomainError::Internal(
+        "purge du build cache indisponible : socket Docker unix requis".into(),
+    )))
+}
+
 /// Garde l'import EventsOptions vivant si bollard l'utilise dans une feature future.
 #[allow(dead_code)]
 fn _unused_events() -> EventsOptions<String> {

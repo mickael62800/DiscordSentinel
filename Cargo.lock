@@ -3163,6 +3163,8 @@ dependencies = [
  "futures-util",
  "hmac",
  "http-body-util",
+ "hyper",
+ "hyper-util",
  "metrics",
  "metrics-exporter-prometheus",
  "ndarray",

@@ -93,6 +93,14 @@ tokio = { workspace = true, features = ["test-util"] }
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
 
+# `docker builder prune` (endpoint POST /build/prune) n'est PAS expose par bollard
+# 0.18 : on tape le socket unix directement en HTTP/1 via hyper. Unix uniquement
+# (le socket Docker en prod est /var/run/docker.sock).
+[target.'cfg(unix)'.dependencies]
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+
 [lints]
 workspace = true
 

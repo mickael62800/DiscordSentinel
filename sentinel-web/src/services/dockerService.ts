@@ -133,6 +133,9 @@ export const dockerService = {
   pruneNetworks(): Promise<PruneResult> {
     return httpPost("/api/docker/prune/networks");
   },
+  pruneBuildCache(all = true): Promise<PruneResult> {
+    return httpPost(`/api/docker/prune/build-cache?all=${all}`);
+  },
   pruneSystem(opts?: { volumes?: boolean; allImages?: boolean }): Promise<PruneSystemResult> {
     const v = opts?.volumes ?? false;
     const a = opts?.allImages ?? false;

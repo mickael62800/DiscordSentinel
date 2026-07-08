@@ -245,6 +245,16 @@ async function pruneNetworks() {
     await refreshTab();
   } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
 }
+async function pruneBuildCache() {
+  const size = fmtBytes(overview.value?.reclaimable_build_cache_bytes ?? 0);
+  if (!(await doConfirm(`Purger tout le build cache Docker (${size}) ? Les prochains builds seront plus lents.`))) return;
+  busy.value = true;
+  try {
+    const r = await dockerService.pruneBuildCache();
+    success(`Build cache purgé · ${fmtBytes(r.space_reclaimed_bytes)} libérés.`);
+    await refreshTab();
+  } catch (e: unknown) { showError(`Erreur : ${errMsg(e)}`); } finally { busy.value = false; }
+}
 async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   let msg = "Nettoyage système complet : conteneurs arrêtés + images";
   msg += allImages ? " (toutes inutilisées)" : " dangling";
@@ -450,7 +460,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
         <h4>🧱 Build cache</h4>
         <p class="muted">Cache de couches buildées non utilisées.</p>
         <p v-if="overview" class="reclaim">Récupérable : {{ fmtBytes(overview.reclaimable_build_cache_bytes) }}</p>
-        <p class="muted small">Inclus dans "Nettoyage complet ↓".</p>
+        <button class="btn warning" :disabled="busy" @click="pruneBuildCache">Nettoyer le build cache ({{ fmtBytes(overview?.reclaimable_build_cache_bytes ?? 0) }})</button>
       </div>
       <div v-if="visible('docker.prune.system')" class="prune-card highlight">
         <h4>🚀 Nettoyage complet</h4>

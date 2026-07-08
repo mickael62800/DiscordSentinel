@@ -167,6 +167,10 @@ pub fn routes() -> Router<AppState> {
             "/api/docker/prune/system",
             post(handlers::system::docker::prune_system),
         )
+        .route(
+            "/api/docker/prune/build-cache",
+            post(handlers::system::docker::prune_build_cache),
+        )
         // AI dataset (collecte messages -> CSV pour entrainement)
         .route(
             "/api/ai-dataset/messages/{guild_id}",
