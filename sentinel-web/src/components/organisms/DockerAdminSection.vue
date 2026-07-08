@@ -4,11 +4,13 @@ import DockerLogsModal from "./docker-admin/DockerLogsModal.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { dockerService, type DockerContainer, type DockerImage, type DockerNetwork, type DockerOverview, type DockerVolume } from "@/services/dockerService";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
 const { visible } = useComponentVisibility();
 
 const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 
 type Tab = "overview" | "containers" | "images" | "volumes" | "networks" | "prune";
 const tab = ref<Tab>("overview");
@@ -113,7 +115,7 @@ const filteredVolumes = computed(() =>
 
 // ── Actions ──
 async function doConfirm(msg: string): Promise<boolean> {
-  return window.confirm(msg);
+  return confirm({ title: "Confirmation", message: msg });
 }
 
 async function startCt(c: DockerContainer) {

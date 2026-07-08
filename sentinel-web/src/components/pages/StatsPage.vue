@@ -4,8 +4,14 @@ import DashboardChartsSection from "../organisms/DashboardChartsSection.vue";
 import { registerChartJs } from "@/utils/chartjs";
 import { analyticsService } from "@/services/analyticsService";
 import { useGuildSelectorStore } from "@/stores/guildSelectorStore";
+import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
+import { errMsg } from "@/utils/errMsg";
 
 registerChartJs();
+
+const { success, error: showError, warning } = useToast();
+const { confirm } = useConfirm();
 
 const days = ref(30);
 
@@ -27,23 +33,25 @@ async function handleRefresh() {
 async function handleReset() {
   const gid = guildStore.selectedGuildId;
   if (!gid) {
-    alert("Selectionne d'abord un serveur.");
+    warning("Sélectionne d'abord un serveur.");
     return;
   }
-  const ok = window.confirm(
-    "Vider toutes les statistiques d'activite (heatmap, pics horaires, etc.) pour ce serveur ?\n\n" +
-      "Les infractions et logs d'audit seront CONSERVES — seuls les compteurs d'activite (hourly_activity / daily_activity) seront remis a zero.\n\n" +
-      "Action irreversible.",
-  );
+  const ok = await confirm({
+    title: "Vider les statistiques d'activité",
+    message:
+      "Vider toutes les statistiques d'activité (heatmap, pics horaires, etc.) pour ce serveur ? " +
+      "Les infractions et logs d'audit seront CONSERVÉS — seuls les compteurs d'activité (hourly_activity / daily_activity) seront remis à zéro. " +
+      "Action irréversible.",
+  });
   if (!ok) return;
   resetting.value = true;
   try {
     const res = await analyticsService.reset(gid);
-    alert(`Analytics remises a zero : ${res.deleted_rows} lignes supprimees.`);
+    success(`Analytics remises à zéro : ${res.deleted_rows} lignes supprimées.`);
     await chartsRef.value?.refresh();
   } catch (e) {
     console.error("Reset analytics echoue", e);
-    alert("Echec du reset. Voir la console pour les details.");
+    showError(`Échec du reset : ${errMsg(e)}`);
   } finally {
     resetting.value = false;
   }

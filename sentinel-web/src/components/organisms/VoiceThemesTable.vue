@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useVoiceThemes } from "@/composables/useVoiceThemes";
+import { useConfirm } from "@/composables/useConfirm";
 import type { VoiceChannelTheme } from "@/types/voice-extended";
 
 const emit = defineEmits<{
@@ -8,9 +9,16 @@ const emit = defineEmits<{
 }>();
 
 const { themes, loading, remove } = useVoiceThemes();
+const { confirm } = useConfirm();
 
 async function onRemove(theme: VoiceChannelTheme) {
-  if (!confirm(`Supprimer le thème "${theme.name}" ?`)) return;
+  if (
+    !(await confirm({
+      title: "Supprimer le thème",
+      message: `Supprimer le thème "${theme.name}" ?`,
+    }))
+  )
+    return;
   await remove(theme.id);
 }
 </script>

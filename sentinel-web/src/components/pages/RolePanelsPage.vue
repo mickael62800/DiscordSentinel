@@ -1,20 +1,26 @@
 <script setup lang="ts">
 import { useRolePanels } from "../../composables/useRolePanels";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 
 const { selectedGuildId } = useGuildSelector();
+const { confirm } = useConfirm();
 const { panels, autoRoles, selectedPanel, loading, selectPanel, deletePanel, removeAutoRole } =
   useRolePanels();
 
 async function onDelete(panelId: string, title: string, ev: Event) {
   ev.stopPropagation();
-  if (!confirm(`Supprimer le panel "${title}" ?`)) return;
+  if (!(await confirm({ title: "Supprimer le panel", message: `Supprimer le panel "${title}" ?` })))
+    return;
   await deletePanel(panelId);
 }
 
 async function onRemoveAutoRole(roleId: string, name: string) {
-  if (!confirm(`Retirer l'auto-role "${name}" ?`)) return;
+  if (
+    !(await confirm({ title: "Retirer l'auto-rôle", message: `Retirer l'auto-rôle "${name}" ?` }))
+  )
+    return;
   if (!selectedGuildId.value) return;
   await removeAutoRole(selectedGuildId.value, roleId);
 }

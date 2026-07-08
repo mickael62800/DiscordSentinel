@@ -6,6 +6,12 @@ import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useFormatDate } from "../../composables/useFormatDate";
 import type { DiscordRole } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
+import { useConfirm } from "../../composables/useConfirm";
+import { useToast } from "../../composables/useToast";
+import { errMsg } from "@/utils/errMsg";
+
+const { confirm } = useConfirm();
+const { error: showError } = useToast();
 
 const emit = defineEmits<{ edit: [role: DiscordRole] }>();
 
@@ -17,13 +23,19 @@ const deleting = ref<string | null>(null);
 
 async function deleteRole(roleId: string, roleName: string) {
   if (!selectedGuildId.value) return;
-  if (!confirm(`Supprimer le role "${roleName}" ? Cette action est irreversible.`)) return;
+  if (
+    !(await confirm({
+      title: "Supprimer le rôle",
+      message: `Supprimer le rôle "${roleName}" ? Cette action est irréversible.`,
+    }))
+  )
+    return;
   deleting.value = roleId;
   try {
     await discordRolesService.remove(selectedGuildId.value, roleId);
     await fetchRoles();
   } catch (e) {
-    alert("Erreur suppression role: " + e);
+    showError(`Erreur suppression rôle : ${errMsg(e)}`);
   } finally {
     deleting.value = null;
   }

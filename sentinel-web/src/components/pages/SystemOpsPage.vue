@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from "vue";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { systemOpsService } from "@/services/polishServices";
 import type { CacheStats, ModelInfo } from "@/types/polish";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 
 const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 
 const models = ref<ModelInfo[]>([]);
 const cacheStats = ref<CacheStats | null>(null);
@@ -30,7 +32,13 @@ async function fetchAll() {
 }
 
 async function reloadModel(modelType: string) {
-  if (!confirm(`Recharger le modèle ${modelType} à chaud ?`)) return;
+  if (
+    !(await confirm({
+      title: "Recharger le modèle",
+      message: `Recharger le modèle ${modelType} à chaud ?`,
+    }))
+  )
+    return;
   try {
     await systemOpsService.reloadModel(modelType);
     success(`Modèle ${modelType} rechargé.`);

@@ -3,6 +3,7 @@ import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { tempRolesService } from "@/services/polishServices";
 import type { TempRole } from "@/types/polish";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
@@ -13,6 +14,7 @@ import { useFormatDate } from "@/composables/useFormatDate";
 const { guildIdFilter } = useGuildSelector();
 const { formatDateTimeShort: formatDate } = useFormatDate();
 const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 const tempRoles = ref<TempRole[]>([]);
 const loading = ref(true);
 
@@ -67,7 +69,13 @@ async function onCreate() {
 
 async function onDelete(t: TempRole) {
   if (!guildIdFilter.value) return;
-  if (!confirm(`Retirer le rôle ${t.role_id} de l'utilisateur ${t.user_id} ?`)) return;
+  if (
+    !(await confirm({
+      title: "Retirer le rôle temporaire",
+      message: `Retirer le rôle ${t.role_id} de l'utilisateur ${t.user_id} ?`,
+    }))
+  )
+    return;
   try {
     await tempRolesService.remove(guildIdFilter.value, t.user_id, t.role_id);
     tempRoles.value = tempRoles.value.filter((r) => r.id !== t.id);

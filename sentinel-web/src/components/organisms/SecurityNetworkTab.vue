@@ -16,9 +16,12 @@ import { useFormatDate } from "@/composables/useFormatDate";
 
 const { formatDateTimeShort: fmtDate } = useFormatDate();
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
+import { errMsg } from "@/utils/errMsg";
 import { useMyRole } from "@/composables/useMyRole";
 
-const { error: showError } = useToast();
+const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 const { role, isSuper } = useMyRole();
 const canManage = computed(() => isSuper.value || role.value === "owner");
 
@@ -102,10 +105,10 @@ async function loadTlsErrors() {
 }
 
 async function banIp(ip: string) {
-  if (!confirm(`Bannir l'IP ${ip} ?`)) return;
+  if (!(await confirm({ title: "Bannir l'IP", message: `Bannir l'IP ${ip} ?` }))) return;
   try {
     const r = await serverSecurityService.banIp(ip, "ban manuel via panel sécurité");
-    alert(`✅ ${r.message}`);
+    success(r.message);
   } catch (e) { showError(`Echec ban : ${errMsg(e)}`); }
 }
 

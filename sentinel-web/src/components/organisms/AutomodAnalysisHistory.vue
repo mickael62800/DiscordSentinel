@@ -4,6 +4,9 @@ import { infractionsService } from "@/services/infractionsService";
 import { useRealtimeStore } from "@/stores/realtimeStore";
 import type { UnlistenFn } from "@/api/events-api";
 import type { Infraction } from "@/types";
+import { useConfirm } from "@/composables/useConfirm";
+
+const { confirm } = useConfirm();
 
 // ⚠️ Vue de debug temporaire : permet d'analyser pourquoi un message est
 // detecte ou non par l'automod (score IA brut, raison, action). A supprimer
@@ -43,7 +46,13 @@ async function refresh() {
 
 async function wipe() {
   if (!props.guildId) return;
-  if (!confirm("Vider l'historique d'analyse ? Cette action supprime TOUTES les infractions de la guild en DB (irreversible).")) {
+  if (
+    !(await confirm({
+      title: "Vider l'historique d'analyse",
+      message:
+        "Cette action supprime TOUTES les infractions de la guilde en base de données (irréversible). Continuer ?",
+    }))
+  ) {
     return;
   }
   wiping.value = true;

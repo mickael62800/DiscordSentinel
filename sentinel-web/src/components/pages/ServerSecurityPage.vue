@@ -13,6 +13,8 @@ import {
   type TopIpEntry,
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
+import { errMsg } from "@/utils/errMsg";
 import { useMyRole } from "@/composables/useMyRole";
 import { useFormatDate } from "@/composables/useFormatDate";
 import AppTabs from "@/components/molecules/AppTabs.vue";
@@ -21,7 +23,8 @@ import SecurityAttacksTab from "@/components/organisms/SecurityAttacksTab.vue";
 import SecurityNetworkTab from "@/components/organisms/SecurityNetworkTab.vue";
 import SecurityIntegrityTab from "@/components/organisms/SecurityIntegrityTab.vue";
 
-const { error: showError } = useToast();
+const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 const { role, isSuper } = useMyRole();
 const canManage = computed(() => isSuper.value || role.value === "owner");
 
@@ -82,10 +85,10 @@ async function loadServerEvents() {
 }
 
 async function unbanIp(ip: string) {
-  if (!confirm(`Débannir l'IP ${ip} ?`)) return;
+  if (!(await confirm({ title: "Débannir l'IP", message: `Débannir l'IP ${ip} ?` }))) return;
   try {
     const r = await serverSecurityService.unbanIp(ip, "unban manuel via panel sécurité");
-    alert(`✅ ${r.message}`);
+    success(r.message);
     await loadBanned();
     await loadManualBans();
     await loadServerEvents();
@@ -120,14 +123,13 @@ async function runCleanup() {
     });
     showCleanupModal.value = false;
     await refreshAll();
-    alert(
-      `✅ Nettoyage terminé\n\n` +
-      `• Logs API : ${r.deleted_api_logs}\n` +
-      `• Audit logs Discord : ${r.deleted_audit_logs}\n` +
-      `• Events serveur : ${r.deleted_server_events}\n` +
-      `• Logins OAuth : ${r.deleted_successful_logins}\n` +
-      `• Bans manuels : ${r.deleted_manual_bans}\n\n` +
-      `${r.message}`,
+    success(
+      `Nettoyage terminé — ` +
+      `Logs API : ${r.deleted_api_logs}, ` +
+      `Audit logs Discord : ${r.deleted_audit_logs}, ` +
+      `Events serveur : ${r.deleted_server_events}, ` +
+      `Logins OAuth : ${r.deleted_successful_logins}, ` +
+      `Bans manuels : ${r.deleted_manual_bans}.`,
     );
   } catch (e) { showError(`Echec cleanup : ${errMsg(e)}`); }
   finally { cleaning.value = false; }

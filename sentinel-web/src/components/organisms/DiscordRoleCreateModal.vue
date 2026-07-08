@@ -6,6 +6,10 @@ import { useDiscordRoles } from "../../composables/useDiscordRoles";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppModal from "../atoms/AppModal.vue";
 import AppButton from "../atoms/AppButton.vue";
+import { useToast } from "../../composables/useToast";
+import { errMsg } from "@/utils/errMsg";
+
+const { error: showError } = useToast();
 
 const props = defineProps<{ visible: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -40,7 +44,7 @@ async function createRole() {
     emit("close");
     await fetchRoles();
   } catch (e) {
-    alert("Erreur creation role: " + e);
+    showError(`Erreur création rôle : ${errMsg(e)}`);
   } finally {
     creating.value = false;
   }

@@ -7,6 +7,10 @@ import { useGuildSelector } from "../../composables/useGuildSelector";
 import type { DiscordRole } from "../../types";
 import AppModal from "../atoms/AppModal.vue";
 import AppButton from "../atoms/AppButton.vue";
+import { useToast } from "../../composables/useToast";
+import { errMsg } from "@/utils/errMsg";
+
+const { error: showError } = useToast();
 
 const props = defineProps<{
   /** null = closed, sinon edition de ce role */
@@ -86,7 +90,7 @@ async function saveEdit() {
     emit("close");
     await fetchRoles();
   } catch (e) {
-    alert("Erreur modification role: " + e);
+    showError(`Erreur modification rôle : ${errMsg(e)}`);
   } finally {
     saving.value = false;
   }

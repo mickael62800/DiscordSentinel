@@ -6,10 +6,12 @@ import { computed, onMounted, ref, watch } from "vue";
 import { invitationsService, type InvitationDto } from "@/services/invitationsService";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
 import { useFormatDate } from "@/composables/useFormatDate";
 
 const { selectedGuildId } = useGuildSelector();
 const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 const { formatDateTimeShort } = useFormatDate();
 
 const invitations = ref<InvitationDto[]>([]);
@@ -75,7 +77,13 @@ async function generate() {
 }
 
 async function revoke(code: string) {
-  if (!confirm(`Révoquer le code ${code} ? Il ne sera plus utilisable.`)) return;
+  if (
+    !(await confirm({
+      title: "Révoquer le code",
+      message: `Révoquer le code ${code} ? Il ne sera plus utilisable.`,
+    }))
+  )
+    return;
   try {
     await invitationsService.revoke(code);
     success("Code révoqué.");

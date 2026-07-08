@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { aiDatasetService, type DatasetMessage } from "@/services/aiDatasetService";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
+import { useConfirm } from "./useConfirm";
 
 export type DatasetLabel = "skip" | "safe" | "severe";
 
@@ -119,12 +120,18 @@ watch(items, (list) => {
 
 async function exportAndClean() {
   const { success, error: showError } = useToast();
+  const { confirm } = useConfirm();
   const labeled = Object.entries(labels.value).filter(([, v]) => v !== "skip");
   if (labeled.length === 0) {
     showError("Aucun message labelisé.");
     return;
   }
-  if (!confirm(`Exporter ${labeled.length} messages (${counts.value.safe} safe, ${counts.value.severe} severe) puis les supprimer de la BDD ?`)) {
+  if (
+    !(await confirm({
+      title: "Exporter puis supprimer",
+      message: `Exporter ${labeled.length} messages (${counts.value.safe} safe, ${counts.value.severe} severe) puis les supprimer de la BDD ?`,
+    }))
+  ) {
     return;
   }
   exporting.value = true;
@@ -160,11 +167,13 @@ async function exportAndClean() {
     // confirmation explicite APRES le declenchement du telechargement, avant
     // la suppression irreversible.
     if (
-      !confirm(
-        `CSV generes (${safeRows.length} safe, ${severeRows.length} severe). ` +
-          `Verifie qu'ils sont bien dans tes telechargements. ` +
-          `Supprimer maintenant ${idsToDelete.length} messages de la BDD ? (IRREVERSIBLE)`,
-      )
+      !(await confirm({
+        title: "Confirmer la suppression",
+        message:
+          `CSV générés (${safeRows.length} safe, ${severeRows.length} severe). ` +
+          `Vérifie qu'ils sont bien dans tes téléchargements. ` +
+          `Supprimer maintenant ${idsToDelete.length} messages de la BDD ? (IRRÉVERSIBLE)`,
+      }))
     ) {
       showError("Suppression annulee — les messages sont conserves.");
       return;
