@@ -177,12 +177,25 @@ async function launchTemplate(t: GameTemplate) {
   const suggested = `${t.name}-${servers.value.length + 1}`;
   const name = window.prompt(`Nom du nouveau serveur ${t.name} ?`, suggested);
   if (!name) return;
+  // Choix de la RAM allouée, borné par le template (min/max). Défaut = valeur
+  // recommandée du template. Le pool cumulé reste plafonné par
+  // "max_memory_total_mb" (config du composant game-portal) côté serveur.
+  const ramInput = window.prompt(
+    `RAM allouée à ${t.name} (Mo) ? Entre ${t.min_memory_mb} et ${t.max_memory_mb} Mo.`,
+    String(t.default_memory_mb),
+  );
+  if (ramInput === null) return;
+  const parsedRam = Number.parseInt(ramInput, 10);
+  const memory_mb = Number.isNaN(parsedRam)
+    ? t.default_memory_mb
+    : Math.min(t.max_memory_mb, Math.max(t.min_memory_mb, parsedRam));
   busy.value = t.id;
   try {
     const created = await gamePortalService.createServer(selectedGuildId.value, {
       template_slug: t.slug,
       name,
       owner_user_id: actorId,
+      memory_mb,
     });
     success(`${name} créé. Démarrage…`);
     selectedServerId.value = created.id;
