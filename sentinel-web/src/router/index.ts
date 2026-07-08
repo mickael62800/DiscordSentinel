@@ -27,11 +27,13 @@ export const routes: RouteRecordRaw[] = [
   // ── Modération ──
   { path: "/moderation", name: "moderation", component: () => import("../components/pages/ModerationHubPage.vue") },
   { path: "/rules", name: "rules", component: () => import("../components/pages/RulesPage.vue") },
-  { path: "/strikes", name: "strikes", component: () => import("../components/pages/StrikesPage.vue") },
-  { path: "/notes", name: "notes", component: () => import("../components/pages/NotesPage.vue") },
-  { path: "/reminders", name: "reminders", component: () => import("../components/pages/RemindersPage.vue") },
-  { path: "/evidence", name: "evidence", component: () => import("../components/pages/EvidencePage.vue") },
-  { path: "/review", name: "review", component: () => import("../components/pages/ReviewPage.vue") },
+  // Onglets embarques dans le hub Moderation (/moderation) : plus lies nulle
+  // part directement. Redirection pour ne pas casser d'eventuels vieux liens.
+  { path: "/strikes", redirect: "/moderation" },
+  { path: "/notes", redirect: "/moderation" },
+  { path: "/reminders", redirect: "/moderation" },
+  { path: "/evidence", redirect: "/moderation" },
+  { path: "/review", redirect: "/moderation" },
   { path: "/automod", name: "automod", component: () => import("../components/pages/AutomodPage.vue") },
 
   // ── Sécurité ──

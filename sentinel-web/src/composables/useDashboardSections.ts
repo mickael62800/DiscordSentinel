@@ -22,9 +22,9 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "general.stats", path: "/stats", label: "Statistiques serveur", icon: "bar-chart-2", requiredBot: "audit-bot" },
   { key: "general.modstats", path: "/modstats", label: "Statistiques admin", icon: "bar-chart-2", requiredBot: "moderation-bot" },
 
-  { key: "moderation.hub", path: "/moderation", label: "Moderation", icon: "gavel", requiredBot: "moderation-bot" },
+  { key: "moderation.hub", path: "/moderation", label: "Modération", icon: "gavel", requiredBot: "moderation-bot" },
   { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
-  { key: "moderation.rules", path: "/rules", label: "Regles", icon: "shield", requiredBot: "moderation-bot" },
+  { key: "moderation.rules", path: "/rules", label: "Règles", icon: "shield", requiredBot: "moderation-bot" },
   { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x", requiredBot: "audit-bot" },
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
@@ -32,14 +32,14 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "community.confessions", path: "/confessions", label: "Confessions", icon: "edit-3" },
   { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
   { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
-  { key: "community.voice-themes", path: "/voice-themes", label: "Themes vocaux", icon: "layers", requiredBot: "voice-bot" },
-  { key: "community.role-panels", path: "/role-panels", label: "Roles", icon: "users", requiredBot: "community-bot" },
+  { key: "community.voice-themes", path: "/voice-themes", label: "Thèmes vocaux", icon: "layers", requiredBot: "voice-bot" },
+  { key: "community.role-panels", path: "/role-panels", label: "Panneaux de rôles", icon: "users", requiredBot: "community-bot" },
   { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up", requiredBot: "progression-bot" },
-  { key: "community.levels-config", path: "/levels-config", label: "Niveaux config", icon: "sliders", requiredBot: "progression-bot" },
+  { key: "community.levels-config", path: "/levels-config", label: "Config niveaux", icon: "sliders", requiredBot: "progression-bot" },
   { key: "community.sponsorships", path: "/sponsorships", label: "Parrainages", icon: "user-check", requiredBot: "community-bot" },
-  { key: "community.temp-roles", path: "/temp-roles", label: "Roles temp.", icon: "clock", requiredBot: "community-bot" },
+  { key: "community.temp-roles", path: "/temp-roles", label: "Rôles temporaires", icon: "clock", requiredBot: "community-bot" },
 
-  { key: "security.hub", path: "/security", label: "Securite", icon: "zap", requiredBot: "security-bot" },
+  { key: "security.hub", path: "/security", label: "Menaces & alertes", icon: "zap", requiredBot: "security-bot" },
   { key: "security.automod", path: "/automod", label: "Automod", icon: "shield", requiredBot: "automod-bot" },
   { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
@@ -76,8 +76,8 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server", requiredBot: "game-portal" },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
-  { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
-  { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
+  { key: "config.rbac", path: "/rbac", label: "Accès RBAC", icon: "shield" },
+  { key: "config.system-ops", path: "/system/operations", label: "Opérations système", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
   { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
@@ -85,6 +85,28 @@ const ALL_SECTIONS: DashboardSection[] = [
   // pas dans le groupe Journaux (qui est metier Discord uniquement).
   { key: "config.system-logs", path: "/system-logs", label: "Logs système", icon: "list" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
+];
+
+/// Un groupe de tuiles regroupees par domaine (prefixe de `key`).
+export type DashboardGroup = {
+  prefix: string;
+  label: string;
+  sections: DashboardSection[];
+};
+
+/// Ordre d'affichage des groupes + libelles FR. Le prefixe correspond a
+/// la partie de `key` avant le premier point (ex. "community.welcome").
+/// Tout prefixe non liste ici est ignore du regroupement (ne devrait pas
+/// arriver ; garde-fou en cas d'ajout futur non declare).
+const GROUP_ORDER: { prefix: string; label: string }[] = [
+  { prefix: "general", label: "Général" },
+  { prefix: "moderation", label: "Modération" },
+  { prefix: "community", label: "Communauté" },
+  { prefix: "security", label: "Sécurité" },
+  { prefix: "rotation", label: "Administration tournante" },
+  { prefix: "games", label: "Jeux" },
+  { prefix: "config", label: "Configuration" },
+  { prefix: "logs", label: "Journaux" },
 ];
 
 /// Filtre les tuiles dashboard selon :
@@ -108,5 +130,15 @@ export function useDashboardSections() {
     }),
   );
 
-  return { sections };
+  /// Tuiles visibles regroupees par domaine, dans l'ordre de `GROUP_ORDER`.
+  /// Les groupes vides (aucune tuile visible) sont omis.
+  const groups = computed<DashboardGroup[]>(() =>
+    GROUP_ORDER.map((g) => ({
+      prefix: g.prefix,
+      label: g.label,
+      sections: sections.value.filter((s) => s.key.split(".")[0] === g.prefix),
+    })).filter((g) => g.sections.length > 0),
+  );
+
+  return { sections, groups };
 }

@@ -3,25 +3,28 @@ import SectionCard from "../molecules/SectionCard.vue";
 import DashboardHero from "../organisms/DashboardHero.vue";
 import { useDashboardSections } from "@/composables/useDashboardSections";
 
-const { sections } = useDashboardSections();
+const { groups } = useDashboardSections();
 </script>
 
 <template>
   <div class="home page--constrained">
     <DashboardHero />
 
-    <div class="section-grid">
-      <SectionCard
-        v-for="s in sections"
-        :key="s.key"
-        :path="s.path"
-        :label="s.label"
-        :icon="s.icon"
-        :section-key="s.key"
-        :required-bot="s.requiredBot"
-        :required-any-bot="s.requiredAnyBot"
-      />
-    </div>
+    <section v-for="g in groups" :key="g.prefix" class="section-group">
+      <h2 class="section-group__title">{{ g.label }}</h2>
+      <div class="section-grid">
+        <SectionCard
+          v-for="s in g.sections"
+          :key="s.key"
+          :path="s.path"
+          :label="s.label"
+          :icon="s.icon"
+          :section-key="s.key"
+          :required-bot="s.requiredBot"
+          :required-any-bot="s.requiredAnyBot"
+        />
+      </div>
+    </section>
   </div>
 </template>
 
@@ -32,6 +35,23 @@ const { sections } = useDashboardSections();
   display: flex;
   flex-direction: column;
   overflow: auto;
+}
+
+.section-group {
+  margin-top: 20px;
+}
+
+.section-group:first-of-type {
+  margin-top: 8px;
+}
+
+.section-group__title {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #8b93a7);
 }
 
 .section-grid {
