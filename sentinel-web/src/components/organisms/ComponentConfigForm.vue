@@ -427,17 +427,18 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 
 .toggles-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  /* 1 col mobile, ~2 tablette, 3 colonnes max sur desktop : cartes larges,
+     labels complets (multi-lignes) et lisibles sans survol. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 8px;
   margin-top: 8px;
 }
-/* Empeche les cellules de s'etendre quand le label est long
-   (ex: "Mode review IA (insultes, spam, liens, phishing)") :
-   minmax(0, ...) force la taille intrinseque a 0, l'ellipsis du
-   label fait le reste. */
 .toggles-grid > .toggle-card { min-width: 0; }
+@media (min-width: 1400px) {
+  .toggles-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (min-width: 1900px) {
-  .toggles-grid { grid-template-columns: repeat(10, minmax(0, 1fr)); }
+  .toggles-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 .toggle-card {
@@ -457,13 +458,14 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 }
 .toggle-card-header { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
 .toggle-card-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-primary);
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.35;
+  /* Label complet : on autorise le retour a la ligne plutot que de
+     tronquer en ellipsis (illisible sans survol). */
+  white-space: normal;
+  overflow-wrap: anywhere;
   min-width: 0;
   flex: 1 1 auto;
 }
@@ -501,7 +503,9 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   flex: 1;
 }
 @media (min-width: 1900px) {
-  .fields-grid-2col { grid-template-columns: repeat(6, 1fr); }
+  /* Plafonne a 3 colonnes meme sur tres grand ecran : champs lisibles
+     plutot que minuscules. */
+  .fields-grid-2col { grid-template-columns: repeat(3, 1fr); }
 }
 
 .inputs-section.section-textareas .fields-grid-2col {

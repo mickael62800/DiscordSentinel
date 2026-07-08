@@ -84,8 +84,13 @@ function isOn(botName: string): boolean {
 
 .component-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  /* 1 col mobile, 2 tablette, jusqu'a 3 desktop (4 sur tres grand ecran) :
+     les descriptions ont la place de respirer au lieu d'un mur de cartes. */
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 12px;
+}
+@media (min-width: 1900px) {
+  .component-grid { grid-template-columns: repeat(4, 1fr); }
 }
 
 .component-card {
