@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref, watch } from "vue";
 import type { ComponentVisibilityEntry, RbacRole } from "@/types";
 import { COMPONENT_REGISTRY, ROLES_ORDER, ROLE_RANK, type ComponentDef } from "@/rbac/componentRegistry";
@@ -49,8 +50,8 @@ async function load() {
       }
     }
     matrix.value = m;
-  } catch (e: any) {
-    showError(`Echec chargement visibilite : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Echec chargement visibilite : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -77,8 +78,8 @@ async function save() {
     await rbacService.upsertComponentVisibility(gid, entries);
     success(`${entries.length} regles enregistrees.`);
     await reload();
-  } catch (e: any) {
-    showError(`Echec sauvegarde : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Echec sauvegarde : ${errMsg(e)}`);
   } finally {
     saving.value = false;
   }

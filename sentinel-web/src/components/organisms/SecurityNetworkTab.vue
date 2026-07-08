@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import {
   serverSecurityService,
@@ -82,22 +83,22 @@ async function loadGeoForAll() {
 async function loadConnections() {
   connectionsError.value = null;
   try { connections.value = await serverSecurityService.connections(); }
-  catch (e: any) { connectionsError.value = e?.message ?? String(e); connections.value = null; }
+  catch (e) { connectionsError.value = errMsg(e); connections.value = null; }
 }
 async function loadOpenPorts() {
   portsError.value = null;
   try { openPorts.value = await serverSecurityService.openPorts(); }
-  catch (e: any) { portsError.value = e?.message ?? String(e); openPorts.value = null; }
+  catch (e) { portsError.value = errMsg(e); openPorts.value = null; }
 }
 async function loadOutbound() {
   outboundError.value = null;
   try { outbound.value = await serverSecurityService.outbound(); }
-  catch (e: any) { outboundError.value = e?.message ?? String(e); outbound.value = null; }
+  catch (e) { outboundError.value = errMsg(e); outbound.value = null; }
 }
 async function loadTlsErrors() {
   tlsErrorsError.value = null;
   try { tlsErrors.value = await serverSecurityService.tlsErrors(); }
-  catch (e: any) { tlsErrorsError.value = e?.message ?? String(e); tlsErrors.value = null; }
+  catch (e) { tlsErrorsError.value = errMsg(e); tlsErrors.value = null; }
 }
 
 async function banIp(ip: string) {
@@ -105,7 +106,7 @@ async function banIp(ip: string) {
   try {
     const r = await serverSecurityService.banIp(ip, "ban manuel via panel sécurité");
     alert(`✅ ${r.message}`);
-  } catch (e: any) { showError(`Echec ban : ${e?.message ?? e}`); }
+  } catch (e) { showError(`Echec ban : ${errMsg(e)}`); }
 }
 
 async function refresh() {

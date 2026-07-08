@@ -12,8 +12,17 @@ export function apiBase(): string {
   // Priorite : config localStorage utilisateur > VITE_API_URL au build > defaut.
   // En prod, defaut "" -> URLs relatives -> passent par le proxy nginx (origin courant).
   // En dev, defaut http://localhost:3000 -> hit l'API directement.
+  // SECURITE : la valeur vient de localStorage (modifiable par n'importe quel
+  // code de la page). On n'accepte que http(s) — jamais javascript:, data:,
+  // etc. — pour eviter qu'une config empoisonnee detourne les requetes
+  // (et les tokens qu'elles embarquent) vers un schema/URL arbitraire.
   const cfg = getApiConfig()?.api_url;
-  if (cfg) return cfg;
+  if (cfg) {
+    try {
+      const u = new URL(cfg);
+      if (u.protocol === "https:" || u.protocol === "http:") return cfg;
+    } catch { /* URL malformee : ignore, fallback env/defaut */ }
+  }
   const env = import.meta.env.VITE_API_URL;
   if (env) return env;
   return import.meta.env.PROD ? "" : "http://localhost:3000";

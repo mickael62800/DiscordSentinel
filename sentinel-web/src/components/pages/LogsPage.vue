@@ -90,8 +90,10 @@ function statusClass(code: unknown): string {
             </div>
           </template>
 
-          <!-- WebSocket custom details slot -->
-          <template v-if="tab.key === 'websocket'" #details="{ value }">
+          <!-- WebSocket custom details slot.
+               v-else-if : branches exclusives avec le slot API ci-dessus,
+               sinon vue/valid-v-slot signale un slot #details duplique. -->
+          <template v-else-if="tab.key === 'websocket'" #details="{ value }">
             <div v-if="value && typeof value === 'object'" class="details-cell">
               <span v-if="(value as Record<string, unknown>).event" class="detail-tag event">
                 {{ (value as Record<string, unknown>).event }}

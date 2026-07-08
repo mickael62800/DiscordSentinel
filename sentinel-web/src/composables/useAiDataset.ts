@@ -1,3 +1,4 @@
+import { errMsg } from "@/utils/errMsg";
 import { computed, ref, watch } from "vue";
 import { aiDatasetService, type DatasetMessage } from "@/services/aiDatasetService";
 import { useGuildSelector } from "./useGuildSelector";
@@ -49,8 +50,8 @@ async function fetchData() {
     });
     items.value = r.items;
     total.value = r.total;
-  } catch (e: any) {
-    showError(`Erreur chargement : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Erreur chargement : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -176,8 +177,8 @@ async function exportAndClean() {
     labeledCache.value = {};
     offset.value = 0;
     await fetchData();
-  } catch (e: any) {
-    showError(`Erreur export/clean : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Erreur export/clean : ${errMsg(e)}`);
   } finally {
     exporting.value = false;
   }

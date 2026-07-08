@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { GameTemplate } from "@/services/gamePortalService";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
+import { safeHttpsImageUrl } from "@/utils/safeUrl";
 
 const { visible } = useComponentVisibility();
 
@@ -29,8 +30,8 @@ const emit = defineEmits<{
       >
         <div class="game-cover">
           <img
-            v-if="t.cover_image_url"
-            :src="t.cover_image_url"
+            v-if="safeHttpsImageUrl(t.cover_image_url)"
+            :src="safeHttpsImageUrl(t.cover_image_url)!"
             :alt="t.name"
             class="game-cover-img"
             loading="lazy"

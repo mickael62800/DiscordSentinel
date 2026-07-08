@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import {
   serverSecurityService,
@@ -23,22 +24,22 @@ const containersError = ref<string | null>(null);
 async function loadTls() {
   tlsError.value = null;
   try { tls.value = await serverSecurityService.tlsCert(); }
-  catch (e: any) { tlsError.value = e?.message ?? String(e); tls.value = null; }
+  catch (e) { tlsError.value = errMsg(e); tls.value = null; }
 }
 async function loadTrivy() {
   trivyError.value = null;
   try { trivy.value = await serverSecurityService.trivy(); }
-  catch (e: any) { trivyError.value = e?.message ?? String(e); trivy.value = null; }
+  catch (e) { trivyError.value = errMsg(e); trivy.value = null; }
 }
 async function loadIntegrity() {
   integrityError.value = null;
   try { integrity.value = await serverSecurityService.fileIntegrity(); }
-  catch (e: any) { integrityError.value = e?.message ?? String(e); integrity.value = null; }
+  catch (e) { integrityError.value = errMsg(e); integrity.value = null; }
 }
 async function loadContainers() {
   containersError.value = null;
   try { containers.value = await serverSecurityService.containerChanges(); }
-  catch (e: any) { containersError.value = e?.message ?? String(e); containers.value = null; }
+  catch (e) { containersError.value = errMsg(e); containers.value = null; }
 }
 
 const tlsBadgeClass = computed(() => {

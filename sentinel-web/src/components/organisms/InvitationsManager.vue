@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -30,8 +31,8 @@ async function load() {
   loading.value = true;
   try {
     invitations.value = await invitationsService.list(selectedGuildId.value);
-  } catch (e: any) {
-    showError(`Echec chargement invitations : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Echec chargement invitations : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -66,8 +67,8 @@ async function generate() {
     formExpiresHours.value = 168;
     await load();
     success("Code d'invitation généré.");
-  } catch (e: any) {
-    showError(`Echec génération : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Echec génération : ${errMsg(e)}`);
   } finally {
     generating.value = false;
   }
@@ -79,8 +80,8 @@ async function revoke(code: string) {
     await invitationsService.revoke(code);
     success("Code révoqué.");
     await load();
-  } catch (e: any) {
-    showError(`Echec révocation : ${e?.message ?? e}`);
+  } catch (e) {
+    showError(`Echec révocation : ${errMsg(e)}`);
   }
 }
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
 import {
@@ -63,21 +64,21 @@ async function loadOverviewKpis() {
 }
 async function loadBanned() {
   try { banned.value = await serverSecurityService.bannedIps(); }
-  catch (e: any) { showError(`Bans : ${e?.message ?? e}`); }
+  catch (e) { showError(`Bans : ${errMsg(e)}`); }
 }
 async function loadManualBans() {
   try { manualBans.value = await serverSecurityService.manualBans(); }
-  catch (e: any) { showError(`Bans manuels : ${e?.message ?? e}`); }
+  catch (e) { showError(`Bans manuels : ${errMsg(e)}`); }
 }
 async function loadLastLogins() {
   try { lastLogins.value = await serverSecurityService.lastLogins(20); }
-  catch (e: any) { showError(`Logins : ${e?.message ?? e}`); }
+  catch (e) { showError(`Logins : ${errMsg(e)}`); }
 }
 async function loadServerEvents() {
   try {
     const prefix = eventsFilter.value === "all" ? undefined : eventsFilter.value;
     serverEvents.value = await serverSecurityService.serverEvents({ action_prefix: prefix, limit: 100 });
-  } catch (e: any) { showError(`Events serveur : ${e?.message ?? e}`); }
+  } catch (e) { showError(`Events serveur : ${errMsg(e)}`); }
 }
 
 async function unbanIp(ip: string) {
@@ -88,7 +89,7 @@ async function unbanIp(ip: string) {
     await loadBanned();
     await loadManualBans();
     await loadServerEvents();
-  } catch (e: any) { showError(`Echec unban : ${e?.message ?? e}`); }
+  } catch (e) { showError(`Echec unban : ${errMsg(e)}`); }
 }
 
 async function refreshAll() {
@@ -128,7 +129,7 @@ async function runCleanup() {
       `• Bans manuels : ${r.deleted_manual_bans}\n\n` +
       `${r.message}`,
     );
-  } catch (e: any) { showError(`Echec cleanup : ${e?.message ?? e}`); }
+  } catch (e) { showError(`Echec cleanup : ${errMsg(e)}`); }
   finally { cleaning.value = false; }
 }
 

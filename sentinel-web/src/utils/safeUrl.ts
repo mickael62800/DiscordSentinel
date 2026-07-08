@@ -40,6 +40,23 @@ export function safeLinkUrl(url: string | null | undefined): string | null {
   }
 }
 
+/**
+ * Valide une URL d'image SANS whitelist d'hote (`<img :src>` pour du contenu
+ * configure par les admins : embeds d'annonces, covers de jeux). Impose
+ * uniquement HTTPS — bloque javascript:, data:, vbscript:, http: mixte.
+ * Utiliser `safeImageUrl` (whitelist) des que l'hote attendu est connu.
+ */
+export function safeHttpsImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function safeImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
   try {

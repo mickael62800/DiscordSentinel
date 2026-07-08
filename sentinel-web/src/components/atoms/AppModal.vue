@@ -13,6 +13,7 @@ const props = withDefaults(
     closeOnEsc?: boolean;
   }>(),
   {
+    title: "",
     size: "md",
     elevated: false,
     closeOnOverlay: true,

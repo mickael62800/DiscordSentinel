@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import { Line } from "vue-chartjs";
 import { registerChartJs } from "@/utils/chartjs";
@@ -15,8 +16,8 @@ async function load() {
   error.value = null;
   try {
     data.value = await serverSecurityService.diskTrend();
-  } catch (e: any) {
-    error.value = e?.message ?? String(e);
+  } catch (e) {
+    error.value = errMsg(e);
     data.value = null;
   } finally {
     loading.value = false;
@@ -88,7 +89,7 @@ const chartOptions = computed(() => ({
       max: 100,
       ticks: {
         color: "rgba(255,255,255,0.5)",
-        callback: (v: any) => `${v}%`,
+        callback: (v: string | number) => `${v}%`,
       },
       grid: { color: "rgba(255,255,255,0.05)" },
     },

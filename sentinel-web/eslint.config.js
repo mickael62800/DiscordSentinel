@@ -37,7 +37,12 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": "warn",
+      // Prefixe `_` = intentionnellement inutilise (signatures d'interface).
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
       // `{}` est utilise dans vite-env.d.ts (shims Vue) : guardrail, pas un mur.
       "@typescript-eslint/no-empty-object-type": "warn",
       "no-console": ["warn", { allow: ["error", "warn"] }],

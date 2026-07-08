@@ -250,7 +250,7 @@ async function save() {
       await announcementsService.create(body);
       toastOk("Annonce créée.");
     } else if (props.target) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+       
       const { guild_id: _gid, ...rest } = body;
       await announcementsService.update(props.target.id, rest);
       toastOk("Annonce mise à jour.");

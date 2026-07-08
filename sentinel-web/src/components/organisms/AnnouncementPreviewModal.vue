@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RenderedAnnouncement } from "@/services/announcementsService";
 import AppModal from "../atoms/AppModal.vue";
+import { safeHttpsImageUrl } from "@/utils/safeUrl";
 
 defineProps<{
   preview: RenderedAnnouncement | null;
@@ -25,8 +26,8 @@ const emit = defineEmits<{ close: [] }>();
       >
         <h4 v-if="preview.embed.title">{{ preview.embed.title }}</h4>
         <p class="prev-desc">{{ preview.embed.description }}</p>
-        <img v-if="preview.embed.thumbnail_url" :src="preview.embed.thumbnail_url" class="prev-thumb" />
-        <img v-if="preview.embed.image_url" :src="preview.embed.image_url" class="prev-img" />
+        <img v-if="safeHttpsImageUrl(preview.embed.thumbnail_url)" :src="safeHttpsImageUrl(preview.embed.thumbnail_url)!" class="prev-thumb" />
+        <img v-if="safeHttpsImageUrl(preview.embed.image_url)" :src="safeHttpsImageUrl(preview.embed.image_url)!" class="prev-img" />
       </div>
       <p v-else class="prev-text">{{ preview.content_text }}</p>
       <p class="muted small">

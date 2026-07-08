@@ -29,6 +29,9 @@ RUN apk add --no-cache openssl
 
 # Config nginx (HTTP -> HTTPS redirect + reverse-proxy TLS /api et /ws).
 COPY sentinel-web/nginx.conf /etc/nginx/conf.d/default.conf
+# Headers de securite partages (inclus dans server + locations, cf. piege
+# add_header documente dans le fichier).
+COPY sentinel-web/security-headers.inc /etc/nginx/snippets/security-headers.inc
 
 # Entrypoint : prepare les certs (self-signed fallback) puis lance nginx.
 # `sed` strip des CR eventuels (si edite sous Windows) — sinon shebang casse.

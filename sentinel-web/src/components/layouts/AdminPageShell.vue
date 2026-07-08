@@ -7,7 +7,7 @@ withDefaults(
     /** Largeur de page : constrained (defaut), wide pour dashboards/tables, narrow pour login. */
     width?: "constrained" | "wide" | "narrow";
   }>(),
-  { width: "constrained" },
+  { icon: "", width: "constrained" },
 );
 </script>
 

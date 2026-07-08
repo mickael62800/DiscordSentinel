@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref, watch } from "vue";
 import { Line } from "vue-chartjs";
@@ -17,9 +18,9 @@ const loading = ref(false);
 async function load() {
   loading.value = true;
   try {
-    data.value = await serverSecurityService.trafficTrend(window.value as any, 5);
-  } catch (e: any) {
-    showError(`Trafic : ${e?.message ?? e}`);
+    data.value = await serverSecurityService.trafficTrend(window.value, 5);
+  } catch (e) {
+    showError(`Trafic : ${errMsg(e)}`);
     data.value = null;
   } finally {
     loading.value = false;

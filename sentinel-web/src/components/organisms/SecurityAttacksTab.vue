@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
 import {
@@ -33,21 +34,21 @@ const geoMap = ref<Record<string, GeoIpEntry>>({});
 
 async function loadTopIps() {
   try { topIps.value = await serverSecurityService.topIps(topIpsWindow.value, 20); }
-  catch (e: any) { showError(`Top IPs : ${e?.message ?? e}`); }
+  catch (e) { showError(`Top IPs : ${errMsg(e)}`); }
 }
 async function loadAuthFailures() {
   try { authFailures.value = await serverSecurityService.authFailures(authWindow.value, 100); }
-  catch (e: any) { showError(`Echecs auth : ${e?.message ?? e}`); }
+  catch (e) { showError(`Echecs auth : ${errMsg(e)}`); }
 }
 async function loadSshFailures() {
   sshError.value = null;
   try { sshFailures.value = await serverSecurityService.sshFailures(); }
-  catch (e: any) { sshError.value = e?.message ?? String(e); sshFailures.value = null; }
+  catch (e) { sshError.value = errMsg(e); sshFailures.value = null; }
 }
 async function loadSuspicious() {
   suspiciousError.value = null;
   try { suspicious.value = await serverSecurityService.nginxSuspicious(); }
-  catch (e: any) { suspiciousError.value = e?.message ?? String(e); suspicious.value = null; }
+  catch (e) { suspiciousError.value = errMsg(e); suspicious.value = null; }
 }
 async function loadGeoForAll() {
   const ips = Array.from(new Set([
@@ -68,7 +69,7 @@ async function banIp(ip: string) {
   try {
     const r = await serverSecurityService.banIp(ip, "ban manuel via panel sécurité");
     alert(`✅ ${r.message}`);
-  } catch (e: any) { showError(`Echec ban : ${e?.message ?? e}`); }
+  } catch (e) { showError(`Echec ban : ${errMsg(e)}`); }
 }
 
 async function refresh() {

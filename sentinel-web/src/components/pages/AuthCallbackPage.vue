@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { errMsg } from "@/utils/errMsg";
 import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { setDiscordUser, setDiscordToken, type DiscordUser } from "@/api/config";
@@ -54,8 +55,8 @@ onMounted(async () => {
       const r = await invitationsService.redeem(pendingCode);
       message.value = `✅ Code accepté ! Rôle ${r.role}. Redirection…`;
       status.value = "ok";
-    } catch (e: any) {
-      const msg = e?.message ?? String(e);
+    } catch (e) {
+      const msg = errMsg(e);
       message.value = `⚠️ Code refusé : ${msg}`;
       status.value = "error";
       // Pause pour que l'utilisateur lise le message
@@ -81,7 +82,7 @@ onMounted(async () => {
       router.replace({ name: "login", query: { error: "not_invited" } });
       return;
     }
-  } catch (e: any) {
+  } catch (e) {
     // Si check-access echoue (rate limit Discord, etc.), on laisse passer
     // pour ne pas bloquer un user legitime sur une erreur transitoire.
     console.warn("check-access failed, proceeding anyway:", e);

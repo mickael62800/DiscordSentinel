@@ -82,19 +82,21 @@ export function fillColor(color: string, alpha = 0.15): string {
 /** Deep-merge minimaliste (objets plain uniquement) pour appliquer overrides. */
 function merge<T>(base: T, overrides?: Partial<T>): T {
   if (!overrides) return base;
-  const out: any = Array.isArray(base) ? [...(base as any)] : { ...base };
+  const out: Record<string, unknown> = Array.isArray(base)
+    ? ([...(base as unknown[])] as unknown as Record<string, unknown>)
+    : { ...(base as Record<string, unknown>) };
   for (const key of Object.keys(overrides)) {
-    const o = (overrides as any)[key];
-    const b = (base as any)[key];
+    const o = (overrides as Record<string, unknown>)[key];
+    const b = (base as Record<string, unknown>)[key];
     out[key] =
       o && typeof o === "object" && !Array.isArray(o) && b && typeof b === "object"
         ? merge(b, o)
         : o;
   }
-  return out;
+  return out as T;
 }
 
-type AnyOptions = Record<string, any>;
+type AnyOptions = Record<string, unknown>;
 
 function baseChrome() {
   const c = themeColors();
