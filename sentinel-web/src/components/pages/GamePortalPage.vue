@@ -17,6 +17,11 @@ import GamePortalServersPanel from "@/components/organisms/GamePortalServersPane
 import GamePortalCatalogPanel from "@/components/organisms/GamePortalCatalogPanel.vue";
 import GamePortalRolesPanel from "@/components/organisms/GamePortalRolesPanel.vue";
 import GamePortalConsolePanel, { type LogLine } from "@/components/organisms/GamePortalConsolePanel.vue";
+import GameServerCreateModal from "@/components/organisms/GameServerCreateModal.vue";
+import { botConfigService } from "@/services/botConfigService";
+
+const GAME_PORTAL_BOT = "game-portal";
+const DEFAULT_POOL_TOTAL_MB = 8192;
 
 const { selectedGuildId } = useGuildSelector();
 const realtime = useRealtimeStore();
@@ -38,6 +43,18 @@ const configModalDetail = ref<{ template: GameTemplate | null; config: Record<st
 });
 const sessionsModalOpen = ref(false);
 const sessionsModalServer = ref<GameServer | null>(null);
+
+// Modal de creation (remplace les window.prompt)
+const createModalOpen = ref(false);
+const createModalTemplate = ref<GameTemplate | null>(null);
+const suggestedName = ref("");
+// Pool RAM total du composant (config bot game-portal, cle max_memory_total_mb).
+const poolTotalMb = ref(DEFAULT_POOL_TOTAL_MB);
+const poolRemainingMb = computed(
+  () =>
+    poolTotalMb.value -
+    servers.value.reduce((sum, s) => sum + (s.allocated_memory_mb ?? 0), 0),
+);
 
 const selectedServerId = ref<string | null>(null);
 const selectedServer = computed(() =>
@@ -62,6 +79,22 @@ function nowHHMMSS() {
 }
 
 // ── Fetchers ──
+// Lit le pool RAM total du composant game-portal via la config bot
+// (cle max_memory_total_mb). Defaut 8192 Mo si absente/invalide.
+async function fetchPoolTotal() {
+  if (!selectedGuildId.value) return;
+  try {
+    const cfgs = await botConfigService.getGuildConfig(selectedGuildId.value);
+    const raw = cfgs.find(
+      (c) => c.bot_name === GAME_PORTAL_BOT && c.config_key === "max_memory_total_mb",
+    )?.config_value;
+    const parsed = raw != null ? Number.parseInt(raw, 10) : NaN;
+    poolTotalMb.value = Number.isNaN(parsed) ? DEFAULT_POOL_TOTAL_MB : parsed;
+  } catch {
+    poolTotalMb.value = DEFAULT_POOL_TOTAL_MB;
+  }
+}
+
 async function fetchAll() {
   if (!selectedGuildId.value) return;
   loading.value = true;
@@ -69,6 +102,7 @@ async function fetchAll() {
     const [tpl, srv] = await Promise.all([
       gamePortalService.listTemplates(selectedGuildId.value),
       gamePortalService.listServers(selectedGuildId.value),
+      fetchPoolTotal(),
     ]);
     templates.value = tpl;
     servers.value = srv;
@@ -164,40 +198,39 @@ async function toggleServer(s: GameServer) {
   }
 }
 
-async function launchTemplate(t: GameTemplate) {
+// Ouvre le modal de creation (remplace les anciens window.prompt nom + RAM).
+function launchTemplate(t: GameTemplate) {
   if (!selectedGuildId.value) {
     toastError("Sélectionne une guild d'abord.");
     return;
   }
+  if (!user.value?.id) {
+    toastError("Authentification Discord requise.");
+    return;
+  }
+  createModalTemplate.value = t;
+  suggestedName.value = `${t.name}-${servers.value.length + 1}`;
+  createModalOpen.value = true;
+}
+
+async function submitCreate(payload: { name: string; memoryMb: number }) {
+  const t = createModalTemplate.value;
+  if (!t || !selectedGuildId.value) return;
   const actorId = user.value?.id;
   if (!actorId) {
     toastError("Authentification Discord requise.");
     return;
   }
-  const suggested = `${t.name}-${servers.value.length + 1}`;
-  const name = window.prompt(`Nom du nouveau serveur ${t.name} ?`, suggested);
-  if (!name) return;
-  // Choix de la RAM allouée, borné par le template (min/max). Défaut = valeur
-  // recommandée du template. Le pool cumulé reste plafonné par
-  // "max_memory_total_mb" (config du composant game-portal) côté serveur.
-  const ramInput = window.prompt(
-    `RAM allouée à ${t.name} (Mo) ? Entre ${t.min_memory_mb} et ${t.max_memory_mb} Mo.`,
-    String(t.default_memory_mb),
-  );
-  if (ramInput === null) return;
-  const parsedRam = Number.parseInt(ramInput, 10);
-  const memory_mb = Number.isNaN(parsedRam)
-    ? t.default_memory_mb
-    : Math.min(t.max_memory_mb, Math.max(t.min_memory_mb, parsedRam));
   busy.value = t.id;
   try {
     const created = await gamePortalService.createServer(selectedGuildId.value, {
       template_slug: t.slug,
-      name,
+      name: payload.name,
       owner_user_id: actorId,
-      memory_mb,
+      memory_mb: payload.memoryMb,
     });
-    success(`${name} créé. Démarrage…`);
+    success(`${payload.name} créé. Démarrage…`);
+    createModalOpen.value = false;
     selectedServerId.value = created.id;
     pushLog({
       time: nowHHMMSS(),
@@ -389,6 +422,16 @@ watch(selectedServerId, async (sid) => {
       :server-id="sessionsModalServer?.id ?? null"
       :server-name="sessionsModalServer?.name ?? ''"
       @close="sessionsModalOpen = false"
+    />
+
+    <GameServerCreateModal
+      :open="createModalOpen"
+      :template="createModalTemplate"
+      :pool-remaining-mb="poolRemainingMb"
+      :suggested-name="suggestedName"
+      :busy="busy === createModalTemplate?.id"
+      @close="createModalOpen = false"
+      @submit="submitCreate"
     />
   </div>
 </template>
