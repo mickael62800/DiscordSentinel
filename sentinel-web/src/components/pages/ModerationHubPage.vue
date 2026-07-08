@@ -5,9 +5,10 @@ import AppTabs from "../molecules/AppTabs.vue";
 import ModerationJournalTab from "../organisms/ModerationJournalTab.vue";
 import ModerationBansTab from "../organisms/ModerationBansTab.vue";
 import ModerationTrackingTab from "../organisms/ModerationTrackingTab.vue";
-import ModerationWorkflowTab from "../organisms/ModerationWorkflowTab.vue";
+import ReviewPage from "./ReviewPage.vue";
+import RemindersPage from "./RemindersPage.vue";
 
-type TabKey = "journal" | "bans" | "tracking" | "workflow";
+type TabKey = "journal" | "bans" | "tracking" | "review" | "reminders";
 
 const activeTab = ref<TabKey>("journal");
 
@@ -15,7 +16,8 @@ const hubTabs = [
   { key: "journal", label: "Journal" },
   { key: "bans", label: "Bannis actifs" },
   { key: "tracking", label: "Suivi utilisateur" },
-  { key: "workflow", label: "Workflow" },
+  { key: "review", label: "Revue AutoMod" },
+  { key: "reminders", label: "Rappels" },
 ];
 
 const { sharedUserId } = useSharedUserLookup();
@@ -53,7 +55,8 @@ function handleOpenNotesEvidence(userId: string) {
         v-else-if="activeTab === 'tracking'"
         :jump-to-notes-evidence="trackingJumpSignal"
       />
-      <ModerationWorkflowTab v-else-if="activeTab === 'workflow'" />
+      <ReviewPage v-else-if="activeTab === 'review'" />
+      <RemindersPage v-else-if="activeTab === 'reminders'" />
     </div>
   </div>
 </template>
