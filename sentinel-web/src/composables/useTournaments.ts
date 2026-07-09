@@ -1,4 +1,5 @@
 import { ref } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import {
   tournamentsService,
   type CurrentTournament,
@@ -17,7 +18,7 @@ export function useTournaments() {
     try {
       current.value = await tournamentsService.current(guildId);
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : String(e);
+      error.value = errMsg(e);
     } finally {
       loading.value = false;
     }
@@ -29,7 +30,7 @@ export function useTournaments() {
     try {
       history.value = await tournamentsService.history(guildId);
     } catch (e: unknown) {
-      error.value = e instanceof Error ? e.message : String(e);
+      error.value = errMsg(e);
     } finally {
       loading.value = false;
     }

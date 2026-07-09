@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import {
   gamePortalService,
   type ConfigField,
@@ -81,7 +82,7 @@ async function save() {
     emit("saved");
     emit("close");
   } catch (e) {
-    toastError(`Échec : ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Échec : ${errMsg(e)}`);
   } finally {
     saving.value = false;
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import AppSelect from "@/components/atoms/AppSelect.vue";
+import { errMsg } from "@/utils/errMsg";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
@@ -148,7 +149,7 @@ async function applyGuildDefaults() {
   } catch (e) {
     // Garde les defauts hardcodes du `emptyForm()` mais previens
     // l'utilisateur que les defauts du serveur n'ont pas pu etre lus.
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errMsg(e);
     toastErr(`Impossible de charger les defauts du serveur : ${msg}`);
   }
 }
@@ -258,7 +259,7 @@ async function save() {
     emit("saved");
     emit("close");
   } catch (e: unknown) {
-    toastErr(`Echec sauvegarde : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec sauvegarde : ${errMsg(e)}`);
   } finally {
     saving.value = false;
   }

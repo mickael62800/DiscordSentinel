@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
@@ -39,7 +40,7 @@ async function fetchAll() {
     channels.value = ch;
     roles.value = ro;
   } catch (e: unknown) {
-    toastErr(`Echec chargement annonces : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec chargement annonces : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -70,7 +71,7 @@ async function toggleEnabled(a: ScheduledAnnouncement) {
     await announcementsService.toggle(a.id, !a.enabled);
     await fetchAll();
   } catch (e: unknown) {
-    toastErr(`Echec toggle : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec toggle : ${errMsg(e)}`);
   }
 }
 
@@ -85,7 +86,7 @@ async function removeAnnouncement(a: ScheduledAnnouncement) {
     toastOk("Annonce supprimée.");
     await fetchAll();
   } catch (e: unknown) {
-    toastErr(`Echec suppression : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec suppression : ${errMsg(e)}`);
   }
 }
 
@@ -95,7 +96,7 @@ async function showPreview(a: ScheduledAnnouncement) {
   try {
     preview.value = await announcementsService.preview(a.id);
   } catch (e: unknown) {
-    toastErr(`Echec preview : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec preview : ${errMsg(e)}`);
   }
 }
 function closePreview() { preview.value = null; }
@@ -108,7 +109,7 @@ async function showRuns(a: ScheduledAnnouncement) {
   try {
     runs.value = await announcementsService.listRuns(a.id, 50);
   } catch (e: unknown) {
-    toastErr(`Echec chargement runs : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec chargement runs : ${errMsg(e)}`);
     runs.value = [];
   }
 }

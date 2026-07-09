@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { infractionsService } from "@/services/infractionsService";
 import { useRealtimeStore } from "@/stores/realtimeStore";
 import type { UnlistenFn } from "@/api/events-api";
@@ -38,7 +39,7 @@ async function refresh() {
   try {
     items.value = await infractionsService.getAll(props.guildId);
   } catch (e) {
-    errorMsg.value = e instanceof Error ? e.message : String(e);
+    errorMsg.value = errMsg(e);
   } finally {
     loading.value = false;
   }
@@ -61,7 +62,7 @@ async function wipe() {
     await infractionsService.purgeAll(props.guildId);
     items.value = [];
   } catch (e) {
-    errorMsg.value = e instanceof Error ? e.message : String(e);
+    errorMsg.value = errMsg(e);
   } finally {
     wiping.value = false;
   }

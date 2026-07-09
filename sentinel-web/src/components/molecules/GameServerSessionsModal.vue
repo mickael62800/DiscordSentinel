@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import {
   gamePortalService,
   type PlayerSession,
@@ -34,7 +35,7 @@ watch(
           0,
         );
       } catch (e) {
-        error.value = e instanceof Error ? e.message : String(e);
+        error.value = errMsg(e);
         sessions.value = [];
       } finally {
         loading.value = false;

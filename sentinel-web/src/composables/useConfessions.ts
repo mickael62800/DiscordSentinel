@@ -1,4 +1,5 @@
 import { ref, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { useRealtimeRefresh } from "./useRealtimeRefresh";
@@ -34,7 +35,7 @@ async function fetchAll() {
     confessions.value = c;
     reports.value = r;
   } catch (e: unknown) {
-    toastErr(`Echec chargement : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec chargement : ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -62,7 +63,7 @@ export function useConfessions() {
     try {
       replies.value = await confessionsService.listReplies(c.id);
     } catch (e: unknown) {
-      toastErr(`Echec replies : ${(e as Error)?.message ?? e}`);
+      toastErr(`Echec replies : ${errMsg(e)}`);
       replies.value = [];
     }
   }
@@ -78,7 +79,7 @@ export function useConfessions() {
       toastOk(`Confession #${c.public_number} supprimee.`);
       await fetchAll();
     } catch (e: unknown) {
-      toastErr(`Echec : ${(e as Error)?.message ?? e}`);
+      toastErr(`Echec : ${errMsg(e)}`);
     }
   }
 
@@ -88,7 +89,7 @@ export function useConfessions() {
       toastOk("Reply supprime.");
       if (repliesTarget.value) await showReplies(repliesTarget.value);
     } catch (e: unknown) {
-      toastErr(`Echec : ${(e as Error)?.message ?? e}`);
+      toastErr(`Echec : ${errMsg(e)}`);
     }
   }
 
@@ -98,7 +99,7 @@ export function useConfessions() {
       toastOk(`Signalement ${status === "resolved" ? "résolu" : "rejeté"}.`);
       await fetchAll();
     } catch (e: unknown) {
-      toastErr(`Echec : ${(e as Error)?.message ?? e}`);
+      toastErr(`Echec : ${errMsg(e)}`);
     }
   }
 

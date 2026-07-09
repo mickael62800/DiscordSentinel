@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { errMsg } from "@/utils/errMsg";
 import { ref } from "vue";
 import { authService } from "@/services/authService";
 import { Store as KvStore } from "@/api/store";
@@ -66,7 +67,7 @@ export const useAuthStore = defineStore("auth", () => {
         const { httpGet } = await import("@/api/http");
         await httpGet("/api/auth/check-access");
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = errMsg(e);
         if (msg.includes("403")) {
           user.value = null;
           try {

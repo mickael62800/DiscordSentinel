@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { levelsService } from "@/services/levelsService";
 import { useLevels } from "../../composables/useLevels";
 import { useGuildSelector } from "../../composables/useGuildSelector";
@@ -60,7 +61,7 @@ async function saveEditXp() {
     closeEditModal();
     await fetchAll();
   } catch (e: unknown) {
-    toastErr(`Echec edit XP : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec edit XP : ${errMsg(e)}`);
   } finally {
     editing.value = false;
   }
@@ -84,7 +85,7 @@ async function resetUserXp(user: UserLevel, target: "all" | "text" | "voice") {
     toastOk(`XP ${target} reset pour ${user.username}.`);
     await fetchAll();
   } catch (e: unknown) {
-    toastErr(`Echec reset : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec reset : ${errMsg(e)}`);
   } finally {
     resetting.value = null;
   }

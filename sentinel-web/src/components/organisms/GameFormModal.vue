@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { gamesService, type Game } from "@/services/gamesService";
 import { useGames } from "@/composables/useGames";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -196,7 +197,7 @@ async function submit() {
     emit("close");
     await fetchAll();
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errMsg(e);
     form.value.error = msg;
     showError(msg);
   } finally {

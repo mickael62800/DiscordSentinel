@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, onMounted, computed } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { discordRolesService } from "@/services/discordRolesService";
 import type { DiscordRole } from "@/types";
 
@@ -27,7 +28,7 @@ async function load() {
   try {
     roles.value = await discordRolesService.getAll(props.guildId);
   } catch (e) {
-    errorMsg.value = e instanceof Error ? e.message : String(e);
+    errorMsg.value = errMsg(e);
   } finally {
     loading.value = false;
   }

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import type { Game } from "@/services/gamesService";
 import { useGames } from "@/composables/useGames";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -42,7 +43,7 @@ async function onDeploy() {
     });
     toastOk("Panneau envoye au bot — il apparait dans le salon dans un instant.");
   } catch (e) {
-    toastErr(`Echec deploiement : ${(e as Error)?.message ?? e}`);
+    toastErr(`Echec deploiement : ${errMsg(e)}`);
   } finally {
     deploying.value = false;
   }

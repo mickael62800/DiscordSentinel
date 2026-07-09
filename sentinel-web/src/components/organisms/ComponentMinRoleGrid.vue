@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import { rbacService, type ComponentMinRoleEntry } from "@/services/rbacService";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -40,7 +41,7 @@ async function load() {
   try {
     entries.value = await rbacService.listComponentMinRoles(selectedGuildId.value);
   } catch (e) {
-    toastError(`Chargement échoué: ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Chargement échoué: ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -65,7 +66,7 @@ async function setRole(e: ComponentMinRoleEntry, newRole: RbacRole) {
     await load();
     await reload();
   } catch (err) {
-    toastError(`Sauvegarde échouée: ${err instanceof Error ? err.message : String(err)}`);
+    toastError(`Sauvegarde échouée: ${errMsg(err)}`);
   } finally {
     saving.value = null;
   }
@@ -81,7 +82,7 @@ async function resetToDefault(e: ComponentMinRoleEntry) {
     await load();
     await reload();
   } catch (err) {
-    toastError(`Reset échoué: ${err instanceof Error ? err.message : String(err)}`);
+    toastError(`Reset échoué: ${errMsg(err)}`);
   } finally {
     saving.value = null;
   }

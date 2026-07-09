@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { gamesService, type Game } from "@/services/gamesService";
+import { errMsg } from "@/utils/errMsg";
 import { useGames } from "@/composables/useGames";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -46,7 +47,7 @@ async function onDelete(game: Game) {
     showSuccess(`Jeu "${game.game_name}" supprime.`);
     await fetchAll();
   } catch (e) {
-    showError(e instanceof Error ? e.message : String(e));
+    showError(errMsg(e));
   }
 }
 </script>

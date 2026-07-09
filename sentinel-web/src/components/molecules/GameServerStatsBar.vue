@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import {
   gamePortalService,
   type GameServerStats,
@@ -49,7 +50,7 @@ async function fetchStats() {
     stats.value = await gamePortalService.getStats(props.serverId);
     error.value = null;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : String(e);
+    error.value = errMsg(e);
   }
 }
 

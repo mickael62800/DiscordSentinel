@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { errMsg } from "@/utils/errMsg";
 import {
   gamePortalService,
   type GameServer,
@@ -113,7 +114,7 @@ async function fetchAll() {
       selectedServerId.value = srv[0]?.id ?? null;
     }
   } catch (e) {
-    toastError(`Erreur chargement: ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Erreur chargement: ${errMsg(e)}`);
   } finally {
     loading.value = false;
   }
@@ -134,7 +135,7 @@ async function fetchLogs(serverId: string) {
     const lines = await gamePortalService.getLogs(serverId, 100);
     logs.value = lines.map((raw) => parseLogLine(raw, serverId));
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = errMsg(e);
     if (msg.includes("409") || msg.includes("container_id")) {
       pushLog({
         time: nowHHMMSS(),
@@ -192,7 +193,7 @@ async function toggleServer(s: GameServer) {
     }
     await fetchAll();
   } catch (e) {
-    toastError(`Echec: ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Echec: ${errMsg(e)}`);
   } finally {
     busy.value = null;
   }
@@ -241,7 +242,7 @@ async function submitCreate(payload: { name: string; memoryMb: number }) {
     await gamePortalService.startServer(created.id, actorId);
     await fetchAll();
   } catch (e) {
-    toastError(`Echec création: ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Echec création: ${errMsg(e)}`);
   } finally {
     busy.value = null;
   }
@@ -256,7 +257,7 @@ async function openConfigModal(s: GameServer) {
     configModalDetail.value = { template: tpl, config: detail.config };
     configModalOpen.value = true;
   } catch (e) {
-    toastError(`Échec : ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Échec : ${errMsg(e)}`);
   } finally {
     busy.value = null;
   }
@@ -280,7 +281,7 @@ async function deleteServer(s: GameServer) {
     if (selectedServerId.value === s.id) selectedServerId.value = null;
     await fetchAll();
   } catch (e) {
-    toastError(`Echec suppression: ${e instanceof Error ? e.message : String(e)}`);
+    toastError(`Echec suppression: ${errMsg(e)}`);
   } finally {
     busy.value = null;
   }
@@ -305,7 +306,7 @@ async function sendCommand() {
       time: nowHHMMSS(),
       source: sid.slice(0, 8),
       level: "error",
-      text: `RCON: ${e instanceof Error ? e.message : String(e)}`,
+      text: `RCON: ${errMsg(e)}`,
     });
   }
 }
