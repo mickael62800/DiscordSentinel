@@ -142,17 +142,38 @@ input:focus, select:focus {
   border-color: var(--accent);
 }
 
+/* Scrollbar : pill flottante, piste transparente. Le thumb est "insere"
+ * via une bordure transparente + background-clip, donc il flotte au lieu
+ * de coller au bord (et donc au header). Survol -> accent. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 12px;
+  height: 12px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-alt);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ═══════════════════════════════════════════════════════════
