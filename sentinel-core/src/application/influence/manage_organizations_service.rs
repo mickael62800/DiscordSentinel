@@ -388,6 +388,16 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         Ok(())
     }
 
+    async fn set_channel(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        channel_id: &str,
+    ) -> Result<(), DomainError> {
+        let org = self.require_org(guild_id, org_name).await?;
+        self.orgs.set_discord_channel(org.id, channel_id).await
+    }
+
     async fn set_relation(
         &self,
         guild_id: &str,

@@ -19,6 +19,8 @@ pub struct Organization {
     pub influence: i64,
     pub founder_id: Uuid,
     pub discord_role_id: Option<String>,
+    /// Salon texte prive auto-cree a la fondation, ou les membres se coordonnent.
+    pub discord_channel_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub dissolved_at: Option<DateTime<Utc>>,
 }

@@ -42,6 +42,7 @@ struct Row {
     influence: i64,
     founder_id: Uuid,
     discord_role_id: Option<String>,
+    discord_channel_id: Option<String>,
     created_at: DateTime<Utc>,
     dissolved_at: Option<DateTime<Utc>>,
 }
@@ -62,6 +63,7 @@ impl TryFrom<Row> for Organization {
             influence: r.influence,
             founder_id: r.founder_id,
             discord_role_id: r.discord_role_id,
+            discord_channel_id: r.discord_channel_id,
             created_at: r.created_at,
             dissolved_at: r.dissolved_at,
         })
@@ -69,7 +71,7 @@ impl TryFrom<Row> for Organization {
 }
 
 const SELECT_COLS: &str = "id, guild_id, kind, name, motto, treasury, reputation, \
-    influence, founder_id, discord_role_id, created_at, dissolved_at";
+    influence, founder_id, discord_role_id, discord_channel_id, created_at, dissolved_at";
 
 #[async_trait]
 impl OrganizationRepository for PgOrganizationRepository {
@@ -151,6 +153,20 @@ impl OrganizationRepository for PgOrganizationRepository {
         sqlx::query("UPDATE influence_organizations SET discord_role_id = $2 WHERE id = $1")
             .bind(org_id)
             .bind(role_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn set_discord_channel(
+        &self,
+        org_id: Uuid,
+        channel_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query("UPDATE influence_organizations SET discord_channel_id = $2 WHERE id = $1")
+            .bind(org_id)
+            .bind(channel_id)
             .execute(&self.pool)
             .await
             .map_err(pg_err)?;

@@ -51,6 +51,8 @@ pub struct Organization {
     pub treasury: i64,
     #[serde(default)]
     pub discord_role_id: Option<String>,
+    #[serde(default)]
+    pub discord_channel_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -874,6 +876,26 @@ pub async fn link_role(
     api.post_json(
         &format!("/api/influence/{guild_id}/orgs/role/link"),
         &LinkRoleBody { org_name, role_id, actor_user_id, is_moderator },
+    )
+    .await
+}
+
+#[derive(Debug, Serialize)]
+struct LinkChannelBody<'a> {
+    org_name: &'a str,
+    channel_id: &'a str,
+}
+
+/// Persiste l'id du salon prive auto-cree pour une organisation.
+pub async fn link_channel(
+    api: &BaseApiClient,
+    guild_id: &str,
+    org_name: &str,
+    channel_id: &str,
+) -> Result<serde_json::Value, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/channel/link"),
+        &LinkChannelBody { org_name, channel_id },
     )
     .await
 }

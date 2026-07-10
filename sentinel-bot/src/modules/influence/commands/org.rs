@@ -212,16 +212,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             let motto = option_str(&opts, "devise").unwrap_or("");
             match api_client::create_org(&api, &guild_id, &user_id, &username, kind, &name, motto).await {
                 Ok(org) => {
+                    // Salon prive auto-cree : les membres de l'orga y discutent
+                    // a l'abri des regards. Best-effort (ne bloque pas la fondation).
+                    let mut channel_line = String::new();
+                    if let Some(chan) = create_org_channel(ctx, &guild_id, &org.name, &user_id).await {
+                        let _ =
+                            api_client::link_channel(&api, &guild_id, &org.name, &chan.to_string())
+                                .await;
+                        channel_line = format!("\n\n📢 Salon privé : <#{chan}>");
+                    }
+                    let base_desc = if org.motto.is_empty() {
+                        "Tu en es le **Fondateur**.".to_string()
+                    } else {
+                        format!("*« {} »*\n\nTu en es le **Fondateur**.", org.motto)
+                    };
                     let embed = CreateEmbed::new()
                         .title(format!("{} Organisation fondée : {}", org.emoji, org.name))
                         .color(0x8E44AD)
                         .field("Type", org.kind_label.clone(), true)
                         .field("Trésorerie", format!("{} 💰", org.treasury), true)
-                        .description(if org.motto.is_empty() {
-                            "Tu en es le **Fondateur**.".to_string()
-                        } else {
-                            format!("*« {} »*\n\nTu en es le **Fondateur**.", org.motto)
-                        });
+                        .description(format!("{base_desc}{channel_line}"));
                     reply_ephemeral_embed(ctx, command, embed).await;
                     // Une du journal : une nouvelle organisation voit le jour.
                     crate::modules::influence::press::publish_news(
@@ -253,6 +263,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                                 .await;
                         }
                     }
+                }
+                // Acces au salon prive de l'organisation.
+                if let Some(chan) = &org.discord_channel_id {
+                    grant_channel_access(ctx, chan, &user_id).await;
                 }
                 reply_ephemeral(
                     ctx,
@@ -560,4 +574,110 @@ async fn handle_role(
         ),
     )
     .await;
+}
+
+/// Nom par defaut de la categorie d'accueil des salons d'organisations, utilisee
+/// si `influence_org_category_id` n'est pas configure.
+const ORG_CATEGORY_NAME: &str = "🏢 Organisations";
+
+/// Cree le salon texte PRIVE d'une organisation, sous une categorie, visible des
+/// seuls membres (et du bot). Best-effort : renvoie l'id du salon cree ou `None`.
+async fn create_org_channel(
+    ctx: &Context,
+    guild_id: &str,
+    org_name: &str,
+    founder_user_id: &str,
+) -> Option<serenity::model::id::ChannelId> {
+    use serenity::all::{
+        ChannelType, CreateChannel, PermissionOverwrite, PermissionOverwriteType, Permissions,
+    };
+    use serenity::model::id::{ChannelId, GuildId, RoleId, UserId};
+
+    let gid = GuildId::new(guild_id.parse::<u64>().ok()?);
+
+    // Categorie : config `influence_org_category_id`, sinon on cree/trouve
+    // « 🏢 Organisations ».
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, guild_id, "influence-bot")
+            .await;
+    let category_id: Option<ChannelId> = match cfg
+        .get("influence_org_category_id")
+        .filter(|s| !s.is_empty())
+    {
+        Some(s) => s.parse::<u64>().ok().map(ChannelId::new),
+        None => find_or_create_category(ctx, gid).await,
+    };
+
+    // @everyone ne voit pas le salon ; le fondateur (et le bot) le voient/parlent.
+    let visible = Permissions::VIEW_CHANNEL
+        | Permissions::SEND_MESSAGES
+        | Permissions::READ_MESSAGE_HISTORY;
+    let mut overwrites = vec![PermissionOverwrite {
+        allow: Permissions::empty(),
+        deny: Permissions::VIEW_CHANNEL,
+        kind: PermissionOverwriteType::Role(RoleId::new(gid.get())),
+    }];
+    if let Ok(fid) = founder_user_id.parse::<u64>() {
+        overwrites.push(PermissionOverwrite {
+            allow: visible,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(UserId::new(fid)),
+        });
+    }
+    if let Ok(me) = ctx.http.get_current_user().await {
+        overwrites.push(PermissionOverwrite {
+            allow: visible,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(me.id),
+        });
+    }
+
+    let mut builder = CreateChannel::new(org_name)
+        .kind(ChannelType::Text)
+        .topic(format!("Salon privé de l'organisation {org_name}"))
+        .permissions(overwrites);
+    if let Some(cat) = category_id {
+        builder = builder.category(cat);
+    }
+    gid.create_channel(&ctx.http, builder).await.ok().map(|c| c.id)
+}
+
+/// Trouve la categorie « Organisations » ou la cree si absente.
+async fn find_or_create_category(
+    ctx: &Context,
+    gid: serenity::model::id::GuildId,
+) -> Option<serenity::model::id::ChannelId> {
+    use serenity::all::{ChannelType, CreateChannel};
+    if let Ok(channels) = gid.channels(&ctx.http).await {
+        if let Some(c) = channels
+            .values()
+            .find(|c| c.kind == ChannelType::Category && c.name == ORG_CATEGORY_NAME)
+        {
+            return Some(c.id);
+        }
+    }
+    gid.create_channel(
+        &ctx.http,
+        CreateChannel::new(ORG_CATEGORY_NAME).kind(ChannelType::Category),
+    )
+    .await
+    .ok()
+    .map(|c| c.id)
+}
+
+/// Donne a un membre l'acces au salon prive de son organisation (best-effort).
+async fn grant_channel_access(ctx: &Context, channel_id: &str, user_id: &str) {
+    use serenity::all::{PermissionOverwrite, PermissionOverwriteType, Permissions};
+    use serenity::model::id::{ChannelId, UserId};
+    let (Ok(cid), Ok(uid)) = (channel_id.parse::<u64>(), user_id.parse::<u64>()) else {
+        return;
+    };
+    let overwrite = PermissionOverwrite {
+        allow: Permissions::VIEW_CHANNEL
+            | Permissions::SEND_MESSAGES
+            | Permissions::READ_MESSAGE_HISTORY,
+        deny: Permissions::empty(),
+        kind: PermissionOverwriteType::Member(UserId::new(uid)),
+    };
+    let _ = ChannelId::new(cid).create_permission(&ctx.http, overwrite).await;
 }

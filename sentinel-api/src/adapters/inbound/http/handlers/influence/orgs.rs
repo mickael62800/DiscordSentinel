@@ -285,6 +285,25 @@ pub async fn link_role(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct LinkChannelDto {
+    pub org_name: String,
+    pub channel_id: String,
+}
+
+/// POST /api/influence/{guild_id}/orgs/channel/link
+pub async fn link_channel(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<LinkChannelDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .influence_orgs_uc
+        .set_channel(&guild_id, &dto.org_name, &dto.channel_id)
+        .await?;
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+#[derive(Debug, Deserialize)]
 pub struct SetRelationDto {
     pub actor_user_id: String,
     #[serde(default)]

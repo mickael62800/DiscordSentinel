@@ -85,6 +85,7 @@ pub struct OrganizationDto {
     pub reputation: i64,
     pub influence: i64,
     pub discord_role_id: Option<String>,
+    pub discord_channel_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -102,6 +103,7 @@ impl From<Organization> for OrganizationDto {
             reputation: o.reputation,
             influence: o.influence,
             discord_role_id: o.discord_role_id,
+            discord_channel_id: o.discord_channel_id,
             created_at: o.created_at,
         }
     }

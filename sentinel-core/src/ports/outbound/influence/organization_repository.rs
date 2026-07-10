@@ -41,6 +41,10 @@ pub trait OrganizationRepository: Send + Sync {
     /// Lie un role Discord a une organisation.
     async fn set_discord_role(&self, org_id: Uuid, role_id: &str) -> Result<(), DomainError>;
 
+    /// Lie le salon prive Discord auto-cree a une organisation.
+    async fn set_discord_channel(&self, org_id: Uuid, channel_id: &str)
+        -> Result<(), DomainError>;
+
     /// Discord user_id du fondateur d'une organisation (JOIN citizens).
     async fn founder_user_id(&self, org_id: Uuid) -> Result<Option<String>, DomainError>;
 

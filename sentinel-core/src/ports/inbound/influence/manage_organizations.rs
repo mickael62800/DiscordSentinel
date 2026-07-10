@@ -112,6 +112,14 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
         is_moderator: bool,
     ) -> Result<(), DomainError>;
 
+    /// Lie le salon prive Discord auto-cree a la fondation a l'organisation.
+    async fn set_channel(
+        &self,
+        guild_id: &str,
+        org_name: &str,
+        channel_id: &str,
+    ) -> Result<(), DomainError>;
+
     /// Declare une relation d'une organisation vers une autre. L'acteur doit
     /// etre dirigeant (ou fondateur) de l'organisation source.
     async fn set_relation(
