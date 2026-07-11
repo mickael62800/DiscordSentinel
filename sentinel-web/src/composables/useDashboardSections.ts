@@ -19,8 +19,9 @@ export type DashboardSection = {
 };
 
 const ALL_SECTIONS: DashboardSection[] = [
-  { key: "general.stats", path: "/stats", label: "Statistiques serveur", icon: "bar-chart-2", requiredBot: "audit-bot" },
-  { key: "general.modstats", path: "/modstats", label: "Statistiques admin", icon: "bar-chart-2", requiredBot: "moderation-bot" },
+  // Statistiques serveur + modération réunies (onglets). Visible si au moins un
+  // des deux bots concernés est actif.
+  { key: "general.stats", path: "/stats", label: "Statistiques", icon: "bar-chart-2", requiredAnyBot: ["audit-bot", "moderation-bot"] },
 
   { key: "moderation.hub", path: "/moderation", label: "Modération", icon: "gavel", requiredBot: "moderation-bot" },
   { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
@@ -39,11 +40,11 @@ const ALL_SECTIONS: DashboardSection[] = [
 
   { key: "security.hub", path: "/security", label: "Menaces & alertes", icon: "zap", requiredBot: "security-bot" },
   { key: "security.automod", path: "/automod", label: "Automod", icon: "shield", requiredBot: "automod-bot" },
-  { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
   { key: "rotation.dashboard", path: "/rotation-dashboard", label: "Admin tournant", icon: "users", requiredBot: "rotation-bot" },
 
-  { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
+  // Observabilité : journaux métier + système + audit réunis (onglets).
+  { key: "logs.journal", path: "/logs", label: "Journaux & audit", icon: "list" },
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
   { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },
@@ -79,9 +80,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
   { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
-  // Logs systeme : place dans le groupe admin/config (bots/workers/API/WS),
-  // pas dans le groupe Journaux (qui est metier Discord uniquement).
-  { key: "config.system-logs", path: "/system-logs", label: "Logs système", icon: "list" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
 ];
 

@@ -17,11 +17,15 @@ export const routes: RouteRecordRaw[] = [
   { path: "/", name: "dashboard", component: DashboardPage },
 
   // ── Stats / Audit ──
-  { path: "/stats", name: "stats", component: () => import("../components/pages/StatsPage.vue") },
-  { path: "/modstats", name: "modstats", component: () => import("../components/pages/ModstatsPage.vue") },
-  { path: "/logs", name: "logs", component: () => import("../components/pages/LogsPage.vue") },
-  { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/SystemLogsPage.vue") },
-  { path: "/audit", name: "audit", component: () => import("../components/pages/AuditPage.vue") },
+  // Statistiques : serveur + modération réunies en onglets (StatsHubPage).
+  { path: "/stats", name: "stats", component: () => import("../components/pages/StatsHubPage.vue") },
+  { path: "/modstats", redirect: "/stats" },
+  // Observabilité : journaux métier + système + audit réunis en onglets
+  // (ObservabilityHubPage). Les trois chemins pointent le même hub, l'onglet
+  // actif est dérivé de l'URL (chemins bookmarkables).
+  { path: "/logs", name: "logs", component: () => import("../components/pages/ObservabilityHubPage.vue") },
+  { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/ObservabilityHubPage.vue") },
+  { path: "/audit", name: "audit", component: () => import("../components/pages/ObservabilityHubPage.vue") },
   { path: "/name-history", name: "name-history", component: () => import("../components/pages/NameHistoryPage.vue") },
 
   // ── Modération ──
