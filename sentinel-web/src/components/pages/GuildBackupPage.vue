@@ -142,6 +142,27 @@ async function runCapture() {
   }
 }
 
+// ── Aperçu du contenu d'un snapshot (avant restauration) ──
+interface SnapshotPreview {
+  roles?: { name: string }[];
+  categories?: { name: string }[];
+  channels?: { name: string; kind?: string }[];
+}
+const preview = ref<SnapshotPreview | null>(null);
+const previewLoading = ref(false);
+
+async function loadPreview(id: string) {
+  preview.value = null;
+  previewLoading.value = true;
+  try {
+    preview.value = (await guildBackupService.getSnapshot(id)) as SnapshotPreview;
+  } catch {
+    preview.value = null;
+  } finally {
+    previewLoading.value = false;
+  }
+}
+
 // ── Restaurer ──
 function openRestoreModal(snap: SnapshotSummary) {
   restoreTarget.value = snap;
@@ -149,6 +170,7 @@ function openRestoreModal(snap: SnapshotSummary) {
   wipeConfirmText.value = "";
   restoreConfirmed.value = false;
   showRestoreModal.value = true;
+  void loadPreview(snap.id);
 }
 function closeRestoreModal() {
   showRestoreModal.value = false;
@@ -370,6 +392,39 @@ onMounted(fetchSnapshots);
           L'opération est exécutée de façon asynchrone par le bot.
         </p>
 
+        <!-- Aperçu du contenu du snapshot -->
+        <div class="preview-box">
+          <div v-if="previewLoading" class="muted small">Chargement de l'aperçu…</div>
+          <template v-else-if="preview">
+            <div class="preview-cols">
+              <div class="preview-col">
+                <h4>Rôles ({{ preview.roles?.length ?? 0 }})</h4>
+                <ul>
+                  <li v-for="(r, i) in (preview.roles ?? []).slice(0, 12)" :key="i">{{ r.name }}</li>
+                  <li v-if="(preview.roles?.length ?? 0) > 12" class="muted">
+                    +{{ (preview.roles?.length ?? 0) - 12 }} autres…
+                  </li>
+                </ul>
+              </div>
+              <div class="preview-col">
+                <h4>Salons ({{ preview.channels?.length ?? 0 }})</h4>
+                <ul>
+                  <li v-for="(c, i) in (preview.channels ?? []).slice(0, 12)" :key="i">
+                    {{ c.name }}<span v-if="c.kind" class="muted small"> · {{ c.kind }}</span>
+                  </li>
+                  <li v-if="(preview.channels?.length ?? 0) > 12" class="muted">
+                    +{{ (preview.channels?.length ?? 0) - 12 }} autres…
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <p class="muted small">
+              Sans « wipe », la restauration RÉUTILISE les rôles/salons de même nom
+              déjà présents (pas de doublon) et ne crée que ce qui manque.
+            </p>
+          </template>
+        </div>
+
         <label class="checkbox danger-box">
           <input type="checkbox" v-model="restoreWipe" />
           <span>
@@ -447,6 +502,19 @@ onMounted(fetchSnapshots);
 }
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
 .hidden-file { display: none; }
+
+.preview-box {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+.preview-cols { display: flex; gap: 20px; flex-wrap: wrap; }
+.preview-col { flex: 1; min-width: 160px; }
+.preview-col h4 { margin: 0 0 6px; font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
+.preview-col ul { list-style: none; margin: 0; padding: 0; font-size: 13px; max-height: 180px; overflow-y: auto; }
+.preview-col li { padding: 2px 0; }
 
 .input {
   background: var(--bg, var(--bg-secondary)); color: var(--text, var(--text-primary));
