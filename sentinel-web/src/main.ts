@@ -35,8 +35,30 @@ router.beforeEach(async (to, _from, next) => {
   if (user.value) {
     const { useGuildSelector } = await import("./composables/useGuildSelector");
     const { selectedGuildId } = useGuildSelector();
-    if (selectedGuildId.value) {
-      void initAppData(selectedGuildId.value);
+    const gid = selectedGuildId.value;
+    if (gid) {
+      void initAppData(gid);
+
+      // Guard RBAC au niveau route : empeche l'ouverture directe (par URL)
+      // d'une page que le role de l'utilisateur ne voit pas. Le masquage des
+      // tuiles seul ne protegeait pas l'acces direct. L'API applique deja le
+      // RBAC (403), ce guard evite juste d'ouvrir une page qui echouerait.
+      const { rbacKeyForPath } = await import("./composables/useDashboardSections");
+      const key = rbacKeyForPath(to.path);
+      if (key) {
+        const { useComponentVisibilityStore } = await import(
+          "./stores/componentVisibilityStore"
+        );
+        const store = useComponentVisibilityStore();
+        // Charge (dedup/cache par guild) puis verifie. On n'enforce QUE si la
+        // visibilite est chargee (role resolu) : sinon visible() renvoie false
+        // faute de role et redirigerait a tort. Fail-open pendant le chargement.
+        await store.load(gid);
+        if (store.loaded && !store.visible(key)) {
+          next({ name: "dashboard" });
+          return;
+        }
+      }
     }
   } else {
     resetAppInit();

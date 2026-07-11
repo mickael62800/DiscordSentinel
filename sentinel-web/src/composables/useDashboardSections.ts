@@ -83,6 +83,27 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
 ];
 
+/// Alias : sous-chemins de hubs (fusionnes) qui partagent la gouvernance RBAC
+/// de leur hub — ils n'ont pas de tuile propre mais restent atteignables par URL.
+const PATH_RBAC_ALIASES: Record<string, string> = {
+  "/discord-roles": "community.role-panels",
+  "/voice-themes": "community.voice-channels",
+  "/levels-config": "community.levels",
+  "/modstats": "general.stats",
+  "/system-logs": "logs.journal",
+  "/audit": "logs.journal",
+};
+
+/// Cle RBAC (composant) gouvernant l'acces a un chemin de route, ou `undefined`
+/// si le chemin n'est pas soumis a une restriction de role connue. Utilise par
+/// le guard de navigation pour bloquer l'ouverture directe d'une page par URL
+/// quand le role ne la voit pas (defense alignee sur le masquage des tuiles).
+export function rbacKeyForPath(path: string): string | undefined {
+  const direct = ALL_SECTIONS.find((s) => s.path === path);
+  if (direct) return direct.key;
+  return PATH_RBAC_ALIASES[path];
+}
+
 /// Un groupe de tuiles regroupees par domaine (prefixe de `key`).
 export type DashboardGroup = {
   prefix: string;
