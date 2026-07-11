@@ -11,7 +11,18 @@ use sentinel_core::domain::errors::DomainError;
 /// - `guilds` : enregistrement du serveur (reste visible dans le dashboard)
 /// - RBAC : l'owner garde son acces
 /// - `bot_definitions` : metadata globale (non guild-scopee)
-const EXCLUDED_TABLES: &[&str] = &["guilds", "api_user_guilds", "api_users", "bot_definitions"];
+/// - `guild_snapshots` : les SAUVEGARDES sont le filet de securite ; un reset ne
+///   doit PAS les detruire (sinon on perd la possibilite de revenir en arriere
+///   apres un reset accidentel/regrette). Note : `pending_role_grants` (grants
+///   en attente d'un restore anterieur) N'est PAS exclu — apres un reset ces
+///   grants referencent des roles disparus, donc les purger est correct.
+const EXCLUDED_TABLES: &[&str] = &[
+    "guilds",
+    "api_user_guilds",
+    "api_users",
+    "bot_definitions",
+    "guild_snapshots",
+];
 
 pub struct PgGuildResetRepository {
     pool: PgPool,
