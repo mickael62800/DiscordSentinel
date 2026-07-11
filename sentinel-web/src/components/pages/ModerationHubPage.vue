@@ -16,7 +16,7 @@ const hubTabs = [
   { key: "journal", label: "Journal" },
   { key: "bans", label: "Bannis actifs" },
   { key: "tracking", label: "Suivi utilisateur" },
-  { key: "review", label: "Revue AutoMod" },
+  { key: "review", label: "Revue manuelle" },
   { key: "reminders", label: "Rappels" },
 ];
 

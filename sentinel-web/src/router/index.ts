@@ -60,7 +60,10 @@ export const routes: RouteRecordRaw[] = [
   // ── Jeux ──
   { path: "/games", name: "games", component: () => import("../components/pages/GamesPage.vue") },
   { path: "/coude", name: "coude", component: () => import("../components/pages/CoudeHubPage.vue") },
-  { path: "/coude/social", name: "coude-social", component: () => import("../components/pages/CoudeSocialPage.vue") },
+  // Social + Tournoi sont des ONGLETS du hub Coude (CoudeHubPage), pas des pages
+  // autonomes. Anciennes routes standalone -> redirection vers le hub pour ne
+  // pas casser d'eventuels vieux liens (memes composants montes en onglets).
+  { path: "/coude/social", redirect: "/coude" },
   { path: "/taunts", name: "taunts", component: () => import("../components/pages/TauntsConfigPage.vue") },
   { path: "/coude/taunts", redirect: "/taunts" },
   { path: "/blackjack", name: "blackjack", component: () => import("../components/pages/BlackjackPage.vue") },
@@ -68,7 +71,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/wheel", name: "wheel", component: () => import("../components/pages/WheelPage.vue") },
   { path: "/wallet", name: "wallet", component: () => import("../components/pages/WalletPage.vue") },
   { path: "/tamagotchi", name: "tamagotchi", component: () => import("../components/pages/TamagotchiPage.vue") },
-  { path: "/tournaments", name: "tournaments", component: () => import("../components/pages/TournamentPage.vue") },
+  { path: "/tournaments", redirect: "/coude" },
   { path: "/game-portal", name: "game-portal", component: () => import("../components/pages/GamePortalPage.vue") },
 
   // ── Configuration / Admin ──
