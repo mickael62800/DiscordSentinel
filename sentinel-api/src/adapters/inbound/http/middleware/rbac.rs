@@ -454,13 +454,16 @@ fn extract_guild_id_from_path(path: &str) -> Option<String> {
     None
 }
 
+/// Dérive une clé de cache opaque à partir d'un access_token (jamais stocké en
+/// clair). SHA-256 tronqué à 128 bits : contrairement à `DefaultHasher`
+/// (SipHash 64-bit à clés fixes), une collision `short_hash(a) == short_hash(b)`
+/// n'est pas calculable, ce qui écarte tout risque d'usurpation d'identité par
+/// collision de clé de cache (résolution du token A vers le user_id de B).
 fn short_hash(input: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::Hash;
-    use std::hash::Hasher;
-    let mut hasher = DefaultHasher::new();
-    input.hash(&mut hasher);
-    format!("{:x}", hasher.finish())
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(input.as_bytes());
+    // 16 octets = 128 bits, largement suffisant pour éviter les collisions.
+    digest[..16].iter().map(|b| format!("{b:02x}")).collect()
 }
 
 #[cfg(test)]

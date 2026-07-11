@@ -8,6 +8,32 @@ fn err_msg(r: Result<(), DomainError>) -> String {
     }
 }
 
+// ── validate_limit ──────────────────────────────────────
+
+#[test]
+fn limit_none_ok() {
+    assert!(validate_limit(None).is_ok());
+}
+
+#[test]
+fn limit_zero_and_normal_ok() {
+    assert!(validate_limit(Some(0)).is_ok());
+    assert!(validate_limit(Some(500)).is_ok());
+    assert!(validate_limit(Some(MAX_QUERY_LIMIT)).is_ok());
+}
+
+#[test]
+fn limit_negative_rejected() {
+    assert!(validate_limit(Some(-1)).is_err());
+}
+
+#[test]
+fn limit_above_ceiling_rejected() {
+    // Defense en profondeur anti-DoS : au-dela du plafond absolu.
+    assert!(validate_limit(Some(MAX_QUERY_LIMIT + 1)).is_err());
+    assert!(validate_limit(Some(i64::MAX)).is_err());
+}
+
 // ── validate_discord_id ─────────────────────────────────
 
 #[test]

@@ -70,6 +70,18 @@ pub async fn publish_top_users_all(
     let mut processed = 0;
 
     for pub_ in &plan.publications {
+        // Securite : channel_id vient de la config guild (DB). On le valide comme
+        // snowflake numerique avant de l'interpoler dans l'URL Discord, pour
+        // qu'un id malforme (`../`, %2F...) ne puisse pas atteindre un autre
+        // endpoint de l'API Discord avec le bot token.
+        if crate::adapters::inbound::http::validation::validate_discord_id(
+            "channel_id",
+            &pub_.channel_id,
+        )
+        .is_err()
+        {
+            continue;
+        }
         let embed = serde_json::json!({
             "title": pub_.title,
             "description": pub_.description,

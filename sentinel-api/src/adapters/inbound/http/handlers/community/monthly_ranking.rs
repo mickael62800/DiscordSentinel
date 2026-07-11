@@ -123,6 +123,16 @@ pub async fn publish_monthly_ranking_all(
             "timestamp": now.to_rfc3339(),
         });
 
+        // Securite : valider channel_id (config guild) comme snowflake avant
+        // interpolation dans l'URL Discord (cf. snapshots.rs).
+        if crate::adapters::inbound::http::validation::validate_discord_id(
+            "channel_id",
+            &item.channel_id,
+        )
+        .is_err()
+        {
+            continue;
+        }
         let url = format!(
             "https://discord.com/api/v10/channels/{}/messages",
             item.channel_id

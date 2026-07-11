@@ -129,11 +129,21 @@ pub fn parse_uuid(field: &str, value: &str) -> Result<Uuid, DomainError> {
 
 // ── Validateurs numériques ──
 
-/// Valide que limit est >= 0.
+/// Plafond de securite absolu pour un `limit` (defense en profondeur anti-DoS).
+/// Aucune requete legitime n'a besoin de plus ; les handlers appliquent en plus
+/// leur propre `normalize_limit`/`clamp` bien plus bas.
+pub const MAX_QUERY_LIMIT: i64 = 100_000;
+
+/// Valide que limit est dans [0, MAX_QUERY_LIMIT].
 pub fn validate_limit(limit: Option<i64>) -> Result<(), DomainError> {
     if let Some(l) = limit {
         if l < 0 {
             return Err(DomainError::ValidationError("limit doit etre >= 0".into()));
+        }
+        if l > MAX_QUERY_LIMIT {
+            return Err(DomainError::ValidationError(format!(
+                "limit trop grand (max {MAX_QUERY_LIMIT})"
+            )));
         }
     }
     Ok(())

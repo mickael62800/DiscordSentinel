@@ -62,9 +62,15 @@ pub async fn leaderboard(
             category
         )))
     })?;
+    // Securite DoS : plafonner le limit fourni par le client (sinon un
+    // ?limit=100000000 declenche une requete DB + reponse JSON enorme).
+    let limit = params
+        .limit
+        .unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT)
+        .clamp(1, 100);
     let entries = state
         .coude_social_uc
-        .leaderboard(&guild_id, cat, params.limit.unwrap_or(sentinel_core::domain::entities::coude::limits::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
+        .leaderboard(&guild_id, cat, limit)
         .await?;
     Ok(Json(
         entries.into_iter().map(LeaderboardEntryDto::from).collect(),

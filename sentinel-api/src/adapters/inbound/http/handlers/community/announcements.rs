@@ -71,6 +71,13 @@ async fn try_post_log_embed(
         Some(s) if !s.is_empty() => s,
         _ => return,
     };
+    // Securite : valider channel_id (config guild) comme snowflake avant de
+    // l'interpoler dans l'URL Discord (cf. snapshots.rs).
+    if crate::adapters::inbound::http::validation::validate_discord_id("channel_id", &channel_id)
+        .is_err()
+    {
+        return;
+    }
     let url = format!("https://discord.com/api/v10/channels/{channel_id}/messages");
     let payload = serde_json::json!({
         "embeds": [{

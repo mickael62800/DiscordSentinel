@@ -66,6 +66,12 @@ pub async fn list_messages(
 ) -> Result<Json<ListMessagesResponse>, ApiError> {
     require_role(&ctx, Role::Admin).map_err(|_: StatusCode| forbid("admin+ requis"))?;
 
+    // Securite DoS : borne le limit. Sans plafond, un limit absent devient
+    // `LIMIT NULL` en Postgres (= toute la table de messages) et un grand limit
+    // rapatrie un volume enorme -> risque OOM. Defaut 500, max 2000.
+    let limit = Some(q.limit.unwrap_or(500).clamp(1, 2000));
+    let offset = Some(q.offset.unwrap_or(0).max(0));
+
     let page = state
         .dataset_uc
         .list_messages(ListDatasetQuery {
@@ -74,8 +80,8 @@ pub async fn list_messages(
             from: q.from,
             to: q.to,
             min_length: q.min_length,
-            limit: q.limit,
-            offset: q.offset,
+            limit,
+            offset,
         })
         .await?;
 

@@ -18,9 +18,11 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{require_superadmin, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use axum::extract::State;
+use axum::extract::{Extension, State};
 use axum::Json;
+use sentinel_core::domain::errors::DomainError;
 use redis::AsyncCommands;
 use serde::Serialize;
 use sysinfo::Disks;
@@ -142,7 +144,20 @@ fn parse_redis_info(raw: &str) -> RedisMetricsDto {
 
 pub async fn get_system_info(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<SystemInfoDto>, ApiError> {
+    // SECURITE : cet endpoint divulgue des infos host (CPU/RAM, points de
+    // montage disques, taille BDD, liste des services). Le gate RBAC global ne
+    // filtre que les mutations (GET = pass) : sans ce check, tout porteur d'un
+    // X-Discord-Token valide (meme viewer) y accederait. On restreint donc aux
+    // superadmins, comme les endpoints d'admin host (docker).
+    // Appel web -> RoleContext present -> exige superadmin. Appel interne
+    // (bot/worker, AuthKind::Internal, pas de RoleContext) -> autorise.
+    if let Some(Extension(ctx)) = &rbac {
+        require_superadmin(&state, ctx)
+            .map_err(|_| ApiError(DomainError::Forbidden("superadmin requis".into())))?;
+    }
+
     // ── 1. Liste nominative + metriques Redis ──
     let (mut bots, mut workers) = (Vec::new(), Vec::new());
     let mut redis_metrics = RedisMetricsDto::default();
