@@ -526,7 +526,8 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         None
     };
 
-    let report = restore::restore(ctx, guild_id, &snapshot, &progress).await;
+    // Sans wipe -> mode merge (reutilise l'existant par nom, pas de doublon).
+    let report = restore::restore(ctx, guild_id, &snapshot, !wipe, &progress).await;
 
     // Persiste les re-attributions pour TOUS les membres (les absents seront
     // re-rolises a leur retour via le hook de join).

@@ -213,7 +213,8 @@ async fn on_restore_requested(ctx: &Context, data: &serde_json::Value) {
         None
     };
 
-    let report = restore::restore(ctx, guild_id, &snapshot, &progress).await;
+    // Sans wipe -> mode merge (reutilise l'existant par nom, pas de doublon).
+    let report = restore::restore(ctx, guild_id, &snapshot, !wipe_first, &progress).await;
 
     // Persiste les re-attributions pour les membres absents (re-rolises au retour).
     if !report.pending_grants.is_empty() {

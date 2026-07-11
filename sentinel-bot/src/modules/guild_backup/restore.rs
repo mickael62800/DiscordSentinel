@@ -39,6 +39,10 @@ pub struct RestoreReport {
     pub members_updated: usize,
     pub emojis_created: usize,
     pub emojis_total: usize,
+    /// Elements existants REUTILISES (mode merge, sans wipe) au lieu d'etre
+    /// recrees — evite les doublons lors d'une restauration sur un serveur non vide.
+    pub roles_reused: usize,
+    pub channels_reused: usize,
     /// `Some(true)` = icone restauree, `Some(false)` = echec, `None` = pas d'icone.
     pub icon_restored: Option<bool>,
     pub notes: Vec<String>,
@@ -66,10 +70,16 @@ fn channel_type(kind: &str) -> ChannelType {
 }
 
 /// Restaure le snapshot dans `guild_id`. Renvoie un rapport de synthese.
+///
+/// `merge` (= restauration SANS wipe) : au lieu de recreer aveuglement (ce qui
+/// DUPLIQUE tout sur un serveur non vide), on retrouve les roles/categories/
+/// salons/emojis existants PAR NOM et on ne cree que ce qui manque. Le flux
+/// avec wipe (`merge = false`) reste strictement inchange (creation fraiche).
 pub async fn restore(
     ctx: &Context,
     guild_id: GuildId,
     snapshot: &GuildSnapshot,
+    merge: bool,
     progress: &ProgressSink<'_>,
 ) -> RestoreReport {
     let mut report = RestoreReport::default();
@@ -82,9 +92,42 @@ pub async fn restore(
     // vers le @everyone du serveur cible.
     role_map.insert(snapshot.guild_id.clone(), guild_id.everyone_role());
 
+    // ── Index de l'existant (mode merge uniquement) ──
+    // name -> RoleId ; (name, kind, parent) -> ChannelId ; name de categorie.
+    let mut existing_role_by_name: HashMap<String, RoleId> = HashMap::new();
+    let mut existing_cat_by_name: HashMap<String, ChannelId> = HashMap::new();
+    let mut existing_chan: HashMap<(String, ChannelType, Option<ChannelId>), ChannelId> =
+        HashMap::new();
+    if merge {
+        if let Ok(roles) = guild_id.roles(&ctx.http).await {
+            for (rid, r) in roles {
+                existing_role_by_name.entry(r.name).or_insert(rid);
+            }
+        }
+        if let Ok(channels) = guild_id.channels(&ctx.http).await {
+            for (cid, ch) in channels {
+                if ch.kind == ChannelType::Category {
+                    existing_cat_by_name.entry(ch.name).or_insert(cid);
+                } else {
+                    existing_chan
+                        .entry((ch.name, ch.kind, ch.parent_id))
+                        .or_insert(cid);
+                }
+            }
+        }
+    }
+
     // ── 1. Roles ──
     progress.set("♻️ Restauration… roles").await;
     for role in &snapshot.roles {
+        // Merge : reutilise un role de meme nom deja present (pas de doublon).
+        if merge {
+            if let Some(&rid) = existing_role_by_name.get(&role.name) {
+                role_map.insert(role.old_id.clone(), rid);
+                report.roles_reused += 1;
+                continue;
+            }
+        }
         let builder = EditRole::new()
             .name(&role.name)
             .colour(Colour::new(role.color))
@@ -106,6 +149,14 @@ pub async fn restore(
     // ── 2. Categories ──
     progress.set("♻️ Restauration… categories").await;
     for cat in &snapshot.categories {
+        // Merge : reutilise une categorie de meme nom deja presente.
+        if merge {
+            if let Some(&cid) = existing_cat_by_name.get(&cat.name) {
+                channel_map.insert(cat.old_id.clone(), cid);
+                report.channels_reused += 1;
+                continue;
+            }
+        }
         let builder = CreateChannel::new(&cat.name).kind(ChannelType::Category);
         match guild_id.create_channel(&ctx.http, builder).await {
             Ok(ch) => {
@@ -125,6 +176,19 @@ pub async fn restore(
             progress
                 .set(&format!("♻️ Restauration… salons {}/{}", i, total))
                 .await;
+        }
+        // Merge : reutilise un salon de meme (nom, type, categorie parente).
+        if merge {
+            let parent_new = chan
+                .parent_old_id
+                .as_ref()
+                .and_then(|p| channel_map.get(p).copied());
+            let key = (chan.name.clone(), channel_type(&chan.kind), parent_new);
+            if let Some(&cid) = existing_chan.get(&key) {
+                channel_map.insert(chan.old_id.clone(), cid);
+                report.channels_reused += 1;
+                continue;
+            }
         }
         match create_channel(ctx, guild_id, chan, &channel_map, &role_map).await {
             Some(id) => {
@@ -165,6 +229,18 @@ pub async fn restore(
     if !snapshot.emojis.is_empty() {
         report.emojis_total = snapshot.emojis.len();
         let total = snapshot.emojis.len();
+        // Merge : noms d'emojis deja presents (pour ne pas creer de doublon).
+        let existing_emoji_names: std::collections::HashSet<String> = if merge {
+            guild_id
+                .emojis(&ctx.http)
+                .await
+                .unwrap_or_default()
+                .into_iter()
+                .map(|e| e.name)
+                .collect()
+        } else {
+            std::collections::HashSet::new()
+        };
         // `full` : une fois la limite du serveur atteinte (erreur Discord), on
         // arrete d'essayer pour ne pas spammer l'API inutilement.
         let mut full = false;
@@ -176,6 +252,9 @@ pub async fn restore(
             }
             if full {
                 break;
+            }
+            if merge && existing_emoji_names.contains(&emoji.name) {
+                continue; // deja present : pas de doublon
             }
             let Some(bytes) = download_bytes(ctx, &emoji.image_ref).await else {
                 warn!(emoji = %emoji.name, url = %emoji.image_ref, "guild_backup: echec download emoji");
@@ -255,13 +334,23 @@ pub async fn restore(
         }
     }
 
+    if merge && (report.roles_reused > 0 || report.channels_reused > 0) {
+        report.notes.push(format!(
+            "merge (sans wipe) : {} rôle(s) et {} salon(s)/catégorie(s) existants réutilisés (pas de doublon)",
+            report.roles_reused, report.channels_reused
+        ));
+    }
+
     info!(
         guild = %guild_id,
         roles = report.roles_created,
+        roles_reused = report.roles_reused,
         categories = report.categories_created,
         channels = report.channels_created,
+        channels_reused = report.channels_reused,
         bans = report.bans_applied,
         members = report.members_updated,
+        merge,
         "guild_backup: restauration terminee"
     );
 
