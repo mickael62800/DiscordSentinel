@@ -9,4 +9,6 @@ pub fn spawn_security_workers(state: &AppState) {
         state.redis_client.clone(),
         state.container_monitor.clone(),
     );
+    // Planificateur de sauvegardes automatiques (config guild-backup-bot).
+    crate::adapters::outbound::system::backup_scheduler::spawn(state.clone());
 }
