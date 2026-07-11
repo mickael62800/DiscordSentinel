@@ -29,9 +29,15 @@ pub struct AppConfig {
     /// Ex: `http://192.168.1.15:5180`.
     pub web_front_url: String,
     /// Feature flag — active le `global_rbac_gate` (gate RBAC global
-    /// fail-closed sur les mutations web). Default `false` (no-op). Voir
-    /// `middleware/global_rbac.rs`. A valider en staging avant activation prod.
+    /// fail-closed sur les mutations web) en mode ENFORCE (refuse reellement).
+    /// Default `false` (no-op). Voir `middleware/global_rbac.rs`.
     pub rbac_global_gate: bool,
+    /// Mode AUDIT du gate RBAC global : exécute toute la logique de décision et
+    /// journalise ce qui SERAIT refusé, mais laisse passer les requêtes. Permet
+    /// de valider la table de routes en prod (repérer les 403 potentiels sur des
+    /// routes légitimes non mappées) AVANT de basculer en enforce. Activé quand
+    /// `RBAC_GLOBAL_GATE=audit`. Mutuellement exclusif avec l'enforce.
+    pub rbac_global_gate_audit: bool,
 }
 
 impl AppConfig {
@@ -49,10 +55,14 @@ impl AppConfig {
                     std::process::exit(1);
                 }
                 if !key.is_empty() && key.len() < 16 {
-                    tracing::warn!(
-                        "API_KEY trop courte ({} chars). Utiliser au moins 32 chars en production.",
+                    // Securite : une API_KEY courte est bruteforçable. On refuse
+                    // de demarrer avec une cle < 16 chars quand elle est requise,
+                    // plutot que d'emettre un simple warning ignore en pratique.
+                    tracing::error!(
+                        "API_KEY trop courte ({} chars). Minimum 16 chars (32+ recommande en prod).",
                         key.len()
                     );
+                    std::process::exit(1);
                 }
                 key
             },
@@ -94,10 +104,16 @@ impl AppConfig {
             discord_oauth_client_secret: std::env::var("DISCORD_CLIENT_SECRET").unwrap_or_default(),
             discord_oauth_redirect_uri: std::env::var("DISCORD_REDIRECT_URI").unwrap_or_default(),
             web_front_url: std::env::var("WEB_FRONT_URL").unwrap_or_default(),
-            // Default OFF : tant que la var n'est pas explicitement "true"/"1",
-            // le gate global est un no-op (zero changement de comportement).
+            // Tri-etat via RBAC_GLOBAL_GATE :
+            //   - "true"/"1"     -> enforce (refuse reellement)
+            //   - "audit"/"dryrun" -> audit (log-only, laisse passer)
+            //   - autre / absent -> off (no-op total)
+            // Default OFF : zero changement de comportement tant que non configure.
             rbac_global_gate: std::env::var("RBAC_GLOBAL_GATE")
                 .map(|v| v == "true" || v == "1")
+                .unwrap_or(false),
+            rbac_global_gate_audit: std::env::var("RBAC_GLOBAL_GATE")
+                .map(|v| v == "audit" || v == "dryrun")
                 .unwrap_or(false),
         }
     }

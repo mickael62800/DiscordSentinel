@@ -27,10 +27,15 @@
 //!
 //! ## Feature flag (SECURITE)
 //!
-//! Pilote par `AppState.rbac_global_gate` (env `RBAC_GLOBAL_GATE`, default
-//! **false**). Tant que le flag est OFF, ce middleware est un **no-op total**
-//! (zero changement de comportement). C'est l'interrupteur de securite : on
-//! deploie le code derriere le flag, on valide en staging, puis on active.
+//! Pilote par `RBAC_GLOBAL_GATE` (default **off**), tri-etat :
+//!   - `off` (absent / autre)     → no-op total (zero changement).
+//!   - `audit` / `dryrun`         → log-only : execute la decision, journalise
+//!     ce qui SERAIT refuse, mais laisse TOUJOURS passer. Sert a reperer en
+//!     prod les routes legitimes non mappees (403 potentiels) sans rien casser.
+//!   - `true` / `1`               → enforce : refuse reellement (fail-closed).
+//!
+//! Sequence de deploiement recommandee : `audit` en prod → surveiller les logs
+//! `global_rbac_gate` (mode=AUDIT) → completer `ROUTE_ROLES` → basculer enforce.
 //!
 //! ## ⚠️ A VALIDER EN STAGING avant activation en prod
 //!
@@ -426,10 +431,13 @@ pub async fn global_rbac_gate(
     request: Request<Body>,
     next: Next,
 ) -> Response {
-    // Interrupteur de securite : OFF → no-op total (zero changement).
-    if !state.rbac_global_gate {
+    // Interrupteur de securite : ni enforce ni audit → no-op total.
+    if !state.rbac_global_gate && !state.rbac_global_gate_audit {
         return next.run(request).await;
     }
+    // En mode audit (log-only), on execute toute la logique de decision mais on
+    // ne bloque jamais : on journalise ce qui SERAIT refuse et on laisse passer.
+    let audit_only = !state.rbac_global_gate && state.rbac_global_gate_audit;
 
     // Methodes safe : jamais gatees.
     if is_safe_method(request.method()) {
@@ -474,11 +482,15 @@ pub async fn global_rbac_gate(
         }
     }
 
+    // Prefixe de log distinguant audit (laisse passer) et enforce (bloque).
+    let mode = if audit_only { "AUDIT" } else { "ENFORCE" };
+
     match required_role(&method, &path) {
         Some(required) => match ctx.as_ref().and_then(|c| c.role) {
             Some(role) if role.satisfies(required) => next.run(request).await,
             other => {
                 tracing::warn!(
+                    mode = %mode,
                     method = %method,
                     route = %path,
                     required = %required.as_str(),
@@ -486,20 +498,29 @@ pub async fn global_rbac_gate(
                     user_id = ?ctx.as_ref().map(|c| c.discord_user_id.as_str()),
                     "global_rbac_gate: acces refuse (role insuffisant / non resolu)"
                 );
-                forbidden("Forbidden: role insuffisant pour cette operation")
+                if audit_only {
+                    next.run(request).await
+                } else {
+                    forbidden("Forbidden: role insuffisant pour cette operation")
+                }
             }
         },
         None => {
             // Fail-closed : toute route mutante non mappee est refusee pour un
             // user web. Le log permet d'identifier la route a ajouter a la table.
             tracing::error!(
+                mode = %mode,
                 method = %method,
                 route = %path,
                 user_id = ?ctx.as_ref().map(|c| c.discord_user_id.as_str()),
                 "global_rbac_gate: route mutante NON MAPPEE -> DENY (fail-closed). \
                  Ajouter (methode, pattern) a ROUTE_ROLES si elle doit etre web-accessible."
             );
-            forbidden("Forbidden: route non autorisee pour les utilisateurs web")
+            if audit_only {
+                next.run(request).await
+            } else {
+                forbidden("Forbidden: route non autorisee pour les utilisateurs web")
+            }
         }
     }
 }

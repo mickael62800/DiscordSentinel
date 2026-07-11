@@ -1496,5 +1496,6 @@ pub async fn build_app_state(
             crate::adapters::outbound::system::rate_limiter::RateLimiter::from_env(),
         )),
         rbac_global_gate: config.rbac_global_gate,
+        rbac_global_gate_audit: config.rbac_global_gate_audit,
     }
 }

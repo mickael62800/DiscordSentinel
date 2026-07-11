@@ -27,7 +27,18 @@ use super::routes;
 use super::state::AppState;
 
 fn build_cors(allowed_origins: &str) -> CorsLayer {
-    let allow_origin = if allowed_origins == "*" {
+    // Securite : `*` (AllowOrigin::any) est INCOMPATIBLE avec allow_credentials(true).
+    // Le combo autoriserait n'importe quelle origine a envoyer les cookies de
+    // session / le header Authorization. On desactive donc les credentials des
+    // que la config est en wildcard, et on log un warning explicite.
+    let wildcard = allowed_origins == "*";
+    if wildcard {
+        tracing::warn!(
+            "ALLOWED_ORIGINS=* : CORS en mode permissif SANS credentials. \
+             Pour autoriser les cookies de session, lister les origines exactes."
+        );
+    }
+    let allow_origin = if wildcard {
         AllowOrigin::any()
     } else if allowed_origins.is_empty() {
         // Default securise : uniquement les origines Tauri + localhost dev
@@ -67,7 +78,8 @@ fn build_cors(allowed_origins: &str) -> CorsLayer {
         // En prod le front est same-origin (reverse proxy) donc CORS ne joue
         // pas ; en dev cross-origin, ALLOWED_ORIGINS doit lister l'origine exacte
         // (pas `*`) pour que les cookies soient acceptes par le navigateur.
-        .allow_credentials(true)
+        // credentials desactive en wildcard (cf. supra) — sinon faille CORS.
+        .allow_credentials(!wildcard)
         .max_age(std::time::Duration::from_secs(3600))
 }
 

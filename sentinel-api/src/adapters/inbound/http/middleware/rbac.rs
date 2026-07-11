@@ -39,6 +39,7 @@ use axum::{
 };
 use redis::AsyncCommands;
 
+use crate::adapters::inbound::http::middleware::auth::AuthKind;
 use crate::adapters::inbound::http::state::AppState;
 
 const USER_ID_CACHE_TTL_SECS: u64 = 600;
@@ -312,6 +313,39 @@ pub async fn check_role_for_guild(
         ))),
         Err(_) => Err(ApiError(DomainError::Forbidden(forbidden_msg.to_string()))),
     }
+}
+
+/// Exige que la requete provienne d'un service interne de confiance
+/// (`AuthKind::Internal` = bot/workers via Bearer `API_KEY`).
+///
+/// A utiliser sur les endpoints purement bot/worker (transitions de gameplay,
+/// persistence fire-and-forget) qui ne doivent JAMAIS etre appelables par un
+/// utilisateur web : sans cela, un utilisateur web muni d'un `X-Discord-Token`
+/// valide passe la couche d'auth et peut piloter ces routes par id opaque /
+/// guild_id dans le body (IDOR cross-tenant). C'est une defense en profondeur
+/// independante du `global_rbac_gate` (qui peut etre OFF).
+///
+/// En dev mode (`API_KEY` vide), on laisse passer pour ne pas casser le local.
+pub fn require_internal(
+    state: &AppState,
+    auth_kind: Option<&AuthKind>,
+) -> Result<(), crate::adapters::inbound::http::errors::ApiError> {
+    use crate::adapters::inbound::http::errors::ApiError;
+    use sentinel_core::domain::errors::DomainError;
+
+    if internal_allowed(state.api_key.is_empty(), auth_kind) {
+        Ok(())
+    } else {
+        Err(ApiError(DomainError::Forbidden(
+            "endpoint reserve aux services internes".to_string(),
+        )))
+    }
+}
+
+/// Decision pure derriere `require_internal` (testable sans `AppState`).
+/// Autorise si dev mode (pas d'API_KEY) OU auth interne de confiance.
+fn internal_allowed(dev_mode: bool, auth_kind: Option<&AuthKind>) -> bool {
+    dev_mode || auth_kind == Some(&AuthKind::Internal)
 }
 
 async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<String, String> {

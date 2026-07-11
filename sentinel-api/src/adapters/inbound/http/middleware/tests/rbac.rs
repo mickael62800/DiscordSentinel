@@ -138,3 +138,27 @@ fn check_role_forbidden_when_role_is_none() {
     let result = check_role(&rbac, Role::Viewer, "msg");
     assert!(result.is_err());
 }
+
+// ── require_internal (endpoints bot-only, defense anti-IDOR) ──────
+
+#[test]
+fn internal_allowed_grants_internal_auth() {
+    // Prod (api_key defini) + auth interne → autorise.
+    assert!(internal_allowed(false, Some(&AuthKind::Internal)));
+}
+
+#[test]
+fn internal_allowed_denies_web_in_prod() {
+    // Prod + auth web → refuse (coeur de la protection anti-IDOR).
+    assert!(!internal_allowed(false, Some(&AuthKind::Web)));
+    // Prod + aucune auth → refuse.
+    assert!(!internal_allowed(false, None));
+}
+
+#[test]
+fn internal_allowed_permits_dev_mode() {
+    // Dev mode (pas d'API_KEY) → laisse passer quel que soit l'auth kind,
+    // pour ne pas casser le local.
+    assert!(internal_allowed(true, None));
+    assert!(internal_allowed(true, Some(&AuthKind::Web)));
+}

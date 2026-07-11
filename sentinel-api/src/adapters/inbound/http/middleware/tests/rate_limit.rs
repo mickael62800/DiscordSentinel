@@ -15,10 +15,12 @@ fn make_req(headers: &[(&str, &str)]) -> Request<Body> {
 }
 
 #[test]
-fn client_ip_prefers_x_forwarded_for_first_hop() {
-    let req = make_req(&[("x-forwarded-for", "10.0.0.1, 10.0.0.2, proxy3")]);
+fn client_ip_uses_rightmost_trusted_hop() {
+    // TRUST_PROXY_HOPS defaut = 1 : on prend l'IP inseree par le dernier proxy
+    // de confiance (la plus a DROITE), non falsifiable par le client.
+    let req = make_req(&[("x-forwarded-for", "1.1.1.1, 2.2.2.2, 3.3.3.3")]);
     let ip = client_ip(&req, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-    assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(10, 0, 0, 1)));
+    assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(3, 3, 3, 3)));
 }
 
 #[test]
@@ -37,9 +39,10 @@ fn client_ip_falls_back_to_socket_when_no_headers() {
 
 #[test]
 fn client_ip_invalid_xff_falls_through_to_fallback() {
-    let req = make_req(&[("x-forwarded-for", "not-an-ip, 10.0.0.1")]);
+    // Le hop de confiance (le plus a droite) n'est pas parseable -> fallback
+    // socket (on ne "remonte" pas vers la gauche, qui est controlee par le client).
+    let req = make_req(&[("x-forwarded-for", "10.0.0.1, not-an-ip")]);
     let ip = client_ip(&req, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
-    // premier segment pas parseable -> fallback (on ne skip pas au 2eme)
     assert_eq!(ip, IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
 }
 

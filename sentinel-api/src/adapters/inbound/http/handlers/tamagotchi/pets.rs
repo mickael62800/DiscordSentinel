@@ -105,14 +105,31 @@ pub async fn list_pets(
 }
 
 /// DELETE /api/tamagotchi/{guild_id}/pets/{pet_id} — supprime un compagnon.
-/// Action destructive : owner+. Le `guild_id` du path sert au contexte RBAC.
+/// Action destructive : owner+.
 pub async fn delete_pet(
     State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
-    Path((_guild_id, pet_id)): Path<(String, String)>,
+    Path((guild_id, pet_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
     require_role(&ctx, Role::Owner).map_err(|s| forbid(s, "owner+ requis"))?;
     let id = validation::parse_uuid("pet_id", &pet_id).map_err(ApiError)?;
+    // Securite IDOR : le middleware valide l'appartenance au guild du path et
+    // require_role l'Owner de CE guild — mais rien ne garantit que le pet_id
+    // appartient a ce guild. Sans ce controle, un Owner de la guilde A pourrait
+    // supprimer un pet de la guilde B via son UUID. On confirme donc que le pet
+    // fait partie de la guilde du path avant de supprimer (404 sinon, pour ne
+    // pas divulguer l'existence d'un pet d'une autre guilde).
+    let belongs = state
+        .pets_uc
+        .list_by_guild(&guild_id)
+        .await?
+        .iter()
+        .any(|p| p.id == id);
+    if !belongs {
+        return Err(ApiError(DomainError::NotFound(
+            "compagnon introuvable dans cette guilde".into(),
+        )));
+    }
     state.pets_uc.delete(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }

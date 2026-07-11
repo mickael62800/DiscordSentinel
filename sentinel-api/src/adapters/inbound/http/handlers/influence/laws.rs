@@ -99,24 +99,46 @@ pub async fn law_vote(
 /// POST /api/influence/{guild_id}/laws/state
 pub async fn law_state(
     State(state): State<AppState>,
-    ValidatedGuild { guild_id: _ }: ValidatedGuild,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<LawIdDto>,
 ) -> Result<Json<LawStateDto>, ApiError> {
     let st = state.influence_laws_uc.get_state(&dto.law_id).await?;
+    // Securite IDOR : la loi est identifiee par un UUID opaque venant du body.
+    // On verifie qu'elle appartient bien au guild valide du path, sinon on
+    // divulguerait l'etat d'une loi d'une autre guilde.
+    ensure_law_in_guild(&st, &guild_id)?;
     Ok(Json(st.into()))
 }
 
 /// POST /api/influence/{guild_id}/laws/message
 pub async fn set_law_message(
     State(state): State<AppState>,
-    ValidatedGuild { guild_id: _ }: ValidatedGuild,
+    ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SetLawMessageDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Securite IDOR : verifier que la loi ciblee appartient au guild du path
+    // AVANT d'ecrire son pointeur salon/message (sinon write cross-tenant).
+    let st = state.influence_laws_uc.get_state(&dto.law_id).await?;
+    ensure_law_in_guild(&st, &guild_id)?;
     state
         .influence_laws_uc
         .set_message(&dto.law_id, &dto.channel_id, &dto.message_id)
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// Refuse (404) si la loi n'appartient pas au guild attendu. 404 plutot que 403
+/// pour ne pas divulguer l'existence d'une loi d'une autre guilde.
+fn ensure_law_in_guild(
+    st: &sentinel_core::ports::inbound::influence::manage_laws::LawState,
+    guild_id: &str,
+) -> Result<(), ApiError> {
+    if st.law.guild_id != guild_id {
+        return Err(ApiError(DomainError::NotFound(
+            "loi introuvable dans cette guilde".into(),
+        )));
+    }
+    Ok(())
 }
 
 /// POST /api/influence/internal/jobs/close-laws  (worker)

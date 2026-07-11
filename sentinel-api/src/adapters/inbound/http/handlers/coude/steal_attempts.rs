@@ -19,7 +19,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::auth::AuthKind;
+use crate::adapters::inbound::http::middleware::rbac::require_internal;
 use crate::adapters::inbound::http::state::AppState;
+use axum::Extension;
 
 use sentinel_core::ports::inbound::coude::manage_steal_attempts::CreateStealAttempt;
 
@@ -43,8 +46,12 @@ pub struct StealAttemptDto {
 /// POST /api/coude/steals — bot cree une tentative quand /voler est lance.
 pub async fn create_steal_attempt(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthKind>>,
     Json(dto): Json<CreateStealAttemptDto>,
 ) -> Result<Json<StealAttemptDto>, ApiError> {
+    // Endpoint bot-only : le guild_id vient du body, aucune notion de role web
+    // ne s'applique. On refuse tout appel non-interne (defense anti-IDOR).
+    require_internal(&state, auth.as_deref())?;
     let created = state
         .coude_steal_attempts_uc
         .create_attempt(CreateStealAttempt {
@@ -67,8 +74,13 @@ pub async fn create_steal_attempt(
 /// Marque pending -> defended (atomique, idempotent).
 pub async fn mark_defended(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthKind>>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    // Bot-only : mutation par UUID opaque, pas de guild resolu. On refuse tout
+    // appel web (sinon un utilisateur web pourrait piloter des vols d'autres
+    // guildes par id).
+    require_internal(&state, auth.as_deref())?;
     // Idempotent cote bot : qu'il y ait eu transition ou non (deja
     // defended/expired ou id inconnu), on renvoie 204.
     state.coude_steal_attempts_uc.mark_defended(id).await?;
@@ -83,8 +95,11 @@ pub async fn mark_defended(
 /// double-resolution (victime sur-drainee).
 pub async fn mark_resolved(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthKind>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Bot/worker-only : ce claim declenche le transfert de coins. Interdit au web.
+    require_internal(&state, auth.as_deref())?;
     let claimed = state.coude_steal_attempts_uc.claim_resolved(id).await?;
     Ok(Json(serde_json::json!({ "claimed": claimed })))
 }

@@ -15,8 +15,11 @@ use super::dto::InventoryItemDto;
 use super::dto::PrimeDto;
 use super::dto::UseItemDto;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::auth::AuthKind;
+use crate::adapters::inbound::http::middleware::rbac::require_internal;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use axum::Extension;
 use sentinel_core::domain::entities::coude::inventory::NewCoudePrime;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 
@@ -200,8 +203,12 @@ pub async fn get_active_insurance(
 /// POST /api/coude/insurance/{insurance_id}/expire
 pub async fn expire_insurance(
     State(state): State<AppState>,
+    auth: Option<Extension<AuthKind>>,
     Path(insurance_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    // Bot/worker-only : expiration par UUID opaque, aucun guild resolu. Interdit
+    // au web pour eviter l'expiration cross-tenant d'assurances arbitraires.
+    require_internal(&state, auth.as_deref())?;
     let id = validation::parse_uuid("assurance", &insurance_id).map_err(ApiError)?;
     state.coude_inventory_uc.expire_insurance(id).await?;
     Ok(StatusCode::NO_CONTENT)

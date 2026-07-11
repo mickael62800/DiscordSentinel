@@ -91,23 +91,43 @@ impl RateLimiter {
 /// toutes les requetes viennent de 127.0.0.1 et le rate limit s'applique
 /// globalement au lieu de par-client.
 fn client_ip(request: &Request, fallback: IpAddr) -> IpAddr {
-    if let Some(xff) = request.headers().get("x-forwarded-for") {
-        if let Ok(s) = xff.to_str() {
-            // X-Forwarded-For peut contenir plusieurs IPs "client, proxy1, proxy2"
-            if let Some(first) = s.split(',').next() {
-                if let Ok(ip) = first.trim().parse::<IpAddr>() {
+    // Securite anti-spoofing : X-Forwarded-For est de la forme
+    // "client, proxy1, proxy2" ou chaque proxy AJOUTE l'IP qu'il a vue a droite.
+    // Prendre la PREMIERE IP (a gauche) est dangereux : elle est entierement
+    // controlee par le client, qui peut donc forger une IP differente a chaque
+    // requete et contourner totalement le rate limit.
+    //
+    // On fait confiance a `TRUST_PROXY_HOPS` proxies (defaut 1 = notre nginx
+    // edge). L'IP client reelle est celle inseree par le dernier proxy de
+    // confiance : on compte `hops` positions depuis la DROITE. Un client ne peut
+    // pas falsifier cette position car nos proxies l'ecrasent/ajoutent apres lui.
+    let hops: usize = std::env::var("TRUST_PROXY_HOPS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1);
+
+    if hops > 0 {
+        if let Some(xff) = request.headers().get("x-forwarded-for") {
+            if let Ok(s) = xff.to_str() {
+                let ips: Vec<&str> = s.split(',').map(str::trim).filter(|s| !s.is_empty()).collect();
+                // Position depuis la droite : le proxy le plus interne = dernier.
+                if ips.len() >= hops {
+                    if let Ok(ip) = ips[ips.len() - hops].parse::<IpAddr>() {
+                        return ip;
+                    }
+                }
+            }
+        }
+        if let Some(xri) = request.headers().get("x-real-ip") {
+            if let Ok(s) = xri.to_str() {
+                if let Ok(ip) = s.trim().parse::<IpAddr>() {
                     return ip;
                 }
             }
         }
     }
-    if let Some(xri) = request.headers().get("x-real-ip") {
-        if let Ok(s) = xri.to_str() {
-            if let Ok(ip) = s.trim().parse::<IpAddr>() {
-                return ip;
-            }
-        }
-    }
+    // hops == 0 (pas de proxy de confiance) ou aucun header exploitable :
+    // on utilise l'IP de la socket, non falsifiable.
     fallback
 }
 

@@ -273,10 +273,23 @@ pub async fn purge_all(
 /// POST /api/coude/combats/{combat_id}/defender-special
 pub async fn set_defender_special(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
     Json(dto): Json<DefenderSpecialDto>,
 ) -> Result<StatusCode, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+    // Securite IDOR : resoudre le guild proprietaire du combat et verifier le
+    // role de l'appelant AVANT la mutation (comme resolve/expire/betting).
+    if let Some(gid) = state.coude_combats_uc.get_guild_id(id).await? {
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &gid,
+            Role::Moderator,
+            "moderator+ requis pour set_defender_special",
+        )
+        .await?;
+    }
     state
         .coude_combats_uc
         .set_defender_special(id, &dto.item_key)
