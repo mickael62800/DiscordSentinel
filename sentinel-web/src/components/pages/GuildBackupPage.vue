@@ -177,6 +177,51 @@ async function runRestore() {
   }
 }
 
+// ── Export / Import (clonage cross-serveur) ──
+async function exportSnapshot(snap: SnapshotSummary) {
+  busy.value = true;
+  try {
+    const full = await guildBackupService.getSnapshot(snap.id);
+    const blob = new Blob([JSON.stringify(full, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    const safe = snap.label.replace(/[^\w.-]+/g, "_").slice(0, 40) || "snapshot";
+    a.download = `sentinel-backup-${safe}-${snap.id.slice(0, 8)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    toastError(`Export : ${String(e)}`);
+  } finally {
+    busy.value = false;
+  }
+}
+
+const importInput = ref<HTMLInputElement | null>(null);
+function triggerImport() {
+  importInput.value?.click();
+}
+async function onImportFile(e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ""; // reset pour permettre de ré-importer le même fichier
+  if (!file || !selectedGuildId.value) return;
+  busy.value = true;
+  try {
+    const text = await file.text();
+    const snapshot = JSON.parse(text);
+    await guildBackupService.importSnapshot(selectedGuildId.value, snapshot);
+    success("Sauvegarde importée dans ce serveur. Restaurez-la pour l'appliquer.");
+    await fetchSnapshots();
+  } catch (e) {
+    toastError(
+      `Import : ${e instanceof SyntaxError ? "fichier JSON invalide" : String(e)}`,
+    );
+  } finally {
+    busy.value = false;
+  }
+}
+
 function goToConfig() {
   // Le formulaire de config est schema-driven (page Composants). On y renvoie ;
   // le composant guild-backup-bot y est selectionnable.
@@ -195,9 +240,25 @@ onMounted(fetchSnapshots);
     <template #actions>
       <AppButton variant="secondary" @click="goToConfig">⚙ Configurer</AppButton>
       <AppButton variant="secondary" :disabled="loading" @click="fetchSnapshots">↻ Rafraîchir</AppButton>
+      <AppButton
+        v-if="canManage"
+        variant="secondary"
+        :disabled="busy || !selectedGuildId"
+        title="Importer une sauvegarde exportée (clonage cross-serveur)"
+        @click="triggerImport"
+      >
+        ⬆ Importer
+      </AppButton>
       <AppButton v-if="canManage" variant="primary" :disabled="busy || !selectedGuildId" @click="openCaptureModal">
         📸 Capturer maintenant
       </AppButton>
+      <input
+        ref="importInput"
+        type="file"
+        accept="application/json,.json"
+        class="hidden-file"
+        @change="onImportFile"
+      />
     </template>
 
     <div v-if="!selectedGuildId" class="empty-state">
@@ -263,6 +324,9 @@ onMounted(fetchSnapshots);
           <div v-if="canManage" class="row-actions">
             <AppButton variant="secondary" size="sm" :disabled="busy" @click="openRestoreModal(row as unknown as SnapshotSummary)">
               ⟲ Restaurer
+            </AppButton>
+            <AppButton variant="secondary" size="sm" :disabled="busy" title="Exporter (JSON) — pour cloner sur un autre serveur" @click="exportSnapshot(row as unknown as SnapshotSummary)">
+              ⬇
             </AppButton>
             <AppButton variant="danger" size="sm" :disabled="busy" @click="removeSnapshot(row as unknown as SnapshotSummary)">
               🗑
@@ -382,6 +446,7 @@ onMounted(fetchSnapshots);
   font-size: 0.8rem; font-weight: 600;
 }
 .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.hidden-file { display: none; }
 
 .input {
   background: var(--bg, var(--bg-secondary)); color: var(--text, var(--text-primary));

@@ -12,9 +12,18 @@ export const guildBackupService = {
     return httpGet(`/api/guild-backup/${guildId}/snapshots`);
   },
 
-  /** GET /api/guild-backup/snapshots/{id} — snapshot complet (roles + salons). */
+  /** GET /api/guild-backup/snapshots/{id} — snapshot complet (roles + salons).
+   *  Sert aussi à l'EXPORT (téléchargement du JSON). */
   getSnapshot(id: string): Promise<unknown> {
     return httpGet(`/api/guild-backup/snapshots/${id}`);
+  },
+
+  /** POST /api/guild-backup/{guild_id}/snapshots — IMPORTE un snapshot (JSON
+   *  exporté) dans la guild cible. Le guild_id du path fait autorité (écrase
+   *  celui du body) → permet le CLONAGE cross-serveur (le remapping des IDs se
+   *  fait à la restauration). Renvoie l'id du snapshot créé. */
+  importSnapshot(guildId: string, snapshot: unknown): Promise<{ id: string }> {
+    return httpPost(`/api/guild-backup/${guildId}/snapshots`, snapshot);
   },
 
   /** PATCH /api/guild-backup/snapshots/{id} — renomme le snapshot. */
