@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
 import TopBar from "../organisms/TopBar.vue";
+import Sidebar from "../organisms/Sidebar.vue";
 import ConnectionBanner from "../atoms/ConnectionBanner.vue";
 import { useRealtime } from "../../composables/useRealtime";
 import { useNotifications } from "../../composables/useNotifications";
@@ -21,16 +22,28 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="main-wrapper">
-    <TopBar />
-    <ConnectionBanner />
-    <main class="main-content" @click="closePanel()">
-      <slot />
-    </main>
+  <div class="app-shell">
+    <Sidebar />
+    <div class="main-wrapper">
+      <TopBar />
+      <ConnectionBanner />
+      <main class="main-content" @click="closePanel()">
+        <slot />
+      </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.app-shell {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
+
 .main-wrapper {
   flex: 1;
   display: flex;

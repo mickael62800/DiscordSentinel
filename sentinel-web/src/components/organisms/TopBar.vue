@@ -7,9 +7,11 @@ import { useAuth } from "../../composables/useAuth";
 import { useNotifications } from "../../composables/useNotifications";
 import { useRealtime } from "../../composables/useRealtime";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useSidebar } from "../../composables/useSidebar";
 
 const route = useRoute();
 const router = useRouter();
+const { toggle: toggleSidebar } = useSidebar();
 const { user, logout, avatarUrl } = useAuth();
 const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
@@ -39,6 +41,19 @@ onMounted(() => {
 <template>
   <header class="topbar">
     <div class="topbar-gloss" aria-hidden="true"></div>
+    <button
+      class="menu-btn"
+      type="button"
+      title="Menu"
+      aria-label="Ouvrir le menu"
+      @click="toggleSidebar"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6" x2="21" y2="6" />
+        <line x1="3" y1="12" x2="21" y2="12" />
+        <line x1="3" y1="18" x2="21" y2="18" />
+      </svg>
+    </button>
     <button class="brand" type="button" title="Accueil" @click="goHome">
       <span class="brand-halo" aria-hidden="true"></span>
       <img src="/logo.png" alt="Sentinel" class="logo-icon" />
@@ -158,6 +173,36 @@ onMounted(() => {
   0%   { left: -50%; }
   10%  { left: 150%; }
   100% { left: 150%; }
+}
+
+/* Bouton hamburger : ouvre le drawer de navigation. Masque sur desktop
+   (la sidebar y est toujours visible), affiche sur mobile <=900px. */
+.menu-btn {
+  display: none;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  background: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  flex-shrink: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+.menu-btn:hover {
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+}
+.menu-btn svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 900px) {
+  .menu-btn {
+    display: flex;
+  }
 }
 
 .brand {
