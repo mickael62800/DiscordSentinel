@@ -42,6 +42,15 @@ pub fn routes() -> Router<AppState> {
             "/api/system/info",
             get(handlers::system::info::get_system_info),
         )
+        // Regles d'alerte de supervision (superadmin) — pilote alerts_dispatcher
+        .route(
+            "/api/alert-rules",
+            get(handlers::system::alert_rules::list_alert_rules),
+        )
+        .route(
+            "/api/alert-rules/{id}",
+            axum::routing::patch(handlers::system::alert_rules::update_alert_rule),
+        )
         // DANGER — factory reset d'un serveur (owner-only + confirmation forte)
         .route(
             "/api/system/guild-reset/{guild_id}",

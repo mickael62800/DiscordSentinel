@@ -78,6 +78,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.rbac", path: "/rbac", label: "Accès RBAC", icon: "shield" },
   { key: "config.system-ops", path: "/system/operations", label: "Opérations système", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
+  { key: "config.alert-rules", path: "/alert-rules", label: "Règles d'alerte", icon: "zap" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
   { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
