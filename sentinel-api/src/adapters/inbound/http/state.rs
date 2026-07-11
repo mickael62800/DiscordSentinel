@@ -130,6 +130,8 @@ pub struct AppState {
     pub discord_api: Arc<dyn DiscordApi>,
     pub inference: Arc<InferenceService>,
     pub api_key: String,
+    /// Token optionnel protégeant `/metrics` (vide = ouvert). Voir config.
+    pub metrics_token: String,
     #[allow(dead_code)]
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository>,

@@ -61,7 +61,41 @@ pub fn init_prometheus() {
 ///
 /// Si `init_prometheus()` n'a pas été appelée, retourne une chaîne vide
 /// (Prometheus considère ça comme "pas de métrique" et ne lève pas d'erreur).
-pub async fn metrics_handler() -> Response {
+pub async fn metrics_handler(
+    axum::extract::State(state): axum::extract::State<crate::adapters::inbound::http::state::AppState>,
+    headers: axum::http::HeaderMap,
+) -> Response {
+    // Protection optionnelle : si METRICS_TOKEN est defini, on exige
+    // `Authorization: Bearer <token>`. Vide = ouvert (comportement historique :
+    // Prometheus scrape sans auth sur le reseau interne). Mitige la fuite
+    // d'infos operationnelles si le port venait a etre expose.
+    let auth_header = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok());
+    if !metrics_auth_ok(&state.metrics_token, auth_header) {
+        return (axum::http::StatusCode::UNAUTHORIZED, "unauthorized").into_response();
+    }
+    render_metrics()
+}
+
+/// Decision d'auth pure (testable) : autorise si aucun token configure, sinon
+/// exige un header `Authorization: Bearer <token>` egal en temps constant.
+fn metrics_auth_ok(configured_token: &str, auth_header: Option<&str>) -> bool {
+    if configured_token.is_empty() {
+        return true;
+    }
+    use subtle::ConstantTimeEq;
+    let provided = auth_header
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .unwrap_or("");
+    provided
+        .as_bytes()
+        .ct_eq(configured_token.as_bytes())
+        .into()
+}
+
+/// Rend les metriques Prometheus (sans controle d'acces).
+fn render_metrics() -> Response {
     match PROMETHEUS_HANDLE.get() {
         Some(handle) => handle.render().into_response(),
         None => String::new().into_response(),
@@ -181,8 +215,24 @@ mod tests {
     #[tokio::test]
     async fn metrics_handler_ok_status() {
         ensure_init();
-        let resp = metrics_handler().await;
+        let resp = render_metrics();
         assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn metrics_auth_open_when_no_token() {
+        // Aucun token configure -> ouvert (comportement historique).
+        assert!(metrics_auth_ok("", None));
+        assert!(metrics_auth_ok("", Some("Bearer whatever")));
+    }
+
+    #[test]
+    fn metrics_auth_requires_matching_bearer() {
+        assert!(metrics_auth_ok("s3cret", Some("Bearer s3cret")));
+        // Mauvais token, pas de header, mauvais schema -> refuse.
+        assert!(!metrics_auth_ok("s3cret", Some("Bearer nope")));
+        assert!(!metrics_auth_ok("s3cret", None));
+        assert!(!metrics_auth_ok("s3cret", Some("s3cret"))); // sans prefixe Bearer
     }
 
     #[tokio::test]
@@ -196,7 +246,7 @@ mod tests {
     #[tokio::test]
     async fn metrics_handler_renders_after_init() {
         ensure_init();
-        let resp = metrics_handler().await;
+        let resp = render_metrics();
         assert_eq!(resp.status(), StatusCode::OK);
         let body = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
         // Prometheus render est du texte (peut etre vide si pas encore de metriques,

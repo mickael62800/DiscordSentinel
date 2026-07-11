@@ -1415,6 +1415,7 @@ pub async fn build_app_state(
         discord_api,
         inference: inference.clone(),
         api_key: config.api_key.clone(),
+        metrics_token: config.metrics_token.clone(),
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,

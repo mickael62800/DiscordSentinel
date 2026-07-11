@@ -32,6 +32,11 @@ pub struct AppConfig {
     /// fail-closed sur les mutations web) en mode ENFORCE (refuse reellement).
     /// Default `false` (no-op). Voir `middleware/global_rbac.rs`.
     pub rbac_global_gate: bool,
+    /// Token optionnel protégeant `/metrics`. Vide (défaut) = endpoint ouvert
+    /// (comportement historique : Prometheus scrape sans auth sur le réseau
+    /// interne). Si défini, `/metrics` exige `Authorization: Bearer <token>`
+    /// (comparaison constant-time) et Prometheus doit être configuré avec.
+    pub metrics_token: String,
     /// Mode AUDIT du gate RBAC global : exécute toute la logique de décision et
     /// journalise ce qui SERAIT refusé, mais laisse passer les requêtes. Permet
     /// de valider la table de routes en prod (repérer les 403 potentiels sur des
@@ -88,6 +93,7 @@ impl AppConfig {
                 .parse()
                 .unwrap_or(30),
             allowed_origins: std::env::var("ALLOWED_ORIGINS").unwrap_or_default(),
+            metrics_token: std::env::var("METRICS_TOKEN").unwrap_or_default(),
             // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
             // fallback sur DISCORD_TOKEN. Les anciens noms par bot
             // (AUTOMOD_DISCORD_TOKEN, MODERATION_DISCORD_TOKEN) sont abandonnes.

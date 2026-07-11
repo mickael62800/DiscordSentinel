@@ -247,9 +247,10 @@ pub fn build(
 
     // Routes publiques (health + métriques Prometheus pour scraping)
     //
-    // ⚠️ `/metrics` est volontairement public — Prometheus scrape sans auth.
-    // Pour restreindre en prod, faire un firewall sur l'IP du Prometheus ou
-    // ajouter une couche basic auth via reverse proxy.
+    // `/metrics` : ouvert par defaut (Prometheus scrape sans auth sur le reseau
+    // interne ; le port API est bind 127.0.0.1 et non proxifie par nginx).
+    // Pour durcir : definir METRICS_TOKEN cote API + configurer l'`authorization`
+    // du job Prometheus avec le meme token (cf. metrics_handler).
     let public = Router::new()
         .route("/health", get(handlers::system::health::health))
         .route("/metrics", get(metrics_handler))

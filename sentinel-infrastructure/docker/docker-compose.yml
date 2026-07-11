@@ -268,6 +268,9 @@ services:
       # handler. Surchargeable via la var RBAC_GLOBAL_GATE du .env docker.
       RBAC_GLOBAL_GATE: ${RBAC_GLOBAL_GATE:-true}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Optionnel : protege /metrics par un Bearer token. Vide = ouvert (scrape
+      # interne sans auth). Si defini, configurer aussi le job Prometheus.
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}

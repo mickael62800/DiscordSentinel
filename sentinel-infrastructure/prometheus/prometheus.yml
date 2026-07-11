@@ -24,6 +24,11 @@ scrape_configs:
   # ── API ──
   - job_name: 'sentinel-api'
     metrics_path: '/metrics'
+    # Durcissement optionnel : si METRICS_TOKEN est defini cote API, decommenter
+    # le bloc ci-dessous avec le meme token pour que le scrape reste autorise.
+    # authorization:
+    #   type: Bearer
+    #   credentials: '<METRICS_TOKEN>'
     static_configs:
       - targets: ['api:3000']
         labels:

@@ -12,6 +12,7 @@ fn cfg(host: &str, port: u16, grpc_port: u16) -> AppConfig {
         max_body_size: 1024,
         shutdown_timeout_secs: 30,
         allowed_origins: String::new(),
+        metrics_token: String::new(),
         discord_bot_token: String::new(),
         superadmin_user_ids: vec![],
         discord_oauth_client_id: String::new(),
