@@ -11,10 +11,8 @@ set -eu
 
 DOMAIN="${WEB_DOMAIN:-localhost}"
 LE_DIR="/etc/letsencrypt/live/${DOMAIN}"
-# nginx tourne en UID 101 (image unprivileged) et ne peut pas ecrire sous
-# /etc/nginx : on place les certs generes/symlinks dans /tmp (inscriptible).
-SELFSIGNED_DIR="/tmp/nginx-self-signed"
-NGINX_CERT_DIR="/tmp/nginx-certs"
+SELFSIGNED_DIR="/etc/nginx/self-signed"
+NGINX_CERT_DIR="/etc/nginx/certs"
 
 mkdir -p "${NGINX_CERT_DIR}"
 
@@ -41,7 +39,4 @@ else
 fi
 
 # Prepare le webroot pour les challenges ACME HTTP-01 (certbot --webroot).
-# nginx ne fait que LIRE ce repertoire ; c'est le sidecar certbot (root) qui y
-# ecrit les challenges. En non-root, le mkdir peut echouer sur un volume
-# root-only : on le rend tolerant (|| true) pour ne pas bloquer le demarrage.
-mkdir -p /var/www/certbot/.well-known/acme-challenge 2>/dev/null || true
+mkdir -p /var/www/certbot/.well-known/acme-challenge

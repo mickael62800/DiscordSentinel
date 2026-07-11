@@ -21,14 +21,8 @@ ENV VITE_API_URL=${VITE_API_URL}
 
 RUN npm run build
 
-# ----- Stage 2 : nginx runtime (NON-ROOT) -----
-# Image unprivileged : le master ET les workers tournent en UID 101 (nginx),
-# jamais en root. Ecoute par defaut sur des ports > 1024 (8080/8443) — le
-# mapping host 80->8080 / 443->8443 est fait par docker-compose.
-FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
-
-# apk + COPY/chmod exigent root au BUILD ; on redescend en 101 avant le CMD.
-USER root
+# ----- Stage 2 : nginx runtime -----
+FROM nginx:1.27-alpine AS runtime
 
 # openssl : generation du cert self-signed en dev si aucun LE cert trouve.
 RUN apk add --no-cache openssl
@@ -48,13 +42,9 @@ RUN sed -i 's/\r$//' /docker-entrypoint.d/40-init-tls.sh \
 # Assets statiques
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Retour a l'utilisateur non-privilegie fourni par l'image (UID 101) pour
-# l'execution : plus aucun process nginx ne tourne en root au runtime.
-USER 101
+EXPOSE 80 443
 
-EXPOSE 8080 8443
-
-# Healthcheck : endpoint HTTP /healthz expose par nginx sur le port 8080
+# Healthcheck : endpoint HTTP /healthz expose par nginx sur le port 80
 # (evite le probleme de cert self-signed non trustable en HTTPS).
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 --start-period=5s \
-  CMD wget --spider -q http://localhost:8080/healthz || exit 1
+  CMD wget --spider -q http://localhost/healthz || exit 1

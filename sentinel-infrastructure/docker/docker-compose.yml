@@ -490,11 +490,9 @@ services:
     restart: unless-stopped
     init: true
     logging: *default-logging
-    # nginx tourne en non-root (UID 101) et ecoute en interne sur 8080/8443
-    # (ports non privilegies). Le host publie toujours 80/443.
     ports:
-      - "80:8080"
-      - "443:8443"
+      - "80:80"
+      - "443:443"
     environment:
       WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
     volumes:
@@ -503,12 +501,12 @@ services:
       # Logs scanner (444 sur paths suspects) ecrits par nginx, lus par
       # le jail fail2ban `nginx-scanner` cote host. Le repertoire host
       # /var/log/sentinel-nginx doit appartenir a UID 101 (user nginx
-      # dans nginxinc/nginx-unprivileged) — gere par setup-host-security.sh.
+      # dans nginx:1.27-alpine) — gere par setup-host-security.sh.
       - /var/log/sentinel-nginx:/var/log/nginx/sentinel
     healthcheck:
       # 127.0.0.1 explicit : evite que wget resolve localhost en IPv6 [::1]
       # alors que nginx ecoute en IPv4 -> faux positif "unhealthy".
-      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:8080/healthz || exit 1"]
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/healthz || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -554,18 +552,11 @@ services:
           STAGING_FLAG="--staging"
           echo "[certbot] STAGING mode actif (certs non trustables, pour tests)"
         fi
-        # nginx tourne en non-root (UID 101) : son master ne peut pas lire la
-        # cle privee LE (root:600 par defaut). On rend live/ + archive/ lisibles
-        # DANS ce volume de certs isole (partage uniquement entre `web` et
-        # `certbot`, aucun autre utilisateur) : dirs a+rx (traversee), fichiers
-        # a+r (lecture). Sans ca, le chargement TLS echoue au demarrage de nginx.
-        FIX_PERMS='chmod -R a+rX /etc/letsencrypt/live /etc/letsencrypt/archive 2>/dev/null || true'
-        DEPLOY_HOOK="$$FIX_PERMS; docker kill --signal=HUP \$$(docker ps -q -f label=com.docker.compose.service=web) || true"
+        DEPLOY_HOOK='docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) || true'
         certbot certonly --webroot -w /var/www/certbot \
           --non-interactive --agree-tos --email "$$LETSENCRYPT_EMAIL" \
           $$STAGING_FLAG --keep-until-expiring \
           -d "$$WEB_DOMAIN" || echo "[certbot] premiere obtention echouee, retry au prochain cycle"
-        eval "$$FIX_PERMS"
         docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) 2>/dev/null || true
         trap exit TERM
         while :; do
