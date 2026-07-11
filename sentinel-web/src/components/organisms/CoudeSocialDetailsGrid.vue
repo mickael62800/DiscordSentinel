@@ -2,7 +2,7 @@
 import { useCoudeSocial } from "@/composables/useCoudeSocial";
 import { useFormatDate } from "@/composables/useFormatDate";
 
-const { curse, bounty, coalition, vendettasAsChallenger, liftCurse } = useCoudeSocial();
+const { curse, primes, bountyPot, liftCurse } = useCoudeSocial();
 const { formatDateTimeShort } = useFormatDate();
 
 function formatDate(iso: string | null): string {
@@ -39,63 +39,35 @@ function statusColor(s: string): string {
       </div>
     </section>
 
-    <!-- Bounty -->
+    <!-- Primes / bounties -->
     <section class="card">
-      <h2>💰 Prime collective</h2>
-      <div v-if="!bounty" class="empty">Aucune prime ouverte sur ce joueur.</div>
-      <div v-else>
-        <div class="kv"><span>Pot total</span><strong>{{ bounty.total_amount.toLocaleString() }} coins</strong></div>
-        <div class="kv">
-          <span>Statut</span>
-          <span class="badge" :style="{ backgroundColor: statusColor(bounty.status) }">{{ bounty.status }}</span>
-        </div>
-        <div class="kv"><span>Ouverte le</span><span>{{ formatDate(bounty.opened_at) }}</span></div>
-        <div v-if="bounty.claimed_by" class="kv"><span>Claimée par</span><code>{{ bounty.claimed_by }}</code></div>
-        <div v-if="bounty.claimed_at" class="kv"><span>Le</span><span>{{ formatDate(bounty.claimed_at) }}</span></div>
-      </div>
-    </section>
-
-    <!-- Coalition -->
-    <section class="card">
-      <h2>🤝 Coalition contre</h2>
-      <div v-if="!coalition" class="empty">Aucune coalition active.</div>
+      <h2>💰 Primes sur ce joueur</h2>
+      <div v-if="primes.length === 0" class="empty">Aucune prime posée sur ce joueur.</div>
       <div v-else>
         <div class="kv">
-          <span>Statut</span>
-          <span class="badge" :style="{ backgroundColor: statusColor(coalition.status) }">{{ coalition.status }}</span>
+          <span>Pot total (non réclamé)</span>
+          <strong>{{ bountyPot.toLocaleString() }} coins</strong>
         </div>
-        <div class="kv"><span>Ouverte</span><span>{{ formatDate(coalition.opened_at) }}</span></div>
-        <div class="kv"><span>Expire</span><span>{{ formatDate(coalition.expires_at) }}</span></div>
-        <div v-if="coalition.broken_by" class="kv"><span>Cassée par</span><code>{{ coalition.broken_by }}</code></div>
-        <h4>Membres ({{ coalition.members.length }})</h4>
-        <ul class="members-list">
-          <li v-for="m in coalition.members" :key="m.member_id">
-            <strong>{{ m.member_name }}</strong>
-            <code>{{ m.member_id }}</code>
-            <span class="muted">{{ formatDate(m.joined_at) }}</span>
+        <ul class="prime-list">
+          <li v-for="p in primes" :key="p.id">
+            <div class="kv">
+              <span>Posée par</span>
+              <strong>{{ p.placed_by_name || p.placed_by_id }}</strong>
+            </div>
+            <div class="kv"><span>Montant</span><span>{{ p.amount.toLocaleString() }} coins</span></div>
+            <div class="kv">
+              <span>Statut</span>
+              <span class="badge" :style="{ backgroundColor: statusColor(p.claimed ? 'claimed' : 'open') }">
+                {{ p.claimed ? "réclamée" : "ouverte" }}
+              </span>
+            </div>
+            <div v-if="p.claimed && p.claimed_by_name" class="kv">
+              <span>Réclamée par</span><code>{{ p.claimed_by_name }}</code>
+            </div>
+            <div class="kv"><span>Posée le</span><span>{{ formatDate(p.created_at) }}</span></div>
           </li>
         </ul>
       </div>
-    </section>
-
-    <!-- Vendettas -->
-    <section class="card">
-      <h2>⚔️ Vendettas (en tant que challenger)</h2>
-      <div v-if="vendettasAsChallenger.length === 0" class="empty">
-        Aucune vendetta en tant que challenger.
-      </div>
-      <ul v-else class="vendetta-list">
-        <li v-for="v in vendettasAsChallenger" :key="v.id">
-          <div class="kv"><span>Cible</span><code>{{ v.target_id }}</code></div>
-          <div class="kv">
-            <span>Statut</span>
-            <span class="badge" :style="{ backgroundColor: statusColor(v.status) }">{{ v.status }}</span>
-          </div>
-          <div class="kv"><span>Déclarée</span><span>{{ formatDate(v.declared_at) }}</span></div>
-          <div class="kv"><span>Expire</span><span>{{ formatDate(v.expires_at) }}</span></div>
-          <div v-if="v.resolved_at" class="kv"><span>Résolue</span><span>{{ formatDate(v.resolved_at) }}</span></div>
-        </li>
-      </ul>
     </section>
   </div>
 </template>
@@ -120,21 +92,11 @@ function statusColor(s: string): string {
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
-.members-list, .vendetta-list { list-style: none; padding: 0; margin: 8px 0 0 0; }
-.members-list li {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  gap: 8px;
-  padding: 6px 0;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.9rem;
-  align-items: center;
-}
-.vendetta-list li {
+.prime-list { list-style: none; padding: 0; margin: 8px 0 0 0; }
+.prime-list li {
   background: var(--bg-card);
   padding: 8px 12px;
   border-radius: 4px;
   margin-bottom: 8px;
 }
-h4 { margin: 12px 0 4px 0; font-size: 0.95rem; color: var(--text-secondary); }
 </style>

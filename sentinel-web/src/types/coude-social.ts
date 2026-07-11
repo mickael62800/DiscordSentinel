@@ -1,5 +1,7 @@
-// Types Phase 8 — vues admin sur les sous-systèmes social/toxic du Coude.
-// Endpoints API : sentinel-api/src/adapters/inbound/http/handlers/coude/{curses,bounty,coalition,vendetta}.rs
+// Vues admin sur les sous-systèmes social/toxic du Coude.
+// Endpoints API réellement exposés : curses (malédictions) et primes (bounties)
+// dans handlers/coude/{social,inventory}.rs. Les coalitions/vendettas avaient
+// été planifiées mais jamais implémentées côté API — retirées de l'UI.
 
 export interface ActiveCurse {
   id: string;
@@ -15,42 +17,19 @@ export interface ActiveCurse {
   lifted_by: string | null;
 }
 
-export interface ActiveBounty {
+// Une prime (bounty) posée sur une cible. `GET /api/coude/{guild}/primes/{target}/active`
+// renvoie la LISTE des primes actives (une par contributeur), pas un agrégat.
+export interface Prime {
   id: string;
   guild_id: string;
   target_id: string;
-  total_amount: number;
-  status: string;
-  opened_at: string;
-  claimed_by: string | null;
+  target_name: string;
+  placed_by_id: string;
+  placed_by_name: string;
+  amount: number;
+  claimed: boolean;
+  claimed_by_id: string | null;
+  claimed_by_name: string | null;
   claimed_at: string | null;
-}
-
-export interface CoalitionMember {
-  member_id: string;
-  member_name: string;
-  joined_at: string;
-}
-
-export interface ActiveCoalition {
-  id: string;
-  guild_id: string;
-  target_id: string;
-  opened_at: string;
-  expires_at: string;
-  status: string;
-  broken_by: string | null;
-  broken_at: string | null;
-  members: CoalitionMember[];
-}
-
-export interface ActiveVendetta {
-  id: string;
-  guild_id: string;
-  challenger_id: string;
-  target_id: string;
-  declared_at: string;
-  expires_at: string;
-  status: string;
-  resolved_at: string | null;
+  created_at: string;
 }

@@ -1,13 +1,8 @@
-// Service web pour les sous-systèmes social/toxic du Coude (curses,
-// bounties, coalitions, vendettas). Expose les endpoints existants côté API.
+// Service web pour les sous-systèmes social/toxic du Coude réellement exposés
+// par l'API : curses (malédictions) et primes (bounties).
 
 import { httpGet, httpPost } from "@/api/http";
-import type {
-  ActiveBounty,
-  ActiveCoalition,
-  ActiveCurse,
-  ActiveVendetta,
-} from "@/types/coude-social";
+import type { ActiveCurse, Prime } from "@/types/coude-social";
 
 export const coudeSocialService = {
   // ── Curses (par target) ───────────────────────────────────
@@ -20,26 +15,9 @@ export const coudeSocialService = {
     });
   },
 
-  // ── Bounties (par target) ─────────────────────────────────
-  getBountyByTarget(guildId: string, targetId: string): Promise<ActiveBounty | null> {
-    return httpGet(`/api/coude/${guildId}/bounties/by-target/${targetId}`);
-  },
-
-  // ── Coalitions (par target) ───────────────────────────────
-  getCoalitionByTarget(
-    guildId: string,
-    targetId: string,
-  ): Promise<ActiveCoalition | null> {
-    return httpGet(`/api/coude/${guildId}/coalitions/by-target/${targetId}`);
-  },
-
-  // ── Vendettas (par challenger) ────────────────────────────
-  listVendettasByChallenger(
-    guildId: string,
-    challengerId: string,
-  ): Promise<ActiveVendetta[]> {
-    return httpGet(
-      `/api/coude/${guildId}/vendettas/by-challenger/${challengerId}`,
-    );
+  // ── Primes / bounties (par target) ────────────────────────
+  // Liste des primes actives posées sur la cible.
+  listActivePrimes(guildId: string, targetId: string): Promise<Prime[]> {
+    return httpGet(`/api/coude/${guildId}/primes/${targetId}/active`);
   },
 };
