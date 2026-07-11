@@ -78,9 +78,13 @@ impl SnapshotRepository for PgSnapshotRepository {
 
     async fn list(&self, guild_id: &str) -> Result<Vec<SnapshotSummary>, DomainError> {
         let rows: Vec<SummaryRow> = sqlx::query_as(
+            // jsonb_array_length renvoie un `integer` (int4) : on caste en
+            // bigint (int8) pour matcher `role_count`/`channel_count: i64` cote
+            // Rust — sinon sqlx echoue a decoder int4 dans un i64 des qu'il y a
+            // au moins une ligne (500 "Erreur interne" sur la liste).
             "SELECT id, guild_id, label, created_at, created_by, schema_version, \
-             COALESCE(jsonb_array_length(payload->'roles'), 0) AS role_count, \
-             COALESCE(jsonb_array_length(payload->'channels'), 0) AS channel_count \
+             COALESCE(jsonb_array_length(payload->'roles'), 0)::bigint AS role_count, \
+             COALESCE(jsonb_array_length(payload->'channels'), 0)::bigint AS channel_count \
              FROM guild_snapshots WHERE guild_id = $1 ORDER BY created_at DESC",
         )
         .bind(guild_id)
