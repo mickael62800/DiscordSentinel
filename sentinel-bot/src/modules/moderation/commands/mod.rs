@@ -2,6 +2,7 @@ pub mod appeal;
 pub mod ban;
 pub mod call;
 pub mod card;
+pub mod channel_control;
 pub mod compare;
 pub mod context;
 pub mod copilote;
@@ -9,6 +10,7 @@ pub mod evidence;
 pub mod expirations;
 pub mod export;
 pub mod history;
+pub mod kick;
 pub mod mass;
 pub mod modstats;
 pub mod mute;
@@ -218,6 +220,10 @@ pub fn all() -> Vec<CreateCommand> {
         mute::register_unmute(),
         ban::register(),
         ban::register_unban(),
+        kick::register(),
+        channel_control::register_lock(),
+        channel_control::register_unlock(),
+        channel_control::register_slowmode(),
         ban_sursis::register(),
         history::register(),
         notes::register(),
