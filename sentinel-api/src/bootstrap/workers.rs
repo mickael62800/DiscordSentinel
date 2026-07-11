@@ -6,6 +6,7 @@ use crate::adapters::inbound::http::state::AppState;
 pub fn spawn_security_workers(state: &AppState) {
     crate::adapters::outbound::system::alerts_dispatcher::spawn(
         state.pg_pool.clone(),
+        state.redis_client.clone(),
         state.container_monitor.clone(),
     );
 }
