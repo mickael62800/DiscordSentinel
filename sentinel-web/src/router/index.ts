@@ -50,8 +50,9 @@ export const routes: RouteRecordRaw[] = [
   { path: "/role-panels", name: "role-panels", component: () => import("../components/pages/RolePanelsPage.vue") },
   { path: "/role-panels/new", name: "role-panel-new", component: () => import("../components/pages/RolePanelEditPage.vue") },
   { path: "/discord-roles", name: "discord-roles", component: () => import("../components/pages/DiscordRolesPage.vue") },
-  { path: "/levels", name: "levels", component: () => import("../components/pages/LevelsPage.vue") },
-  { path: "/levels-config", name: "levels-config", component: () => import("../components/pages/LevelsConfigPage.vue") },
+  // Niveaux : classement + configuration réunis en onglets (LevelsHubPage).
+  { path: "/levels", name: "levels", component: () => import("../components/pages/LevelsHubPage.vue") },
+  { path: "/levels-config", redirect: "/levels" },
   { path: "/sponsorships", name: "sponsorships", component: () => import("../components/pages/SponsorshipsPage.vue") },
   { path: "/temp-roles", name: "temp-roles", component: () => import("../components/pages/TempRolesPage.vue") },
   { path: "/members", name: "members", component: () => import("../components/pages/MembersPage.vue") },
