@@ -32,7 +32,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "community.confessions", path: "/confessions", label: "Confessions", icon: "edit-3" },
   { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
   { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
-  { key: "community.voice-themes", path: "/voice-themes", label: "Thèmes vocaux", icon: "layers", requiredBot: "voice-bot" },
   { key: "community.role-panels", path: "/role-panels", label: "Panneaux de rôles", icon: "users", requiredBot: "community-bot" },
   { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up", requiredBot: "progression-bot" },
   { key: "community.sponsorships", path: "/sponsorships", label: "Parrainages", icon: "user-check", requiredBot: "community-bot" },

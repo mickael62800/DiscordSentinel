@@ -45,11 +45,15 @@ export const routes: RouteRecordRaw[] = [
   { path: "/announcements", name: "announcements", component: () => import("../components/pages/AnnouncementsPage.vue") },
   { path: "/confessions", name: "confessions", component: () => import("../components/pages/ConfessionsPage.vue") },
   { path: "/tickets", name: "tickets", component: () => import("../components/pages/TicketsPage.vue") },
-  { path: "/voice-channels", name: "voice-channels", component: () => import("../components/pages/VoiceChannelsPage.vue") },
-  { path: "/voice-themes", name: "voice-themes", component: () => import("../components/pages/VoiceThemesPage.vue") },
-  { path: "/role-panels", name: "role-panels", component: () => import("../components/pages/RolePanelsPage.vue") },
+  // Vocaux : salons + thèmes réunis en onglets (VoiceHubPage).
+  { path: "/voice-channels", name: "voice-channels", component: () => import("../components/pages/VoiceHubPage.vue") },
+  { path: "/voice-themes", redirect: "/voice-channels" },
+  // Rôles : panneaux + rôles Discord réunis en onglets (RolesHubPage). Les deux
+  // chemins pointent le même hub, qui choisit l'onglet selon l'URL (le lien
+  // croisé "Voir tous les rôles" reste fonctionnel).
+  { path: "/role-panels", name: "role-panels", component: () => import("../components/pages/RolesHubPage.vue") },
   { path: "/role-panels/new", name: "role-panel-new", component: () => import("../components/pages/RolePanelEditPage.vue") },
-  { path: "/discord-roles", name: "discord-roles", component: () => import("../components/pages/DiscordRolesPage.vue") },
+  { path: "/discord-roles", name: "discord-roles", component: () => import("../components/pages/RolesHubPage.vue") },
   // Niveaux : classement + configuration réunis en onglets (LevelsHubPage).
   { path: "/levels", name: "levels", component: () => import("../components/pages/LevelsHubPage.vue") },
   { path: "/levels-config", redirect: "/levels" },
