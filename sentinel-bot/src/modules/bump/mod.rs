@@ -357,9 +357,9 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let detected_success = (provider.detect)(msg);
     let bumper_id = resolve_bumper(msg);
 
-    // DIAGNOSTIC : trace l'etat du message pour calibrer la detection (la
-    // detection DiscordL n'a pas encore ete verifiee en conditions reelles).
-    info!(
+    // DIAGNOSTIC (temporaire, en WARN pour etre visible) : trace l'etat du
+    // message reconnu comme provider + le verdict detected_success.
+    warn!(
         provider = provider.key,
         guild_id,
         has_interaction_metadata = msg.interaction_metadata.is_some(),
