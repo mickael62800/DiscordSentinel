@@ -22,7 +22,7 @@ use crate::modules;
 ///
 /// Bots qui n'ont pas de slash commands ne sont pas listes (ex audit-bot
 /// ecoute juste les events Discord, automod-bot scan les messages, etc.).
-fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
+pub(crate) fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
     match bot_name {
         "cleanup-bot" => modules::cleanup::register_commands(),
         "game-bot" => modules::games::register_commands(),

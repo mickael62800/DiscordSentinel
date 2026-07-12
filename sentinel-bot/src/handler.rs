@@ -159,6 +159,11 @@ impl EventHandler for Handler {
             return;
         }
 
+        // Panneau d'aide auto-genere : publie/maintient dans un salon le
+        // catalogue de toutes les commandes (trie par categorie). Idempotent
+        // (remplace ses anciens messages), n'affiche que les modules actifs.
+        modules::help_panel::deploy_all(&ctx, ready.user.id, &guild_ids).await;
+
         // Listener Redis pour les events bot_enabled_changed -> re-register
         // les commandes guild a la volee quand un admin toggle on/off.
         crate::command_registry::spawn_consumer(ctx.clone());

@@ -14,6 +14,7 @@ pub mod coude;
 pub mod game_portal;
 pub mod games;
 pub mod guild_backup;
+pub mod help_panel;
 pub mod influence;
 pub mod moderation;
 pub mod progression;
