@@ -6,6 +6,7 @@ pub mod config;
 pub mod discord_helpers;
 pub mod embeds;
 pub mod event_bus;
+pub mod game_channels;
 pub mod grpc_client;
 pub mod heartbeat;
 pub mod parsers;

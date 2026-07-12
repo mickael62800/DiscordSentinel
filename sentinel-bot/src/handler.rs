@@ -166,6 +166,8 @@ impl EventHandler for Handler {
 
         // Influence : salons de domaine (un par entite du jeu), si active.
         modules::influence::channels::deploy_domain_channels(&ctx, &guild_ids).await;
+        // Coude : salons de domaine (un par entite du jeu), si active.
+        modules::coude::channels::deploy_domain_channels(&ctx, &guild_ids).await;
 
         // Listener Redis pour les events bot_enabled_changed -> re-register
         // les commandes guild a la volee quand un admin toggle on/off.

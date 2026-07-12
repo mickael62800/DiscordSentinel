@@ -59,10 +59,8 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     }
     // Restriction : chaque commande ne s'utilise que dans son salon de domaine
     // (si la fonctionnalité est activée). Sinon fail-open.
-    if let Some(domain) = channels::domain_for_command(command.data.name.as_str()) {
-        if !channels::enforce(ctx, command, domain).await {
-            return;
-        }
+    if !channels::enforce(ctx, command).await {
+        return;
     }
     match command.data.name.as_str() {
         "influence-profil" => commands::profil::handle(ctx, command).await,

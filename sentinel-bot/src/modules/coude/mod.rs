@@ -9,6 +9,7 @@ pub mod achievements;
 pub mod api_client;
 pub mod catalog;
 pub mod channel_check;
+pub mod channels;
 pub mod command_prelude;
 pub mod commands;
 pub mod daily_chaos_events;
@@ -108,6 +109,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
+    }
+    // Restriction : chaque commande ne s'utilise que dans son salon de domaine
+    // (si la fonctionnalité est activée). Sinon fail-open.
+    if !channels::enforce(ctx, command).await {
         return;
     }
     match command.data.name.as_str() {
