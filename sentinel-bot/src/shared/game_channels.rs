@@ -199,7 +199,7 @@ async fn ensure_channel(
     {
         Ok(c) => Some(c.id),
         Err(e) => {
-            warn!(guild_id = %gid, game = "?", error = %e, "création salon de domaine échouée");
+            warn!(guild_id = %gid, channel = dom.channel_name, error = %e, "création salon de domaine échouée");
             None
         }
     }
