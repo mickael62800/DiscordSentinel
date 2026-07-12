@@ -86,6 +86,11 @@ const isMultilineText = computed(
   () => props.field.type === "text" && props.field.key.endsWith("_message"),
 );
 
+// Selection du composant : le TYPE du schema decide (source de verite). Les
+// Set de cles ci-dessus ne sont qu'un REPLI pour les champs historiques encore
+// declares en "text"/"channel" ; toute nouvelle cle doit simplement declarer
+// son type ("voice", "channel_list", "voice_list", "role_list") et fonctionne
+// sans toucher a ce fichier.
 const isChannelMap = computed(
   () => props.field.type === "text" && CHANNEL_MAP_KEYS.has(props.field.key),
 );
@@ -93,16 +98,24 @@ const isRoleMap = computed(
   () => props.field.type === "text" && ROLE_MAP_KEYS.has(props.field.key),
 );
 const isChannelList = computed(
-  () => props.field.type === "text" && CHANNEL_LIST_KEYS.has(props.field.key),
+  () =>
+    props.field.type === "channel_list" ||
+    (props.field.type === "text" && CHANNEL_LIST_KEYS.has(props.field.key)),
 );
 const isRoleList = computed(
-  () => props.field.type === "text" && ROLE_LIST_KEYS.has(props.field.key),
+  () =>
+    props.field.type === "role_list" ||
+    (props.field.type === "text" && ROLE_LIST_KEYS.has(props.field.key)),
 );
 const isVoiceChannelList = computed(
-  () => props.field.type === "text" && VOICE_CHANNEL_LIST_KEYS.has(props.field.key),
+  () =>
+    props.field.type === "voice_list" ||
+    (props.field.type === "text" && VOICE_CHANNEL_LIST_KEYS.has(props.field.key)),
 );
 const isVoiceChannel = computed(
-  () => props.field.type === "channel" && VOICE_CHANNEL_KEYS.has(props.field.key),
+  () =>
+    props.field.type === "voice" ||
+    (props.field.type === "channel" && VOICE_CHANNEL_KEYS.has(props.field.key)),
 );
 
 const mapDefaults = computed(() => {
@@ -201,7 +214,7 @@ const mapDefaults = computed(() => {
     />
 
     <IdsListPickerField
-      v-else-if="isChannelList || isRoleList"
+      v-else-if="isChannelList || isRoleList || isVoiceChannelList"
       :model-value="modelValue"
       :guild-id="guildId"
       :kind="isRoleList ? 'role' : (isVoiceChannelList ? 'channel-voice' : 'channel')"
