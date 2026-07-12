@@ -952,6 +952,49 @@ pub async fn delete_action(
     }
 }
 
+#[derive(Deserialize)]
+pub struct ModActionCountQuery {
+    pub window_secs: Option<i64>,
+}
+
+/// GET /api/moderation/mod-action-count/{guild_id}/{moderator_id}?window_secs=N
+///
+/// Nombre d'actions de moderation posees par ce moderateur sur la fenetre
+/// (defaut 3600s). Sert au garde-fou "quota par moderateur" cote bot (anti-modo
+/// compromis / emballement) : le bot bloque une action au-dela du quota configure.
+pub async fn mod_action_count(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path((guild_id, moderator_id)): Path<(String, String)>,
+    Query(q): Query<ModActionCountQuery>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis",
+    )
+    .await?;
+    let window = q.window_secs.unwrap_or(3600).clamp(1, 86400) as f64;
+    let count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM moderation_actions \
+         WHERE guild_id = $1 AND moderator_id = $2 \
+           AND created_at > NOW() - ($3::double precision * INTERVAL '1 second')",
+    )
+    .bind(&guild_id)
+    .bind(&moderator_id)
+    .bind(window)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(sentinel_core::domain::errors::DomainError::Internal(
+            e.to_string(),
+        ))
+    })?;
+    Ok(Json(serde_json::json!({ "count": count })))
+}
+
 #[cfg(test)]
 #[path = "tests/actions.rs"]
 mod tests;

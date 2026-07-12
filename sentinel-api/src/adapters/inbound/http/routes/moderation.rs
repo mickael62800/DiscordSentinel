@@ -16,6 +16,11 @@ fn moderation_inner() -> Router<AppState> {
             "/actions/{id}",
             delete(handlers::moderation::actions::delete_action),
         )
+        // Quota par moderateur : nombre d'actions sur une fenetre (garde-fou bot).
+        .route(
+            "/mod-action-count/{guild_id}/{moderator_id}",
+            get(handlers::moderation::actions::mod_action_count),
+        )
         // Ban en sursis
         .route(
             "/{guild_id}/sursis",

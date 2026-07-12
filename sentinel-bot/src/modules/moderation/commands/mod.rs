@@ -153,6 +153,53 @@ pub fn check_hierarchy(
     Ok(())
 }
 
+/// Garde-fou "quota par moderateur" : renvoie `Err(message)` si le moderateur a
+/// deja pose `mod_quota_max` actions sur la fenetre `mod_quota_window_secs`
+/// (config `moderation-bot`). `mod_quota_max = 0` (defaut) = desactive.
+/// Fail-open si l'API est indisponible (on ne bloque pas un modo legitime).
+pub async fn check_mod_quota(
+    ctx: &Context,
+    guild_id: &str,
+    moderator_id: &str,
+) -> Result<(), String> {
+    use crate::shared::api_client::BaseApiClient;
+    let cfg = crate::shared::discord_helpers::guild_config_or_default(
+        ctx,
+        guild_id,
+        crate::modules::moderation::MODULE_BOT_NAME,
+    )
+    .await;
+    let max = BaseApiClient::config_u64(&cfg, "mod_quota_max", 0);
+    if max == 0 {
+        return Ok(()); // quota desactive
+    }
+    let window = BaseApiClient::config_u64(&cfg, "mod_quota_window_secs", 3600).max(1);
+
+    let api = {
+        let data = ctx.data.read().await;
+        data.get::<ModerationApiKey>().cloned()
+    };
+    let Some(api) = api else {
+        return Ok(());
+    };
+
+    match api.mod_action_count(guild_id, moderator_id, window).await {
+        Ok(count) if (count as u64) >= max => {
+            let win = if window >= 3600 {
+                format!("{}h", window / 3600)
+            } else {
+                format!("{}min", window.max(60) / 60)
+            };
+            Err(format!(
+                "🚦 Quota de modération atteint ({count}/{max} actions sur {win}). \
+                 Réessaie plus tard ou demande à un admin d'ajuster le quota."
+            ))
+        }
+        // Sous le quota, ou erreur API (fail-open) : on laisse passer.
+        _ => Ok(()),
+    }
+}
+
 /// Helper : retourne un message user-friendly pour signaler qu'un user est immunise.
 pub fn immunity_message(role_id: u64, action_label: &str) -> String {
     format!(

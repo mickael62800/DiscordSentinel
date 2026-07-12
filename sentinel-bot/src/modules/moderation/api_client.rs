@@ -328,6 +328,25 @@ impl ApiClient {
             .await
     }
 
+    /// Nombre d'actions de moderation posees par ce moderateur sur la fenetre.
+    /// Sert au garde-fou "quota par moderateur".
+    pub async fn mod_action_count(
+        &self,
+        guild_id: &str,
+        moderator_id: &str,
+        window_secs: u64,
+    ) -> Result<u32, String> {
+        #[derive(serde::Deserialize)]
+        struct CountResp {
+            count: i64,
+        }
+        let path = format!(
+            "/api/moderation/mod-action-count/{guild_id}/{moderator_id}?window_secs={window_secs}"
+        );
+        let r: CountResp = self.base.get_json(&path).await?;
+        Ok(r.count.max(0) as u32)
+    }
+
     /// Supprime une action de moderation par son ID (unwarn).
     pub async fn delete_action(&self, action_id: &str) -> Result<bool, String> {
         let req = self.base.client().delete(format!(

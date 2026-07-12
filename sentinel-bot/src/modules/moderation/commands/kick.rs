@@ -87,6 +87,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    if let Err(msg) =
+        super::check_mod_quota(ctx, &guild_id.to_string(), &command.user.id.to_string()).await
+    {
+        edit_response_text(ctx, command, &msg).await;
+        return;
+    }
+
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
         Err(_) => {
