@@ -73,6 +73,15 @@ pub trait ManageOrganizationsUseCase: Send + Sync {
     /// Informations sur une organisation par nom.
     async fn info(&self, guild_id: &str, name: &str) -> Result<OrgInfo, DomainError>;
 
+    /// Dissout une organisation (soft-delete). Reservee au FONDATEUR. Renvoie
+    /// l'org dissoute (pour que l'appelant supprime ses salons Discord).
+    async fn dissolve(
+        &self,
+        guild_id: &str,
+        name: &str,
+        actor_user_id: &str,
+    ) -> Result<Organization, DomainError>;
+
     /// Rejoint une organisation comme Recrue.
     async fn join(
         &self,

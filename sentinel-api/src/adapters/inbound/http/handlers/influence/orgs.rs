@@ -40,6 +40,12 @@ pub struct JoinOrgDto {
     pub username: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct DissolveOrgDto {
+    pub name: String,
+    pub actor_user_id: String,
+}
+
 /// POST /api/influence/{guild_id}/orgs
 pub async fn create_org(
     State(state): State<AppState>,
@@ -74,6 +80,21 @@ pub async fn org_info(
 ) -> Result<Json<OrgInfoDto>, ApiError> {
     let info = state.influence_orgs_uc.info(&guild_id, &dto.name).await?;
     Ok(Json(info.into()))
+}
+
+/// POST /api/influence/{guild_id}/orgs/dissolve — dissout une org (fondateur).
+/// Renvoie l'org dissoute (avec discord_channel_id) pour que le bot supprime
+/// les salons associes.
+pub async fn dissolve_org(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+    Json(dto): Json<DissolveOrgDto>,
+) -> Result<Json<OrganizationDto>, ApiError> {
+    let org = state
+        .influence_orgs_uc
+        .dissolve(&guild_id, &dto.name, &dto.actor_user_id)
+        .await?;
+    Ok(Json(org.into()))
 }
 
 /// POST /api/influence/{guild_id}/orgs/join

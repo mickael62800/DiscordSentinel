@@ -63,6 +63,17 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
+                "dissoudre",
+                "Dissout ton organisation (fondateur) et supprime ses salons",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(CommandOptionType::String, "nom", "Ton organisation")
+                    .required(true),
+            ),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
                 "role",
                 "Crée un rôle Discord au nom de ton organisation",
             )
@@ -284,6 +295,31 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .await
             }
             Err(e) => reply_ephemeral(ctx, command, &format!("Impossible de rejoindre : {e}")).await,
+        },
+        "dissoudre" => match api_client::dissolve_org(&api, &guild_id, &name, &user_id).await {
+            Ok(org) => {
+                cleanup_org_discord(ctx, &guild_id, &org).await;
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    &format!(
+                        "🗑️ L'organisation **{}** a été dissoute (salons et rôle supprimés).",
+                        org.name
+                    ),
+                )
+                .await;
+                crate::modules::influence::press::publish_news(
+                    ctx,
+                    &guild_id,
+                    &format!("Dissolution : {}", org.name),
+                    &format!(
+                        "L'organisation **{}** a été dissoute par <@{}>.",
+                        org.name, user_id
+                    ),
+                )
+                .await;
+            }
+            Err(e) => reply_ephemeral(ctx, command, &format!("Impossible de dissoudre : {e}")).await,
         },
         "role" => handle_role(ctx, command, &api, &guild_id, &user_id, &username, &name).await,
         "membres" => match api_client::org_members(&api, &guild_id, &name).await {
@@ -746,6 +782,44 @@ async fn grant_channel_access(ctx: &Context, channel_id: &str, user_id: &str) {
         kind: PermissionOverwriteType::Member(UserId::new(uid)),
     };
     let _ = ChannelId::new(cid).create_permission(&ctx.http, overwrite).await;
+}
+
+/// Supprime les ressources Discord d'une org dissoute : salon texte (id stocke),
+/// salon vocal (retrouve par nom « 🔊 {org} ») et role Discord si present.
+/// Best-effort (chaque suppression est independante).
+async fn cleanup_org_discord(ctx: &Context, guild_id: &str, org: &api_client::Organization) {
+    use serenity::all::ChannelType;
+    use serenity::model::id::{ChannelId, GuildId, RoleId};
+
+    // Salon texte (id stocke).
+    if let Some(chan) = &org.discord_channel_id {
+        if let Ok(cid) = chan.parse::<u64>() {
+            let _ = ChannelId::new(cid).delete(&ctx.http).await;
+        }
+    }
+
+    let Ok(gid) = guild_id.parse::<u64>() else {
+        return;
+    };
+    let gid = GuildId::new(gid);
+
+    // Salon vocal (retrouve par nom).
+    let vname = format!("🔊 {}", org.name);
+    if let Ok(channels) = gid.channels(&ctx.http).await {
+        if let Some(vc) = channels
+            .values()
+            .find(|c| c.kind == ChannelType::Voice && c.name == vname)
+        {
+            let _ = vc.id.delete(&ctx.http).await;
+        }
+    }
+
+    // Role Discord de l'org (si cree).
+    if let Some(role) = &org.discord_role_id {
+        if let Ok(rid) = role.parse::<u64>() {
+            let _ = gid.delete_role(&ctx.http, RoleId::new(rid)).await;
+        }
+    }
 }
 
 /// Donne l'acces au VOCAL prive de l'org (retrouve par nom « 🔊 {org} ») a un

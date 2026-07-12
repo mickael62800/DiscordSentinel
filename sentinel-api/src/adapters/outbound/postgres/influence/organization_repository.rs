@@ -149,6 +149,18 @@ impl OrganizationRepository for PgOrganizationRepository {
         rows.into_iter().map(TryInto::try_into).collect()
     }
 
+    async fn dissolve(&self, org_id: Uuid) -> Result<(), DomainError> {
+        sqlx::query(
+            "UPDATE influence_organizations SET dissolved_at = NOW() \
+             WHERE id = $1 AND dissolved_at IS NULL",
+        )
+        .bind(org_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn set_discord_role(&self, org_id: Uuid, role_id: &str) -> Result<(), DomainError> {
         sqlx::query("UPDATE influence_organizations SET discord_role_id = $2 WHERE id = $1")
             .bind(org_id)

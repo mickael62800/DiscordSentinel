@@ -133,6 +133,30 @@ pub async fn create_org(
     .await
 }
 
+#[derive(serde::Serialize)]
+struct DissolveOrgBody<'a> {
+    name: &'a str,
+    actor_user_id: &'a str,
+}
+
+/// Dissout une organisation (fondateur uniquement, verifie cote API). Renvoie
+/// l'org dissoute (avec `discord_channel_id`) pour supprimer ses salons.
+pub async fn dissolve_org(
+    api: &BaseApiClient,
+    guild_id: &str,
+    name: &str,
+    actor_user_id: &str,
+) -> Result<Organization, String> {
+    api.post_json(
+        &format!("/api/influence/{guild_id}/orgs/dissolve"),
+        &DissolveOrgBody {
+            name,
+            actor_user_id,
+        },
+    )
+    .await
+}
+
 pub async fn org_info(
     api: &BaseApiClient,
     guild_id: &str,

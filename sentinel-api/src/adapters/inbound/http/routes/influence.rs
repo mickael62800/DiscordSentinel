@@ -25,6 +25,10 @@ fn influence_inner() -> Router<AppState> {
             post(handlers::influence::orgs::join_org),
         )
         .route(
+            "/{guild_id}/orgs/dissolve",
+            post(handlers::influence::orgs::dissolve_org),
+        )
+        .route(
             "/{guild_id}/orgs/members",
             post(handlers::influence::orgs::org_members),
         )

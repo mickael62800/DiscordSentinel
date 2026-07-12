@@ -259,6 +259,28 @@ impl ManageOrganizationsUseCase for ManageOrganizationsService {
         Ok(org)
     }
 
+    async fn dissolve(
+        &self,
+        guild_id: &str,
+        name: &str,
+        actor_user_id: &str,
+    ) -> Result<Organization, DomainError> {
+        let org = self.require_org(guild_id, name).await?;
+        // Seul le fondateur peut dissoudre.
+        let founder = self
+            .orgs
+            .founder_user_id(org.id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound("fondateur introuvable".into()))?;
+        if actor_user_id != founder {
+            return Err(DomainError::Forbidden(
+                "Seul le fondateur peut dissoudre l'organisation.".into(),
+            ));
+        }
+        self.orgs.dissolve(org.id).await?;
+        Ok(org)
+    }
+
     async fn info(&self, guild_id: &str, name: &str) -> Result<OrgInfo, DomainError> {
         let org = self.require_org(guild_id, name).await?;
         let member_count = self.memberships.count(org.id).await?;
