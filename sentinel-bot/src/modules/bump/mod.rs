@@ -15,7 +15,7 @@ use serenity::all::MessageInteractionMetadata;
 use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, UserId};
 use serenity::prelude::*;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::heartbeat::ApiClientKey;
@@ -292,17 +292,6 @@ pub async fn on_message_update(
     ctx: &Context,
     event: &serenity::model::event::MessageUpdateEvent,
 ) {
-    // TRACE CIBLE (diagnostic DiscordL) : logue INCONDITIONNELLEMENT toute
-    // edition d'un message du bot DiscordL, avant tout filtre — pour savoir si
-    // l'evenement MESSAGE_UPDATE parvient bien au bot.
-    if event.author.as_ref().map(|a| a.id.get()) == Some(DISCORDL.bot_id) {
-        warn!(
-            has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false),
-            embed_count = event.embeds.as_ref().map(|e| e.len()).unwrap_or(0),
-            "DIAG bump-update: edition du bot DiscordL VUE au MESSAGE_UPDATE"
-        );
-    }
-
     // Un embed vient-il d'apparaitre ? (sinon rien a detecter).
     let has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false);
     if !has_embeds {
@@ -324,29 +313,16 @@ pub async fn on_message_update(
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
-    // TRACE CIBLE (diagnostic DiscordL) : logue INCONDITIONNELLEMENT tout message
-    // du bot DiscordL vu au MESSAGE_CREATE, avant tout filtre.
-    if msg.author.id.get() == DISCORDL.bot_id {
-        warn!(
-            embed_count = msg.embeds.len(),
-            content_len = msg.content.len(),
-            has_interaction = msg.interaction_metadata.is_some(),
-            "DIAG bump-create: message du bot DiscordL VU au MESSAGE_CREATE"
-        );
-    }
-
     let Some(provider) = provider_for_message(msg) else {
-        // DIAGNOSTIC : message d'un bot PROVIDER connu (bon bot_id) mais qu'aucune
-        // action (bump/vote) n'a reconnu -> motifs de detection a calibrer.
+        // Un bot PROVIDER connu (bon bot_id) a poste un embed qu'aucune action
+        // (bump/vote) n'a reconnu : probablement un changement de format du
+        // provider -> a recalibrer. Log defensif (rare, uniquement en cas de casse).
         if is_provider_bot(msg.author.id.get()) && !msg.embeds.is_empty() {
             warn!(
                 bot_id = msg.author.id.get(),
                 bot_name = %msg.author.name,
-                known_provider = is_provider_bot(msg.author.id.get()),
-                embed_title = msg.embeds.first().and_then(|e| e.title.as_deref()).unwrap_or("<aucun>"),
                 embed_desc = msg.embeds.first().and_then(|e| e.description.as_deref()).unwrap_or("<aucune>"),
-                content = %msg.content,
-                "DIAG bump: message bump-like NON reconnu — calibrer bot_id/motifs du provider"
+                "bump: message d'un provider connu non reconnu (format change ?)"
             );
         }
         return;
@@ -357,31 +333,12 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let detected_success = (provider.detect)(msg);
     let bumper_id = resolve_bumper(msg);
 
-    // DIAGNOSTIC (temporaire, en WARN pour etre visible) : trace l'etat du
-    // message reconnu comme provider + le verdict detected_success.
-    warn!(
+    debug!(
         provider = provider.key,
         guild_id,
-        has_interaction_metadata = msg.interaction_metadata.is_some(),
-        is_command_interaction = matches!(
-            msg.interaction_metadata.as_deref(),
-            Some(MessageInteractionMetadata::Command(_))
-        ),
         resolved_bumper = bumper_id.map(|u| u.get()),
-        embed_count = msg.embeds.len(),
-        embed_title = msg
-            .embeds
-            .first()
-            .and_then(|e| e.title.as_deref())
-            .unwrap_or("<aucun>"),
-        embed_desc = msg
-            .embeds
-            .first()
-            .and_then(|e| e.description.as_deref())
-            .unwrap_or("<aucune>"),
-        content = %msg.content,
         detected_success,
-        "DIAG bump: message provider recu"
+        "bump: message provider traite"
     );
 
     let Some(bumper_id) = bumper_id else { return };
