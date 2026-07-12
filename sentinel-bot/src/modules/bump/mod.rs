@@ -113,15 +113,6 @@ fn is_provider_bot(bot_id: u64) -> bool {
     PROVIDERS.iter().any(|p| p.bot_id == bot_id)
 }
 
-/// Heuristique de diagnostic : cet embed ressemble-t-il a une confirmation de
-/// bump/vote ? (titre ou description contient "bump" ou "vote"). Sert a
-/// capturer les messages d'un provider MAL configure (bot_id ou motifs faux),
-/// pour reveler dans les logs le format reel a calibrer.
-fn embed_looks_bumpy(e: &serenity::all::Embed) -> bool {
-    let t = e.title.as_deref().unwrap_or("").to_lowercase();
-    let d = e.description.as_deref().unwrap_or("").to_lowercase();
-    t.contains("bump") || d.contains("bump") || t.contains("vote") || d.contains("vote")
-}
 
 fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
     PROVIDERS.iter().find(|p| p.key == key)
@@ -168,22 +159,26 @@ fn dl_is_cooldown(msg: &Message) -> bool {
     )
 }
 
-/// `true` si un titre d'embed contient `needle` (insensible a la casse).
-/// Matching robuste (sous-chaine) : tolere le phrasing exact / les accents /
-/// l'ellipsis ("Résultat du Bump sur DiscordL …").
-fn dl_title_contains(msg: &Message, needle: &str) -> bool {
+/// Descriptions d'embeds concaténées en minuscules. IMPORTANT : DiscordL met son
+/// "titre" en MARKDOWN dans la DESCRIPTION (`### [Résultat du Bump...](url)`) ;
+/// le champ `title` de l'embed est VIDE. On matche donc sur la description.
+fn dl_desc_lower(msg: &Message) -> String {
     msg.embeds
         .iter()
-        .any(|e| e.title.as_deref().unwrap_or("").to_lowercase().contains(needle))
+        .filter_map(|e| e.description.as_deref())
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
-// Le meme bot DiscordL poste bump ET vote : on tranche sur le TITRE de l'embed
-// ("Résultat du **Bump**…" vs "Résultat du **Vote**…").
+// Le meme bot DiscordL poste bump ET vote : on tranche sur le mot present dans
+// la description ("...du **bump**..." vs "...du **vote**...").
 fn matches_discordl_bump(msg: &Message) -> bool {
-    dl_title_contains(msg, "bump") && !dl_title_contains(msg, "vote")
+    let d = dl_desc_lower(msg);
+    d.contains("bump") && !d.contains("vote")
 }
 fn matches_discordl_vote(msg: &Message) -> bool {
-    dl_title_contains(msg, "vote")
+    dl_desc_lower(msg).contains("vote")
 }
 
 /// Marqueur de SUCCES DiscordL : coche verte "✅" ou "a bump/voté", cherche dans
@@ -313,18 +308,10 @@ pub async fn on_message_update(
     if !has_embeds {
         return;
     }
-    // On refetch si : (a) c'est un provider connu, OU (b) l'embed edite ressemble
-    // a un bump/vote (permet de diagnostiquer un provider mal configure, ex:
-    // DiscordL avec un bot_id ou des motifs errones). Sinon on ignore (evite de
-    // refetch tous les messages edites du serveur).
+    // On ne refetch que les editions d'un bot PROVIDER connu (evite de refetch
+    // tous les messages edites du serveur, ex: notre propre panneau d'aide).
     if let Some(author) = &event.author {
-        let known = is_provider_bot(author.id.get());
-        let bumpy = event
-            .embeds
-            .as_ref()
-            .map(|es| es.iter().any(embed_looks_bumpy))
-            .unwrap_or(false);
-        if !known && !bumpy {
+        if !is_provider_bot(author.id.get()) {
             return;
         }
     }
@@ -349,13 +336,9 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     }
 
     let Some(provider) = provider_for_message(msg) else {
-        // DIAGNOSTIC : message d'un BOT qui ressemble a un bump/vote mais qu'aucun
-        // provider n'a reconnu (bot_id inconnu OU motifs de detection faux). On
-        // logue le format reel pour pouvoir calibrer (ex: DiscordL non detecte).
-        if msg.author.bot
-            && !msg.embeds.is_empty()
-            && (is_provider_bot(msg.author.id.get()) || msg.embeds.iter().any(embed_looks_bumpy))
-        {
+        // DIAGNOSTIC : message d'un bot PROVIDER connu (bon bot_id) mais qu'aucune
+        // action (bump/vote) n'a reconnu -> motifs de detection a calibrer.
+        if is_provider_bot(msg.author.id.get()) && !msg.embeds.is_empty() {
             warn!(
                 bot_id = msg.author.id.get(),
                 bot_name = %msg.author.name,
