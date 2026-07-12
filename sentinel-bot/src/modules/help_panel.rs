@@ -29,7 +29,16 @@ use crate::shared::heartbeat::ApiClientKey;
 const BOT_NAME: &str = "help-bot";
 const MARKER: &str = "Sentinel · Panneau d'aide";
 const CATEGORY_NAME: &str = "Aide commandes";
-const DESC_MAX: usize = 4000;
+
+// ── Limites Discord (embeds) ──
+const FIELD_MAX: usize = 1024; // taille max d'une valeur de champ
+const FIELDS_PER_EMBED: usize = 25;
+const EMBED_MAX: usize = 5500; // marge sous la limite de 6000
+
+/// Une sous-section : libellé de module + ses lignes de commandes.
+type SubSection = (&'static str, Vec<String>);
+/// Une catégorie publiée : libellé + ses sous-sections.
+type Bucket = (&'static str, Vec<SubSection>);
 
 // ── Permissions Discord (bits) pour classer les commandes ──
 const ADMINISTRATOR: u64 = 1 << 3;
@@ -106,31 +115,43 @@ fn classify(perms: u64) -> Audience {
     }
 }
 
-/// Catégories de MODULE (groupement interne à chaque salon), dans l'ordre.
-const CATEGORIES: &[(&str, &[&str])] = &[
-    ("🛡️ Modération", &["moderation-bot"]),
-    ("🚨 Sécurité", &["security-bot", "automod-bot"]),
-    ("🎫 Tickets", &["ticket-bot"]),
-    ("🙊 Confessions", &["confessions"]),
+/// Arborescence du panneau : CATÉGORIE (un embed) -> SOUS-SECTIONS (un champ
+/// par module). Évite de mélanger des modules distincts (les jeux notamment)
+/// dans un même bloc. Chaque sous-section porte son propre libellé.
+type Section = (&'static str, &'static [(&'static str, &'static str)]);
+
+const CATEGORIES: &[Section] = &[
+    ("🛡️ Modération", &[("moderation-bot", "🛡️ Modération")]),
+    (
+        "🚨 Sécurité",
+        &[("security-bot", "🚨 Sécurité"), ("automod-bot", "🤖 Auto-modération")],
+    ),
+    ("🎫 Tickets", &[("ticket-bot", "🎫 Tickets")]),
+    ("🙊 Confessions", &[("confessions", "🙊 Confessions")]),
     (
         "💬 Communauté",
-        &["community-bot", "progression-bot", "voice-bot", "rotation-bot"],
+        &[
+            ("community-bot", "💬 Communauté"),
+            ("progression-bot", "📈 Progression"),
+            ("voice-bot", "🔊 Vocal"),
+            ("rotation-bot", "🔄 Rotation"),
+        ],
     ),
     (
         "🎮 Jeux",
         &[
-            "game-bot",
-            "coude-bot",
-            "blackjack-bot",
-            "slot-bot",
-            "wheel-bot",
-            "tamagotchi-bot",
-            "influence-bot",
+            ("coude-bot", "🥊 Coude"),
+            ("influence-bot", "🏛️ Influence"),
+            ("blackjack-bot", "🃏 Blackjack"),
+            ("slot-bot", "🎰 Machine à sous"),
+            ("wheel-bot", "🎡 Roue de la fortune"),
+            ("tamagotchi-bot", "🥚 Tamagotchi"),
+            ("game-bot", "🎯 Portail de jeux"),
         ],
     ),
-    ("💾 Sauvegarde", &["guild-backup-bot"]),
-    ("📊 Audit", &["audit-bot"]),
-    ("🧹 Nettoyage", &["cleanup-bot"]),
+    ("💾 Sauvegarde", &[("guild-backup-bot", "💾 Sauvegarde")]),
+    ("📊 Audit", &[("audit-bot", "📊 Audit")]),
+    ("🧹 Nettoyage", &[("cleanup-bot", "🧹 Nettoyage")]),
 ];
 
 /// Deploie les panneaux sur toutes les guilds connues (appele une fois au boot).
@@ -163,16 +184,18 @@ async fn deploy_for_guild(
         return Ok(());
     }
 
-    // ── Construit les buckets : audience -> Vec<(module_label, lignes)> ──
+    // ── Buckets : audience -> [ (catégorie, [ (sous-section, lignes) ]) ] ──
     // On n'appelle is_bot_enabled qu'une fois par module.
-    let mut buckets: [Vec<(&'static str, Vec<String>)>; 3] =
-        [Vec::new(), Vec::new(), Vec::new()];
-    for (mod_label, bot_names) in CATEGORIES {
-        let mut per_aud: [Vec<String>; 3] = [Vec::new(), Vec::new(), Vec::new()];
-        for bot_name in *bot_names {
+    let mut buckets: [Vec<Bucket>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+    for (cat_label, subs) in CATEGORIES {
+        let mut per_aud: [Vec<SubSection>; 3] = [Vec::new(), Vec::new(), Vec::new()];
+        for (bot_name, sub_label) in *subs {
             if !is_bot_enabled(api, &gid, bot_name).await {
                 continue;
             }
+            // Les commandes d'un module peuvent viser des audiences differentes :
+            // on eclate la sous-section par audience.
+            let mut sub_lines: [Vec<String>; 3] = [Vec::new(), Vec::new(), Vec::new()];
             for cmd in module_commands(bot_name) {
                 let json = match serde_json::to_value(&cmd) {
                     Ok(v) => v,
@@ -180,14 +203,20 @@ async fn deploy_for_guild(
                 };
                 let audience = classify(command_perms(&json));
                 for (name, desc) in extract_commands(&json) {
-                    per_aud[audience.idx()].push(format!("**`{name}`** — {desc}"));
+                    sub_lines[audience.idx()].push(format!("**`{name}`** — {desc}"));
+                }
+            }
+            for aud in Audience::ALL {
+                let lines = std::mem::take(&mut sub_lines[aud.idx()]);
+                if !lines.is_empty() {
+                    per_aud[aud.idx()].push((*sub_label, lines));
                 }
             }
         }
         for aud in Audience::ALL {
-            let lines = std::mem::take(&mut per_aud[aud.idx()]);
-            if !lines.is_empty() {
-                buckets[aud.idx()].push((mod_label, lines));
+            let sections = std::mem::take(&mut per_aud[aud.idx()]);
+            if !sections.is_empty() {
+                buckets[aud.idx()].push((*cat_label, sections));
             }
         }
     }
@@ -218,19 +247,18 @@ async fn deploy_for_guild(
             .send_message(ctx, CreateMessage::new().embed(header))
             .await;
 
-        // Un embed par categorie de module presente.
-        for (mod_label, lines) in entries {
-            let mut body = lines.join("\n");
-            if body.chars().count() > DESC_MAX {
-                body = body.chars().take(DESC_MAX).collect::<String>() + "\n…";
+        // Un embed par CATEGORIE ; a l'interieur, un champ par SOUS-SECTION
+        // (module). Pagine si la categorie deborde les limites Discord.
+        for (cat_label, sections) in entries {
+            let mut fields: Vec<(String, String)> = Vec::new();
+            for (sub_label, lines) in sections {
+                fields.extend(chunk_section(sub_label, lines));
             }
-            let embed = CreateEmbed::new()
-                .title(*mod_label)
-                .description(body)
-                .footer(CreateEmbedFooter::new(MARKER));
-            let _ = channel_id
-                .send_message(ctx, CreateMessage::new().embed(embed))
-                .await;
+            for embed in paginate(cat_label, fields) {
+                let _ = channel_id
+                    .send_message(ctx, CreateMessage::new().embed(embed))
+                    .await;
+            }
         }
         info!(guild_id = %guild_id, channel = %channel_id, "help_panel: audience publiee");
     }
@@ -346,6 +374,76 @@ fn is_panel_message(m: &serenity::all::Message) -> bool {
     })
 }
 
+/// Transforme une sous-section en champs d'embed, en respectant la limite de
+/// 1024 caractères par champ. Si les lignes débordent, la sous-section est
+/// découpée en plusieurs champs numérotés (`Coude (2/3)`).
+fn chunk_section(label: &str, lines: &[String]) -> Vec<(String, String)> {
+    let mut chunks: Vec<String> = Vec::new();
+    let mut buf = String::new();
+    for line in lines {
+        // Une ligne seule plus longue que la limite est tronquee (cas pathologique).
+        let line: String = if line.chars().count() > FIELD_MAX {
+            line.chars().take(FIELD_MAX - 1).collect::<String>() + "…"
+        } else {
+            line.clone()
+        };
+        if !buf.is_empty() && buf.chars().count() + 1 + line.chars().count() > FIELD_MAX {
+            chunks.push(std::mem::take(&mut buf));
+        }
+        if !buf.is_empty() {
+            buf.push('\n');
+        }
+        buf.push_str(&line);
+    }
+    if !buf.is_empty() {
+        chunks.push(buf);
+    }
+
+    let total = chunks.len();
+    chunks
+        .into_iter()
+        .enumerate()
+        .map(|(i, value)| {
+            let name = if total <= 1 {
+                label.to_string()
+            } else {
+                format!("{label} ({}/{total})", i + 1)
+            };
+            (name, value)
+        })
+        .collect()
+}
+
+/// Répartit les champs d'une catégorie en un ou plusieurs embeds, sous les
+/// limites Discord (25 champs / ~6000 caractères).
+fn paginate(cat_label: &str, fields: Vec<(String, String)>) -> Vec<CreateEmbed> {
+    let mut embeds = Vec::new();
+    let mut it = fields.into_iter().peekable();
+    while it.peek().is_some() {
+        let title = if embeds.is_empty() {
+            cat_label.to_string()
+        } else {
+            format!("{cat_label} (suite)")
+        };
+        let mut embed = CreateEmbed::new()
+            .title(title)
+            .footer(CreateEmbedFooter::new(MARKER));
+        let (mut count, mut chars) = (0usize, 0usize);
+        while let Some((name, value)) = it.peek() {
+            let add = name.chars().count() + value.chars().count();
+            if count >= FIELDS_PER_EMBED || (count > 0 && chars + add > EMBED_MAX) {
+                break;
+            }
+            let (name, value) = it.next().expect("peek a garanti la presence");
+            chars += add;
+            count += 1;
+            embed = embed.field(name, value, false);
+        }
+        embeds.push(embed);
+    }
+    embeds
+}
+
 /// Lit `default_member_permissions` (bitfield en chaine) d'une commande sérialisée.
 fn command_perms(v: &serde_json::Value) -> u64 {
     v.get("default_member_permissions")
@@ -449,11 +547,53 @@ mod tests {
     }
 
     #[test]
-    fn every_registry_bot_name_has_a_category() {
+    fn every_registry_bot_name_has_a_subsection() {
         use crate::command_registry::BOT_NAMES_WITH_COMMANDS;
         for bot_name in BOT_NAMES_WITH_COMMANDS {
-            let found = CATEGORIES.iter().any(|(_, names)| names.contains(bot_name));
-            assert!(found, "module sans categorie dans le panneau : {bot_name}");
+            let found = CATEGORIES
+                .iter()
+                .any(|(_, subs)| subs.iter().any(|(n, _)| n == bot_name));
+            assert!(found, "module sans sous-section dans le panneau : {bot_name}");
         }
+    }
+
+    /// Chaque jeu a SA propre sous-section : c'est tout l'interet du decoupage
+    /// (avant, tous les jeux etaient fondus dans un seul bloc "Jeux").
+    #[test]
+    fn games_have_distinct_subsections() {
+        let (_, subs) = CATEGORIES
+            .iter()
+            .find(|(label, _)| *label == "🎮 Jeux")
+            .expect("categorie Jeux");
+        let labels: Vec<&str> = subs.iter().map(|(_, l)| *l).collect();
+        assert!(labels.len() >= 6, "un jeu = une sous-section");
+        let unique: std::collections::HashSet<_> = labels.iter().collect();
+        assert_eq!(unique.len(), labels.len(), "libelles de jeux dupliques");
+    }
+
+    #[test]
+    fn chunk_section_splits_over_field_limit() {
+        // Une seule ligne courte -> un champ portant le libelle tel quel.
+        let one = chunk_section("🥊 Coude", &["**`/coude`** — Defie".to_string()]);
+        assert_eq!(one.len(), 1);
+        assert_eq!(one[0].0, "🥊 Coude");
+
+        // Beaucoup de lignes -> plusieurs champs numerotes, chacun <= 1024.
+        let many: Vec<String> = (0..200).map(|i| format!("**`/cmd{i}`** — description")).collect();
+        let out = chunk_section("🥊 Coude", &many);
+        assert!(out.len() > 1, "doit deborder sur plusieurs champs");
+        assert_eq!(out[0].0, format!("🥊 Coude (1/{})", out.len()));
+        for (_, value) in &out {
+            assert!(value.chars().count() <= FIELD_MAX);
+        }
+    }
+
+    #[test]
+    fn paginate_respects_field_count_limit() {
+        let fields: Vec<(String, String)> = (0..60)
+            .map(|i| (format!("Section {i}"), "x".to_string()))
+            .collect();
+        let embeds = paginate("🎮 Jeux", fields);
+        assert_eq!(embeds.len(), 3, "60 champs / 25 par embed -> 3 embeds");
     }
 }
