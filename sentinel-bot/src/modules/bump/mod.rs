@@ -297,6 +297,17 @@ pub async fn on_message_update(
     ctx: &Context,
     event: &serenity::model::event::MessageUpdateEvent,
 ) {
+    // TRACE CIBLE (diagnostic DiscordL) : logue INCONDITIONNELLEMENT toute
+    // edition d'un message du bot DiscordL, avant tout filtre — pour savoir si
+    // l'evenement MESSAGE_UPDATE parvient bien au bot.
+    if event.author.as_ref().map(|a| a.id.get()) == Some(DISCORDL.bot_id) {
+        warn!(
+            has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false),
+            embed_count = event.embeds.as_ref().map(|e| e.len()).unwrap_or(0),
+            "DIAG bump-update: edition du bot DiscordL VUE au MESSAGE_UPDATE"
+        );
+    }
+
     // Un embed vient-il d'apparaitre ? (sinon rien a detecter).
     let has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false);
     if !has_embeds {
@@ -326,6 +337,17 @@ pub async fn on_message_update(
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
+    // TRACE CIBLE (diagnostic DiscordL) : logue INCONDITIONNELLEMENT tout message
+    // du bot DiscordL vu au MESSAGE_CREATE, avant tout filtre.
+    if msg.author.id.get() == DISCORDL.bot_id {
+        warn!(
+            embed_count = msg.embeds.len(),
+            content_len = msg.content.len(),
+            has_interaction = msg.interaction_metadata.is_some(),
+            "DIAG bump-create: message du bot DiscordL VU au MESSAGE_CREATE"
+        );
+    }
+
     let Some(provider) = provider_for_message(msg) else {
         // DIAGNOSTIC : message d'un BOT qui ressemble a un bump/vote mais qu'aucun
         // provider n'a reconnu (bot_id inconnu OU motifs de detection faux). On
