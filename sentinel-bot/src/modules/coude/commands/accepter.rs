@@ -292,6 +292,20 @@ pub async fn resolve_combat_internal_ex(
         }
     }
 
+    // Journal du jeu (si un salon de logs est configure). Point unique : tous
+    // les combats (defi, surprise, bloodbath) passent par ici une fois resolus.
+    if let Ok(guild_id) = combat_record.guild_id.parse::<u64>() {
+        crate::shared::game_log::log_event(
+            ctx,
+            crate::modules::coude::MODULE_BOT_NAME,
+            "coude_log_channel_id",
+            serenity::all::GuildId::new(guild_id),
+            "\u{1f94a} Combat",
+            format!("{}\n{}", resp.title, resp.description),
+        )
+        .await;
+    }
+
     ResolveOutcome::Resolved(embed)
 }
 

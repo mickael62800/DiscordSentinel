@@ -79,6 +79,27 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             _ => return,
         };
         send_dm(ctx, owner_id, &dm_text).await;
+
+        // Journal du jeu (si un salon de logs est configure).
+        if let Ok(gid) = guild_id.parse::<u64>() {
+            let line = match status {
+                "sick" => format!("🤒 **{pet_name}** (<@{owner_id}>) est tombé malade."),
+                "death" => format!("🪦 **{pet_name}** (<@{owner_id}>) est mort."),
+                "recovered" => format!("💚 **{pet_name}** (<@{owner_id}>) est guéri."),
+                _ => String::new(),
+            };
+            if !line.is_empty() {
+                crate::shared::game_log::log_event(
+                    ctx,
+                    super::MODULE_BOT_NAME,
+                    "tamagotchi_log_channel_id",
+                    serenity::all::GuildId::new(gid),
+                    "🥚 Tamagotchi",
+                    line,
+                )
+                .await;
+            }
+        }
     }
 
     // 2. Mort : on supprime le salon prive du compagnon (s'il est connu) pour

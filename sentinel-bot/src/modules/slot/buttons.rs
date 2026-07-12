@@ -262,6 +262,32 @@ pub async fn handle_spin_in_channel(ctx: &Context, component: &ComponentInteract
     )
     .await;
 
+    // Journal du jeu (si un salon de logs est configure).
+    if let Some(gid) = component.guild_id {
+        let issue = if response.is_jackpot {
+            format!("\u{1f389} JACKPOT +{}", response.payout)
+        } else if response.payout > 0 {
+            format!("gagne +{}", response.payout)
+        } else {
+            format!("perd {}", response.mise)
+        };
+        crate::shared::game_log::log_event(
+            ctx,
+            super::MODULE_BOT_NAME,
+            "slot_log_channel_id",
+            gid,
+            "\u{1f3b0} Machine a sous",
+            format!(
+                "**{}** mise {} \u{2014} {} \u{2014} [{}]",
+                username,
+                response.mise,
+                issue,
+                response.symbols.join(" ")
+            ),
+        )
+        .await;
+    }
+
     // Acquitte le clic ephemeral.
     let edit = serenity::builder::EditInteractionResponse::new().content("Spin lance !");
     let _ = component.edit_response(&ctx.http, edit).await;

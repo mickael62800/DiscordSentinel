@@ -251,6 +251,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         .field("Trésorerie", format!("{} 💰", org.treasury), true)
                         .description(format!("{base_desc}{channel_line}"));
                     reply_ephemeral_embed(ctx, command, embed).await;
+                    glog(
+                        ctx,
+                        command,
+                        "🏛️ Organisation",
+                        format!(
+                            "**{}** ({}) fondée par <@{}>.",
+                            org.name, org.kind_label, user_id
+                        ),
+                    )
+                    .await;
                     // Une du journal : une nouvelle organisation voit le jour.
                     crate::modules::influence::press::publish_news(
                         ctx,
@@ -287,6 +297,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     grant_channel_access(ctx, chan, &user_id).await;
                 }
                 grant_org_voice_access(ctx, &guild_id, &org.name, &user_id).await;
+                glog(
+                    ctx,
+                    command,
+                    "🏛️ Organisation",
+                    format!("<@{}> a rejoint **{}**.", user_id, org.name),
+                )
+                .await;
                 reply_ephemeral(
                     ctx,
                     command,
@@ -299,6 +316,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "dissoudre" => match api_client::dissolve_org(&api, &guild_id, &name, &user_id).await {
             Ok(org) => {
                 cleanup_org_discord(ctx, &guild_id, &org).await;
+                glog(
+                    ctx,
+                    command,
+                    "🏛️ Organisation",
+                    format!("**{}** a été dissoute par <@{}>.", org.name, user_id),
+                )
+                .await;
                 reply_ephemeral(
                     ctx,
                     command,
@@ -626,6 +650,22 @@ const ORG_CATEGORY_NAME: &str = "🏢 Organisations";
 
 /// Cree le salon texte PRIVE d'une organisation, sous une categorie, visible des
 /// seuls membres (et du bot). Best-effort : renvoie l'id du salon cree ou `None`.
+/// Journalise un evenement d'organisation dans le salon de logs Influence
+/// (si configure). Best-effort : ne bloque jamais la commande.
+async fn glog(ctx: &Context, command: &CommandInteraction, title: &str, desc: String) {
+    if let Some(gid) = command.guild_id {
+        crate::shared::game_log::log_event(
+            ctx,
+            crate::modules::influence::MODULE_BOT_NAME,
+            "influence_log_channel_id",
+            gid,
+            title,
+            desc,
+        )
+        .await;
+    }
+}
+
 async fn create_org_channel(
     ctx: &Context,
     guild_id: &str,

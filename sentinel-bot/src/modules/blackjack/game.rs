@@ -119,7 +119,9 @@ pub(super) async fn check_game_over(ctx: &Context, component: &ComponentInteract
         None => return,
     };
 
-    let is_over = {
+    // `finished` porte le resultat de la partie quand elle vient de se terminer,
+    // pour pouvoir la journaliser (statut + gain).
+    let (is_over, finished) = {
         let data = ctx.data.read().await;
         let api = match data.get::<GameApiKey>() {
             Some(a) => a,
@@ -129,11 +131,30 @@ pub(super) async fn check_game_over(ctx: &Context, component: &ComponentInteract
             .get_active(&guild_id, &component.user.id.to_string())
             .await
         {
-            Ok(Some(game)) => game_logic::is_game_over(&game.status),
-            Ok(None) => true, // Pas de partie active = terminee
-            Err(_) => false,
+            Ok(Some(game)) if game_logic::is_game_over(&game.status) => {
+                (true, Some((game.status.clone(), game.payout)))
+            }
+            Ok(Some(_)) => (false, None),
+            Ok(None) => (true, None), // Pas de partie active = terminee
+            Err(_) => (false, None),
         }
     };
+
+    // Journal du jeu (si un salon de logs est configure).
+    if let (Some((status, payout)), Some(gid)) = (finished, component.guild_id) {
+        crate::shared::game_log::log_event(
+            ctx,
+            super::MODULE_BOT_NAME,
+            "blackjack_log_channel_id",
+            gid,
+            "\u{1f0cf} Blackjack",
+            format!(
+                "**{}** \u{2014} {} (gain : {})",
+                component.user.name, status, payout
+            ),
+        )
+        .await;
+    }
 
     if is_over {
         send_replay_buttons(ctx, component.channel_id).await;

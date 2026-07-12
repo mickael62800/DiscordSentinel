@@ -111,6 +111,24 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
     // dernier message du salon.
     super::setup::repost_panel(ctx, component.channel_id).await;
 
+    // Journal du jeu (si un salon de logs est configure).
+    if let Some(gid) = component.guild_id {
+        crate::shared::game_log::log_event(
+            ctx,
+            super::MODULE_BOT_NAME,
+            "wheel_log_channel_id",
+            gid,
+            "\u{1f300} Roue",
+            format!(
+                "**{}** a tire **{}** ({})",
+                username,
+                response.case_label,
+                format_payout(response.payout)
+            ),
+        )
+        .await;
+    }
+
     // Acquitte le clic ephemeral.
     let edit = serenity::builder::EditInteractionResponse::new().content(format!(
         "\u{1f300} Tu as tire la roue : {} ({})",
