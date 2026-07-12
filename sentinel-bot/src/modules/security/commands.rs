@@ -6,7 +6,7 @@ use serenity::all::{
 };
 
 use crate::shared::discord_helpers::reply_ephemeral_embed;
-use crate::shared::embeds::info_embed;
+use crate::shared::embeds::{critical_embed, info_embed, success_embed};
 
 use super::{LockdownKey, QuarantineKey, RaidDetectorKey, RecentJoinsKey, SecurityApiKey};
 
@@ -36,6 +36,16 @@ pub fn register() -> CreateCommand {
                 .required(false),
             ),
         )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "panic",
+            "🚨 Bouton panique : verrouille TOUS les salons texte immediatement",
+        ))
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "calm",
+            "Leve le verrouillage panique et restaure les permissions",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -49,8 +59,75 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     match sub {
         "status" => handle_status(ctx, command).await,
         "history" => handle_history(ctx, command).await,
+        "panic" => handle_panic(ctx, command).await,
+        "calm" => handle_calm(ctx, command).await,
         _ => {}
     }
+}
+
+/// 🚨 Bouton panique : verrouille immediatement tous les salons texte
+/// (SEND_MESSAGES refuse pour @everyone), de facon entierement reversible
+/// (permissions d'origine sauvegardees, restaurees par /calm ou a l'expiration).
+async fn handle_panic(ctx: &Context, command: &CommandInteraction) {
+    let guild_id = match command.guild_id {
+        Some(id) => id,
+        None => return,
+    };
+    // Duree persistee (le worker restaure a l'expiration) ; /calm leve avant.
+    let duration = std::env::var("LOCKDOWN_DURATION_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(900);
+
+    {
+        // On tient le lock data pendant activate (comme join_handler) : activate
+        // relit ctx.data (ApiClientKey) en interne, re-entrance de lecture OK.
+        let data = ctx.data.read().await;
+        match data.get::<LockdownKey>() {
+            Some(lockdown) => lockdown.activate(ctx, guild_id, duration).await,
+            None => {
+                drop(data);
+                reply_ephemeral_embed(
+                    ctx,
+                    command,
+                    critical_embed("Security").description("Module lockdown indisponible."),
+                )
+                .await;
+                return;
+            }
+        }
+    }
+
+    let embed = critical_embed("🚨 Mode panique activé")
+        .description(format!(
+            "Tous les salons texte sont verrouillés (@everyone ne peut plus écrire).\n\
+             Restauration automatique dans {}s, ou immédiate via `/security calm`.",
+            duration
+        ));
+    reply_ephemeral_embed(ctx, command, embed).await;
+    tracing::warn!(guild = %guild_id, moderator = %command.user.name, "security: mode panique active");
+}
+
+/// Leve le verrouillage panique (restaure les permissions d'origine).
+async fn handle_calm(ctx: &Context, command: &CommandInteraction) {
+    let guild_id = match command.guild_id {
+        Some(id) => id,
+        None => return,
+    };
+    {
+        let data = ctx.data.read().await;
+        if let Some(lockdown) = data.get::<LockdownKey>() {
+            lockdown.deactivate(ctx, guild_id).await;
+        }
+    }
+    reply_ephemeral_embed(
+        ctx,
+        command,
+        success_embed("🔓 Mode panique levé")
+            .description("Les permissions des salons ont été restaurées."),
+    )
+    .await;
+    tracing::info!(guild = %guild_id, moderator = %command.user.name, "security: mode panique leve");
 }
 
 async fn handle_status(ctx: &Context, command: &CommandInteraction) {
