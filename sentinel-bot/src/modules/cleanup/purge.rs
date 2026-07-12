@@ -166,6 +166,21 @@ pub fn register() -> CreateCommand {
                 .required(true),
             ),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "until",
+                "Supprimer tous les messages postes APRES un message donne (borne)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "message_id",
+                    "ID du message servant de borne d'arret (ce message n'est PAS supprime)",
+                )
+                .required(true),
+            ),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -265,6 +280,62 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 &format!(
                     "Purge all : {} message(s) supprime(s) par {}",
                     deleted, command.user.name
+                ),
+            );
+        }
+        return;
+    }
+
+    // Branche speciale : /purge until <message_id> — supprime tout ce qui a ete
+    // poste APRES ce message (la borne elle-meme est conservee).
+    if sub == "until" {
+        let raw = sub_opts
+            .iter()
+            .find(|o| o.name == "message_id")
+            .and_then(|o| o.value.as_str())
+            .unwrap_or("")
+            .trim();
+        let boundary = match raw.parse::<u64>() {
+            Ok(id) if id != 0 => MessageId::new(id),
+            _ => {
+                reply_error(
+                    ctx,
+                    command,
+                    "ID de message invalide. Clic droit sur le message → Copier l'identifiant.",
+                )
+                .await;
+                return;
+            }
+        };
+        // Le message-borne doit exister DANS ce salon (evite une purge massive
+        // accidentelle si l'ID vient d'ailleurs / est errone).
+        if channel_id.message(&ctx.http, boundary).await.is_err() {
+            reply_error(
+                ctx,
+                command,
+                "Message introuvable dans ce salon. Vérifie que l'ID appartient bien à ce salon.",
+            )
+            .await;
+            return;
+        }
+
+        let (deleted, errors) = purge_until(ctx, channel_id, boundary).await;
+        let description = if errors > 0 {
+            format!("{deleted} message(s) supprime(s).\n{errors} erreur(s) rencontree(s).")
+        } else {
+            format!("{deleted} message(s) supprime(s) apres la borne.")
+        };
+        let embed = success_embed("Purge jusqu'a la borne terminee").description(description);
+        followup_ephemeral_embed(ctx, command, embed).await;
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!(
+                    "Purge until {boundary} : {deleted} message(s) supprime(s) par {}",
+                    command.user.name
                 ),
             );
         }
@@ -569,6 +640,107 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
         for &id in &old_ids {
             if let Err(e) = channel_id.delete_message(&ctx.http, id).await {
                 error!(error = %e, "Erreur delete ancien (purge all)");
+                errors += 1;
+            } else {
+                deleted += 1;
+            }
+            tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms())).await;
+        }
+
+        if deleted == before {
+            empty_streak += 1;
+            if empty_streak >= 2 {
+                break;
+            }
+        } else {
+            empty_streak = 0;
+        }
+    }
+
+    (deleted, errors)
+}
+
+/// Supprime tous les messages postes APRES `boundary` (exclu), par lots, en
+/// paginant avec `.after(boundary)`. La borne et tout ce qui precede sont
+/// conserves. Ne touche jamais aux messages epingles.
+async fn purge_until(
+    ctx: &Context,
+    channel_id: serenity::all::ChannelId,
+    boundary: MessageId,
+) -> (u64, u64) {
+    let mut deleted: u64 = 0;
+    let mut errors: u64 = 0;
+    let fourteen_days_secs = DISCORD_BULK_DELETE_MAX_AGE_SECS;
+    let mut empty_streak = 0u32;
+
+    loop {
+        // `after` renvoie les plus ANCIENS messages situes apres la borne ; on
+        // les supprime puis on re-fetch after(boundary) jusqu'a epuisement.
+        let messages = match channel_id
+            .messages(
+                &ctx.http,
+                GetMessages::new()
+                    .after(boundary)
+                    .limit(DISCORD_BULK_DELETE_BATCH as u8),
+            )
+            .await
+        {
+            Ok(m) => m,
+            Err(e) => {
+                error!(error = %e, "Erreur fetch messages (purge until)");
+                break;
+            }
+        };
+        if messages.is_empty() {
+            break;
+        }
+
+        let before = deleted;
+        let now = chrono_now_unix();
+        let mut recent_ids: Vec<MessageId> = Vec::new();
+        let mut old_ids: Vec<MessageId> = Vec::new();
+        for msg in &messages {
+            if msg.pinned || msg.id == boundary {
+                continue;
+            }
+            if now - msg.timestamp.unix_timestamp() < fourteen_days_secs {
+                recent_ids.push(msg.id);
+            } else {
+                old_ids.push(msg.id);
+            }
+        }
+
+        for chunk in recent_ids.chunks(DISCORD_BULK_DELETE_BATCH) {
+            if chunk.len() == 1 {
+                if let Err(e) = channel_id.delete_message(&ctx.http, chunk[0]).await {
+                    error!(error = %e, "Erreur delete individuel (purge until)");
+                    errors += 1;
+                } else {
+                    deleted += 1;
+                }
+            } else {
+                match channel_id.delete_messages(&ctx.http, chunk).await {
+                    Ok(_) => deleted += chunk.len() as u64,
+                    Err(e) => {
+                        error!(error = %e, "Erreur bulk delete (purge until), fallback individuel");
+                        for &id in chunk {
+                            if let Err(e) = channel_id.delete_message(&ctx.http, id).await {
+                                error!(error = %e, "Erreur delete fallback (purge until)");
+                                errors += 1;
+                            } else {
+                                deleted += 1;
+                            }
+                            tokio::time::sleep(Duration::from_millis(purge_delete_rate_limit_ms()))
+                                .await;
+                        }
+                    }
+                }
+            }
+        }
+
+        for &id in &old_ids {
+            if let Err(e) = channel_id.delete_message(&ctx.http, id).await {
+                error!(error = %e, "Erreur delete ancien (purge until)");
                 errors += 1;
             } else {
                 deleted += 1;
