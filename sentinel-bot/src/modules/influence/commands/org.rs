@@ -221,6 +221,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                                 .await;
                         channel_line = format!("\n\n📢 Salon privé : <#{chan}>");
                     }
+                    // Vocal privé de l'org (meme categorie que le texte) : les
+                    // membres peuvent communiquer en vocal. Best-effort.
+                    if let Some(vchan) =
+                        create_org_voice_channel(ctx, &guild_id, &org.name, &user_id).await
+                    {
+                        channel_line.push_str(&format!("\n🔊 Vocal privé : <#{vchan}>"));
+                    }
                     let base_desc = if org.motto.is_empty() {
                         "Tu en es le **Fondateur**.".to_string()
                     } else {
@@ -264,10 +271,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         }
                     }
                 }
-                // Acces au salon prive de l'organisation.
+                // Acces au salon prive (texte) + au vocal prive de l'organisation.
                 if let Some(chan) = &org.discord_channel_id {
                     grant_channel_access(ctx, chan, &user_id).await;
                 }
+                grant_org_voice_access(ctx, &guild_id, &org.name, &user_id).await;
                 reply_ephemeral(
                     ctx,
                     command,
@@ -642,6 +650,64 @@ async fn create_org_channel(
     gid.create_channel(&ctx.http, builder).await.ok().map(|c| c.id)
 }
 
+/// Cree le VOCAL prive d'une organisation, sous la MEME categorie que son salon
+/// texte, joignable des seuls membres (et du bot). Best-effort.
+async fn create_org_voice_channel(
+    ctx: &Context,
+    guild_id: &str,
+    org_name: &str,
+    founder_user_id: &str,
+) -> Option<serenity::model::id::ChannelId> {
+    use serenity::all::{
+        ChannelType, CreateChannel, PermissionOverwrite, PermissionOverwriteType, Permissions,
+    };
+    use serenity::model::id::{ChannelId, GuildId, RoleId, UserId};
+
+    let gid = GuildId::new(guild_id.parse::<u64>().ok()?);
+
+    // Meme categorie que le salon texte de l'org.
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, guild_id, "influence-bot")
+            .await;
+    let category_id: Option<ChannelId> = match cfg
+        .get("influence_org_category_id")
+        .filter(|s| !s.is_empty())
+    {
+        Some(s) => s.parse::<u64>().ok().map(ChannelId::new),
+        None => find_or_create_category(ctx, gid).await,
+    };
+
+    // @everyone ne voit/rejoint pas ; fondateur + bot peuvent voir/parler.
+    let allow = Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK;
+    let mut overwrites = vec![PermissionOverwrite {
+        allow: Permissions::empty(),
+        deny: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
+        kind: PermissionOverwriteType::Role(RoleId::new(gid.get())),
+    }];
+    if let Ok(fid) = founder_user_id.parse::<u64>() {
+        overwrites.push(PermissionOverwrite {
+            allow,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(UserId::new(fid)),
+        });
+    }
+    if let Ok(me) = ctx.http.get_current_user().await {
+        overwrites.push(PermissionOverwrite {
+            allow,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(me.id),
+        });
+    }
+
+    let mut builder = CreateChannel::new(format!("🔊 {org_name}"))
+        .kind(ChannelType::Voice)
+        .permissions(overwrites);
+    if let Some(cat) = category_id {
+        builder = builder.category(cat);
+    }
+    gid.create_channel(&ctx.http, builder).await.ok().map(|c| c.id)
+}
+
 /// Trouve la categorie « Organisations » ou la cree si absente.
 async fn find_or_create_category(
     ctx: &Context,
@@ -680,4 +746,31 @@ async fn grant_channel_access(ctx: &Context, channel_id: &str, user_id: &str) {
         kind: PermissionOverwriteType::Member(UserId::new(uid)),
     };
     let _ = ChannelId::new(cid).create_permission(&ctx.http, overwrite).await;
+}
+
+/// Donne l'acces au VOCAL prive de l'org (retrouve par nom « 🔊 {org} ») a un
+/// membre qui vient de rejoindre. Best-effort.
+async fn grant_org_voice_access(ctx: &Context, guild_id: &str, org_name: &str, user_id: &str) {
+    use serenity::all::{ChannelType, PermissionOverwrite, PermissionOverwriteType, Permissions};
+    use serenity::model::id::{GuildId, UserId};
+    let (Ok(gid), Ok(uid)) = (guild_id.parse::<u64>(), user_id.parse::<u64>()) else {
+        return;
+    };
+    let gid = GuildId::new(gid);
+    let name = format!("🔊 {org_name}");
+    let Ok(channels) = gid.channels(&ctx.http).await else {
+        return;
+    };
+    let Some(vc) = channels
+        .values()
+        .find(|c| c.kind == ChannelType::Voice && c.name == name)
+    else {
+        return;
+    };
+    let overwrite = PermissionOverwrite {
+        allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+        deny: Permissions::empty(),
+        kind: PermissionOverwriteType::Member(UserId::new(uid)),
+    };
+    let _ = vc.id.create_permission(&ctx.http, overwrite).await;
 }
