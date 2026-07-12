@@ -113,6 +113,16 @@ fn is_provider_bot(bot_id: u64) -> bool {
     PROVIDERS.iter().any(|p| p.bot_id == bot_id)
 }
 
+/// Heuristique de diagnostic : cet embed ressemble-t-il a une confirmation de
+/// bump/vote ? (titre ou description contient "bump" ou "vote"). Sert a
+/// capturer les messages d'un provider MAL configure (bot_id ou motifs faux),
+/// pour reveler dans les logs le format reel a calibrer.
+fn embed_looks_bumpy(e: &serenity::all::Embed) -> bool {
+    let t = e.title.as_deref().unwrap_or("").to_lowercase();
+    let d = e.description.as_deref().unwrap_or("").to_lowercase();
+    t.contains("bump") || d.contains("bump") || t.contains("vote") || d.contains("vote")
+}
+
 fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
     PROVIDERS.iter().find(|p| p.key == key)
 }
@@ -254,10 +264,18 @@ pub async fn on_message_update(
     if !has_embeds {
         return;
     }
-    // Si l'auteur est connu et n'est pas un provider bump, on ignore
-    // (evite de refetch tous les messages edites du serveur).
+    // On refetch si : (a) c'est un provider connu, OU (b) l'embed edite ressemble
+    // a un bump/vote (permet de diagnostiquer un provider mal configure, ex:
+    // DiscordL avec un bot_id ou des motifs errones). Sinon on ignore (evite de
+    // refetch tous les messages edites du serveur).
     if let Some(author) = &event.author {
-        if !is_provider_bot(author.id.get()) {
+        let known = is_provider_bot(author.id.get());
+        let bumpy = event
+            .embeds
+            .as_ref()
+            .map(|es| es.iter().any(embed_looks_bumpy))
+            .unwrap_or(false);
+        if !known && !bumpy {
             return;
         }
     }
@@ -271,6 +289,23 @@ pub async fn on_message_update(
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
     let Some(provider) = provider_for_message(msg) else {
+        // DIAGNOSTIC : message d'un BOT qui ressemble a un bump/vote mais qu'aucun
+        // provider n'a reconnu (bot_id inconnu OU motifs de detection faux). On
+        // logue le format reel pour pouvoir calibrer (ex: DiscordL non detecte).
+        if msg.author.bot
+            && !msg.embeds.is_empty()
+            && (is_provider_bot(msg.author.id.get()) || msg.embeds.iter().any(embed_looks_bumpy))
+        {
+            warn!(
+                bot_id = msg.author.id.get(),
+                bot_name = %msg.author.name,
+                known_provider = is_provider_bot(msg.author.id.get()),
+                embed_title = msg.embeds.first().and_then(|e| e.title.as_deref()).unwrap_or("<aucun>"),
+                embed_desc = msg.embeds.first().and_then(|e| e.description.as_deref()).unwrap_or("<aucune>"),
+                content = %msg.content,
+                "DIAG bump: message bump-like NON reconnu — calibrer bot_id/motifs du provider"
+            );
+        }
         return;
     };
     let Some(guild_id) = msg.guild_id else { return };
