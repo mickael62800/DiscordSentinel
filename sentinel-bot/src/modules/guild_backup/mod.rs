@@ -96,6 +96,21 @@ pub fn register_commands() -> Vec<CreateCommand> {
                 )
                 .required(true),
             ),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "preview",
+                "Compare une sauvegarde a l'etat actuel (a creer vs deja present)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "id",
+                    "ID de la sauvegarde a comparer",
+                )
+                .required(true),
+            ),
         )]
 }
 
@@ -251,6 +266,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
             cmd_restore_prompt(ctx, command, opt_string(opts, "id"), opt_bool(opts, "wipe")).await
         }
         "delete" => cmd_delete(ctx, command, opt_string(opts, "id")).await,
+        "preview" => cmd_preview(ctx, command, guild_id, opt_string(opts, "id")).await,
         _ => reply(ctx, command, "Sous-commande inconnue.").await,
     }
 }
@@ -314,6 +330,94 @@ async fn cmd_create(
         }
         Err(e) => edit(ctx, command, &format!("❌ Stockage impossible : {e}")).await,
     }
+}
+
+/// Diff live : compare une sauvegarde a l'etat ACTUEL du serveur et indique ce
+/// qui serait cree vs deja present (comme le fait la restauration sans wipe).
+async fn cmd_preview(
+    ctx: &Context,
+    command: &CommandInteraction,
+    guild_id: GuildId,
+    id: Option<String>,
+) {
+    let Some(api) = api(ctx).await else {
+        return reply(ctx, command, "Service indisponible.").await;
+    };
+    let Some(snapshot_id) = id else {
+        return reply(ctx, command, "Precise l'ID de la sauvegarde (`id`).").await;
+    };
+    // Defer : lecture roles + salons Discord peut depasser 3s.
+    if command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+        .is_err()
+    {
+        return;
+    }
+
+    let snapshot = match api_client::get_snapshot(&api, &snapshot_id).await {
+        Ok(s) => s,
+        Err(e) => {
+            edit(ctx, command, &format!("❌ Sauvegarde introuvable : {e}")).await;
+            return;
+        }
+    };
+
+    // Etat actuel : noms de roles / categories / salons.
+    use std::collections::HashSet;
+    let mut role_names: HashSet<String> = HashSet::new();
+    if let Ok(roles) = guild_id.roles(&ctx.http).await {
+        role_names = roles.into_values().map(|r| r.name).collect();
+    }
+    let mut cat_names: HashSet<String> = HashSet::new();
+    let mut chan_names: HashSet<String> = HashSet::new();
+    if let Ok(channels) = guild_id.channels(&ctx.http).await {
+        for ch in channels.into_values() {
+            if ch.kind == serenity::all::ChannelType::Category {
+                cat_names.insert(ch.name);
+            } else {
+                chan_names.insert(ch.name);
+            }
+        }
+    }
+
+    // Compte "a creer" vs "deja present" (match par nom, comme le merge).
+    let count = |items: &HashSet<String>, present: &HashSet<String>| -> (usize, usize) {
+        let reused = items.iter().filter(|n| present.contains(*n)).count();
+        (items.len() - reused, reused)
+    };
+    // Snapshot -> ensembles de noms.
+    let snap_roles: HashSet<String> = snapshot.roles.iter().map(|r| r.name.clone()).collect();
+    let snap_cats: HashSet<String> = snapshot.categories.iter().map(|c| c.name.clone()).collect();
+    let snap_chans: HashSet<String> =
+        snapshot.channels.iter().map(|c| c.name.clone()).collect();
+
+    let (roles_new, roles_reused) = count(&snap_roles, &role_names);
+    let (cats_new, cats_reused) = count(&snap_cats, &cat_names);
+    let (chans_new, chans_reused) = count(&snap_chans, &chan_names);
+
+    edit(
+        ctx,
+        command,
+        &format!(
+            "🔍 **Aperçu de « {} »** comparé à l'état actuel du serveur.\n\n\
+             **En restaurant SANS wipe** (fusion par nom) :\n\
+             🆕 À créer : **{roles_new}** rôle(s), **{cats_new}** catégorie(s), **{chans_new}** salon(s)\n\
+             ♻️ Déjà présents (réutilisés, pas de doublon) : **{roles_reused}** rôle(s), **{cats_reused}** catégorie(s), **{chans_reused}** salon(s)\n\n\
+             La sauvegarde contient au total {} rôle(s), {} catégorie(s), {} salon(s).\n\
+             ⚠️ Avec wipe, tout est supprimé puis recréé (les compteurs « réutilisés » deviennent « à créer »).",
+            snapshot.meta.label,
+            snapshot.roles.len(),
+            snapshot.categories.len(),
+            snapshot.channels.len(),
+        ),
+    )
+    .await;
 }
 
 async fn cmd_list(ctx: &Context, command: &CommandInteraction, guild_id: GuildId) {
