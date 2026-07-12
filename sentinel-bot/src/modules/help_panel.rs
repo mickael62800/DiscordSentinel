@@ -70,6 +70,14 @@ impl Audience {
             Audience::Members => "commandes-membres",
         }
     }
+    /// Clé de config (help-bot) portant la catégorie où ranger ce salon.
+    fn category_key(self) -> &'static str {
+        match self {
+            Audience::Admin => "admin_category_id",
+            Audience::Moderation => "moderation_category_id",
+            Audience::Members => "membres_category_id",
+        }
+    }
     fn header_title(self) -> &'static str {
         match self {
             Audience::Admin => "🔐 Commandes — Administration",
@@ -183,15 +191,20 @@ async fn deploy_for_guild(
         }
     }
 
-    // ── Catégorie parente ──
-    let category_id = resolve_category(ctx, &gid, guild_id).await?;
+    // ── Config (catégorie par audience) ──
+    let cfg = guild_config_or_default(ctx, &gid, BOT_NAME).await;
+    // Catégorie par défaut partagée, créée à la demande si une audience n'a pas
+    // de catégorie configurée (évite d'en créer plusieurs).
+    let mut default_category: Option<ChannelId> = None;
 
-    // ── Un salon par audience non vide ──
+    // ── Un salon par audience non vide, sous SA catégorie ──
     for aud in Audience::ALL {
         let entries = &buckets[aud.idx()];
         if entries.is_empty() {
             continue;
         }
+        let category_id =
+            resolve_audience_category(ctx, &cfg, guild_id, aud, &mut default_category).await?;
         let channel_id = resolve_channel(ctx, guild_id, category_id, aud).await?;
         purge_old_panels(ctx, channel_id, bot_id).await;
 
@@ -223,15 +236,18 @@ async fn deploy_for_guild(
     Ok(())
 }
 
-/// Catégorie parente : config `category_id` si valide, sinon une catégorie
-/// existante nommée `CATEGORY_NAME`, sinon on la crée.
-async fn resolve_category(
+/// Catégorie où ranger le salon d'une audience : celle configurée pour cette
+/// audience (dropdown `<audience>_category_id`) si valide, sinon une catégorie
+/// par défaut partagée (créée/réutilisée une seule fois).
+async fn resolve_audience_category(
     ctx: &Context,
-    gid: &str,
+    cfg: &std::collections::HashMap<String, String>,
     guild_id: GuildId,
+    aud: Audience,
+    default_category: &mut Option<ChannelId>,
 ) -> Result<ChannelId, String> {
-    let cfg = guild_config_or_default(ctx, gid, BOT_NAME).await;
-    if let Some(raw) = cfg.get("category_id") {
+    // 1. Catégorie configurée pour CETTE audience.
+    if let Some(raw) = cfg.get(aud.category_key()) {
         if let Ok(id) = raw.trim().parse::<u64>() {
             if id != 0 {
                 if let Ok(Channel::Guild(ch)) = ChannelId::new(id).to_channel(&ctx.http).await {
@@ -242,7 +258,20 @@ async fn resolve_category(
             }
         }
     }
+    // 2. Repli : catégorie par défaut partagée (mémorisée pour ne pas la recréer).
+    if let Some(id) = default_category {
+        return Ok(*id);
+    }
+    let id = find_or_create_default_category(ctx, guild_id).await?;
+    *default_category = Some(id);
+    Ok(id)
+}
 
+/// Catégorie par défaut `CATEGORY_NAME` : réutilise l'existante ou la crée.
+async fn find_or_create_default_category(
+    ctx: &Context,
+    guild_id: GuildId,
+) -> Result<ChannelId, String> {
     let channels = guild_id
         .channels(&ctx.http)
         .await
@@ -253,7 +282,6 @@ async fn resolve_category(
     {
         return Ok(ch.id);
     }
-
     guild_id
         .create_channel(
             &ctx.http,
