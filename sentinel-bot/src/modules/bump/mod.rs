@@ -168,21 +168,59 @@ fn dl_is_cooldown(msg: &Message) -> bool {
     )
 }
 
-// Le meme bot DiscordL poste bump ET vote : on tranche sur "Bump" vs "Vote".
-fn matches_discordl_bump(msg: &Message) -> bool {
-    dl_has(msg, &["résultat du bump", "a bump"])
-}
-fn matches_discordl_vote(msg: &Message) -> bool {
-    dl_has(msg, &["résultat du vote", "a voté", "a vote"])
+/// `true` si un titre d'embed contient `needle` (insensible a la casse).
+/// Matching robuste (sous-chaine) : tolere le phrasing exact / les accents /
+/// l'ellipsis ("Résultat du Bump sur DiscordL …").
+fn dl_title_contains(msg: &Message, needle: &str) -> bool {
+    msg.embeds
+        .iter()
+        .any(|e| e.title.as_deref().unwrap_or("").to_lowercase().contains(needle))
 }
 
-/// Bump DiscordL reussi : message de bump (cf. `matches_discordl_bump`) hors cooldown.
-fn detect_discordl_bump(msg: &Message) -> bool {
-    !dl_is_cooldown(msg) && matches_discordl_bump(msg)
+// Le meme bot DiscordL poste bump ET vote : on tranche sur le TITRE de l'embed
+// ("Résultat du **Bump**…" vs "Résultat du **Vote**…").
+fn matches_discordl_bump(msg: &Message) -> bool {
+    dl_title_contains(msg, "bump") && !dl_title_contains(msg, "vote")
 }
-/// Vote DiscordL reussi : message de vote (cf. `matches_discordl_vote`) hors cooldown.
+fn matches_discordl_vote(msg: &Message) -> bool {
+    dl_title_contains(msg, "vote")
+}
+
+/// Marqueur de SUCCES DiscordL : coche verte "✅" ou "a bump/voté", cherche dans
+/// titre + description + CHAMPS de l'embed (le texte de succes peut vivre dans un
+/// field, pas la description). Distingue un vrai bump d'un cooldown au meme titre.
+fn dl_is_success(msg: &Message) -> bool {
+    msg.embeds.iter().any(|e| {
+        let mut hay = String::new();
+        if let Some(t) = &e.title {
+            hay.push_str(t);
+            hay.push(' ');
+        }
+        if let Some(d) = &e.description {
+            hay.push_str(d);
+            hay.push(' ');
+        }
+        for f in &e.fields {
+            hay.push_str(&f.name);
+            hay.push(' ');
+            hay.push_str(&f.value);
+            hay.push(' ');
+        }
+        if hay.contains('\u{2705}') {
+            return true; // ✅
+        }
+        let low = hay.to_lowercase();
+        low.contains("a bump") || low.contains("a voté") || low.contains("a vote")
+    })
+}
+
+/// Bump DiscordL reussi : titre "bump" + marqueur de succes + hors cooldown.
+fn detect_discordl_bump(msg: &Message) -> bool {
+    matches_discordl_bump(msg) && dl_is_success(msg) && !dl_is_cooldown(msg)
+}
+/// Vote DiscordL reussi : titre "vote" + marqueur de succes + hors cooldown.
 fn detect_discordl_vote(msg: &Message) -> bool {
-    !dl_is_cooldown(msg) && matches_discordl_vote(msg)
+    matches_discordl_vote(msg) && dl_is_success(msg) && !dl_is_cooldown(msg)
 }
 
 /// Resout l'auteur du /bump : d'abord via interaction_metadata (reponse de
