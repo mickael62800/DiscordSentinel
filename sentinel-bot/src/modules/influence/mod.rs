@@ -11,6 +11,7 @@ use crate::shared::discord_helpers::is_module_enabled_or_reply_command;
 use crate::shared::heartbeat::ApiClientKey;
 
 pub mod api_client;
+pub mod channels;
 pub mod commands;
 pub mod press;
 
@@ -55,6 +56,13 @@ pub fn handles_command(name: &str) -> bool {
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;
+    }
+    // Restriction : chaque commande ne s'utilise que dans son salon de domaine
+    // (si la fonctionnalité est activée). Sinon fail-open.
+    if let Some(domain) = channels::domain_for_command(command.data.name.as_str()) {
+        if !channels::enforce(ctx, command, domain).await {
+            return;
+        }
     }
     match command.data.name.as_str() {
         "influence-profil" => commands::profil::handle(ctx, command).await,
