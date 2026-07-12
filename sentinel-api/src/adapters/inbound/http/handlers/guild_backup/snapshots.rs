@@ -66,8 +66,26 @@ pub async fn store_snapshot(
 ) -> Result<(StatusCode, Json<StoredSnapshotDto>), ApiError> {
     check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, OWNER_REQUIRED).await?;
     // Le guild_id autoritaire est celui du path (evite un mismatch body/URL).
-    snapshot.guild_id = guild_id;
-    let id = state.guild_snapshots_uc.store_snapshot(snapshot).await?;
+    snapshot.guild_id = guild_id.clone();
+    // Quota de retention configurable (guild-backup-bot / snapshot_quota).
+    // Absent => defaut historique (20). Le service borne a [1, 100].
+    let quota = state
+        .bot_config_repo
+        .get_config(&guild_id, "guild-backup-bot")
+        .await
+        .ok()
+        .and_then(|cfg| {
+            cfg.iter()
+                .find(|c| c.config_key == "snapshot_quota")
+                .and_then(|c| c.config_value.parse::<u32>().ok())
+        })
+        .unwrap_or(
+            sentinel_core::application::guild_backup::manage_snapshots_service::MAX_SNAPSHOTS_PER_GUILD,
+        );
+    let id = state
+        .guild_snapshots_uc
+        .store_snapshot_with_quota(snapshot, quota)
+        .await?;
     Ok((
         StatusCode::CREATED,
         Json(StoredSnapshotDto { id: id.to_string() }),

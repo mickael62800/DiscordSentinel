@@ -33,7 +33,16 @@ pub struct SnapshotSummary {
 #[async_trait]
 pub trait ManageGuildSnapshotsUseCase: Send + Sync {
     /// Stocke une nouvelle sauvegarde (nouvelle version). Renvoie son id.
+    /// Utilise le quota de rétention par défaut.
     async fn store_snapshot(&self, snapshot: GuildSnapshot) -> Result<SnapshotId, DomainError>;
+
+    /// Comme `store_snapshot` mais avec un quota de rétention explicite
+    /// (nombre max de sauvegardes conservées par serveur, configurable).
+    async fn store_snapshot_with_quota(
+        &self,
+        snapshot: GuildSnapshot,
+        quota: u32,
+    ) -> Result<SnapshotId, DomainError>;
 
     /// Liste les sauvegardes d'une guild (resumes, sans payload), du plus
     /// recent au plus ancien.

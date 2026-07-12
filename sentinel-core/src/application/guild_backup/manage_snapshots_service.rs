@@ -34,6 +34,15 @@ impl ManageGuildSnapshotsService {
 #[async_trait]
 impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
     async fn store_snapshot(&self, snapshot: GuildSnapshot) -> Result<SnapshotId, DomainError> {
+        self.store_snapshot_with_quota(snapshot, MAX_SNAPSHOTS_PER_GUILD)
+            .await
+    }
+
+    async fn store_snapshot_with_quota(
+        &self,
+        snapshot: GuildSnapshot,
+        quota: u32,
+    ) -> Result<SnapshotId, DomainError> {
         if snapshot.guild_id.trim().is_empty() {
             return Err(DomainError::ValidationError("guild_id requis".into()));
         }
@@ -47,9 +56,12 @@ impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
             )));
         }
 
+        // Quota borne a [1, 100] (garde-fou contre une config aberrante).
+        let quota = quota.clamp(1, 100);
+
         // Rotation : si le quota est atteint, on evince la/les plus anciennes
-        // pour garder au plus MAX_SNAPSHOTS_PER_GUILD - 1 avant l'insertion.
-        while self.repo.count(&snapshot.guild_id).await? >= MAX_SNAPSHOTS_PER_GUILD {
+        // pour garder au plus `quota - 1` avant l'insertion.
+        while self.repo.count(&snapshot.guild_id).await? >= quota {
             match self.repo.oldest_id(&snapshot.guild_id).await? {
                 Some(id) => {
                     self.repo.delete(id).await?;
@@ -304,6 +316,44 @@ mod tests {
             .collect();
         assert!(!labels.contains(&"b0".to_string()));
         assert!(labels.contains(&"newest".to_string()));
+    }
+
+    #[tokio::test]
+    async fn custom_quota_evicts_at_configured_limit() {
+        let (svc, repo) = service();
+        // Quota configure a 3 : au-dela, la plus ancienne est evincee.
+        for i in 0..3 {
+            svc.store_snapshot_with_quota(snapshot("g1", &format!("b{i}")), 3)
+                .await
+                .unwrap();
+        }
+        assert_eq!(repo.count("g1").await.unwrap(), 3);
+        svc.store_snapshot_with_quota(snapshot("g1", "newest"), 3)
+            .await
+            .unwrap();
+        assert_eq!(repo.count("g1").await.unwrap(), 3);
+        let labels: Vec<String> = svc
+            .list_snapshots("g1")
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|s| s.label)
+            .collect();
+        assert!(!labels.contains(&"b0".to_string()));
+        assert!(labels.contains(&"newest".to_string()));
+    }
+
+    #[tokio::test]
+    async fn quota_zero_is_clamped_to_one() {
+        let (svc, repo) = service();
+        svc.store_snapshot_with_quota(snapshot("g1", "a"), 0)
+            .await
+            .unwrap();
+        svc.store_snapshot_with_quota(snapshot("g1", "b"), 0)
+            .await
+            .unwrap();
+        // quota 0 borne a 1 : une seule sauvegarde conservee.
+        assert_eq!(repo.count("g1").await.unwrap(), 1);
     }
 
     #[tokio::test]
