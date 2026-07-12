@@ -62,12 +62,13 @@ impl Audience {
             Audience::Members => 2,
         }
     }
-    /// Nom du salon dédié (Discord le normalise en minuscules/tirets).
+    /// Nom du salon dédié (préfixe emoji + ・, comme demandé). Discord conserve
+    /// l'emoji et le ・, normalise juste les lettres en minuscules.
     fn channel_name(self) -> &'static str {
         match self {
-            Audience::Admin => "commandes-admin",
-            Audience::Moderation => "commandes-moderation",
-            Audience::Members => "commandes-membres",
+            Audience::Admin => "👑・commandes-admin",
+            Audience::Moderation => "🔨・commandes-moderation",
+            Audience::Members => "💬・commandes-membres",
         }
     }
     /// Clé de config (help-bot) portant la catégorie où ranger ce salon.
