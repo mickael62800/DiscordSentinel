@@ -46,6 +46,7 @@ pub(crate) fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
         // On l'utilise ici officiellement.
         "confessions" => modules::confessions::register_commands(),
         "guild-backup-bot" => modules::guild_backup::register_commands(),
+        "nasa-apod-bot" => modules::nasa_apod::register_commands(),
         _ => Vec::new(),
     }
 }
@@ -72,6 +73,7 @@ pub const BOT_NAMES_WITH_COMMANDS: &[&str] = &[
     "ticket-bot",
     "confessions",
     "guild-backup-bot",
+    "nasa-apod-bot",
 ];
 
 /// Calcule la liste des commandes a enregistrer pour cette guild en

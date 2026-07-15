@@ -634,6 +634,7 @@ impl EventHandler for Handler {
                             modules::confessions::handle_command(&ctx, &command).await
                         }
                         "backup" => modules::guild_backup::handle_command(&ctx, &command).await,
+                        "apod" => modules::nasa_apod::handle_command(&ctx, &command).await,
                         _ if modules::coude::handles_command(name) => {
                             modules::coude::handle_command(&ctx, &command).await
                         }

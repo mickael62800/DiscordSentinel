@@ -12,13 +12,18 @@ use std::time::Duration;
 
 use chrono::{Timelike, Utc};
 use serde::Deserialize;
-use serenity::all::{Color, GetMessages};
+use serenity::all::{
+    Color, CommandInteraction, CreateCommand, CreateInteractionResponse,
+    CreateInteractionResponseMessage, EditInteractionResponse, GetMessages, Permissions,
+};
 use serenity::builder::{CreateEmbed, CreateMessage};
 use serenity::prelude::Context;
 use tracing::{debug, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
-use crate::shared::discord_helpers::{get_channel_from_config, guild_config_or_default};
+use crate::shared::discord_helpers::{
+    get_channel_from_config, guild_config_or_default, is_module_enabled_or_reply_command,
+};
 use crate::shared::heartbeat::ApiClientKey;
 
 pub const MODULE_BOT_NAME: &str = "nasa-apod-bot";
@@ -84,8 +89,17 @@ async fn tick(ctx: &Context) -> Result<(), String> {
         if !BaseApiClient::config_bool(&cfg, "enabled", false) {
             continue;
         }
-        let post_hour = BaseApiClient::config_u64(&cfg, "post_hour", 9).min(23) as u32;
-        if now_hour != post_hour {
+        // Heure de publication exprimee dans le fuseau local du serveur :
+        // `post_hour` locale, `timezone_offset` = decalage vs UTC (ex. +1 Paris
+        // hiver, +2 ete). On ramene a l'heure UTC equivalente pour comparer.
+        let post_hour = BaseApiClient::config_u64(&cfg, "post_hour", 9).min(23) as i64;
+        let offset = cfg
+            .get("timezone_offset")
+            .and_then(|v| v.trim().parse::<i64>().ok())
+            .unwrap_or(0)
+            .clamp(-12, 14);
+        let target_utc = (post_hour - offset).rem_euclid(24) as u32;
+        if now_hour != target_utc {
             continue;
         }
         let api_key = BaseApiClient::config_or(&cfg, "nasa_api_key", "");
@@ -129,6 +143,87 @@ async fn tick(ctx: &Context) -> Result<(), String> {
         info!(guild_id = %guild_id, date = %apod.date, "nasa-apod: photo du jour publiee");
     }
     Ok(())
+}
+
+/// Commande slash du module.
+pub fn register_commands() -> Vec<CreateCommand> {
+    vec![CreateCommand::new("apod")
+        .description("Affiche la photo de l'espace du jour (NASA)")
+        .default_member_permissions(Permissions::empty())]
+}
+
+/// `/apod` : publie a la demande la photo du jour dans le salon courant.
+/// Accessible a tous ; utile pour tester ou revoir la photo sans attendre
+/// l'heure de publication automatique.
+pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
+    }
+    let Some(gid) = command.guild_id else {
+        return;
+    };
+    let cfg = guild_config_or_default(ctx, &gid.to_string(), MODULE_BOT_NAME).await;
+    let api_key = BaseApiClient::config_or(&cfg, "nasa_api_key", "");
+    if api_key.trim().is_empty() {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().ephemeral(true).content(
+                        "⚠️ Aucune clé API NASA configurée. Un admin doit la renseigner dans les Composants.",
+                    ),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    // La recuperation + traduction peut prendre 1-2 s : on differe la reponse.
+    if command
+        .create_response(&ctx.http, CreateInteractionResponse::Defer(Default::default()))
+        .await
+        .is_err()
+    {
+        return;
+    }
+
+    let client = {
+        let data = ctx.data.read().await;
+        data.get::<ApiClientKey>().map(|a| a.client().clone())
+    };
+    let Some(client) = client else {
+        let _ = command
+            .edit_response(
+                &ctx.http,
+                EditInteractionResponse::new().content("API indisponible, réessaie plus tard."),
+            )
+            .await;
+        return;
+    };
+
+    let apod = match fetch_apod(&client, api_key.trim()).await {
+        Ok(a) => a,
+        Err(e) => {
+            warn!(error = %e, "nasa-apod: /apod recuperation echouee");
+            let _ = command
+                .edit_response(
+                    &ctx.http,
+                    EditInteractionResponse::new()
+                        .content("Impossible de récupérer la photo du jour de la NASA."),
+                )
+                .await;
+            return;
+        }
+    };
+
+    let deepl_key = BaseApiClient::config_or(&cfg, "deepl_api_key", "");
+    let (title, explanation) =
+        translate_or_original(&client, deepl_key.trim(), &apod.title, &apod.explanation).await;
+    let marker = format!("{MARKER} · {}", apod.date);
+    let embed = build_embed(&apod, &title, &explanation, &marker);
+    let _ = command
+        .edit_response(&ctx.http, EditInteractionResponse::new().embed(embed))
+        .await;
 }
 
 /// Appelle l'API APOD de la NASA.
