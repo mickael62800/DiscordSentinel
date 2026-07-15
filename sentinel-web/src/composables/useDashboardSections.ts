@@ -82,6 +82,9 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
   { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
+  // Module sans page dediee : la tuile ouvre directement sa config (lien
+  // profond ?bot= gere par ComponentConfigPage). Masquee si le bot est off.
+  { key: "config.nasa-apod", path: "/component-config?bot=nasa-apod-bot", label: "Photo de l'espace", icon: "image", requiredBot: "nasa-apod-bot" },
 ];
 
 /// Alias : sous-chemins de hubs (fusionnes) qui partagent la gouvernance RBAC

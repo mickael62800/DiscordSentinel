@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
+import { useRoute } from "vue-router";
 import { storeToRefs } from "pinia";
 import type { BotDefinition } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
@@ -11,6 +12,7 @@ import ComponentSelectorSection from "../organisms/ComponentSelectorSection.vue"
 import ComponentConfigForm from "../organisms/ComponentConfigForm.vue";
 import AutomodAnalysisHistory from "../organisms/AutomodAnalysisHistory.vue";
 
+const route = useRoute();
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 const { fetchConfigs } = useBotEnabledStatus();
 
@@ -64,8 +66,14 @@ async function reloadAfterSave() {
   await fetchConfigs();
 }
 
-onMounted(() => {
-  fetchDefinitions();
+onMounted(async () => {
+  await fetchDefinitions();
+  // Lien direct depuis une tuile du tableau de bord : ?bot=<bot_name>
+  // présélectionne le module concerné (ex. /component-config?bot=nasa-apod-bot).
+  const wanted = route.query.bot;
+  if (typeof wanted === "string" && definitions.value.some((d) => d.bot_name === wanted)) {
+    selectComponent(wanted);
+  }
 });
 </script>
 
