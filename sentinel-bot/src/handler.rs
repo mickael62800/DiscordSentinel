@@ -178,6 +178,7 @@ impl EventHandler for Handler {
         // Background tasks blackjack (AFK cleanup consumer)
         modules::blackjack::spawn_background(ctx.clone());
         modules::bump::spawn_background(ctx.clone());
+        modules::nasa_apod::spawn_background(ctx.clone());
 
         // Security: sync membres au demarrage + background tasks
         let ctx_sec = ctx.clone();
