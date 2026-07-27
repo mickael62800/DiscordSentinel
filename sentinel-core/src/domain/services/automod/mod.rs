@@ -2,6 +2,7 @@
 //! dépendance Discord/infra). Partagé par le bot (analyse locale d'un message)
 //! et réutilisable par l'API/worker. Extrait de sentinel-bot (archi hexagonale).
 
+pub mod adaptive_slowmode;
 pub mod insult;
 pub mod link;
 pub mod phishing;
