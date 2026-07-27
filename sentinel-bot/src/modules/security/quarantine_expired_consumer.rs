@@ -85,6 +85,6 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         q.remove_tracking(guild_id, user_id);
     }
     if let Some(cp) = bot_data.get::<CaptchaPendingKey>() {
-        cp.remove(guild_id, user_id);
+        cp.remove((guild_id, user_id));
     }
 }

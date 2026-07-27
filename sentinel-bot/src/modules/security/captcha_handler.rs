@@ -86,10 +86,10 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
             }
         };
 
-        match captcha_pending.verify(guild_id, user_id, pressed_index) {
+        match captcha_pending.verify((guild_id, user_id), pressed_index) {
             Some(true) => {
                 // Bonne reponse — liberer
-                captcha_pending.remove(guild_id, user_id);
+                captcha_pending.remove((guild_id, user_id));
 
                 let guild_config = match base
                     .get_guild_config_for(
@@ -223,7 +223,7 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
     // -> empeche un self-bot de sauter l'epreuve via le custom_id du bouton simple.
     if data
         .get::<CaptchaPendingKey>()
-        .map(|cp| cp.is_pending(target_guild, user_id))
+        .map(|cp| cp.is_pending((target_guild, user_id)))
         .unwrap_or(false)
     {
         let response = serenity::builder::CreateInteractionResponse::Message(
