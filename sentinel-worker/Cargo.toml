@@ -5,6 +5,9 @@ edition = "2021"
 description = "Worker unifie DiscordSentinel — orchestrateur de tous les jobs periodiques (cleanup, coude, moderation, analytics, etc.) dans un seul binaire. Fusion progressive des anciens workers eclates."
 
 [dependencies]
+# Coeur hexagonal partagé (domain + ports + application). Permet au worker de
+# réutiliser les use cases au lieu de dupliquer le métier en SQL brut.
+sentinel-core = { workspace = true }
 tokio = { workspace = true }
 sqlx = { workspace = true }
 reqwest = { workspace = true }

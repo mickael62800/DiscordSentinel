@@ -8,7 +8,10 @@ mod api_client;
 pub mod automod_cmd;
 mod backend;
 mod config;
-pub mod detectors;
+// Détecteurs automod : la logique (règles pures) vit désormais dans le core
+// hexagonal partagé. Le bot ne fait que la ré-exposer sous le même chemin
+// (`super::detectors::…`) pour rester un adaptateur mince.
+pub use sentinel_core::domain::services::automod as detectors;
 mod message_handler;
 mod review;
 mod vote;
