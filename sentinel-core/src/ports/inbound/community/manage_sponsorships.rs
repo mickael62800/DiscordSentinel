@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::temp_role_repository::TempRole;
-use crate::ports::outbound::coude::sponsorship_repository::Sponsorship;
+use crate::ports::outbound::community::sponsorship_repository::Sponsorship;
 
 /// Use case du domaine Community pour les parrainages (sponsorships) et les
 /// roles temporaires (temp-roles). Regroupe la persistance derriere les ports

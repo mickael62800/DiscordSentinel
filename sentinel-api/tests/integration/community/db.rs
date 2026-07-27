@@ -288,7 +288,7 @@ mod community_grpc {
         use std::sync::Arc;
         let uc = Arc::new(
             sentinel_api::application::community::manage_sponsorships_service::ManageSponsorshipsService::new(
-                Arc::new(sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository::new(p.clone())),
+                Arc::new(sentinel_api::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository::new(p.clone())),
                 Arc::new(sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository::new(p.clone())),
             ),
         );

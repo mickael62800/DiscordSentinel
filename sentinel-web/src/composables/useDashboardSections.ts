@@ -47,31 +47,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "logs.journal", path: "/logs", label: "Journaux & audit", icon: "list" },
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
-  { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },
-  { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers", requiredBot: "blackjack-bot" },
-  { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign", requiredBot: "slot-bot" },
-  { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw", requiredBot: "wheel-bot" },
-  { key: "games.tamagotchi", path: "/tamagotchi", label: "Tamagotchi", icon: "heart", requiredBot: "tamagotchi-bot" },
-  // Wallet : visible tant qu'au moins un jeu utilisant le wallet est actif.
-  // Cache uniquement si coude + blackjack + slot + wheel sont TOUS off.
-  {
-    key: "games.wallet",
-    path: "/wallet",
-    label: "Wallet",
-    icon: "dollar-sign",
-    requiredAnyBot: ["coude-bot", "blackjack-bot", "slot-bot", "wheel-bot"],
-  },
-  // Railleries : feature partagee entre Coude et Blackjack (TauntEvent
-  // emis par les deux moteurs de jeu, canal Discord unique). Visible
-  // si AU MOINS un des deux bots est actif.
-  {
-    key: "games.taunts",
-    path: "/taunts",
-    label: "Railleries",
-    icon: "zap",
-    requiredAnyBot: ["coude-bot", "blackjack-bot"],
-  },
-
   { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server", requiredBot: "game-portal" },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },

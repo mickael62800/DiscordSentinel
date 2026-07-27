@@ -29,12 +29,8 @@ use tonic::transport::Channel;
 use tonic::transport::Endpoint;
 use tonic::Request;
 
-use sentinel_proto::blackjack::v1 as bj_proto;
-use sentinel_proto::blackjack::v1::blackjack_service_client::BlackjackServiceClient;
 use sentinel_proto::community::v1 as com_proto;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
-use sentinel_proto::coude::v1 as proto;
-use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceClient;
 use sentinel_proto::tickets::v1 as tickets_proto;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
 use sentinel_proto::welcome::v1 as welcome_proto;
@@ -85,129 +81,20 @@ fn auth<T>(mut req: Request<T>) -> Request<T> {
 
 #[tokio::test]
 #[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
-async fn live_get_or_create_then_get_player() {
-    let channel = connect().await;
-    let mut client = CoudePlayerServiceClient::new(channel);
-
-    let guild_id = unique_id();
-    let user_id = unique_id();
-
-    // 1. GetOrCreate cree le joueur (premiere fois)
-    let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-        username: "live_test_user".into(),
-    }));
-    let created = client
-        .get_or_create_player(req)
-        .await
-        .expect("get_or_create reussi")
-        .into_inner();
-
-    assert_eq!(created.guild_id, guild_id);
-    assert_eq!(created.user_id, user_id);
-    assert_eq!(created.username, "live_test_user");
-    assert_eq!(created.level, 1, "nouveau joueur niveau 1");
-    assert_eq!(created.xp, 0);
-    assert!(created.coins >= 0);
-
-    // 2. Get verifie que la creation a bien persiste en DB
-    let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-    }));
-    let fetched = client
-        .get_player(req)
-        .await
-        .expect("get reussi apres create")
-        .into_inner();
-
-    assert_eq!(fetched.guild_id, guild_id);
-    assert_eq!(fetched.user_id, user_id);
-    assert_eq!(fetched.username, "live_test_user");
-    // L'horodatage created_at doit etre du jour meme.
-    assert!(
-        fetched
-            .created_at
-            .starts_with(&chrono::Utc::now().format("%Y-%m-%d").to_string()),
-        "created_at attendu aujourd'hui, recu {}",
-        fetched.created_at
-    );
-
-    // 3. GetOrCreate de nouveau retourne le meme joueur (pas de duplicate)
-    let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-        username: "different_name".into(),
-    }));
-    let again = client.get_or_create_player(req).await.unwrap().into_inner();
-    assert_eq!(again.user_id, user_id, "doit etre le meme joueur");
-}
-
-#[tokio::test]
-#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
-async fn live_add_xp_persists_progression() {
-    let channel = connect().await;
-    let mut client = CoudePlayerServiceClient::new(channel);
-
-    let guild_id = unique_id();
-    let user_id = unique_id();
-
-    // Cree le joueur
-    let req = auth(Request::new(proto::GetOrCreatePlayerRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-        username: "xp_test".into(),
-    }));
-    let initial = client.get_or_create_player(req).await.unwrap().into_inner();
-    let initial_xp = initial.xp;
-
-    // Ajoute 75 XP
-    let req = auth(Request::new(proto::AddXpRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-        amount: 75,
-    }));
-    let progress = client.add_xp(req).await.unwrap().into_inner();
-    assert_eq!(progress.new_xp, initial_xp + 75);
-
-    // Re-fetch confirme la persistance
-    let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: guild_id.clone(),
-        user_id: user_id.clone(),
-    }));
-    let after = client.get_player(req).await.unwrap().into_inner();
-    assert_eq!(after.xp, initial_xp + 75);
-}
-
-#[tokio::test]
-#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
-async fn live_get_unknown_player_returns_not_found() {
-    let channel = connect().await;
-    let mut client = CoudePlayerServiceClient::new(channel);
-
-    let req = auth(Request::new(proto::GetPlayerRequest {
-        guild_id: unique_id(), // guild qui n'existe pas
-        user_id: unique_id(),
-    }));
-    let err = client.get_player(req).await.expect_err("doit echouer");
-
-    // domain_to_status mappe DomainError::NotFound vers Code::NotFound.
-    assert_eq!(err.code(), tonic::Code::NotFound);
-}
-
-#[tokio::test]
-#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
 async fn live_missing_auth_token_is_unauthenticated() {
     let channel = connect().await;
-    let mut client = CoudePlayerServiceClient::new(channel);
+    let mut client = TicketsServiceClient::new(channel);
 
     // Pas d'auth() - request sans header authorization
-    let req = Request::new(proto::GetPlayerRequest {
-        guild_id: "1".into(),
-        user_id: "1".into(),
+    let req = Request::new(tickets_proto::ListTicketsRequest {
+        status: None,
+        priority: None,
+        search: None,
+        author_id: None,
+        limit: 5,
+        offset: 0,
     });
-    let err = client.get_player(req).await.expect_err("doit echouer");
+    let err = client.list_tickets(req).await.expect_err("doit echouer");
     assert_eq!(err.code(), tonic::Code::Unauthenticated);
 }
 
@@ -285,21 +172,3 @@ async fn live_community_list_sponsorships_and_temp_roles() {
     assert!(temp_roles.roles.is_empty(), "guild aleatoire = vide");
 }
 
-#[tokio::test]
-#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
-async fn live_blackjack_get_active_returns_none_for_new_user() {
-    let channel = connect().await;
-    let mut client = BlackjackServiceClient::new(channel);
-
-    // Nouveau user -> pas de partie active.
-    let req = auth(Request::new(bj_proto::GetActiveRequest {
-        guild_id: unique_id(),
-        user_id: unique_id(),
-    }));
-    let resp = client
-        .get_active(req)
-        .await
-        .expect("get_active reussi")
-        .into_inner();
-    assert!(resp.game.is_none(), "nouveau user n'a pas de partie active");
-}

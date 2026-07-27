@@ -27,18 +27,6 @@ pub async fn require_guild_id(ctx: &Context, command: &CommandInteraction) -> Op
     }
 }
 
-/// Repond ephemerement avec le message d'erreur API standard.
-///
-/// Remplace le pattern `reply_ephemeral(ctx, command, &e.to_string()).await`
-/// duplique ~42 fois dans les commandes du bot.
-pub async fn reply_api_err<E: std::fmt::Display>(
-    ctx: &Context,
-    command: &CommandInteraction,
-    e: E,
-) {
-    reply_ephemeral(ctx, command, &e.to_string()).await;
-}
-
 /// Defer une slash command en mode ephemere.
 /// A appeler en tout debut de handler si le traitement peut depasser 3s.
 /// Apres un defer, utiliser `followup_ephemeral_embed` au lieu de `reply_*`.
@@ -141,42 +129,6 @@ pub async fn reply_ephemeral_embed(
         .await
     {
         warn!(error = %e, command = %command.data.name, "Echec reponse ephemere embed");
-    }
-}
-
-/// Reponse publique (non ephemere) embed a une slash command.
-pub async fn reply_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Echec response Discord");
-    }
-}
-
-/// Reponse ephemere texte a un component interaction (bouton/menu).
-pub async fn component_reply_ephemeral(
-    ctx: &Context,
-    component: &ComponentInteraction,
-    content: &str,
-) {
-    if let Err(e) = component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Echec reponse composant ephemere texte");
     }
 }
 

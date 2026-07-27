@@ -22,8 +22,7 @@ use crate::shared::heartbeat::{spawn_heartbeat, ApiClientKey};
 use crate::config::Config;
 use crate::handler::Handler;
 use crate::modules::{
-    audit, automod, blackjack, community, coude, moderation, progression, security, slot, tickets,
-    voice,
+    audit, automod, community, moderation, progression, security, tickets, voice,
 };
 
 #[tokio::main]
@@ -72,8 +71,6 @@ async fn main() {
         data.insert::<GrpcClientKey>(Arc::clone(&grpc));
 
         progression::init_typemap(&mut data, &api, &grpc);
-        blackjack::init_typemap(&mut data, &api, &grpc);
-        slot::init_typemap(&mut data);
         community::init_typemap(&mut data, &api, &grpc);
         security::init_typemap(&mut data, &api, &grpc);
         automod::init_typemap(&mut data);
@@ -81,8 +78,7 @@ async fn main() {
         moderation::init_typemap(&mut data, &api, &grpc);
         tickets::init_typemap(&mut data);
 
-        // Coude et voice font des appels API async au boot (catalogue / channels).
-        coude::init_typemap(&mut data, &api, &grpc).await;
+        // Voice fait des appels API async au boot (channels).
         voice::init_typemap(&mut data, &api, &grpc).await;
     }
 

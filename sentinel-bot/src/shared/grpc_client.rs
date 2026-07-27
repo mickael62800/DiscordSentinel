@@ -40,21 +40,13 @@ use tracing::{error, info, warn};
 
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_client::AiDatasetServiceClient;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
-use sentinel_proto::blackjack::v1::blackjack_service_client::BlackjackServiceClient;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
-use sentinel_proto::coude::v1::coude_bets_service_client::CoudeBetsServiceClient;
-use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
-use sentinel_proto::coude::v1::coude_economy_service_client::CoudeEconomyServiceClient;
-use sentinel_proto::coude::v1::coude_inventory_service_client::CoudeInventoryServiceClient;
-use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceClient;
-use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceClient;
 use sentinel_proto::members::v1::members_service_client::MembersServiceClient;
 use sentinel_proto::moderation::v1::moderation_service_client::ModerationServiceClient;
 use sentinel_proto::progression::v1::progression_service_client::ProgressionServiceClient;
 use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClient;
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
-use sentinel_proto::tamagotchi::v1::tamagotchi_service_client::TamagotchiServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
 use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
@@ -310,72 +302,6 @@ impl SentinelGrpcClient {
             .accept_compressed(CompressionEncoding::Gzip)
     }
 
-    /// Retourne un client `BlackjackService` pret a l'emploi.
-    pub fn blackjack(
-        &self,
-    ) -> BlackjackServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        BlackjackServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Retourne un client `CoudePlayerService` pret a l'emploi.
-    pub fn coude_players(
-        &self,
-    ) -> CoudePlayerServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudePlayerServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Phase 7A.opt F.1 — Retourne un client `CoudeCombatsService`.
-    pub fn coude_combats(
-        &self,
-    ) -> CoudeCombatsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeCombatsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Phase 7A.opt F.1 — Retourne un client `CoudeBetsService`.
-    pub fn coude_bets(
-        &self,
-    ) -> CoudeBetsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeBetsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Phase 7A.opt F.1 — Retourne un client `CoudeEconomyService`.
-    pub fn coude_economy(
-        &self,
-    ) -> CoudeEconomyServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeEconomyServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Phase 7A.opt F.1 — Retourne un client `CoudeInventoryService`.
-    pub fn coude_inventory(
-        &self,
-    ) -> CoudeInventoryServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeInventoryServiceClient::with_interceptor(
-            self.channel.clone(),
-            self.interceptor.clone(),
-        )
-        .send_compressed(CompressionEncoding::Gzip)
-        .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Phase 7A.opt F.1 — Retourne un client `CoudeSocialService`.
-    pub fn coude_social(
-        &self,
-    ) -> CoudeSocialServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        CoudeSocialServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
     /// Retourne un client `RolePanelsService` pret a l'emploi.
     pub fn role_panels(
         &self,
@@ -427,15 +353,6 @@ impl SentinelGrpcClient {
         &self,
     ) -> CommunityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         CommunityServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
-            .send_compressed(CompressionEncoding::Gzip)
-            .accept_compressed(CompressionEncoding::Gzip)
-    }
-
-    /// Retourne un client `TamagotchiService` pret a l'emploi.
-    pub fn tamagotchi(
-        &self,
-    ) -> TamagotchiServiceClient<InterceptedService<Channel, AuthInterceptor>> {
-        TamagotchiServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }

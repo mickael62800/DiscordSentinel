@@ -2,11 +2,10 @@
 //!
 //! Le `sentinel-core` ne connait pas sqlx : les derives `sqlx::Type` qui
 //! lient les enums aux types Postgres custom (`moderation_gravity`,
-//! `coude_class`, `voice_channel_kind`) vivent ici, dans l'adapter. Les
+//! `voice_channel_kind`) vivent ici, dans l'adapter. Les
 //! repos `query_as!` decodent vers `Pg*` puis convertissent via `.into()`.
 
 use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
-use sentinel_core::domain::enums::coude::coude_class::PlayerClass;
 use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
@@ -40,36 +39,6 @@ impl From<ModerationGravity> for PgModerationGravity {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
-#[sqlx(type_name = "coude_class", rename_all = "lowercase")]
-pub enum PgPlayerClass {
-    Bourrin,
-    Agile,
-    Fourbe,
-    Tank,
-}
-
-impl From<PgPlayerClass> for PlayerClass {
-    fn from(c: PgPlayerClass) -> Self {
-        match c {
-            PgPlayerClass::Bourrin => Self::Bourrin,
-            PgPlayerClass::Agile => Self::Agile,
-            PgPlayerClass::Fourbe => Self::Fourbe,
-            PgPlayerClass::Tank => Self::Tank,
-        }
-    }
-}
-
-impl From<PlayerClass> for PgPlayerClass {
-    fn from(c: PlayerClass) -> Self {
-        match c {
-            PlayerClass::Bourrin => Self::Bourrin,
-            PlayerClass::Agile => Self::Agile,
-            PlayerClass::Fourbe => Self::Fourbe,
-            PlayerClass::Tank => Self::Tank,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, sqlx::Type)]
 #[sqlx(type_name = "voice_channel_kind", rename_all = "lowercase")]

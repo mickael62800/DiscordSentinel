@@ -1,7 +1,5 @@
 // Enums du domain regroupes par bounded context.
 pub mod community;
-pub mod coude;
-pub mod influence;
 pub mod moderation;
 pub mod system;
 

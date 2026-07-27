@@ -16,14 +16,7 @@ use std::sync::Arc;
 
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
-use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
-use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsServiceServer;
-use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsServiceServer;
-use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyServiceServer;
-use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryServiceServer;
-use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerServiceServer;
-use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialServiceServer;
 use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
 use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
 use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
@@ -32,7 +25,6 @@ use sentinel_proto::progression::v1::progression_service_server::ProgressionServ
 use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
 use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
 use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
-use sentinel_proto::tamagotchi::v1::tamagotchi_service_server::TamagotchiServiceServer;
 use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
 use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
@@ -50,21 +42,13 @@ use crate::adapters::inbound::grpc::ai::dataset::AiDatasetGrpc;
 use crate::adapters::inbound::grpc::ai::images::ImagesGrpc;
 use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
-use crate::adapters::inbound::grpc::casino::blackjack::BlackjackGrpc;
 use crate::adapters::inbound::grpc::community::members::MembersGrpc;
 use crate::adapters::inbound::grpc::community::progression::ProgressionGrpc;
 use crate::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use crate::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
 use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
-use crate::adapters::inbound::grpc::coude::bets::BetsGrpc;
-use crate::adapters::inbound::grpc::coude::combats::CombatsGrpc;
-use crate::adapters::inbound::grpc::coude::economy::EconomyGrpc;
-use crate::adapters::inbound::grpc::coude::inventory::InventoryGrpc;
-use crate::adapters::inbound::grpc::coude::players::PlayerGrpc;
-use crate::adapters::inbound::grpc::coude::social::SocialGrpc;
 use crate::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use crate::adapters::inbound::grpc::system::export::ExportGrpc;
-use crate::adapters::inbound::grpc::system::tamagotchi::TamagotchiGrpc;
 use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
 use crate::adapters::inbound::http::state::AppState;
@@ -88,58 +72,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         moderation_uc: state.moderation_uc.clone(),
         reminders_uc: state.reminders_uc.clone(),
         moderation_copilot_uc: state.moderation_copilot_uc.clone(),
-    };
-    let blackjack = BlackjackGrpc {
-        svc: state.blackjack_svc.clone(),
-        wallet_repo: state.wallet_repo.clone(),
-        bot_config_repo: state.bot_config_repo.clone(),
-        table_repo: state.blackjack_table_repo.clone(),
-        broadcaster: state.broadcaster.clone(),
-    };
-    let coude = PlayerGrpc {
-        players_uc: state.coude_players_uc.clone(),
-        wallet_uc: state.wallet_uc.clone(),
-    };
-    // Phase 7A.opt F.1 — 5 services coude supplementaires.
-    let coude_combats = CombatsGrpc {
-        uc: state.coude_combats_uc.clone(),
-        resolve_batch_uc: state.resolve_betting_batch_uc.clone(),
-        expire_batch_uc: state.expire_combats_batch_uc.clone(),
-        resolve_now_uc: state.resolve_combat_now_uc.clone(),
-    };
-    let coude_bets = BetsGrpc {
-        uc: state.coude_bets_uc.clone(),
-    };
-    let coude_economy = EconomyGrpc {
-        uc: state.coude_economy_uc.clone(),
-    };
-    // Achat boutique atomique : use case pur (sentinel-core) branche sur le
-    // repo Postgres transactionnel + la config bot (prix serveur). Construit
-    // ici a partir des dependances deja presentes dans l'AppState.
-    let coude_purchase_uc: std::sync::Arc<
-        dyn crate::ports::inbound::coude::purchase_item::PurchaseItemUseCase,
-    > = std::sync::Arc::new(
-        sentinel_core::application::coude::purchase_item::PurchaseItemService::new(
-            std::sync::Arc::new(
-                crate::adapters::outbound::postgres::coude::purchase_repository::PgPurchaseRepository::new(
-                    state.pg_pool.clone(),
-                ),
-            ),
-            state.bot_config_repo.clone(),
-        ),
-    );
-    let coude_inventory = InventoryGrpc {
-        uc: state.coude_inventory_uc.clone(),
-        purchase_uc: coude_purchase_uc,
-        steal_protections_uc: state.coude_steal_protections_uc.clone(),
-        steal_boosts_uc: state.coude_steal_boosts_uc.clone(),
-    };
-    let coude_social = SocialGrpc {
-        uc: state.coude_social_uc.clone(),
-        catalog_uc: state.coude_catalog_uc.clone(),
-        taunts_uc: state.coude_taunts_uc.clone(),
-        heist_uc: state.coude_heist_uc.clone(),
-        cashbox_uc: state.coude_cashbox_uc.clone(),
     };
     let roles = RolePanelsGrpc {
         uc: state.role_panels_uc.clone(),
@@ -170,9 +102,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let images = ImagesGrpc {
         uc: state.analyze_image_uc.clone(),
     };
-    let tamagotchi = TamagotchiGrpc {
-        uc: state.pets_uc.clone(),
-    };
     let ai_dataset = AiDatasetGrpc {
         pg_pool: state.pg_pool.clone(),
     };
@@ -193,14 +122,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let stats_svc = svc!(StatsServiceServer, stats);
     let tickets_svc = svc!(TicketsServiceServer, tickets);
     let moderation_svc = svc!(ModerationServiceServer, moderation);
-    let blackjack_svc = svc!(BlackjackServiceServer, blackjack);
-    let coude_svc = svc!(CoudePlayerServiceServer, coude);
-    // Phase 7A.opt F.1 — 5 services coude supplementaires.
-    let coude_combats_svc = svc!(CoudeCombatsServiceServer, coude_combats);
-    let coude_bets_svc = svc!(CoudeBetsServiceServer, coude_bets);
-    let coude_economy_svc = svc!(CoudeEconomyServiceServer, coude_economy);
-    let coude_inventory_svc = svc!(CoudeInventoryServiceServer, coude_inventory);
-    let coude_social_svc = svc!(CoudeSocialServiceServer, coude_social);
     let roles_svc = svc!(RolePanelsServiceServer, roles);
     let members_svc = svc!(MembersServiceServer, members);
     let security_svc = svc!(SecurityServiceServer, security);
@@ -211,7 +132,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let welcome_svc = svc!(WelcomeServiceServer, welcome);
     let export_svc = svc!(ExportServiceServer, export);
     let community_svc = svc!(CommunityServiceServer, community);
-    let tamagotchi_svc = svc!(TamagotchiServiceServer, tamagotchi);
     let ai_dataset_svc = svc!(AiDatasetServiceServer, ai_dataset);
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
@@ -228,27 +148,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .await;
     health_reporter
         .set_serving::<ModerationServiceServer<ModerationGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<BlackjackServiceServer<BlackjackGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudePlayerServiceServer<PlayerGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudeCombatsServiceServer<CombatsGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudeBetsServiceServer<BetsGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudeEconomyServiceServer<EconomyGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudeInventoryServiceServer<InventoryGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<CoudeSocialServiceServer<SocialGrpc>>()
         .await;
     health_reporter
         .set_serving::<RolePanelsServiceServer<RolePanelsGrpc>>()
@@ -276,9 +175,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .await;
     health_reporter
         .set_serving::<CommunityServiceServer<CommunityGrpc>>()
-        .await;
-    health_reporter
-        .set_serving::<TamagotchiServiceServer<TamagotchiGrpc>>()
         .await;
     health_reporter
         .set_serving::<AiDatasetServiceServer<AiDatasetGrpc>>()
@@ -322,8 +218,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(stats_svc)
         .add_service(tickets_svc)
         .add_service(moderation_svc)
-        .add_service(blackjack_svc)
-        .add_service(coude_svc)
         .add_service(roles_svc)
         .add_service(members_svc)
         .add_service(security_svc)
@@ -333,12 +227,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(welcome_svc)
         .add_service(export_svc)
         .add_service(community_svc)
-        .add_service(coude_combats_svc)
-        .add_service(coude_bets_svc)
-        .add_service(coude_economy_svc)
-        .add_service(coude_inventory_svc)
-        .add_service(coude_social_svc)
-        .add_service(tamagotchi_svc)
         .add_service(ai_dataset_svc)
         .serve(bind)
         .await

@@ -137,18 +137,7 @@ const CATEGORIES: &[Section] = &[
             ("rotation-bot", "🔄 Rotation"),
         ],
     ),
-    (
-        "🎮 Jeux",
-        &[
-            ("coude-bot", "🥊 Coude"),
-            ("influence-bot", "🏛️ Influence"),
-            ("blackjack-bot", "🃏 Blackjack"),
-            ("slot-bot", "🎰 Machine à sous"),
-            ("wheel-bot", "🎡 Roue de la fortune"),
-            ("tamagotchi-bot", "🥚 Tamagotchi"),
-            ("game-bot", "🎯 Portail de jeux"),
-        ],
-    ),
+    ("🎮 Jeux", &[("game-bot", "🎯 Portail de jeux")]),
     ("🌌 Espace", &[("nasa-apod-bot", "🌌 Photo de l'espace (NASA)")]),
     ("💾 Sauvegarde", &[("guild-backup-bot", "💾 Sauvegarde")]),
     ("📊 Audit", &[("audit-bot", "📊 Audit")]),
@@ -558,32 +547,18 @@ mod tests {
         }
     }
 
-    /// Chaque jeu a SA propre sous-section : c'est tout l'interet du decoupage
-    /// (avant, tous les jeux etaient fondus dans un seul bloc "Jeux").
-    #[test]
-    fn games_have_distinct_subsections() {
-        let (_, subs) = CATEGORIES
-            .iter()
-            .find(|(label, _)| *label == "🎮 Jeux")
-            .expect("categorie Jeux");
-        let labels: Vec<&str> = subs.iter().map(|(_, l)| *l).collect();
-        assert!(labels.len() >= 6, "un jeu = une sous-section");
-        let unique: std::collections::HashSet<_> = labels.iter().collect();
-        assert_eq!(unique.len(), labels.len(), "libelles de jeux dupliques");
-    }
-
     #[test]
     fn chunk_section_splits_over_field_limit() {
         // Une seule ligne courte -> un champ portant le libelle tel quel.
-        let one = chunk_section("🥊 Coude", &["**`/coude`** — Defie".to_string()]);
+        let one = chunk_section("🛡️ Modération", &["**`/ban`** — Bannit".to_string()]);
         assert_eq!(one.len(), 1);
-        assert_eq!(one[0].0, "🥊 Coude");
+        assert_eq!(one[0].0, "🛡️ Modération");
 
         // Beaucoup de lignes -> plusieurs champs numerotes, chacun <= 1024.
         let many: Vec<String> = (0..200).map(|i| format!("**`/cmd{i}`** — description")).collect();
-        let out = chunk_section("🥊 Coude", &many);
+        let out = chunk_section("🛡️ Modération", &many);
         assert!(out.len() > 1, "doit deborder sur plusieurs champs");
-        assert_eq!(out[0].0, format!("🥊 Coude (1/{})", out.len()));
+        assert_eq!(out[0].0, format!("🛡️ Modération (1/{})", out.len()));
         for (_, value) in &out {
             assert!(value.chars().count() <= FIELD_MAX);
         }

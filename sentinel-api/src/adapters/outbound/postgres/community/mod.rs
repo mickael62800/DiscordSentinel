@@ -8,6 +8,7 @@ pub mod level_repository;
 pub mod member_repository;
 pub mod monthly_ranking_repository;
 pub mod role_panel_repository;
+pub mod sponsorship_repository;
 pub mod temp_role_repository;
 pub mod voice_channel_repository;
 pub mod welcome_config_repository;

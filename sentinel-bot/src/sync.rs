@@ -17,9 +17,7 @@ use crate::shared::api_client::BaseApiClient;
 /// (sentinel-api/src/domain/entities/discord_action_message.rs::kinds).
 pub mod kinds {
     pub const TICKET: &str = "ticket";
-    pub const COMBAT_CHALLENGE: &str = "combat_challenge";
     pub const AUTOMOD_REVIEW: &str = "automod_review";
-    pub const BLACKJACK_TABLE: &str = "blackjack_table";
 }
 
 #[derive(serde::Serialize)]

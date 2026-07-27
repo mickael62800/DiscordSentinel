@@ -104,10 +104,6 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::bot_persistence::routes())
         // Members + guild direct API
         .merge(routes::members::routes())
-        // Coup de coude
-        .merge(routes::coude::routes())
-        .merge(routes::influence::routes())
-        .merge(routes::tamagotchi::routes())
         .merge(routes::guild_backup::routes())
         .merge(routes::bump::routes())
         .merge(routes::community::routes())

@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase;
 use crate::ports::outbound::community::temp_role_repository::{TempRole, TempRoleRepository};
-use crate::ports::outbound::coude::sponsorship_repository::{Sponsorship, SponsorshipRepository};
+use crate::ports::outbound::community::sponsorship_repository::{Sponsorship, SponsorshipRepository};
 
 pub struct ManageSponsorshipsService {
     sponsorships: Arc<dyn SponsorshipRepository>,

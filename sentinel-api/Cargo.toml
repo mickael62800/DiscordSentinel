@@ -125,18 +125,6 @@ path = "tests/integration/audit/db.rs"
 name = "integration_automod_db"
 path = "tests/integration/automod/db.rs"
 
-# blackjack
-[[test]]
-name = "integration_blackjack_basic"
-path = "tests/integration/blackjack/basic.rs"
-[[test]]
-name = "integration_blackjack_multi"
-path = "tests/integration/blackjack/multi.rs"
-[[test]]
-name = "integration_blackjack_shoe"
-path = "tests/integration/blackjack/shoe.rs"
-
-# community
 [[test]]
 name = "integration_community_db"
 path = "tests/integration/community/db.rs"
@@ -149,15 +137,6 @@ path = "tests/integration/config/bots.rs"
 name = "integration_config_worker"
 path = "tests/integration/config/worker.rs"
 
-# coude
-[[test]]
-name = "integration_coude_basic"
-path = "tests/integration/coude/basic.rs"
-[[test]]
-name = "integration_coude_advanced"
-path = "tests/integration/coude/advanced.rs"
-
-# games
 [[test]]
 name = "integration_games_db"
 path = "tests/integration/games/db.rs"
@@ -265,12 +244,6 @@ path = "tests/integration/bot_config/http.rs"
 name = "integration_role_panels_http"
 path = "tests/integration/role_panels/http.rs"
 
-# wallet HTTP (handler-level, avec logique metier extraite dans le domain)
-[[test]]
-name = "integration_wallet_http"
-path = "tests/integration/wallet_http/http.rs"
-
-# games HTTP
 [[test]]
 name = "integration_games_http"
 path = "tests/integration/games_http/http.rs"
@@ -295,12 +268,6 @@ path = "tests/integration/members_http/http.rs"
 name = "integration_bot_persistence_http"
 path = "tests/integration/bot_persistence_http/http.rs"
 
-# blackjack HTTP
-[[test]]
-name = "integration_blackjack_http"
-path = "tests/integration/blackjack_http/http.rs"
-
-# guild_channels HTTP
 [[test]]
 name = "integration_guild_channels_http"
 path = "tests/integration/guild_channels_http/http.rs"
@@ -325,42 +292,6 @@ path = "tests/integration/exports_http/http.rs"
 name = "integration_system_endpoints_http"
 path = "tests/integration/system_endpoints_http/http.rs"
 
-# coude/bets HTTP
-[[test]]
-name = "integration_coude_bets_http"
-path = "tests/integration/coude_bets_http/http.rs"
-
-# coude/social HTTP
-[[test]]
-name = "integration_coude_social_http"
-path = "tests/integration/coude_social_http/http.rs"
-
-# coude/inventory HTTP
-[[test]]
-name = "integration_coude_inventory_http"
-path = "tests/integration/coude_inventory_http/http.rs"
-
-# coude/economy HTTP
-[[test]]
-name = "integration_coude_economy_http"
-path = "tests/integration/coude_economy_http/http.rs"
-
-# coude/taunts HTTP
-[[test]]
-name = "integration_coude_taunts_http"
-path = "tests/integration/coude_taunts_http/http.rs"
-
-# coude/tournaments HTTP
-[[test]]
-name = "integration_coude_tournaments_http"
-path = "tests/integration/coude_tournaments_http/http.rs"
-
-# coude/combats HTTP
-[[test]]
-name = "integration_coude_combats_http"
-path = "tests/integration/coude_combats_http/http.rs"
-
-# oauth HTTP
 [[test]]
 name = "integration_oauth_http"
 path = "tests/integration/oauth_http/http.rs"
@@ -370,12 +301,6 @@ path = "tests/integration/oauth_http/http.rs"
 name = "integration_rbac_http"
 path = "tests/integration/rbac_http/http.rs"
 
-# coude/players HTTP
-[[test]]
-name = "integration_coude_players_http"
-path = "tests/integration/coude_players_http/http.rs"
-
-# postgres strikes repo
 [[test]]
 name = "integration_postgres_strikes"
 path = "tests/integration/postgres_strikes/repo.rs"
@@ -402,11 +327,6 @@ path = "tests/integration/postgres_stats/repo.rs"
 
 # postgres wallet repo
 [[test]]
-name = "integration_postgres_wallet"
-path = "tests/integration/postgres_wallet/repo.rs"
-
-# postgres tickets repo
-[[test]]
 name = "integration_postgres_tickets"
 path = "tests/integration/postgres_tickets/repo.rs"
 
@@ -426,31 +346,6 @@ name = "integration_postgres_infraction"
 path = "tests/integration/postgres_infraction/repo.rs"
 
 # postgres cashbox repo
-[[test]]
-name = "integration_postgres_cashbox"
-path = "tests/integration/postgres_cashbox/repo.rs"
-
-# postgres blackjack repo
-[[test]]
-name = "integration_postgres_blackjack"
-path = "tests/integration/postgres_blackjack/repo.rs"
-
-# postgres coude_social repo
-[[test]]
-name = "integration_postgres_coude_social"
-path = "tests/integration/postgres_coude_social/repo.rs"
-
-# postgres coude_economy repo
-[[test]]
-name = "integration_postgres_coude_economy"
-path = "tests/integration/postgres_coude_economy/repo.rs"
-
-# postgres coude_player repo (mod + read + progression + streaks + hp + combat_stats)
-[[test]]
-name = "integration_postgres_coude_player"
-path = "tests/integration/postgres_coude_player/repo.rs"
-
-# postgres voice_channel repo (790L : channels + co-admins + whitelist + bans + invites + themes)
 [[test]]
 name = "integration_postgres_voice_channel"
 path = "tests/integration/postgres_voice_channel/repo.rs"
@@ -482,25 +377,10 @@ path = "tests/integration/postgres_misc_6/repo.rs"
 
 # postgres coude_inventory repo
 [[test]]
-name = "integration_postgres_coude_inventory"
-path = "tests/integration/postgres_coude_inventory/repo.rs"
-
-# postgres coude_combat repo
-[[test]]
-name = "integration_postgres_coude_combat"
-path = "tests/integration/postgres_coude_combat/repo.rs"
-
-# postgres analytics repo
-[[test]]
 name = "integration_postgres_analytics"
 path = "tests/integration/postgres_analytics/repo.rs"
 
 # postgres coude_bet repo (wallet chain via stub taunts)
-[[test]]
-name = "integration_postgres_coude_bet"
-path = "tests/integration/postgres_coude_bet/repo.rs"
-
-# redis cache infra (CachePort impl)
 [[test]]
 name = "integration_redis_cache"
 path = "tests/integration/redis_cache/http.rs"
@@ -530,12 +410,6 @@ path = "tests/integration/export_service/repo.rs"
 name = "integration_voice_channels_service"
 path = "tests/integration/voice_channels_service/repo.rs"
 
-# wallet application service (credit/debit/transfer + tx mode)
-[[test]]
-name = "integration_wallet_service"
-path = "tests/integration/wallet_service/repo.rs"
-
-# stats application service (Redis + PG bootstrap)
 [[test]]
 name = "integration_stats_service"
 path = "tests/integration/stats_service/repo.rs"
@@ -576,12 +450,6 @@ path = "tests/integration/voice/db.rs"
 name = "integration_voice_http"
 path = "tests/integration/voice/http.rs"
 
-# wallet
-[[test]]
-name = "integration_wallet_db"
-path = "tests/integration/wallet/db.rs"
-
-# welcome
 [[test]]
 name = "integration_welcome_db"
 path = "tests/integration/welcome/db.rs"
@@ -598,9 +466,6 @@ name = "integration_misc_repositories"
 path = "tests/integration/misc/repositories.rs"
 
 # ── E2E (serveur gRPC in-process, clients reels) ──
-[[test]]
-name = "e2e_grpc_coude"
-path = "tests/e2e/grpc/coude.rs"
 [[test]]
 name = "e2e_grpc_live"
 path = "tests/e2e/grpc/live.rs"

@@ -11,7 +11,6 @@ use crate::domain::entities::community::bump::{
 };
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::community::manage_bump::{ManageBumpUseCase, RecordBumpCommand};
 use crate::ports::outbound::community::bump_repository::BumpRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -23,20 +22,11 @@ const MAX_BUMP_REWARD: i64 = 100_000_000;
 pub struct ManageBumpService {
     config: Arc<dyn BotConfigRepository>,
     repo: Arc<dyn BumpRepository>,
-    wallet: Arc<dyn ManageWalletUseCase>,
 }
 
 impl ManageBumpService {
-    pub fn new(
-        config: Arc<dyn BotConfigRepository>,
-        repo: Arc<dyn BumpRepository>,
-        wallet: Arc<dyn ManageWalletUseCase>,
-    ) -> Self {
-        Self {
-            config,
-            repo,
-            wallet,
-        }
+    pub fn new(config: Arc<dyn BotConfigRepository>, repo: Arc<dyn BumpRepository>) -> Self {
+        Self { config, repo }
     }
 }
 
@@ -121,28 +111,9 @@ impl ManageBumpUseCase for ManageBumpService {
             )
             .await?;
 
-        // Credit du wallet partage.
-        let new_balance = if reward > 0 {
-            match self
-                .wallet
-                .credit(
-                    &cmd.guild_id,
-                    &cmd.user_id,
-                    reward,
-                    &format!("{provider}-bump"),
-                    &format!("Bump #{n} de la semaine"),
-                )
-                .await
-            {
-                Ok(m) => Some(m.new_balance),
-                Err(e) => {
-                    tracing::warn!(error = %e, guild_id = %cmd.guild_id, user_id = %cmd.user_id, "Echec credit recompense bump");
-                    None
-                }
-            }
-        } else {
-            None
-        };
+        // L'economie de coins partagee a ete retiree avec les jeux : plus de
+        // credit de wallet. La recompense reste journalisee (compteur bump).
+        let new_balance = None;
 
         // Role VIP : seuil de bumps CUMULES (all-time).
         let mut vip_role_id: Option<String> = None;

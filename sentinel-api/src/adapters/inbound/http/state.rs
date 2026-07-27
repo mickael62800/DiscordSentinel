@@ -5,7 +5,6 @@ use crate::adapters::outbound::discord_api::DiscordApi;
 use crate::adapters::outbound::inference_service::InferenceService;
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::redis_cache::RedisCache;
-use crate::application::casino::blackjack_service::BlackjackService;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use crate::ports::inbound::ai::manage_dataset::ManageDatasetUseCase;
@@ -13,18 +12,11 @@ use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
-use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::community::manage_bump::ManageBumpUseCase;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
 use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
 use crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
@@ -35,7 +27,6 @@ use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
 use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
-use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
@@ -89,41 +80,8 @@ pub struct AppState {
     pub guild_repo: Arc<dyn GuildRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
-    pub wallet_repo: Arc<dyn WalletRepository>,
-    pub wallet_uc: Arc<dyn ManageWalletUseCase>,
-    pub blackjack_svc: Arc<BlackjackService>,
-    pub slot_uc: Arc<dyn crate::ports::inbound::casino::manage_slot::ManageSlotUseCase>,
-    pub wheel_uc: Arc<dyn crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase>,
-    pub coude_players_uc: Arc<dyn ManageCoudePlayersUseCase>,
-    pub coude_combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
-    pub coude_bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
-    pub coude_economy_uc: Arc<dyn ManageCoudeEconomyUseCase>,
-    pub coude_inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
-    pub coude_social_uc: Arc<dyn ManageCoudeSocialUseCase>,
-    pub resolve_betting_batch_uc: Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
-    pub expire_combats_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
-    pub resolve_combat_now_uc: Arc<dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase>,
-    pub resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase>,
-    pub coude_catalog_uc: Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
-    pub coude_cashbox_uc: Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
-    pub coude_steal_protections_uc:
-        Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
-    pub coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
-    pub coude_steal_attempts_uc:
-        Arc<dyn crate::ports::inbound::coude::manage_steal_attempts::ManageStealAttemptsUseCase>,
-    pub coude_taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase>,
-    pub coude_heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
-    pub coude_curses_uc: Arc<dyn crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase>,
-    pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase>,
-    pub tournaments_uc: Arc<dyn crate::ports::inbound::coude::manage_tournaments::ManageTournamentsUseCase>,
-    pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository>,
-    pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase>,
-    pub roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase>,
-    pub resolve_steal_uc: Arc<dyn crate::ports::inbound::coude::resolve_steal::ResolveStealUseCase>,
-    pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository>,
     pub discord_action_messages_uc:
         Arc<dyn crate::ports::inbound::audit::manage_discord_action_messages::ManageDiscordActionMessagesUseCase>,
-    pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,
@@ -141,7 +99,6 @@ pub struct AppState {
     pub automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase>,
     pub automod_adaptive_slowmode_repo: Arc<dyn crate::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository>,
     pub reset_guild_uc: Arc<dyn crate::ports::inbound::system::reset_guild::ResetGuildUseCase>,
-    pub pets_uc: Arc<dyn crate::ports::inbound::tamagotchi::manage_pets::ManagePetsUseCase>,
     /// Sauvegarde / restauration de serveur (domaine `guild_backup`).
     pub guild_snapshots_uc: Arc<
         dyn crate::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase,
@@ -185,12 +142,11 @@ pub struct AppState {
     pub review_repo: Arc<dyn crate::ports::outbound::moderation::review_repository::ReviewRepository>,
     pub modstats_repo: Arc<dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository>,
     pub game_repo: Arc<dyn crate::ports::outbound::casino::game_repository::GameRepository>,
-    pub sponsorship_repo: Arc<dyn crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository>,
+    pub sponsorship_repo: Arc<dyn crate::ports::outbound::community::sponsorship_repository::SponsorshipRepository>,
     pub temp_role_repo: Arc<dyn crate::ports::outbound::community::temp_role_repository::TempRoleRepository>,
     /// Use case Community (sponsorships + temp-roles) derriere le service gRPC.
     pub manage_sponsorships_uc: Arc<dyn crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase>,
     pub pending_action_repo: Arc<dyn crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository>,
-    pub blackjack_table_repo: Arc<dyn crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository>,
     /// Game Portal : use cases lifecycle serveurs Docker.
     pub game_servers_uc: Arc<dyn ManageGameServersUseCase>,
     pub game_templates_uc: Arc<dyn ManageGameTemplatesUseCase>,
@@ -205,22 +161,6 @@ pub struct AppState {
     pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,
     pub game_rcon_client: Arc<dyn crate::ports::outbound::game::rcon_client::RconClient>,
     pub game_port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator>,
-    /// Jeu Influence — use cases.
-    pub influence_view_profile_uc:
-        Arc<dyn crate::ports::inbound::influence::view_profile::ViewProfileUseCase>,
-    pub influence_orgs_uc: Arc<
-        dyn crate::ports::inbound::influence::manage_organizations::ManageOrganizationsUseCase,
-    >,
-    pub influence_votes_uc:
-        Arc<dyn crate::ports::inbound::influence::manage_votes::ManageVotesUseCase>,
-    pub influence_capital_uc:
-        Arc<dyn crate::ports::inbound::influence::manage_capital::ManageCapitalUseCase>,
-    pub influence_laws_uc:
-        Arc<dyn crate::ports::inbound::influence::manage_laws::ManageLawsUseCase>,
-    pub influence_information_uc:
-        Arc<dyn crate::ports::inbound::influence::manage_information::ManageInformationUseCase>,
-    pub influence_archives_uc:
-        Arc<dyn crate::ports::inbound::influence::read_archives::ReadArchivesUseCase>,
     pub sursis_uc:
         Arc<dyn crate::ports::inbound::moderation::manage_sursis::ManageSursisUseCase>,
     pub pg_pool: sqlx::PgPool,

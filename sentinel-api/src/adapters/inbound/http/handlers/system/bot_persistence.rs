@@ -254,7 +254,7 @@ pub async fn create_sponsorship(
 pub async fn list_sponsorships(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::coude::sponsorship_repository::Sponsorship>>, ApiError>
+) -> Result<Json<Vec<crate::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
 {
     // Validation
 

@@ -30,10 +30,6 @@ fn command_module(name: &str) -> &'static str {
         "roles-panel" | "parrain" => "community",
         "audit" => "audit",
         "level" | "stats" | "progression-resync" | "classement" => "progression",
-        "blackjack-setup" => "blackjack",
-        "slot-setup" => "slot",
-        "wheel-setup" => "wheel",
-        "tama-setup" => "tamagotchi",
         "rotation" => "rotation",
         "security" => "security",
         "automod" => "automod",
@@ -44,8 +40,6 @@ fn command_module(name: &str) -> &'static str {
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         "backup" => "guild_backup",
-        _ if modules::coude::handles_command(name) => "coude",
-        _ if modules::influence::handles_command(name) => "influence",
         _ => "unknown",
     }
 }
@@ -164,19 +158,12 @@ impl EventHandler for Handler {
         // (remplace ses anciens messages), n'affiche que les modules actifs.
         modules::help_panel::deploy_all(&ctx, ready.user.id, &guild_ids).await;
 
-        // Influence : salons de domaine (un par entite du jeu), si active.
-        modules::influence::channels::deploy_domain_channels(&ctx, &guild_ids).await;
-        // Coude : salons de domaine (un par entite du jeu), si active.
-        modules::coude::channels::deploy_domain_channels(&ctx, &guild_ids).await;
-
         // Listener Redis pour les events bot_enabled_changed -> re-register
         // les commandes guild a la volee quand un admin toggle on/off.
         crate::command_registry::spawn_consumer(ctx.clone());
         modules::community::load_temp_roles(&ctx, &guild_ids).await;
         modules::community::spawn_temp_role_cleanup(ctx.clone());
 
-        // Background tasks blackjack (AFK cleanup consumer)
-        modules::blackjack::spawn_background(ctx.clone());
         modules::bump::spawn_background(ctx.clone());
         modules::nasa_apod::spawn_background(ctx.clone());
 
@@ -217,11 +204,6 @@ impl EventHandler for Handler {
         // Voice: reconcile + spawn AFK sweep
         modules::voice::on_ready(&ctx, &ready).await;
 
-        // Coude: stocker les guild IDs + spawn background tasks
-        let coude_guild_ids: Vec<_> = ready.guilds.iter().map(|g| g.id).collect();
-        modules::coude::on_ready(&ctx, coude_guild_ids).await;
-        modules::coude::spawn_background(ctx.clone());
-
         // Tickets: deploy panel + spawn background tasks (inactive close, SLA, Redis consumer)
         modules::tickets::on_ready(&ctx, &ready).await;
         modules::tickets::spawn_background(ctx.clone());
@@ -238,23 +220,14 @@ impl EventHandler for Handler {
         // suppressions web -> Discord (delete confession ou reply).
         modules::confessions::spawn_consumer(ctx.clone());
 
-        // Tamagotchi : refresh horaire des cartes + consumer maladie/mort (DM).
-        modules::tamagotchi::spawn_background(ctx.clone());
-
         // Welcome : consumer Redis pour publier le panneau de reglement
         // (bouton "Publier le reglement" du dashboard).
         modules::welcome::spawn(ctx.clone());
-
-        // Slot : fermeture auto des salons de machine a sous inactifs
-        // (timeout par guild, defaut 2 min). Suivi en memoire -> cleanup
-        // dans le bot, pas dans le worker.
-        modules::slot::spawn_background(ctx.clone());
 
         // Games : consumer Redis pour deployer/rafraichir le panneau de jeux
         // (bouton "Deployer" du dashboard).
         modules::games::spawn(ctx.clone());
         modules::game_portal::spawn(ctx.clone());
-        modules::influence::spawn(ctx.clone());
 
         // Guild backup : consumer Redis pour piloter capture/restore/wipe depuis
         // le web (events guild_backup:capture_requested / :restore_requested).
@@ -539,14 +512,6 @@ impl EventHandler for Handler {
             Interaction::Command(command) => {
                 let name = command.data.name.as_str();
 
-                // Prison check (coude) : bloque les commandes gameplay si
-                // le joueur est en prison, puis return.
-                if modules::coude::handles_command(name)
-                    && modules::coude::check_and_reply_if_in_prison(&ctx, &command).await
-                {
-                    return;
-                }
-
                 // ── Telemetrie commande : invoked + success/error ──
                 let api = {
                     let data = ctx.data.read().await;
@@ -613,12 +578,6 @@ impl EventHandler for Handler {
                         "level" | "stats" | "progression-resync" | "classement" => {
                             modules::progression::handle_command(&ctx, &command).await
                         }
-                        "blackjack-setup" => {
-                            modules::blackjack::handle_command(&ctx, &command).await
-                        }
-                        "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
-                        "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
-                        "tama-setup" => modules::tamagotchi::handle_command(&ctx, &command).await,
                         "rotation" => modules::rotation::handle_command(&ctx, &command).await,
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
@@ -635,12 +594,6 @@ impl EventHandler for Handler {
                         }
                         "backup" => modules::guild_backup::handle_command(&ctx, &command).await,
                         "apod" => modules::nasa_apod::handle_command(&ctx, &command).await,
-                        _ if modules::coude::handles_command(name) => {
-                            modules::coude::handle_command(&ctx, &command).await
-                        }
-                        _ if modules::influence::handles_command(name) => {
-                            modules::influence::handle_command(&ctx, &command).await
-                        }
                         _ => {}
                     }
                 })
@@ -695,18 +648,8 @@ impl EventHandler for Handler {
                     modules::games::on_component(&ctx, &component).await;
                 } else if modules::game_portal::handles_component(cid) {
                     modules::game_portal::on_component(&ctx, &component).await;
-                } else if modules::influence::handles_component(cid) {
-                    modules::influence::on_component(&ctx, &component).await;
                 } else if modules::community::handles_component(cid) {
                     modules::community::on_component(&ctx, &component).await;
-                } else if modules::blackjack::handles_component(cid) {
-                    modules::blackjack::on_component(&ctx, &component).await;
-                } else if modules::slot::handles_component(cid) {
-                    modules::slot::on_component(&ctx, &component).await;
-                } else if modules::tamagotchi::handles_component(cid) {
-                    modules::tamagotchi::on_component(&ctx, &component).await;
-                } else if modules::wheel::handles_component(cid) {
-                    modules::wheel::on_component(&ctx, &component).await;
                 } else if modules::security::handles_component(cid) {
                     modules::security::on_component(&ctx, &component).await;
                 } else if modules::automod::handles_component(cid) {
@@ -718,12 +661,6 @@ impl EventHandler for Handler {
                     modules::rotation::on_component(&ctx, &component).await;
                 } else if modules::voice::handles_component(cid) {
                     modules::voice::on_component(&ctx, &component).await;
-                } else if modules::coude::handles_component(cid) {
-                    // Prison check : bloque les boutons offensifs en prison.
-                    if modules::coude::check_component_in_prison(&ctx, &component).await {
-                        return;
-                    }
-                    modules::coude::on_component(&ctx, &component).await;
                 } else if modules::tickets::handles_component(cid) {
                     modules::tickets::on_component(&ctx, &component).await;
                 } else if modules::guild_backup::handles_component(cid) {
