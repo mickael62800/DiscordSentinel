@@ -8,6 +8,7 @@ pub mod component_visibility;
 pub mod config_parsers;
 pub mod discord_ids;
 pub mod discord_role;
+pub mod docker_host;
 pub mod geoip;
 pub mod guild;
 pub mod host_probe;

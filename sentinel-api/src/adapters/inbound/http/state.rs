@@ -136,6 +136,8 @@ pub struct AppState {
     /// logique de resolution de role.
     pub rbac_admin_uc: Arc<dyn crate::ports::inbound::system::manage_rbac::ManageRbacUseCase>,
     pub tls_cert_uc: Arc<dyn crate::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase>,
+    /// Acces au daemon Docker de l'hote (listing, actions, prune, df).
+    pub docker_host: Arc<dyn crate::ports::outbound::system::docker_host::DockerHost>,
     pub geoip_uc: Arc<dyn crate::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase>,
     pub export_uc: Arc<dyn crate::application::system::export_service::ExecuteExportUseCase>,
     pub export_jobs_uc:

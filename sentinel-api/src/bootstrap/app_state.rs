@@ -593,6 +593,10 @@ pub async fn build_app_state(
             server_event_repo,
         ));
 
+    // Daemon Docker de l'hote : client bollard derriere le port DockerHost.
+    let docker_host: Arc<dyn crate::ports::outbound::system::docker_host::DockerHost> =
+        Arc::new(crate::adapters::outbound::system::docker_host::BollardDockerHost);
+
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
     let tls_cert_reader: Arc<dyn crate::ports::outbound::system::tls_cert_reader::TlsCertReader> =
         Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
@@ -842,6 +846,7 @@ pub async fn build_app_state(
         oauth_uc,
         rbac_admin_uc,
         tls_cert_uc,
+        docker_host,
         geoip_uc,
         export_uc: Arc::new(ExportService::new(Arc::new(
             crate::adapters::outbound::postgres::system::export_repository::PgExportRepository::new(

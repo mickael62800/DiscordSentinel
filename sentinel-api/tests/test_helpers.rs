@@ -2569,6 +2569,100 @@ impl sentinel_core::ports::inbound::system::manage_alert_rules::ManageAlertRules
     }
 }
 
+pub struct StubDockerHost;
+#[async_trait]
+impl sentinel_core::ports::outbound::system::docker_host::DockerHost for StubDockerHost {
+    async fn version_info(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::DockerVersionInfo, DomainError>
+    {
+        Ok(Default::default())
+    }
+    async fn disk_usage(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::DiskUsage, DomainError> {
+        Ok(Default::default())
+    }
+    async fn list_containers(
+        &self,
+        _: bool,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::ContainerSummary>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn start_container(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn stop_container(&self, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn restart_container(&self, _: &str, _: i64) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_container(&self, _: &str, _: bool, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn container_logs(&self, _: &str, _: u32, _: bool) -> Result<String, DomainError> {
+        Ok(String::new())
+    }
+    async fn list_images(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::ImageSummary>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn remove_image(&self, _: &str, _: bool, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_volumes(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::VolumeSummary>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn remove_volume(&self, _: &str, _: bool) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_networks(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::NetworkSummary>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn prune_containers(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::PruneOutcome, DomainError>
+    {
+        Ok(Default::default())
+    }
+    async fn prune_images(
+        &self,
+        _: bool,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::PruneOutcome, DomainError>
+    {
+        Ok(Default::default())
+    }
+    async fn prune_volumes(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::PruneOutcome, DomainError>
+    {
+        Ok(Default::default())
+    }
+    async fn prune_networks(
+        &self,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::PruneOutcome, DomainError>
+    {
+        Ok(Default::default())
+    }
+    async fn prune_build_cache(
+        &self,
+        _: bool,
+    ) -> Result<sentinel_core::domain::entities::system::docker_host::PruneOutcome, DomainError>
+    {
+        Ok(Default::default())
+    }
+}
+
 pub struct StubLockdown;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase
@@ -3006,6 +3100,7 @@ fn base_state() -> AppState {
         component_visibility_uc: Arc::new(StubComponentVisibility),
         component_min_role_uc: Arc::new(StubComponentMinRole),
         alert_rules_uc: Arc::new(StubAlertRules),
+        docker_host: Arc::new(StubDockerHost),
         bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),
