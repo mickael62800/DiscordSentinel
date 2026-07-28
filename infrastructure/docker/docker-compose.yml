@@ -433,7 +433,6 @@ services:
       <<: *build-alpine
       args:
         BIN_NAME: sentinel-bot
-        ASSETS_SRC: sentinel-bot/assets
     # Le bot n'expose pas /metrics par worker-common ; on retombe sur pidof.
     healthcheck:
       test: ["CMD-SHELL", "pidof sentinel-app || exit 1"]

@@ -53,7 +53,6 @@ target "bot" {
   inherits = ["_alpine-base"]
   args = {
     BIN_NAME   = "sentinel-bot"
-    ASSETS_SRC = "sentinel-bot/assets"
   }
   tags = ["sentinel/bot:${TAG}"]
 }
