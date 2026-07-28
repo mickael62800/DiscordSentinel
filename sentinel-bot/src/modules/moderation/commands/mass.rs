@@ -1,4 +1,4 @@
-use serenity::all::{
+﻿use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
@@ -71,7 +71,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         crate::shared::discord_helpers::reply_ephemeral(
             ctx,
             command,
-            "❌ Permission MODERATE_MEMBERS requise pour /massmute.",
+            "âŒ Permission MODERATE_MEMBERS requise pour /massmute.",
         )
         .await;
         warn!(user = %command.user.name, "Tentative /massmute sans permission");
@@ -232,7 +232,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let embed = danger_embed(format!("Mass Mute — {} utilisateurs", user_ids.len()))
+    let embed = danger_embed(format!("Mass Mute â€” {} utilisateurs", user_ids.len()))
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
@@ -244,7 +244,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 
     let followup = serenity::builder::CreateInteractionResponseFollowup::new()
         .content(format!(
-            "✅ Mass mute termine : {success}/{} utilisateurs.",
+            "âœ… Mass mute termine : {success}/{} utilisateurs.",
             user_ids.len()
         ))
         .ephemeral(true);
@@ -278,7 +278,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         crate::shared::discord_helpers::reply_ephemeral(
             ctx,
             command,
-            "❌ Permission BAN_MEMBERS requise pour /massban.",
+            "âŒ Permission BAN_MEMBERS requise pour /massban.",
         )
         .await;
         warn!(user = %command.user.name, "Tentative /massban sans permission");
@@ -440,7 +440,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let embed = danger_embed(format!("Mass Ban — {} utilisateurs", user_ids.len()))
+    let embed = danger_embed(format!("Mass Ban â€” {} utilisateurs", user_ids.len()))
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
@@ -451,7 +451,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
     let followup = serenity::builder::CreateInteractionResponseFollowup::new()
         .content(format!(
-            "✅ Mass ban termine : {success}/{} utilisateurs.",
+            "âœ… Mass ban termine : {success}/{} utilisateurs.",
             user_ids.len()
         ))
         .ephemeral(true);
@@ -480,70 +480,6 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
     );
 }
 
-pub fn parse_user_ids(input: &str) -> Vec<u64> {
-    let mut seen = std::collections::HashSet::new();
-    input
-        .split([',', ' ', '\n'])
-        .filter_map(|s| {
-            let trimmed = s
-                .trim()
-                .trim_start_matches("<@")
-                .trim_start_matches('!')
-                .trim_end_matches('>');
-            trimmed.parse::<u64>().ok()
-        })
-        .filter(|id| seen.insert(*id))
-        .collect()
-}
+// La logique de parsing vit dans le core hexagonal (avec ses tests).
+pub use sentinel_core::domain::services::moderation::user_id_parsing::parse_user_ids;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_space_separated() {
-        let ids = parse_user_ids("123456 789012 345678");
-        assert_eq!(ids, vec![123456, 789012, 345678]);
-    }
-
-    #[test]
-    fn parse_comma_separated() {
-        let ids = parse_user_ids("123456,789012,345678");
-        assert_eq!(ids, vec![123456, 789012, 345678]);
-    }
-
-    #[test]
-    fn parse_mixed_separators() {
-        let ids = parse_user_ids("123456, 789012 345678");
-        assert_eq!(ids, vec![123456, 789012, 345678]);
-    }
-
-    #[test]
-    fn parse_mention_format() {
-        let ids = parse_user_ids("<@123456> <@!789012>");
-        assert_eq!(ids, vec![123456, 789012]);
-    }
-
-    #[test]
-    fn parse_ignores_invalid() {
-        let ids = parse_user_ids("123456 invalid 789012 abc");
-        assert_eq!(ids, vec![123456, 789012]);
-    }
-
-    #[test]
-    fn parse_empty() {
-        assert!(parse_user_ids("").is_empty());
-        assert!(parse_user_ids("   ").is_empty());
-    }
-
-    #[test]
-    fn parse_single() {
-        assert_eq!(parse_user_ids("123456"), vec![123456]);
-    }
-
-    #[test]
-    fn parse_with_newlines() {
-        let ids = parse_user_ids("123456\n789012\n345678");
-        assert_eq!(ids, vec![123456, 789012, 345678]);
-    }
-}

@@ -365,18 +365,8 @@ fn now_rfc3339() -> String {
     chrono::Utc::now().to_rfc3339()
 }
 
-fn parse_dt(s: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
-    s.as_deref()
-        .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
-        .map(|d| d.with_timezone(&chrono::Utc))
-}
-
-fn elapsed_hours(since: &Option<String>) -> i64 {
-    match parse_dt(since) {
-        Some(d) => (chrono::Utc::now() - d).num_hours(),
-        None => i64::MAX,
-    }
-}
+// Parse/échéances : logique pure du core (services/system/rotation).
+use sentinel_core::domain::services::system::rotation as rotation_core;
 
 /// Choisit le prochain candidat : membre avec le role modo, non bot, pas deja
 /// sollicite ce tour, en round-robin (jamais servi d'abord, puis plus ancien).
@@ -406,11 +396,14 @@ async fn pick_candidate(
         .get_json(&format!("/api/rotation/{guild_id}/history"))
         .await
         .unwrap_or_default();
+    // Rang round-robin : règle du core (jamais servi d'abord, puis plus ancien).
     let rank = |uid: u64| -> (u8, String) {
-        match served.iter().find(|e| e.user_id == uid.to_string()) {
-            Some(e) => (1, e.served_at.clone()), // deja servi : trie par date asc (plus ancien d'abord)
-            None => (0, String::new()),          // jamais servi : prioritaire
-        }
+        rotation_core::candidate_rank(
+            served
+                .iter()
+                .find(|e| e.user_id == uid.to_string())
+                .map(|e| e.served_at.as_str()),
+        )
     };
     eligible.sort_by_key(|a| rank(*a));
     eligible.first().map(|id| UserId::new(*id))
@@ -538,27 +531,27 @@ async fn tick(ctx: &Context, guild_id: GuildId) {
         ..Default::default()
     });
 
-    match st.state.as_str() {
-        "idle" => {
-            let due = match parse_dt(&st.next_rotation_at) {
-                None => true,
-                Some(d) => chrono::Utc::now() >= d,
-            };
-            if due {
-                start_rotation(ctx, guild_id, &cfg, &api, &mut st).await;
-            }
+    // La table de décision (transitions + timeouts) vit dans le core ; le bot
+    // n'exécute que les effets (DM, rôles, persistance).
+    match rotation_core::decide_tick(
+        &st.state,
+        st.next_rotation_at.as_deref(),
+        st.candidate_offered_at.as_deref(),
+        cfg.timeout_hours,
+        chrono::Utc::now(),
+    ) {
+        rotation_core::RotationTick::StartRotation => {
+            start_rotation(ctx, guild_id, &cfg, &api, &mut st).await;
         }
-        "offering_candidate" | "awaiting_owner"
-            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours => {
-                advance_or_finish(ctx, guild_id, &cfg, &api, &mut st).await;
-            }
-        "offering_stay"
-            if elapsed_hours(&st.candidate_offered_at) >= cfg.timeout_hours => {
-                // Pas de reponse de l'admin actuel : on le garde, fin de cycle.
-                st.state = "idle".into();
-                save_state(&api, &st).await;
-            }
-        _ => {}
+        rotation_core::RotationTick::TimeoutAdvance => {
+            advance_or_finish(ctx, guild_id, &cfg, &api, &mut st).await;
+        }
+        rotation_core::RotationTick::TimeoutKeepAdmin => {
+            // Pas de reponse de l'admin actuel : on le garde, fin de cycle.
+            st.state = "idle".into();
+            save_state(&api, &st).await;
+        }
+        rotation_core::RotationTick::Nothing => {}
     }
 }
 
@@ -571,7 +564,7 @@ async fn start_rotation(
 ) {
     st.period_start = Some(now_rfc3339());
     st.next_rotation_at =
-        Some((chrono::Utc::now() + chrono::Duration::days(cfg.period_days.max(1))).to_rfc3339());
+        Some(rotation_core::next_rotation_at(chrono::Utc::now(), cfg.period_days).to_rfc3339());
     st.asked_this_round = Vec::new();
 
     match pick_candidate(ctx, guild_id, cfg, api, &st.asked_this_round).await {

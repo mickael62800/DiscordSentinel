@@ -542,11 +542,12 @@ impl BaseApiClient {
             .unwrap_or(default)
     }
 
+    /// Sémantique de vérité partagée avec l'API et le worker (core
+    /// `parse_bool_config` : "true"/"1"/"yes", insensible à la casse).
     pub fn config_bool(config: &HashMap<String, String>, key: &str, default: bool) -> bool {
-        config
-            .get(key)
-            .map(|v| v == "true" || v == "1")
-            .unwrap_or(default)
+        sentinel_core::domain::entities::system::config_parsers::parse_bool_config(
+            config, key, default,
+        )
     }
 }
 

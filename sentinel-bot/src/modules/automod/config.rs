@@ -98,22 +98,11 @@ fn parse_color(hex: &str, default: u32) -> u32 {
     u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(default)
 }
 
-/// Verifie si l'heure actuelle est dans la plage de nuit.
+/// Verifie si l'heure actuelle est dans la plage de nuit. La règle (fenêtre
+/// passant minuit) vit dans le core ; le bot ne fournit que l'horloge.
 pub(super) fn is_night_mode(start: u8, end: u8) -> bool {
     let hour = time::OffsetDateTime::now_utc().hour();
-    if start > end {
-        // Passage par minuit (ex: 22h-8h)
-        hour >= start || hour < end
-    } else {
-        hour >= start && hour < end
-    }
+    sentinel_core::domain::services::automod::night_mode::is_night_hour(hour, start, end)
 }
 
-/// Reduit les seuils de detection pour le mode nuit (seuils divises par ~2).
-pub(super) fn apply_night_mode(config: &mut DetectorConfig) {
-    config.spam_repeat_char_threshold = (config.spam_repeat_char_threshold / 2).max(4);
-    config.spam_repeat_word_threshold = (config.spam_repeat_word_threshold / 2).max(3);
-    config.caps_threshold_chars = (config.caps_threshold_chars / 2).max(6);
-    config.emoji_spam_max = (config.emoji_spam_max / 2).max(5);
-    config.mentions_max = (config.mentions_max / 2).max(3);
-}
+pub(super) use sentinel_core::domain::services::automod::night_mode::apply_night_mode;
