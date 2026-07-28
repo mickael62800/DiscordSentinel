@@ -26,7 +26,7 @@ use crate::ports::outbound::community::level_repository::LevelRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 /// Nom du bot sous lequel la config progression est stockee en DB.
-const PROGRESSION_BOT_NAME: &str = "progression-bot";
+use crate::domain::entities::system::bot_names::PROGRESSION_BOT as PROGRESSION_BOT_NAME;
 
 pub struct ManageLevelsService {
     repo: Arc<dyn LevelRepository>,

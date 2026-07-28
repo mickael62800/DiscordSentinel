@@ -9,7 +9,6 @@ use async_trait::async_trait;
 use crate::domain::entities::community::bump::{
     bump_reward, sanitize_provider, BumpReward, DueReminder,
 };
-use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_bump::{ManageBumpUseCase, RecordBumpCommand};
 use crate::ports::outbound::community::bump_repository::BumpRepository;
@@ -30,22 +29,7 @@ impl ManageBumpService {
     }
 }
 
-fn cfg_str<'a>(entries: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
-    entries
-        .iter()
-        .find(|e| e.config_key == key)
-        .map(|e| e.config_value.as_str())
-}
-fn cfg_bool(entries: &[BotGuildConfig], key: &str, d: bool) -> bool {
-    cfg_str(entries, key)
-        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(d)
-}
-fn cfg_i64(entries: &[BotGuildConfig], key: &str, d: i64) -> i64 {
-    cfg_str(entries, key)
-        .and_then(|v| v.parse::<i64>().ok())
-        .unwrap_or(d)
-}
+use crate::domain::entities::system::bot_config::{cfg_bool, cfg_i64, cfg_str};
 
 #[async_trait]
 impl ManageBumpUseCase for ManageBumpService {

@@ -5,6 +5,11 @@
 
 use crate::domain::errors::DomainError;
 
+/// Plafond standard d'une page de listing (endpoints web).
+pub const PAGE_LIMIT_MAX: i64 = 500;
+/// Plafond des listings « batch » (exports, agrégations, dataset).
+pub const BATCH_LIMIT_MAX: i64 = 1000;
+
 /// Valide qu'un `guild_id` n'est pas vide. Message coherent partout.
 pub fn validate_guild_id(guild_id: &str) -> Result<(), DomainError> {
     validate_non_empty(guild_id, "guild_id")

@@ -1,8 +1,8 @@
 use std::hash::Hash;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
+use std::time::Duration;
 
-use dashmap::DashMap;
+use crate::domain::services::sliding_window::SlidingWindow;
 
 const DEFAULT_MAX_MESSAGES: u64 = 5;
 const DEFAULT_TIME_WINDOW_SECS: u64 = 5;
@@ -10,16 +10,18 @@ const DEFAULT_TIME_WINDOW_SECS: u64 = 5;
 /// Détecteur de flood par fenêtre glissante, par couple (salon, utilisateur).
 /// Générique sur les clés `C` (salon) et `U` (utilisateur) — le core ne
 /// connaît pas Discord. Seuils reconfigurables à chaud depuis la config API.
-pub struct FloodTracker<C: Eq + Hash, U: Eq + Hash> {
-    map: DashMap<(C, U), Vec<Instant>>,
+/// Stockage : `SlidingWindow` partagée avec purge amortie (les couples
+/// inactifs sont éjectés — corrige une fuite mémoire non bornée).
+pub struct FloodTracker<C: Eq + Hash + Clone, U: Eq + Hash + Clone> {
+    map: SlidingWindow<(C, U)>,
     max_messages: AtomicU64,
     time_window_secs: AtomicU64,
 }
 
-impl<C: Eq + Hash, U: Eq + Hash> FloodTracker<C, U> {
+impl<C: Eq + Hash + Clone, U: Eq + Hash + Clone> FloodTracker<C, U> {
     pub fn new() -> Self {
         Self {
-            map: DashMap::new(),
+            map: SlidingWindow::new(),
             max_messages: AtomicU64::new(DEFAULT_MAX_MESSAGES),
             time_window_secs: AtomicU64::new(DEFAULT_TIME_WINDOW_SECS),
         }
@@ -32,27 +34,26 @@ impl<C: Eq + Hash, U: Eq + Hash> FloodTracker<C, U> {
             .store(time_window_secs, Ordering::Relaxed);
     }
 
+    fn window(&self) -> Duration {
+        Duration::from_secs(self.time_window_secs.load(Ordering::Relaxed))
+    }
+
     /// Enregistre un message. Retourne true si flood detecte.
     pub fn record_message(&self, channel_id: C, user_id: U) -> bool {
-        let key = (channel_id, user_id);
-        let now = Instant::now();
-        let window = self.time_window_secs.load(Ordering::Relaxed);
+        let window = self.window();
         let max = self.max_messages.load(Ordering::Relaxed) as usize;
-
-        let mut entry = self.map.entry(key).or_default();
-        let timestamps = entry.value_mut();
-        timestamps.retain(|t| now.duration_since(*t).as_secs() < window);
-        timestamps.push(now);
-        timestamps.len() >= max
+        let count = self.map.record((channel_id, user_id), window);
+        self.map.prune_if_larger(1000, window * 2);
+        count >= max
     }
 
     /// Nettoie le compteur pour un utilisateur dans un channel.
     pub fn clear(&self, channel_id: C, user_id: U) {
-        self.map.remove(&(channel_id, user_id));
+        self.map.clear(&(channel_id, user_id));
     }
 }
 
-impl<C: Eq + Hash, U: Eq + Hash> Default for FloodTracker<C, U> {
+impl<C: Eq + Hash + Clone, U: Eq + Hash + Clone> Default for FloodTracker<C, U> {
     fn default() -> Self {
         Self::new()
     }

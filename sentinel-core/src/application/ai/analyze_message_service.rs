@@ -301,7 +301,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         use crate::ports::inbound::ai::analyze_message::FloodDecision;
         let entries = self
             .bot_config_repo
-            .get_config(guild_id, "automod-bot")
+            .get_config(guild_id, crate::domain::entities::system::bot_names::AUTOMOD_BOT)
             .await
             .unwrap_or_default();
         let num = |key: &str, default: u64| -> u64 {
@@ -358,7 +358,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
         let entries = self
             .bot_config_repo
-            .get_config(guild_id, "automod-bot")
+            .get_config(guild_id, crate::domain::entities::system::bot_names::AUTOMOD_BOT)
             .await
             .unwrap_or_default();
 
@@ -417,7 +417,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // a [0.0, 1.0]. La detection (forme/longueur) reste locale au bot.
         let entries = self
             .bot_config_repo
-            .get_config(guild_id, "automod-bot")
+            .get_config(guild_id, crate::domain::entities::system::bot_names::AUTOMOD_BOT)
             .await
             .unwrap_or_default();
         let score = entries
@@ -448,7 +448,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // "tension de salon" plus bas.
         let automod_entries = match self
             .bot_config_repo
-            .get_config(&cmd.guild_id, "automod-bot")
+            .get_config(&cmd.guild_id, crate::domain::entities::system::bot_names::AUTOMOD_BOT)
             .await
         {
             Ok(e) => e,

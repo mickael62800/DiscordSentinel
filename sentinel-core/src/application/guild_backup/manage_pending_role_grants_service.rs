@@ -29,9 +29,7 @@ impl ManagePendingRoleGrantsUseCase for ManagePendingRoleGrantsService {
         guild_id: &str,
         grants: Vec<PendingRoleGrant>,
     ) -> Result<u64, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         // Normalisation : force le guild_id autoritaire, ecarte les entrees sans
         // user_id ou sans roles (rien a re-attribuer).
         let cleaned: Vec<PendingRoleGrant> = grants
@@ -63,9 +61,7 @@ impl ManagePendingRoleGrantsUseCase for ManagePendingRoleGrantsService {
     }
 
     async fn clear_guild(&self, guild_id: &str) -> Result<u64, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.clear_guild(guild_id).await
     }
 }

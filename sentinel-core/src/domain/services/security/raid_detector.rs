@@ -1,15 +1,14 @@
 use std::hash::Hash;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use dashmap::DashMap;
+use crate::domain::services::sliding_window::SlidingWindow;
 
 /// Détecteur de raid basé sur le nombre de joins dans une fenêtre de temps.
 /// Générique sur la clé `K` (l'adaptateur fournit son type d'identifiant de
 /// serveur, ex. `GuildId`) pour rester pur — le core ne connaît pas Discord.
-/// Thread-safe grâce à DashMap.
+/// Stockage : `SlidingWindow` partagée (politique de purge unique).
 pub struct RaidDetector<K: Eq + Hash + Clone> {
-    /// clé (serveur) -> liste des timestamps de join
-    joins: DashMap<K, Vec<Instant>>,
+    joins: SlidingWindow<K>,
     threshold: u64,
     window: Duration,
 }
@@ -17,7 +16,7 @@ pub struct RaidDetector<K: Eq + Hash + Clone> {
 impl<K: Eq + Hash + Clone> RaidDetector<K> {
     pub fn new(threshold: u64, window_secs: u64) -> Self {
         Self {
-            joins: DashMap::new(),
+            joins: SlidingWindow::new(),
             threshold,
             window: Duration::from_secs(window_secs),
         }
@@ -25,45 +24,19 @@ impl<K: Eq + Hash + Clone> RaidDetector<K> {
 
     /// Enregistre un join et retourne `true` si un raid est détecté.
     pub fn record_join(&self, key: K) -> bool {
-        let now = Instant::now();
-        let mut entry = self.joins.entry(key).or_default();
-        let timestamps = entry.value_mut();
-
-        // Nettoyer les joins hors fenêtre
-        timestamps.retain(|t| now.duration_since(*t) < self.window);
-
-        // Ajouter le nouveau join
-        timestamps.push(now);
-
-        let result = timestamps.len() as u64 >= self.threshold;
-        drop(entry);
-
-        // Cleanup périodique : supprimer les serveurs avec vecteur vide
-        if self.joins.len() > 1000 {
-            self.joins.retain(|_, ts| !ts.is_empty());
-        }
-
-        result
+        let count = self.joins.record(key, self.window);
+        self.joins.prune_if_larger(1000, self.window * 2);
+        count as u64 >= self.threshold
     }
 
     /// Retourne le nombre de joins récents pour une clé.
     pub fn recent_joins(&self, key: K) -> u64 {
-        let now = Instant::now();
-        self.joins
-            .get(&key)
-            .map(|entry| {
-                entry
-                    .value()
-                    .iter()
-                    .filter(|t| now.duration_since(**t) < self.window)
-                    .count() as u64
-            })
-            .unwrap_or(0)
+        self.joins.count(&key, self.window) as u64
     }
 
     /// Réinitialise les compteurs d'une clé (après lockdown par ex).
     pub fn reset(&self, key: K) {
-        self.joins.remove(&key);
+        self.joins.clear(&key);
     }
 }
 

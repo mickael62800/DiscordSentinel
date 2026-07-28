@@ -10,7 +10,7 @@
 use std::time::Duration;
 
 use serde::Deserialize;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::common;
 

@@ -17,7 +17,7 @@ use crate::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRanki
 use crate::ports::outbound::community::monthly_ranking_repository::MonthlyRankingRepository;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
-const PROGRESSION_BOT: &str = "progression-bot";
+use crate::domain::entities::system::bot_names::PROGRESSION_BOT;
 const LAST_PERIOD_KEY: &str = "monthly_ranking_last_period";
 
 pub struct ManageMonthlyRankingService {
@@ -54,19 +54,8 @@ impl ManageMonthlyRankingService {
     }
 }
 
-fn cfg_str<'a>(entries: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
-    entries
-        .iter()
-        .find(|e| e.config_key == key)
-        .map(|e| e.config_value.as_str())
-}
-fn cfg_bool(entries: &[BotGuildConfig], key: &str, d: bool) -> bool {
-    match cfg_str(entries, key) {
-        Some("true") | Some("1") => true,
-        Some("false") | Some("0") => false,
-        _ => d,
-    }
-}
+use crate::domain::entities::system::bot_config::{cfg_bool, cfg_str};
+
 fn cfg_top(entries: &[BotGuildConfig]) -> usize {
     cfg_str(entries, "monthly_ranking_top_count")
         .and_then(|v| v.parse::<i64>().ok())

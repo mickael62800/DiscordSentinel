@@ -49,7 +49,7 @@ impl ManageAnnouncementsService {
                     .and_then(|c| c.config_value.parse::<i64>().ok())
             })
             .unwrap_or(DEFAULT_FETCH_LIMIT_PER_GUILD);
-        cap.clamp(1, 500)
+        cap.clamp(1, crate::application::validation::PAGE_LIMIT_MAX)
     }
 
     /// Lit une cle de config du guild (bot_name='announcements').

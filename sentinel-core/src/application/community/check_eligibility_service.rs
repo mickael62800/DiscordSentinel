@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use crate::domain::entities::community::eligibility::{
     check_prerequisites, days_since, evaluate_sponsorship, parse_prerequisites, EligibilityDecision,
 };
-use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::check_eligibility::{
     CheckEligibilityUseCase, CheckRoleEligibilityCommand, ValidateSponsorshipCommand,
@@ -30,18 +29,7 @@ impl CheckEligibilityService {
     }
 }
 
-fn cfg_str<'a>(entries: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
-    entries
-        .iter()
-        .find(|e| e.config_key == key)
-        .map(|e| e.config_value.as_str())
-}
-
-fn cfg_u64(entries: &[BotGuildConfig], key: &str, default: u64) -> u64 {
-    cfg_str(entries, key)
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(default)
-}
+use crate::domain::entities::system::bot_config::{cfg_str, cfg_u64};
 
 /// Horodatage courant (secondes unix). Isole pour la lisibilite/tests.
 fn now_unix() -> i64 {

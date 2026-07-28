@@ -32,9 +32,7 @@ impl ManageAiJobsUseCase for ManageAiJobsService {
                 job.job_type
             )));
         }
-        if job.guild_id.is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(&job.guild_id)?;
         self.repo.enqueue(&job).await
     }
 

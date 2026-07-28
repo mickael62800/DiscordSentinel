@@ -2,16 +2,20 @@
 //! d'activation/désactivation). Générique sur la clé `K` (l'adaptateur fournit
 //! son `ChannelId`) pour rester sans dépendance Discord. La pose/retrait effectif
 //! du slowmode Discord reste dans l'adaptateur.
+//! Stockage : `SlidingWindow` partagée ; la DÉCISION (seuils, ensembles
+//! activating/active) reste ici.
 
 use std::hash::Hash;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use dashmap::{DashMap, DashSet};
+use dashmap::DashSet;
+
+use crate::domain::services::sliding_window::SlidingWindow;
 
 /// Tracker d'activité par salon pour le slowmode adaptatif.
 pub struct SlowmodeTracker<K: Eq + Hash + Clone> {
     /// clé (salon) -> timestamps des messages récents
-    counters: DashMap<K, Vec<Instant>>,
+    counters: SlidingWindow<K>,
     /// salons en cours d'activation (évite les activations multiples)
     activating: DashSet<K>,
     /// salons dont l'automod a RÉELLEMENT activé un slowmode (pour ne
@@ -23,7 +27,7 @@ pub struct SlowmodeTracker<K: Eq + Hash + Clone> {
 impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     pub fn new(window_secs: u64) -> Self {
         Self {
-            counters: DashMap::new(),
+            counters: SlidingWindow::new(),
             activating: DashSet::new(),
             active: DashSet::new(),
             window: Duration::from_secs(window_secs),
@@ -39,28 +43,12 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
 
     /// Enregistre un message et retourne le nombre de messages dans la fenêtre.
     pub fn record_message(&self, key: K) -> usize {
-        let now = Instant::now();
-        let mut entry = self.counters.entry(key).or_default();
-        let timestamps = entry.value_mut();
-        timestamps.retain(|t| now.duration_since(*t) < self.window);
-        timestamps.push(now);
-        timestamps.len()
+        self.counters.record(key, self.window)
     }
 
     /// Vérifie si le seuil d'activation est atteint.
     pub fn should_activate(&self, key: K, threshold: usize) -> bool {
-        let now = Instant::now();
-        self.counters
-            .get(&key)
-            .map(|entry| {
-                entry
-                    .value()
-                    .iter()
-                    .filter(|t| now.duration_since(**t) < self.window)
-                    .count()
-                    >= threshold
-            })
-            .unwrap_or(false)
+        self.counters.count(&key, self.window) >= threshold
     }
 
     /// Tente de démarrer l'activation du slowmode. Retourne true si ok (pas déjà en cours).
@@ -76,18 +64,12 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     /// Reset le compteur d'un salon.
     #[allow(dead_code)]
     pub fn reset(&self, key: K) {
-        self.counters.remove(&key);
+        self.counters.clear(&key);
     }
 
     /// Supprime les salons inactifs (pas de message depuis > 2x la fenêtre).
     pub fn cleanup(&self) {
-        let now = Instant::now();
-        let max_age = self.window * 2;
-        self.counters.retain(|_, ts| {
-            ts.last()
-                .map(|t| now.duration_since(*t) < max_age)
-                .unwrap_or(false)
-        });
+        self.counters.prune(self.window * 2);
     }
 
     /// Retourne le nombre de salons actuellement suivis.
@@ -99,24 +81,13 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     /// est retombée sous le seuil (aucun message dans la fenêtre).
     /// Ces salons devraient avoir leur slowmode désactivé.
     pub fn channels_to_deactivate(&self, threshold: usize) -> Vec<K> {
-        let now = Instant::now();
         let floor = (threshold / 2).max(1);
         // On n'examine QUE les salons activés par l'automod (jamais les
         // slowmodes manuels des modos).
         let mut out = Vec::new();
         for ch in self.active.iter() {
             let ch = ch.key().clone();
-            let count = self
-                .counters
-                .get(&ch)
-                .map(|e| {
-                    e.value()
-                        .iter()
-                        .filter(|t| now.duration_since(**t) < self.window)
-                        .count()
-                })
-                .unwrap_or(0);
-            if count < floor {
+            if self.counters.count(&ch, self.window) < floor {
                 out.push(ch);
             }
         }
@@ -130,17 +101,7 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     /// Retourne le nombre de messages dans la fenêtre pour un salon.
     #[allow(dead_code)]
     pub fn count(&self, key: K) -> usize {
-        let now = Instant::now();
-        self.counters
-            .get(&key)
-            .map(|entry| {
-                entry
-                    .value()
-                    .iter()
-                    .filter(|t| now.duration_since(**t) < self.window)
-                    .count()
-            })
-            .unwrap_or(0)
+        self.counters.count(&key, self.window)
     }
 }
 
@@ -189,10 +150,9 @@ mod tests {
     fn cleanup_removes_old_channels() {
         let tracker = SlowmodeTracker::<u64>::new(1); // window 1s
         tracker.record_message(1);
-        tracker.counters.entry(1).and_modify(|ts| {
-            ts.clear();
-            ts.push(Instant::now() - Duration::from_secs(10));
-        });
+        tracker
+            .counters
+            .backdate(&1, std::time::Duration::from_secs(10));
         tracker.cleanup();
         assert_eq!(tracker.tracked_channels(), 0);
     }

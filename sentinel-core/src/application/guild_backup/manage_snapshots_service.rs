@@ -43,13 +43,9 @@ impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
         snapshot: GuildSnapshot,
         quota: u32,
     ) -> Result<SnapshotId, DomainError> {
-        if snapshot.guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(&snapshot.guild_id)?;
         let label = snapshot.meta.label.trim();
-        if label.is_empty() {
-            return Err(DomainError::ValidationError("label requis".into()));
-        }
+        crate::application::validation::validate_non_empty(label, "label")?;
         if label.chars().count() > MAX_LABEL_LEN {
             return Err(DomainError::ValidationError(format!(
                 "label trop long (max {MAX_LABEL_LEN} caracteres)"
@@ -76,9 +72,7 @@ impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
     }
 
     async fn list_snapshots(&self, guild_id: &str) -> Result<Vec<SnapshotSummary>, DomainError> {
-        if guild_id.trim().is_empty() {
-            return Err(DomainError::ValidationError("guild_id requis".into()));
-        }
+        crate::application::validation::validate_guild_id(guild_id)?;
         self.repo.list(guild_id).await
     }
 
@@ -99,9 +93,7 @@ impl ManageGuildSnapshotsUseCase for ManageGuildSnapshotsService {
         label: &str,
     ) -> Result<bool, DomainError> {
         let label = label.trim();
-        if label.is_empty() {
-            return Err(DomainError::ValidationError("label requis".into()));
-        }
+        crate::application::validation::validate_non_empty(label, "label")?;
         if label.chars().count() > MAX_LABEL_LEN {
             return Err(DomainError::ValidationError(format!(
                 "label trop long (max {MAX_LABEL_LEN} caracteres)"

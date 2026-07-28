@@ -1,22 +1,23 @@
 use std::hash::Hash;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::Instant;
 
-use dashmap::DashMap;
+use crate::domain::services::cooldown_map::CooldownMap;
 
 const DEFAULT_COOLDOWN_SECS: u64 = 5;
 
 /// Cooldown par utilisateur avec check-and-set atomique. Générique sur la clé
-/// `U` (l'adaptateur fournit son type d'identifiant, ex. `UserId`).
+/// `U` (l'adaptateur fournit son type d'identifiant, ex. `UserId`). Le
+/// mécanisme (atomicité, purge) vit dans `CooldownMap` ; ici on ne garde que
+/// la valeur de cooldown reconfigurable à chaud.
 pub struct CooldownTracker<U: Eq + Hash> {
-    map: DashMap<U, Instant>,
+    map: CooldownMap<U>,
     cooldown_secs: AtomicU64,
 }
 
 impl<U: Eq + Hash> CooldownTracker<U> {
     pub fn new() -> Self {
         Self {
-            map: DashMap::new(),
+            map: CooldownMap::new(500),
             cooldown_secs: AtomicU64::new(DEFAULT_COOLDOWN_SECS),
         }
     }
@@ -26,44 +27,12 @@ impl<U: Eq + Hash> CooldownTracker<U> {
         self.cooldown_secs.store(secs, Ordering::Relaxed);
     }
 
-    fn cooldown(&self) -> u64 {
-        self.cooldown_secs.load(Ordering::Relaxed)
-    }
-
     /// Verifie ET pose le cooldown de maniere atomique. Retourne
-    /// `Some(remaining_secs)` si l'utilisateur est encore en cooldown (rien
-    /// n'est ecrit), `None` si l'action est autorisee (le timestamp est alors
-    /// enregistre).
-    ///
-    /// A privilegier sur `check` + `set` separes : ces deux appels formaient un
-    /// TOCTOU ou deux evenements concurrents du meme user pouvaient tous deux
-    /// passer le `check` avant le premier `set`. Ici le shard de la cle reste
-    /// verrouille entre lecture et ecriture via l'API `entry` de DashMap.
+    /// `Some(remaining_secs)` si l'utilisateur est encore en cooldown,
+    /// `None` si l'action est autorisee.
     pub fn check_and_set(&self, user_id: U) -> Option<u64> {
-        let cd = self.cooldown();
-        let now = Instant::now();
-
-        // Cleanup inline avant le `entry` (retain verrouille tous les shards,
-        // l'appeler en tenant le lock d'une entry risquerait un deadlock).
-        if self.map.len() > 500 {
-            self.map.retain(|_, ts| ts.elapsed().as_secs() < cd);
-        }
-
-        use dashmap::mapref::entry::Entry;
-        match self.map.entry(user_id) {
-            Entry::Occupied(mut e) => {
-                let elapsed = e.get().elapsed().as_secs();
-                if elapsed < cd {
-                    return Some(cd - elapsed);
-                }
-                e.insert(now);
-                None
-            }
-            Entry::Vacant(e) => {
-                e.insert(now);
-                None
-            }
-        }
+        self.map
+            .check_and_set(user_id, self.cooldown_secs.load(Ordering::Relaxed))
     }
 }
 

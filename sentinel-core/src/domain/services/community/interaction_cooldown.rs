@@ -1,23 +1,20 @@
-//! Rate limiter per-user pour eviter le spam d'interactions (boutons, commandes).
-//!
-//! Utilise une DashMap (user_id, bucket_key) -> Instant. Le `bucket_key` est
-//! un identifiant libre qui permet d'avoir plusieurs cooldowns distincts par
-//! user (ex: "role_toggle", "parrain_command"). Cleanup inline dans `check()`
-//! pour eviter le leak memoire.
+//! Rate limiter per-user pour eviter le spam d'interactions (boutons,
+//! commandes). Le `bucket_key` est un identifiant libre qui permet d'avoir
+//! plusieurs cooldowns distincts par user (ex: "role_toggle",
+//! "parrain_command"). Le mécanisme (check-and-set atomique, purge amortie)
+//! vit dans `CooldownMap`.
 
-use std::time::Instant;
-
-use dashmap::DashMap;
+use crate::domain::services::cooldown_map::CooldownMap;
 
 /// Bucket = (user_id, key) -> dernier timestamp de trigger.
 pub struct InteractionCooldown {
-    map: DashMap<(u64, String), Instant>,
+    map: CooldownMap<(u64, String)>,
 }
 
 impl InteractionCooldown {
     pub fn new() -> Self {
         Self {
-            map: DashMap::new(),
+            map: CooldownMap::new(1000),
         }
     }
 
@@ -25,38 +22,8 @@ impl InteractionCooldown {
     /// encore attendre, `None` si l'action est autorisee (et alors enregistre
     /// le nouveau timestamp).
     pub fn check_and_set(&self, user_id: u64, key: &str, cooldown_secs: u64) -> Option<u64> {
-        let k = (user_id, key.to_string());
-        let now = Instant::now();
-
-        // Cleanup inline : si la map devient grosse, retirer les entrees
-        // dont le cooldown maximal (60s suffisent pour tous les cas) est
-        // deja expire. Evite un leak long-terme. Fait AVANT le `entry`
-        // ci-dessous : `retain` verrouille tous les shards, l'appeler
-        // pendant qu'on tient le lock d'une entry risquerait un deadlock.
-        if self.map.len() > 1000 {
-            self.map.retain(|_, ts| ts.elapsed().as_secs() < 60);
-        }
-
-        // Atomicite : check-then-set en une seule operation verrouillee via
-        // l'API `entry` de DashMap. Le shard de la cle reste verrouille entre
-        // la lecture du timestamp et l'ecriture, donc deux interactions
-        // concurrentes sur la meme cle ne peuvent plus passer toutes les deux
-        // (TOCTOU corrige).
-        use dashmap::mapref::entry::Entry;
-        match self.map.entry(k) {
-            Entry::Occupied(mut e) => {
-                let elapsed = e.get().elapsed().as_secs();
-                if elapsed < cooldown_secs {
-                    return Some(cooldown_secs - elapsed);
-                }
-                e.insert(now);
-                None
-            }
-            Entry::Vacant(e) => {
-                e.insert(now);
-                None
-            }
-        }
+        self.map
+            .check_and_set((user_id, key.to_string()), cooldown_secs)
     }
 }
 

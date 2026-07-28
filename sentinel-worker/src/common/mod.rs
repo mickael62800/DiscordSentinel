@@ -296,6 +296,11 @@ const WORKER_MODULES: &[&str] = &[
     "cleanup",
     "export",
     "game-portal",
+    // Domaines dont les jobs lisent leur config sous ces bot_name (bug corrigé :
+    // ils étaient absents, leurs intervalles n'étaient jamais résolus depuis la
+    // config DB de leur domaine — seulement sous `sentinel-worker`).
+    "guild-backup-bot",
+    "welcome-bot",
     "moderation-bot",
     "monitoring",
     "security-bot",

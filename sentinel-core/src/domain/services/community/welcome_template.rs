@@ -25,9 +25,11 @@ pub fn render(
     result
 }
 
-/// Parse une couleur hex (sans #) en u32 pour les embeds Discord.
+/// Parse une couleur hex (avec ou sans #) en u32 pour les embeds Discord.
+/// Fallback bleu Discord. Implémentation unique : `parse_role_color_hex`
+/// (qui trim les espaces — un `" #FF0000"` est valide).
 pub fn parse_color(hex: &str) -> u32 {
-    u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(0x3498db)
+    crate::domain::entities::casino::game::parse_role_color_hex(hex, 0x3498db)
 }
 
 #[cfg(test)]
@@ -95,6 +97,12 @@ mod tests {
     #[test]
     fn parse_color_invalid_fallback() {
         assert_eq!(parse_color("not_hex"), 0x3498db);
+    }
+
+    #[test]
+    fn parse_color_trims_whitespace() {
+        // Régression : avant l'unification, " #FF0000" retombait sur le bleu.
+        assert_eq!(parse_color(" #FF0000 "), 0xff0000);
     }
 
     #[test]
