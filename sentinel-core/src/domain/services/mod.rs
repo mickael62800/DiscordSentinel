@@ -5,3 +5,4 @@ pub mod automod;
 pub mod moderation;
 pub mod progression;
 pub mod security;
+pub mod voice;
