@@ -23,7 +23,7 @@ Discord Messages / Events / Images
 ┌─────────────────────────┐         ┌──────────────────────────┐
 │  API backend (Axum 0.8) │◄────────┤  Gateway WebSocket       │
 │  sentinel-api           │         │  sentinel-gateway        │
-│  - 285 migrations       │         │  (relay Redis → clients) │
+│  - 1 migration init     │         │  (relay Redis → clients) │
 │  - ONNX inference       │         └─────────┬────────────────┘
 │  - ~150 handlers HTTP   │                   │
 │  - Hexagonal            │                   │
@@ -37,7 +37,7 @@ Discord Messages / Events / Images
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
 │ Postgres  │  │  Redis    │        │ web (Vue 3)   │
 │(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
-│ 285 migs  │  │  streams) │        └────────────────────────┘
+│ 1 mig init│  │  streams) │        └────────────────────────┘
 └─────┬─────┘  └─────┬─────┘
       │              │
       └──────┬───────┘
@@ -62,12 +62,12 @@ Discord Messages / Events / Images
 
 | Composant | Technologie | Détails |
 |---|---|---|
-| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~150 handlers, 285 migrations, ONNX inference, OAuth Discord |
+| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~150 handlers, 1 migration init (historique archivé dans migrations_legacy/), ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis | Service dédié temps réel, auto-reconnect exponential backoff |
 | Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 22 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
 | Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 17 domaines périodiques), heartbeat + métriques Prometheus |
 | gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (CRUD voice/IA/modération en gRPC) |
-| PostgreSQL | Postgres 16 + **PgBouncer** | 285 migrations, partitionnement RANGE mensuel, vues matérialisées |
+| PostgreSQL | Postgres 16 + **PgBouncer** | 1 migration init (historique archivé dans migrations_legacy/), partitionnement RANGE mensuel, vues matérialisées |
 | Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables), cache `user_guilds` multi-tenant |
 | Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
 | Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `web` — servi par Nginx (Dockerfile + nginx.conf) |
@@ -101,7 +101,7 @@ DiscordSentinel/
 │   │   ├── application/             # use case services
 │   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
 │   │   └── ports/                   # traits inbound/outbound
-│   └── migrations/                  # 285 fichiers (001 → 281, plusieurs séries)
+│   └── migrations/                  # 1 migration init (historique dans migrations_legacy/)
 │
 ├── sentinel-gateway/            # WebSocket relay (Redis → clients)
 ├── sentinel-proto/              # Définitions gRPC (`tonic` + `prost`)
@@ -252,7 +252,7 @@ Module indépendant (désactivé par défaut) : quand actif, envoie chaque messa
 
 ## Base de données
 
-**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **285 migrations** versionnées dans `sentinel-api/migrations/` (numérotation 001 → 281, plusieurs séries de plages).
+**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **1 migration init** (`sentinel-api/migrations/001_init.sql`, base vierge requise — historique archivé dans `sentinel-api/migrations_legacy/`).
 
 ### Optimisations structurelles
 
