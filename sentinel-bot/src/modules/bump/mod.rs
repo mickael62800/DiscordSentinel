@@ -3,14 +3,17 @@
 //! semaine, calculee cote API) et rappelle quand un nouveau bump est possible
 //! apres le cooldown.
 //!
-//! Multi-provider (DRY) : chaque plateforme de bump est decrite par une entree
-//! `BumpProvider` dans le registre `PROVIDERS`. Le chemin
-//! record/reward/VIP/annonce est ecrit UNE seule fois, parametre par le
-//! provider detecte. Ajouter une plateforme = une entree ici + un jeu de cles
-//! de config cote API.
+//! La detection (registre providers, succes/cooldown, resolution du bumpeur)
+//! vit dans le core hexagonal (`sentinel_core::domain::services::bump`). Ce
+//! module construit le DTO `BumpMessageFacts` depuis le `Message` Serenity et
+//! garde l'orchestration Discord/API.
 
 use std::time::Duration;
 
+use sentinel_core::domain::services::bump::detection::{
+    is_provider_bot, provider_by_key, provider_for_message, resolve_bumper, BumpAction,
+    BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD,
+};
 use serenity::all::MessageInteractionMetadata;
 use serenity::model::channel::Message;
 use serenity::model::id::{ChannelId, UserId};
@@ -22,243 +25,39 @@ use crate::shared::heartbeat::ApiClientKey;
 
 pub const MODULE_BOT_NAME: &str = "bump-bot";
 
-/// Action recompensee : bump (remontee de serveur) ou vote.
-#[derive(Clone, Copy, PartialEq)]
-enum BumpAction {
-    Bump,
-    Vote,
-}
-
-impl BumpAction {
-    /// Mot affiche dans les annonces ("pour le **bump**" / "#3 de la semaine").
-    fn label(self) -> &'static str {
-        match self {
-            BumpAction::Bump => "bump",
-            BumpAction::Vote => "vote",
-        }
-    }
-}
-
-/// Description d'une plateforme de bump/vote (Disboard, DiscordL bump/vote, ...).
-struct BumpProvider {
-    /// User id du bot qui poste la confirmation.
-    bot_id: u64,
-    /// Identifiant stable envoye a l'API + namespace de config ("disboard").
-    key: &'static str,
-    /// Nom lisible pour les annonces / rappels.
-    display: &'static str,
-    /// Texte de la commande a rappeler (ex: "/bump (Disboard)").
-    bump_hint: &'static str,
-    /// Action recompensee (bump ou vote) pour les annonces/rappels.
-    action: BumpAction,
-    /// Cooldown par defaut en minutes (indicatif ; l'API tranche).
-    #[allow(dead_code)]
-    default_cooldown_min: i64,
-    /// Discrimine l'ACTION : ce message correspond-il a ce provider ?
-    /// (le meme bot DiscordL poste bump ET vote — on tranche sur le titre).
-    matches: fn(&Message) -> bool,
-    /// Detection d'un SUCCES (et pas un cooldown/echec) pour ce provider.
-    detect: fn(&Message) -> bool,
-}
-
-/// Disboard (bot historique, bump uniquement).
-const DISBOARD: BumpProvider = BumpProvider {
-    bot_id: 302050872383242240,
-    key: "disboard",
-    display: "Disboard",
-    bump_hint: "/bump (Disboard)",
-    action: BumpAction::Bump,
-    default_cooldown_min: 120,
-    matches: |_| true,
-    detect: detect_disboard,
-};
-
-/// DiscordL — bump (discordl.org).
-const DISCORDL: BumpProvider = BumpProvider {
-    bot_id: 528557940811104258,
-    key: "discordl",
-    display: "DiscordL",
-    bump_hint: "/bump (DiscordL)",
-    action: BumpAction::Bump,
-    default_cooldown_min: 240,
-    matches: matches_discordl_bump,
-    detect: detect_discordl_bump,
-};
-
-/// DiscordL — vote (meme bot, action differente).
-const DISCORDL_VOTE: BumpProvider = BumpProvider {
-    bot_id: 528557940811104258,
-    key: "discordl_vote",
-    display: "DiscordL",
-    bump_hint: "/vote (DiscordL)",
-    action: BumpAction::Vote,
-    default_cooldown_min: 720,
-    matches: matches_discordl_vote,
-    detect: detect_discordl_vote,
-};
-
-/// Registre des plateformes supportees.
-static PROVIDERS: &[BumpProvider] = &[DISBOARD, DISCORDL, DISCORDL_VOTE];
-
-/// Provider correspondant a CE message : bon bot_id ET bonne action.
-fn provider_for_message(msg: &Message) -> Option<&'static BumpProvider> {
-    let bot_id = msg.author.id.get();
-    PROVIDERS
-        .iter()
-        .find(|p| p.bot_id == bot_id && (p.matches)(msg))
-}
-
-/// Un provider connu poste-t-il avec ce bot_id ? (filtre rapide a l'edition).
-fn is_provider_bot(bot_id: u64) -> bool {
-    PROVIDERS.iter().any(|p| p.bot_id == bot_id)
-}
-
-
-fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
-    PROVIDERS.iter().find(|p| p.key == key)
-}
-
-/// `true` si l'embed Disboard indique un bump REUSSI (et pas un cooldown/echec).
-fn detect_disboard(msg: &Message) -> bool {
-    let mut positive = false;
-    for e in &msg.embeds {
-        let desc = e.description.as_deref().unwrap_or("").to_lowercase();
-        // Echec / cooldown Disboard : "please wait ... minutes", "patienter".
-        if desc.contains("minutes") || desc.contains("wait") || desc.contains("patient") {
-            return false;
-        }
-        if desc.contains("done")
-            || desc.contains("effectu")
-            || desc.contains("👍")
-            || desc.contains(":thumbsup:")
-        {
-            positive = true;
-        }
-    }
-    positive
-}
-
-/// `true` si un embed DiscordL contient l'un des motifs (titre ou description).
-fn dl_has(msg: &Message, needles: &[&str]) -> bool {
-    msg.embeds.iter().any(|e| {
-        let title = e.title.as_deref().unwrap_or("").to_lowercase();
-        let desc = e.description.as_deref().unwrap_or("").to_lowercase();
-        needles
+/// Construit le DTO de detection depuis le message Serenity.
+fn message_facts(msg: &Message) -> BumpMessageFacts {
+    BumpMessageFacts {
+        author_id: msg.author.id.get(),
+        embeds: msg
+            .embeds
             .iter()
-            .any(|n| title.contains(n) || desc.contains(n))
-    })
-}
-
-/// `true` si le message DiscordL est un cooldown/echec (pas un succes).
-fn dl_is_cooldown(msg: &Message) -> bool {
-    dl_has(
-        msg,
-        &[
-            "wait", "patient", "attends", "prochain", "déjà", "reviens", "already", "minute",
-        ],
-    )
-}
-
-/// Descriptions d'embeds concaténées en minuscules. IMPORTANT : DiscordL met son
-/// "titre" en MARKDOWN dans la DESCRIPTION (`### [Résultat du Bump...](url)`) ;
-/// le champ `title` de l'embed est VIDE. On matche donc sur la description.
-fn dl_desc_lower(msg: &Message) -> String {
-    msg.embeds
-        .iter()
-        .filter_map(|e| e.description.as_deref())
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase()
-}
-
-// Le meme bot DiscordL poste bump ET vote : on tranche sur le mot present dans
-// la description ("...du **bump**..." vs "...du **vote**...").
-fn matches_discordl_bump(msg: &Message) -> bool {
-    let d = dl_desc_lower(msg);
-    d.contains("bump") && !d.contains("vote")
-}
-fn matches_discordl_vote(msg: &Message) -> bool {
-    dl_desc_lower(msg).contains("vote")
-}
-
-/// Marqueur de SUCCES DiscordL : coche verte "✅" ou "a bump/voté", cherche dans
-/// titre + description + CHAMPS de l'embed (le texte de succes peut vivre dans un
-/// field, pas la description). Distingue un vrai bump d'un cooldown au meme titre.
-fn dl_is_success(msg: &Message) -> bool {
-    msg.embeds.iter().any(|e| {
-        let mut hay = String::new();
-        if let Some(t) = &e.title {
-            hay.push_str(t);
-            hay.push(' ');
-        }
-        if let Some(d) = &e.description {
-            hay.push_str(d);
-            hay.push(' ');
-        }
-        for f in &e.fields {
-            hay.push_str(&f.name);
-            hay.push(' ');
-            hay.push_str(&f.value);
-            hay.push(' ');
-        }
-        if hay.contains('\u{2705}') {
-            return true; // ✅
-        }
-        let low = hay.to_lowercase();
-        low.contains("a bump") || low.contains("a voté") || low.contains("a vote")
-    })
-}
-
-/// Bump DiscordL reussi : titre "bump" + marqueur de succes + hors cooldown.
-fn detect_discordl_bump(msg: &Message) -> bool {
-    matches_discordl_bump(msg) && dl_is_success(msg) && !dl_is_cooldown(msg)
-}
-/// Vote DiscordL reussi : titre "vote" + marqueur de succes + hors cooldown.
-fn detect_discordl_vote(msg: &Message) -> bool {
-    matches_discordl_vote(msg) && dl_is_success(msg) && !dl_is_cooldown(msg)
-}
-
-/// Resout l'auteur du /bump : d'abord via interaction_metadata (reponse de
-/// commande), sinon en repli via la premiere mention d'un user non-bot dans la
-/// description de l'embed (DiscordL mentionne le bumpeur).
-fn resolve_bumper(msg: &Message) -> Option<UserId> {
-    if let Some(MessageInteractionMetadata::Command(meta)) = msg.interaction_metadata.as_deref() {
-        if !meta.user.bot {
-            return Some(meta.user.id);
-        }
+            .map(|e| EmbedFacts {
+                title: e.title.clone(),
+                description: e.description.clone(),
+                fields: e
+                    .fields
+                    .iter()
+                    .map(|f| (f.name.clone(), f.value.clone()))
+                    .collect(),
+            })
+            .collect(),
+        interaction_user: match msg.interaction_metadata.as_deref() {
+            Some(MessageInteractionMetadata::Command(meta)) => Some(UserFacts {
+                id: meta.user.id.get(),
+                is_bot: meta.user.bot,
+            }),
+            _ => None,
+        },
+        mentions: msg
+            .mentions
+            .iter()
+            .map(|m| UserFacts {
+                id: m.id.get(),
+                is_bot: m.bot,
+            })
+            .collect(),
     }
-    // Repli : premiere mention non-bot dans l'embed (si presente dans msg.mentions).
-    for e in &msg.embeds {
-        let desc = e.description.as_deref().unwrap_or("");
-        for m in &msg.mentions {
-            if !m.bot && desc.contains(&format!("<@{}>", m.id)) {
-                return Some(m.id);
-            }
-        }
-    }
-    // Repli cle pour DiscordL : `msg.mentions` n'inclut PAS les mentions situees
-    // DANS les embeds (seulement celles du contenu). On parse donc `<@id>`
-    // directement dans la description/titre de l'embed.
-    for e in &msg.embeds {
-        for s in [e.description.as_deref(), e.title.as_deref()]
-            .into_iter()
-            .flatten()
-        {
-            if let Some(id) = first_mention_id(s) {
-                return Some(UserId::new(id));
-            }
-        }
-    }
-    // Repli ultime : toute mention non-bot du message.
-    msg.mentions.iter().find(|m| !m.bot).map(|m| m.id)
-}
-
-/// Extrait l'ID de la premiere mention utilisateur `<@id>` / `<@!id>` d'un texte.
-fn first_mention_id(s: &str) -> Option<u64> {
-    let start = s.find("<@")?;
-    let rest = s[start + 2..].trim_start_matches('!');
-    let digits: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
-    digits.parse().ok()
 }
 
 #[derive(serde::Serialize)]
@@ -313,7 +112,8 @@ pub async fn on_message_update(
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
-    let Some(provider) = provider_for_message(msg) else {
+    let facts = message_facts(msg);
+    let Some(provider) = provider_for_message(&facts) else {
         // Un bot PROVIDER connu (bon bot_id) a poste un embed qu'aucune action
         // (bump/vote) n'a reconnu : probablement un changement de format du
         // provider -> a recalibrer. Log defensif (rare, uniquement en cas de casse).
@@ -330,8 +130,8 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     let Some(guild_id) = msg.guild_id else { return };
     let guild_id = guild_id.to_string();
 
-    let detected_success = (provider.detect)(msg);
-    let bumper_id = resolve_bumper(msg);
+    let detected_success = (provider.detect)(&facts);
+    let bumper_id = resolve_bumper(&facts).map(UserId::new);
 
     debug!(
         provider = provider.key,
