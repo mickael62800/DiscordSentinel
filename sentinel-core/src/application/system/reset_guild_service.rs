@@ -48,3 +48,7 @@ impl ResetGuildUseCase for ResetGuildService {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/reset_guild.rs"]
+mod tests;

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from "vue";
+import AppModal from "@/components/atoms/AppModal.vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { systemService } from "@/services/systemService";
@@ -7,7 +8,10 @@ import { systemService } from "@/services/systemService";
 const { selectedGuild, selectedGuildId } = useGuildSelector();
 const { success, error: showError } = useToast();
 
-const open = ref(false);
+// Double confirmation : etape 1 = avertissement + options, etape 2 = saisie du
+// nom exact du serveur. Le backend re-verifie le nom (garde-fou cote use case).
+const modalOpen = ref(false);
+const step = ref<1 | 2>(1);
 const confirmText = ref("");
 const submitting = ref(false);
 const opts = ref({ unban: true, unmute: true, remove_roles: true });
@@ -19,8 +23,14 @@ const canConfirm = computed(
 
 function openDialog() {
   confirmText.value = "";
+  step.value = 1;
   opts.value = { unban: true, unmute: true, remove_roles: true };
-  open.value = true;
+  modalOpen.value = true;
+}
+
+function closeDialog() {
+  if (submitting.value) return;
+  modalOpen.value = false;
 }
 
 async function doReset() {
@@ -29,7 +39,7 @@ async function doReset() {
   try {
     const res = await systemService.resetGuild(selectedGuildId.value, confirmText.value.trim(), opts.value);
     success(`Serveur réinitialisé : ${res.total_rows} lignes supprimées (${res.tables_wiped} tables).`);
-    open.value = false;
+    modalOpen.value = false;
   } catch (e) {
     showError(`Échec de la réinitialisation : ${e}`);
   } finally {
@@ -49,26 +59,46 @@ async function doReset() {
       <p class="warn-text">
         Cette action <strong>supprime définitivement TOUTES les données</strong> de
         <strong>{{ guildName || "ce serveur" }}</strong> : infractions, historiques de
-        modération, reviews/votes automod, tickets, niveaux/XP, stats, données de jeu,
+        modération, reviews/votes automod, tickets, niveaux/XP, stats,
         salons vocaux, <strong>et la configuration</strong> (salons, règles, etc.).
         En parallèle, le bot <strong>débannit tout le monde</strong>, lève les mutes et
         retire les rôles temporaires/quarantaine.
+      </p>
+      <p class="warn-text">
+        Seuls survivent l'enregistrement du serveur dans le dashboard, les accès
+        web (RBAC) et les sauvegardes (snapshots).
       </p>
       <p class="warn-text danger">
         Il n'y a <strong>aucune corbeille</strong> et <strong>aucun retour arrière</strong>.
         Réservé au <strong>propriétaire</strong> du serveur.
       </p>
 
-      <button v-if="!open" class="btn-danger" @click="openDialog">
-        Réinitialiser ce serveur…
+      <button class="btn-danger" @click="openDialog">
+        Réinitialiser complètement ce serveur…
       </button>
+    </div>
 
-      <div v-else class="confirm-box">
+    <AppModal
+      :visible="modalOpen"
+      :title="step === 1 ? 'Réinitialiser complètement ce serveur ?' : 'Confirmation finale'"
+      size="md"
+      :close-on-overlay="!submitting"
+      :close-on-esc="!submitting"
+      @close="closeDialog"
+    >
+      <template v-if="step === 1">
+        <p class="modal-warn">
+          Toutes les données de <strong>{{ guildName }}</strong> vont être
+          <strong>définitivement effacées</strong> (modération, tickets, niveaux,
+          stats, configuration…). Cette action est <strong>irréversible</strong>.
+        </p>
         <label class="opt"><input type="checkbox" v-model="opts.unban" /> Débannir tous les membres bannis</label>
         <label class="opt"><input type="checkbox" v-model="opts.unmute" /> Lever tous les mutes (timeouts)</label>
         <label class="opt"><input type="checkbox" v-model="opts.remove_roles" /> Retirer les rôles temporaires / quarantaine</label>
+      </template>
 
-        <p class="confirm-instr">
+      <template v-else>
+        <p class="modal-warn">
           Pour confirmer, tape exactement le nom du serveur :
           <code>{{ guildName }}</code>
         </p>
@@ -77,15 +107,21 @@ async function doReset() {
           class="confirm-input"
           :placeholder="guildName"
           autocomplete="off"
+          spellcheck="false"
+          @keyup.enter="canConfirm && doReset()"
         />
-        <div class="actions">
-          <button class="btn-ghost" @click="open = false" :disabled="submitting">Annuler</button>
-          <button class="btn-danger" :disabled="!canConfirm" @click="doReset">
-            {{ submitting ? "Suppression…" : "Tout supprimer définitivement" }}
-          </button>
-        </div>
-      </div>
-    </div>
+      </template>
+
+      <template #footer>
+        <button class="btn-ghost" :disabled="submitting" @click="closeDialog">Annuler</button>
+        <button v-if="step === 1" class="btn-danger" @click="step = 2">
+          Je comprends, continuer
+        </button>
+        <button v-else class="btn-danger" :disabled="!canConfirm" @click="doReset">
+          {{ submitting ? "Suppression…" : "Tout supprimer définitivement" }}
+        </button>
+      </template>
+    </AppModal>
   </section>
 </template>
 
@@ -117,13 +153,12 @@ async function doReset() {
   background: transparent; color: var(--text-secondary);
   border: 1px solid var(--border); border-radius: 6px; padding: 10px 18px; cursor: pointer;
 }
-.confirm-box { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
-.opt { font-size: 0.88rem; display: flex; align-items: center; gap: 8px; }
-.confirm-instr { font-size: 0.88rem; margin: 8px 0 4px; }
-.confirm-instr code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; color: #E74C3C; font-weight: 700; }
+.modal-warn { font-size: 0.92rem; line-height: 1.55; margin: 0 0 12px; }
+.modal-warn code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; color: #E74C3C; font-weight: 700; }
+.opt { font-size: 0.88rem; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .confirm-input {
+  width: 100%;
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
   padding: 9px 12px; color: var(--text-primary); font-size: 0.95rem;
 }
-.actions { display: flex; gap: 10px; margin-top: 6px; }
 </style>
