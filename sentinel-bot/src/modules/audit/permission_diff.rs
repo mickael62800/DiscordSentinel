@@ -1,11 +1,11 @@
+//! Diff de permissions : l'algorithme (comparaison de bitmasks + formatage)
+//! vit dans le core hexagonal. Le bot garde la table des flags construite sur
+//! les constantes Serenity et passe les bits bruts au core.
+
 use serenity::model::permissions::Permissions;
 
-/// Un changement de permission individuel.
-#[derive(Debug, Clone, PartialEq)]
-pub struct PermissionChange {
-    pub name: &'static str,
-    pub added: bool,
-}
+pub use sentinel_core::domain::services::audit::permission_diff::{format_diff, PermissionChange};
+use sentinel_core::domain::services::audit::permission_diff::diff_flags;
 
 /// Liste de toutes les permissions avec leur flag et nom lisible.
 const PERMISSION_FLAGS: &[(Permissions, &str)] = &[
@@ -48,39 +48,11 @@ const PERMISSION_FLAGS: &[(Permissions, &str)] = &[
 
 /// Compare deux sets de permissions et retourne les changements.
 pub fn diff_permissions(old: Permissions, new: Permissions) -> Vec<PermissionChange> {
-    let mut changes = Vec::new();
-
-    for &(flag, name) in PERMISSION_FLAGS {
-        let had = old.contains(flag);
-        let has = new.contains(flag);
-
-        if !had && has {
-            changes.push(PermissionChange { name, added: true });
-        } else if had && !has {
-            changes.push(PermissionChange { name, added: false });
-        }
-    }
-
-    changes
-}
-
-/// Formate les changements en texte lisible.
-pub fn format_diff(changes: &[PermissionChange]) -> String {
-    if changes.is_empty() {
-        return "(aucun changement)".to_string();
-    }
-
-    changes
+    let flags: Vec<(u64, &'static str)> = PERMISSION_FLAGS
         .iter()
-        .map(|c| {
-            if c.added {
-                format!("+ {}", c.name)
-            } else {
-                format!("- {}", c.name)
-            }
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
+        .map(|&(flag, name)| (flag.bits(), name))
+        .collect();
+    diff_flags(old.bits(), new.bits(), &flags)
 }
 
 #[cfg(test)]
@@ -142,27 +114,5 @@ mod tests {
         assert_eq!(changes.len(), 1);
         assert_eq!(changes[0].name, "ADMINISTRATOR");
         assert!(changes[0].added);
-    }
-
-    #[test]
-    fn format_diff_empty() {
-        assert_eq!(format_diff(&[]), "(aucun changement)");
-    }
-
-    #[test]
-    fn format_diff_mixed() {
-        let changes = vec![
-            PermissionChange {
-                name: "BAN_MEMBERS",
-                added: true,
-            },
-            PermissionChange {
-                name: "KICK_MEMBERS",
-                added: false,
-            },
-        ];
-        let result = format_diff(&changes);
-        assert!(result.contains("+ BAN_MEMBERS"));
-        assert!(result.contains("- KICK_MEMBERS"));
     }
 }
