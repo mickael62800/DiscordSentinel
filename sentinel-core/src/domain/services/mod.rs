@@ -7,5 +7,6 @@ pub mod community;
 pub mod moderation;
 pub mod progression;
 pub mod security;
+pub mod system;
 pub mod tickets;
 pub mod voice;

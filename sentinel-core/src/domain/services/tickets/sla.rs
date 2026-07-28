@@ -46,6 +46,26 @@ impl Default for SlaTracker {
     }
 }
 
+// ── Décision d'escalade/warning SLA (consommée par sentinel-worker) ──
+
+pub const DEFAULT_SLA_FIRST_RESPONSE_MINUTES: i64 = 30;
+pub const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
+
+/// Seuil SLA effectif : une valeur configurée > 0 l'emporte, sinon le défaut.
+/// (Une config absente, non numérique ou <= 0 retombe sur le défaut.)
+pub fn threshold_or_default(parsed: Option<i64>, default: i64) -> i64 {
+    match parsed {
+        Some(v) if v > 0 => v,
+        _ => default,
+    }
+}
+
+/// Décision de breach SLA : le ticket a dépassé le seuil. Un seuil <= 0
+/// signifie « désactivé » — jamais de breach.
+pub fn is_breached(age_minutes: i64, threshold_minutes: i64) -> bool {
+    threshold_minutes > 0 && age_minutes >= threshold_minutes
+}
+
 /// Formate une duree en texte lisible.
 pub fn format_sla_duration(duration: Duration) -> String {
     let total_secs = duration.as_secs();
@@ -92,6 +112,31 @@ mod tests {
         t.record_creation("T2");
         assert!(t.record_staff_response("T1").is_some());
         assert!(t.record_staff_response("T2").is_some());
+    }
+
+    #[test]
+    fn threshold_positive_wins() {
+        assert_eq!(threshold_or_default(Some(45), 60), 45);
+    }
+
+    #[test]
+    fn threshold_zero_or_negative_falls_back() {
+        assert_eq!(threshold_or_default(Some(0), 60), 60);
+        assert_eq!(threshold_or_default(Some(-5), 60), 60);
+        assert_eq!(threshold_or_default(None, 60), 60);
+    }
+
+    #[test]
+    fn breach_at_and_after_threshold() {
+        assert!(!is_breached(59, 60));
+        assert!(is_breached(60, 60));
+        assert!(is_breached(120, 60));
+    }
+
+    #[test]
+    fn breach_disabled_threshold_never_fires() {
+        assert!(!is_breached(10_000, 0));
+        assert!(!is_breached(10_000, -1));
     }
 
     #[test]

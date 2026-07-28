@@ -109,15 +109,12 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 /// ecoule depuis la derniere capture. Un intervalle <= 0 est traite comme le
 /// defaut (garde-fou contre une valeur absurde en config).
 fn is_due(last: Option<DateTime<Utc>>, interval_hours: i64, now: DateTime<Utc>) -> bool {
-    let hours = if interval_hours <= 0 {
-        DEFAULT_INTERVAL_HOURS
-    } else {
-        interval_hours
-    };
-    match last {
-        None => true,
-        Some(last) => now - last >= Duration::hours(hours),
-    }
+    sentinel_core::domain::services::system::scheduling::is_due(
+        last,
+        interval_hours,
+        DEFAULT_INTERVAL_HOURS,
+        now,
+    )
 }
 
 /// Charge `auto_backup_enabled` + `auto_backup_interval_hours` par guild.
@@ -139,7 +136,7 @@ async fn load_configs(pool: &PgPool) -> HashMap<String, GuildAuto> {
             interval_hours: DEFAULT_INTERVAL_HOURS,
         });
         match key.as_str() {
-            "auto_backup_enabled" => entry.enabled = value == "true" || value == "1",
+            "auto_backup_enabled" => entry.enabled = crate::common::parse_bool_str(&value),
             "auto_backup_interval_hours" => {
                 if let Ok(h) = value.parse::<i64>() {
                     entry.interval_hours = h;

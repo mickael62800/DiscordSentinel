@@ -17,6 +17,7 @@ pub mod redis_helpers;
 
 use std::time::Duration;
 
+pub use sentinel_core::domain::entities::system::config_parsers::parse_bool_str;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use tokio::signal;
@@ -228,7 +229,7 @@ pub async fn is_feature_enabled(
     .unwrap_or(None);
 
     match result {
-        Some(v) => v == "true" || v == "1",
+        Some(v) => parse_bool_str(&v),
         None => default_value,
     }
 }
@@ -252,7 +253,7 @@ pub async fn is_worker_globally_enabled(pool: &PgPool, worker_name: &str) -> boo
     if rows.is_empty() {
         return true; // Pas de config = active par defaut
     }
-    rows.iter().any(|(v,)| v == "true" || v == "1")
+    rows.iter().any(|(v,)| parse_bool_str(v))
 }
 
 /// Constantes de temps utilitaires.
@@ -371,7 +372,8 @@ pub fn config_or_env<T: std::str::FromStr>(
     default
 }
 
-/// Version bool de config_or_env.
+/// Version bool de config_or_env. Sémantique de vérité partagée avec le core
+/// (`parse_bool_str` : "true"/"1"/"yes", insensible à la casse).
 pub fn config_or_env_bool(
     db_config: &std::collections::HashMap<String, String>,
     db_key: &str,
@@ -379,10 +381,10 @@ pub fn config_or_env_bool(
     default: bool,
 ) -> bool {
     if let Some(val) = db_config.get(db_key) {
-        return val == "true" || val == "1";
+        return parse_bool_str(val);
     }
     match std::env::var(env_key) {
-        Ok(v) => v == "true" || v == "1",
+        Ok(v) => parse_bool_str(&v),
         Err(_) => default,
     }
 }
@@ -395,10 +397,10 @@ pub fn load_env<T: std::str::FromStr>(key: &str, default: T) -> T {
         .unwrap_or(default)
 }
 
-/// Charge une variable d'environnement booleenne (accepte "true"/"1").
+/// Charge une variable d'environnement booleenne (accepte "true"/"1"/"yes").
 pub fn load_env_bool(key: &str, default: bool) -> bool {
     match std::env::var(key) {
-        Ok(v) => v == "true" || v == "1",
+        Ok(v) => parse_bool_str(&v),
         Err(_) => default,
     }
 }

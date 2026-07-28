@@ -80,7 +80,7 @@ async fn resolve_guild(
     // Tournoi desactive par config ? → on ne resout pas.
     let tournament_enabled: bool = get_config_value(pool, guild_id, "tournament_enabled")
         .await
-        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
+        .map(|v| crate::common::parse_bool_str(&v))
         .unwrap_or(true);
     if !tournament_enabled {
         return Ok(());

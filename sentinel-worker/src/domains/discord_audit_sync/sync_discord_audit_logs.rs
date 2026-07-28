@@ -1,4 +1,4 @@
-//! Phase 6A — Reconciliation des audit_logs avec l'API Discord.
+﻿//! Phase 6A â€” Reconciliation des audit_logs avec l'API Discord.
 //!
 //! Ce worker importe dans la table `audit_logs` les actions de moderation
 //! effectuees HORS de nos bots (via le client Discord directement, ou par
@@ -17,14 +17,14 @@
 //!
 //! # Action types Discord couverts (MVP)
 //!
-//! - 20 = `MEMBER_KICK`       → `discord_audit:member_kick`
-//! - 22 = `MEMBER_BAN_ADD`    → `discord_audit:member_ban`
-//! - 23 = `MEMBER_BAN_REMOVE` → `discord_audit:member_unban`
-//! - 24 = `MEMBER_UPDATE`     → `discord_audit:member_timeout` (si timeout)
-//! - 25 = `MEMBER_ROLE_UPDATE`→ `discord_audit:member_role_update`
+//! - 20 = `MEMBER_KICK`       â†’ `discord_audit:member_kick`
+//! - 22 = `MEMBER_BAN_ADD`    â†’ `discord_audit:member_ban`
+//! - 23 = `MEMBER_BAN_REMOVE` â†’ `discord_audit:member_unban`
+//! - 24 = `MEMBER_UPDATE`     â†’ `discord_audit:member_timeout` (si timeout)
+//! - 25 = `MEMBER_ROLE_UPDATE`â†’ `discord_audit:member_role_update`
 //!
 //! Les autres types (channel/role create/delete, message delete, etc.) sont
-//! ignores par le MVP — ils peuvent etre ajoutes incrementalement dans
+//! ignores par le MVP â€” ils peuvent etre ajoutes incrementalement dans
 //! `map_action_type`.
 //!
 //! # Dedup
@@ -38,7 +38,7 @@
 //! Discord impose un rate limit global + par-route. Pour le MVP on fait 1
 //! request par guild par tick (5 min), largement sous le budget. Les
 //! headers `X-RateLimit-Remaining` et `Retry-After` ne sont pas encore
-//! respectes — a ajouter si on scale a beaucoup de guilds.
+//! respectes â€” a ajouter si on scale a beaucoup de guilds.
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -142,18 +142,18 @@ async fn sync_guild(
 
     let status = resp.status();
     if status == reqwest::StatusCode::FORBIDDEN {
-        // Le bot n'a pas VIEW_AUDIT_LOG sur cette guild — on n'insiste pas
+        // Le bot n'a pas VIEW_AUDIT_LOG sur cette guild â€” on n'insiste pas
         return Err("VIEW_AUDIT_LOG manquant".into());
     }
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        // Rate limited par Discord — respecter Retry-After avant de retenter.
+        // Rate limited par Discord â€” respecter Retry-After avant de retenter.
         let retry_after = resp
             .headers()
             .get("retry-after")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<f64>().ok())
             .unwrap_or(5.0);
-        warn!(guild_id = %guild_id, retry_after, "Discord rate limit — attente");
+        warn!(guild_id = %guild_id, retry_after, "Discord rate limit â€” attente");
         tokio::time::sleep(std::time::Duration::from_secs_f64(retry_after)).await;
         return Err(format!(
             "rate limited ({retry_after}s), retry au prochain tick"
@@ -170,7 +170,7 @@ async fn sync_guild(
         .map_err(|e| format!("discord parse: {e}"))?;
 
     if audit_log.audit_log_entries.is_empty() {
-        // Pas de nouvelles entries — juste update last_synced_at
+        // Pas de nouvelles entries â€” juste update last_synced_at
         sqlx::query(
             "INSERT INTO discord_audit_sync_state (guild_id, last_entry_id, last_synced_at, consecutive_errors) \
              VALUES ($1, $2, NOW(), 0) \
@@ -187,7 +187,7 @@ async fn sync_guild(
         return Ok(0);
     }
 
-    // Construit une map user_id → username pour enrichir les inserts
+    // Construit une map user_id â†’ username pour enrichir les inserts
     let user_map: std::collections::HashMap<String, String> = audit_log
         .users
         .iter()
@@ -195,7 +195,7 @@ async fn sync_guild(
         .collect();
 
     // 3. Insert les entries pertinentes. Discord renvoie les entries du
-    //    plus recent au plus ancien — on inverse pour que les inserts
+    //    plus recent au plus ancien â€” on inverse pour que les inserts
     //    soient chronologiques et que `last_entry_id` reflete le plus
     //    recent.
     let mut inserted = 0u32;
@@ -203,7 +203,7 @@ async fn sync_guild(
 
     for entry in audit_log.audit_log_entries.iter().rev() {
         let Some(event_type) = map_action_type(entry.action_type) else {
-            // Type d'action non couvert par le MVP — on skip mais on
+            // Type d'action non couvert par le MVP â€” on skip mais on
             // avance quand meme le curseur.
             if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
                 newest_id = Some(entry.id.clone());
@@ -250,7 +250,7 @@ async fn sync_guild(
                 error = %e,
                 entry_id = %entry.id,
                 event_type = %event_type,
-                "insert audit_log failed — curseur non avance"
+                "insert audit_log failed â€” curseur non avance"
             ),
         }
     }
@@ -274,50 +274,14 @@ async fn sync_guild(
     Ok(inserted)
 }
 
-/// Compare deux snowflakes Discord (stockes en String dans le JSON) par leur
-/// valeur u64. Retourne true si `candidate` est plus recent que `current`.
-///
-/// Historiquement le code faisait une comparaison de Strings, ce qui
-/// fonctionne tant que les deux snowflakes ont la **meme longueur** (cas
-/// habituel en 2024+ : ~19 digits). Mais c'est un bug latent : si les
-/// longueurs different (ex : vieux snowflake 17 digits vs nouveau 19 digits),
-/// la comparaison ASCII renvoie un ordre faux et le curseur `last_entry_id`
-/// peut se retrouver bloque ou rater des entries.
-fn is_newer_snowflake(current: Option<&str>, candidate: &str) -> bool {
-    let candidate_id: u64 = match candidate.parse() {
-        Ok(v) => v,
-        Err(_) => return false, // candidate invalide : ne pas avancer le curseur
-    };
-    match current {
-        None => true,
-        Some(s) => match s.parse::<u64>() {
-            Ok(curr) => candidate_id > curr,
-            Err(_) => true, // current invalide : accepter le candidate
-        },
-    }
-}
+// La comparaison de snowflakes et le mapping des action_types Discord vivent
+// dans le core hexagonal (avec leurs tests, dont la rÃ©gression P0 string vs
+// u64) â€” partagÃ©s avec le cache de messages d'audit du bot.
+use sentinel_core::domain::services::audit::discord_audit::{is_newer_snowflake, map_action_type};
 
-/// Mapping des action_types Discord numeriques vers des `event_type` lisibles
-/// stockes dans `audit_logs`. Les valeurs proviennent de la doc Discord :
-/// <https://discord.com/developers/docs/resources/audit-log#audit-log-entry-object-audit-log-events>
-///
-/// MVP : on couvre uniquement les actions de moderation pertinentes. Les autres
-/// (channel/role create, message delete, etc.) retournent None et sont skip.
-fn map_action_type(action_type: u32) -> Option<String> {
-    let name = match action_type {
-        20 => "member_kick",
-        22 => "member_ban",
-        23 => "member_unban",
-        24 => "member_timeout",
-        25 => "member_role_update",
-        _ => return None,
-    };
-    Some(format!("discord_audit:{name}"))
-}
-
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Discord API response types
-// ═══════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[derive(Debug, Deserialize)]
 struct AuditLogResponse {
@@ -347,119 +311,10 @@ struct DiscordUser {
     username: String,
 }
 
-// Suppress unused warnings on DateTime import — utile si on ajoute du tracking
+// Suppress unused warnings on DateTime import â€” utile si on ajoute du tracking
 // temporel plus tard
 #[allow(dead_code)]
 fn _ensure_chrono_used() -> Option<DateTime<Utc>> {
     None
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn map_action_type_member_ban() {
-        assert_eq!(
-            map_action_type(22),
-            Some("discord_audit:member_ban".to_string())
-        );
-    }
-
-    #[test]
-    fn map_action_type_member_unban() {
-        assert_eq!(
-            map_action_type(23),
-            Some("discord_audit:member_unban".to_string())
-        );
-    }
-
-    #[test]
-    fn map_action_type_member_kick() {
-        assert_eq!(
-            map_action_type(20),
-            Some("discord_audit:member_kick".to_string())
-        );
-    }
-
-    #[test]
-    fn map_action_type_member_timeout() {
-        assert_eq!(
-            map_action_type(24),
-            Some("discord_audit:member_timeout".to_string())
-        );
-    }
-
-    #[test]
-    fn map_action_type_member_role_update() {
-        assert_eq!(
-            map_action_type(25),
-            Some("discord_audit:member_role_update".to_string())
-        );
-    }
-
-    #[test]
-    fn map_action_type_unknown_returns_none() {
-        assert_eq!(map_action_type(1), None);
-        assert_eq!(map_action_type(72), None); // MESSAGE_DELETE pas couvert MVP
-        assert_eq!(map_action_type(999), None);
-    }
-
-    // ── Tests du helper is_newer_snowflake ────────────────
-
-    #[test]
-    fn snowflake_none_current_accepts_anything() {
-        assert!(is_newer_snowflake(None, "1234567890123456789"));
-    }
-
-    #[test]
-    fn snowflake_strictly_greater() {
-        assert!(is_newer_snowflake(
-            Some("1234567890123456789"),
-            "1234567890123456790"
-        ));
-    }
-
-    #[test]
-    fn snowflake_equal_is_not_newer() {
-        assert!(!is_newer_snowflake(
-            Some("1234567890123456789"),
-            "1234567890123456789"
-        ));
-    }
-
-    #[test]
-    fn snowflake_strictly_smaller() {
-        assert!(!is_newer_snowflake(
-            Some("1234567890123456790"),
-            "1234567890123456789"
-        ));
-    }
-
-    /// Regression test pour le bug P0 : comparaison string vs u64.
-    /// En string, "2" < "10" serait false car '2' > '1' en ASCII.
-    /// En u64, 2 < 10 est vrai.
-    #[test]
-    fn snowflake_different_lengths_compared_numerically() {
-        // "2" (1 digit) < "10" (2 digits) en u64 -> 10 doit etre newer que 2
-        assert!(is_newer_snowflake(Some("2"), "10"));
-
-        // "99" (2 digits) < "100" (3 digits) en u64 mais "99" > "100" en string
-        assert!(is_newer_snowflake(Some("99"), "100"));
-
-        // Sens inverse : "1000" > "999" en u64
-        assert!(!is_newer_snowflake(Some("1000"), "999"));
-    }
-
-    #[test]
-    fn snowflake_invalid_candidate_ignored() {
-        assert!(!is_newer_snowflake(Some("1234"), "not-a-number"));
-    }
-
-    #[test]
-    fn snowflake_invalid_current_accepts_candidate() {
-        // Si le curseur en base est corrompu (pas un u64), on accepte le
-        // candidate pour se re-synchroniser.
-        assert!(is_newer_snowflake(Some("corrupted"), "1234567890123456789"));
-    }
-}

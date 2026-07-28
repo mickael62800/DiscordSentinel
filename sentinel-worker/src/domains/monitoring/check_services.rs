@@ -85,7 +85,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                         "data": {
                             "bot": name,
                             "online": false,
-                            "type": if name.contains("worker") { "worker" } else { "bot" },
+                            "type": if sentinel_core::domain::entities::system::config_parsers::is_worker_service(name) { "worker" } else { "bot" },
                         }
                     });
                     if let Err(e) =
@@ -124,7 +124,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                         "data": {
                             "bot": name,
                             "online": true,
-                            "type": if name.contains("worker") { "worker" } else { "bot" },
+                            "type": if sentinel_core::domain::entities::system::config_parsers::is_worker_service(name) { "worker" } else { "bot" },
                         }
                     });
                     if let Err(e) =
@@ -141,9 +141,11 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
     });
 }
 
-/// Retourne le label d'un service (Bot ou Worker).
+/// Retourne le label d'un service (Bot ou Worker). Le prédicat de
+/// classification vit dans le core (`is_worker_service`), partagé avec le
+/// dashboard de l'API.
 fn service_label(name: &str) -> &'static str {
-    if name.contains("worker") {
+    if sentinel_core::domain::entities::system::config_parsers::is_worker_service(name) {
         "Worker"
     } else {
         "Bot"

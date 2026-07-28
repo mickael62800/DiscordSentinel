@@ -16,16 +16,15 @@ use crate::config::CleanupConfig;
 /// d'executer le DELETE : mieux vaut conserver les donnees qu'une purge totale
 /// declenchee par une simple case de config erronee.
 fn valid_retention(days: i64, label: &str) -> Option<i64> {
-    if days >= 1 {
-        Some(days)
-    } else {
+    let valid = sentinel_core::domain::services::system::scheduling::valid_retention(days);
+    if valid.is_none() {
         warn!(
             days,
             table = label,
             "retention <= 0 -> DELETE ignore (garde anti purge totale)"
         );
-        None
     }
+    valid
 }
 
 pub async fn run(pool: &PgPool, config: &CleanupConfig) -> Result<(), String> {

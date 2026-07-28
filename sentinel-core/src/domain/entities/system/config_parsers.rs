@@ -7,12 +7,17 @@
 
 use std::collections::HashMap;
 
+/// Parse un flag booleen stringifie. Accepte (insensible a la casse) :
+/// `"true"`, `"1"`, `"yes"`. Tout le reste = false. Semantique de reference
+/// du repo — bot, API et worker doivent tous passer par ici.
+pub fn parse_bool_str(v: &str) -> bool {
+    matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")
+}
+
 /// Parse un flag booleen depuis un map de config. Accepte (insensible a
 /// la casse) : `"true"`, `"1"`, `"yes"`. Tout le reste = false.
 pub fn parse_bool_config(map: &HashMap<String, String>, key: &str, default: bool) -> bool {
-    map.get(key)
-        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(default)
+    map.get(key).map(|v| parse_bool_str(v)).unwrap_or(default)
 }
 
 /// Parse un entier i64 depuis un map de config. Si la cle est absente

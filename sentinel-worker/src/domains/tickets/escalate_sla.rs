@@ -12,12 +12,13 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
+use sentinel_core::domain::services::tickets::sla::{
+    is_breached, DEFAULT_SLA_ESCALATION_MINUTES,
+    DEFAULT_SLA_FIRST_RESPONSE_MINUTES as DEFAULT_SLA_WARN_MINUTES,
+};
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
-
-const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
-const DEFAULT_SLA_WARN_MINUTES: i64 = 30;
 
 #[derive(sqlx::FromRow)]
 struct CandidateTicket {
@@ -72,11 +73,8 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             .get(&t.server)
             .copied()
             .unwrap_or(DEFAULT_SLA_ESCALATION_MINUTES);
-        if escalation_minutes <= 0 {
-            continue;
-        }
         let age_minutes = (now - t.created_at).num_minutes();
-        if age_minutes < escalation_minutes {
+        if !is_breached(age_minutes, escalation_minutes) {
             continue;
         }
 
@@ -176,11 +174,8 @@ async fn scan_and_warn(
             .get(&t.server)
             .copied()
             .unwrap_or(DEFAULT_SLA_WARN_MINUTES);
-        if warn_minutes <= 0 {
-            continue;
-        }
         let age_minutes = (now - t.created_at).num_minutes();
-        if age_minutes < warn_minutes {
+        if !is_breached(age_minutes, warn_minutes) {
             continue;
         }
         // Claim atomique : marque sla_warned_at avec garde.

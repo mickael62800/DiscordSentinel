@@ -3,9 +3,10 @@
 //! et 60 minutes — alignes sur l'ancienne migration 047 ticket-bot).
 //!
 //! Porte de appeal-sla-worker (Phase 2 fusion). Les constantes SLA
-//! restent ici parce que `escalate_appeal_sla.rs` les importe.
+//! vivent dans le core (source unique, partagée avec tickets/escalate_sla).
 
 pub mod escalate_appeal_sla;
 
-pub const DEFAULT_SLA_FIRST_RESPONSE_MINUTES: i64 = 30;
-pub const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
+pub use sentinel_core::domain::services::tickets::sla::{
+    DEFAULT_SLA_ESCALATION_MINUTES, DEFAULT_SLA_FIRST_RESPONSE_MINUTES,
+};

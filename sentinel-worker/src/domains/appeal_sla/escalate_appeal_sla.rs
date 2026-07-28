@@ -62,7 +62,10 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             .unwrap_or(DEFAULT_SLA_ESCALATION_MINUTES);
 
         let age_minutes = (now - ticket.created_at).num_minutes();
-        if age_minutes < escalation_minutes {
+        if !sentinel_core::domain::services::tickets::sla::is_breached(
+            age_minutes,
+            escalation_minutes,
+        ) {
             skipped += 1;
             continue;
         }
@@ -181,13 +184,17 @@ async fn load_sla_configs(pool: &PgPool) -> Result<HashMap<String, GuildSlaConfi
             first_response_minutes: DEFAULT_SLA_FIRST_RESPONSE_MINUTES,
             escalation_minutes: DEFAULT_SLA_ESCALATION_MINUTES,
         });
-        let parsed = row.config_value.parse::<i64>().unwrap_or(0);
-        if parsed > 0 {
-            match row.config_key.as_str() {
-                "sla_first_response_minutes" => entry.first_response_minutes = parsed,
-                "sla_escalation_minutes" => entry.escalation_minutes = parsed,
-                _ => {}
+        use sentinel_core::domain::services::tickets::sla::threshold_or_default;
+        let parsed = row.config_value.parse::<i64>().ok();
+        match row.config_key.as_str() {
+            "sla_first_response_minutes" => {
+                entry.first_response_minutes =
+                    threshold_or_default(parsed, entry.first_response_minutes);
             }
+            "sla_escalation_minutes" => {
+                entry.escalation_minutes = threshold_or_default(parsed, entry.escalation_minutes);
+            }
+            _ => {}
         }
     }
 
