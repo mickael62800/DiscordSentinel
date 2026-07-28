@@ -445,6 +445,8 @@ impl BaseApiClient {
     }
 
     /// PATCH JSON vers l'API. Retourne le body deserialise.
+    /// (Seul appelant historique : module game_portal, retire temporairement.)
+    #[allow(dead_code)]
     pub async fn patch_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
         &self,
         path: &str,

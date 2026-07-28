@@ -26,7 +26,6 @@ use crate::modules;
 fn command_module(name: &str) -> &'static str {
     match name {
         "purge" | "cleanup" => "cleanup",
-        "game" | "game-admin" => "games",
         "roles-panel" | "parrain" => "community",
         "audit" => "audit",
         "level" | "stats" | "progression-resync" | "classement" => "progression",
@@ -223,11 +222,6 @@ impl EventHandler for Handler {
         // Welcome : consumer Redis pour publier le panneau de reglement
         // (bouton "Publier le reglement" du dashboard).
         modules::welcome::spawn(ctx.clone());
-
-        // Games : consumer Redis pour deployer/rafraichir le panneau de jeux
-        // (bouton "Deployer" du dashboard).
-        modules::games::spawn(ctx.clone());
-        modules::game_portal::spawn(ctx.clone());
 
         // Guild backup : consumer Redis pour piloter capture/restore/wipe depuis
         // le web (events guild_backup:capture_requested / :restore_requested).
@@ -568,9 +562,6 @@ impl EventHandler for Handler {
                         "purge" | "cleanup" => {
                             modules::cleanup::handle_command(&ctx, &command).await
                         }
-                        "game" | "game-admin" => {
-                            modules::games::handle_command(&ctx, &command).await
-                        }
                         "roles-panel" | "parrain" => {
                             modules::community::handle_command(&ctx, &command).await
                         }
@@ -644,10 +635,6 @@ impl EventHandler for Handler {
                     modules::confessions::on_component(&ctx, &component).await;
                 } else if modules::welcome::handles_component(cid) {
                     modules::welcome::on_component(&ctx, &component).await;
-                } else if modules::games::handles_component(cid) {
-                    modules::games::on_component(&ctx, &component).await;
-                } else if modules::game_portal::handles_component(cid) {
-                    modules::game_portal::on_component(&ctx, &component).await;
                 } else if modules::community::handles_component(cid) {
                     modules::community::on_component(&ctx, &component).await;
                 } else if modules::security::handles_component(cid) {

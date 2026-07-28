@@ -289,43 +289,6 @@ fn route_roles() -> &'static HashMap<(&'static str, &'static str), Role> {
             Role::Admin,
         );
 
-        // ── Games (config Discord game roles / panels) ───────────────────
-        m.insert(("POST", "/api/games/"), Role::Admin);
-        m.insert(("DELETE", "/api/games/{guild_id}/{game_id}"), Role::Admin);
-        m.insert(("PATCH", "/api/games/{guild_id}/{game_id}"), Role::Admin);
-        m.insert(
-            ("PATCH", "/api/games/{guild_id}/{game_id}/role"),
-            Role::Admin,
-        );
-        m.insert(("POST", "/api/games/{guild_id}/upload-emoji"), Role::Admin);
-        m.insert(("POST", "/api/games/{guild_id}/panels"), Role::Admin);
-        m.insert(("POST", "/api/games/{guild_id}/panel/deploy"), Role::Admin);
-
-        // ── Game Portal (serveurs Docker — deja gates par component_gates,
-        //    redondance defense en profondeur) ───────────────────────────
-        m.insert(("POST", "/api/games/{guild_id}/servers"), Role::Admin);
-        m.insert(("DELETE", "/api/games/servers/{server_id}"), Role::Owner);
-        m.insert(
-            ("POST", "/api/games/servers/{server_id}/start"),
-            Role::Moderator,
-        );
-        m.insert(
-            ("POST", "/api/games/servers/{server_id}/stop"),
-            Role::Moderator,
-        );
-        m.insert(
-            ("POST", "/api/games/servers/{server_id}/restart"),
-            Role::Moderator,
-        );
-        m.insert(
-            ("PUT", "/api/games/servers/{server_id}/config"),
-            Role::Admin,
-        );
-        m.insert(
-            ("POST", "/api/games/servers/{server_id}/command"),
-            Role::Owner,
-        );
-
         // ── Rotation admin tournant ──────────────────────────────────────
         m.insert(("POST", "/api/rotation/{guild_id}/save"), Role::Admin);
 

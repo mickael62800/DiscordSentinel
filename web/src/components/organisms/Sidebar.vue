@@ -15,7 +15,6 @@ const GROUP_COLORS: Record<string, string> = {
   community: "#22c55e",
   security: "#f59e0b",
   rotation: "#14b8a6",
-  games: "#ec4899",
   config: "#64748b",
   logs: "#a855f7",
 };

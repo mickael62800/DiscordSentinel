@@ -13,7 +13,6 @@ pub mod cache;
 pub mod cleanup;
 pub mod discord_audit_sync;
 pub mod export;
-pub mod game_portal;
 pub mod guild_backup;
 pub mod moderation;
 pub mod monitoring;

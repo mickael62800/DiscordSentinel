@@ -1,7 +1,7 @@
 //! Règles de nommage Discord. Deux slugifieurs coexistent volontairement dans
 //! le repo, avec des contraintes Discord distinctes :
 //! - `slugify_channel_name` (ici) : noms de SALON — séparateur `-`, 90 chars.
-//! - `slugify_emoji_name` (`entities/casino/game.rs`) : noms d'ÉMOJI —
+//! - `slugify_emoji_name` (retire avec le systeme jeux) : noms d emoji —
 //!   séparateur `_`, 32 chars, minimum 2.
 
 /// Nettoie un nom pour en faire un nom de salon Discord valide (texte).
@@ -55,6 +55,13 @@ pub fn parse_hex_color_strict(s: &str) -> Option<u32> {
         return None;
     }
     u32::from_str_radix(h, 16).ok()
+}
+
+/// Parse laxiste d'une couleur hex `#RRGGBB`/`RRGGBB` avec fallback.
+/// (Anciennement `entities::casino::game::parse_role_color_hex` — deplace ici
+/// lors du retrait temporaire du systeme jeux.)
+pub fn parse_role_color_hex(hex: &str, fallback: u32) -> u32 {
+    u32::from_str_radix(hex.trim().trim_start_matches('#'), 16).unwrap_or(fallback)
 }
 
 #[cfg(test)]

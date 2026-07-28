@@ -1,9 +1,7 @@
 // Bounded contexts.
 pub mod ai;
 pub mod audit;
-pub mod casino;
 pub mod community;
-pub mod game;
 pub mod guild_backup;
 pub mod moderation;
 pub mod system;

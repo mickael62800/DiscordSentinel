@@ -5,11 +5,9 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
 use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use sentinel_api::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
-use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
 use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;
 use sentinel_api::ports::outbound::community::sponsorship_repository::SponsorshipRepository;
 use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
@@ -25,59 +23,6 @@ fn ugid() -> String {
         "{}",
         Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
     )
-}
-
-// ══════════════════════════════════════════════════════════
-// GameRepository
-// ══════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn game_repo_create_and_list() {
-    let p = pool().await;
-    let repo = PgGameRepository::new(p);
-    let gid = ugid();
-
-    repo.create(&gid, "Fortnite", "user1", None, None, None)
-        .await
-        .unwrap();
-    repo.create(&gid, "Valorant", "user1", None, None, None)
-        .await
-        .unwrap();
-
-    let games = repo.list(&gid).await.unwrap();
-    assert_eq!(games.len(), 2);
-}
-
-#[tokio::test]
-async fn game_repo_find_by_name() {
-    let p = pool().await;
-    let repo = PgGameRepository::new(p);
-    let gid = ugid();
-
-    repo.create(&gid, "Rocket League", "user1", None, None, None)
-        .await
-        .unwrap();
-    let found = repo.find_by_name(&gid, "rocket league").await.unwrap();
-    assert!(found.is_some());
-    assert_eq!(found.unwrap().game_name, "Rocket League");
-}
-
-#[tokio::test]
-async fn game_repo_delete_removes_entry() {
-    let p = pool().await;
-    let repo = PgGameRepository::new(p);
-    let gid = ugid();
-
-    let game = repo
-        .create(&gid, "Minecraft", "user1", None, None, None)
-        .await
-        .unwrap();
-    assert!(repo.delete(&gid, &game.id).await.unwrap());
-    assert!(repo
-        .find_by_name(&gid, "Minecraft")
-        .await
-        .unwrap()
-        .is_none());
 }
 
 // ══════════════════════════════════════════════════════════

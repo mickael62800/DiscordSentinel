@@ -237,10 +237,10 @@ fn build_action_rows(
 }
 
 /// Parse un emoji unicode ou custom Discord <:name:id> ou <a:name:id>.
-/// Délègue au parseur unique (`games::emoji`, adossé au core) — l'ancienne
+/// Délègue au parseur unique (`modules::emoji`, adossé au core) — l'ancienne
 /// copie locale cassait sur un nom contenant `:`.
 fn parse_emoji(s: &str) -> Option<ReactionType> {
-    crate::modules::games::emoji::parse_reaction_type(s)
+    crate::modules::emoji::parse_reaction_type(s)
 }
 
 async fn post_to_channel(

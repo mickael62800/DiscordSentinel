@@ -38,7 +38,6 @@ use sentinel_api::ports::inbound::system::manage_tickets::*;
 use sentinel_api::ports::outbound::audit::analytics_repository::*;
 use sentinel_api::ports::outbound::audit::modstats_repository::*;
 use sentinel_api::ports::outbound::audit::user_activity_repository::*;
-use sentinel_api::ports::outbound::casino::game_repository::*;
 use sentinel_api::ports::outbound::community::daily_activity_repository::*;
 use sentinel_api::ports::outbound::community::discord_role_repository::*;
 use sentinel_api::ports::outbound::community::sponsorship_repository::*;
@@ -1558,71 +1557,6 @@ impl ModstatsRepository for StubModstatsRepo {
     }
 }
 
-pub struct StubGameRepo;
-#[async_trait]
-impl GameRepository for StubGameRepo {
-    async fn list(&self, _: &str) -> Result<Vec<Game>, DomainError> {
-        Ok(vec![])
-    }
-    async fn list_by_category(&self, _: &str, _: Option<&str>) -> Result<Vec<Game>, DomainError> {
-        Ok(vec![])
-    }
-    async fn create(
-        &self,
-        _: &str,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-        _: Option<&str>,
-        _: Option<&str>,
-    ) -> Result<Game, DomainError> {
-        Err(DomainError::Internal("stub".into()))
-    }
-    async fn update(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-        _: Option<Option<&str>>,
-        _: Option<Option<&str>>,
-    ) -> Result<Option<Game>, DomainError> {
-        Ok(None)
-    }
-    async fn delete(&self, _: &str, _: &str) -> Result<bool, DomainError> {
-        Ok(false)
-    }
-    async fn find_by_name(&self, _: &str, _: &str) -> Result<Option<Game>, DomainError> {
-        Ok(None)
-    }
-    async fn set_role_id(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Option<Game>, DomainError> {
-        Ok(None)
-    }
-    async fn save_panel(
-        &self,
-        _: &str,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<GamePanel, DomainError> {
-        Err(DomainError::Internal("stub".into()))
-    }
-    async fn find_panel_by_message(
-        &self,
-        _: &str,
-        _: &str,
-    ) -> Result<Option<GamePanel>, DomainError> {
-        Ok(None)
-    }
-    async fn list_panels(&self, _: &str) -> Result<Vec<GamePanel>, DomainError> {
-        Ok(vec![])
-    }
-}
-
 pub struct StubSponsorshipRepo;
 #[async_trait]
 impl SponsorshipRepository for StubSponsorshipRepo {
@@ -1677,7 +1611,7 @@ impl PendingActionRepository for StubPendingActionRepo {
 }
 
 
-// ── Stubs Tamagotchi / Systeme securite / Game Portal ──
+// ── Stubs Tamagotchi / Systeme securite ──
 
 pub struct StubGuildSnapshots;
 #[async_trait]
@@ -1914,414 +1848,6 @@ impl sentinel_core::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase for
         &self,
         _: Vec<String>,
     ) -> Result<Vec<sentinel_core::domain::entities::system::geoip::GeoIpEntry>, DomainError> {
-        unimplemented!()
-    }
-}
-
-pub struct StubGameServers;
-#[async_trait]
-impl sentinel_core::ports::inbound::game::manage_game_servers::ManageGameServersUseCase
-    for StubGameServers
-{
-    async fn create(
-        &self,
-        _: sentinel_core::domain::entities::game::server::CreateGameServerCommand,
-    ) -> Result<sentinel_core::domain::entities::game::server::GameServer, DomainError> {
-        unimplemented!()
-    }
-    async fn list_for_guild(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        unimplemented!()
-    }
-    async fn get(
-        &self,
-        _: Uuid,
-    ) -> Result<
-        sentinel_core::ports::inbound::game::manage_game_servers::GameServerDetail,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-    async fn delete(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn start(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn stop(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn restart(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn get_logs(&self, _: Uuid, _: u32) -> Result<Vec<String>, DomainError> {
-        unimplemented!()
-    }
-    async fn get_stats(
-        &self,
-        _: Uuid,
-    ) -> Result<sentinel_core::ports::outbound::game::container_runtime::ContainerStats, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn update_config(
-        &self,
-        _: Uuid,
-        _: std::collections::HashMap<String, String>,
-        _: &str,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn execute_rcon(&self, _: Uuid, _: &str, _: &str) -> Result<String, DomainError> {
-        unimplemented!()
-    }
-}
-
-pub struct StubGameTemplates;
-#[async_trait]
-impl sentinel_core::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase
-    for StubGameTemplates
-{
-    async fn list_for_guild(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::template::GameTemplate>, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn get(
-        &self,
-        _: Uuid,
-    ) -> Result<sentinel_core::domain::entities::game::template::GameTemplate, DomainError> {
-        unimplemented!()
-    }
-    async fn get_by_slug(
-        &self,
-        _: &str,
-    ) -> Result<sentinel_core::domain::entities::game::template::GameTemplate, DomainError> {
-        unimplemented!()
-    }
-}
-
-pub struct StubGameServerRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::game_server_repository::GameServerRepository
-    for StubGameServerRepo
-{
-    async fn create(
-        &self,
-        _: sentinel_core::ports::outbound::game::game_server_repository::NewGameServer,
-    ) -> Result<sentinel_core::domain::entities::game::server::GameServer, DomainError> {
-        unimplemented!()
-    }
-    async fn find_by_id(
-        &self,
-        _: Uuid,
-    ) -> Result<Option<sentinel_core::domain::entities::game::server::GameServer>, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn list_by_guild(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        unimplemented!()
-    }
-    async fn list_running(
-        &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        unimplemented!()
-    }
-    async fn list_active(
-        &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        unimplemented!()
-    }
-    async fn update_runtime(
-        &self,
-        _: Uuid,
-        _: sentinel_core::ports::outbound::game::game_server_repository::GameServerRuntimeUpdate,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn update_status(
-        &self,
-        _: Uuid,
-        _: sentinel_core::domain::entities::game::server::GameServerStatus,
-        _: Option<&str>,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn try_transition_status(
-        &self,
-        _: Uuid,
-        _: &[sentinel_core::domain::entities::game::server::GameServerStatus],
-        _: sentinel_core::domain::entities::game::server::GameServerStatus,
-    ) -> Result<bool, DomainError> {
-        unimplemented!()
-    }
-    async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn record_restart_attempt(&self, _: Uuid) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn reset_restart_attempts(&self, _: Uuid) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn soft_delete(&self, _: Uuid) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn count_active_for_guild(&self, _: &str) -> Result<(i32, i32), DomainError> {
-        unimplemented!()
-    }
-    async fn template_usage(
-        &self,
-        _: uuid::Uuid,
-    ) -> Result<
-        sentinel_core::ports::outbound::game::game_server_repository::TemplateUsage,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-    async fn set_session_channels(
-        &self,
-        _: Uuid,
-        _: Option<&str>,
-        _: Option<&str>,
-    ) -> Result<bool, DomainError> {
-        Ok(true)
-    }
-    async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn list_ip_reveal_due(
-        &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        Ok(vec![])
-    }
-    async fn list_awaiting_reveal_no_ping_today(
-        &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::server::GameServer>, DomainError> {
-        Ok(vec![])
-    }
-    async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn set_ip_reveal_at(
-        &self,
-        _: Uuid,
-        _: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Result<(), DomainError> {
-        Ok(())
-    }
-}
-
-pub struct StubGameTemplateRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::game_template_repository::GameTemplateRepository
-    for StubGameTemplateRepo
-{
-    async fn list(
-        &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::template::GameTemplate>, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn find_by_id(
-        &self,
-        _: Uuid,
-    ) -> Result<Option<sentinel_core::domain::entities::game::template::GameTemplate>, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn find_by_slug(
-        &self,
-        _: &str,
-    ) -> Result<Option<sentinel_core::domain::entities::game::template::GameTemplate>, DomainError>
-    {
-        unimplemented!()
-    }
-}
-
-pub struct StubGameAuditRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::game_audit_repository::GameAuditRepository
-    for StubGameAuditRepo
-{
-    async fn log(
-        &self,
-        _: &str,
-        _: Option<Uuid>,
-        _: Option<&str>,
-        _: sentinel_core::domain::entities::game::audit::GameAuditAction,
-        _: serde_json::Value,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn list_for_server(
-        &self,
-        _: Uuid,
-        _: i64,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::audit::GameAuditEntry>, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn list_for_guild(
-        &self,
-        _: &str,
-        _: i64,
-        _: i64,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::audit::GameAuditEntry>, DomainError>
-    {
-        unimplemented!()
-    }
-}
-
-pub struct StubGameSessionRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::player_session_repository::PlayerSessionRepository
-    for StubGameSessionRepo
-{
-    async fn open(&self, _: Uuid, _: &str) -> Result<Uuid, DomainError> {
-        unimplemented!()
-    }
-    async fn close(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn list_active(
-        &self,
-        _: Uuid,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::game::player_session::PlayerSession>,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-    async fn list_history(
-        &self,
-        _: Uuid,
-        _: i64,
-        _: i64,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::game::player_session::PlayerSession>,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-    async fn close_all_active(&self, _: Uuid) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-}
-
-pub struct StubContainerRuntime;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::container_runtime::ContainerRuntime
-    for StubContainerRuntime
-{
-    async fn ensure_network(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn create_container(
-        &self,
-        _: &sentinel_core::ports::outbound::game::container_runtime::ContainerSpec,
-    ) -> Result<String, DomainError> {
-        unimplemented!()
-    }
-    async fn start_container(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn remove_container(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn remove_volume(&self, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> {
-        unimplemented!()
-    }
-    async fn inspect(
-        &self,
-        _: &str,
-    ) -> Result<
-        Option<sentinel_core::ports::outbound::game::container_runtime::ContainerStatus>,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-    async fn stats(
-        &self,
-        _: &str,
-    ) -> Result<sentinel_core::ports::outbound::game::container_runtime::ContainerStats, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> {
-        unimplemented!()
-    }
-    async fn list_managed_containers(
-        &self,
-    ) -> Result<
-        Vec<sentinel_core::ports::outbound::game::container_runtime::ManagedContainer>,
-        DomainError,
-    > {
-        unimplemented!()
-    }
-}
-
-pub struct StubRconClient;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::rcon_client::RconClient for StubRconClient {
-    async fn execute(
-        &self,
-        _: &sentinel_core::ports::outbound::game::rcon_client::RconConnectionParams,
-        _: &str,
-    ) -> Result<sentinel_core::ports::outbound::game::rcon_client::RconResponse, DomainError> {
-        unimplemented!()
-    }
-}
-
-pub struct StubPortAllocator;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::port_allocator::PortAllocator for StubPortAllocator {
-    async fn allocate(
-        &self,
-        _: sentinel_core::ports::outbound::game::port_allocator::PortKind,
-        _: u16,
-        _: u16,
-        _: &str,
-    ) -> Result<u16, DomainError> {
-        unimplemented!()
-    }
-    async fn release(
-        &self,
-        _: sentinel_core::ports::outbound::game::port_allocator::PortKind,
-        _: u16,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn is_available(
-        &self,
-        _: sentinel_core::ports::outbound::game::port_allocator::PortKind,
-        _: u16,
-    ) -> Result<bool, DomainError> {
         unimplemented!()
     }
 }
@@ -2896,58 +2422,6 @@ impl sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::A
     }
 }
 
-pub struct StubGameTemplateSettingsRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::game_session_repository::GameTemplateSettingsRepository
-    for StubGameTemplateSettingsRepo
-{
-    async fn get(
-        &self,
-        _: &str,
-        _: &str,
-    ) -> Result<
-        Option<sentinel_core::domain::entities::game::session::GameTemplateSettings>,
-        DomainError,
-    > {
-        Ok(None)
-    }
-    async fn list(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::session::GameTemplateSettings>, DomainError>
-    {
-        Ok(vec![])
-    }
-    async fn set_role(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<(), DomainError> {
-        Ok(())
-    }
-}
-
-pub struct StubGameSessionRegRepo;
-#[async_trait]
-impl sentinel_core::ports::outbound::game::game_session_repository::GameSessionRegistrationRepository
-    for StubGameSessionRegRepo
-{
-    async fn register(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn unregister(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn list(
-        &self,
-        _: Uuid,
-    ) -> Result<Vec<sentinel_core::domain::entities::game::session::GameSessionRegistration>, DomainError>
-    {
-        Ok(vec![])
-    }
-}
-
 // ══════════════════════════════════════════════════════════
 // TestAppState builder
 // ══════════════════════════════════════════════════════════
@@ -3068,7 +2542,6 @@ fn base_state() -> AppState {
         evidence_repo: Arc::new(StubEvidenceRepo),
         review_repo: Arc::new(StubReviewRepo),
         modstats_repo: Arc::new(StubModstatsRepo),
-        game_repo: Arc::new(StubGameRepo),
         sponsorship_repo: Arc::new(StubSponsorshipRepo),
         temp_role_repo: Arc::new(StubTempRoleRepo),
         pending_action_repo: Arc::new(StubPendingActionRepo),
@@ -3081,15 +2554,6 @@ fn base_state() -> AppState {
         security_audit_uc: Arc::new(StubSecurityAudit),
         tls_cert_uc: Arc::new(StubTlsCert),
         geoip_uc: Arc::new(StubGeoIp),
-        game_servers_uc: Arc::new(StubGameServers),
-        game_templates_uc: Arc::new(StubGameTemplates),
-        game_server_repo: Arc::new(StubGameServerRepo),
-        game_template_repo: Arc::new(StubGameTemplateRepo),
-        game_audit_repo: Arc::new(StubGameAuditRepo),
-        game_session_repo: Arc::new(StubGameSessionRepo),
-        game_container_runtime: Arc::new(StubContainerRuntime),
-        game_rcon_client: Arc::new(StubRconClient),
-        game_port_allocator: Arc::new(StubPortAllocator),
         bump_uc: Arc::new(StubBump),
         eligibility_uc: Arc::new(StubEligibility),
         manage_sponsorships_uc: Arc::new(StubSponsorships),
@@ -3110,8 +2574,6 @@ fn base_state() -> AppState {
         rbac_admin_uc: Arc::new(StubRbac),
         sursis_uc: Arc::new(StubSursis),
         automod_adaptive_slowmode_repo: Arc::new(StubAdaptiveSlowmodeRepo),
-        game_template_settings_repo: Arc::new(StubGameTemplateSettingsRepo),
-        game_session_reg_repo: Arc::new(StubGameSessionRegRepo),
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
@@ -3296,18 +2758,6 @@ pub fn build_test_state_welcome(welcome_config_repo: Arc<dyn WelcomeConfigReposi
 pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>) -> AppState {
     let mut state = base_state();
     state.bot_config_repo = bot_config_repo;
-    state
-}
-
-/// Construit un AppState avec un mock wallet repository injecte.
-#[allow(dead_code)]
-/// Construit un AppState avec un mock game repository + MockDiscordApi injectes
-/// (create_game appelle discord_api.create_role + edit_role en plus du repo).
-#[allow(dead_code)]
-pub fn build_test_state_game(game_repo: Arc<dyn GameRepository>) -> AppState {
-    let mut state = base_state();
-    state.game_repo = game_repo;
-    state.discord_api = Arc::new(MockDiscordApi::new());
     state
 }
 

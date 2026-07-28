@@ -67,8 +67,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/watched-users", redirect: "/members" },
 
   // ── Jeux ──
-  { path: "/games", name: "games", component: () => import("../components/pages/GamesPage.vue") },
-  { path: "/game-portal", name: "game-portal", component: () => import("../components/pages/GamePortalPage.vue") },
 
   // ── Configuration / Admin ──
   { path: "/component-config", name: "component-config", component: () => import("../components/pages/ComponentConfigPage.vue") },

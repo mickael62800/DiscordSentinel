@@ -87,7 +87,7 @@ pub async fn guild_auth_middleware(
 /// Extrait la valeur du parametre de route nomme exactement `guild_id` tel
 /// que matche par le routeur axum. Robuste (pas de devinette) : ne renvoie
 /// une valeur que si la route declare reellement un `{guild_id}`. Pour les
-/// routes sans ce parametre (ex: `/api/games/servers/{server_id}`), renvoie
+/// routes sans ce parametre (ex : route sans guild_id), renvoie
 /// None et on retombe sur l'heuristique historique.
 pub(crate) async fn guild_id_from_route_param(
     parts: &mut axum::http::request::Parts,

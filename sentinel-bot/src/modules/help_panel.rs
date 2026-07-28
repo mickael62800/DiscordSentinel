@@ -137,7 +137,6 @@ const CATEGORIES: &[Section] = &[
             ("rotation-bot", "🔄 Rotation"),
         ],
     ),
-    ("🎮 Jeux", &[("game-bot", "🎯 Portail de jeux")]),
     ("🌌 Espace", &[("nasa-apod-bot", "🌌 Photo de l'espace (NASA)")]),
     ("💾 Sauvegarde", &[("guild-backup-bot", "💾 Sauvegarde")]),
     ("📊 Audit", &[("audit-bot", "📊 Audit")]),

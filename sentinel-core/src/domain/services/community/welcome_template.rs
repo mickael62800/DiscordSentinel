@@ -29,7 +29,7 @@ pub fn render(
 /// Fallback bleu Discord. Implémentation unique : `parse_role_color_hex`
 /// (qui trim les espaces — un `" #FF0000"` est valide).
 pub fn parse_color(hex: &str) -> u32 {
-    crate::domain::entities::casino::game::parse_role_color_hex(hex, 0x3498db)
+    crate::domain::services::system::discord_naming::parse_role_color_hex(hex, 0x3498db)
 }
 
 #[cfg(test)]

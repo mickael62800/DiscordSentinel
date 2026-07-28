@@ -99,12 +99,6 @@ const DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS: u64 = 15;
 /// Auto-deban verification d'age : cadence mensuelle (30 j) par defaut.
 const DEFAULT_AGE_UNBAN_INTERVAL_SECS: u64 = 30 * 24 * SECS_PER_HOUR;
 
-// ── Defauts game-portal (intervals des jobs worker) ──
-const DEFAULT_GAME_HEALTH_CHECK_SECS: u64 = 30;
-const DEFAULT_GAME_IDLE_SHUTDOWN_CHECK_SECS: u64 = SECS_PER_HOUR;
-const DEFAULT_GAME_RECONCILER_SECS: u64 = SECS_PER_HOUR;
-const DEFAULT_GAME_IMAGE_CLEANUP_SECS: u64 = 24 * SECS_PER_HOUR;
-
 // ── Defauts automod ──
 /// Cloture des votes de moderation a echeance : tick 60s. CHEMIN CRITIQUE —
 /// seule voie qui ferme les cartes de vote a leur deadline.
@@ -194,12 +188,6 @@ pub struct WorkerConfig {
     pub quarantine_kick_check_secs: u64,
     pub lockdown_expire_check_secs: u64,
     pub slowmode_expire_check_secs: u64,
-
-    // ── Game portal (intervals des jobs worker) ──
-    pub game_health_check_interval_secs: u64,
-    pub game_idle_shutdown_check_interval_secs: u64,
-    pub game_reconciler_interval_secs: u64,
-    pub game_image_cleanup_interval_secs: u64,
 
     // ── Automod ──
     pub automod_close_votes_secs: u64,
@@ -368,24 +356,6 @@ impl WorkerConfig {
             slowmode_expire_check_secs: load_env(
                 "SLOWMODE_EXPIRE_CHECK_SECS",
                 DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS,
-            ),
-
-            // game portal (intervals des jobs worker)
-            game_health_check_interval_secs: load_env(
-                "GAME_HEALTH_CHECK_INTERVAL_SECS",
-                DEFAULT_GAME_HEALTH_CHECK_SECS,
-            ),
-            game_idle_shutdown_check_interval_secs: load_env(
-                "GAME_IDLE_SHUTDOWN_CHECK_INTERVAL_SECS",
-                DEFAULT_GAME_IDLE_SHUTDOWN_CHECK_SECS,
-            ),
-            game_reconciler_interval_secs: load_env(
-                "GAME_RECONCILER_INTERVAL_SECS",
-                DEFAULT_GAME_RECONCILER_SECS,
-            ),
-            game_image_cleanup_interval_secs: load_env(
-                "GAME_IMAGE_CLEANUP_INTERVAL_SECS",
-                DEFAULT_GAME_IMAGE_CLEANUP_SECS,
             ),
 
             // automod
@@ -675,32 +645,6 @@ impl WorkerConfig {
             "age_unban_interval_secs",
             "AGE_UNBAN_INTERVAL",
             DEFAULT_AGE_UNBAN_INTERVAL_SECS,
-        );
-
-        // game portal (intervals des jobs worker) — cles du schema game-portal.
-        self.game_health_check_interval_secs = config_or_env(
-            db,
-            "health_check_interval_secs",
-            "GAME_HEALTH_CHECK_INTERVAL_SECS",
-            DEFAULT_GAME_HEALTH_CHECK_SECS,
-        );
-        self.game_idle_shutdown_check_interval_secs = config_or_env(
-            db,
-            "idle_shutdown_check_interval_secs",
-            "GAME_IDLE_SHUTDOWN_CHECK_INTERVAL_SECS",
-            DEFAULT_GAME_IDLE_SHUTDOWN_CHECK_SECS,
-        );
-        self.game_reconciler_interval_secs = config_or_env(
-            db,
-            "reconciler_interval_secs",
-            "GAME_RECONCILER_INTERVAL_SECS",
-            DEFAULT_GAME_RECONCILER_SECS,
-        );
-        self.game_image_cleanup_interval_secs = config_or_env(
-            db,
-            "image_cleanup_interval_secs",
-            "GAME_IMAGE_CLEANUP_INTERVAL_SECS",
-            DEFAULT_GAME_IMAGE_CLEANUP_SECS,
         );
 
         // automod — cles du schema automod-bot (module flattene).

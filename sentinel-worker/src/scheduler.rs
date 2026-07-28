@@ -426,24 +426,6 @@ pub fn start(
     );
 
     // ─────────────────────────────────────────────────────────────
-    // Domaine : game_portal (4 jobs HTTP-triggered en parallele)
-    // Porte de l'ancien game-portal-worker.
-    // ─────────────────────────────────────────────────────────────
-    domains::game_portal::jobs::start(
-        api_url.clone(),
-        domains::game_portal::jobs::GamePortalIntervals {
-            health_check_secs: config.game_health_check_interval_secs,
-            idle_shutdown_secs: config.game_idle_shutdown_check_interval_secs,
-            reconciler_secs: config.game_reconciler_interval_secs,
-            image_cleanup_secs: config.game_image_cleanup_interval_secs,
-            // Revelation d'IP : verif toutes les 5 min. Ping quotidien : verif
-            // toutes les heures (le job compare a l'heure configuree).
-            reveal_ip_secs: 300,
-            daily_ping_secs: 3600,
-        },
-    );
-
-    // ─────────────────────────────────────────────────────────────
     // Domaine : moderation (conduit, bans, propositions, rappels)
     // Porte de l'ancien moderation-worker.
     // ─────────────────────────────────────────────────────────────

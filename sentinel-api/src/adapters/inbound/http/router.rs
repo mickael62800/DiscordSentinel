@@ -108,10 +108,6 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::bump::routes())
         .merge(routes::community::routes())
         .merge(routes::rotation::routes())
-        // Games (Discord game roles / panels)
-        .merge(routes::games::routes())
-        // Game Portal (serveurs de jeux Docker)
-        .merge(routes::game_portal::routes())
         // Système + jobs async + RBAC + welcome
         .merge(routes::system::routes())
 }

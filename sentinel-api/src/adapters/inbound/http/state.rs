@@ -17,8 +17,6 @@ use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
 use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
 use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
-use crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
@@ -145,26 +143,11 @@ pub struct AppState {
     pub evidence_repo: Arc<dyn crate::ports::outbound::moderation::evidence_repository::EvidenceRepository>,
     pub review_repo: Arc<dyn crate::ports::outbound::moderation::review_repository::ReviewRepository>,
     pub modstats_repo: Arc<dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository>,
-    pub game_repo: Arc<dyn crate::ports::outbound::casino::game_repository::GameRepository>,
     pub sponsorship_repo: Arc<dyn crate::ports::outbound::community::sponsorship_repository::SponsorshipRepository>,
     pub temp_role_repo: Arc<dyn crate::ports::outbound::community::temp_role_repository::TempRoleRepository>,
     /// Use case Community (sponsorships + temp-roles) derriere le service gRPC.
     pub manage_sponsorships_uc: Arc<dyn crate::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase>,
     pub pending_action_repo: Arc<dyn crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository>,
-    /// Game Portal : use cases lifecycle serveurs Docker.
-    pub game_servers_uc: Arc<dyn ManageGameServersUseCase>,
-    pub game_templates_uc: Arc<dyn ManageGameTemplatesUseCase>,
-    /// Game Portal : adapters exposes pour les endpoints internes /jobs/*
-    /// appeles par game-portal-worker (health/idle/reconcile).
-    pub game_server_repo: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository>,
-    pub game_template_repo: Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository>,
-    pub game_template_settings_repo: Arc<dyn crate::ports::outbound::game::game_session_repository::GameTemplateSettingsRepository>,
-    pub game_session_reg_repo: Arc<dyn crate::ports::outbound::game::game_session_repository::GameSessionRegistrationRepository>,
-    pub game_audit_repo: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository>,
-    pub game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository>,
-    pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,
-    pub game_rcon_client: Arc<dyn crate::ports::outbound::game::rcon_client::RconClient>,
-    pub game_port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator>,
     pub sursis_uc:
         Arc<dyn crate::ports::inbound::moderation::manage_sursis::ManageSursisUseCase>,
     /// Sondes sante systeme (taille/disponibilite BDD) derriere un port —

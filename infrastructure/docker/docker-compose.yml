@@ -417,7 +417,7 @@ services:
   # ──────────────────────────────────────────────────────────────────────────
   #
   # Les 15 anciens bots (audit, automod, cleanup, community,
-  # games, moderation, progression, roles, security, tickets, voice, welcome,
+  # moderation, progression, roles, security, tickets, voice, welcome,
   # image) ont ete fusionnes en un seul binaire `sentinel-bot` structure en
   # modules. Un seul processus, une seule connexion Gateway Discord, un seul
   # cache, une seule TypeMap.

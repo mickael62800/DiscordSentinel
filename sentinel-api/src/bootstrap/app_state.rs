@@ -14,7 +14,6 @@ use crate::adapters::outbound::postgres::audit::security_event_repository::PgSec
 use crate::adapters::outbound::postgres::audit::stats_repository::PgStatsRepository;
 use crate::adapters::outbound::postgres::audit::user_activity_repository::PgUserActivityRepository;
 use crate::adapters::outbound::postgres::audit::watched_user_repository::PgWatchedUserRepository;
-use crate::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
 use crate::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
 use crate::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
 use crate::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
@@ -657,94 +656,6 @@ pub async fn build_app_state(
         std::env::var("REDIS_QUEUE_KEY").unwrap_or_else(|_| "sentinel:jobs".to_string());
     let job_client = JobClient::new(redis_client.clone(), queue_key);
 
-    // ── Game Portal (plateforme serveurs Docker) ──────────────────────
-    let game_template_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::template_repository::PgGameTemplateRepository::new(pg_pool.clone()),
-    );
-    let game_template_settings_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::session_repository::PgGameTemplateSettingsRepository::new(pg_pool.clone()),
-    );
-    let game_session_reg_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::session_repository::PgGameSessionRegistrationRepository::new(pg_pool.clone()),
-    );
-    let game_server_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::server_repository::PgGameServerRepository::new(
-            pg_pool.clone(),
-        ),
-    );
-    let game_config_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::config_repository::PgGameServerConfigRepository::new(pg_pool.clone()),
-    );
-    let game_audit_repo = Arc::new(
-        crate::adapters::outbound::postgres::game::audit_repository::PgGameAuditRepository::new(
-            pg_pool.clone(),
-        ),
-    );
-    let docker_client =
-        match crate::adapters::outbound::game_runtime::docker_runtime::make_docker_client() {
-            Ok(c) => Some(c),
-            Err(e) => {
-                tracing::warn!(error = %e, "Docker socket indisponible — Game Portal lifecycle inactif");
-                None
-            }
-        };
-    // Fallback : si Docker n'est pas dispo, on instancie quand meme un
-    // adapter qui retournera Internal a chaque appel (les endpoints de
-    // listing/detail continuent de marcher, seules create/start/etc. echouent).
-    let container_runtime: Arc<
-        dyn crate::ports::outbound::game::container_runtime::ContainerRuntime,
-    > = match docker_client.clone() {
-        Some(d) => Arc::new(
-            crate::adapters::outbound::game_runtime::docker_runtime::DockerContainerRuntime::new(d),
-        ),
-        None => {
-            Arc::new(crate::adapters::outbound::game_runtime::noop_runtime::NoopContainerRuntime)
-        }
-    };
-    let rcon_client: Arc<dyn crate::ports::outbound::game::rcon_client::RconClient> = Arc::new(
-        crate::adapters::outbound::game_runtime::rcon_minecraft::MinecraftRconClient::new(),
-    );
-    let port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator> =
-        Arc::new(
-            crate::adapters::outbound::game_runtime::redis_port_allocator::RedisPortAllocator::new(
-                redis_client.clone(),
-            ),
-        );
-    let game_templates_uc: Arc<
-        dyn crate::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase,
-    > = Arc::new(
-        crate::application::game::manage_templates_service::ManageGameTemplatesService::new(
-            game_template_repo.clone(),
-            bot_config_repo.clone(),
-        ),
-    );
-    let game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository> = Arc::new(
-        crate::adapters::outbound::postgres::game::player_session_repository::PgPlayerSessionRepository::new(pg_pool.clone()),
-    );
-    let game_server_repo_dyn: Arc<
-        dyn crate::ports::outbound::game::game_server_repository::GameServerRepository,
-    > = game_server_repo.clone();
-    let game_template_repo_dyn: Arc<
-        dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository,
-    > = game_template_repo.clone();
-    let game_audit_repo_dyn: Arc<
-        dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository,
-    > = game_audit_repo.clone();
-    let game_servers_uc: Arc<
-        dyn crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase,
-    > = Arc::new(
-        crate::application::game::manage_game_servers_service::ManageGameServersService {
-            server_repo: game_server_repo,
-            template_repo: game_template_repo,
-            config_repo: game_config_repo,
-            audit_repo: game_audit_repo,
-            container_runtime: container_runtime.clone(),
-            rcon_client: rcon_client.clone(),
-            port_allocator: port_allocator.clone(),
-            bot_config: bot_config_repo.clone(),
-        },
-    );
-
     // ── State ──
     let modstats_repo: Arc<
         dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository,
@@ -865,7 +776,6 @@ pub async fn build_app_state(
         evidence_repo: Arc::new(PgEvidenceRepository::new(pg_pool.clone())),
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),
         modstats_repo,
-        game_repo: Arc::new(PgGameRepository::new(pg_pool.clone())),
         sponsorship_repo: Arc::new(PgSponsorshipRepository::new(pg_pool.clone())),
         temp_role_repo: Arc::new(PgTempRoleRepository::new(pg_pool.clone())),
         manage_sponsorships_uc: Arc::new(
@@ -875,17 +785,6 @@ pub async fn build_app_state(
             ),
         ),
         pending_action_repo: Arc::new(PgPendingActionRepository::new(pg_pool.clone())),
-        game_servers_uc,
-        game_templates_uc,
-        game_server_repo: game_server_repo_dyn,
-        game_template_repo: game_template_repo_dyn,
-        game_template_settings_repo,
-        game_session_reg_repo,
-        game_audit_repo: game_audit_repo_dyn,
-        game_session_repo,
-        game_container_runtime: container_runtime,
-        game_rcon_client: rcon_client,
-        game_port_allocator: port_allocator,
         sursis_uc,
         system_probe: Arc::new(
             crate::adapters::outbound::system::pg_probe::PgSystemProbe::new(pg_pool.clone()),

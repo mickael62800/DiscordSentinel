@@ -9,7 +9,6 @@ pub const AUDIT_BOT: &str = "audit-bot";
 pub const AUTOMOD_BOT: &str = "automod-bot";
 pub const BUMP_BOT: &str = "bump-bot";
 pub const COMMUNITY_BOT: &str = "community-bot";
-pub const GAME_PORTAL: &str = "game-portal";
 pub const GUILD_BACKUP_BOT: &str = "guild-backup-bot";
 pub const MODERATION_BOT: &str = "moderation-bot";
 pub const PROGRESSION_BOT: &str = "progression-bot";

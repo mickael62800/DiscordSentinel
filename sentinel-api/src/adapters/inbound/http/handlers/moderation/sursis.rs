@@ -14,7 +14,15 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::application::game::worker_jobs::JobReport;
+/// Rapport de job renvoye au worker (observabilite). Copie locale de
+/// l'ancien `application::game::worker_jobs::JobReport` (module jeux retire).
+#[derive(Debug, serde::Serialize)]
+pub struct JobReport {
+    pub job: &'static str,
+    pub processed: usize,
+    pub errors: usize,
+    pub details: serde_json::Value,
+}
 
 #[derive(Debug, Serialize)]
 pub struct SursisDto {

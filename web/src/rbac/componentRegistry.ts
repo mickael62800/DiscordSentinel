@@ -75,8 +75,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
 
   // ── Dashboard : logs / jeux ──
   { key: "logs.journal", label: "Bouton Journal logs Discord", category: "Dashboard", minRole: "admin" },
-  { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },
-  { key: "games.portal", label: "Bouton Game Portal (serveurs Docker)", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : config (admin) ──
   { key: "config.components", label: "Bouton Config composants", category: "Dashboard", minRole: "admin" },

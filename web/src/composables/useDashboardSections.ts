@@ -45,8 +45,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   // Observabilité : journaux métier + système + audit réunis (onglets).
   { key: "logs.journal", path: "/logs", label: "Journaux & audit", icon: "list" },
 
-  { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
-  { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server", requiredBot: "game-portal" },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
   { key: "config.rbac", path: "/rbac", label: "Accès RBAC", icon: "shield" },
@@ -99,7 +97,6 @@ const GROUP_ORDER: { prefix: string; label: string }[] = [
   { prefix: "community", label: "Communauté" },
   { prefix: "security", label: "Sécurité" },
   { prefix: "rotation", label: "Administration tournante" },
-  { prefix: "games", label: "Jeux" },
   { prefix: "config", label: "Configuration" },
   { prefix: "logs", label: "Journaux" },
 ];

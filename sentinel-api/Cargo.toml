@@ -137,10 +137,6 @@ path = "tests/integration/config/bots.rs"
 name = "integration_config_worker"
 path = "tests/integration/config/worker.rs"
 
-[[test]]
-name = "integration_games_db"
-path = "tests/integration/games/db.rs"
-
 # moderation
 [[test]]
 name = "integration_moderation_db"
@@ -244,10 +240,6 @@ path = "tests/integration/bot_config/http.rs"
 name = "integration_role_panels_http"
 path = "tests/integration/role_panels/http.rs"
 
-[[test]]
-name = "integration_games_http"
-path = "tests/integration/games_http/http.rs"
-
 # purge HTTP
 [[test]]
 name = "integration_purge_http"
@@ -329,11 +321,6 @@ path = "tests/integration/postgres_stats/repo.rs"
 [[test]]
 name = "integration_postgres_tickets"
 path = "tests/integration/postgres_tickets/repo.rs"
-
-# postgres games repo
-[[test]]
-name = "integration_postgres_games"
-path = "tests/integration/postgres_games/repo.rs"
 
 # postgres misc repos (audit_log, security, notes, reminders, bot_config)
 [[test]]
