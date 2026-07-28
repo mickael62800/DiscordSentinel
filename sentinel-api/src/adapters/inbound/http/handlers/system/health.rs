@@ -12,11 +12,8 @@ pub async fn health(State(state): State<AppState>) -> (StatusCode, Json<Value>) 
     let mut status = "ok";
     let mut http_status = StatusCode::OK;
 
-    // ── PostgreSQL check ──
-    let pg_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
-        .fetch_one(&state.pg_pool)
-        .await
-        .is_ok();
+    // ── PostgreSQL check (via le port SystemProbe) ──
+    let pg_ok = state.system_probe.database_responding().await;
 
     // ── Redis check ──
     let redis_ok = match state.redis_client.get_multiplexed_async_connection().await {

@@ -2569,6 +2569,10 @@ impl sentinel_core::ports::inbound::system::manage_alert_rules::ManageAlertRules
     }
 }
 
+pub struct StubSystemProbe;
+#[async_trait]
+impl sentinel_core::ports::outbound::system::system_probe::SystemProbe for StubSystemProbe {}
+
 pub struct StubDockerHost;
 #[async_trait]
 impl sentinel_core::ports::outbound::system::docker_host::DockerHost for StubDockerHost {
@@ -3114,6 +3118,7 @@ fn base_state() -> AppState {
         inference: Arc::new(sentinel_api::adapters::outbound::inference_service::InferenceService::new(None, None)),
         api_key: String::new(),
         discord_bot_token: String::new(),
+        system_probe: Arc::new(StubSystemProbe),
         pg_pool,
         redis_client,
         cache: None,

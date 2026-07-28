@@ -209,9 +209,10 @@ pub async fn get_system_info(
         }
     };
 
-    // ── 3. Taille BDD PostgreSQL + health check ──
-    let db_size_bytes: i64 = sqlx::query_scalar("SELECT pg_database_size(current_database())")
-        .fetch_one(&state.pg_pool)
+    // ── 3. Taille BDD PostgreSQL + health check (via le port SystemProbe) ──
+    let db_size_bytes: i64 = state
+        .system_probe
+        .database_size_bytes()
         .await
         .unwrap_or(-1);
     let postgres_responding = db_size_bytes >= 0;

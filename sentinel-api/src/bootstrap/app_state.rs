@@ -887,6 +887,9 @@ pub async fn build_app_state(
         game_rcon_client: rcon_client,
         game_port_allocator: port_allocator,
         sursis_uc,
+        system_probe: Arc::new(
+            crate::adapters::outbound::system::pg_probe::PgSystemProbe::new(pg_pool.clone()),
+        ),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

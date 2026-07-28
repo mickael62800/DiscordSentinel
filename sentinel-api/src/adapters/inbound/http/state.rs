@@ -167,7 +167,9 @@ pub struct AppState {
     pub game_port_allocator: Arc<dyn crate::ports::outbound::game::port_allocator::PortAllocator>,
     pub sursis_uc:
         Arc<dyn crate::ports::inbound::moderation::manage_sursis::ManageSursisUseCase>,
-    pub pg_pool: sqlx::PgPool,
+    /// Sondes sante systeme (taille/disponibilite BDD) derriere un port —
+    /// les handlers health/info passent par ici, jamais par `pg_pool`.
+    pub system_probe: Arc<dyn crate::ports::outbound::system::system_probe::SystemProbe>,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,
     /// Phase 7 B — Liste des Discord user_ids superadmin (env SUPERADMIN_USER_IDS).
@@ -189,6 +191,17 @@ pub struct AppState {
     /// Mode AUDIT du gate RBAC global : log-only, laisse passer. Sert à valider
     /// la table de routes avant de basculer en enforce.
     pub rbac_global_gate_audit: bool,
+
+    // ─────────────────────────────────────────────────────────────────────
+    // NE PAS utiliser depuis les handlers — passer par un repository
+    // outbound (ports/outbound/*). Ce champ n'existe que pour le bootstrap
+    // (construction des repositories Pg*) et les tests d'integration
+    // (tests/test_helpers.rs) qui construisent AppState hors du crate.
+    // ─────────────────────────────────────────────────────────────────────
+    #[doc = "Reserve au bootstrap et aux tests d'integration. Aucun handler \
+             inbound ne doit executer de SQL via ce pool : creer/utiliser un \
+             port outbound (ex: SystemProbe pour les sondes sante)."]
+    pub pg_pool: sqlx::PgPool,
 }
 
 impl AppState {
