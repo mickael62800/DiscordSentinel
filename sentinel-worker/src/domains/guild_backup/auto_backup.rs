@@ -20,7 +20,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
@@ -166,6 +166,7 @@ async fn load_last_snapshots(pool: &PgPool) -> Result<HashMap<String, DateTime<U
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Duration;
 
     fn t(h: i64) -> DateTime<Utc> {
         Utc::now() - Duration::hours(h)
