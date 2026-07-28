@@ -125,6 +125,8 @@ pub struct AppState {
     pub component_min_role_uc: Arc<
         dyn crate::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase,
     >,
+    pub alert_rules_uc:
+        Arc<dyn crate::ports::inbound::system::manage_alert_rules::ManageAlertRulesUseCase>,
     pub bot_persistence_uc:
         Arc<dyn crate::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase>,
     pub server_events_uc:

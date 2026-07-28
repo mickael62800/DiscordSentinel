@@ -1,4 +1,5 @@
 pub mod export_service;
+pub mod manage_alert_rules_service;
 pub mod manage_export_jobs_service;
 pub mod lookup_geoip_service;
 pub mod manage_component_min_role_service;

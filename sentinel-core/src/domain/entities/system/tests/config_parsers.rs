@@ -131,3 +131,10 @@ fn lookup_u64_found() {
 fn lookup_u64_none() {
     assert_eq!(lookup_u64(&[(1, 100)], 99), None);
 }
+
+#[test]
+fn default_log_category_by_name() {
+    assert_eq!(default_log_category("sentinel-worker"), "worker");
+    assert_eq!(default_log_category("automod-bot"), "bot");
+    assert_eq!(default_log_category("dashboard"), "discord");
+}

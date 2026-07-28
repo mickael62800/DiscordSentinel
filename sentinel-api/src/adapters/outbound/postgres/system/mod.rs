@@ -1,4 +1,5 @@
 pub mod admin_rotation_repository;
+pub mod alert_rule_repository;
 pub mod bot_config_repository;
 pub mod component_min_role_repository;
 pub mod component_visibility_repository;

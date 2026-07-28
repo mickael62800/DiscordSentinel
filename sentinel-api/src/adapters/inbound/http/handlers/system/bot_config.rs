@@ -186,7 +186,9 @@ pub async fn set_config(
     // commands de cette guild. Cache/decache les commandes Discord
     // instantanement (au lieu d'attendre un restart).
     if dto.config_key == "enabled" {
-        let enabled = dto.config_value == "true" || dto.config_value == "1";
+        let enabled = sentinel_core::domain::entities::system::config_parsers::parse_bool_str(
+            &dto.config_value,
+        );
         state.broadcaster.broadcast(
             "bot_enabled_changed",
             serde_json::json!({

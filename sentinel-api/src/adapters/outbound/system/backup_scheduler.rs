@@ -52,7 +52,7 @@ async fn run_once(state: &AppState) -> Result<(), sqlx::Error> {
 
         let enabled = get("enabled").map(|v| v != "false").unwrap_or(true);
         let auto = get("auto_backup_enabled")
-            .map(|v| v == "true" || v == "1")
+            .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(&v))
             .unwrap_or(false);
         if !enabled || !auto {
             continue;

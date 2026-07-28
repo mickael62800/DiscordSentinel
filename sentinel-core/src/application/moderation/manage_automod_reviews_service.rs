@@ -226,6 +226,8 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         quorum: usize,
         tie_action: &str,
     ) -> Result<(AutomodReview, TallyResult), DomainError> {
+        // Borne saine du quorum : règle du dépouillement, pas du handler.
+        let quorum = quorum.clamp(1, 100);
         let votes = self.repo.list_votes(review_id).await?;
         let actions: Vec<AppliedAction> = votes
             .iter()

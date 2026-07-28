@@ -1,7 +1,9 @@
 //! CRUD des regles d'alerte de supervision (table `alert_rules`).
 //!
 //! Endpoint host-level : reserve aux superadmins (comme docker/security).
-//! Les regles pilotent `outbound/system/alerts_dispatcher.rs`.
+//! Les regles pilotent `outbound/system/alerts_dispatcher.rs`. Le handler ne
+//! fait que RBAC + mapping DTO ; invariants et SQL vivent derrière le use case
+//! (`manage_alert_rules` + `PgAlertRuleRepository`).
 
 use axum::extract::{Path, State};
 use axum::{Extension, Json};
@@ -10,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::{require_superadmin, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use sentinel_core::domain::entities::system::alert_rule::{AlertRule, AlertRuleUpdate};
 use sentinel_core::domain::errors::DomainError;
 
 fn forbid(msg: &str) -> ApiError {
@@ -23,7 +26,7 @@ fn gate_super(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result
     require_superadmin(state, ctx).map_err(|_| forbid("superadmin requis"))
 }
 
-#[derive(Serialize, sqlx::FromRow)]
+#[derive(Serialize)]
 pub struct AlertRuleDto {
     pub id: String,
     pub label: String,
@@ -35,8 +38,20 @@ pub struct AlertRuleDto {
     pub cooldown_secs: i32,
 }
 
-const SELECT_COLS: &str =
-    "id, label, metric, comparator, threshold, enabled, severity, cooldown_secs";
+impl From<AlertRule> for AlertRuleDto {
+    fn from(r: AlertRule) -> Self {
+        Self {
+            id: r.id,
+            label: r.label,
+            metric: r.metric,
+            comparator: r.comparator,
+            threshold: r.threshold,
+            enabled: r.enabled,
+            severity: r.severity,
+            cooldown_secs: r.cooldown_secs,
+        }
+    }
+}
 
 /// GET /api/alert-rules — liste toutes les regles (actives ou non).
 pub async fn list_alert_rules(
@@ -44,13 +59,8 @@ pub async fn list_alert_rules(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<Vec<AlertRuleDto>>, ApiError> {
     gate_super(&state, &rbac)?;
-    let rows = sqlx::query_as::<_, AlertRuleDto>(&format!(
-        "SELECT {SELECT_COLS} FROM alert_rules ORDER BY id"
-    ))
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?;
-    Ok(Json(rows))
+    let rules = state.alert_rules_uc.list().await?;
+    Ok(Json(rules.into_iter().map(Into::into).collect()))
 }
 
 #[derive(Deserialize)]
@@ -70,42 +80,12 @@ pub async fn update_alert_rule(
     Json(dto): Json<UpdateAlertRuleDto>,
 ) -> Result<Json<AlertRuleDto>, ApiError> {
     gate_super(&state, &rbac)?;
-
-    if let Some(ref s) = dto.severity {
-        if !matches!(s.as_str(), "info" | "warning" | "critical") {
-            return Err(ApiError(DomainError::ValidationError(
-                "severite invalide (info|warning|critical)".into(),
-            )));
-        }
-    }
-    if let Some(c) = dto.cooldown_secs {
-        if c < 60 {
-            return Err(ApiError(DomainError::ValidationError(
-                "cooldown_secs minimum 60".into(),
-            )));
-        }
-    }
-
-    // COALESCE : seuls les champs fournis sont modifies. threshold n'est pas
-    // remis a NULL par cet endpoint (les metriques booleennes le gardent NULL).
-    let row = sqlx::query_as::<_, AlertRuleDto>(&format!(
-        "UPDATE alert_rules SET \
-         enabled = COALESCE($2, enabled), \
-         threshold = COALESCE($3, threshold), \
-         severity = COALESCE($4, severity), \
-         cooldown_secs = COALESCE($5, cooldown_secs), \
-         updated_at = NOW() \
-         WHERE id = $1 RETURNING {SELECT_COLS}"
-    ))
-    .bind(&id)
-    .bind(dto.enabled)
-    .bind(dto.threshold)
-    .bind(&dto.severity)
-    .bind(dto.cooldown_secs)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError(DomainError::Internal(e.to_string())))?
-    .ok_or_else(|| ApiError(DomainError::NotFound("regle d'alerte inconnue".into())))?;
-
-    Ok(Json(row))
+    let update = AlertRuleUpdate {
+        enabled: dto.enabled,
+        threshold: dto.threshold,
+        severity: dto.severity,
+        cooldown_secs: dto.cooldown_secs,
+    };
+    let rule = state.alert_rules_uc.update(&id, update).await?;
+    Ok(Json(rule.into()))
 }

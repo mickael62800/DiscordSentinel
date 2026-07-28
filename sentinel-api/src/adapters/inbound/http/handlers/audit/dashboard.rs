@@ -112,13 +112,8 @@ pub async fn create_log(
 ) -> Result<StatusCode, ApiError> {
     let bot_name = dto.bot.unwrap_or_default();
     let category = dto.category.unwrap_or_else(|| {
-        if bot_name.contains("worker") {
-            "worker".to_string()
-        } else if bot_name.contains("-bot") {
-            "bot".to_string()
-        } else {
-            "discord".to_string()
-        }
+        sentinel_core::domain::entities::system::config_parsers::default_log_category(&bot_name)
+            .to_string()
     });
     let entry = LogEntry {
         id: Uuid::new_v4(),

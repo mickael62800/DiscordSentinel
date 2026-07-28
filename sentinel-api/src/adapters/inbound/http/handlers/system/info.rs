@@ -172,7 +172,7 @@ pub async fn get_system_info(
                 name: name.clone(),
                 online,
             };
-            if name.contains("worker") {
+            if sentinel_core::domain::entities::system::config_parsers::is_worker_service(&name) {
                 workers.push(entry);
             } else {
                 bots.push(entry);

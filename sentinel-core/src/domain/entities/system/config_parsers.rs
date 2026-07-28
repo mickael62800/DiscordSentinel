@@ -85,6 +85,18 @@ pub fn is_worker_service(name: &str) -> bool {
     name.contains("worker")
 }
 
+/// Categorie de log par defaut d'un service, derivee de son nom :
+/// `worker` (jobs batch), `bot` (suffixe `-bot`), sinon `discord`.
+pub fn default_log_category(bot_name: &str) -> &'static str {
+    if is_worker_service(bot_name) {
+        "worker"
+    } else if bot_name.contains("-bot") {
+        "bot"
+    } else {
+        "discord"
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/config_parsers.rs"]
 mod tests;

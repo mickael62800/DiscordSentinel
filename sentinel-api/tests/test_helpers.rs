@@ -2543,6 +2543,26 @@ impl sentinel_core::ports::inbound::system::manage_component_min_role::ManageCom
     }
 }
 
+pub struct StubAlertRules;
+#[async_trait]
+impl sentinel_core::ports::inbound::system::manage_alert_rules::ManageAlertRulesUseCase
+    for StubAlertRules
+{
+    async fn list(
+        &self,
+    ) -> Result<Vec<sentinel_core::domain::entities::system::alert_rule::AlertRule>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn update(
+        &self,
+        _: &str,
+        _: sentinel_core::domain::entities::system::alert_rule::AlertRuleUpdate,
+    ) -> Result<sentinel_core::domain::entities::system::alert_rule::AlertRule, DomainError> {
+        Err(DomainError::NotFound("regle d'alerte inconnue".into()))
+    }
+}
+
 pub struct StubLockdown;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase
@@ -2979,6 +2999,7 @@ fn base_state() -> AppState {
         slowmode_uc: Arc::new(StubSlowmode),
         component_visibility_uc: Arc::new(StubComponentVisibility),
         component_min_role_uc: Arc::new(StubComponentMinRole),
+        alert_rules_uc: Arc::new(StubAlertRules),
         bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),
         rbac_admin_uc: Arc::new(StubRbac),

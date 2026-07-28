@@ -774,7 +774,8 @@ pub async fn decide_review(
     Json(body): Json<DecideReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
-    let quorum = body.quorum.clamp(1, 100) as usize;
+    // Le clamp 1..100 du quorum est appliqué par le use case (règle métier).
+    let quorum = body.quorum.max(0) as usize;
     let (review, tally) = state
         .automod_reviews_uc
         .decide(id, quorum, &body.tie_action)

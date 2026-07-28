@@ -132,11 +132,7 @@ impl From<ReportRow> for ConfessionReport {
 
 use std::collections::HashMap;
 
-fn cfg_bool(map: &HashMap<String, String>, key: &str, default: bool) -> bool {
-    map.get(key)
-        .map(|v| v == "true" || v == "1")
-        .unwrap_or(default)
-}
+use sentinel_core::domain::entities::system::config_parsers::parse_bool_config as cfg_bool;
 
 fn cfg_i32(map: &HashMap<String, String>, key: &str, default: i32) -> i32 {
     map.get(key).and_then(|v| v.parse().ok()).unwrap_or(default)

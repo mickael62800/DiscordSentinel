@@ -565,6 +565,15 @@ pub async fn build_app_state(
             component_min_role_repo,
         ));
 
+    // Règles d'alerte de supervision : repo Postgres (SQL alert_rules) + use
+    // case (invariants sévérité/cooldown). Le handler ne fait que RBAC/mapper.
+    let alert_rules_repo: Arc<dyn crate::ports::outbound::system::alert_rule_repository::AlertRuleRepository> =
+        Arc::new(crate::adapters::outbound::postgres::system::alert_rule_repository::PgAlertRuleRepository::new(pg_pool.clone()));
+    let alert_rules_uc: Arc<dyn crate::ports::inbound::system::manage_alert_rules::ManageAlertRulesUseCase> =
+        Arc::new(sentinel_core::application::system::manage_alert_rules_service::ManageAlertRulesService::new(
+            alert_rules_repo,
+        ));
+
     // Persistance fire-and-forget des bots (streaks, etc.) : repo Postgres
     // (SQL user_levels) + use case pass-through. Le handler ne fait que
     // parser/valider/mapper.
@@ -775,6 +784,7 @@ pub async fn build_app_state(
         slowmode_uc,
         component_visibility_uc,
         component_min_role_uc,
+        alert_rules_uc,
         bot_persistence_uc,
         server_events_uc,
         security_uc,

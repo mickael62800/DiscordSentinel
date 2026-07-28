@@ -56,23 +56,13 @@ async fn gate_by_channel_id(
 }
 
 /// Ensemble des guilds ou le caller est Moderator+ (pour scoper les endpoints
-/// guild-less comme `list_all_channels`). Lit `api_user_guilds` (role stocke en
-/// minuscules). Mirroir du helper homonyme de `tickets.rs`.
+/// guild-less comme `list_all_channels`). Délègue au use case tickets (source
+/// unique de la règle, plus de SQL dupliqué dans l'inbound).
 async fn moderated_guilds(
     state: &AppState,
     user_id: &str,
 ) -> Result<std::collections::HashSet<String>, ApiError> {
-    let rows: Vec<(String, String)> =
-        sqlx::query_as("SELECT guild_id, role FROM api_user_guilds WHERE discord_user_id = $1")
-            .bind(user_id)
-            .fetch_all(&state.pg_pool)
-            .await
-            .map_err(sqlx_internal("moderated_guilds (voice)"))?;
-    Ok(rows
-        .into_iter()
-        .filter(|(_, r)| Role::from_str(r).is_some_and(|role| role.satisfies(Role::Moderator)))
-        .map(|(g, _)| g)
-        .collect())
+    Ok(state.tickets_uc.moderated_guilds(user_id).await?)
 }
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
