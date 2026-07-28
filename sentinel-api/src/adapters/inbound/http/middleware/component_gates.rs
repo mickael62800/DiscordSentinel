@@ -2,7 +2,7 @@
 //! override par-guild stocke en DB (table `rbac_component_min_role`).
 //!
 //! Le default + floor sont hardcodes ici (source de verite cote API). Ils
-//! sont mirrores cote frontend dans `sentinel-web/src/rbac/componentRegistry.ts`
+//! sont mirrores cote frontend dans `web/src/rbac/componentRegistry.ts`
 //! pour cacher les boutons coherents avec ce que l'API autorise.
 //!
 //! Modele de resolution :

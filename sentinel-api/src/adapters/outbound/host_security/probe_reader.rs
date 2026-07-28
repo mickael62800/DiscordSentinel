@@ -38,7 +38,7 @@ impl HostProbeReader for FileHostProbeReader {
         let feature = probe.feature();
         let raw = std::fs::read_to_string(path).map_err(|e| {
             DomainError::NotFound(format!(
-                "{feature} non disponible. Setup : sudo bash sentinel-infrastructure/scripts/setup-host-security.sh {feature}. (lecture {path}: {e})"
+                "{feature} non disponible. Setup : sudo bash infrastructure/scripts/setup-host-security.sh {feature}. (lecture {path}: {e})"
             ))
         })?;
         serde_json::from_str(&raw).map_err(|e| DomainError::Internal(format!("parse {path}: {e}")))

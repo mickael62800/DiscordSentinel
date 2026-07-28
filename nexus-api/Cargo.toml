@@ -1,0 +1,15 @@
+[package]
+name = "nexus-api"
+version = "0.1.0"
+edition = "2021"
+description = "API HTTP (axum) de la plateforme jeux Nexus — adapters + bootstrap autour de nexus-core"
+
+[dependencies]
+nexus-core = { path = "../nexus-core" }
+axum = "0.8"
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[lints]
+workspace = true

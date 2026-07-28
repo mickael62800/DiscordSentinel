@@ -1,0 +1,14 @@
+[package]
+name = "nexus-core"
+version = "0.1.0"
+edition = "2021"
+description = "Coeur hexagonal pur de la plateforme jeux Nexus — sans dependance infra (pas de sqlx/axum/reqwest/redis/serenity)"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+[lints]
+workspace = true

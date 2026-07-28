@@ -35,7 +35,7 @@ Discord Messages / Events / Images
        │ PostgreSQL   │ Redis                 │
        ▼              ▼                       ▼
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
-│ Postgres  │  │  Redis    │        │ sentinel-web (Vue 3)   │
+│ Postgres  │  │  Redis    │        │ web (Vue 3)   │
 │(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
 │ 285 migs  │  │  streams) │        └────────────────────────┘
 └─────┬─────┘  └─────┬─────┘
@@ -70,7 +70,7 @@ Discord Messages / Events / Images
 | PostgreSQL | Postgres 16 + **PgBouncer** | 285 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables), cache `user_guilds` multi-tenant |
 | Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
-| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `sentinel-web` — servi par Nginx (Dockerfile + nginx.conf) |
+| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `web` — servi par Nginx (Dockerfile + nginx.conf) |
 | Observabilité | Prometheus + Grafana + tokio-metrics | Middleware Axum metrics, dashboards provisionnés |
 | Containerisation | Docker Alpine multi-stage + Compose | Infra + API + gateway + bot + workers + web + monitoring |
 
@@ -82,7 +82,7 @@ Discord Messages / Events / Images
 
 ```
 DiscordSentinel/
-├── sentinel-web/                # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
+├── web/                # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
 │
 ├── sentinel-bot/                # Bot Discord unifié (single process, 22 modules)
 │   └── src/
@@ -108,10 +108,33 @@ DiscordSentinel/
 ├── sentinel-worker/             # Meta-scheduler unifié — 17 domaines périodiques
 │
 ├── sentinel-ml/                 # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
-├── sentinel-infrastructure/     # docker/ (compose + Dockerfiles), prometheus.yml, grafana, scripts/ (build-all, dev, health-check, ...)
-├── Cargo.toml                   # Workspace Rust (20+ membres)
+├── infrastructure/              # docker/ (compose + Dockerfiles), prometheus.yml, grafana, scripts/ (build-all, dev, health-check, ...)
+│                                # (partagé par les stacks Sentinel et Nexus — ex-sentinel-infrastructure/)
+│
+├── nexus-core/                  # Nexus (jeux) — cœur hexagonal pur (scaffold)
+├── nexus-api/                   # Nexus — API HTTP axum (scaffold)
+├── nexus-bot/                   # Nexus — bot Discord serenity (scaffold)
+├── nexus-worker/                # Nexus — worker tokio (scaffold)
+├── nexus-gateway/               # Nexus — gateway (scaffold)
+├── nexus-proto/                 # Nexus — définitions gRPC (stub)
+│
+├── Cargo.toml                   # Workspace Rust (11 crates)
 └── README.md                    # ← ce fichier
 ```
+
+> Note : `web/` et `infrastructure/` (ex-`sentinel-web/` / `sentinel-infrastructure/`)
+> sont désormais partagés par les deux stacks (Sentinel et Nexus).
+
+## Nexus (plateforme jeux, en construction)
+
+Nouvelle plateforme de jeux, architecture calquée sur Sentinel (hexagonale) :
+
+- `nexus-core` — lib pure : domain / application / ports, zéro dépendance infra
+- `nexus-api` — API HTTP (axum), port `NEXUS_API_PORT` (défaut 3100)
+- `nexus-bot` — bot Discord (serenity) ; ne se connecte pas sans `NEXUS_DISCORD_TOKEN`
+- `nexus-worker` — jobs de fond (tokio)
+- `nexus-gateway` — point d'entrée réseau
+- `nexus-proto` — protos gRPC (stub, modèle `sentinel-proto`)
 
 ---
 
@@ -393,7 +416,7 @@ Request
 ## Observabilité
 
 - **Prometheus** — endpoint `/metrics` sur l'API et chaque worker (port 9100). Compteurs `http_requests_total{route,method,status}`, histogrammes `http_request_duration_seconds`, gauges `tokio_busy_ratio`, `tokio_live_tasks_count`, `tokio_global_queue_depth`.
-- **Grafana** — dashboards auto-provisionnés dans `sentinel-infrastructure/grafana/`. Démarrage : `docker compose -f sentinel-infrastructure/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
+- **Grafana** — dashboards auto-provisionnés dans `infrastructure/grafana/`. Démarrage : `docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
 - **pg_stat_statements** — extension activée. `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC`.
 - **Tracing structuré** — `tracing-subscriber` JSON en prod, correlation IDs `X-Request-ID` propagés via `tower_http::request_id`.
 
@@ -405,10 +428,10 @@ Request
 
 ```bash
 # Stack complète (infra + API + bot unifié + worker unifié + gateway + web)
-docker compose -f sentinel-infrastructure/docker/docker-compose.yml up -d
+docker compose -f infrastructure/docker/docker-compose.yml up -d
 
 # Avec Prometheus + Grafana
-docker compose -f sentinel-infrastructure/docker/docker-compose.yml --profile monitoring up -d
+docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring up -d
 ```
 
 **Services infra** : `postgres` (tuning RAM : `shared_buffers=4GB`, `work_mem=64MB`, WAL tuning), `pgbouncer` (transaction pooling), `redis` (`maxmemory=2gb allkeys-lru`).
@@ -460,17 +483,17 @@ WALLET_STARTING_COINS=100
 ### Développement local
 
 ```bash
-bash sentinel-infrastructure/scripts/dev.sh              # Lance API + bot + web
-bash sentinel-infrastructure/scripts/build-all.sh        # Build release de tous les crates
-bash sentinel-infrastructure/scripts/health-check.sh     # Vérifie que tous les services répondent
-bash sentinel-infrastructure/scripts/seed-rules.sh       # Seed de règles de dev
-bash sentinel-infrastructure/scripts/start-all.sh        # Démarre la stack complète
+bash infrastructure/scripts/dev.sh              # Lance API + bot + web
+bash infrastructure/scripts/build-all.sh        # Build release de tous les crates
+bash infrastructure/scripts/health-check.sh     # Vérifie que tous les services répondent
+bash infrastructure/scripts/seed-rules.sh       # Seed de règles de dev
+bash infrastructure/scripts/start-all.sh        # Démarre la stack complète
 
 # Ou composant par composant :
 cd sentinel-api && cargo run
 cd sentinel-worker && cargo run
 cd sentinel-bot && cargo run
-cd sentinel-web && npm run dev
+cd web && npm run dev
 ```
 
 ---
@@ -484,7 +507,7 @@ Tests `cargo test --lib` côté API + unitaires workers/modules bot. Couverture 
 - **Workers** : helpers `worker-common`.
 - **Gateway** : broadcaster.
 
-Stack de tests dédiée via `sentinel-infrastructure/docker/docker-compose.test.yml`.
+Stack de tests dédiée via `infrastructure/docker/docker-compose.test.yml`.
 
 ---
 

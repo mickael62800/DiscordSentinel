@@ -7,6 +7,12 @@ members = [
     "sentinel-gateway",
     "sentinel-worker",
     "sentinel-bot",
+    "nexus-proto",
+    "nexus-core",
+    "nexus-api",
+    "nexus-gateway",
+    "nexus-worker",
+    "nexus-bot",
 ]
 
 [workspace.package]

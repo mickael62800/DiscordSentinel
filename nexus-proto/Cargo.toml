@@ -1,0 +1,12 @@
+[package]
+name = "nexus-proto"
+version = "0.1.0"
+edition = "2021"
+description = "Definitions protobuf/gRPC de la plateforme jeux Nexus (stub, calque sur sentinel-proto)"
+
+[dependencies]
+tonic = { workspace = true }
+prost = { workspace = true }
+
+[lints]
+workspace = true
