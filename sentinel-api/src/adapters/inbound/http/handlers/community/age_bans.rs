@@ -87,7 +87,7 @@ pub async fn list_due_age_bans(
     State(state): State<AppState>,
     Query(q): Query<DueQuery>,
 ) -> Result<Json<Vec<AgeBanDto>>, ApiError> {
-    let limit = q.limit.unwrap_or(200).clamp(1, 1000);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 200, 1, 1000);
     let list = state.age_ban_repo.list_due(limit).await?;
     Ok(Json(list.into_iter().map(AgeBanDto::from).collect()))
 }

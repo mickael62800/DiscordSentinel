@@ -72,7 +72,12 @@ impl ProgressionService for ProgressionGrpc {
         let guild_id = req.guild_id.clone();
         let user_id = req.user_id.clone();
         let role_ids = parse_ids(&req.role_ids);
-        let channel_id = req.channel_id.parse::<u64>().unwrap_or(0);
+        // Snowflake invalide = erreur de validation explicite (un `0` silencieux
+        // fausserait les trackers de salon côté progression).
+        let channel_id = req
+            .channel_id
+            .parse::<u64>()
+            .map_err(|_| Status::invalid_argument("channel_id invalide (snowflake u64 attendu)"))?;
 
         let result = self
             .levels_uc
@@ -109,7 +114,12 @@ impl ProgressionService for ProgressionGrpc {
         let guild_id = req.guild_id.clone();
         let user_id = req.user_id.clone();
         let role_ids = parse_ids(&req.role_ids);
-        let channel_id = req.channel_id.parse::<u64>().unwrap_or(0);
+        // Snowflake invalide = erreur de validation explicite (un `0` silencieux
+        // fausserait les trackers de salon côté progression).
+        let channel_id = req
+            .channel_id
+            .parse::<u64>()
+            .map_err(|_| Status::invalid_argument("channel_id invalide (snowflake u64 attendu)"))?;
 
         let result = self
             .levels_uc

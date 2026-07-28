@@ -103,7 +103,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         uc: state.analyze_image_uc.clone(),
     };
     let ai_dataset = AiDatasetGrpc {
-        pg_pool: state.pg_pool.clone(),
+        dataset_uc: state.dataset_uc.clone(),
     };
 
     // Helper local : compression Gzip (send/accept) puis wrap dans l'auth

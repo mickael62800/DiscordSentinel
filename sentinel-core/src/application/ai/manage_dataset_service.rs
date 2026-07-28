@@ -12,7 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::ai::manage_dataset::{
     BulkDeleteCommand, ListDatasetQuery, ManageDatasetUseCase,
 };
-use crate::ports::outbound::ai::dataset_repository::DatasetRepository;
+use crate::ports::outbound::ai::dataset_repository::{DatasetRepository, NewDatasetMessage};
 
 /// Plafond dur d'ids par requete de suppression (anti-abus).
 const MAX_BULK_DELETE_IDS: usize = 5000;
@@ -29,6 +29,18 @@ impl ManageDatasetService {
 
 #[async_trait]
 impl ManageDatasetUseCase for ManageDatasetService {
+    async fn collect_message(&self, msg: NewDatasetMessage) -> Result<(), DomainError> {
+        if msg.guild_id.trim().is_empty()
+            || msg.user_id.trim().is_empty()
+            || msg.content.trim().is_empty()
+        {
+            return Err(DomainError::ValidationError(
+                "guild_id, user_id et content requis".into(),
+            ));
+        }
+        self.repo.insert_message(&msg).await
+    }
+
     async fn list_messages(&self, query: ListDatasetQuery) -> Result<DatasetPage, DomainError> {
         let bounded = DatasetQuery {
             guild_id: query.guild_id,

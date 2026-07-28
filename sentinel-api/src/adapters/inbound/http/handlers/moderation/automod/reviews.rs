@@ -83,7 +83,7 @@ pub async fn list_reviews(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReviewsQuery>,
 ) -> Result<Json<Vec<AutomodReviewDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(100).clamp(1, 500);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(params.limit, 100, 1, 500);
     let reviews = if params.include_resolved.unwrap_or(false) {
         state
             .automod_reviews_uc

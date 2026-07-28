@@ -21,7 +21,7 @@ c'est ce qui trompe le plus l'utilisateur.
 | **Sécurité** | Le lockdown et le slowmode **persistés** ignorent `lockdown_duration_secs` / la durée configurée (hardcode 600 / 300) | `detectors/lockdown.rs:141`, `detectors/slowmode.rs:80` | Lire la durée configurée |
 | **Confessions** | Couleur d'embed hardcodée `0xff5e5e` alors que `default_embed_color_hex` existe ; les modales submit/reply ignorent `min_chars`/`max_chars` | `confessions/mod.rs:503,669,152,378` | Lire les clés existantes |
 | **Voice** | Le message anti-flood affiche "30 secondes" en dur au lieu de `voice_flood_mute_duration_secs` | `voice/handlers/message.rs:70,88` | Lire la clé |
-| **Worker** | `tamagotchi_tick_interval_secs` et `age_unban_interval` lus depuis l'env mais **absents de `apply_db_config`** → pas surchargeables par DB | `sentinel-worker/config.rs` | Ajouter les lignes `config_or_env` |
+| **Worker** | ~~`tamagotchi_tick_interval_secs` et `age_unban_interval` absents de `apply_db_config`~~ **✅ RÉSOLU/OBSOLÈTE** : `age_unban_interval_secs` est surchargeable par DB ; le domaine tamagotchi a été supprimé du worker (jeux retirés) | `sentinel-worker/config.rs` | (fait) |
 
 ---
 
@@ -78,11 +78,11 @@ c'est ce qui trompe le plus l'utilisateur.
 - **MED** — `underage_ban_days` (formule ans×365) · `rejoin_title` (semble manquant) · `leave_embed_color`/`rules_embed_color`
 
 ### Worker (intervals littéraux violant le pattern config)
-- **HIGH** — `automod_close_votes_secs` (60, **seul chemin qui clôt les votes à l'échéance**) · `automod_cleanup_cards_secs` (86400) · `monthly_ranking_check_secs` (3600) · `tournament_check_secs` (3600)
-- **MED** — `ai_batch_size` (5) · `announcement_publish_interval_secs` (3600) · `daily_chaos_min/max_delay_secs`
+- **HIGH** — `automod_close_votes_secs` (60, **seul chemin qui clôt les votes à l'échéance**) · `automod_cleanup_cards_secs` (86400) · `monthly_ranking_check_secs` (3600) ~~· `tournament_check_secs`~~ (job supprimé)
+- **MED** — `ai_batch_size` (5) · `announcement_publish_interval_secs` (3600) ~~· `daily_chaos_min/max_delay_secs`~~ (job supprimé)
 
 ### Autres modules
-- **HIGH** — Tamagotchi : effets des items de shop (`shop_*_gain`, +25/+60/…) — **prix configurables mais pas les effets** → économie non équilibrable — `tamagotchi/panel.rs:522` · Audit : `anomaly_detector_max_buffer_size` (500) · `watched_users_query_limit` (10000)
+- **HIGH** — ~~Tamagotchi : effets des items de shop~~ (module supprimé) · Audit : `anomaly_detector_max_buffer_size` (500) · `watched_users_query_limit` (10000)
 - **MED** — `sponsor_cooldown_secs` (30) · `role_button_cooldown_secs` (2) · seuils sprite tamagotchi
 - **LOW** — poll de rotation (600s) · rate-limit purge (300ms) · poll refresh tamagotchi (60s)
 

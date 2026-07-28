@@ -54,7 +54,7 @@ pub async fn list_sessions(
         "role insuffisant pour consulter les sessions",
     )
     .await?;
-    let limit = q.limit.unwrap_or(100).clamp(1, 1000);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 100, 1, 1000);
     let offset = q.offset.unwrap_or(0).max(0);
     let list = state
         .game_session_repo

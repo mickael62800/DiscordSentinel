@@ -781,7 +781,7 @@ pub async fn get_modstats(
         Role::Moderator,
         "moderator+ requis pour voir les stats de moderation",
     )?;
-    let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
+    let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats(&guild_id, days).await?;
 
@@ -820,7 +820,7 @@ pub async fn get_modstats_trend(
         "moderator+ requis pour voir les stats de moderation",
     )?;
 
-    let days = (params.days.unwrap_or(30).clamp(1, 90)) as i32;
+    let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats_trend(&guild_id, days).await?;
 

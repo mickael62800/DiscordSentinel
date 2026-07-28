@@ -2382,6 +2382,12 @@ impl sentinel_core::ports::inbound::community::check_eligibility::CheckEligibili
 pub struct StubDataset;
 #[async_trait]
 impl sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase for StubDataset {
+    async fn collect_message(
+        &self,
+        _: sentinel_core::ports::outbound::ai::dataset_repository::NewDatasetMessage,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn list_messages(
         &self,
         _: sentinel_core::ports::inbound::ai::manage_dataset::ListDatasetQuery,

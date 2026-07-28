@@ -41,6 +41,15 @@ pub fn normalize_days(days: Option<i32>, default: i32, max: i32) -> i32 {
     days.unwrap_or(default).max(1).min(max)
 }
 
+/// Normalise un parametre numerique optionnel dans des bornes explicites
+/// `[min, max]`. Variante generique de `normalize_limit`/`normalize_days`
+/// pour les endpoints dont la borne basse n'est pas 0/1 implicite — l'objectif
+/// est que TOUTES les paginations passent par un helper nomme plutot que des
+/// `unwrap_or(N).clamp(a, b)` inline eparpilles.
+pub fn normalize_in<T: Ord + Copy>(value: Option<T>, default: T, min: T, max: T) -> T {
+    value.unwrap_or(default).clamp(min, max)
+}
+
 /// Normalise un parametre offset optionnel. Garantit >= 0.
 pub fn normalize_offset(offset: Option<i64>) -> i64 {
     offset.unwrap_or(0).max(0)

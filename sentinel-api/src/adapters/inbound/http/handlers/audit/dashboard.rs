@@ -48,7 +48,7 @@ pub async fn get_logs(
     State(state): State<AppState>,
     Query(params): Query<GuildFilterParams>,
 ) -> Result<Json<Vec<LogEntryDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(200).clamp(1, 1000);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(params.limit, 200, 1, 1000);
 
     let dtos: Vec<LogEntryDto> = if let Some(cat) = params.category.as_deref() {
         // Cache Redis (adapter) : filtre guild post-fetch faute d'index.

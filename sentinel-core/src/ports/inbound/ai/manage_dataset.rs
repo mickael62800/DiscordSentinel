@@ -22,6 +22,12 @@ pub struct BulkDeleteCommand {
 
 #[async_trait]
 pub trait ManageDatasetUseCase: Send + Sync {
+    /// Ingestion d'un message collecte : valide (champs non vides) puis
+    /// delegue au repository. Chemin chaud, best-effort cote appelant.
+    async fn collect_message(
+        &self,
+        msg: crate::ports::outbound::ai::dataset_repository::NewDatasetMessage,
+    ) -> Result<(), DomainError>;
     /// Liste paginee des messages du dataset : borne les parametres puis
     /// delegue au repository.
     async fn list_messages(&self, query: ListDatasetQuery) -> Result<DatasetPage, DomainError>;

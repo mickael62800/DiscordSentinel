@@ -155,7 +155,7 @@ pub async fn export_analytics(
         "moderator+ requis pour exporter les analytics",
     )
     .await?;
-    let days = params.days.unwrap_or(30).clamp(1, 365);
+    let days = crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 365);
 
     let format = match params.format {
         Some(f) if !f.is_empty() => f,

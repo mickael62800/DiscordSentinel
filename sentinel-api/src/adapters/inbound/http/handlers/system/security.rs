@@ -77,7 +77,7 @@ pub async fn top_ips(
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("1h"));
-    let limit = q.limit.unwrap_or(20).clamp(1, 100);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 20, 1, 100);
 
     let rows = state
         .security_logs_uc
@@ -115,7 +115,7 @@ pub async fn auth_failures(
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
-    let limit = q.limit.unwrap_or(100).clamp(1, 500);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 100, 1, 500);
 
     let rows = state
         .security_logs_uc
@@ -221,7 +221,7 @@ pub async fn audit_logs(
     let filter = AuditLogFilter {
         guild_id: q.guild_id,
         event_type_prefix: q.event_type_prefix,
-        limit: q.limit.unwrap_or(100).clamp(1, 500),
+        limit: crate::adapters::inbound::http::helpers::normalize_in(q.limit, 100, 1, 500),
     };
     let rows = state
         .security_audit_uc
@@ -752,7 +752,7 @@ pub async fn last_successful_logins(
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
     gate_admin(&state, &rbac)?;
-    let limit = q.limit.unwrap_or(20).clamp(1, 200);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 20, 1, 200);
     let rows = state
         .security_audit_uc
         .recent_logins(limit)
@@ -805,7 +805,7 @@ pub async fn traffic_trend(
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
-    let bucket_min = (q.bucket_minutes.unwrap_or(5).clamp(1, 60)) as i64;
+    let bucket_min = (crate::adapters::inbound::http::helpers::normalize_in(q.bucket_minutes, 5, 1, 60)) as i64;
 
     let trend = state
         .security_logs_uc

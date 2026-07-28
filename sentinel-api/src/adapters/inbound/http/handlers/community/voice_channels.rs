@@ -254,7 +254,7 @@ pub async fn list_channel_events(
         "moderator+ pour consulter les evenements d'un voice channel",
     )
     .await?;
-    let limit = params.limit.unwrap_or(200).clamp(1, 1000);
+    let limit = crate::adapters::inbound::http::helpers::normalize_in(params.limit, 200, 1, 1000);
     let rows: Vec<(
         uuid::Uuid,
         String,

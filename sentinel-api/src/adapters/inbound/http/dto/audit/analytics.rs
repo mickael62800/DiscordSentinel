@@ -12,11 +12,11 @@ pub struct AnalyticsQuery {
 
 impl AnalyticsQuery {
     pub fn days(&self) -> i32 {
-        self.days.unwrap_or(30).clamp(1, 90)
+        crate::adapters::inbound::http::helpers::normalize_in(self.days, 30, 1, 90)
     }
 
     pub fn limit(&self) -> i64 {
-        self.limit.unwrap_or(10).clamp(1, 50)
+        crate::adapters::inbound::http::helpers::normalize_in(self.limit, 10, 1, 50)
     }
 }
 

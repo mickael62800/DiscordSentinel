@@ -158,12 +158,6 @@ fn spawn_job(
             }
         }
     });
-    let _ = warn_link;
-}
-
-#[allow(dead_code)]
-fn warn_link() {
-    warn!("link warn");
 }
 
 async fn call_job(

@@ -8,7 +8,9 @@ use uuid::Uuid;
 use crate::adapters::outbound::postgres::pg_err;
 use sentinel_core::domain::entities::ai::dataset::{DatasetMessage, DatasetPage, DatasetQuery};
 use sentinel_core::domain::errors::DomainError;
-use sentinel_core::ports::outbound::ai::dataset_repository::DatasetRepository;
+use sentinel_core::ports::outbound::ai::dataset_repository::{
+    DatasetRepository, NewDatasetMessage,
+};
 
 pub struct PgDatasetRepository {
     pool: PgPool,
@@ -22,6 +24,22 @@ impl PgDatasetRepository {
 
 #[async_trait]
 impl DatasetRepository for PgDatasetRepository {
+    async fn insert_message(&self, msg: &NewDatasetMessage) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO ai_dataset_messages (guild_id, channel_id, channel_name, user_id, content) \
+             VALUES ($1, $2, $3, $4, $5)",
+        )
+        .bind(&msg.guild_id)
+        .bind(&msg.channel_id)
+        .bind(msg.channel_name.as_deref())
+        .bind(&msg.user_id)
+        .bind(&msg.content)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn list_messages(&self, query: &DatasetQuery) -> Result<DatasetPage, DomainError> {
         // Construction dynamique securisee (params bindes via $N).
         let mut sql = String::from(
