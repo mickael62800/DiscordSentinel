@@ -44,12 +44,17 @@ struct MockWalletRepo {
 
 #[async_trait]
 impl WalletRepository for MockWalletRepo {
-    async fn get_or_default(&self, g: &str, u: &str) -> Result<Wallet, DomainError> {
+    async fn find(&self, g: &str, u: &str) -> Result<Option<Wallet>, DomainError> {
+        // Le wallet "existe" toujours : pas de credit de solde de depart,
+        // le comportement wheel historique des tests est conserve.
         let mut w = Wallet::new(g, u);
         if self.initial_coins > 0 {
             w.credit(self.initial_coins)?;
         }
-        Ok(w)
+        Ok(Some(w))
+    }
+    async fn starting_coins(&self, _g: &str) -> Result<Option<i64>, DomainError> {
+        Ok(None)
     }
     async fn save_with_transaction(
         &self,
@@ -58,6 +63,28 @@ impl WalletRepository for MockWalletRepo {
     ) -> Result<(), DomainError> {
         self.saved.lock().unwrap().push((wallet.clone(), mutation.clone()));
         Ok(())
+    }
+    async fn transfer_atomic(
+        &self,
+        _g: &str,
+        _f: &str,
+        _t: &str,
+        _a: i64,
+        _r: Option<&str>,
+    ) -> Result<crate::ports::outbound::wallet_repository::TransferOutcome, DomainError> {
+        unimplemented!("pas de transfert dans les tests wheel")
+    }
+    async fn history(
+        &self,
+        _g: &str,
+        _u: &str,
+        _l: i64,
+        _o: i64,
+    ) -> Result<Vec<crate::domain::entities::wallet::WalletTransaction>, DomainError> {
+        unimplemented!("pas d'historique dans les tests wheel")
+    }
+    async fn leaderboard(&self, _g: &str, _l: i64) -> Result<Vec<Wallet>, DomainError> {
+        unimplemented!("pas de leaderboard dans les tests wheel")
     }
 }
 

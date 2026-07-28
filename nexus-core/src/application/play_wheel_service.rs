@@ -15,6 +15,7 @@ use chrono::Utc;
 use rand::SeedableRng;
 use uuid::Uuid;
 
+use crate::application::wallet_service::get_or_create_wallet;
 use crate::domain::entities::wallet::Wallet;
 use crate::domain::entities::wallet::WalletMutation;
 use crate::domain::entities::wheel::is_memorable_case;
@@ -61,11 +62,16 @@ impl PlayWheelUseCase for PlayWheelService {
         let outcome = spin_with_rng(&mut rng);
         let payout = outcome.case.payout;
 
-        // 3. Wallet : regles pures de credit/debit.
-        let mut wallet = self
-            .wallet_repo
-            .get_or_default(&cmd.guild_id, &cmd.user_id)
-            .await?;
+        // 3. Wallet : regles pures de credit/debit (creation via le socle
+        // partage : solde de depart credite pour un nouveau joueur).
+        let mut wallet = get_or_create_wallet(
+            self.wallet_repo.as_ref(),
+            &cmd.guild_id,
+            &cmd.user_id,
+            &cmd.username,
+        )
+        .await?;
+        wallet.username = cmd.username.clone();
         if payout > 0 {
             wallet.credit(payout)?;
             let mutation = WalletMutation {
@@ -73,6 +79,7 @@ impl PlayWheelUseCase for PlayWheelService {
                 balance_after: wallet.coins,
                 source: "wheel_payout".into(),
                 description: format!("Roue du Destin : {}", outcome.case.label),
+                reason: None,
             };
             self.wallet_repo
                 .save_with_transaction(&wallet, &mutation)
@@ -85,6 +92,7 @@ impl PlayWheelUseCase for PlayWheelService {
                     balance_after: wallet.coins,
                     source: "wheel_loss".into(),
                     description: format!("Roue du Destin : {}", outcome.case.label),
+                    reason: None,
                 };
                 self.wallet_repo
                     .save_with_transaction(&wallet, &mutation)
@@ -116,7 +124,7 @@ impl PlayWheelUseCase for PlayWheelService {
 #[async_trait]
 impl GetWalletUseCase for PlayWheelService {
     async fn get(&self, guild_id: &str, user_id: &str) -> Result<Wallet, DomainError> {
-        self.wallet_repo.get_or_default(guild_id, user_id).await
+        get_or_create_wallet(self.wallet_repo.as_ref(), guild_id, user_id, "").await
     }
 }
 

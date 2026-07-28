@@ -18,7 +18,13 @@ use crate::bootstrap::AppState;
 pub fn build_router(state: AppState) -> Router {
     let api = Router::new()
         .route("/api/wheel/{guild_id}/{user_id}/spin", post(handlers::wheel::spin))
+        .route("/api/wallet/{guild_id}/transfer", post(handlers::wallet::transfer))
+        .route("/api/wallet/{guild_id}/leaderboard", get(handlers::wallet::leaderboard))
         .route("/api/wallet/{guild_id}/{user_id}", get(handlers::wallet::get))
+        .route(
+            "/api/wallet/{guild_id}/{user_id}/history",
+            get(handlers::wallet::history),
+        )
         .layer(middleware::from_fn_with_state(state.clone(), require_api_key));
 
     Router::new()

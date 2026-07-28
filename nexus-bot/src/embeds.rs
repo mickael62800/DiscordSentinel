@@ -62,6 +62,66 @@ pub fn build_result_embed(resp: &WheelSpinResponse, username: &str) -> CreateEmb
     embed
 }
 
+/// Embed du solde (`/solde`).
+pub fn build_wallet_embed(w: &crate::api_client::WalletResponse, display_name: &str) -> CreateEmbed {
+    CreateEmbed::new()
+        .title(format!("\u{1fa99} Portefeuille de {display_name}"))
+        .color(0xf1c40f)
+        .field("Solde", format!("**{}** coins", w.coins), true)
+        .field("Total gagne", format!("{} coins", w.total_earned), true)
+        .field("Total depense", format!("{} coins", w.total_spent), true)
+        .timestamp(serenity::model::Timestamp::now())
+}
+
+/// Embed d'un don reussi (`/donner`), style historique du don de coins.
+pub fn build_transfer_embed(
+    from_user_id: u64,
+    to_user_id: u64,
+    amount: i64,
+    from_balance: i64,
+    reason: Option<&str>,
+) -> CreateEmbed {
+    let mut description = format!(
+        "<@{from_user_id}> a donne **{amount} coins** a <@{to_user_id}> !\n\n\
+         \u{1f4b0} Nouveau solde du donateur : {from_balance} coins"
+    );
+    if let Some(r) = reason {
+        description.push_str(&format!("\n\u{1f4dd} Raison : {r}"));
+    }
+    CreateEmbed::new()
+        .title("\u{1f381} Don de coins !")
+        .description(description)
+        .color(0x57F287)
+        .timestamp(serenity::model::Timestamp::now())
+}
+
+/// Embed du classement (`/classement`), style medailles des anciens
+/// leaderboards (`format_leaderboard` du module coude).
+pub fn build_leaderboard_embed(entries: &[crate::api_client::WalletResponse]) -> CreateEmbed {
+    let body = if entries.is_empty() {
+        "Aucun joueur pour le moment.".to_string()
+    } else {
+        let medals = ["\u{1f947}", "\u{1f948}", "\u{1f949}"];
+        entries
+            .iter()
+            .enumerate()
+            .map(|(i, e)| {
+                let rank = medals
+                    .get(i)
+                    .map(|m| (*m).to_string())
+                    .unwrap_or_else(|| format!("{}.", i + 1));
+                format!("{} <@{}> — **{}** coins", rank, e.user_id, e.coins)
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    CreateEmbed::new()
+        .title("\u{1f3c6} Classement — Les plus riches")
+        .description(body)
+        .color(0xE67E22)
+        .timestamp(serenity::model::Timestamp::now())
+}
+
 /// Embed pour signaler une erreur (daily deja claim, API down...).
 pub fn build_error_embed(message: &str) -> CreateEmbed {
     CreateEmbed::new()
