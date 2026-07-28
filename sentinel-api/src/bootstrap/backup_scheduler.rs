@@ -50,7 +50,11 @@ async fn run_once(state: &AppState) -> Result<(), sqlx::Error> {
                 .map(|c| c.config_value.clone())
         };
 
-        let enabled = get("enabled").map(|v| v != "false").unwrap_or(true);
+        // Meme regle que le worker (`is_worker_enabled`) sur la meme ligne
+        // `guild-backup-bot/enabled` : absent => actif, present => parse_bool_str.
+        let enabled = sentinel_core::domain::entities::system::config_parsers::parse_enabled_flag(
+            get("enabled").as_deref(),
+        );
         let auto = get("auto_backup_enabled")
             .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(&v))
             .unwrap_or(false);

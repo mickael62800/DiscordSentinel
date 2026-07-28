@@ -1,4 +1,4 @@
-﻿//! Phase 6A â€” Reconciliation des audit_logs avec l'API Discord.
+//! Phase 6A — Reconciliation des audit_logs avec l'API Discord.
 //!
 //! Ce worker importe dans la table `audit_logs` les actions de moderation
 //! effectuees HORS de nos bots (via le client Discord directement, ou par
@@ -24,7 +24,7 @@
 //! - 25 = `MEMBER_ROLE_UPDATE`â†’ `discord_audit:member_role_update`
 //!
 //! Les autres types (channel/role create/delete, message delete, etc.) sont
-//! ignores par le MVP â€” ils peuvent etre ajoutes incrementalement dans
+//! ignores par le MVP — ils peuvent etre ajoutes incrementalement dans
 //! `map_action_type`.
 //!
 //! # Dedup
@@ -38,7 +38,7 @@
 //! Discord impose un rate limit global + par-route. Pour le MVP on fait 1
 //! request par guild par tick (5 min), largement sous le budget. Les
 //! headers `X-RateLimit-Remaining` et `Retry-After` ne sont pas encore
-//! respectes â€” a ajouter si on scale a beaucoup de guilds.
+//! respectes — a ajouter si on scale a beaucoup de guilds.
 
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -142,18 +142,18 @@ async fn sync_guild(
 
     let status = resp.status();
     if status == reqwest::StatusCode::FORBIDDEN {
-        // Le bot n'a pas VIEW_AUDIT_LOG sur cette guild â€” on n'insiste pas
+        // Le bot n'a pas VIEW_AUDIT_LOG sur cette guild — on n'insiste pas
         return Err("VIEW_AUDIT_LOG manquant".into());
     }
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        // Rate limited par Discord â€” respecter Retry-After avant de retenter.
+        // Rate limited par Discord — respecter Retry-After avant de retenter.
         let retry_after = resp
             .headers()
             .get("retry-after")
             .and_then(|v| v.to_str().ok())
             .and_then(|v| v.parse::<f64>().ok())
             .unwrap_or(5.0);
-        warn!(guild_id = %guild_id, retry_after, "Discord rate limit â€” attente");
+        warn!(guild_id = %guild_id, retry_after, "Discord rate limit — attente");
         tokio::time::sleep(std::time::Duration::from_secs_f64(retry_after)).await;
         return Err(format!(
             "rate limited ({retry_after}s), retry au prochain tick"
@@ -170,7 +170,7 @@ async fn sync_guild(
         .map_err(|e| format!("discord parse: {e}"))?;
 
     if audit_log.audit_log_entries.is_empty() {
-        // Pas de nouvelles entries â€” juste update last_synced_at
+        // Pas de nouvelles entries — juste update last_synced_at
         sqlx::query(
             "INSERT INTO discord_audit_sync_state (guild_id, last_entry_id, last_synced_at, consecutive_errors) \
              VALUES ($1, $2, NOW(), 0) \
@@ -195,7 +195,7 @@ async fn sync_guild(
         .collect();
 
     // 3. Insert les entries pertinentes. Discord renvoie les entries du
-    //    plus recent au plus ancien â€” on inverse pour que les inserts
+    //    plus recent au plus ancien — on inverse pour que les inserts
     //    soient chronologiques et que `last_entry_id` reflete le plus
     //    recent.
     let mut inserted = 0u32;
@@ -203,7 +203,7 @@ async fn sync_guild(
 
     for entry in audit_log.audit_log_entries.iter().rev() {
         let Some(event_type) = map_action_type(entry.action_type) else {
-            // Type d'action non couvert par le MVP â€” on skip mais on
+            // Type d'action non couvert par le MVP — on skip mais on
             // avance quand meme le curseur.
             if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
                 newest_id = Some(entry.id.clone());
@@ -250,7 +250,7 @@ async fn sync_guild(
                 error = %e,
                 entry_id = %entry.id,
                 event_type = %event_type,
-                "insert audit_log failed â€” curseur non avance"
+                "insert audit_log failed — curseur non avance"
             ),
         }
     }
@@ -275,8 +275,8 @@ async fn sync_guild(
 }
 
 // La comparaison de snowflakes et le mapping des action_types Discord vivent
-// dans le core hexagonal (avec leurs tests, dont la rÃ©gression P0 string vs
-// u64) â€” partagÃ©s avec le cache de messages d'audit du bot.
+// dans le core hexagonal (avec leurs tests, dont la régression P0 string vs
+// u64) — partagés avec le cache de messages d'audit du bot.
 use sentinel_core::domain::services::audit::discord_audit::{is_newer_snowflake, map_action_type};
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -311,7 +311,7 @@ struct DiscordUser {
     username: String,
 }
 
-// Suppress unused warnings on DateTime import â€” utile si on ajoute du tracking
+// Suppress unused warnings on DateTime import — utile si on ajoute du tracking
 // temporel plus tard
 #[allow(dead_code)]
 fn _ensure_chrono_used() -> Option<DateTime<Utc>> {

@@ -31,8 +31,10 @@ impl<U: Eq + Hash> CooldownTracker<U> {
     /// `Some(remaining_secs)` si l'utilisateur est encore en cooldown,
     /// `None` si l'action est autorisee.
     pub fn check_and_set(&self, user_id: U) -> Option<u64> {
-        self.map
-            .check_and_set(user_id, self.cooldown_secs.load(Ordering::Relaxed))
+        let cd = self.cooldown_secs.load(Ordering::Relaxed);
+        // Cooldown unique sur toute la map : l'âge de purge est le cooldown
+        // lui-même, comme avant l'extraction vers `CooldownMap`.
+        self.map.check_and_set(user_id, cd, cd)
     }
 }
 

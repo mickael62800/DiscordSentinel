@@ -1,4 +1,4 @@
-﻿use serenity::all::{
+use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
@@ -232,7 +232,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let embed = danger_embed(format!("Mass Mute â€” {} utilisateurs", user_ids.len()))
+    let embed = danger_embed(format!("Mass Mute — {} utilisateurs", user_ids.len()))
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
@@ -440,7 +440,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let embed = danger_embed(format!("Mass Ban â€” {} utilisateurs", user_ids.len()))
+    let embed = danger_embed(format!("Mass Ban — {} utilisateurs", user_ids.len()))
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)

@@ -6,6 +6,12 @@
 
 use crate::domain::services::cooldown_map::CooldownMap;
 
+/// Âge maximal utilisé par la purge amortie. Les buckets ont des cooldowns
+/// hétérogènes (2 s pour les boutons de rôle, 30 s+ configurables pour le
+/// parrainage) : la purge doit couvrir le plus long — 60 s suffisent pour
+/// tous les cas.
+const PURGE_MAX_AGE_SECS: u64 = 60;
+
 /// Bucket = (user_id, key) -> dernier timestamp de trigger.
 pub struct InteractionCooldown {
     map: CooldownMap<(u64, String)>,
@@ -22,8 +28,11 @@ impl InteractionCooldown {
     /// encore attendre, `None` si l'action est autorisee (et alors enregistre
     /// le nouveau timestamp).
     pub fn check_and_set(&self, user_id: u64, key: &str, cooldown_secs: u64) -> Option<u64> {
-        self.map
-            .check_and_set((user_id, key.to_string()), cooldown_secs)
+        self.map.check_and_set(
+            (user_id, key.to_string()),
+            cooldown_secs,
+            PURGE_MAX_AGE_SECS.max(cooldown_secs),
+        )
     }
 }
 
