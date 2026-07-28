@@ -359,7 +359,7 @@ async fn reminder_find_by_guild_returns_all() {
 async fn bot_config_get_config_empty_when_none() {
     let repo = PgBotConfigRepository::new(pool().await);
     assert!(repo
-        .get_config(&fresh_id(), "coude-bot")
+        .get_config(&fresh_id(), "automod-bot")
         .await
         .unwrap()
         .is_empty());
@@ -369,13 +369,13 @@ async fn bot_config_get_config_empty_when_none() {
 async fn bot_config_set_and_get() {
     let repo = PgBotConfigRepository::new(pool().await);
     let g = fresh_id();
-    repo.set_config(&g, "coude-bot", "jackpot_threshold", "5000")
+    repo.set_config(&g, "automod-bot", "jackpot_threshold", "5000")
         .await
         .unwrap();
-    repo.set_config(&g, "coude-bot", "chaos_enabled", "true")
+    repo.set_config(&g, "automod-bot", "chaos_enabled", "true")
         .await
         .unwrap();
-    let entries = repo.get_config(&g, "coude-bot").await.unwrap();
+    let entries = repo.get_config(&g, "automod-bot").await.unwrap();
     assert_eq!(entries.len(), 2);
     let jackpot = entries
         .iter()

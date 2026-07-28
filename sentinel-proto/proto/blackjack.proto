@@ -78,7 +78,7 @@ message Wallet {
   int64 total_spent = 7;
 }
 
-// Duplique depuis coude.proto pour eviter un couplage cross-package.
+// Message local au package pour eviter un couplage cross-package.
 // Voir sentinel-bot/src/modules/blackjack/api_client.rs qui fait le
 // meme choix cote bot.
 message TauntEvent {

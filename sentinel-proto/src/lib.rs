@@ -46,12 +46,6 @@ pub mod blackjack {
     }
 }
 
-pub mod coude {
-    pub mod v1 {
-        tonic::include_proto!("sentinel.coude.v1");
-    }
-}
-
 pub mod roles {
     pub mod v1 {
         tonic::include_proto!("sentinel.roles.v1");

@@ -366,7 +366,7 @@ fn is_panel_message(m: &serenity::all::Message) -> bool {
 
 /// Transforme une sous-section en champs d'embed, en respectant la limite de
 /// 1024 caractères par champ. Si les lignes débordent, la sous-section est
-/// découpée en plusieurs champs numérotés (`Coude (2/3)`).
+/// découpée en plusieurs champs numérotés (`Modération (2/3)`).
 fn chunk_section(label: &str, lines: &[String]) -> Vec<(String, String)> {
     let mut chunks: Vec<String> = Vec::new();
     let mut buf = String::new();

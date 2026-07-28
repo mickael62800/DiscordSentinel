@@ -21,8 +21,6 @@
 //! - VoiceChannelsService : trait avec >25 methodes (mock too verbose,
 //!   ROI faible vu le converter unique).
 //! - RolePanelsService : trait nombreux + DiscordRoleRepo. ROI moyen.
-//! - CoudePlayerService et 5 services F.1 : deja couverts dans
-//!   `grpc_coude_e2e.rs`.
 //!
 //! Ces tests valident la chaine wiring proto -> handler -> use case ->
 //! conversion -> reponse pour 7 services additionnels.

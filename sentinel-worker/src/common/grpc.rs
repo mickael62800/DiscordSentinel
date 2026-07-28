@@ -3,7 +3,6 @@
 //!
 //! Centralise le boilerplate `Endpoint::from_shared + connect_timeout +
 //! connect + with_interceptor(Authorization Bearer)` duplique dans
-//! `coude-worker/{hp_regen,expire_combats,daily_chaos}` et
 //! `export-worker/drain_export_jobs`.
 //!
 //! Lit `GRPC_API_URL` (default `http://127.0.0.1:50051`) et `API_KEY`

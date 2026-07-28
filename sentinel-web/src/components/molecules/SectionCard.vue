@@ -7,7 +7,7 @@ const props = defineProps<{
   icon: string;
   sectionKey: string;
   requiredBot?: string;
-  /** Si la feature concerne plusieurs bots (ex: railleries = coude + blackjack),
+  /** Si la feature concerne plusieurs bots (ex: railleries = blackjack),
    *  on liste tout. Le badge affiche tous les noms joints par " + ". */
   requiredAnyBot?: string[];
 }>();

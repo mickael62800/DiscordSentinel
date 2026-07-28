@@ -78,7 +78,7 @@ fn require_role_rejects_no_role() {
 #[test]
 fn extract_guild_id_from_snowflake() {
     assert_eq!(
-        extract_guild_id_from_path("/api/coude/123456789012345678/players"),
+        extract_guild_id_from_path("/api/levels/123456789012345678/players"),
         Some("123456789012345678".to_string())
     );
 }

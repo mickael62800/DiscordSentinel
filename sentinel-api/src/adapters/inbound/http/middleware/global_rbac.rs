@@ -91,7 +91,7 @@ const PUBLIC_PATHS: &[&str] = &[
 ///     users, reviews automod, strikes, notes, reminders, actions de mod).
 ///
 /// Les routes purement bot/worker (wallet credit/debit, snapshots,
-/// bot_persistence, audit create_log, coude/casino gameplay, stats record...)
+/// bot_persistence, audit create_log, casino gameplay, stats record...)
 /// ne sont **volontairement pas** listees : `AuthKind::Internal` les laisse
 /// deja passer. Si un user web les atteint un jour, le fail-closed (point 7)
 /// les refuse — ce qui est le comportement correct.

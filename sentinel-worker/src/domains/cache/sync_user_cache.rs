@@ -7,7 +7,7 @@ use tracing::{info, warn};
 ///
 /// Approche pragmatique : plutot que de creer un listener Discord dedie,
 /// on agrege les `(guild_id, user_id, username)` les plus recents depuis
-/// les 4 tables hot et on upsert dans `user_cache`. Le `DISTINCT ON` garde
+/// les 3 tables hot et on upsert dans `user_cache`. Le `DISTINCT ON` garde
 /// la ligne au `updated_at` le plus recent par couple (guild, user).
 ///
 /// Cout : un seul query unifiee + un upsert batch via `INSERT ... SELECT`,
@@ -19,9 +19,6 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         SELECT DISTINCT ON (guild_id, user_id)
             guild_id, user_id, username, updated_at
         FROM (
-            SELECT guild_id, user_id, username, updated_at FROM coude_players
-            WHERE username IS NOT NULL AND username <> ''
-            UNION ALL
             SELECT guild_id, user_id, username, updated_at FROM user_wallets
             WHERE username IS NOT NULL AND username <> ''
             UNION ALL

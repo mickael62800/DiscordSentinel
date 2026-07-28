@@ -133,7 +133,7 @@ pub async fn reply_ephemeral_embed(
 }
 
 /// Verifie si le module est active pour un guild. Charge la config sous le
-/// `bot_name` du module (ex: "coude-bot") et check la cle "enabled".
+/// `bot_name` du module (ex: "automod-bot") et check la cle "enabled".
 pub async fn is_bot_enabled(
     api: &super::api_client::BaseApiClient,
     guild_id: &str,
@@ -154,7 +154,7 @@ pub async fn is_bot_enabled(
 /// (fail-open : on prefere laisser passer que bloquer tout le bot).
 ///
 /// `module_bot_name` doit correspondre a une ligne dans `bot_definitions`
-/// (ex: "coude-bot", "automod-bot", "voice-bot", ...).
+/// (ex: "automod-bot", "voice-bot", ...).
 pub async fn is_module_enabled(ctx: &Context, guild_id: &str, module_bot_name: &str) -> bool {
     let data = ctx.data.read().await;
     match data.get::<super::heartbeat::ApiClientKey>() {

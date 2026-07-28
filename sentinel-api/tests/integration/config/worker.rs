@@ -116,7 +116,7 @@ async fn worker_config_all_workers_configurable() {
         ("moderation-worker", "strike_decay_interval", "2"),
         ("cache-worker", "dashboard_cache_refresh", "900"),
         ("cleanup-worker", "voice_sessions_retention_days", "60"),
-        ("coude-worker", "combat_expiry_check_secs", "43200"),
+        ("monitoring-worker", "heartbeat_check_secs", "43200"),
     ];
 
     for (worker, key, val) in &workers {

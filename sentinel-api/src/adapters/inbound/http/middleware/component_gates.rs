@@ -89,13 +89,6 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
             },
         );
         m.insert(
-            "db.purge.coude",
-            GateDef {
-                default_role: Role::Owner,
-                floor: Role::Admin,
-            },
-        );
-        m.insert(
             "db.purge.blackjack",
             GateDef {
                 default_role: Role::Owner,
@@ -107,13 +100,6 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
             GateDef {
                 default_role: Role::Owner,
                 floor: Role::Admin,
-            },
-        );
-        m.insert(
-            "db.reset.coude_stats",
-            GateDef {
-                default_role: Role::Owner,
-                floor: Role::Moderator,
             },
         );
 

@@ -21,7 +21,7 @@ pub(crate) fn pg_err(e: sqlx::Error) -> DomainError {
 }
 
 /// Variante avec contexte (nom de table / repo). Le contexte apparait
-/// dans le message d'erreur pour aider au debug : `"coude_safety_nets pg: ..."`.
+/// dans le message d'erreur pour aider au debug : `"voice_channels pg: ..."`.
 /// Remplace les ~14 fonctions `pg_err` locales redefinies dans chaque repo.
 pub(crate) fn pg_err_ctx(ctx: &'static str, e: sqlx::Error) -> DomainError {
     DomainError::Internal(format!("{ctx} pg: {e}"))

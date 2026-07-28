@@ -106,7 +106,7 @@ workspace = true
 
 # ═══════════════════════════════════════════════════════════════
 # Tests — arborescence par type (unit / integration / e2e) puis
-# par section metier (audit, coude, moderation, blackjack, etc.).
+# par section metier (audit, moderation, blackjack, etc.).
 # Cargo n'auto-decouvre pas les sous-dossiers de `tests/`, chaque
 # binaire doit etre declare ici explicitement.
 # ═══════════════════════════════════════════════════════════════
@@ -355,12 +355,12 @@ path = "tests/integration/postgres_voice_channel/repo.rs"
 name = "integration_postgres_misc_2"
 path = "tests/integration/postgres_misc_2/repo.rs"
 
-# postgres misc_3 repos (role_panel + welcome_config + coude_taunts)
+# postgres misc_3 repos (role_panel + welcome_config)
 [[test]]
 name = "integration_postgres_misc_3"
 path = "tests/integration/postgres_misc_3/repo.rs"
 
-# postgres misc_4 repos (guild + coude_heist + coude_steal_protection/boost + blackjack_table)
+# postgres misc_4 repos (guild + blackjack_table)
 [[test]]
 name = "integration_postgres_misc_4"
 path = "tests/integration/postgres_misc_4/repo.rs"
@@ -375,12 +375,12 @@ path = "tests/integration/postgres_misc_5/repo.rs"
 name = "integration_postgres_misc_6"
 path = "tests/integration/postgres_misc_6/repo.rs"
 
-# postgres coude_inventory repo
+# postgres analytics repo
 [[test]]
 name = "integration_postgres_analytics"
 path = "tests/integration/postgres_analytics/repo.rs"
 
-# postgres coude_bet repo (wallet chain via stub taunts)
+# redis cache (http)
 [[test]]
 name = "integration_redis_cache"
 path = "tests/integration/redis_cache/http.rs"

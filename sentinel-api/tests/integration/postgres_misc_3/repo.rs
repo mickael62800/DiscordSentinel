@@ -1,5 +1,5 @@
 //! Tests d'integration postgres pour 3 repos mid-size :
-//! role_panel, welcome_config, coude_taunts. Pure plomberie.
+//! role_panel, welcome_config. Pure plomberie.
 
 use chrono::Utc;
 use sqlx::PgPool;
@@ -259,8 +259,4 @@ async fn welcome_save_is_upsert() {
     assert!(!got.welcome_enabled);
     assert_eq!(got.welcome_message, "Bonjour!");
 }
-
-// ══════════════════════════════════════════════════════════
-// CoudeTaunts
-// ══════════════════════════════════════════════════════════
 

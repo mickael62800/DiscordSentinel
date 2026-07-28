@@ -1,5 +1,4 @@
-//! Tests d'integration postgres pour 5 repos : guild, coude_heist,
-//! coude_steal_protection, coude_steal_boost, blackjack_table.
+//! Tests d'integration postgres : guild, blackjack_table.
 
 use chrono::Utc;
 use sqlx::PgPool;
@@ -74,8 +73,4 @@ async fn guild_find_all_includes_inserted() {
     let all = repo.find_all().await.unwrap();
     assert!(all.iter().any(|g| g.guild_id.as_str() == id));
 }
-
-// ══════════════════════════════════════════════════════════
-// CoudeHeist
-// ══════════════════════════════════════════════════════════
 

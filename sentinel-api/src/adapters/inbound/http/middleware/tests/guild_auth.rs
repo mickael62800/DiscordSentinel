@@ -3,7 +3,7 @@ use super::*;
 #[test]
 fn extract_guild_id_finds_snowflake_in_path() {
     assert_eq!(
-        extract_guild_id_from_path("/api/coude/123456789012345678/players"),
+        extract_guild_id_from_path("/api/levels/123456789012345678/players"),
         Some("123456789012345678".to_string())
     );
 }
@@ -11,7 +11,7 @@ fn extract_guild_id_finds_snowflake_in_path() {
 #[test]
 fn extract_guild_id_handles_no_guild() {
     assert_eq!(extract_guild_id_from_path("/api/health"), None);
-    assert_eq!(extract_guild_id_from_path("/api/coude/guilds"), None);
+    assert_eq!(extract_guild_id_from_path("/api/levels/guilds"), None);
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn extract_guild_id_ignores_short_segments() {
 fn extract_guild_id_ignores_uuid_segments() {
     // UUID = 36 chars avec tirets, ne match pas le filtre
     assert_eq!(
-        extract_guild_id_from_path("/api/coude/abcd-1234-ef56/x"),
+        extract_guild_id_from_path("/api/levels/abcd-1234-ef56/x"),
         None
     );
 }

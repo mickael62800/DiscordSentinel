@@ -14,7 +14,7 @@ Discord Messages / Events / Images
 │      Bot Discord unifié (Serenity 0.12)  — sentinel-bot      │
 │   22 modules : ai_dataset · announcements · audit · automod ·│
 │   blackjack · bump · cleanup · command_channel · community · │
-│   confessions · coude · games · moderation · progression ·   │
+│   confessions · games · moderation · progression ·           │
 │   rotation · security · slot · tamagotchi · tickets · voice ·│
 │   welcome · wheel                                            │
 └────────────┬─────────────────────────────────┬──────────────┘
@@ -66,7 +66,7 @@ Discord Messages / Events / Images
 | Gateway WebSocket | Rust / Axum 0.8 / Redis | Service dédié temps réel, auto-reconnect exponential backoff |
 | Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 22 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
 | Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 17 domaines périodiques), heartbeat + métriques Prometheus |
-| gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (CRUD voice/coude/IA/modération en gRPC) |
+| gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (CRUD voice/IA/modération en gRPC) |
 | PostgreSQL | Postgres 16 + **PgBouncer** | 285 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables), cache `user_guilds` multi-tenant |
 | Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
@@ -88,7 +88,7 @@ DiscordSentinel/
 │   └── src/
 │       ├── modules/             # ai_dataset · announcements · audit · automod · blackjack ·
 │       │                        # bump · cleanup · command_channel · community · confessions ·
-│       │                        # coude · games · moderation · progression · rotation ·
+│       │                        # games · moderation · progression · rotation ·
 │       │                        # security · slot · tamagotchi · tickets · voice ·
 │       │                        # welcome · wheel
 │       └── shared/              # Helpers communs (api_client, event_bus, cache_settings, embeds, grpc_client, ...)
@@ -96,7 +96,7 @@ DiscordSentinel/
 ├── sentinel-api/                # API backend (Axum 0.8) — hexagonal
 │   ├── src/
 │   │   ├── adapters/inbound/http/   # handlers, 21 fichiers de routes, middlewares (auth, guild_auth, rate_limit, api_logger, metrics)
-│   │   ├── adapters/inbound/grpc/   # services gRPC (voice, coude, ai, moderation)
+│   │   ├── adapters/inbound/grpc/   # services gRPC (voice, ai, moderation)
 │   │   ├── adapters/outbound/       # repositories postgres, redis_cache
 │   │   ├── application/             # use case services
 │   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
@@ -225,10 +225,6 @@ Module indépendant (désactivé par défaut) : quand actif, envoie chaque messa
 - **slot** — `/slot-setup` (machine à sous, jackpot progressif).
 - **wheel** — `/wheel-setup` (roue du destin).
 
-### 🥊 coude — Mini-jeu « Coup de Coude »
-
-Mini-RPG économie/combat (~36 commandes) : duels (`/coude`, `/coude-amical`, `/honneur`, `/vendetta`, `/coalition`), profil/progression (`/profil`, `/train`, `/classe`, `/prestige`, `/ultimate`…), économie/vol (`/voler`, `/donner`, `/braquage`, `/prime`, `/tout-ou-rien`…), social/paris (`/leaderboard`, `/pari`, `/maudire`, `/prank`…). Admin : `/taunts-channel`. **Solde de départ** des nouveaux joueurs configurable par serveur (`starting_coins`).
-
 ---
 
 ## Base de données
@@ -237,9 +233,9 @@ Mini-RPG économie/combat (~36 commandes) : duels (`/coude`, `/coude-amical`, `/
 
 ### Optimisations structurelles
 
-- **Vues matérialisées** (`mv_coude_leaderboard`, `mv_wallet_leaderboard`, `mv_level_leaderboard`) refreshées toutes les 5 min par le domaine `cache` du worker. Gain 100–1000× sur les endpoints leaderboard.
+- **Vues matérialisées** (`mv_wallet_leaderboard`, `mv_level_leaderboard`) refreshées toutes les 5 min par le domaine `cache` du worker. Gain 100–1000× sur les endpoints leaderboard.
 - **Partitionnement RANGE mensuel** sur 4 tables hot : `infractions`, `audit_logs`, `user_activity_log`, `logs`. Génération automatique M+1/M+2 par le domaine `cache`.
-- **Enums Postgres** : `coude_class`, `moderation_gravity`, `voice_channel_kind` (wrappers Rust `#[derive(sqlx::Type)]`). `discord_roles.permissions` en `BIGINT`.
+- **Enums Postgres** : `moderation_gravity`, `voice_channel_kind` (wrappers Rust `#[derive(sqlx::Type)]`). `discord_roles.permissions` en `BIGINT`.
 - **Index GIN** sur `infractions.flags`, `security_events.user_ids`, `bot_definitions.config_schema`. Partials soft-delete sur `voice_channels` + `tickets`. Discord IDs typés `VARCHAR(20)`.
 - **Table `user_cache`** : source de vérité des usernames Discord, alimentée par agrégation périodique depuis 4 tables hot.
 - **Table `ai_jobs`** : file d'attente asynchrone pour l'inférence IA (consommée par le domaine `ai`).
@@ -256,7 +252,6 @@ Mini-RPG économie/combat (~36 commandes) : duels (`/coude`, `/coude-amical`, `/
 | `user_activity_log` **(partitionné)** | Activité utilisateur pour surveillance |
 | `logs` **(partitionné)** | Logs applicatifs bot/workers |
 | `user_stats` / `user_levels` / `user_wallets` | Stats, XP, wallets (3 vues matérialisées) |
-| `coude_*` | Tables du jeu Coup de Coude |
 | `voice_channels` + sub-tables | Salons vocaux temporaires (enum `voice_channel_kind`), whitelists, bans, invites, **presets par propriétaire** |
 | `pets` / `pet_events` | Tamagotchi : compagnons (jauges, stats, statut, position de la carte Discord) + journal d'actions |
 | `bot_guild_config` / `bot_definitions` | Config per-guild + schéma de config par module bot |
@@ -296,7 +291,6 @@ Mini-RPG économie/combat (~36 commandes) : duels (`/coude`, `/coude-amical`, `/
 | `/api/voice-channels/*` | voice_channels.rs | Salons vocaux dynamiques (presets, whitelists, bans, invites, thèmes) |
 | `/api/tamagotchi/*` | tamagotchi/pets.rs | Compagnons : CRUD, soins, combat, tick de cycle de vie, cartes à rafraîchir |
 | `/api/levels/*` | levels | XP/niveaux |
-| `/api/coude/*` | coude/* | Jeu Coup de Coude (hexagonal, sous-handlers) |
 | `/api/blackjack/*`, `/api/games/*`, `/api/wallet/*` | blackjack/* / games / wallet | Jeux + porte-monnaie |
 | `/api/audit-logs/*`, `/api/watched-users/*`, `/api/user-activity/*` | audit_logs / watched_users / user_activity | Audit + dossiers surveillés |
 | `/api/ai-dataset/*` | ai_dataset | Collecte + étiquetage dataset IA |
@@ -345,7 +339,7 @@ Alternative à `POST /analyze` (synchrone, timeout 5 s côté bot) : **`POST /ap
 
 Tous les producers (API, workers) publient sur une **stream unique `sentinel:events`** (`XADD MAXLEN ~ 10000`). Format d'entrée : un champ `payload` = `{"event": ..., "data": ...}`.
 
-- **Consumers durables** (bot) : `XREADGROUP` + `XACK` (at-least-once), un consumer group par feature (`tamagotchi-bot-lifecycle`, `coude-bot-tournament`, …), auto-claim `XAUTOCLAIM` des pending > 60 s après un crash.
+- **Consumers durables** (bot) : `XREADGROUP` + `XACK` (at-least-once), un consumer group par feature (`tamagotchi-bot-lifecycle`, …), auto-claim `XAUTOCLAIM` des pending > 60 s après un crash.
 - **Consumers live-tail** (gateway) : `XREAD $` sans group → relay WebSocket.
 
 **Events** : `infraction_new`, `ticket_*`, `security_event`, `moderation_action`, `voice_channel_updated/closed`, `tamagotchi_pet_status`, `tournament_resolved`, `sanction_expiry_reminder`, `temp_role_expire`, `bot_log`, etc.
@@ -436,7 +430,7 @@ TEXT_MODEL_PATH=/models/text/text_sentinel.onnx
 TEXT_TOKENIZER_PATH=/models/text/tokenizer.json
 TEXT_MAX_LENGTH=256
 
-# Bot Discord unifié (réutilisé par l'API et certains workers pour audit-sync, coude, etc.)
+# Bot Discord unifié (réutilisé par l'API et certains workers pour audit-sync, etc.)
 SENTINEL_DISCORD_TOKEN=...
 
 # Module security (seuils & toggles globaux, lus au démarrage du bot)
@@ -457,8 +451,7 @@ VOICE_LOG_CHANNEL_ID=...
 # est configuré par serveur via le web : card_refresh_interval_minutes)
 TAMAGOTCHI_TICK_INTERVAL_SECS=300
 
-# Économie (fallback ; le solde de départ est configurable par serveur via
-# le web : starting_coins sur coude-bot)
+# Économie (fallback pour le solde de départ des wallets)
 WALLET_STARTING_COINS=100
 ```
 

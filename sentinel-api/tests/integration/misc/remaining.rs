@@ -1,6 +1,6 @@
 //! Tests d'integration pour les tables restantes :
 //! guild_members, ticket_assignments, voice_channel_themes,
-//! voice_channel_whitelists, bot_definitions, user_activity_log, coude_daily_chaos.
+//! voice_channel_whitelists, bot_definitions, user_activity_log.
 
 use sqlx::PgPool;
 
@@ -182,29 +182,6 @@ async fn bot_definition_has_config_schema() {
             "automod-bot doit avoir des config keys"
         );
     }
-}
-
-// ── Coude daily chaos ──
-
-#[tokio::test]
-async fn daily_chaos_log() {
-    let p = pool().await;
-    let gid = ugid();
-
-    sqlx::query(
-        "INSERT INTO coude_daily_chaos (guild_id, loser_id, loser_name, winner_id, winner_name, amount) VALUES ($1, '222', 'Loser', '111', 'Winner', 50)",
-    ).bind(&gid).execute(&p).await.unwrap();
-
-    let row = sqlx::query_as::<_, (String, String, i64)>(
-        "SELECT loser_name, winner_name, amount FROM coude_daily_chaos WHERE guild_id = $1",
-    )
-    .bind(&gid)
-    .fetch_one(&p)
-    .await
-    .unwrap();
-    assert_eq!(row.0, "Loser");
-    assert_eq!(row.1, "Winner");
-    assert_eq!(row.2, 50);
 }
 
 // ── User activity log (watched users tracking) ──

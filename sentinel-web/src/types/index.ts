@@ -576,48 +576,6 @@ export interface MemberSummary {
   stats: MemberStats;
 }
 
-// ── Coup de Coude ──
-
-export interface CoudeCombat {
-  id: string;
-  guild_id: string;
-  attacker_id: string;
-  attacker_name: string;
-  defender_id: string;
-  defender_name: string;
-  mise: number;
-  status: string;
-  winner_id?: string;
-  attacker_roll?: number;
-  defender_roll?: number;
-  chaos_event?: string;
-  special_attack?: string;
-  defender_special?: string;
-  coins_transferred?: number;
-  result_message?: string;
-  created_at: string;
-  resolved_at?: string;
-}
-
-export interface CoudePlayer {
-  user_id: string;
-  username: string;
-  coins: number;
-  total_wins: number;
-  total_losses: number;
-  total_draws: number;
-  total_earned: number;
-  total_lost: number;
-  total_stolen: number;
-  cowardice_count: number;
-  casino_wins: number;
-  casino_losses: number;
-  level: number;
-  xp: number;
-  class?: string;
-  title?: string;
-}
-
 // ═══════════════════════════════════════════════════
 // Phase 7 B — RBAC fin
 // ═══════════════════════════════════════════════════

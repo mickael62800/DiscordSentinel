@@ -48,7 +48,6 @@ scrape_configs:
           - 'blackjack-cleanup-worker:9100'
           - 'cache-worker:9100'
           - 'cleanup-worker:9100'
-          - 'coude-worker:9100'
           - 'discord-audit-sync-worker:9100'
           - 'export-worker:9100'
           - 'moderation-worker:9100'

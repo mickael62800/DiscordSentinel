@@ -61,13 +61,13 @@ fn evaluate_service_offline_one_alert_per_service() {
         disk_percent: 0.0,
         auth_failures_1h: 0.0,
         tls_expiry_days: None,
-        offline_services: vec!["coude-bot".into(), "audit-worker".into()],
+        offline_services: vec!["automod-bot".into(), "audit-worker".into()],
         container_changes: vec![],
     };
     let alerts = evaluate(&r, &m);
     assert_eq!(alerts.len(), 2);
     // Cle de dedup = nom du service (une alerte distincte par service).
-    assert_eq!(alerts[0].0, "coude-bot");
+    assert_eq!(alerts[0].0, "automod-bot");
     assert_eq!(alerts[1].0, "audit-worker");
 }
 

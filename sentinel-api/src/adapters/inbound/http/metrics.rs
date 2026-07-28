@@ -106,7 +106,7 @@ fn render_metrics() -> Response {
 /// - `http_requests_total{route, method, status}` : counter
 /// - `http_request_duration_seconds{route, method, status}` : histogram
 ///
-/// Le `route` est le pattern matché (ex : `/api/coude/{guild_id}/players/{user_id}`),
+/// Le `route` est le pattern matché (ex : `/api/levels/{guild_id}/users/{user_id}`),
 /// pas l'URI réelle, pour borner la cardinalité.
 pub async fn metrics_middleware(req: Request<axum::body::Body>, next: Next) -> Response {
     let start = Instant::now();

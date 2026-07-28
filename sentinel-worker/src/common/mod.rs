@@ -285,7 +285,7 @@ pub fn load_redis_url() -> String {
 /// Modules de worker — un par dossier `src/domains/{domain}/`.
 /// Le `bot_name` dans `bot_guild_config` utilise ces noms pour stocker
 /// la config de chaque domaine. La migration 204 renomme les anciens
-/// noms d'infrastructure (`coude-worker`, etc.) vers ces noms.
+/// noms d'infrastructure (`cleanup-worker`, etc.) vers ces noms.
 const WORKER_MODULES: &[&str] = &[
     "ai",
     "analytics",
@@ -319,7 +319,7 @@ const WORKER_MODULES: &[&str] = &[
 /// nom de processus du nom de configuration : si on renomme le
 /// binaire plus tard, les configs ne bougent pas.
 ///
-/// La migration 204 a converti les anciens noms (`coude-worker`,
+/// La migration 204 a converti les anciens noms (`cleanup-worker`,
 /// `ticket-bot`, etc.) vers ces noms de modules.
 pub async fn load_worker_config(
     pool: &PgPool,

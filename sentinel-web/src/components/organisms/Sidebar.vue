@@ -24,7 +24,7 @@ function groupColor(prefix: string): string {
 }
 
 // Un lien est actif si la route courante commence par son path (pour que les
-// hubs a onglets — /moderation, /coude — restent surlignes sur leurs sous-vues).
+// hubs a onglets — /moderation — restent surlignes sur leurs sous-vues).
 function isActive(path: string): boolean {
   if (path === "/") return route.path === "/";
   return route.path === path || route.path.startsWith(path + "/");

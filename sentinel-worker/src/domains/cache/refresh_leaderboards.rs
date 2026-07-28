@@ -11,7 +11,6 @@ use tracing::{info, warn};
 /// et on continue les autres (best-effort).
 pub async fn run(pool: &PgPool) -> Result<(), String> {
     const VIEWS: &[&str] = &[
-        "mv_coude_leaderboard",
         "mv_wallet_leaderboard",
         "mv_level_leaderboard",
     ];

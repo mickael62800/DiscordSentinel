@@ -352,7 +352,7 @@ impl BaseApiClient {
 
     /// Variante qui permet de specifier un `bot_name` arbitraire (utile pour
     /// le binaire unifie `sentinel-bot` qui doit lire la config des sous-modules
-    /// `coude-bot`, `automod-bot`, etc., stockee sous leur nom d'origine en DB).
+    /// `voice-bot`, `automod-bot`, etc., stockee sous leur nom d'origine en DB).
     pub async fn get_guild_config_for(
         &self,
         guild_id: &str,

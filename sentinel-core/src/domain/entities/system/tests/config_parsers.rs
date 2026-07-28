@@ -69,13 +69,13 @@ fn parse_i64_invalid_value_returns_default() {
 #[test]
 fn is_worker_true_when_name_contains_worker() {
     assert!(is_worker_service("moderation-worker"));
-    assert!(is_worker_service("coude-worker"));
+    assert!(is_worker_service("audit-worker"));
     assert!(is_worker_service("worker-common"));
 }
 
 #[test]
 fn is_worker_false_for_bot_names() {
-    assert!(!is_worker_service("coude-bot"));
+    assert!(!is_worker_service("audit-bot"));
     assert!(!is_worker_service("moderation-bot"));
     assert!(!is_worker_service("game-bot"));
     assert!(!is_worker_service(""));
