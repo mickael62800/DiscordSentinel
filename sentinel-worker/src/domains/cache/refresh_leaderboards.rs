@@ -10,10 +10,7 @@ use tracing::{info, warn};
 /// Cible toutes les MV de leaderboard une par une. Si une echoue, on log
 /// et on continue les autres (best-effort).
 pub async fn run(pool: &PgPool) -> Result<(), String> {
-    const VIEWS: &[&str] = &[
-        "mv_wallet_leaderboard",
-        "mv_level_leaderboard",
-    ];
+    const VIEWS: &[&str] = &["mv_level_leaderboard"];
 
     let mut refreshed = 0u32;
     for view in VIEWS {

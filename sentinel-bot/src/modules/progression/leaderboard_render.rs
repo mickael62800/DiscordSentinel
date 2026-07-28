@@ -1,6 +1,6 @@
 //! Rendu des classements (général / écrit / vocal) en image PNG, composités sur
-//! les templates fournis (`assets/leaderboard/top*.png`) via resvg (SVG -> PNG),
-//! comme la carte tamagotchi. On place les avatars (cercles) + pseudos + XP aux
+//! les templates fournis (`assets/leaderboard/top*.png`) via resvg (SVG -> PNG).
+//! On place les avatars (cercles) + pseudos + XP aux
 //! emplacements du template (podium top 3 + rangs 4-13 sur 2 colonnes).
 
 use std::path::PathBuf;

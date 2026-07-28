@@ -8,7 +8,6 @@ import { useComponentVisibility } from "@/composables/useComponentVisibility";
 ///   desactive pour la guild courante.
 /// `requiredAnyBot` : si defini, la tuile est cachee uniquement quand
 ///   TOUS ces bots sont desactives (visible si au moins un actif).
-///   Utilise pour Wallet (depend de plusieurs jeux).
 export type DashboardSection = {
   key: string;
   path: string;

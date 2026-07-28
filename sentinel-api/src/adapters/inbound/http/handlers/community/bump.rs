@@ -1,5 +1,5 @@
 //! Bump rewards (HTTP) : adaptateur ENTRANT mince. Toute la regle metier
-//! (recompense graduee, cooldown atomique, credit wallet, seuil VIP) vit dans
+//! (recompense graduee, cooldown atomique, seuil VIP) vit dans
 //! `ManageBumpUseCase` ; le SQL dans `BumpRepository`. Ici : parse + RBAC + map.
 
 use axum::extract::State;
@@ -43,7 +43,7 @@ pub struct BumpRewardDto {
     pub vip_just_unlocked: bool,
 }
 
-/// POST /api/bump/{guild_id}/{user_id} — enregistre un bump et credite le wallet.
+/// POST /api/bump/{guild_id}/{user_id} — enregistre un bump.
 pub async fn record_bump(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,

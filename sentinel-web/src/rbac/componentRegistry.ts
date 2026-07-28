@@ -111,7 +111,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "db.purge.security_events", label: "Vider les events sécurité (DB)", category: "Nettoyages DB", minRole: "owner" },
   { key: "db.purge.voice_history", label: "Vider l'historique vocal (DB)", category: "Nettoyages DB", minRole: "owner" },
   { key: "db.purge.voice_channel", label: "Purger un salon vocal archivé (DB)", category: "Nettoyages DB", minRole: "owner" },
-  { key: "db.reset.wallets", label: "Reset bulk des wallets (DB)", category: "Nettoyages DB", minRole: "owner" },
 
   // ── Membres ──
   { key: "members.reset", label: "Reset complet d'un membre", category: "Membres", minRole: "owner" },

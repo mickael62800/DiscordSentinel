@@ -237,35 +237,16 @@ impl MemberRepository for PgMemberRepository {
     }
 
     async fn mark_left(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
-        let mut tx = self
-            .pool
-            .begin()
-            .await
-            .map_err(pg_ctx("mark_left begin"))?;
-
-        // 1. Marquer comme parti (idempotent : COALESCE garde la date initiale).
+        // Marquer comme parti (idempotent : COALESCE garde la date initiale).
         let res = sqlx::query(
             "UPDATE guild_members SET left_at = COALESCE(left_at, NOW()) \
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
         .bind(user_id)
-        .execute(&mut *tx)
+        .execute(&self.pool)
         .await
         .map_err(pg_ctx("mark_left update"))?;
-
-        // 2. Reset wallet a 0 si la ligne existe (sinon no-op, le user n'a jamais joue).
-        sqlx::query(
-            "UPDATE user_wallets SET coins = 0, total_spent = total_spent + coins, updated_at = NOW() \
-             WHERE guild_id = $1 AND user_id = $2 AND coins > 0",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        .map_err(pg_ctx("mark_left wallet reset"))?;
-
-        tx.commit().await.map_err(pg_ctx("mark_left commit"))?;
         Ok(res.rows_affected())
     }
 

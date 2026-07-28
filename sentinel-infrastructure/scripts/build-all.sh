@@ -45,7 +45,7 @@ fi
 
 # Liste de tous les services a builder (ordre: bot, workers, gateway, api)
 BOTS=(sentinel-bot)
-WORKERS=(moderation-worker analytics-worker monitoring-worker cache-worker cleanup-worker coude-worker ai-worker appeal-sla-worker audit-cache-worker blackjack-cleanup-worker discord-audit-sync-worker export-worker temp-roles-worker)
+WORKERS=(moderation-worker analytics-worker monitoring-worker cache-worker cleanup-worker ai-worker appeal-sla-worker audit-cache-worker discord-audit-sync-worker export-worker temp-roles-worker)
 SERVICES=("${BOTS[@]}" "${WORKERS[@]}" gateway api)
 TOTAL=${#SERVICES[@]}
 

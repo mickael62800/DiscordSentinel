@@ -69,7 +69,7 @@ x-worker-deps-db-redis: &worker-deps-db-redis
 
 # Reseaux par defaut pour les workers : "internal" uniquement (PAS d'internet).
 # Override avec [internal, default] pour les workers qui ont besoin de Discord
-# (coude-worker, discord-audit-sync-worker).
+# (discord-audit-sync-worker).
 x-worker-networks-internal: &worker-networks-internal
   - internal
 
@@ -374,7 +374,7 @@ services:
   # domaine en interne : `src/domains/{domain}/{job}.rs`.
   #
   # Toutes les variables d'env de tous les domaines + acces internet
-  # (Discord pour les jobs ai/audit-sync/coude/announcement) + grpc-certs
+  # (Discord pour les jobs ai/audit-sync/announcement) + grpc-certs
   # pour le job export.
   # ──────────────────────────────────────────────────────────────────────────
   sentinel-worker:
@@ -386,10 +386,10 @@ services:
     healthcheck: *worker-healthcheck
     environment:
       <<: *worker-env
-      # gRPC pour export + coude jobs
+      # gRPC pour le job export
       GRPC_API_URL: http://api:50051
       GRPC_TLS_DIR: /grpc-certs
-      # Discord (audit-sync, coude, announcement)
+      # Discord (audit-sync, announcement)
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       # Cleanup
       VOICE_SESSIONS_RETENTION_DAYS: ${VOICE_SESSIONS_RETENTION_DAYS:-90}
@@ -398,12 +398,6 @@ services:
       CLEANUP_INTERVAL_HOURS: ${CLEANUP_INTERVAL_HOURS:-1}
       VACUUM_ENABLED: ${VACUUM_ENABLED:-true}
       VACUUM_INTERVAL_HOURS: ${VACUUM_INTERVAL_HOURS:-24}
-      # Coude
-      COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
-      BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
-      HP_REGEN_TICK_SECS: ${HP_REGEN_TICK_SECS:-300}
-      CASHBOX_TICK_SECS: ${CASHBOX_TICK_SECS:-3600}
-      CASHBOX_MIN_DAYS: ${CASHBOX_MIN_DAYS:-7}
     volumes:
       - grpc_certs:/grpc-certs:ro
     depends_on:
@@ -422,7 +416,7 @@ services:
   # Bot unifie
   # ──────────────────────────────────────────────────────────────────────────
   #
-  # Les 15 anciens bots (audit, automod, blackjack, cleanup, community, coude,
+  # Les 15 anciens bots (audit, automod, cleanup, community,
   # games, moderation, progression, roles, security, tickets, voice, welcome,
   # image) ont ete fusionnes en un seul binaire `sentinel-bot` structure en
   # modules. Un seul processus, une seule connexion Gateway Discord, un seul
@@ -678,7 +672,7 @@ volumes:
 #
 #   - default (sentinel) : reseau AVEC internet sortant. Reserve aux services
 #     qui ont besoin de joindre Discord ou Let's Encrypt :
-#       api, sentinel-bot, certbot, coude-worker, discord-audit-sync-worker
+#       api, sentinel-bot, certbot, discord-audit-sync-worker
 #     Les autres services n'ont PAS d'acces internet (defense exfiltration
 #     de donnees en cas de zero-day).
 #

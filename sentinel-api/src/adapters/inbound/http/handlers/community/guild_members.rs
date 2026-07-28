@@ -241,12 +241,9 @@ pub struct UpdateMemberPayload {
 ///
 /// Marque un membre comme parti :
 /// - guild_members.left_at = NOW() (idempotent : ne reset pas si deja parti)
-/// - user_wallets.coins = 0 (empeche d'etre cible de vols / paris)
 ///
 /// Les autres donnees (infractions, audit_logs, stats, tickets)
 /// sont conservees pour la chaine de moderation et l'historique.
-/// Au retour (rejoin), le user repart de zero cote jeu mais garde ses
-/// donnees non-jeu liees a son user_id Discord.
 ///
 /// Endpoint appele par sentinel-bot sur GuildMemberRemove. Idempotent.
 pub async fn leave_member(

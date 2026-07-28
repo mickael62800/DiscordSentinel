@@ -40,12 +40,6 @@ pub mod moderation {
     }
 }
 
-pub mod blackjack {
-    pub mod v1 {
-        tonic::include_proto!("sentinel.blackjack.v1");
-    }
-}
-
 pub mod roles {
     pub mod v1 {
         tonic::include_proto!("sentinel.roles.v1");
@@ -97,12 +91,6 @@ pub mod community {
 pub mod export {
     pub mod v1 {
         tonic::include_proto!("sentinel.export.v1");
-    }
-}
-
-pub mod tamagotchi {
-    pub mod v1 {
-        tonic::include_proto!("sentinel.tamagotchi.v1");
     }
 }
 

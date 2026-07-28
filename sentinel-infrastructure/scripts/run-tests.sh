@@ -72,7 +72,7 @@ ok "Migrations appliquees"
 info "Tests unitaires..."
 FAILED=0
 
-for bot in automod-bot security-bot moderation-bot audit-bot voice-bot ticket-bot community-bot progression-bot coude-bot blackjack-bot; do
+for bot in automod-bot security-bot moderation-bot audit-bot voice-bot ticket-bot community-bot progression-bot; do
     if [ -f "bots/$bot/Cargo.toml" ]; then
         info "  $bot..."
         if cargo test --manifest-path "bots/$bot/Cargo.toml" --quiet 2>&1; then

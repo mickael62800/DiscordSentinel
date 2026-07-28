@@ -24,7 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             &[
                 "proto/ai_dataset.proto",
                 "proto/automod.proto",
-                "proto/blackjack.proto",
                 "proto/common.proto",
                 "proto/community.proto",
                 "proto/export.proto",
@@ -35,7 +34,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/roles.proto",
                 "proto/security.proto",
                 "proto/stats.proto",
-                "proto/tamagotchi.proto",
                 "proto/tickets.proto",
                 "proto/voice.proto",
                 "proto/welcome.proto",

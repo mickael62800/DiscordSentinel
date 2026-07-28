@@ -7,20 +7,17 @@ const props = defineProps<{
   icon: string;
   sectionKey: string;
   requiredBot?: string;
-  /** Si la feature concerne plusieurs bots (ex: railleries = blackjack),
-   *  on liste tout. Le badge affiche tous les noms joints par " + ". */
+  /** Si la feature concerne plusieurs bots, on liste tout.
+   *  Le badge affiche tous les noms joints par " + ". */
   requiredAnyBot?: string[];
 }>();
 
 // Le theme est derive du prefixe de la cle (ex: "moderation.strikes" -> "moderation").
 const theme = props.sectionKey.split(".")[0] || "default";
 
-/** Convertit "moderation-bot" → "moderation" / "blackjack-bot" → "bj" pour le badge. */
-const SHORT_OVERRIDES: Record<string, string> = {
-  "blackjack-bot": "bj",
-};
+/** Convertit "moderation-bot" → "moderation" pour le badge. */
 function shortBotName(name: string): string {
-  return SHORT_OVERRIDES[name] ?? name.replace(/-bot$/, "");
+  return name.replace(/-bot$/, "");
 }
 
 /** Texte du badge : single bot OU liste joinde de bots (railleries-like). */

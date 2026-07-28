@@ -25,8 +25,6 @@ const LABELS: Record<string, string> = {
   "db.purge.security_events": "Purger les events sécurité",
   "db.purge.voice_history": "Purger l'historique vocal",
   "db.purge.voice_channel": "Purger un salon vocal archivé",
-  "db.purge.blackjack": "Purger les données blackjack",
-  "db.reset.wallets": "Reset bulk des wallets",
 };
 
 const sortedEntries = computed(() =>

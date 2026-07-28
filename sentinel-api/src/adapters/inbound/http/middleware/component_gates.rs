@@ -88,20 +88,6 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
                 floor: Role::Moderator,
             },
         );
-        m.insert(
-            "db.purge.blackjack",
-            GateDef {
-                default_role: Role::Owner,
-                floor: Role::Admin,
-            },
-        );
-        m.insert(
-            "db.reset.wallets",
-            GateDef {
-                default_role: Role::Owner,
-                floor: Role::Admin,
-            },
-        );
 
         // ── Game Portal ──────────────────────────────────────────────
         m.insert(

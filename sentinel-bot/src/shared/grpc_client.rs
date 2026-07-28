@@ -76,8 +76,7 @@ pub enum GrpcCallError {
 /// NotFound), on affiche le message serveur tel quel (il est ecrit pour l'user) ;
 /// pour les erreurs techniques (Internal, Unknown...) on masque le detail.
 ///
-/// La plupart des api_clients de modules s'en servent ; blackjack a une version
-/// custom.
+/// La plupart des api_clients de modules s'en servent.
 /// Factorise le boilerplate des appels gRPC via le circuit breaker.
 ///
 /// Reproduit exactement le motif repete dans les `api_client` des modules :
@@ -92,8 +91,8 @@ pub enum GrpcCallError {
 /// Le premier argument est le handle gRPC (`self.grpc`, `&self.grpc`, `g`...),
 /// evalue deux fois (construction du client + `guarded`), comme dans le code
 /// d'origine. `grpc_err_to_string` est resolu **au site d'appel** (non
-/// qualifie) : les modules qui possedent leur propre version locale (blackjack)
-/// gardent donc leur comportement.
+/// qualifie) : un module qui possede sa propre version locale garde donc son
+/// comportement.
 ///
 /// Variantes :
 /// - `grpc_call!(handle, service, method, req)` : reponse unaire ->

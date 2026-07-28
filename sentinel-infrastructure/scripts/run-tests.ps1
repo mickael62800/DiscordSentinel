@@ -39,8 +39,7 @@ Info "Tests unitaires..."
 
 $bots = @(
     "automod-bot", "security-bot", "moderation-bot", "audit-bot",
-    "voice-bot", "ticket-bot", "community-bot", "progression-bot",
-    "coude-bot", "blackjack-bot"
+    "voice-bot", "ticket-bot", "community-bot", "progression-bot"
 )
 
 foreach ($bot in $bots) {

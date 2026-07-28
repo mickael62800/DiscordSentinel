@@ -1,5 +1,5 @@
-//! Helpers partages pour le rendu SVG -> PNG via resvg (carte tamagotchi,
-//! classements, ...). Evite de dupliquer le chargement des fonts systeme,
+//! Helpers partages pour le rendu SVG -> PNG via resvg (classements, ...).
+//! Evite de dupliquer le chargement des fonts systeme,
 //! l'echappement XML et l'encodage base64 dans chaque module de rendu.
 
 use std::sync::Arc;

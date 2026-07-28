@@ -329,12 +329,6 @@ fn route_roles() -> &'static HashMap<(&'static str, &'static str), Role> {
         // ── Rotation admin tournant ──────────────────────────────────────
         m.insert(("POST", "/api/rotation/{guild_id}/save"), Role::Admin);
 
-        // ── Tamagotchi (admin web) ───────────────────────────────────────
-        m.insert(
-            ("DELETE", "/api/tamagotchi/{guild_id}/pets/{pet_id}"),
-            Role::Admin,
-        );
-
         // ── Systeme : modeles IA / reset / welcome / jobs / exports ──────
         m.insert(("POST", "/api/models/reload"), Role::Owner);
         m.insert(("POST", "/api/system/guild-reset/{guild_id}"), Role::Owner);

@@ -45,7 +45,6 @@ scrape_configs:
           - 'analytics-worker:9100'
           - 'appeal-sla-worker:9100'
           - 'audit-cache-worker:9100'
-          - 'blackjack-cleanup-worker:9100'
           - 'cache-worker:9100'
           - 'cleanup-worker:9100'
           - 'discord-audit-sync-worker:9100'

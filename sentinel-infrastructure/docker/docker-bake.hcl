@@ -18,7 +18,7 @@ group "default" {
 group "workers" {
   targets = [
     "worker-ai", "worker-analytics", "worker-appeal-sla", "worker-audit-cache",
-    "worker-blackjack-cleanup", "worker-cache", "worker-cleanup", "worker-coude",
+    "worker-cache", "worker-cleanup",
     "worker-discord-audit-sync", "worker-export", "worker-moderation",
     "worker-monitoring", "worker-temp-roles",
   ]
@@ -69,8 +69,8 @@ target "worker" {
   inherits = ["_alpine-base"]
   matrix = {
     name = [
-      "ai", "analytics", "appeal-sla", "audit-cache", "blackjack-cleanup",
-      "cache", "cleanup", "coude", "discord-audit-sync", "export",
+      "ai", "analytics", "appeal-sla", "audit-cache",
+      "cache", "cleanup", "discord-audit-sync", "export",
       "moderation", "monitoring", "temp-roles",
     ]
   }
