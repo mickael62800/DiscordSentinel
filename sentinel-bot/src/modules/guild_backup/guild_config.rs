@@ -58,10 +58,7 @@ impl Config {
     /// owner uniquement.
     pub fn restore_role_ids(&self) -> Vec<String> {
         let raw = BaseApiClient::config_or(&self.raw, "restore_role_ids", "");
-        raw.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
+        crate::shared::parsers::split_csv(&raw)
     }
 }
 

@@ -66,10 +66,11 @@ pub fn load_env_string(key: &str, default: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| default.to_string())
 }
 
-/// Charge une variable d'environnement booleenne (accepte "true"/"1").
+/// Charge une variable d'environnement booleenne (accepte "true"/"1"/"yes",
+/// insensible a la casse — sémantique de vérité unique du core).
 pub fn load_env_bool(key: &str, default: bool) -> bool {
     match std::env::var(key) {
-        Ok(v) => v == "true" || v == "1",
+        Ok(v) => sentinel_core::domain::entities::system::config_parsers::parse_bool_str(&v),
         Err(_) => default,
     }
 }

@@ -815,13 +815,7 @@ impl ConfessUiConfig {
 }
 
 /// Parse une couleur hex ("#ff5e5e" ou "ff5e5e") en u32 RGB. `None` si invalide.
-fn parse_hex_color(s: &str) -> Option<u32> {
-    let h = s.trim().trim_start_matches('#');
-    if h.len() != 6 {
-        return None;
-    }
-    u32::from_str_radix(h, 16).ok()
-}
+use sentinel_core::domain::services::system::discord_naming::parse_hex_color_strict as parse_hex_color;
 
 /// Charge les reglages d'affichage depuis la config guild `confessions` via le
 /// meme mecanisme `get_guild_config_for` que les autres modules. Fallback sur

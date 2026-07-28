@@ -79,6 +79,14 @@ pub fn split_csv(s: &str) -> Vec<String> {
         .collect()
 }
 
+/// Parse une liste CSV d'entiers u64 (les entrées non numériques sont
+/// ignorées).
+pub fn parse_u64_csv(raw: &str) -> Vec<u64> {
+    raw.split(',')
+        .filter_map(|s| s.trim().parse::<u64>().ok())
+        .collect()
+}
+
 /// Lookup dans un Vec<(u64, u64)> par id.
 pub fn lookup_u64(entries: &[(u64, u64)], id: u64) -> Option<u64> {
     entries.iter().find(|(k, _)| *k == id).map(|(_, v)| *v)

@@ -60,7 +60,11 @@ pub(crate) async fn post_vote_card(
     //    Si `aggregate`, l'API peut fusionner l'incident dans une carte
     //    'voting' ouverte du meme utilisateur -> on edite alors la carte
     //    existante au lieu d'en poster une nouvelle.
-    let deadline = chrono::Utc::now() + chrono::Duration::hours(deadline_hours.clamp(1, 720));
+    let deadline = chrono::Utc::now() + chrono::Duration::hours(
+        sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
+            deadline_hours,
+        ),
+    );
     let suggested_str = char_to_str(action_char(suggested_action));
     let body = serde_json::json!({
         "guild_id": guild_id,
@@ -237,7 +241,11 @@ pub(crate) async fn post_manual_vote_card(
 
     // 1. Creer la review en mode vote (memes champs que la carte automod ;
     // score 0 et flags vides car signalement humain, pas IA).
-    let deadline = chrono::Utc::now() + chrono::Duration::hours(deadline_hours.clamp(1, 720));
+    let deadline = chrono::Utc::now() + chrono::Duration::hours(
+        sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
+            deadline_hours,
+        ),
+    );
     let suggested_str = char_to_str(action_char(suggested_action));
     let body = serde_json::json!({
         "guild_id": guild_id,

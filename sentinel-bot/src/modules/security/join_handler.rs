@@ -159,7 +159,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
     // Config quarantaine per-guild
     let _quarantine_enabled = guild_config
         .get("quarantine_enabled")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(env_config.quarantine_enabled);
     let quarantine_role_id = guild_config
         .get("quarantine_role_id")
@@ -173,7 +173,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         .or(env_config.quarantine_role_id);
     let _captcha_enabled = guild_config
         .get("captcha_enabled")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(env_config.captcha_enabled);
     let _slowmode_secs: u16 = guild_config
         .get("slowmode_seconds")
@@ -181,7 +181,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         .unwrap_or(env_config.slowmode_seconds);
     let _lockdown_enabled = guild_config
         .get("lockdown_enabled")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(env_config.lockdown_enabled);
     let captcha_type = guild_config
         .get("captcha_type")
@@ -189,11 +189,11 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         .unwrap_or_else(|| env_config.captcha_type.clone());
     let _alt_detection_enabled = guild_config
         .get("alt_detection_enabled")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(env_config.alt_detection_enabled);
     let _raid_pattern_enabled = guild_config
         .get("raid_pattern_enabled")
-        .map(|v| v == "true" || v == "1")
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(env_config.raid_pattern_enabled);
     let _raid_pattern_score_threshold = guild_config
         .get("raid_pattern_score_threshold")

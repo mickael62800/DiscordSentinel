@@ -35,6 +35,15 @@ pub fn is_due(
     }
 }
 
+/// Convertit une heure de publication locale en heure UTC équivalente.
+/// `post_hour` est bornée 0..23, `offset_hours` (décalage vs UTC, ex. +1
+/// Paris hiver / +2 été) est borné aux fuseaux réels [-12, +14].
+pub fn local_hour_to_utc(post_hour: u64, offset_hours: i64) -> u32 {
+    let post_hour = post_hour.min(23) as i64;
+    let offset = offset_hours.clamp(-12, 14);
+    (post_hour - offset).rem_euclid(24) as u32
+}
+
 /// Secondes restantes avant la prochaine heure pile (HH:00:00), pour aligner
 /// un tick périodique sur l'heure. Retourne 0 si on est exactement à HH:00:00.
 pub fn secs_to_next_hour(minute: u32, second: u32) -> u64 {
@@ -84,6 +93,19 @@ mod tests {
         let now = Utc::now();
         assert!(is_due(Some(now - Duration::hours(25)), 24, 24, now));
         assert!(!is_due(Some(now - Duration::hours(23)), 24, 24, now));
+    }
+
+    #[test]
+    fn local_hour_conversion() {
+        // 9h locale à Paris l'hiver (UTC+1) = 8h UTC.
+        assert_eq!(local_hour_to_utc(9, 1), 8);
+        // 9h locale UTC-5 = 14h UTC.
+        assert_eq!(local_hour_to_utc(9, -5), 14);
+        // Wrap par minuit : 1h locale UTC+2 = 23h UTC la veille.
+        assert_eq!(local_hour_to_utc(1, 2), 23);
+        // Bornes : heure > 23 clampée, offset hors fuseau réel clampé.
+        assert_eq!(local_hour_to_utc(99, 0), 23);
+        assert_eq!(local_hour_to_utc(9, 99), 19); // offset clampé à +14
     }
 
     #[test]

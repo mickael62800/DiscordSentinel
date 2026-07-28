@@ -183,7 +183,9 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
                 ));
             }
         }
-        let hours = cmd.deadline_hours.clamp(1, 720);
+        let hours = crate::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
+            cmd.deadline_hours,
+        );
         self.repo.reopen(cmd.review_id, hours).await
     }
 

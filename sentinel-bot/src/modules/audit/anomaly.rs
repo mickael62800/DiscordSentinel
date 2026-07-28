@@ -1,23 +1,9 @@
 use serde::Deserialize;
 
 /// Seuils de detection d'anomalie, resolus per-guild depuis bot_guild_config
-/// et transmis a l'API qui decide (cf. `anomaly_thresholds_for`).
-#[derive(Debug, Clone, Copy)]
-pub struct AnomalyThresholds {
-    pub mass_ban: usize,
-    pub mass_delete: usize,
-    pub mass_role_change: usize,
-}
-
-impl Default for AnomalyThresholds {
-    fn default() -> Self {
-        Self {
-            mass_ban: 5,
-            mass_delete: 20,
-            mass_role_change: 10,
-        }
-    }
-}
+/// et transmis a l'API qui decide (cf. `anomaly_thresholds_for`). Le type et
+/// ses defauts vivent dans le core (source unique — l'API utilise le meme).
+pub use sentinel_core::domain::entities::audit::moderation_anomaly::AnomalyThresholds;
 
 /// Alerte d'anomalie decidee par l'API et renvoyee au bot pour affichage.
 ///

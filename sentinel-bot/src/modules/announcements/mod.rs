@@ -237,27 +237,10 @@ fn build_action_rows(
 }
 
 /// Parse un emoji unicode ou custom Discord <:name:id> ou <a:name:id>.
+/// Délègue au parseur unique (`games::emoji`, adossé au core) — l'ancienne
+/// copie locale cassait sur un nom contenant `:`.
 fn parse_emoji(s: &str) -> Option<ReactionType> {
-    let s = s.trim();
-    // Custom emoji format <:name:id> ou <a:name:id>
-    if s.starts_with("<:") || s.starts_with("<a:") {
-        let inner = s.trim_start_matches('<').trim_end_matches('>');
-        let parts: Vec<&str> = inner.split(':').collect();
-        if parts.len() == 3 {
-            let animated = parts[0] == "a";
-            let name = parts[1].to_string();
-            if let Ok(id) = parts[2].parse::<u64>() {
-                return Some(ReactionType::Custom {
-                    animated,
-                    id: serenity::model::id::EmojiId::new(id),
-                    name: Some(name),
-                });
-            }
-        }
-        return None;
-    }
-    // Unicode emoji
-    Some(ReactionType::Unicode(s.to_string()))
+    crate::modules::games::emoji::parse_reaction_type(s)
 }
 
 async fn post_to_channel(

@@ -25,21 +25,13 @@ pub fn parse_reaction_type(raw: &str) -> Option<ReactionType> {
 }
 
 fn parse_custom(s: &str) -> Option<ReactionType> {
-    // Formats : <:name:id> ou <a:name:id>
-    let inner = s.strip_prefix('<')?.strip_suffix('>')?;
-    let (animated, rest) = if let Some(r) = inner.strip_prefix("a:") {
-        (true, r)
-    } else if let Some(r) = inner.strip_prefix(':') {
-        (false, r)
-    } else {
-        return None;
-    };
-    let (name, id_str) = rest.rsplit_once(':')?;
-    let id: u64 = id_str.parse().ok()?;
+    // Le décodage `<:name:id>` / `<a:name:id>` vit dans le core ; seul le
+    // mapping vers le type Serenity reste ici.
+    let r = sentinel_core::domain::services::system::discord_naming::parse_emoji_ref(s)?;
     Some(ReactionType::Custom {
-        animated,
-        id: EmojiId::new(id),
-        name: Some(name.to_string()),
+        animated: r.animated,
+        id: EmojiId::new(r.id),
+        name: Some(r.name),
     })
 }
 

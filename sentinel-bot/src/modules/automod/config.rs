@@ -93,10 +93,9 @@ pub(super) fn build_embed_colors(
     }
 }
 
-/// Parse une couleur hex (avec ou sans #) vers u32. Retourne `default` si invalide.
-fn parse_color(hex: &str, default: u32) -> u32 {
-    u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(default)
-}
+/// Parse une couleur hex (avec ou sans #) vers u32. Retourne `default` si
+/// invalide. Implémentation unique du core (trim les espaces).
+use sentinel_core::domain::entities::casino::game::parse_role_color_hex as parse_color;
 
 /// Verifie si l'heure actuelle est dans la plage de nuit. La règle (fenêtre
 /// passant minuit) vit dans le core ; le bot ne fournit que l'horloge.

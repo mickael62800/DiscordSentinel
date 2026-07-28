@@ -290,7 +290,7 @@ pub async fn log_admin_command(
     // Opt-in explicite : toggle + salon dedie.
     let enabled = config
         .get("command_log_enabled")
-        .map(|v| matches!(v.as_str(), "true" | "1" | "yes" | "on"))
+        .map(|v| sentinel_core::domain::entities::system::config_parsers::parse_bool_str(v))
         .unwrap_or(false);
     if !enabled {
         return;

@@ -346,6 +346,12 @@ pub fn can_open_discussion(f: &ModeratorFacts) -> bool {
 /// signale `capped=true`.
 pub const FP_STATS_MAX_ROWS: i64 = 5000;
 
+/// Borne saine de l'échéance d'un vote (heures) : 1h à 30 jours. Source
+/// unique, partagée entre le use case (reopen) et le bot (post de carte).
+pub fn clamp_vote_deadline_hours(hours: i64) -> i64 {
+    hours.clamp(1, 720)
+}
+
 /// Ligne terminale (statut applied|ignored|decided) chargee pour mesurer le
 /// taux de faux positifs. Donnee brute cote repo, agregee en Rust.
 #[derive(Debug, Clone)]

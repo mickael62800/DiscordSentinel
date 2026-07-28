@@ -3,14 +3,18 @@
 //! Probleme : Discord emet un `GUILD_MEMBER_UPDATE` par changement de role ->
 //! une carte par role ajoute/retire = spam. Solution : une SEULE carte par
 //! membre qui reste active pendant une fenetre glissante (defaut 5 min) et se
-//! met a jour (edition) avec l'HISTORIQUE COMPLET des mouvements. Passe la
-//! fenetre sans activite, la carte est figee ; un prochain changement en cree
-//! une neuve.
+//! met a jour (edition) avec l'HISTORIQUE COMPLET des mouvements.
+//!
+//! L'ÉTAT (map fenêtrée, bornes, troncature) vit dans le core
+//! (`services::audit::role_card`) ; ce module garde la config, le post/édit
+//! Discord et l'embed.
 
 use std::collections::HashMap;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use sentinel_core::domain::services::audit::role_card::{
+    clamp_role_log_window, visible_movements, RoleMovement,
+};
 use serenity::all::{
     ChannelId, Context, CreateEmbed, CreateMessage, EditMessage, Member, MessageId, RoleId,
 };
@@ -18,19 +22,8 @@ use serenity::prelude::TypeMapKey;
 
 use crate::shared::heartbeat::ApiClientKey;
 
-/// Une carte active : message a editer + historique chronologique des mouvements.
-struct RoleCard {
-    channel_id: u64,
-    message_id: u64,
-    /// `(true = ajoute, role_id)` dans l'ordre chronologique.
-    movements: Vec<(bool, String)>,
-    expires_at: Instant,
-}
-
-#[derive(Default)]
-pub struct RoleCardTracker {
-    inner: Mutex<HashMap<(String, String), RoleCard>>,
-}
+pub type RoleCardTracker =
+    sentinel_core::domain::services::audit::role_card::RoleCardTracker<(String, String)>;
 
 pub struct RoleCardTrackerKey;
 impl TypeMapKey for RoleCardTrackerKey {
@@ -63,11 +56,10 @@ pub async fn handle_role_change(
             None => return,
         }
     };
-    let window = cfg
-        .get("role_log_window_secs")
-        .and_then(|v| v.parse::<u64>().ok())
-        .unwrap_or(300)
-        .clamp(10, 3600);
+    let window = clamp_role_log_window(
+        cfg.get("role_log_window_secs")
+            .and_then(|v| v.parse::<u64>().ok()),
+    );
 
     let tracker = {
         let data = ctx.data.read().await;
@@ -81,14 +73,13 @@ pub async fn handle_role_change(
     let key = (guild_id.to_string(), member.user.id.to_string());
 
     // Snapshot de la carte active (et purge des expirees). Lock court, pas d'await.
-    let active = {
-        let mut map = tracker.inner.lock().unwrap();
-        map.retain(|_, c| c.expires_at > now);
-        map.get(&key).map(|c| (c.channel_id, c.message_id, c.movements.clone()))
-    };
+    let active = tracker.active(&key, now);
 
     // Historique cumule = existant + mouvements de cet evenement.
-    let mut movements = active.as_ref().map(|(_, _, m)| m.clone()).unwrap_or_default();
+    let mut movements = active
+        .as_ref()
+        .map(|(_, _, m)| m.clone())
+        .unwrap_or_default();
     for r in added_now {
         movements.push((true, r.to_string()));
     }
@@ -104,11 +95,7 @@ pub async fn handle_role_change(
         let _ = ChannelId::new(chan)
             .edit_message(&ctx.http, MessageId::new(msg), EditMessage::new().embed(embed))
             .await;
-        let mut map = tracker.inner.lock().unwrap();
-        if let Some(c) = map.get_mut(&key) {
-            c.movements = movements;
-            c.expires_at = expires_at;
-        }
+        tracker.update(&key, movements, expires_at);
     } else {
         // Nouvelle carte : resout le salon puis poste.
         let Some(chan) = resolve_channel(&cfg) else {
@@ -118,16 +105,7 @@ pub async fn handle_role_change(
             .send_message(&ctx.http, CreateMessage::new().embed(embed))
             .await
         {
-            let mut map = tracker.inner.lock().unwrap();
-            map.insert(
-                key,
-                RoleCard {
-                    channel_id: chan.get(),
-                    message_id: m.id.get(),
-                    movements,
-                    expires_at,
-                },
-            );
+            tracker.insert(key, chan.get(), m.id.get(), movements, expires_at);
         }
     }
 }
@@ -142,15 +120,15 @@ fn resolve_channel(cfg: &HashMap<String, String>) -> Option<ChannelId> {
     None
 }
 
-fn build_embed(member: &Member, movements: &[(bool, String)], window: u64) -> CreateEmbed {
+fn build_embed(member: &Member, movements: &[RoleMovement], window: u64) -> CreateEmbed {
     let total = movements.len();
     // Affiche les MAX_LINES plus recents (ordre chronologique conserve).
-    let start = total.saturating_sub(MAX_LINES);
+    let (hidden, shown) = visible_movements(movements, MAX_LINES);
     let mut body = String::new();
-    if start > 0 {
-        body.push_str(&format!("… ({start} mouvements plus anciens)\n"));
+    if hidden > 0 {
+        body.push_str(&format!("… ({hidden} mouvements plus anciens)\n"));
     }
-    for (added, role) in &movements[start..] {
+    for (added, role) in shown {
         if *added {
             body.push_str(&format!("➕ <@&{role}>\n"));
         } else {

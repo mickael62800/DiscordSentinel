@@ -92,13 +92,13 @@ async fn tick(ctx: &Context) -> Result<(), String> {
         // Heure de publication exprimee dans le fuseau local du serveur :
         // `post_hour` locale, `timezone_offset` = decalage vs UTC (ex. +1 Paris
         // hiver, +2 ete). On ramene a l'heure UTC equivalente pour comparer.
-        let post_hour = BaseApiClient::config_u64(&cfg, "post_hour", 9).min(23) as i64;
+        let post_hour = BaseApiClient::config_u64(&cfg, "post_hour", 9);
         let offset = cfg
             .get("timezone_offset")
             .and_then(|v| v.trim().parse::<i64>().ok())
-            .unwrap_or(0)
-            .clamp(-12, 14);
-        let target_utc = (post_hour - offset).rem_euclid(24) as u32;
+            .unwrap_or(0);
+        let target_utc =
+            sentinel_core::domain::services::system::scheduling::local_hour_to_utc(post_hour, offset);
         if now_hour != target_utc {
             continue;
         }
