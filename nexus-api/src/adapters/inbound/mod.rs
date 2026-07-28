@@ -1,1 +1,3 @@
-//! Adapters inbound (routes/handlers axum, a venir).
+//! Adapters inbound (routes/handlers axum).
+
+pub mod http;

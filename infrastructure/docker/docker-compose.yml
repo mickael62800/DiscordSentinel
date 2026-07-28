@@ -656,6 +656,87 @@ services:
     profiles:
       - monitoring
 
+  # ──────────────────────────────────────────────────────────────────────────
+  # Nexus (plateforme jeux) — profile `nexus`, n'affecte pas la stack Sentinel.
+  #   docker compose --profile nexus up -d nexus-db-init nexus-api nexus-bot
+  # Base `nexus` SEPAREE sur le meme Postgres (creee par nexus-db-init).
+  # Les migrations nexus (nexus-api/migrations) sont embarquees dans le
+  # binaire (sqlx::migrate!) et appliquees au boot de nexus-api.
+  # ──────────────────────────────────────────────────────────────────────────
+
+  # One-shot : cree la base `nexus` si absente (idempotent).
+  nexus-db-init:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-sentinel_secret}
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        psql -h postgres -U sentinel -d discord_sentinel -tc
+        "SELECT 1 FROM pg_database WHERE datname = 'nexus'" | grep -q 1 ||
+        psql -h postgres -U sentinel -d discord_sentinel -c "CREATE DATABASE nexus"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - data
+    profiles:
+      - nexus
+
+  nexus-api:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: nexus-api
+    ports:
+      - "127.0.0.1:3100:3100"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3100/health || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
+    environment:
+      # Connexion DIRECTE a postgres (base nexus) : pgbouncer ne route que
+      # discord_sentinel. Volume faible (jeux) -> pas besoin de pooler.
+      NEXUS_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/nexus
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      NEXUS_API_PORT: "3100"
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nexus-db-init:
+        condition: service_completed_successfully
+    networks:
+      - data
+      - internal
+    profiles:
+      - nexus
+
+  nexus-bot:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: nexus-bot
+    environment:
+      NEXUS_DISCORD_TOKEN: ${NEXUS_DISCORD_TOKEN:-}
+      NEXUS_API_URL: http://nexus-api:3100
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      nexus-api:
+        condition: service_healthy
+    # Connexion Discord Gateway -> internet + interne (nexus-api).
+    networks:
+      - internal
+      - default
+    profiles:
+      - nexus
+
 volumes:
   postgres_data:
   redis_data:

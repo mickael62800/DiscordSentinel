@@ -1,1 +1,4 @@
-//! Entites du domaine Nexus (a venir).
+//! Entites du domaine Nexus.
+
+pub mod wallet;
+pub mod wheel;

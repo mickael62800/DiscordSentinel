@@ -2003,18 +2003,29 @@ dependencies = [
 name = "nexus-api"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "axum",
+ "chrono",
+ "dotenvy",
  "nexus-core",
+ "serde",
+ "serde_json",
+ "sqlx",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
 name = "nexus-bot"
 version = "0.1.0"
 dependencies = [
+ "dotenvy",
  "nexus-core",
+ "reqwest",
+ "serde",
+ "serde_json",
  "serenity",
  "tokio",
  "tracing",
@@ -2025,9 +2036,12 @@ dependencies = [
 name = "nexus-core"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "chrono",
+ "rand 0.8.6",
  "serde",
  "thiserror 2.0.18",
+ "tokio",
  "uuid",
 ]
 
