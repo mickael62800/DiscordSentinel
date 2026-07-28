@@ -5,11 +5,12 @@
 
 use std::collections::HashMap;
 
+use sentinel_core::domain::services::tickets::sla::{
+    effective_threshold, is_breached, DEFAULT_INACTIVE_CLOSE_DAYS,
+};
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
-
-const DEFAULT_INACTIVE_DAYS: i64 = 7;
 
 #[derive(sqlx::FromRow)]
 struct InactiveTicket {
@@ -51,15 +52,13 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
         if !crate::common::is_worker_enabled(pool, &t.server, "ticket-bot").await {
             continue;
         }
-        let timeout_days = timeouts
-            .get(&t.server)
-            .copied()
-            .unwrap_or(DEFAULT_INACTIVE_DAYS);
-        // Décision SLA du core : seuil <= 0 = désactivé, sinon breach à >= seuil.
-        if !sentinel_core::domain::services::tickets::sla::is_breached(
-            t.inactive_days,
-            timeout_days,
-        ) {
+        // Décisions du core : résolution du seuil configuré + breach
+        // (seuil <= 0 = désactivé, sinon breach à >= seuil).
+        let timeout_days = effective_threshold(
+            timeouts.get(&t.server).copied(),
+            DEFAULT_INACTIVE_CLOSE_DAYS,
+        );
+        if !is_breached(t.inactive_days, timeout_days) {
             continue;
         }
 

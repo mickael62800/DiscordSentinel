@@ -63,10 +63,10 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             skipped += 1;
             continue;
         }
-        let escalation_minutes = sla_configs
-            .get(&ticket.server)
-            .map(|c| c.escalation_minutes)
-            .unwrap_or(DEFAULT_SLA_ESCALATION_MINUTES);
+        let escalation_minutes = sentinel_core::domain::services::tickets::sla::effective_threshold(
+            sla_configs.get(&ticket.server).map(|c| c.escalation_minutes),
+            DEFAULT_SLA_ESCALATION_MINUTES,
+        );
 
         let age_minutes = (now - ticket.created_at).num_minutes();
         if !sentinel_core::domain::services::tickets::sla::is_breached(
@@ -93,10 +93,13 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             continue;
         }
 
-        let first_response_minutes = sla_configs
-            .get(&ticket.server)
-            .map(|c| c.first_response_minutes)
-            .unwrap_or(DEFAULT_SLA_FIRST_RESPONSE_MINUTES);
+        let first_response_minutes =
+            sentinel_core::domain::services::tickets::sla::effective_threshold(
+                sla_configs
+                    .get(&ticket.server)
+                    .map(|c| c.first_response_minutes),
+                DEFAULT_SLA_FIRST_RESPONSE_MINUTES,
+            );
 
         let payload = serde_json::json!({
             "event": "appeal_sla_escalated",

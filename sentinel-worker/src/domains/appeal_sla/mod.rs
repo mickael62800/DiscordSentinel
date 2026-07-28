@@ -5,6 +5,11 @@
 //! Porte de appeal-sla-worker (Phase 2 fusion). Les constantes SLA
 //! vivent dans le core (source unique, partagée avec tickets/escalate_sla).
 
+//! SQL assumé : scan ensembliste des appels candidats + claim atomique
+//! `UPDATE ... WHERE escalated_at IS NULL` (fire-once multi-worker) + XADD.
+//! Les décisions vivent dans sentinel-core (`domain::services::tickets::sla`) :
+//! `is_breached`, `effective_threshold` et les constantes SLA ci-dessous.
+
 pub mod escalate_appeal_sla;
 
 pub use sentinel_core::domain::services::tickets::sla::{

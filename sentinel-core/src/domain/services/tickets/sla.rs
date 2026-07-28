@@ -51,6 +51,17 @@ impl Default for SlaTracker {
 pub const DEFAULT_SLA_FIRST_RESPONSE_MINUTES: i64 = 30;
 pub const DEFAULT_SLA_ESCALATION_MINUTES: i64 = 60;
 
+/// Nombre de jours d'inactivite avant fermeture automatique d'un ticket
+/// (override par guild via `bot_guild_config.inactive_close_days`).
+pub const DEFAULT_INACTIVE_CLOSE_DAYS: i64 = 7;
+
+/// Resolution d'un seuil SLA : la valeur configuree par la guild est prise
+/// BRUTE si presente (un seuil <= 0 signifie « desactive », tranche par
+/// [`is_breached`]) ; cle absente ou non numerique = defaut.
+pub fn effective_threshold(configured: Option<i64>, default: i64) -> i64 {
+    configured.unwrap_or(default)
+}
+
 /// Décision de breach SLA : le ticket a dépassé le seuil. Un seuil <= 0
 /// signifie « désactivé » — jamais de breach.
 pub fn is_breached(age_minutes: i64, threshold_minutes: i64) -> bool {
@@ -116,6 +127,20 @@ mod tests {
     fn breach_disabled_threshold_never_fires() {
         assert!(!is_breached(10_000, 0));
         assert!(!is_breached(10_000, -1));
+    }
+
+    #[test]
+    fn effective_threshold_configured_taken_raw() {
+        assert_eq!(effective_threshold(Some(15), 60), 15);
+        // <= 0 = desactive : conserve tel quel, c'est is_breached qui tranche.
+        assert_eq!(effective_threshold(Some(0), 60), 0);
+        assert_eq!(effective_threshold(Some(-5), 60), -5);
+    }
+
+    #[test]
+    fn effective_threshold_absent_falls_back_to_default() {
+        assert_eq!(effective_threshold(None, DEFAULT_SLA_ESCALATION_MINUTES), 60);
+        assert_eq!(effective_threshold(None, DEFAULT_INACTIVE_CLOSE_DAYS), 7);
     }
 
     #[test]
