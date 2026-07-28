@@ -289,6 +289,17 @@ impl ManageModerationUseCase for ManageModerationService {
     > {
         self.repo.find_action_for_reversal(action_id).await
     }
+
+    async fn count_recent_mod_actions(
+        &self,
+        guild_id: &str,
+        moderator_id: &str,
+        window_secs: i64,
+    ) -> Result<i64, DomainError> {
+        self.repo
+            .count_recent_mod_actions(guild_id, moderator_id, window_secs)
+            .await
+    }
 }
 
 #[cfg(test)]

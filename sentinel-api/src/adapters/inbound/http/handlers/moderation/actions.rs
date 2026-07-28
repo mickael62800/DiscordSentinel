@@ -890,56 +890,66 @@ pub async fn delete_action(
     )
     .await?;
 
-    // Reversal Discord : selon le type d'action, on effectue l'action
-    // inverse AVANT de supprimer la ligne. Best-effort : une erreur Discord
-    // ne bloque pas la suppression en DB (on log et on continue pour que
-    // l'UI reste coherente).
-    let lower = action_type.to_lowercase();
-    if lower.starts_with("ban") {
-        match state.discord_api.unban_user(&guild_id, &target_id).await {
-            Ok(()) => tracing::info!(
-                guild_id = %guild_id,
-                target_id = %target_id,
-                target_name = %target_name,
-                "Unban Discord applique lors de l'annulation d'une action ban"
-            ),
-            Err(e) => tracing::warn!(
-                error = %e,
-                guild_id = %guild_id,
-                target_id = %target_id,
-                "Echec unban Discord lors de l'annulation — suppression DB quand meme"
-            ),
-        }
+    // Reversal Discord : la REGLE (quel effet inverse pour quel type) vit dans
+    // le core (`reversal_effect`) ; le handler n'orchestre que les appels
+    // Discord. Best-effort : une erreur Discord ne bloque pas la suppression
+    // en DB (on log et on continue pour que l'UI reste coherente).
+    use sentinel_core::domain::entities::moderation::action::reversal::{
+        reversal_effect, ReversalEffect,
+    };
+    match reversal_effect(&action_type) {
+        ReversalEffect::Unban {
+            cancel_auto_unban_reminder,
+        } => {
+            match state.discord_api.unban_user(&guild_id, &target_id).await {
+                Ok(()) => tracing::info!(
+                    guild_id = %guild_id,
+                    target_id = %target_id,
+                    target_name = %target_name,
+                    "Unban Discord applique lors de l'annulation d'une action ban"
+                ),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    guild_id = %guild_id,
+                    target_id = %target_id,
+                    "Echec unban Discord lors de l'annulation — suppression DB quand meme"
+                ),
+            }
 
-        // BUG #2 : l'action ban annulee peut porter un rappel d'auto-unban
-        // encore 'pending'. On l'annule (keye sur l'action_id) pour que le
-        // worker `expire_temp_bans` ne rejoue pas un unban tardif. Best-effort.
-        if let Err(e) = state.reminders_uc.cancel_for_action(uuid).await {
-            tracing::warn!(
-                error = %e,
-                action_id = %uuid,
-                "Echec annulation du rappel d'auto-unban lors de l'annulation d'un ban"
-            );
+            // BUG #2 : l'action ban annulee peut porter un rappel d'auto-unban
+            // encore 'pending'. On l'annule (keye sur l'action_id) pour que le
+            // worker `expire_temp_bans` ne rejoue pas un unban tardif. Best-effort.
+            if cancel_auto_unban_reminder {
+                if let Err(e) = state.reminders_uc.cancel_for_action(uuid).await {
+                    tracing::warn!(
+                        error = %e,
+                        action_id = %uuid,
+                        "Echec annulation du rappel d'auto-unban lors de l'annulation d'un ban"
+                    );
+                }
+            }
         }
-    } else if lower.starts_with("mute") || lower == "timeout" {
-        match state
-            .discord_api
-            .remove_timeout(&guild_id, &target_id)
-            .await
-        {
-            Ok(()) => tracing::info!(
-                guild_id = %guild_id,
-                target_id = %target_id,
-                target_name = %target_name,
-                "Timeout Discord retire lors de l'annulation d'une action mute/timeout"
-            ),
-            Err(e) => tracing::warn!(
-                error = %e,
-                guild_id = %guild_id,
-                target_id = %target_id,
-                "Echec remove_timeout Discord lors de l'annulation — suppression DB quand meme"
-            ),
+        ReversalEffect::RemoveTimeout => {
+            match state
+                .discord_api
+                .remove_timeout(&guild_id, &target_id)
+                .await
+            {
+                Ok(()) => tracing::info!(
+                    guild_id = %guild_id,
+                    target_id = %target_id,
+                    target_name = %target_name,
+                    "Timeout Discord retire lors de l'annulation d'une action mute/timeout"
+                ),
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    guild_id = %guild_id,
+                    target_id = %target_id,
+                    "Echec remove_timeout Discord lors de l'annulation — suppression DB quand meme"
+                ),
+            }
         }
+        ReversalEffect::None => {}
     }
 
     let deleted = state.moderation_uc.delete_action(uuid).await?;
@@ -976,22 +986,13 @@ pub async fn mod_action_count(
         "moderator+ requis",
     )
     .await?;
-    let window = q.window_secs.unwrap_or(3600).clamp(1, 86400) as f64;
-    let count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM moderation_actions \
-         WHERE guild_id = $1 AND moderator_id = $2 \
-           AND created_at > NOW() - ($3::double precision * INTERVAL '1 second')",
-    )
-    .bind(&guild_id)
-    .bind(&moderator_id)
-    .bind(window)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(sentinel_core::domain::errors::DomainError::Internal(
-            e.to_string(),
-        ))
-    })?;
+    // Fenetre effective (defaut/bornes) : règle du core ; SQL : repository.
+    let window = sentinel_core::domain::entities::moderation::action::reversal::
+        mod_action_window_secs(q.window_secs);
+    let count = state
+        .moderation_uc
+        .count_recent_mod_actions(&guild_id, &moderator_id, window)
+        .await?;
     Ok(Json(serde_json::json!({ "count": count })))
 }
 

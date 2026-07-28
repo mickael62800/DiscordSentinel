@@ -321,6 +321,26 @@ impl ModerationRepository for PgModerationRepository {
         Ok(row.map(|(g,)| g))
     }
 
+    async fn count_recent_mod_actions(
+        &self,
+        guild_id: &str,
+        moderator_id: &str,
+        window_secs: i64,
+    ) -> Result<i64, DomainError> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM moderation_actions \
+             WHERE guild_id = $1 AND moderator_id = $2 \
+               AND created_at > NOW() - ($3::double precision * INTERVAL '1 second')",
+        )
+        .bind(guild_id)
+        .bind(moderator_id)
+        .bind(window_secs as f64)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_ctx("count recent mod actions"))?;
+        Ok(count)
+    }
+
     async fn find_action_for_reversal(
         &self,
         action_id: Uuid,

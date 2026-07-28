@@ -49,4 +49,15 @@ pub trait ModerationRepository: Send + Sync {
     ) -> Result<Option<ActionReversalInfo>, DomainError> {
         Ok(None)
     }
+
+    /// Nombre d'actions posees par un moderateur sur la fenetre (quota
+    /// anti-modo compromis). Default : 0 (mocks de test).
+    async fn count_recent_mod_actions(
+        &self,
+        _guild_id: &str,
+        _moderator_id: &str,
+        _window_secs: i64,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
 }

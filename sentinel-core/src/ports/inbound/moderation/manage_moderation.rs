@@ -91,4 +91,15 @@ pub trait ManageModerationUseCase: Send + Sync {
     ) -> Result<Option<ActionReversalInfo>, DomainError> {
         Ok(None)
     }
+
+    /// Nombre d'actions posees par ce moderateur sur la fenetre effective
+    /// (`mod_action_window_secs`). Default : 0 (pour les stubs de test).
+    async fn count_recent_mod_actions(
+        &self,
+        _guild_id: &str,
+        _moderator_id: &str,
+        _window_secs: i64,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
 }
