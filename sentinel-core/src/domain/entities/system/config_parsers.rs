@@ -23,6 +23,55 @@ pub fn parse_i64_config(map: &HashMap<String, String>, key: &str, default: i64) 
         .unwrap_or(default)
 }
 
+/// Parse des lignes "label|value" (separateur pipe).
+/// Ignore les lignes vides, sans pipe, ou avec label/value vide.
+pub fn parse_pipe_lines(raw: &str) -> Vec<(String, String)> {
+    raw.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+            let (left, right) = line.split_once('|')?;
+            let left = left.trim();
+            let right = right.trim();
+            if left.is_empty() || right.is_empty() {
+                return None;
+            }
+            Some((left.to_string(), right.to_string()))
+        })
+        .collect()
+}
+
+/// Parse des lignes "id:value" ou id est un u64 et value est un u64.
+pub fn parse_id_u64_lines(raw: &str) -> Vec<(u64, u64)> {
+    raw.lines()
+        .filter_map(|line| {
+            let line = line.trim();
+            if line.is_empty() {
+                return None;
+            }
+            let (id_str, val_str) = line.split_once(':')?;
+            let id: u64 = id_str.trim().parse().ok()?;
+            let val: u64 = val_str.trim().parse().ok()?;
+            Some((id, val))
+        })
+        .collect()
+}
+
+/// Decoupe une chaine CSV en Vec<String> (trim + lowercase, ignore les vides).
+pub fn split_csv(s: &str) -> Vec<String> {
+    s.split(',')
+        .map(|v| v.trim().to_lowercase())
+        .filter(|v| !v.is_empty())
+        .collect()
+}
+
+/// Lookup dans un Vec<(u64, u64)> par id.
+pub fn lookup_u64(entries: &[(u64, u64)], id: u64) -> Option<u64> {
+    entries.iter().find(|(k, _)| *k == id).map(|(_, v)| *v)
+}
+
 /// Convention de nommage : les services de type "worker" (jobs batch
 /// planifies) ont `worker` dans leur nom. Les autres sont des bots
 /// Discord. Utilise par le dashboard pour afficher les compteurs

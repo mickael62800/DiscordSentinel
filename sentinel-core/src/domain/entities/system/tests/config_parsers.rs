@@ -80,3 +80,54 @@ fn is_worker_false_for_bot_names() {
     assert!(!is_worker_service("game-bot"));
     assert!(!is_worker_service(""));
 }
+
+// ── parsers de lignes (pipe / id:u64 / csv) ──
+
+#[test]
+fn pipe_simple() {
+    let r = parse_pipe_lines("A|B\nC|D");
+    assert_eq!(r, vec![("A".into(), "B".into()), ("C".into(), "D".into())]);
+}
+
+#[test]
+fn pipe_ignores_empty() {
+    assert_eq!(parse_pipe_lines("\n\nA|B\n\n").len(), 1);
+}
+
+#[test]
+fn pipe_ignores_invalid() {
+    assert_eq!(parse_pipe_lines("no sep\n|b\na|\nOK|V").len(), 1);
+}
+
+#[test]
+fn pipe_trims() {
+    let r = parse_pipe_lines("  X  |  Y  ");
+    assert_eq!(r[0], ("X".into(), "Y".into()));
+}
+
+#[test]
+fn id_u64_simple() {
+    let r = parse_id_u64_lines("111:3600\n222:86400");
+    assert_eq!(r, vec![(111, 3600), (222, 86400)]);
+}
+
+#[test]
+fn csv_simple() {
+    let r = split_csv("a, B , c");
+    assert_eq!(r, vec!["a", "b", "c"]);
+}
+
+#[test]
+fn csv_empty() {
+    assert!(split_csv("").is_empty());
+}
+
+#[test]
+fn lookup_u64_found() {
+    assert_eq!(lookup_u64(&[(1, 100)], 1), Some(100));
+}
+
+#[test]
+fn lookup_u64_none() {
+    assert_eq!(lookup_u64(&[(1, 100)], 99), None);
+}
