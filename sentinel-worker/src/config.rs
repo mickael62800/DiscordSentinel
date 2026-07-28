@@ -135,10 +135,6 @@ const DEFAULT_AUTOMOD_CLEANUP_CARDS_SECS: u64 = 24 * SECS_PER_HOUR;
 /// Check horaire ; l'API gate sur le passage de mois.
 const DEFAULT_MONTHLY_RANKING_CHECK_SECS: u64 = SECS_PER_HOUR;
 
-// ── Defauts tournoi coude ──
-/// Tick horaire ; le job n'agit que dans la fenetre dimanche >= 23h UTC.
-const DEFAULT_TOURNAMENT_CHECK_SECS: u64 = SECS_PER_HOUR;
-
 // ── Defauts guild_backup (auto-backup periodique) ──
 /// Cadence de VERIFICATION du worker (30 min). L'intervalle FIN est par guild
 /// (`auto_backup_interval_hours`, defaut 24h) lu dans bot_guild_config.
@@ -248,7 +244,6 @@ pub struct WorkerConfig {
     pub monthly_ranking_check_secs: u64,
 
     // ── Tournoi (coude) ──
-    pub tournament_check_secs: u64,
 
     // ── Guild backup (auto-backup periodique) ──
     pub guild_backup_auto_check_secs: u64,
@@ -481,7 +476,6 @@ impl WorkerConfig {
             ),
 
             // tournoi (coude)
-            tournament_check_secs: load_env("TOURNAMENT_CHECK_SECS", DEFAULT_TOURNAMENT_CHECK_SECS),
 
             // guild backup (auto-backup periodique)
             guild_backup_auto_check_secs: load_env(
@@ -873,14 +867,6 @@ impl WorkerConfig {
             "monthly_ranking_check_secs",
             "MONTHLY_RANKING_CHECK_SECS",
             DEFAULT_MONTHLY_RANKING_CHECK_SECS,
-        );
-
-        // tournoi — cle du schema coude-bot (module flattene).
-        self.tournament_check_secs = config_or_env(
-            db,
-            "tournament_check_secs",
-            "TOURNAMENT_CHECK_SECS",
-            DEFAULT_TOURNAMENT_CHECK_SECS,
         );
 
         // guild backup — cadence de verification de l'auto-backup.

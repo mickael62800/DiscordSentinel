@@ -1,8 +1,7 @@
-//! Domaine coude (Coup de Coude / Coude Game) : 6 jobs metier du jeu.
+//! Domaine coude (Coup de Coude / Coude Game) : 5 jobs metier du jeu.
 //!   - expire_combats     : timeouts des combats /coude pending
 //!   - resolve_betting    : resolution des paris pending
 //!   - hp_regen           : regeneration HP passive
-//!   - resolve_tournament : resolution du tournoi hebdo
 //!   - redistribute_cashbox : redistribution caisse communautaire
 //!   - daily_chaos        : "Roue du Destin" (delay aleatoire 2-6h)
 //!
@@ -16,4 +15,3 @@ pub mod expire_steals;
 pub mod hp_regen;
 pub mod redistribute_cashbox;
 pub mod resolve_betting;
-pub mod resolve_tournament;

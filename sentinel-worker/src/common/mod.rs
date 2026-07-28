@@ -200,7 +200,7 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
     .await
     .unwrap_or(None);
 
-    result.map(|v| v != "false").unwrap_or(true)
+    sentinel_core::domain::entities::system::config_parsers::parse_enabled_flag(result.as_deref())
 }
 
 /// Verifie si une sous-feature d'un module est activee pour une guild.

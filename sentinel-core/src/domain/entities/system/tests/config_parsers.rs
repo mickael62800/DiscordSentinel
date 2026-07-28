@@ -138,3 +138,17 @@ fn default_log_category_by_name() {
     assert_eq!(default_log_category("automod-bot"), "bot");
     assert_eq!(default_log_category("dashboard"), "discord");
 }
+
+#[test]
+fn enabled_flag_absent_is_enabled() {
+    assert!(parse_enabled_flag(None));
+}
+
+#[test]
+fn enabled_flag_parses_value() {
+    assert!(parse_enabled_flag(Some("true")));
+    assert!(parse_enabled_flag(Some("1")));
+    assert!(!parse_enabled_flag(Some("false")));
+    assert!(!parse_enabled_flag(Some("0")));
+    assert!(!parse_enabled_flag(Some("no")));
+}

@@ -55,7 +55,11 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             .get(&t.server)
             .copied()
             .unwrap_or(DEFAULT_INACTIVE_DAYS);
-        if timeout_days <= 0 || t.inactive_days < timeout_days {
+        // Décision SLA du core : seuil <= 0 = désactivé, sinon breach à >= seuil.
+        if !sentinel_core::domain::services::tickets::sla::is_breached(
+            t.inactive_days,
+            timeout_days,
+        ) {
             continue;
         }
 

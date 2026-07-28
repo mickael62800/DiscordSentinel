@@ -14,6 +14,13 @@ pub fn parse_bool_str(v: &str) -> bool {
     matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")
 }
 
+/// Flag d'activation d'un module : ABSENT = activé (comportement inclusif),
+/// présent = `parse_bool_str`. Sémantique unique pour tous les gardes
+/// `enabled` per-guild (bot, API, worker).
+pub fn parse_enabled_flag(value: Option<&str>) -> bool {
+    value.map(parse_bool_str).unwrap_or(true)
+}
+
 /// Parse un flag booleen depuis un map de config. Accepte (insensible a
 /// la casse) : `"true"`, `"1"`, `"yes"`. Tout le reste = false.
 pub fn parse_bool_config(map: &HashMap<String, String>, key: &str, default: bool) -> bool {

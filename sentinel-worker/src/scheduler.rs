@@ -572,8 +572,8 @@ pub fn start(
     }
 
     // ─────────────────────────────────────────────────────────────
-    // Domaine : coude (6 jobs : combats, paris, hp_regen, tournament,
-    // cashbox, daily_chaos). Porte de l'ancien coude-worker.
+    // Domaine : coude (5 jobs : combats, paris, hp_regen, cashbox,
+    // daily_chaos). Porte de l'ancien coude-worker.
     // ─────────────────────────────────────────────────────────────
     spawn_periodic(
         "expire_combats",
@@ -612,27 +612,6 @@ pub fn start(
         "coude-bot",
         |pool| Box::pin(async move { domains::coude::hp_regen::run(&pool).await }),
     );
-    {
-        let redis = redis_client.clone();
-        spawn_periodic(
-            "resolve_tournament",
-            // Tick horaire : le job n'agit que dans la fenetre dimanche >= 23h
-            // UTC (gate dans resolve_tournament::run). Un intervalle <= 1h
-            // garantit qu'un tick tombe toujours dans l'heure 23h, peu importe
-            // l'heure de demarrage du worker. Idempotent via UNIQUE(guild,week).
-            config.tournament_check_secs,
-            pool.clone(),
-            shutdown.clone(),
-            api_url.clone(),
-            "coude-bot",
-            move |pool| {
-                let redis = redis.clone();
-                Box::pin(
-                    async move { domains::coude::resolve_tournament::run(&pool, &redis).await },
-                )
-            },
-        );
-    }
     {
         let min_days = config.cashbox_min_days as i64;
         spawn_periodic(

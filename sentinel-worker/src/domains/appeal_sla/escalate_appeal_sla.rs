@@ -184,17 +184,15 @@ async fn load_sla_configs(pool: &PgPool) -> Result<HashMap<String, GuildSlaConfi
             first_response_minutes: DEFAULT_SLA_FIRST_RESPONSE_MINUTES,
             escalation_minutes: DEFAULT_SLA_ESCALATION_MINUTES,
         });
-        use sentinel_core::domain::services::tickets::sla::threshold_or_default;
-        let parsed = row.config_value.parse::<i64>().ok();
-        match row.config_key.as_str() {
-            "sla_first_response_minutes" => {
-                entry.first_response_minutes =
-                    threshold_or_default(parsed, entry.first_response_minutes);
+        // Sémantique alignée sur les autres chargeurs SLA (tickets/close_inactive) :
+        // valeur configurée stockée BRUTE (un seuil <= 0 = désactivé, tranché par
+        // `is_breached`), clé absente ou non numérique = défaut.
+        if let Ok(parsed) = row.config_value.parse::<i64>() {
+            match row.config_key.as_str() {
+                "sla_first_response_minutes" => entry.first_response_minutes = parsed,
+                "sla_escalation_minutes" => entry.escalation_minutes = parsed,
+                _ => {}
             }
-            "sla_escalation_minutes" => {
-                entry.escalation_minutes = threshold_or_default(parsed, entry.escalation_minutes);
-            }
-            _ => {}
         }
     }
 
