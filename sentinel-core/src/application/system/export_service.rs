@@ -38,6 +38,16 @@ impl ExportService {
     }
 }
 
+/// Bornes saines du cap de lignes par export — source unique, partagée avec
+/// le clamp de config de sentinel-worker (`max_rows_per_export`).
+pub const EXPORT_MAX_ROWS_MIN: i64 = 1;
+pub const EXPORT_MAX_ROWS_MAX: i64 = 50_000;
+
+/// Clamp du cap de lignes par export dans les bornes saines.
+pub fn clamp_export_rows(v: i64) -> i64 {
+    v.clamp(EXPORT_MAX_ROWS_MIN, EXPORT_MAX_ROWS_MAX)
+}
+
 #[async_trait]
 impl ExecuteExportUseCase for ExportService {
     async fn execute(
@@ -47,7 +57,7 @@ impl ExecuteExportUseCase for ExportService {
         format: &str,
         max_rows: i64,
     ) -> Result<ExportResult, DomainError> {
-        let max_rows = max_rows.clamp(1, 50_000);
+        let max_rows = clamp_export_rows(max_rows);
         match job_type {
             "infractions" => {
                 let rows = self.repo.fetch_infractions(guild_id, max_rows).await?;

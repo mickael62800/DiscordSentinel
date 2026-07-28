@@ -67,14 +67,5 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     Ok(())
 }
 
-/// Ajoute `n` mois a une date UTC, en gerant correctement les overflow d'annee.
-fn add_months(date: chrono::DateTime<chrono::Utc>, n: u32) -> chrono::DateTime<chrono::Utc> {
-    use chrono::{Datelike, TimeZone};
-    let total_months = date.year() * 12 + date.month0() as i32 + n as i32;
-    let new_year = total_months / 12;
-    let new_month = (total_months % 12) as u32 + 1;
-    chrono::Utc
-        .with_ymd_and_hms(new_year, new_month, 1, 0, 0, 0)
-        .single()
-        .unwrap_or(date)
-}
+// L'arithmétique calendaire (overflow d'année) vit dans le core, avec tests.
+use sentinel_core::domain::services::system::scheduling::add_months;

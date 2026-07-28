@@ -35,6 +35,29 @@ pub fn is_due(
     }
 }
 
+/// Secondes restantes avant la prochaine heure pile (HH:00:00), pour aligner
+/// un tick périodique sur l'heure. Retourne 0 si on est exactement à HH:00:00.
+pub fn secs_to_next_hour(minute: u32, second: u32) -> u64 {
+    let secs_in_hour = (minute as u64) * 60 + second as u64;
+    if secs_in_hour == 0 {
+        0
+    } else {
+        3600 - secs_in_hour
+    }
+}
+
+/// Ajoute `n` mois a une date UTC (résultat au 1er du mois à minuit), en
+/// gerant correctement les overflow d'annee.
+pub fn add_months(date: DateTime<Utc>, n: u32) -> DateTime<Utc> {
+    use chrono::{Datelike, TimeZone};
+    let total_months = date.year() * 12 + date.month0() as i32 + n as i32;
+    let new_year = total_months / 12;
+    let new_month = (total_months % 12) as u32 + 1;
+    Utc.with_ymd_and_hms(new_year, new_month, 1, 0, 0, 0)
+        .single()
+        .unwrap_or(date)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -61,6 +84,34 @@ mod tests {
         let now = Utc::now();
         assert!(is_due(Some(now - Duration::hours(25)), 24, 24, now));
         assert!(!is_due(Some(now - Duration::hours(23)), 24, 24, now));
+    }
+
+    #[test]
+    fn next_hour_alignment() {
+        assert_eq!(secs_to_next_hour(0, 0), 0); // pile HH:00:00
+        assert_eq!(secs_to_next_hour(0, 1), 3599);
+        assert_eq!(secs_to_next_hour(59, 59), 1);
+        assert_eq!(secs_to_next_hour(30, 0), 1800);
+    }
+
+    #[test]
+    fn add_months_simple() {
+        let d = chrono::TimeZone::with_ymd_and_hms(&Utc, 2026, 3, 15, 12, 30, 0).unwrap();
+        let r = add_months(d, 1);
+        assert_eq!(r.to_rfc3339(), "2026-04-01T00:00:00+00:00");
+    }
+
+    #[test]
+    fn add_months_year_overflow() {
+        let d = chrono::TimeZone::with_ymd_and_hms(&Utc, 2026, 11, 20, 0, 0, 0).unwrap();
+        assert_eq!(add_months(d, 2).to_rfc3339(), "2027-01-01T00:00:00+00:00");
+        assert_eq!(add_months(d, 14).to_rfc3339(), "2028-01-01T00:00:00+00:00");
+    }
+
+    #[test]
+    fn add_months_zero_normalizes_to_month_start() {
+        let d = chrono::TimeZone::with_ymd_and_hms(&Utc, 2026, 7, 28, 9, 0, 0).unwrap();
+        assert_eq!(add_months(d, 0).to_rfc3339(), "2026-07-01T00:00:00+00:00");
     }
 
     #[test]

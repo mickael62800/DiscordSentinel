@@ -93,13 +93,12 @@ pub fn start(api_url: String, redis_client: redis::Client, publish_interval_secs
 
 fn compute_initial_delay() -> Duration {
     let now = Utc::now();
-    let secs_in_hour = (now.minute() as u64) * 60 + now.second() as u64;
-    let to_next = if secs_in_hour == 0 {
-        0
-    } else {
-        3600 - secs_in_hour
-    };
-    Duration::from_secs(to_next)
+    Duration::from_secs(
+        sentinel_core::domain::services::system::scheduling::secs_to_next_hour(
+            now.minute(),
+            now.second(),
+        ),
+    )
 }
 
 async fn run_one_tick(
