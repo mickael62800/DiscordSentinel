@@ -32,9 +32,6 @@ const DEFAULT_AUDIT_CACHE_REFRESH_SECS: u64 = 60;
 /// Limite du snapshot watched_users pousse en Redis (global, non per-guild).
 const DEFAULT_WATCHED_USERS_QUERY_LIMIT: i64 = 10_000;
 
-// ── Defauts blackjack ──
-const DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS: u64 = 60;
-
 // ── Defauts monitoring ──
 const DEFAULT_MONITOR_CHECK_INTERVAL_SECS: u64 = 30;
 
@@ -80,19 +77,6 @@ const DEFAULT_ANNOUNCEMENT_PUBLISH_INTERVAL_SECS: u64 = 3600;
 const DEFAULT_BAN_CLEANUP_MINUTES: u64 = 1;
 const DEFAULT_SEND_REMINDERS_SECS: u64 = 30;
 
-// ── Defauts coude ──
-const DEFAULT_COMBAT_EXPIRY_CHECK_SECS: u64 = 86400; // 24h (a baisser plus tard)
-const DEFAULT_BETTING_CHECK_SECS: u64 = 30;
-const DEFAULT_HP_REGEN_TICK_SECS: u64 = 300;
-const DEFAULT_CASHBOX_TICK_SECS: u64 = 3600;
-const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
-// Phase 5 — Vol /voler : tick frequent (5s) car la fenetre de defense
-// est de 60s, donc une latence max de 65s pour la resolution AFK.
-const DEFAULT_STEAL_EXPIRY_CHECK_SECS: u64 = 5;
-// Daily-chaos "Roue du Destin" : delai aleatoire entre min et max (2-6h).
-const DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS: u64 = 7200;
-const DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS: u64 = 21600;
-
 // Phase 5 — Tickets close inactifs : tick 30 min (meme cadence que
 // l'ancienne boucle bot).
 const DEFAULT_TICKETS_CLOSE_INACTIVE_SECS: u64 = 1800;
@@ -110,9 +94,6 @@ const DEFAULT_LOCKDOWN_EXPIRE_CHECK_SECS: u64 = 15;
 
 // Phase 5H — Slowmode security expire : tick 15s.
 const DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS: u64 = 15;
-
-// Tamagotchi : tick de cycle de vie (decroissance/maladie/mort). 300s par defaut.
-const DEFAULT_TAMAGOTCHI_TICK_INTERVAL_SECS: u64 = 300;
 
 // ── Defauts moderation age-unban ──
 /// Auto-deban verification d'age : cadence mensuelle (30 j) par defaut.
@@ -167,7 +148,6 @@ pub struct WorkerConfig {
     pub watched_users_query_limit: i64,
 
     // ── Blackjack ──
-    pub blackjack_scan_interval_secs: u64,
 
     // ── Monitoring ──
     pub api_key: String,
@@ -208,16 +188,6 @@ pub struct WorkerConfig {
     pub send_reminders_interval_secs: u64,
     pub age_unban_interval_secs: u64,
 
-    // ── Coude ──
-    pub combat_expiry_check_secs: u64,
-    pub betting_check_secs: u64,
-    pub hp_regen_tick_secs: u64,
-    pub cashbox_tick_secs: u64,
-    pub cashbox_min_days: u64,
-    pub steal_expiry_check_secs: u64,
-    pub daily_chaos_min_delay_secs: u64,
-    pub daily_chaos_max_delay_secs: u64,
-
     // ── Tickets ──
     pub tickets_close_inactive_secs: u64,
     pub tickets_sla_check_secs: u64,
@@ -226,9 +196,6 @@ pub struct WorkerConfig {
     pub quarantine_kick_check_secs: u64,
     pub lockdown_expire_check_secs: u64,
     pub slowmode_expire_check_secs: u64,
-
-    // ── Tamagotchi ──
-    pub tamagotchi_tick_interval_secs: u64,
 
     // ── Game portal (intervals des jobs worker) ──
     pub game_health_check_interval_secs: u64,
@@ -301,12 +268,6 @@ impl WorkerConfig {
             watched_users_query_limit: load_env(
                 "WATCHED_USERS_QUERY_LIMIT",
                 DEFAULT_WATCHED_USERS_QUERY_LIMIT,
-            ),
-
-            // blackjack
-            blackjack_scan_interval_secs: load_env(
-                "BLACKJACK_CLEANUP_SCAN_INTERVAL",
-                DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS,
             ),
 
             // monitoring
@@ -389,28 +350,6 @@ impl WorkerConfig {
                 DEFAULT_AGE_UNBAN_INTERVAL_SECS,
             ),
 
-            // coude
-            combat_expiry_check_secs: load_env(
-                "COMBAT_EXPIRY_CHECK_SECS",
-                DEFAULT_COMBAT_EXPIRY_CHECK_SECS,
-            ),
-            betting_check_secs: load_env("BETTING_CHECK_SECS", DEFAULT_BETTING_CHECK_SECS),
-            hp_regen_tick_secs: load_env("HP_REGEN_TICK_SECS", DEFAULT_HP_REGEN_TICK_SECS),
-            cashbox_tick_secs: load_env("CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS),
-            cashbox_min_days: load_env("CASHBOX_MIN_DAYS", DEFAULT_CASHBOX_MIN_DAYS),
-            steal_expiry_check_secs: load_env(
-                "STEAL_EXPIRY_CHECK_SECS",
-                DEFAULT_STEAL_EXPIRY_CHECK_SECS,
-            ),
-            daily_chaos_min_delay_secs: load_env(
-                "DAILY_CHAOS_MIN_DELAY_SECS",
-                DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS,
-            ),
-            daily_chaos_max_delay_secs: load_env(
-                "DAILY_CHAOS_MAX_DELAY_SECS",
-                DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS,
-            ),
-
             // tickets
             tickets_close_inactive_secs: load_env(
                 "TICKETS_CLOSE_INACTIVE_SECS",
@@ -433,12 +372,6 @@ impl WorkerConfig {
             slowmode_expire_check_secs: load_env(
                 "SLOWMODE_EXPIRE_CHECK_SECS",
                 DEFAULT_SLOWMODE_EXPIRE_CHECK_SECS,
-            ),
-
-            // tamagotchi
-            tamagotchi_tick_interval_secs: load_env(
-                "TAMAGOTCHI_TICK_INTERVAL_SECS",
-                DEFAULT_TAMAGOTCHI_TICK_INTERVAL_SECS,
             ),
 
             // game portal (intervals des jobs worker)
@@ -575,14 +508,6 @@ impl WorkerConfig {
         );
         self.watched_users_query_limit = watched_limit.clamp(100, 100_000);
 
-        // blackjack
-        self.blackjack_scan_interval_secs = config_or_env(
-            db,
-            "blackjack_cleanup_scan_interval",
-            "BLACKJACK_CLEANUP_SCAN_INTERVAL",
-            DEFAULT_BLACKJACK_SCAN_INTERVAL_SECS,
-        );
-
         // monitoring
         self.monitor_check_interval_secs = config_or_env(
             db,
@@ -716,61 +641,6 @@ impl WorkerConfig {
             DEFAULT_SEND_REMINDERS_SECS,
         );
 
-        // coude
-        self.combat_expiry_check_secs = config_or_env(
-            db,
-            "combat_expiry_check_secs",
-            "COMBAT_EXPIRY_CHECK_SECS",
-            DEFAULT_COMBAT_EXPIRY_CHECK_SECS,
-        );
-        self.betting_check_secs = config_or_env(
-            db,
-            "betting_check_secs",
-            "BETTING_CHECK_SECS",
-            DEFAULT_BETTING_CHECK_SECS,
-        );
-        self.hp_regen_tick_secs = config_or_env(
-            db,
-            "hp_regen_tick_secs",
-            "HP_REGEN_TICK_SECS",
-            DEFAULT_HP_REGEN_TICK_SECS,
-        );
-        self.cashbox_tick_secs = config_or_env(
-            db,
-            "cashbox_tick_secs",
-            "CASHBOX_TICK_SECS",
-            DEFAULT_CASHBOX_TICK_SECS,
-        );
-        self.cashbox_min_days = config_or_env(
-            db,
-            "cashbox_min_days",
-            "CASHBOX_MIN_DAYS",
-            DEFAULT_CASHBOX_MIN_DAYS,
-        );
-        self.steal_expiry_check_secs = config_or_env(
-            db,
-            "steal_expiry_check_secs",
-            "STEAL_EXPIRY_CHECK_SECS",
-            DEFAULT_STEAL_EXPIRY_CHECK_SECS,
-        );
-        // daily_chaos : delai aleatoire, garde min <= max.
-        self.daily_chaos_min_delay_secs = config_or_env(
-            db,
-            "daily_chaos_min_delay_secs",
-            "DAILY_CHAOS_MIN_DELAY_SECS",
-            DEFAULT_DAILY_CHAOS_MIN_DELAY_SECS,
-        );
-        self.daily_chaos_max_delay_secs = config_or_env(
-            db,
-            "daily_chaos_max_delay_secs",
-            "DAILY_CHAOS_MAX_DELAY_SECS",
-            DEFAULT_DAILY_CHAOS_MAX_DELAY_SECS,
-        );
-        // Garantit un range gen_range valide (min..=max non vide).
-        if self.daily_chaos_max_delay_secs < self.daily_chaos_min_delay_secs {
-            self.daily_chaos_max_delay_secs = self.daily_chaos_min_delay_secs;
-        }
-
         // tickets
         self.tickets_close_inactive_secs = config_or_env(
             db,
@@ -811,14 +681,6 @@ impl WorkerConfig {
             "age_unban_interval_secs",
             "AGE_UNBAN_INTERVAL",
             DEFAULT_AGE_UNBAN_INTERVAL_SECS,
-        );
-
-        // tamagotchi — omis precedemment de apply_db_config.
-        self.tamagotchi_tick_interval_secs = config_or_env(
-            db,
-            "tamagotchi_tick_interval_secs",
-            "TAMAGOTCHI_TICK_INTERVAL_SECS",
-            DEFAULT_TAMAGOTCHI_TICK_INTERVAL_SECS,
         );
 
         // game portal (intervals des jobs worker) — cles du schema game-portal.

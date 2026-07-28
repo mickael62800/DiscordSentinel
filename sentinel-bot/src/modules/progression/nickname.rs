@@ -19,7 +19,6 @@ use super::{StatsApiKey, MODULE_BOT_NAME};
 
 pub use sentinel_core::domain::services::progression::nickname::{
     build_nickname_full, parse_level_prefix, parse_role_emojis, pick_emoji, strip_all_prefixes,
-    strip_level_prefix,
 };
 
 /// Resultat d'une tentative de renommage. Permet a la commande resync de

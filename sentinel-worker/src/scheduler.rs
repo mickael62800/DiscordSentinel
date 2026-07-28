@@ -1,4 +1,4 @@
-//! Scheduler central : enregistre tous les jobs periodiques avec leur
+﻿//! Scheduler central : enregistre tous les jobs periodiques avec leur
 //! intervalle et delegue l'execution a `spawn_periodic` (impl commune
 //! qui gere shutdown, panic catch, log lifecycle, metrics).
 //!
@@ -32,9 +32,9 @@ pub fn start(
 ) {
     let api_url = config.api_url.clone();
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : cleanup (porte de l'ancien cleanup-worker)
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let cfg = CleanupConfig::from(config);
         spawn_periodic(
@@ -65,14 +65,14 @@ pub fn start(
         }
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : cache (warm Redis pour analytics, dashboard, voice)
     // Porte de l'ancien cache-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-    // ─────────────────────────────────────────────────────────────
-    // Domaine : automod — cloture des votes de moderation a echeance
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Domaine : automod â€” cloture des votes de moderation a echeance
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     spawn_periodic(
         "automod_close_votes",
         config.automod_close_votes_secs,
@@ -83,7 +83,7 @@ pub fn start(
         move |pool| Box::pin(async move { domains::automod::close_votes::run(&pool).await }),
     );
 
-    // Domaine : automod — suppression des cartes closes vieilles de > 1 mois
+    // Domaine : automod â€” suppression des cartes closes vieilles de > 1 mois
     // (24h). Le bot supprime le message Discord via event ; la review + le
     // transcript restent en DB (trace web conservee).
     spawn_periodic(
@@ -94,19 +94,6 @@ pub fn start(
         api_url.clone(),
         "automod-bot",
         move |pool| Box::pin(async move { domains::automod::cleanup_cards::run(&pool).await }),
-    );
-
-    // ─────────────────────────────────────────────────────────────
-    // Domaine : tamagotchi — tick de cycle de vie (decroissance/maladie/mort)
-    // ─────────────────────────────────────────────────────────────
-    spawn_periodic(
-        "tamagotchi_tick",
-        config.tamagotchi_tick_interval_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "tamagotchi-bot",
-        move |pool| Box::pin(async move { domains::tamagotchi::tick::run(&pool).await }),
     );
 
     {
@@ -183,10 +170,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : audit_cache (refresh watched_users en Redis)
     // Porte de l'ancien audit-cache-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         let watched_users_query_limit = config.watched_users_query_limit;
@@ -211,34 +198,12 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Domaine : blackjack (cleanup AFK tables)
-    // Porte de l'ancien blackjack-cleanup-worker.
-    // ─────────────────────────────────────────────────────────────
-    {
-        let redis = redis_client.clone();
-        spawn_periodic(
-            "cleanup_afk_tables",
-            config.blackjack_scan_interval_secs,
-            pool.clone(),
-            shutdown.clone(),
-            api_url.clone(),
-            "blackjack-bot",
-            move |pool| {
-                let redis = redis.clone();
-                Box::pin(
-                    async move { domains::blackjack::cleanup_afk_tables::run(&pool, &redis).await },
-                )
-            },
-        );
-    }
-
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : monitoring (surveillance bots/workers online)
     // Porte de l'ancien monitoring-worker. Structure differente :
     // boucle stateful (track previous_online), pas un simple
     // spawn_periodic. On delegue a son propre `start()`.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let cfg = domains::monitoring::MonitorConfig {
             api_url: api_url.clone(),
@@ -248,10 +213,10 @@ pub fn start(
         domains::monitoring::check_services::start(redis_client.clone(), cfg);
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : analytics (snapshots quotidien + horaire)
     // Porte de l'ancien analytics-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     spawn_periodic(
         "daily_snapshot",
         config.daily_snapshot_interval_secs,
@@ -303,13 +268,13 @@ pub fn start(
         },
     );
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : guild_backup (auto-backup periodique)
     // Le worker publie `guild_backup:capture_requested` pour les guilds dont
     // l'intervalle configure est ecoule ; le bot fait la capture reelle. La
-    // cadence ici n'est qu'une frequence de VERIFICATION (30 min par defaut) —
+    // cadence ici n'est qu'une frequence de VERIFICATION (30 min par defaut) â€”
     // l'intervalle FIN est par guild (`auto_backup_interval_hours`).
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -326,10 +291,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : temp_roles (expiration des roles temporaires)
     // Porte de l'ancien temp-roles-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -348,10 +313,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : appeal_sla (escalade des appels de sanction)
     // Porte de l'ancien appeal-sla-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -370,10 +335,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : export (drain export_jobs)
     // Porte de l'ancien export-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let max_rows = config.max_rows_per_export;
         let export_timeout = config.export_processing_timeout_secs;
@@ -392,10 +357,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : discord_audit_sync (poll Discord audit-logs API)
     // Porte de l'ancien discord-audit-sync-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let token = config.discord_bot_token.clone();
         spawn_periodic(
@@ -414,10 +379,10 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : ai (drain ai_jobs)
     // Porte de l'ancien ai-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         let api = api_url.clone();
@@ -440,11 +405,11 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : announcements (publication horaire alignee)
     // Porte de l'ancien announcement-worker. Structure custom (boucle
     // alignee sur HH:00:00 UTC).
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     domains::announcements::publish_due::start(
         api_url.clone(),
         redis_client.clone(),
@@ -460,10 +425,10 @@ pub fn start(
         |pool| Box::pin(async move { domains::announcements::retention_cleanup::run(&pool).await }),
     );
 
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : game_portal (4 jobs HTTP-triggered en parallele)
     // Porte de l'ancien game-portal-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     domains::game_portal::jobs::start(
         api_url.clone(),
         domains::game_portal::jobs::GamePortalIntervals {
@@ -478,15 +443,10 @@ pub fn start(
         },
     );
 
-    // ─────────────────────────────────────────────────────────────
-    // Domaine : influence (monde vivant — cloture des lois a echeance)
-    // ─────────────────────────────────────────────────────────────
-    domains::influence::jobs::start(api_url.clone(), 300);
-
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     // Domaine : moderation (conduit, bans, propositions, rappels)
     // Porte de l'ancien moderation-worker.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     spawn_periodic(
         "cleanup_bans",
         config.ban_cleanup_interval_secs,
@@ -513,7 +473,7 @@ pub fn start(
             },
         );
     }
-    // BUG #1/#2 — Auto-unban des bans temporaires a l'expiration. Chemin
+    // BUG #1/#2 â€” Auto-unban des bans temporaires a l'expiration. Chemin
     // d'enforcement reel (le DM "early" ne leve aucun ban). Independant de
     // send_reminders : couvre aussi les bans courts. Meme granularite que les
     // rappels (intervalle send_reminders).
@@ -571,119 +531,8 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Domaine : coude (5 jobs : combats, paris, hp_regen, cashbox,
-    // daily_chaos). Porte de l'ancien coude-worker.
-    // ─────────────────────────────────────────────────────────────
-    spawn_periodic(
-        "expire_combats",
-        config.combat_expiry_check_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "coude-bot",
-        |pool| Box::pin(async move { domains::coude::expire_combats::run(&pool).await }),
-    );
-    {
-        let api = api_url.clone();
-        let token = config.discord_bot_token.clone();
-        spawn_periodic(
-            "resolve_betting",
-            config.betting_check_secs,
-            pool.clone(),
-            shutdown.clone(),
-            api_url.clone(),
-            "coude-bot",
-            move |pool| {
-                let api = api.clone();
-                let token = token.clone();
-                Box::pin(
-                    async move { domains::coude::resolve_betting::run(&pool, &api, &token).await },
-                )
-            },
-        );
-    }
-    spawn_periodic(
-        "hp_regen",
-        config.hp_regen_tick_secs,
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "coude-bot",
-        |pool| Box::pin(async move { domains::coude::hp_regen::run(&pool).await }),
-    );
-    {
-        let min_days = config.cashbox_min_days as i64;
-        spawn_periodic(
-            "redistribute_cashbox",
-            config.cashbox_tick_secs,
-            pool.clone(),
-            shutdown.clone(),
-            api_url.clone(),
-            "coude-bot",
-            move |pool| {
-                Box::pin(
-                    async move { domains::coude::redistribute_cashbox::run(&pool, min_days).await },
-                )
-            },
-        );
-    }
-
-    // Phase 5 — expire_steals : claim les /voler dont la fenetre de
-    // defense est ecoulee + publie un event Redis pour le bot.
-    {
-        let redis = redis_client.clone();
-        spawn_periodic(
-            "expire_steals",
-            config.steal_expiry_check_secs,
-            pool.clone(),
-            shutdown.clone(),
-            api_url.clone(),
-            "coude-bot",
-            move |pool| {
-                let redis = redis.clone();
-                Box::pin(async move { domains::coude::expire_steals::run(&pool, &redis).await })
-            },
-        );
-    }
-
-    // daily_chaos : delai aleatoire 2-6h, pas un interval fixe -> on
-    // spawn une task custom.
-    {
-        let pool = pool.clone();
-        let api = api_url.clone();
-        let token = config.discord_bot_token.clone();
-        let min_delay = config.daily_chaos_min_delay_secs;
-        let max_delay = config.daily_chaos_max_delay_secs;
-        let mut rx = shutdown.clone();
-        tokio::spawn(async move {
-            use rand::Rng;
-            loop {
-                let delay_secs = {
-                    let mut rng = rand::thread_rng();
-                    rng.gen_range(min_delay..=max_delay)
-                };
-                info!(
-                    delay_secs,
-                    "daily_chaos: prochain tick dans {}h{}",
-                    delay_secs / 3600,
-                    (delay_secs % 3600) / 60
-                );
-                tokio::select! {
-                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(delay_secs)) => {}
-                    _ = rx.changed() => {
-                        if *rx.borrow() { return; }
-                    }
-                }
-                if let Err(e) = domains::coude::daily_chaos::run(&pool, &api, &token).await {
-                    tracing::error!(error = %e, "daily_chaos job failed");
-                }
-            }
-        });
-    }
-
-    // ─────────────────────────────────────────────────────────────
-    // Phase 5I — Tickets SLA escalation (toutes categories sauf
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Phase 5I â€” Tickets SLA escalation (toutes categories sauf
     // appel_sanction qui est gere par appeal_sla::escalate_appeal_sla).
     {
         let redis = redis_client.clone();
@@ -701,12 +550,12 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Phase 5 — Domaine tickets : fermeture auto des tickets inactifs.
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Phase 5 â€” Domaine tickets : fermeture auto des tickets inactifs.
     // Avant : boucle 30min dans le bot. Maintenant : worker UPDATE
     // status='closed' + XADD event 'ticket_auto_closed' que le bot
     // consume pour le menage Discord (notification + delete channel).
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -723,11 +572,11 @@ pub fn start(
         );
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Phase 5F — Domaine security : kick auto des quarantaines expirees
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Phase 5F â€” Domaine security : kick auto des quarantaines expirees
     // (captcha non valide). Le bot publie via API a chaque mise en
     // quarantaine, ce job claim les expirees et XADD quarantine_expired.
-    // ─────────────────────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -746,7 +595,7 @@ pub fn start(
         );
     }
 
-    // Phase 5G — Lockdown auto-revert : worker scanne les expires
+    // Phase 5G â€” Lockdown auto-revert : worker scanne les expires
     // et publie un event avec le JSON des saved_states. Le bot
     // desserialise et restaure les permissions Discord.
     {
@@ -767,7 +616,7 @@ pub fn start(
         );
     }
 
-    // Phase 5H — Slowmode security auto-revert.
+    // Phase 5H â€” Slowmode security auto-revert.
     {
         let redis = redis_client.clone();
         spawn_periodic(
@@ -788,7 +637,7 @@ pub fn start(
 
     // Phases suivantes : slowmode automod (meme pattern, ~150 lignes).
     // voice-afk + progression voice tick + tickets SLA dependent
-    // d'etat live populé par events Discord -> rester dans le bot.
+    // d'etat live populÃ© par events Discord -> rester dans le bot.
 
     // Variables inutilisees a ce stade.
     let _ = (pool, shutdown, redis_client, api_url);

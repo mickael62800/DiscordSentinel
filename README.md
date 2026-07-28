@@ -1,6 +1,6 @@
 # DiscordSentinel
 
-Plateforme de modération et d'animation distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **un worker unifié `sentinel-worker`** (scheduler regroupant 19 domaines périodiques), **inférence ONNX** embarquée.
+Plateforme de modération et d'animation distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **un worker unifié `sentinel-worker`** (scheduler regroupant 17 domaines périodiques), **inférence ONNX** embarquée.
 
 ---
 
@@ -44,14 +44,13 @@ Discord Messages / Events / Images
              ▼
 ┌─────────────────────────────────────────┐
 │ sentinel-worker (Tokio) — worker unifié  │
-│ Meta-scheduler, 19 domaines périodiques: │
+│ Meta-scheduler, 17 domaines périodiques: │
 │ ai · analytics · announcements ·         │
 │ appeal_sla · audit_cache · automod ·     │
-│ blackjack · cache · cleanup · coude ·    │
-│ discord_audit_sync · export ·            │
-│ game_portal · moderation · monitoring ·  │
-│ security · tamagotchi · temp_roles ·     │
-│ tickets                                  │
+│ cache · cleanup · discord_audit_sync ·   │
+│ export · game_portal · guild_backup ·    │
+│ moderation · monitoring · security ·     │
+│ temp_roles · tickets                     │
 └─────────────────────────────────────────┘
 ```
 
@@ -66,7 +65,7 @@ Discord Messages / Events / Images
 | API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~150 handlers, 285 migrations, ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis | Service dédié temps réel, auto-reconnect exponential backoff |
 | Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 22 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
-| Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 19 domaines périodiques), heartbeat + métriques Prometheus |
+| Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 17 domaines périodiques), heartbeat + métriques Prometheus |
 | gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (CRUD voice/coude/IA/modération en gRPC) |
 | PostgreSQL | Postgres 16 + **PgBouncer** | 285 migrations, partitionnement RANGE mensuel, vues matérialisées |
 | Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables), cache `user_guilds` multi-tenant |
@@ -106,7 +105,7 @@ DiscordSentinel/
 │
 ├── sentinel-gateway/            # WebSocket relay (Redis → clients)
 ├── sentinel-proto/              # Définitions gRPC (`tonic` + `prost`)
-├── sentinel-worker/             # Meta-scheduler unifié — 19 domaines périodiques
+├── sentinel-worker/             # Meta-scheduler unifié — 17 domaines périodiques
 │
 ├── sentinel-ml/                 # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
 ├── sentinel-infrastructure/     # docker/ (compose + Dockerfiles), prometheus.yml, grafana, scripts/ (build-all, dev, health-check, ...)

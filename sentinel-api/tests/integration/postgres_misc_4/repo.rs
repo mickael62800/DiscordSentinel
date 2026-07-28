@@ -1,7 +1,6 @@
 //! Tests d'integration postgres pour 5 repos : guild, coude_heist,
 //! coude_steal_protection, coude_steal_boost, blackjack_table.
 
-use chrono::Duration;
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
