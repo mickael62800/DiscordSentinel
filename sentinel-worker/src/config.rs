@@ -147,8 +147,6 @@ pub struct WorkerConfig {
     pub audit_cache_refresh_secs: u64,
     pub watched_users_query_limit: i64,
 
-    // ── Blackjack ──
-
     // ── Monitoring ──
     pub api_key: String,
     pub monitor_check_interval_secs: u64,
@@ -209,8 +207,6 @@ pub struct WorkerConfig {
 
     // ── Classement mensuel (analytics) ──
     pub monthly_ranking_check_secs: u64,
-
-    // ── Tournoi (coude) ──
 
     // ── Guild backup (auto-backup periodique) ──
     pub guild_backup_auto_check_secs: u64,
@@ -407,8 +403,6 @@ impl WorkerConfig {
                 "MONTHLY_RANKING_CHECK_SECS",
                 DEFAULT_MONTHLY_RANKING_CHECK_SECS,
             ),
-
-            // tournoi (coude)
 
             // guild backup (auto-backup periodique)
             guild_backup_auto_check_secs: load_env(

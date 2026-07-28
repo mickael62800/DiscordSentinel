@@ -71,17 +71,18 @@ pub async fn create_server(
 
     // Programme la revelation d'IP : delai fourni, sinon defaut de la guild.
     // 0 jour = pas de revelation programmee.
-    let default_days = state
-        .bot_config_repo
-        .get_config(&guild_id, "game-portal")
-        .await
-        .ok()
-        .and_then(|cfg| {
-            cfg.iter()
-                .find(|c| c.config_key == "ip_reveal_default_days")
-                .and_then(|c| c.config_value.parse::<i32>().ok())
-        })
-        .unwrap_or(7);
+    let default_days = sentinel_core::domain::entities::system::bot_config::cfg_i64(
+        &state
+            .bot_config_repo
+            .get_config(
+                &guild_id,
+                sentinel_core::domain::entities::system::bot_names::GAME_PORTAL,
+            )
+            .await
+            .unwrap_or_default(),
+        "ip_reveal_default_days",
+        7,
+    ) as i32;
     let days = dto.ip_reveal_days.unwrap_or(default_days).max(0);
     if days > 0 {
         let at = chrono::Utc::now() + chrono::Duration::days(i64::from(days));

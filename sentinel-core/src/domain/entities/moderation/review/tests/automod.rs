@@ -280,3 +280,34 @@ fn can_open_discussion_matches_moderator() {
         ..Default::default()
     }));
 }
+
+// ── finalize_sanction_plan (machine à états de finalisation) ──
+
+#[test]
+fn finalize_plan_non_loggable_actions() {
+    for a in ["delete", "ignore", "unknown", ""] {
+        assert_eq!(finalize_sanction_plan(a, false), FinalizeSanctionPlan::Nothing);
+        assert_eq!(finalize_sanction_plan(a, true), FinalizeSanctionPlan::Nothing);
+    }
+}
+
+#[test]
+fn finalize_plan_nominal_with_strike() {
+    for a in ["prevention", "warn", "mute", "ban"] {
+        assert_eq!(finalize_sanction_plan(a, false), FinalizeSanctionPlan::LogWithStrike);
+    }
+}
+
+#[test]
+fn finalize_plan_anti_double_strike() {
+    // Sévérité <= mute auto : pas de re-journalisation.
+    for a in ["prevention", "warn", "mute"] {
+        assert_eq!(finalize_sanction_plan(a, true), FinalizeSanctionPlan::AlreadyLogged);
+    }
+}
+
+#[test]
+fn finalize_plan_escalation_without_strike() {
+    // BUG #5 : ban plus sévère que le mute auto -> journalisé sans strike.
+    assert_eq!(finalize_sanction_plan("ban", true), FinalizeSanctionPlan::LogWithoutStrike);
+}

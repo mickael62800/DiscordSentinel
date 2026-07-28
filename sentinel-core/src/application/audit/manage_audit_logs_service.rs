@@ -41,6 +41,14 @@ impl ManageAuditLogsUseCase for ManageAuditLogsService {
         Ok(log)
     }
 
+    async fn list_voice_channel_events(
+        &self,
+        channel_id: &str,
+        limit: i64,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        self.repo.list_voice_channel_events(channel_id, limit).await
+    }
+
     async fn list(
         &self,
         guild_id: Option<&str>,

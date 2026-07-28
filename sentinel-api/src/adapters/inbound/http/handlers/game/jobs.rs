@@ -88,14 +88,16 @@ pub async fn job_daily_ping(State(state): State<AppState>) -> Result<Json<JobRep
     for s in &awaiting {
         let cfg = state
             .bot_config_repo
-            .get_config(&s.guild_id, "game-portal")
+            .get_config(
+                &s.guild_id,
+                sentinel_core::domain::entities::system::bot_names::GAME_PORTAL,
+            )
             .await
             .unwrap_or_default();
-        let get = |k: &str| cfg.iter().find(|c| c.config_key == k).map(|c| c.config_value.clone());
-        let enabled = matches!(get("session_daily_ping_enabled").as_deref(), Some("true") | Some("1"));
-        let hour = get("session_daily_ping_hour")
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(18);
+        // Lecture typée via les helpers core (sémantique bool de référence).
+        use sentinel_core::domain::entities::system::bot_config::{cfg_bool, cfg_i64};
+        let enabled = cfg_bool(&cfg, "session_daily_ping_enabled", false);
+        let hour = cfg_i64(&cfg, "session_daily_ping_hour", 18);
         // `>=` (pas `==`) : si le tick tombe apres l'heure pile, on ne rate pas
         // le ping du jour (le fire-once/jour est deja garanti par la requete
         // list_awaiting_reveal_no_ping_today).

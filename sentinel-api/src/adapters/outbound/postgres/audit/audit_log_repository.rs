@@ -54,6 +54,33 @@ impl From<AuditLogRow> for AuditLog {
 
 #[async_trait]
 impl AuditLogRepository for PgAuditLogRepository {
+    async fn list_voice_channel_events(
+        &self,
+        channel_id: &str,
+        limit: i64,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        let types: Vec<String> =
+            sentinel_core::domain::entities::audit::audit_log::VOICE_TIMELINE_EVENT_TYPES
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+        let rows: Vec<AuditLogRow> = sqlx::query_as(
+            "SELECT id, guild_id, event_type, actor_id, actor_name, target_id, target_name, \
+                    channel_id, channel_name, details, created_at \
+             FROM audit_logs \
+             WHERE channel_id = $1 AND event_type = ANY($2) \
+             ORDER BY created_at ASC \
+             LIMIT $3",
+        )
+        .bind(channel_id)
+        .bind(&types)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_ctx("fetch voice events"))?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn save(&self, log: &AuditLog) -> Result<(), DomainError> {
         sqlx::query(
             r#"INSERT INTO audit_logs (id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, channel_name, details, created_at)

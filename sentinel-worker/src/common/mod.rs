@@ -312,7 +312,7 @@ const WORKER_MODULES: &[&str] = &[
 ///
 /// Lit les rows ou `bot_name` est :
 ///   - le nom du processus (`sentinel-worker`) pour la config globale,
-///   - un nom de module (`coude`, `cleanup`, ...) pour la config
+///   - un nom de module (`cleanup`, `ticket-bot`, ...) pour la config
 ///     specifique a un domaine.
 ///
 /// Priorite : nom du processus d'abord, puis modules. Decouple le

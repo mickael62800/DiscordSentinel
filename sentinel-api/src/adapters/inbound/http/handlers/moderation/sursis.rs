@@ -75,17 +75,18 @@ pub async fn create_sursis(
     )
     .await?;
     // Delai depuis la config (parametrable), defaut 7 jours.
-    let days = state
-        .bot_config_repo
-        .get_config(&guild_id, "moderation-bot")
-        .await
-        .ok()
-        .and_then(|cfg| {
-            cfg.iter()
-                .find(|c| c.config_key == "sursis_appeal_days")
-                .and_then(|c| c.config_value.parse::<i64>().ok())
-        })
-        .unwrap_or(7);
+    let days = sentinel_core::domain::entities::system::bot_config::cfg_i64(
+        &state
+            .bot_config_repo
+            .get_config(
+                &guild_id,
+                sentinel_core::domain::entities::system::bot_names::MODERATION_BOT,
+            )
+            .await
+            .unwrap_or_default(),
+        "sursis_appeal_days",
+        7,
+    );
 
     let sursis = state
         .sursis_uc

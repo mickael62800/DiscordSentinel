@@ -69,19 +69,20 @@ pub async fn store_snapshot(
     snapshot.guild_id = guild_id.clone();
     // Quota de retention configurable (guild-backup-bot / snapshot_quota).
     // Absent => defaut historique (20). Le service borne a [1, 100].
-    let quota = state
-        .bot_config_repo
-        .get_config(&guild_id, "guild-backup-bot")
-        .await
-        .ok()
-        .and_then(|cfg| {
-            cfg.iter()
-                .find(|c| c.config_key == "snapshot_quota")
-                .and_then(|c| c.config_value.parse::<u32>().ok())
-        })
-        .unwrap_or(
+    let quota = sentinel_core::domain::entities::system::bot_config::cfg_u64(
+        &state
+            .bot_config_repo
+            .get_config(
+                &guild_id,
+                sentinel_core::domain::entities::system::bot_names::GUILD_BACKUP_BOT,
+            )
+            .await
+            .unwrap_or_default(),
+        "snapshot_quota",
+        u64::from(
             sentinel_core::application::guild_backup::manage_snapshots_service::MAX_SNAPSHOTS_PER_GUILD,
-        );
+        ),
+    ) as u32;
     let id = state
         .guild_snapshots_uc
         .store_snapshot_with_quota(snapshot, quota)

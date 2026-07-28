@@ -34,4 +34,14 @@ pub trait ManageAuditLogsUseCase: Send + Sync {
     ) -> Result<Vec<AuditLog>, DomainError>;
 
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
+
+    /// Timeline d'un salon vocal (events voice, ordre ASC). Default : vide
+    /// (pour les stubs de test).
+    async fn list_voice_channel_events(
+        &self,
+        _channel_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        Ok(vec![])
+    }
 }

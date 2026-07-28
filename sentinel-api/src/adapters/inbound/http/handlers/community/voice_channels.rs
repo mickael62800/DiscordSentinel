@@ -21,7 +21,6 @@ use crate::adapters::inbound::http::dto::community::voice_channels::VoiceChannel
 use crate::adapters::inbound::http::dto::community::voice_channels::VoiceChannelResponseDto;
 use crate::adapters::inbound::http::dto::community::voice_channels::WhitelistEntryResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
@@ -255,60 +254,28 @@ pub async fn list_channel_events(
     )
     .await?;
     let limit = crate::adapters::inbound::http::helpers::normalize_in(params.limit, 200, 1, 1000);
-    let rows: Vec<(
-        uuid::Uuid,
-        String,
-        String,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        serde_json::Value,
-        chrono::DateTime<chrono::Utc>,
-    )> = sqlx::query_as(
-        "SELECT id, guild_id, event_type, actor_id, actor_name, channel_id, channel_name, details, created_at
-         FROM audit_logs
-         WHERE channel_id = $1
-           AND event_type IN (
-             'voice_join', 'voice_leave', 'voice_move',
-             'voice_channel_created', 'voice_channel_updated', 'voice_channel_closed'
-           )
-         ORDER BY created_at ASC
-         LIMIT $2",
-    )
-    .bind(&channel_id)
-    .bind(limit)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(sqlx_internal("fetch voice events"))?;
+    // La liste blanche des events voix (règle métier) et le SQL vivent
+    // derrière le use case audit_logs — plus de sqlx dans l'inbound.
+    let logs = state
+        .audit_logs_uc
+        .list_voice_channel_events(&channel_id, limit)
+        .await?;
 
-    let events: Vec<serde_json::Value> = rows
+    let events: Vec<serde_json::Value> = logs
         .into_iter()
-        .map(
-            |(
-                id,
-                guild_id,
-                event_type,
-                actor_id,
-                actor_name,
-                ch_id,
-                ch_name,
-                details,
-                created_at,
-            )| {
-                serde_json::json!({
-                    "id": id.to_string(),
-                    "guild_id": guild_id,
-                    "event_type": event_type,
-                    "actor_id": actor_id,
-                    "actor_name": actor_name,
-                    "channel_id": ch_id,
-                    "channel_name": ch_name,
-                    "details": details,
-                    "created_at": created_at.to_rfc3339(),
-                })
-            },
-        )
+        .map(|l| {
+            serde_json::json!({
+                "id": l.id.to_string(),
+                "guild_id": l.guild_id,
+                "event_type": l.event_type,
+                "actor_id": l.actor_id,
+                "actor_name": l.actor_name,
+                "channel_id": l.channel_id,
+                "channel_name": l.channel_name,
+                "details": l.details,
+                "created_at": l.created_at.to_rfc3339(),
+            })
+        })
         .collect();
     Ok(Json(events))
 }

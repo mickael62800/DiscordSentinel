@@ -352,6 +352,45 @@ pub fn clamp_vote_deadline_hours(hours: i64) -> i64 {
     hours.clamp(1, 720)
 }
 
+/// Décision de journalisation à la finalisation d'une carte automod.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FinalizeSanctionPlan {
+    /// Action non journalisable (`delete`/`ignore`/inconnue) : rien à faire.
+    Nothing,
+    /// C1 — anti double-strike : l'auto-protection sévère a déjà journalisé
+    /// une sanction (mute auto) et la finalisation n'est pas plus sévère —
+    /// on ne re-journalise pas (sinon un incident = deux strikes).
+    AlreadyLogged,
+    /// Chemin nominal : journaliser l'action AVEC strike.
+    LogWithStrike,
+    /// BUG #5 — la finalisation est PLUS SÉVÈRE que le mute auto : on
+    /// journalise l'escalade (sinon l'action lourde n'apparaît nulle part)
+    /// mais SANS second strike (le mute auto a déjà compté celui de
+    /// l'incident).
+    LogWithoutStrike,
+}
+
+/// Règle de journalisation à la finalisation : quelle action journaliser et
+/// avec quel effet strike, selon que l'auto-protection a déjà sanctionné.
+pub fn finalize_sanction_plan(applied_action: &str, sanction_logged: bool) -> FinalizeSanctionPlan {
+    if !matches!(applied_action, "prevention" | "warn" | "mute" | "ban") {
+        return FinalizeSanctionPlan::Nothing;
+    }
+    if !sanction_logged {
+        return FinalizeSanctionPlan::LogWithStrike;
+    }
+    // L'auto-protection sévère journalise un mute : c'est la référence.
+    let auto_severity = AppliedAction::Mute.severity();
+    let finalized_severity = AppliedAction::from_str(applied_action)
+        .map(|a| a.severity())
+        .unwrap_or(0);
+    if finalized_severity <= auto_severity {
+        FinalizeSanctionPlan::AlreadyLogged
+    } else {
+        FinalizeSanctionPlan::LogWithoutStrike
+    }
+}
+
 /// Ligne terminale (statut applied|ignored|decided) chargee pour mesurer le
 /// taux de faux positifs. Donnee brute cote repo, agregee en Rust.
 #[derive(Debug, Clone)]

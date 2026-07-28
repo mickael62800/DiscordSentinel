@@ -31,6 +31,17 @@ pub fn is_security_audit_event(event_type: &str) -> bool {
     event_type.starts_with(AUDIT_EVENT_SECURITY_PREFIX)
 }
 
+/// Events composant la timeline d'un salon vocal (règle métier : liste
+/// blanche consommée par le repository pour l'endpoint by-channel/events).
+pub const VOICE_TIMELINE_EVENT_TYPES: &[&str] = &[
+    "voice_join",
+    "voice_leave",
+    "voice_move",
+    "voice_channel_created",
+    "voice_channel_updated",
+    "voice_channel_closed",
+];
+
 #[cfg(test)]
 #[path = "tests/audit_log.rs"]
 mod tests;

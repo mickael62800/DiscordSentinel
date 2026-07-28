@@ -2,7 +2,7 @@
 name = "sentinel-worker"
 version = "0.1.0"
 edition = "2021"
-description = "Worker unifie DiscordSentinel — orchestrateur de tous les jobs periodiques (cleanup, coude, moderation, analytics, etc.) dans un seul binaire. Fusion progressive des anciens workers eclates."
+description = "Worker unifie DiscordSentinel — orchestrateur de tous les jobs periodiques (cleanup, moderation, analytics, tickets, etc.) dans un seul binaire. Fusion progressive des anciens workers eclates."
 
 [dependencies]
 # Coeur hexagonal partagé (domain + ports + application). Permet au worker de

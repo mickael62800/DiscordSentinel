@@ -56,6 +56,13 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let mut skipped = 0u32;
 
     for ticket in &candidates {
+        // Garde per-guild alignée sur les jumeaux tickets/escalate_sla et
+        // close_inactive (oubli historique : appeal_sla escaladait même pour
+        // les guilds ayant désactivé ticket-bot).
+        if !crate::common::is_worker_enabled(pool, &ticket.server, "ticket-bot").await {
+            skipped += 1;
+            continue;
+        }
         let escalation_minutes = sla_configs
             .get(&ticket.server)
             .map(|c| c.escalation_minutes)

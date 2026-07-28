@@ -234,28 +234,15 @@ async fn log_review_sanction(
     use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
     use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
 
-    if !matches!(applied_action, "prevention" | "warn" | "mute" | "ban") {
-        return;
-    }
-
-    // C1 — anti double-strike : si l'auto-protection sévère a déjà journalisé
-    // une sanction pour cet incident (mute auto AVANT la carte), la finalisation
-    // ne doit PAS re-journaliser -> sinon un incident = deux strikes.
-    //
-    // BUG #5 — exception : si l'admin finalise avec une action PLUS SÉVÈRE que
-    // l'auto-protection (qui applique un mute), on journalise quand même
-    // l'escalade (sinon l'action lourde n'apparaît nulle part -> sous-comptage),
-    // mais SANS second strike (le mute auto a déjà compté le strike de
-    // l'incident). Les finalisations de sévérité égale ou moindre restent
-    // ignorées comme avant.
-    let skip_strike = if review.sanction_logged {
-        use sentinel_core::domain::entities::moderation::review::automod::AppliedAction;
-        // L'auto-protection sévère journalise un mute : c'est notre référence.
-        let auto_severity = AppliedAction::Mute.severity();
-        let finalized_severity = AppliedAction::from_str(applied_action)
-            .map(|a| a.severity())
-            .unwrap_or(0);
-        if finalized_severity <= auto_severity {
+    // La DÉCISION (quelle action journaliser, avec ou sans strike — règles C1
+    // anti double-strike et BUG #5 escalade) vit dans le domaine ; le handler
+    // n'exécute que les effets (métriques, logs, appels use case).
+    use sentinel_core::domain::entities::moderation::review::automod::{
+        finalize_sanction_plan, FinalizeSanctionPlan,
+    };
+    let skip_strike = match finalize_sanction_plan(applied_action, review.sanction_logged) {
+        FinalizeSanctionPlan::Nothing => return,
+        FinalizeSanctionPlan::AlreadyLogged => {
             metrics::counter!("automod_sanction_log_total", "result" => "skipped_already_logged")
                 .increment(1);
             tracing::info!(
@@ -265,29 +252,33 @@ async fn log_review_sanction(
             );
             return;
         }
-        // Escalade plus sévère : on journalise l'action lourde sans strike.
-        metrics::counter!("automod_sanction_log_total", "result" => "escalation_no_strike")
-            .increment(1);
-        tracing::info!(
-            review_id = %review.id,
-            action = %applied_action,
-            "Finalisation plus sévère que l'auto-protection : escalade journalisée sans second strike (BUG #5)"
-        );
-        true
-    } else {
-        false
+        FinalizeSanctionPlan::LogWithoutStrike => {
+            metrics::counter!("automod_sanction_log_total", "result" => "escalation_no_strike")
+                .increment(1);
+            tracing::info!(
+                review_id = %review.id,
+                action = %applied_action,
+                "Finalisation plus sévère que l'auto-protection : escalade journalisée sans second strike (BUG #5)"
+            );
+            true
+        }
+        FinalizeSanctionPlan::LogWithStrike => false,
     };
 
     // Duree du mute depuis la config guild (pour le rappel d'expiration + l'historique).
     let duration = if applied_action == "mute" {
-        state
-            .bot_config_repo
-            .get_config(review.guild_id.as_str(), "automod-bot")
-            .await
-            .unwrap_or_default()
-            .iter()
-            .find(|e| e.config_key == "mute_duration_secs")
-            .and_then(|e| e.config_value.parse::<u64>().ok())
+        sentinel_core::domain::entities::system::bot_config::cfg_str(
+            &state
+                .bot_config_repo
+                .get_config(
+                    review.guild_id.as_str(),
+                    sentinel_core::domain::entities::system::bot_names::AUTOMOD_BOT,
+                )
+                .await
+                .unwrap_or_default(),
+            "mute_duration_secs",
+        )
+        .and_then(|v| v.parse::<u64>().ok())
     } else {
         None
     };
