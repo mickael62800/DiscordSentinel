@@ -14,7 +14,6 @@ pub mod faq;
 pub mod satisfaction;
 pub mod sla;
 pub mod templates;
-pub mod transcript;
 
 use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand, ModalInteraction,

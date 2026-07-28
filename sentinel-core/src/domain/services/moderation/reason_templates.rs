@@ -15,6 +15,17 @@ pub fn parse_templates(raw: &str) -> Vec<ReasonTemplate> {
         .collect()
 }
 
+/// Sérialise les templates vers le format config "label|raison" par ligne
+/// (inverse exact de `parse_templates` — l'aller-retour vit ici pour que le
+/// format ne puisse pas diverger).
+pub fn serialize_templates(templates: &[ReasonTemplate]) -> String {
+    templates
+        .iter()
+        .map(|t| format!("{}|{}", t.label, t.reason))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// Filtre les templates par un terme de recherche (pour l'autocomplete).
 pub fn filter_templates<'a>(
     templates: &'a [ReasonTemplate],
@@ -74,6 +85,36 @@ mod tests {
         let raw = "Label|Raison avec | pipe";
         let t = parse_templates(raw);
         assert_eq!(t[0].reason, "Raison avec | pipe");
+    }
+
+    #[test]
+    fn serialize_roundtrip() {
+        let templates = vec![
+            ReasonTemplate {
+                label: "Spam".into(),
+                reason: "Repetition".into(),
+            },
+            ReasonTemplate {
+                label: "Insulte".into(),
+                reason: "Propos inapproprie".into(),
+            },
+        ];
+        let parsed = parse_templates(&serialize_templates(&templates));
+        assert_eq!(parsed, templates);
+    }
+
+    #[test]
+    fn serialize_empty() {
+        assert_eq!(serialize_templates(&[]), "");
+    }
+
+    #[test]
+    fn serialize_single() {
+        let t = vec![ReasonTemplate {
+            label: "A".into(),
+            reason: "B".into(),
+        }];
+        assert_eq!(serialize_templates(&t), "A|B");
     }
 
     #[test]

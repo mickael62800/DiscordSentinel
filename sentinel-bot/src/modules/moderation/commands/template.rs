@@ -345,7 +345,7 @@ async fn save_templates(
     guild_id: &str,
     templates: &[ReasonTemplate],
 ) -> Result<(), String> {
-    let serialized = serialize_templates(templates);
+    let serialized = reason_templates::serialize_templates(templates);
 
     let data = ctx.data.read().await;
     let api = data
@@ -356,48 +356,5 @@ async fn save_templates(
     Ok(())
 }
 
-fn serialize_templates(templates: &[ReasonTemplate]) -> String {
-    templates
-        .iter()
-        .map(|t| format!("{}|{}", t.label, t.reason))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn serialize_roundtrip() {
-        let templates = vec![
-            ReasonTemplate {
-                label: "Spam".into(),
-                reason: "Repetition".into(),
-            },
-            ReasonTemplate {
-                label: "Insulte".into(),
-                reason: "Propos inapproprie".into(),
-            },
-        ];
-        let serialized = serialize_templates(&templates);
-        let parsed = reason_templates::parse_templates(&serialized);
-        assert_eq!(parsed.len(), 2);
-        assert_eq!(parsed[0].label, "Spam");
-        assert_eq!(parsed[1].reason, "Propos inapproprie");
-    }
-
-    #[test]
-    fn serialize_empty() {
-        assert_eq!(serialize_templates(&[]), "");
-    }
-
-    #[test]
-    fn serialize_single() {
-        let t = vec![ReasonTemplate {
-            label: "A".into(),
-            reason: "B".into(),
-        }];
-        assert_eq!(serialize_templates(&t), "A|B");
-    }
-}
+// `serialize_templates` vit dans le core, à côté de `parse_templates`
+// (l'aller-retour du format "label|raison" ne peut plus diverger).

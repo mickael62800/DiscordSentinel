@@ -606,14 +606,6 @@ fn build_panel_embed(
         .timestamp(serenity::model::Timestamp::now())
 }
 
-/// Nettoie un nom pour en faire un nom de salon Discord valide (texte).
-fn slugify(name: &str) -> String {
-    name.to_lowercase()
-        .chars()
-        .map(|c| if c.is_alphanumeric() { c } else { '-' })
-        .collect::<String>()
-        .trim_matches('-')
-        .chars()
-        .take(90)
-        .collect()
-}
+// La règle de nommage de salon vit dans le core (avec tests), à côté de
+// `slugify_emoji_name` — les deux slugifieurs Discord sont documentés ensemble.
+use sentinel_core::domain::services::system::discord_naming::slugify_channel_name as slugify;
