@@ -11,7 +11,12 @@
 //! re-exports ci-dessous.
 
 mod app_state;
+// Schedulers/monitors de fond : ils orchestrent des use cases ET connaissent
+// `AppState` — leur place est la composition root (pas `adapters/outbound`,
+// qui ne doit jamais dépendre de l'inbound).
+pub mod backup_scheduler;
 mod connections;
+pub mod container_monitor;
 mod inference;
 mod workers;
 

@@ -890,7 +890,7 @@ pub async fn build_app_state(
         discord_oauth_client_secret: config.discord_oauth_client_secret.clone(),
         discord_oauth_redirect_uri: config.discord_oauth_redirect_uri.clone(),
         web_front_url: config.web_front_url.clone(),
-        container_monitor: Some(crate::adapters::outbound::system::container_monitor::spawn(
+        container_monitor: Some(crate::bootstrap::container_monitor::spawn(
             pg_pool.clone(),
         )),
         rate_limiter: Some(Arc::new(

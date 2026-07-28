@@ -12,7 +12,7 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;

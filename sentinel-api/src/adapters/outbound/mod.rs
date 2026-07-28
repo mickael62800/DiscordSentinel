@@ -11,3 +11,6 @@ pub mod redis_cache;
 pub mod redis_service_registry;
 pub mod system;
 pub mod text_tokenizer;
+// Adapter OUTBOUND : implémente le port `EventBroadcasterPort` (publication
+// Redis pub/sub vers la gateway) — historiquement rangé côté inbound.
+pub mod ws;

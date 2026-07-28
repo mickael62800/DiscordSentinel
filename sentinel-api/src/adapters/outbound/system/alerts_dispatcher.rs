@@ -18,7 +18,7 @@ use redis::AsyncCommands;
 use sqlx::PgPool;
 use tokio::sync::RwLock;
 
-use super::container_monitor::ContainerMonitorState;
+use crate::bootstrap::container_monitor::ContainerMonitorState;
 
 /// Une regle d'alerte chargee depuis la DB.
 #[derive(Debug, Clone, sqlx::FromRow)]

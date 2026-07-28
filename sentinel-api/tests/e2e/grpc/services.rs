@@ -47,7 +47,7 @@ use sentinel_api::adapters::inbound::grpc::community::progression::ProgressionGr
 use sentinel_api::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
-use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;

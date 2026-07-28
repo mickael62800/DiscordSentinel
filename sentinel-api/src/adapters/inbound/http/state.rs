@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::discord_api::DiscordApi;
 use crate::adapters::outbound::inference_service::InferenceService;
 use crate::adapters::outbound::job_client::JobClient;
@@ -177,7 +177,7 @@ pub struct AppState {
     pub discord_oauth_redirect_uri: String,
     pub web_front_url: String,
     /// Container monitor : poll Docker chaque minute, detecte les changements.
-    pub container_monitor: Option<std::sync::Arc<tokio::sync::RwLock<crate::adapters::outbound::system::container_monitor::ContainerMonitorState>>>,
+    pub container_monitor: Option<std::sync::Arc<tokio::sync::RwLock<crate::bootstrap::container_monitor::ContainerMonitorState>>>,
     /// Rate limiter dynamique : tracking req/IP en memoire pour ban auto.
     pub rate_limiter: Option<std::sync::Arc<crate::adapters::outbound::system::rate_limiter::RateLimiter>>,
     /// Feature flag — active le `global_rbac_gate` (gate RBAC global

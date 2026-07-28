@@ -11,7 +11,7 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;

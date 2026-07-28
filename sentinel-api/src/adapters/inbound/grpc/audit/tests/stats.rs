@@ -73,7 +73,7 @@ fn guild_overview_to_proto_empty_top_members() {
 
 // ── RPC handler tests avec mock ──
 
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;

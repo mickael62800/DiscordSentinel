@@ -128,7 +128,7 @@ fn add_xp_result_to_proto_no_levelup() {
 
 // ── RPC tests avec mock ──
 
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::community::manage_levels::AddXpCommand;
 use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use crate::ports::inbound::community::manage_levels::ResetTarget;
