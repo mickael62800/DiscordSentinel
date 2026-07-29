@@ -63,7 +63,10 @@ pub fn build_result_embed(resp: &WheelSpinResponse, username: &str) -> CreateEmb
 }
 
 /// Embed du solde (`/solde`).
-pub fn build_wallet_embed(w: &crate::api_client::WalletResponse, display_name: &str) -> CreateEmbed {
+pub fn build_wallet_embed(
+    w: &crate::api_client::WalletResponse,
+    display_name: &str,
+) -> CreateEmbed {
     CreateEmbed::new()
         .title(format!("\u{1fa99} Portefeuille de {display_name}"))
         .color(0xf1c40f)
@@ -128,4 +131,42 @@ pub fn build_error_embed(message: &str) -> CreateEmbed {
         .title("\u{1f300} Roue du Destin")
         .description(message)
         .color(0xed4245)
+}
+
+pub fn build_coude_challenge_embed(attacker_id: u64, defender_id: u64, mise: i64) -> CreateEmbed {
+    CreateEmbed::new()
+        .title("👊 Coup de Coude !")
+        .description(format!("<@{attacker_id}> defie <@{defender_id}> pour **{mise} coins**.\n\n<@{defender_id}>, acceptes-tu le duel ?"))
+        .color(0xF39C12)
+        .footer(CreateEmbedFooter::new("Le defi expire lorsqu'il est refuse ou resolu."))
+}
+
+pub fn build_coude_result_embed(
+    attacker_id: u64,
+    defender_id: u64,
+    attacker_roll: i32,
+    defender_roll: i32,
+    winner_id: Option<u64>,
+    mise: i64,
+) -> CreateEmbed {
+    let description = match winner_id {
+        Some(winner) => format!(
+            "<@{attacker_id}> lance **{attacker_roll}** • <@{defender_id}> lance **{defender_roll}**\n\n🏆 <@{winner}> remporte **{mise} coins** !"
+        ),
+        None => format!(
+            "<@{attacker_id}> lance **{attacker_roll}** • <@{defender_id}> lance **{defender_roll}**\n\n🤝 Egalite : personne ne perd de coins."
+        ),
+    };
+    CreateEmbed::new().title("👊 Resultat du Coup de Coude").description(description).color(0x57F287)
+}
+
+pub fn build_coude_profile_embed(p: &crate::api_client::CoudeProfileResponse) -> CreateEmbed {
+    CreateEmbed::new().title(format!("👊 Profil Coude — {}", p.username)).color(0x5865F2)
+        .description(format!("**{}** · Niveau **{}** — {} XP\n❤️ {}/{} HP · 🪙 {} coins", p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins))
+        .field("Classe", &p.class, true).field("ATK / DEF", format!("{} / {}", p.atk, p.def), true)
+        .field("Points de stats", p.stat_points.to_string(), true)
+        .field("Palmares", format!("{}V · {}D · {}N", p.total_wins, p.total_losses, p.total_draws), false)
+        .field("Vols", format!("{} coins", p.total_stolen), true)
+        .field("Lâcheté", p.cowardice_count.to_string(), true)
+        .field("Chaos", p.chaos_events.to_string(), true)
 }

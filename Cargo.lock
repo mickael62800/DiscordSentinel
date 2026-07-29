@@ -2005,12 +2005,16 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "bollard",
  "chrono",
  "dotenvy",
+ "futures-util",
  "nexus-core",
+ "redis",
  "serde",
  "serde_json",
  "sqlx",
+ "tar",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2021,8 +2025,12 @@ dependencies = [
 name = "nexus-bot"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "dotenvy",
+ "futures-util",
  "nexus-core",
+ "rand 0.8.6",
+ "redis",
  "reqwest",
  "serde",
  "serde_json",
@@ -2040,8 +2048,10 @@ dependencies = [
  "chrono",
  "rand 0.8.6",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tracing",
  "uuid",
 ]
 
@@ -2067,7 +2077,11 @@ dependencies = [
 name = "nexus-worker"
 version = "0.1.0"
 dependencies = [
+ "dotenvy",
  "nexus-core",
+ "reqwest",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "tracing-subscriber",

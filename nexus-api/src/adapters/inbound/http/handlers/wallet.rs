@@ -148,6 +148,9 @@ pub async fn leaderboard(
     Path(guild_id): Path<String>,
     Query(q): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<WalletDto>>, ApiError> {
-    let wallets = state.wallet_leaderboard.leaderboard(&guild_id, q.limit).await?;
+    let wallets = state
+        .wallet_leaderboard
+        .leaderboard(&guild_id, q.limit)
+        .await?;
     Ok(Json(wallets.into_iter().map(WalletDto::from).collect()))
 }

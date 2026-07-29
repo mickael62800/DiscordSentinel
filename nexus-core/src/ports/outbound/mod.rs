@@ -1,4 +1,14 @@
 //! Ports outbound Nexus (repos abstraits, implementes par les adapters).
 
+pub mod casino;
+pub mod events;
+pub mod coude_repository;
+pub mod coude_inventory_repository;
+pub mod coude_insurance_repository;
+pub mod coude_steal_repository;
+pub mod coude_prime_repository;
+pub mod coude_bet_repository;
+pub mod game;
+pub mod system;
 pub mod wallet_repository;
 pub mod wheel_repository;

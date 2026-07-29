@@ -1,0 +1,27 @@
+//! Port outbound : publication d'evenements applicatifs vers les autres
+//! composants Nexus (typiquement le bot Discord).
+//!
+//! L'API publie ; le bot consomme. L'implementation concrete (stream Redis,
+//! noop en dev) vit dans les adapters de `nexus-api`. Le domaine ne connait
+//! que ce trait.
+
+use async_trait::async_trait;
+
+/// Nom des evenements game-portal, partages entre publieur (API) et
+/// consommateur (bot). Une constante par event pour eviter les typos.
+pub mod game_events {
+    pub const SERVER_STARTED: &str = "game_server_started";
+    pub const SERVER_STOPPED: &str = "game_server_stopped";
+    pub const SERVER_DELETED: &str = "game_server_deleted";
+    pub const IP_REVEAL: &str = "game_ip_reveal";
+    pub const DAILY_PING: &str = "game_daily_ping";
+}
+
+#[async_trait]
+pub trait EventPublisher: Send + Sync {
+    /// Publie un evenement. Best-effort : un echec de publication ne doit
+    /// jamais faire echouer le cas d'usage metier appelant (le serveur de jeu
+    /// a bien demarre meme si le bot n'a pas ete prevenu). Les erreurs sont
+    /// loggees par l'implementation.
+    async fn publish(&self, event: &str, data: serde_json::Value);
+}

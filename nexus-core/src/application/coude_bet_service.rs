@@ -1,0 +1,3 @@
+use std::sync::Arc; use async_trait::async_trait; use crate::{domain::errors::DomainError,ports::{inbound::coude_bet::CoudeBetUseCase,outbound::coude_bet_repository::CoudeBetRepository}};
+pub struct CoudeBetService{repo:Arc<dyn CoudeBetRepository>} impl CoudeBetService{pub fn new(repo:Arc<dyn CoudeBetRepository>)->Self{Self{repo}}}
+#[async_trait] impl CoudeBetUseCase for CoudeBetService {async fn place(&self,guild:&str,combat:uuid::Uuid,bettor:&str,name:&str,backed:&str,amount:i64)->Result<(),DomainError>{if amount<=0{return Err(DomainError::Validation("mise invalide".into()))}self.repo.place(guild,combat,bettor,name,backed,amount).await}}

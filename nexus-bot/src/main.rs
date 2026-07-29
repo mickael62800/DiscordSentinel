@@ -16,6 +16,9 @@
 
 mod api_client;
 mod embeds;
+mod event_bus;
+mod game_portal;
+mod games;
 
 use std::sync::Arc;
 
@@ -28,42 +31,62 @@ use serenity::all::CreateCommand;
 use serenity::all::CreateCommandOption;
 use serenity::all::CreateInteractionResponse;
 use serenity::all::CreateInteractionResponseMessage;
-use serenity::all::UserId;
+use serenity::all::CreateActionRow;
+use serenity::all::CreateButton;
+use serenity::all::ButtonStyle;
 use serenity::all::EventHandler;
 use serenity::all::GatewayIntents;
 use serenity::all::Interaction;
 use serenity::all::Ready;
+use serenity::all::UserId;
 use serenity::async_trait;
 use serenity::Client;
+
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use api_client::ApiClient;
 
 struct Handler {
     api: Arc<ApiClient>,
+    /// Garde : le consumer d'evenements ne doit demarrer qu'une fois, meme si
+    /// `ready` est rejoue apres une reconnexion gateway.
+    game_portal_started: AtomicBool,
 }
 
 /// Extrait une option user par nom.
 fn option_user(cmd: &CommandInteraction, name: &str) -> Option<UserId> {
-    cmd.data.options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        CommandDataOptionValue::User(id) => Some(*id),
-        _ => None,
-    })
+    cmd.data
+        .options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::User(id) => Some(*id),
+            _ => None,
+        })
 }
 
 /// Extrait une option entiere par nom.
 fn option_integer(cmd: &CommandInteraction, name: &str) -> Option<i64> {
-    cmd.data.options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        CommandDataOptionValue::Integer(v) => Some(*v),
-        _ => None,
-    })
+    cmd.data
+        .options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::Integer(v) => Some(*v),
+            _ => None,
+        })
 }
 
 /// Extrait une option string par nom.
 fn option_string(cmd: &CommandInteraction, name: &str) -> Option<String> {
-    cmd.data.options.iter().find(|o| o.name == name).and_then(|o| match &o.value {
-        CommandDataOptionValue::String(s) => Some(s.clone()),
-        _ => None,
-    })
+    cmd.data
+        .options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::String(s) => Some(s.clone()),
+            _ => None,
+        })
 }
 
 impl Handler {
@@ -82,8 +105,12 @@ impl Handler {
         match cmd.guild_id {
             Some(g) => Some(g.to_string()),
             None => {
-                self.reply_error(ctx, cmd, "Cette commande s'utilise sur un serveur, pas en MP.")
-                    .await;
+                self.reply_error(
+                    ctx,
+                    cmd,
+                    "Cette commande s'utilise sur un serveur, pas en MP.",
+                )
+                .await;
                 None
             }
         }
@@ -128,11 +155,13 @@ impl Handler {
         };
 
         let Some(target_id) = option_user(cmd, "membre") else {
-            self.reply_error(ctx, cmd, "Indique le membre a qui donner.").await;
+            self.reply_error(ctx, cmd, "Indique le membre a qui donner.")
+                .await;
             return;
         };
         let Some(amount) = option_integer(cmd, "montant") else {
-            self.reply_error(ctx, cmd, "Indique le montant du don.").await;
+            self.reply_error(ctx, cmd, "Indique le montant du don.")
+                .await;
             return;
         };
         let reason = option_string(cmd, "raison");
@@ -140,12 +169,14 @@ impl Handler {
         // Pre-checks UI rapides (la regle de verite reste cote core/API :
         // auto-transfert, montant > 0, solde suffisant sans clamp).
         if target_id == cmd.user.id {
-            self.reply_error(ctx, cmd, "Tu ne peux pas te donner a toi-meme !").await;
+            self.reply_error(ctx, cmd, "Tu ne peux pas te donner a toi-meme !")
+                .await;
             return;
         }
         let target_user = cmd.data.resolved.users.get(&target_id);
         if target_user.is_some_and(|u| u.bot) {
-            self.reply_error(ctx, cmd, "Tu ne peux pas donner a un bot !").await;
+            self.reply_error(ctx, cmd, "Tu ne peux pas donner a un bot !")
+                .await;
             return;
         }
         let target_username = target_user
@@ -212,7 +243,9 @@ impl Handler {
     async fn handle_roue(&self, ctx: &Context, cmd: &CommandInteraction) {
         let Some(guild_id) = cmd.guild_id else {
             let msg = CreateInteractionResponseMessage::new()
-                .embed(embeds::build_error_embed("La Roue se tire sur un serveur, pas en MP."))
+                .embed(embeds::build_error_embed(
+                    "La Roue se tire sur un serveur, pas en MP.",
+                ))
                 .ephemeral(true);
             let _ = cmd
                 .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
@@ -241,12 +274,137 @@ impl Handler {
             tracing::error!("followup /roue impossible: {e}");
         }
     }
+
+    async fn handle_coude(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id) = self.require_guild(ctx, cmd).await else { return; };
+        let Some(defender_id) = option_user(cmd, "membre") else {
+            self.reply_error(ctx, cmd, "Indique un adversaire.").await;
+            return;
+        };
+        let Some(mise) = option_integer(cmd, "mise") else {
+            self.reply_error(ctx, cmd, "Indique une mise valide.").await;
+            return;
+        };
+        if defender_id == cmd.user.id {
+            self.reply_error(ctx, cmd, "Tu ne peux pas te defier toi-meme.").await;
+            return;
+        }
+        let defender = cmd.data.resolved.users.get(&defender_id);
+        if defender.is_some_and(|u| u.bot) {
+            self.reply_error(ctx, cmd, "Tu ne peux pas defier un bot.").await;
+            return;
+        }
+        if let Err(e) = cmd.defer(&ctx.http).await { tracing::error!("defer /coude impossible: {e}"); return; }
+        let response = self.api.challenge_coude(&guild_id, &api_client::CoudeChallengeRequest {
+            channel_id: cmd.channel_id.to_string(), attacker_id: cmd.user.id.to_string(),
+            attacker_name: cmd.user.display_name().to_string(), defender_id: defender_id.to_string(),
+            defender_name: defender.map(|u| u.display_name().to_string()).unwrap_or_else(|| format!("<@{defender_id}>")), mise,
+        }).await;
+        match response {
+            Ok(combat) => {
+                let buttons = CreateActionRow::Buttons(vec![
+                    CreateButton::new(format!("c:a:{}:{}:{}", combat.id, defender_id, cmd.user.id)).label("Accepter").style(ButtonStyle::Success),
+                    CreateButton::new(format!("c:r:{}:{}:{}", combat.id, defender_id, cmd.user.id)).label("Refuser").style(ButtonStyle::Danger),
+                ]);
+                let message = serenity::all::CreateInteractionResponseFollowup::new()
+                    .embed(embeds::build_coude_challenge_embed(cmd.user.id.get(), defender_id.get(), combat.mise))
+                    .components(vec![buttons]);
+                if let Err(e) = cmd.create_followup(&ctx.http, message).await { tracing::error!("envoi defi Coude impossible: {e}"); }
+            }
+            Err(message) => self.reply_error(ctx, cmd, &message).await,
+        }
+    }
+
+    async fn handle_coude_profile(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id) = self.require_guild(ctx, cmd).await else { return; };
+        let user_id = option_user(cmd, "membre").unwrap_or(cmd.user.id);
+        let username = if user_id == cmd.user.id { cmd.user.display_name().to_string() } else { cmd.data.resolved.users.get(&user_id).map(|u| u.display_name().to_string()).unwrap_or_default() };
+        if let Err(e) = cmd.defer(&ctx.http).await { tracing::error!("defer /profil impossible: {e}"); return; }
+        let embed = match self.api.coude_profile(&guild_id, &user_id.to_string(), &username).await { Ok(profile) => embeds::build_coude_profile_embed(&profile), Err(message) => embeds::build_error_embed(&message) };
+        let _ = cmd.create_followup(&ctx.http, serenity::all::CreateInteractionResponseFollowup::new().embed(embed)).await;
+    }
+
+    async fn handle_coude_class(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id) = self.require_guild(ctx, cmd).await else { return; };
+        let Some(class) = option_string(cmd, "classe") else { self.reply_error(ctx, cmd, "Choisis une classe.").await; return; };
+        if let Err(e) = cmd.defer(&ctx.http).await { tracing::error!("defer /classe impossible: {e}"); return; }
+        let embed = match self.api.choose_coude_class(&guild_id, &cmd.user.id.to_string(), cmd.user.display_name(), &class).await { Ok(profile) => embeds::build_coude_profile_embed(&profile), Err(message) => embeds::build_error_embed(&message) };
+        let _ = cmd.create_followup(&ctx.http, serenity::all::CreateInteractionResponseFollowup::new().embed(embed)).await;
+    }
+
+    async fn handle_coude_train(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id) = self.require_guild(ctx, cmd).await else { return; };
+        let Some(stat) = option_string(cmd, "stat") else { self.reply_error(ctx, cmd, "Choisis atk ou def.").await; return; };
+        if let Err(e) = cmd.defer(&ctx.http).await { tracing::error!("defer /train impossible: {e}"); return; }
+        let embed = match self.api.train_coude(&guild_id, &cmd.user.id.to_string(), cmd.user.display_name(), &stat).await { Ok(profile) => embeds::build_coude_profile_embed(&profile), Err(message) => embeds::build_error_embed(&message) };
+        let _ = cmd.create_followup(&ctx.http, serenity::all::CreateInteractionResponseFollowup::new().embed(embed)).await;
+    }
+    async fn handle_coude_shop(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id) = self.require_guild(ctx, cmd).await else { return; }; let Some(item) = option_string(cmd, "objet") else { return; };
+        if let Err(e)=cmd.defer(&ctx.http).await { tracing::error!("defer /shop impossible: {e}"); return; }
+        let message=match self.api.buy_coude_item(&guild_id,&cmd.user.id.to_string(),&item).await { Ok(balance)=>format!("🛒 Objet **{item}** acheté. Solde : **{balance} coins**."),Err(e)=>e};
+        let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(message)).await;
+    }
+    async fn handle_coude_insurance(&self, ctx: &Context, cmd: &CommandInteraction) {
+        let Some(guild_id)=self.require_guild(ctx,cmd).await else{return;}; if let Err(e)=cmd.defer(&ctx.http).await{tracing::error!("defer /assurance impossible: {e}");return;}
+        let message=match self.api.buy_coude_insurance(&guild_id,&cmd.user.id.to_string()).await { Ok((scam,expires))=>if scam {format!("⚠️ Assurance achetée, mais elle semble douteuse… Expire : {expires}")} else {format!("🛡️ Assurance active jusqu’à {expires}.")},Err(e)=>e};
+        let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(message)).await;
+    }
+    async fn handle_steal(&self,ctx:&Context,cmd:&CommandInteraction){let Some(guild)=self.require_guild(ctx,cmd).await else{return;};let Some(target)=option_user(cmd,"membre")else{return;};let name=cmd.data.resolved.users.get(&target).map(|u|u.display_name().to_string()).unwrap_or_default();if let Err(_)=cmd.defer(&ctx.http).await{return;}let text=match self.api.steal_coude(&guild,&cmd.user.id.to_string(),&api_client::CoudeStealRequest{thief_name:cmd.user.display_name().into(),victim_id:target.to_string(),victim_name:name}).await{Ok((true,n))=>format!("🗡️ Vol réussi : {n} coins."),Ok((false,n))=>format!("💥 Vol raté : {n} coins perdus."),Err(e)=>e};let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(text)).await;}
+    async fn handle_prime(&self,ctx:&Context,cmd:&CommandInteraction){let Some(guild)=self.require_guild(ctx,cmd).await else{return;};let(Some(target),Some(amount))=(option_user(cmd,"membre"),option_integer(cmd,"montant"))else{return;};let name=cmd.data.resolved.users.get(&target).map(|u|u.display_name().to_string()).unwrap_or_default();if let Err(_)=cmd.defer(&ctx.http).await{return;}let text=match self.api.prime_coude(&guild,&cmd.user.id.to_string(),&api_client::CoudePrimeRequest{target_id:target.to_string(),target_name:name,placer_name:cmd.user.display_name().into(),amount}).await{Ok(())=>format!("🎯 Prime de {amount} coins posée sur <@{target}>."),Err(e)=>e};let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(text)).await;}
+
+    async fn handle_inventory(&self,ctx:&Context,cmd:&CommandInteraction){let Some(guild)=self.require_guild(ctx,cmd).await else{return;};if cmd.defer(&ctx.http).await.is_err(){return;}let text=match self.api.inventory_coude(&guild,&cmd.user.id.to_string()).await{Ok(items)if items.is_empty()=>"🎒 Inventaire vide.".into(),Ok(items)=>items.into_iter().map(|i|format!("• {} ×{}",i.item_key,i.quantity)).collect::<Vec<_>>().join("\n"),Err(e)=>e};let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(text)).await;}
+
+    async fn handle_bet(&self,ctx:&Context,cmd:&CommandInteraction){let Some(guild)=self.require_guild(ctx,cmd).await else{return;};let(Some(id),Some(target),Some(amount))=(option_string(cmd,"combat"),option_user(cmd,"membre"),option_integer(cmd,"montant"))else{return;};if cmd.defer(&ctx.http).await.is_err(){return;}let text=match self.api.bet_coude(&guild,&cmd.user.id.to_string(),&api_client::CoudeBetRequest{combat_id:id,bettor_name:cmd.user.display_name().into(),backed_id:target.to_string(),amount}).await{Ok(())=>format!("🎲 Pari de {amount} coins enregistré sur <@{target}>."),Err(e)=>e};let _=cmd.create_followup(&ctx.http,serenity::all::CreateInteractionResponseFollowup::new().content(text)).await;}
+
+    async fn handle_coude_component(&self, ctx: &Context, component: &serenity::all::ComponentInteraction) {
+        let parts: Vec<_> = component.data.custom_id.split(':').collect();
+        if parts.len() != 5 || parts[0] != "c" { return; }
+        let (action, combat_id, defender_id, attacker_id) = (parts[1], parts[2], parts[3], parts[4]);
+        if component.user.id.to_string() != defender_id {
+            let _ = component.create_response(&ctx.http, CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().content("Seul l'adversaire peut repondre a ce defi.").ephemeral(true)
+            )).await;
+            return;
+        }
+        if action == "r" {
+            match self.api.refuse_coude(combat_id, defender_id).await {
+                Ok(true) => { let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(CreateInteractionResponseMessage::new().content("👊 Duel refuse.").components(vec![]))).await; }
+                Ok(false) => self.component_error(ctx, component, "Ce defi n'est plus disponible.").await,
+                Err(e) => self.component_error(ctx, component, &e).await,
+            }
+            return;
+        }
+        if action != "a" { return; }
+        match self.api.accept_coude(combat_id, defender_id).await {
+            Ok(true) => {
+                let Ok(attacker_id) = attacker_id.parse::<u64>() else { self.component_error(ctx, component, "Defi invalide.").await; return; };
+                match self.api.resolve_coude(combat_id).await {
+                    Ok(true) => { let _ = component.create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(CreateInteractionResponseMessage::new().content(format!("👊 Duel resolu entre <@{}> et <@{}>. Consultez /profil pour voir les consequences.", attacker_id, component.user.id)).components(vec![]))).await; }
+                    Ok(false) => self.component_error(ctx, component, "Le duel n'a pas pu etre resolu.").await,
+                    Err(e) => self.component_error(ctx, component, &e).await,
+                }
+            }
+            Ok(false) => self.component_error(ctx, component, "Ce defi n'est plus disponible.").await,
+            Err(e) => self.component_error(ctx, component, &e).await,
+        }
+    }
+
+    async fn component_error(&self, ctx: &Context, component: &serenity::all::ComponentInteraction, message: &str) {
+        let _ = component.create_response(&ctx.http, CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(message).ephemeral(true))).await;
+    }
 }
 
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         tracing::info!("nexus-bot connecte en tant que {}", ready.user.name);
+        // Consumer des evenements game-portal (cycle de vie des salons de
+        // session). Spawn une seule fois : `ready` peut etre rejoue apres une
+        // reconnexion gateway, le consumer tourne deja.
+        if !self.game_portal_started.swap(true, Ordering::SeqCst) {
+            game_portal::spawn(ctx.clone(), self.api.clone());
+        }
         let commands = vec![
             CreateCommand::new("roue")
                 .description("Tire la Roue du Destin — 1 spin par jour, le destin decide."),
@@ -281,26 +439,74 @@ impl EventHandler for Handler {
                     "raison",
                     "Raison du don (optionnelle)",
                 )),
-            CreateCommand::new("classement")
-                .description("Top 10 des plus riches du serveur"),
+            CreateCommand::new("classement").description("Top 10 des plus riches du serveur"),
+            CreateCommand::new("coude")
+                .description("Defie un membre a Coup de Coude")
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::User, "membre", "Adversaire")
+                        .required(true),
+                )
+                .add_option(
+                    CreateCommandOption::new(CommandOptionType::Integer, "mise", "Mise en coins")
+                        .required(true)
+                        .min_int_value(1),
+                ),
+            CreateCommand::new("profil").description("Affiche le profil Coup de Coude").add_option(CreateCommandOption::new(CommandOptionType::User, "membre", "Membre (defaut : toi)")),
+            CreateCommand::new("classe").description("Choisis ta classe Coup de Coude").add_option(CreateCommandOption::new(CommandOptionType::String, "classe", "bourrin, agile, fourbe ou tank").required(true)
+                .add_string_choice("💪 Bourrin", "bourrin").add_string_choice("🏃 Agile", "agile").add_string_choice("🗡️ Fourbe", "fourbe").add_string_choice("🛡️ Tank", "tank")),
+            CreateCommand::new("train").description("Depense un point de statistique").add_option(CreateCommandOption::new(CommandOptionType::String, "stat", "Statistique a ameliorer").required(true).add_string_choice("Attaque", "atk").add_string_choice("Defense", "def")),
+            CreateCommand::new("shop").description("Achete un objet Coude").add_option(CreateCommandOption::new(CommandOptionType::String,"objet","Objet").required(true).add_string_choice("Rage", "rage").add_string_choice("Mindgame", "mindgame").add_string_choice("Explosion", "explosion").add_string_choice("Double Coup", "double_coup").add_string_choice("Attaque Surprise", "surprise").add_string_choice("Coup Traitre", "coup_traitre").add_string_choice("Inversion", "inversion")),
+            CreateCommand::new("assurance").description("Achete une assurance Coude (50 coins, 1h)"),
+            CreateCommand::new("voler").description("Tente de voler un membre").add_option(CreateCommandOption::new(CommandOptionType::User,"membre","Cible").required(true)),
+            CreateCommand::new("prime").description("Pose une prime").add_option(CreateCommandOption::new(CommandOptionType::User,"membre","Cible").required(true)).add_option(CreateCommandOption::new(CommandOptionType::Integer,"montant","Montant").required(true).min_int_value(1)),
+            CreateCommand::new("inventaire").description("Affiche ton inventaire Coude"),
+            CreateCommand::new("pari").description("Parie sur un combat Coude").add_option(CreateCommandOption::new(CommandOptionType::String,"combat","ID du combat").required(true)).add_option(CreateCommandOption::new(CommandOptionType::User,"membre","Combattant soutenu").required(true)).add_option(CreateCommandOption::new(CommandOptionType::Integer,"montant","Mise").required(true).min_int_value(1)),
         ];
+        let commands: Vec<CreateCommand> = commands
+            .into_iter()
+            .chain(games::register_commands())
+            .collect();
         for command in commands {
             if let Err(e) = Command::create_global_command(&ctx.http, command).await {
                 tracing::error!("enregistrement d'une commande slash impossible: {e}");
             }
         }
-        tracing::info!("commandes slash /roue /solde /donner /classement enregistrees (globales)");
+        tracing::info!(
+            "commandes slash /roue /solde /donner /classement /game /game-admin enregistrees (globales)"
+        );
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(cmd) = interaction {
-            match cmd.data.name.as_str() {
+        match interaction {
+            Interaction::Command(cmd) => match cmd.data.name.as_str() {
                 "roue" => self.handle_roue(&ctx, &cmd).await,
                 "solde" => self.handle_solde(&ctx, &cmd).await,
                 "donner" => self.handle_donner(&ctx, &cmd).await,
                 "classement" => self.handle_classement(&ctx, &cmd).await,
+                "coude" => self.handle_coude(&ctx, &cmd).await,
+                "profil" => self.handle_coude_profile(&ctx, &cmd).await,
+                "classe" => self.handle_coude_class(&ctx, &cmd).await,
+                "train" => self.handle_coude_train(&ctx, &cmd).await,
+                "shop" => self.handle_coude_shop(&ctx, &cmd).await,
+                "assurance" => self.handle_coude_insurance(&ctx, &cmd).await,
+                "voler" => self.handle_steal(&ctx, &cmd).await,
+                "prime" => self.handle_prime(&ctx, &cmd).await,
+                "inventaire" => self.handle_inventory(&ctx, &cmd).await,
+                "pari" => self.handle_bet(&ctx, &cmd).await,
+                "game" | "game-admin" => games::handle_command(&self.api, &ctx, &cmd).await,
                 _ => {}
+            },
+            Interaction::Component(component) => {
+                let cid = component.data.custom_id.as_str();
+                if cid.starts_with("c:") {
+                    self.handle_coude_component(&ctx, &component).await;
+                } else if games::handles_component(cid) {
+                    games::on_component(&self.api, &ctx, &component).await;
+                } else if game_portal::handles_component(cid) {
+                    game_portal::on_component(&self.api, &ctx, &component).await;
+                }
             }
+            _ => {}
         }
     }
 }
@@ -317,11 +523,16 @@ async fn main() {
 
     let api_url =
         std::env::var("NEXUS_API_URL").unwrap_or_else(|_| "http://localhost:3100".to_string());
-    let api_key = std::env::var("NEXUS_API_KEY").ok().filter(|k| !k.is_empty());
+    let api_key = std::env::var("NEXUS_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
     let api = Arc::new(ApiClient::new(api_url, api_key));
 
     let mut client = Client::builder(&token, GatewayIntents::non_privileged())
-        .event_handler(Handler { api })
+        .event_handler(Handler {
+            api,
+            game_portal_started: AtomicBool::new(false),
+        })
         .await
         .expect("creation du client serenity");
     if let Err(e) = client.start().await {

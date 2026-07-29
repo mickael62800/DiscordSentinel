@@ -657,7 +657,8 @@ services:
 
   # ──────────────────────────────────────────────────────────────────────────
   # Nexus (plateforme jeux) — profile `nexus`, n'affecte pas la stack Sentinel.
-  #   docker compose --profile nexus up -d nexus-db-init nexus-api nexus-bot
+  #   docker compose --profile nexus up -d
+  # Services : nexus-db-init (one-shot), nexus-api, nexus-bot, nexus-worker.
   # Base `nexus` SEPAREE sur le meme Postgres (creee par nexus-db-init).
   # Les migrations nexus (nexus-api/migrations) sont embarquees dans le
   # binaire (sqlx::migrate!) et appliquees au boot de nexus-api.
@@ -703,12 +704,36 @@ services:
       NEXUS_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/nexus
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
       NEXUS_API_PORT: "3100"
+      # Redis : allocation atomique des ports de jeu ET bus d'evenements
+      # game-portal (stream nexus:events consomme par nexus-bot). Sans lui,
+      # l'API bascule sur un publieur inerte et les salons de session ne sont
+      # jamais crees.
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
+      # Runtime des serveurs de jeu : docker | noop. `noop` par defaut (aucun
+      # container reel) : passer a `docker` quand la flotte doit tourner.
+      NEXUS_GAME_RUNTIME: ${NEXUS_GAME_RUNTIME:-noop}
       RUST_LOG: ${RUST_LOG:-info}
+    # GID du groupe `docker` de l'host, proprietaire du socket. Sans lui, le
+    # user non-root du conteneur ne peut pas ouvrir /var/run/docker.sock.
+    # Override : DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) dans .env.
+    group_add:
+      - "${DOCKER_GID:-988}"
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      # SECURITE — socket Docker en RW : c'est ce qui permet a game-portal de
+      # creer/demarrer/supprimer les containers de serveurs de jeu. Equivaut a
+      # un acces root sur l'host, donc l'API reste bindee sur 127.0.0.1 et
+      # protegee par NEXUS_API_KEY. Sans NEXUS_GAME_RUNTIME=docker, le socket
+      # est monte mais jamais sollicite.
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
       nexus-db-init:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     networks:
       - data
       - internal
@@ -725,14 +750,48 @@ services:
       NEXUS_DISCORD_TOKEN: ${NEXUS_DISCORD_TOKEN:-}
       NEXUS_API_URL: http://nexus-api:3100
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      # Consomme la stream nexus:events (creation/suppression des salons de
+      # session game-portal). Meme Redis que l'API, sinon aucun event recu.
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       RUST_LOG: ${RUST_LOG:-info}
     depends_on:
       nexus-api:
         condition: service_healthy
-    # Connexion Discord Gateway -> internet + interne (nexus-api).
+      redis:
+        condition: service_healthy
+    # Connexion Discord Gateway -> internet + interne (nexus-api, redis).
     networks:
       - internal
       - default
+    profiles:
+      - nexus
+
+  # Jobs periodiques game-portal : health-check des containers, extinction des
+  # serveurs inactifs, reconciliation etat DB/Docker, nettoyage des images,
+  # revelation d'IP et ping quotidien. Le worker ne touche NI la DB NI Docker :
+  # il appelle les endpoints internes de nexus-api.
+  nexus-worker:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: nexus-worker
+    environment:
+      NEXUS_API_URL: http://nexus-api:3100
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      GAME_HEALTH_CHECK_INTERVAL_SECS: ${GAME_HEALTH_CHECK_INTERVAL_SECS:-30}
+      GAME_IDLE_SHUTDOWN_CHECK_INTERVAL_SECS: ${GAME_IDLE_SHUTDOWN_CHECK_INTERVAL_SECS:-3600}
+      GAME_RECONCILER_INTERVAL_SECS: ${GAME_RECONCILER_INTERVAL_SECS:-3600}
+      GAME_IMAGE_CLEANUP_INTERVAL_SECS: ${GAME_IMAGE_CLEANUP_INTERVAL_SECS:-86400}
+      GAME_REVEAL_IP_INTERVAL_SECS: ${GAME_REVEAL_IP_INTERVAL_SECS:-300}
+      GAME_DAILY_PING_INTERVAL_SECS: ${GAME_DAILY_PING_INTERVAL_SECS:-3600}
+      RUST_LOG: ${RUST_LOG:-info}
+    depends_on:
+      nexus-api:
+        condition: service_healthy
+    # Pas d'internet : ne parle qu'a nexus-api.
+    networks:
+      - internal
     profiles:
       - nexus
 
