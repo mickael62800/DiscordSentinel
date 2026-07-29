@@ -25,7 +25,7 @@ const { universe, canAccessNexus, setUniverse } = useUniverse();
 function switchUniverse(target: "sentinel" | "nexus") {
   if (target === universe.value) return;
   setUniverse(target);
-  router.push(target === "nexus" ? "/nexus/config" : "/dashboard");
+  router.push(target === "nexus" ? "/nexus/servers" : "/dashboard");
 }
 
 function onGuildChange(event: Event) {

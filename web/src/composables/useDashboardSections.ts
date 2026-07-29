@@ -30,6 +30,13 @@ const ALL_SECTIONS: DashboardSection[] = [
   // L'acces est garde par le gate RBAC `nexus.access` cote serveur : masquer
   // ces entrees ne suffirait pas, nexus-api n'a aucun controle de role.
   {
+    key: "nexus.servers",
+    path: "/nexus/servers",
+    label: "Serveurs de jeu",
+    icon: "server",
+    universe: "nexus",
+  },
+  {
     key: "nexus.config",
     path: "/nexus/config",
     label: "Configuration",
