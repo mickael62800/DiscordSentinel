@@ -2,8 +2,12 @@
 import SectionCard from "../molecules/SectionCard.vue";
 import DashboardHero from "../organisms/DashboardHero.vue";
 import { useDashboardSections } from "@/composables/useDashboardSections";
+import { useUniverse } from "@/composables/useUniverse";
 
-const { groups } = useDashboardSections();
+// Les tuiles suivent le meme univers que la barre laterale : sans ce filtre,
+// les entrees Nexus apparaissaient en bas du tableau de bord Sentinel.
+const { universe } = useUniverse();
+const { groups } = useDashboardSections(universe);
 </script>
 
 <template>
