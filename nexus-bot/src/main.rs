@@ -516,8 +516,19 @@ async fn main() {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt::init();
 
-    let Ok(token) = std::env::var("NEXUS_DISCORD_TOKEN") else {
-        tracing::info!("NEXUS_DISCORD_TOKEN absent — arret (pas de connexion Discord)");
+    // `env::var` renvoie Ok("") pour une variable definie mais vide — cas
+    // normal quand le compose passe `${NEXUS_DISCORD_TOKEN:-}` et que le .env
+    // n'est pas encore rempli. Sans ce filtre, le bot tenterait de s'authentifier
+    // avec un token vide, echouerait, et repartirait en boucle de redemarrage
+    // avec une erreur Discord illisible au lieu d'un message clair.
+    let token = std::env::var("NEXUS_DISCORD_TOKEN")
+        .ok()
+        .filter(|t| !t.trim().is_empty());
+    let Some(token) = token else {
+        tracing::info!(
+            "NEXUS_DISCORD_TOKEN absent ou vide — arret (renseigne-le dans .env \
+             pour connecter le bot Discord)"
+        );
         return;
     };
 
