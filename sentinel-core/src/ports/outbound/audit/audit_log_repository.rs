@@ -12,6 +12,15 @@ pub trait AuditLogRepository: Send + Sync {
         guild_id: Option<&str>,
         filters: &AuditLogFilters,
     ) -> Result<Vec<AuditLog>, DomainError>;
+    /// Total correspondant aux filtres (hors limit/offset). Default 0 pour
+    /// ne pas casser les mocks de test existants.
+    async fn count(
+        &self,
+        _guild_id: Option<&str>,
+        _filters: &AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
 
     /// Timeline d'un salon vocal : events `VOICE_TIMELINE_EVENT_TYPES` du

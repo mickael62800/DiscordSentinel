@@ -26,8 +26,16 @@ fn default_details() -> serde_json::Value {
 pub struct AuditLogQueryParams {
     pub guild_id: Option<String>,
     pub event_type: Option<String>,
+    /// Liste separee par des virgules (ex: `voice_join,voice_leave`).
+    /// Le journal web filtre par nature d'evenement, pas type par type.
+    pub event_types: Option<String>,
     pub actor_id: Option<String>,
     pub target_id: Option<String>,
+    /// Bornes RFC3339 incluses.
+    pub from: Option<String>,
+    pub to: Option<String>,
+    /// Recherche libre sur les noms d'acteur, de cible et de salon.
+    pub search: Option<String>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }

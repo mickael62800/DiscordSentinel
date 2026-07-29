@@ -15,6 +15,7 @@ use sentinel_core::domain::enums::system::role::Role;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Extension;
+use axum::response::IntoResponse;
 use axum::Json;
 use sentinel_core::domain::errors::DomainError;
 
@@ -64,7 +65,7 @@ pub async fn list_audit_logs(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Query(params): Query<AuditLogQueryParams>,
-) -> Result<Json<Vec<AuditLogResponseDto>>, ApiError> {
+) -> Result<axum::response::Response, ApiError> {
     // Securite : guild_id obligatoire pour eviter une fuite inter-guild.
     let guild_id = params.guild_id.ok_or_else(|| {
         ApiError(DomainError::ValidationError(
@@ -84,14 +85,42 @@ pub async fn list_audit_logs(
     )
     .await?;
 
+    // Une date illisible est ignoree plutot que rejetee : un filtre mal forme
+    // ne doit pas rendre le journal inaccessible.
+    let parse_date = |v: Option<String>| {
+        v.and_then(|s| chrono::DateTime::parse_from_rfc3339(&s).ok())
+            .map(|d| d.with_timezone(&chrono::Utc))
+    };
+
     let filters = AuditLogFilters {
         event_type: params.event_type,
+        event_types: params
+            .event_types
+            .map(|raw| {
+                raw.split(',')
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .map(String::from)
+                    .collect()
+            })
+            .unwrap_or_default(),
         actor_id: params.actor_id,
         target_id: params.target_id,
+        from: parse_date(params.from),
+        to: parse_date(params.to),
+        search: params.search.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
         limit: normalize_limit(params.limit, 100, 500),
         offset: normalize_offset(params.offset),
     };
 
+    // Le total part en en-tete plutot que dans le corps : la reponse reste un
+    // tableau JSON, donc les clients existants ne cassent pas.
+    let total = state.audit_logs_uc.count(Some(&guild_id), &filters).await?;
     let logs = state.audit_logs_uc.list(Some(&guild_id), filters).await?;
-    Ok(map_to_dtos(logs))
+
+    let mut response = map_to_dtos::<_, AuditLogResponseDto>(logs).into_response();
+    if let Ok(value) = axum::http::HeaderValue::from_str(&total.to_string()) {
+        response.headers_mut().insert("X-Total-Count", value);
+    }
+    Ok(response)
 }

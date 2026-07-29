@@ -67,10 +67,9 @@ pub async fn list_name_history(
                 event_type: Some(
                     sentinel_core::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.to_string(),
                 ),
-                actor_id: None,
                 target_id: Some(user_id.clone()),
                 limit: 50,
-                offset: 0,
+                ..Default::default()
             },
         )
         .await?;

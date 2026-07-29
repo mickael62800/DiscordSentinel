@@ -57,6 +57,14 @@ impl ManageAuditLogsUseCase for ManageAuditLogsService {
         self.repo.find_all(guild_id, &filters).await
     }
 
+    async fn count(
+        &self,
+        guild_id: Option<&str>,
+        filters: &AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        self.repo.count(guild_id, filters).await
+    }
+
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
         self.repo.delete_older_than_days(guild_id, days).await
     }
