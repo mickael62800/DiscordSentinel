@@ -28,7 +28,7 @@ export function useUniverse() {
   /// Nexus n'est propose que si l'utilisateur y a droit sur AU MOINS une de
   /// ses pages. Quelqu'un qui n'a que Sentinel ne voit meme pas que l'autre
   /// univers existe.
-  const canAccessNexus = computed(() => visible("nexus.servers") || visible("nexus.config"));
+  const canAccessNexus = computed(() => visible("nexus.servers") || visible("nexus.economy") || visible("nexus.config"));
 
   /// L'URL fait foi : arriver sur /nexus/... bascule l'univers, ce qui evite
   /// une barre laterale incoherente avec la page affichee (lien direct,

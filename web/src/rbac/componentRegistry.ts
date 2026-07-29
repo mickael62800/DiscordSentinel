@@ -43,6 +43,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // l'onglet et, cote serveur, l'autorisation de la passerelle /nexus-api/
   // (gate `nexus.access` interroge par nginx via auth_request).
   { key: "nexus.servers", label: "Nexus — Serveurs de jeu", category: "Nexus", minRole: "admin" },
+  { key: "nexus.economy", label: "Nexus — Economie", category: "Nexus", minRole: "moderator" },
   { key: "nexus.config", label: "Nexus — Configuration", category: "Nexus", minRole: "admin" },
   { key: "system.rbac", label: "Bouton RBAC", category: "Dashboard", minRole: "owner" },
   { key: "system.systemops", label: "Bouton SystemOps", category: "Dashboard", minRole: "admin" },

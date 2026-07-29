@@ -37,6 +37,13 @@ const ALL_SECTIONS: DashboardSection[] = [
     universe: "nexus",
   },
   {
+    key: "nexus.economy",
+    path: "/nexus/economie",
+    label: "Economie",
+    icon: "trending-up",
+    universe: "nexus",
+  },
+  {
     key: "nexus.config",
     path: "/nexus/config",
     label: "Configuration",
