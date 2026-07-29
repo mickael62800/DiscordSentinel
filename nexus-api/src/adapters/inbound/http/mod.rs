@@ -44,6 +44,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/api/games", post(handlers::casino::games::create_game))
         .route(
+            "/api/bots/definitions",
+            get(handlers::bot_config::get_definitions),
+        )
+        .route(
             "/api/config/{guild_id}/{bot_name}",
             get(handlers::bot_config::get_config).put(handlers::bot_config::set_config),
         )

@@ -235,6 +235,52 @@ fn parse_role(s: &str) -> Result<Role, ApiError> {
     })
 }
 
+/// GET /api/auth/nexus-access
+///
+/// Cible de la directive `auth_request` de nginx : autorise (200) ou refuse
+/// (403) l'acces a la plateforme jeux Nexus. Repond sans corps — nginx ne lit
+/// que le statut.
+///
+/// Pourquoi ici et pas dans nexus-api : nexus-api n'a aucune notion
+/// d'utilisateur ni de role (une seule cle statique). Sentinel reste donc la
+/// source de verite unique de l'identite et du RBAC ; nginx lui demande son
+/// avis avant de relayer, puis injecte lui-meme la cle Nexus cote serveur.
+/// Le navigateur ne voit jamais cette cle.
+///
+/// La guild vient de l'en-tete `X-Guild-Id` : une sous-requete `auth_request`
+/// a une URI fixe, on ne peut pas passer par un parametre de chemin.
+pub async fn nexus_access(
+    State(state): State<AppState>,
+    rbac: Option<axum::Extension<RoleContext>>,
+    headers: axum::http::HeaderMap,
+) -> StatusCode {
+    if rbac.is_none() {
+        return StatusCode::FORBIDDEN;
+    }
+    let Some(guild_id) = headers
+        .get("x-guild-id")
+        .and_then(|v| v.to_str().ok())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    else {
+        // Pas de guild ciblee = rien a autoriser. Refus par defaut.
+        return StatusCode::FORBIDDEN;
+    };
+
+    match crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state,
+        &rbac,
+        guild_id,
+        "nexus.access",
+        "Acces a la plateforme jeux Nexus",
+    )
+    .await
+    {
+        Ok(()) => StatusCode::OK,
+        Err(_) => StatusCode::FORBIDDEN,
+    }
+}
+
 fn status_to_err(status: StatusCode, context: &str) -> ApiError {
     match status {
         StatusCode::FORBIDDEN => ApiError(sentinel_core::domain::errors::DomainError::Forbidden(

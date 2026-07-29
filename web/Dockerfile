@@ -39,6 +39,12 @@ COPY web/docker-entrypoint.sh /docker-entrypoint.d/40-init-tls.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.d/40-init-tls.sh \
     && chmod +x /docker-entrypoint.d/40-init-tls.sh
 
+# Genere le snippet d'injection de la cle Nexus (proxy /nexus-api/). Doit
+# tourner AVANT nginx : l'include serait sinon introuvable.
+COPY web/docker-entrypoint-nexus.sh /docker-entrypoint.d/30-nexus-key.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/30-nexus-key.sh \
+    && chmod +x /docker-entrypoint.d/30-nexus-key.sh
+
 # Assets statiques
 COPY --from=builder /app/dist /usr/share/nginx/html
 

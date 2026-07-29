@@ -1,4 +1,4 @@
-import { computed } from "vue";
+import { computed, type Ref } from "vue";
 import { useBotEnabledStatus } from "@/composables/useBotEnabledStatus";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
@@ -8,6 +8,11 @@ import { useComponentVisibility } from "@/composables/useComponentVisibility";
 ///   desactive pour la guild courante.
 /// `requiredAnyBot` : si defini, la tuile est cachee uniquement quand
 ///   TOUS ces bots sont desactives (visible si au moins un actif).
+/// Univers applicatif d'une entree. Deux produits distincts partagent ce
+/// dashboard : Sentinel (moderation/communaute) et Nexus (plateforme jeux).
+/// La barre laterale n'affiche que l'univers courant.
+export type Universe = "sentinel" | "nexus";
+
 export type DashboardSection = {
   key: string;
   path: string;
@@ -15,9 +20,22 @@ export type DashboardSection = {
   icon: string;
   requiredBot?: string;
   requiredAnyBot?: string[];
+  /// Absent = "sentinel" (l'immense majorite des entrees existantes).
+  universe?: Universe;
 };
 
 const ALL_SECTIONS: DashboardSection[] = [
+  // ── Plateforme jeux Nexus ──
+  // Backend distinct (nexus-api), accessible via la passerelle /nexus-api/.
+  // L'acces est garde par le gate RBAC `nexus.access` cote serveur : masquer
+  // ces entrees ne suffirait pas, nexus-api n'a aucun controle de role.
+  {
+    key: "nexus.config",
+    path: "/nexus/config",
+    label: "Configuration",
+    icon: "sliders",
+    universe: "nexus",
+  },
   // Statistiques serveur + modération réunies (onglets). Visible si au moins un
   // des deux bots concernés est actif.
   { key: "general.stats", path: "/stats", label: "Statistiques", icon: "bar-chart-2", requiredAnyBot: ["audit-bot", "moderation-bot"] },
@@ -99,6 +117,8 @@ const GROUP_ORDER: { prefix: string; label: string }[] = [
   { prefix: "rotation", label: "Administration tournante" },
   { prefix: "config", label: "Configuration" },
   { prefix: "logs", label: "Journaux" },
+  // ── Univers Nexus ──
+  { prefix: "nexus", label: "Plateforme jeux" },
 ];
 
 /// Filtre les tuiles dashboard selon :
@@ -106,12 +126,15 @@ const GROUP_ORDER: { prefix: string; label: string }[] = [
 /// - `requiredAnyBot` : visible si AU MOINS UN bot de la liste est actif
 /// - aucun des deux : toujours visible (autonome)
 /// - RBAC visibility par role (overrides BDD + defauts registry).
-export function useDashboardSections() {
+export function useDashboardSections(universe?: Ref<Universe>) {
   const { isBotEnabled } = useBotEnabledStatus();
   const { visible: rbacVisible } = useComponentVisibility();
 
   const sections = computed<DashboardSection[]>(() =>
     ALL_SECTIONS.filter((s) => {
+      // Univers : une entree sans `universe` appartient a Sentinel.
+      const u = s.universe ?? "sentinel";
+      if (universe && u !== universe.value) return false;
       if (s.requiredBot && !isBotEnabled(s.requiredBot)) return false;
       if (s.requiredAnyBot && s.requiredAnyBot.length > 0) {
         const anyActive = s.requiredAnyBot.some((b) => isBotEnabled(b));

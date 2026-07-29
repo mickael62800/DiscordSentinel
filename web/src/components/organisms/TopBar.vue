@@ -8,6 +8,7 @@ import { useNotifications } from "../../composables/useNotifications";
 import { useRealtime } from "../../composables/useRealtime";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useSidebar } from "../../composables/useSidebar";
+import { useUniverse } from "../../composables/useUniverse";
 
 const route = useRoute();
 const router = useRouter();
@@ -16,6 +17,16 @@ const { user, logout, avatarUrl } = useAuth();
 const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
 const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
+
+const { universe, canAccessNexus, setUniverse } = useUniverse();
+
+/// Bascule d'univers : on navigue vers la page d'accueil de la cible plutot
+/// que de rester sur une route qui n'existe pas dans l'autre univers.
+function switchUniverse(target: "sentinel" | "nexus") {
+  if (target === universe.value) return;
+  setUniverse(target);
+  router.push(target === "nexus" ? "/nexus/config" : "/dashboard");
+}
 
 function onGuildChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
@@ -61,6 +72,27 @@ onMounted(() => {
     </button>
 
     <div class="spacer" />
+
+    <!-- Bascule Sentinel / Nexus : affichee seulement si l'utilisateur a
+         acces aux deux univers. Sinon il ne voit que le sien. -->
+    <div v-if="canAccessNexus" class="universe-switch">
+      <button
+        type="button"
+        class="universe-btn"
+        :class="{ active: universe === 'sentinel' }"
+        @click="switchUniverse('sentinel')"
+      >
+        Sentinel
+      </button>
+      <button
+        type="button"
+        class="universe-btn"
+        :class="{ active: universe === 'nexus' }"
+        @click="switchUniverse('nexus')"
+      >
+        Nexus
+      </button>
+    </div>
 
     <div class="guild-selector">
       <select
@@ -471,5 +503,39 @@ onMounted(() => {
   .brand,
   .brand:hover,
   .bell-btn:hover { transform: none; }
+}
+
+.universe-switch {
+  display: flex;
+  gap: 2px;
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+.universe-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  padding: 4px 12px;
+  border-radius: calc(var(--radius-md) - 2px);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.universe-btn:hover {
+  color: var(--text-primary);
+}
+
+.universe-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+@media (max-width: 700px) {
+  .universe-switch {
+    display: none;
+  }
 }
 </style>

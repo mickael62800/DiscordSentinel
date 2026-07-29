@@ -3,9 +3,12 @@ import { useRoute } from "vue-router";
 import SectionIcon from "../atoms/SectionIcon.vue";
 import { useDashboardSections } from "../../composables/useDashboardSections";
 import { useSidebar } from "../../composables/useSidebar";
+import { useUniverse } from "../../composables/useUniverse";
 
 const route = useRoute();
-const { groups } = useDashboardSections();
+// La barre laterale ne montre que l'univers courant (Sentinel ou Nexus).
+const { universe } = useUniverse();
+const { groups } = useDashboardSections(universe);
 const { open, close, isCollapsed, toggleGroup } = useSidebar();
 
 // Couleur d'accent par groupe (aligne sur les themes de SectionCard).
@@ -17,6 +20,7 @@ const GROUP_COLORS: Record<string, string> = {
   rotation: "#14b8a6",
   config: "#64748b",
   logs: "#a855f7",
+  nexus: "#7c5cfc",
 };
 function groupColor(prefix: string): string {
   return GROUP_COLORS[prefix] ?? "var(--accent)";

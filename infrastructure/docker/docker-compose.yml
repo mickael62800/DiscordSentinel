@@ -488,6 +488,11 @@ services:
       - "443:443"
     environment:
       WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
+      # Injectee cote serveur dans le proxy /nexus-api/ par
+      # /docker-entrypoint.d/30-nexus-key.sh. Ne transite JAMAIS jusqu'au
+      # navigateur : nexus-api n'a qu'une cle statique, la divulguer donnerait
+      # un acces admin complet a la plateforme jeux.
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
     volumes:
       - letsencrypt_etc:/etc/letsencrypt
       - letsencrypt_www:/var/www/certbot
@@ -690,8 +695,11 @@ services:
       <<: *build-alpine
       args:
         BIN_NAME: nexus-api
-    ports:
-      - "127.0.0.1:3100:3100"
+    # PAS de `ports:` volontairement — point d'entree unique. nexus-api n'est
+    # joignable que par le reseau docker `internal` : le proxy nginx du service
+    # `web` (qui authentifie et injecte la cle), le bot et le worker. Pour un
+    # acces de debug ponctuel :
+    #   docker compose exec nexus-api wget -qO- http://127.0.0.1:3100/health
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1:3100/health || exit 1"]
       interval: 15s

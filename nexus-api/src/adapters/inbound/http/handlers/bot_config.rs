@@ -11,6 +11,18 @@ use std::collections::HashMap;
 
 use crate::adapters::inbound::http::handlers::ApiError;
 use crate::bootstrap::AppState;
+use nexus_core::domain::entities::system::bot_config::BotDefinition;
+
+/// GET /api/bots/definitions
+///
+/// Liste les modules configurables et leur schema (`config_schema`). Meme
+/// forme que l'endpoint homonyme de sentinel-api, pour que le formulaire de
+/// configuration generique du front fonctionne sans adaptation.
+pub async fn get_definitions(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<BotDefinition>>, ApiError> {
+    Ok(Json(state.bot_config_repo.get_definitions().await?))
+}
 
 /// GET /api/config/{guild_id}/{bot_name}
 ///

@@ -89,6 +89,21 @@ fn registry() -> &'static HashMap<&'static str, GateDef> {
             },
         );
 
+        // ── Acces a la plateforme jeux Nexus ───────────────────────────
+        // Gate unique de l'univers Nexus : c'est la cle interrogee par nginx
+        // (auth_request) avant de laisser passer une requete vers nexus-api,
+        // qui n'a lui-meme AUCUN controle de role. Sans elle, l'onglet Nexus
+        // ne serait qu'un masquage cosmetique.
+        // floor Viewer : un owner peut vouloir un "gestionnaire de jeux" en
+        // lecture seule qui ne voit rien de la moderation.
+        m.insert(
+            "nexus.access",
+            GateDef {
+                default_role: Role::Admin,
+                floor: Role::Viewer,
+            },
+        );
+
         m
     })
 }

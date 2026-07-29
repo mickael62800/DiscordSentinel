@@ -208,6 +208,13 @@ pub fn routes() -> Router<AppState> {
             "/api/auth/check-access",
             get(handlers::system::invitations::check_access),
         )
+        // Cible de `auth_request` nginx pour la passerelle /nexus-api/.
+        // Repond 200/403 selon le gate RBAC `nexus.access` (guild en en-tete
+        // X-Guild-Id). Voir handlers::system::rbac::nexus_access.
+        .route(
+            "/api/auth/nexus-access",
+            get(handlers::system::rbac::nexus_access),
+        )
         // Security monitoring (admin+) : top IPs, auth failures, audit logs, TLS
         .route(
             "/api/security/top-ips",

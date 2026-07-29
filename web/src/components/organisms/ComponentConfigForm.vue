@@ -7,11 +7,28 @@ import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import AppToggle from "../atoms/AppToggle.vue";
 import ConfigFieldRow from "../molecules/ConfigFieldRow.vue";
 
-const props = defineProps<{
-  definition: BotDefinition;
-  configs: BotGuildConfig[];
-  guildId: string;
-}>();
+/**
+ * Persistance de la configuration. Par defaut sentinel-api ; la plateforme
+ * Nexus fournit la sienne, car c'est un autre backend (autre base, autre
+ * passerelle). Le rendu du formulaire, lui, est identique : il est pilote par
+ * `definition.config_schema`.
+ */
+export interface ConfigPersistence {
+  set(guildId: string, botName: string, key: string, value: string): Promise<unknown>;
+  remove(guildId: string, botName: string, key: string): Promise<unknown>;
+}
+
+const props = withDefaults(
+  defineProps<{
+    definition: BotDefinition;
+    configs: BotGuildConfig[];
+    guildId: string;
+    persistence?: ConfigPersistence;
+  }>(),
+  { persistence: undefined },
+);
+
+const persist = computed<ConfigPersistence>(() => props.persistence ?? botConfigService);
 
 const emit = defineEmits<{
   (e: "saved"): void;
@@ -180,9 +197,9 @@ async function save() {
         formValues.value[field.key] = value;
       }
       if (value) {
-        await botConfigService.set(props.guildId, props.definition.bot_name, field.key, String(value));
+        await persist.value.set(props.guildId, props.definition.bot_name, field.key, String(value));
       } else {
-        await botConfigService.remove(props.guildId, props.definition.bot_name, field.key);
+        await persist.value.remove(props.guildId, props.definition.bot_name, field.key);
       }
     }
     const count = changesCount.value;
