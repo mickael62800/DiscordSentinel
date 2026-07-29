@@ -47,6 +47,13 @@ pub trait CoudeRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<CoudeProfile>, DomainError>;
+    /// Classement des joueurs de la guild (supervision cote web).
+    /// Trie par niveau puis XP decroissants, borne par `limit`.
+    async fn list_profiles(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeProfile>, DomainError>;
     async fn create_profile(&self, profile: &CoudeProfile) -> Result<(), DomainError>;
     async fn update_class(&self, guild_id: &str, user_id: &str, class: PlayerClass, atk: i32, def: i32, hp_max: i32) -> Result<(), DomainError>;
     async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoudeProfile, DomainError>;

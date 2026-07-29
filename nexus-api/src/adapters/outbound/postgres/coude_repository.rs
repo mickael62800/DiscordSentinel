@@ -56,6 +56,44 @@ impl CoudeRepository for PgCoudeRepository {
             })
         .transpose()
     }
+    async fn list_profiles(&self, guild: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError> {
+        let rows: Vec<ProfileRow> = sqlx::query_as(
+            "SELECT p.guild_id,p.user_id,p.username,p.class,p.level,p.xp,p.atk,p.def,p.hp_current,p.hp_max,COALESCE(w.coins, 0) AS coins,p.stat_points,p.title,p.total_wins,p.total_losses,p.total_draws,p.total_stolen,p.cowardice_count,p.chaos_events FROM nexus_coude_players p LEFT JOIN nexus_wallets w ON w.guild_id=p.guild_id AND w.user_id=p.user_id WHERE p.guild_id=$1 ORDER BY p.level DESC, p.xp DESC LIMIT $2",
+        )
+        .bind(guild)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        // Une classe illisible en base ne doit pas faire echouer tout le
+        // classement : on ignore la ligne fautive plutot que d'avorter.
+        Ok(rows
+            .into_iter()
+            .filter_map(|row| {
+                PlayerClass::parse(&row.class).map(|class| CoudeProfile {
+                    guild_id: row.guild_id,
+                    user_id: row.user_id,
+                    username: row.username,
+                    class,
+                    level: row.level,
+                    xp: row.xp,
+                    atk: row.atk,
+                    def: row.def,
+                    hp_current: row.hp_current,
+                    hp_max: row.hp_max,
+                    coins: row.coins,
+                    stat_points: row.stat_points,
+                    title: row.title,
+                    total_wins: row.total_wins,
+                    total_losses: row.total_losses,
+                    total_draws: row.total_draws,
+                    total_stolen: row.total_stolen,
+                    cowardice_count: row.cowardice_count,
+                    chaos_events: row.chaos_events,
+                })
+            })
+            .collect())
+    }
     async fn create_profile(&self, p: &CoudeProfile) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query("INSERT INTO nexus_coude_players (guild_id,user_id,username,class,level,xp,atk,def,hp_current,hp_max) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (guild_id,user_id) DO NOTHING").bind(&p.guild_id).bind(&p.user_id).bind(&p.username).bind(p.class.as_str()).bind(p.level).bind(p.xp).bind(p.atk).bind(p.def).bind(p.hp_current).bind(p.hp_max).execute(&mut *tx).await.map_err(pg_err)?;

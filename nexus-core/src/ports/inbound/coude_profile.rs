@@ -13,6 +13,9 @@ pub trait CoudeProfileUseCase: Send + Sync {
     ) -> Result<CoudeProfile, DomainError>;
     async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoudeProfile, DomainError>;
     async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoudeProfile, DomainError>;
+    /// Classement des joueurs de la guild (supervision). Lecture seule :
+    /// contrairement a `profile`, ne cree aucun profil manquant.
+    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError>;
 }
 
 #[async_trait]

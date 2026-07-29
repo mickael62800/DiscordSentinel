@@ -80,6 +80,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("@/components/pages/NexusEconomyPage.vue"),
   },
   {
+    path: "/nexus/coude",
+    name: "nexus-coude",
+    component: () => import("@/components/pages/NexusCoudePage.vue"),
+  },
+  {
     path: "/nexus/config",
     name: "nexus-config",
     component: () => import("@/components/pages/NexusConfigPage.vue"),

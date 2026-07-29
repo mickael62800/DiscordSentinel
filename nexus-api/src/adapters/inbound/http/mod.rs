@@ -60,6 +60,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/coude/{guild_id}/{user_id}/steal", post(handlers::coude::steal))
         .route("/api/coude/{guild_id}/{user_id}/prime", post(handlers::coude::place_prime))
         .route("/api/coude/{guild_id}/{user_id}/bets", post(handlers::coude::place_bet))
+        .route("/api/coude/{guild_id}/classement", get(handlers::coude::ranking))
         .route("/api/coude/{guild_id}/combats", post(handlers::coude::challenge))
         .route("/api/coude/combats/{id}/accept", post(handlers::coude::accept))
         .route("/api/coude/combats/{id}/refuse", post(handlers::coude::refuse))

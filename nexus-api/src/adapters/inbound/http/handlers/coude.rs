@@ -63,6 +63,27 @@ pub async fn profile(
 }
 
 #[derive(Deserialize)]
+pub struct RankingQuery {
+    pub limit: Option<i64>,
+}
+
+/// GET /api/coude/{guild_id}/classement — supervision cote web.
+///
+/// Lecture seule : ne cree aucun profil, contrairement a `profile` qui
+/// materialise le joueur au premier appel.
+pub async fn ranking(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Query(q): Query<RankingQuery>,
+) -> Result<Json<Vec<ProfileDto>>, ApiError> {
+    let list = state
+        .coude_profile
+        .ranking(&guild_id, q.limit.unwrap_or(50))
+        .await?;
+    Ok(Json(list.into_iter().map(profile_dto).collect()))
+}
+
+#[derive(Deserialize)]
 pub struct ClassRequest { pub username: String, pub class: String }
 
 fn profile_dto(p: nexus_core::ports::outbound::coude_repository::CoudeProfile) -> ProfileDto {

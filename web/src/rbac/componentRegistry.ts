@@ -49,6 +49,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "nexus.access", label: "Nexus — Acces a la plateforme", category: "Nexus", minRole: "admin" },
   { key: "nexus.servers", label: "Nexus — Serveurs de jeu", category: "Nexus", minRole: "admin" },
   { key: "nexus.economy", label: "Nexus — Economie", category: "Nexus", minRole: "moderator" },
+  { key: "nexus.coude", label: "Nexus — Coude", category: "Nexus", minRole: "moderator" },
   { key: "nexus.config", label: "Nexus — Configuration", category: "Nexus", minRole: "admin" },
   { key: "system.rbac", label: "Bouton RBAC", category: "Dashboard", minRole: "owner" },
   { key: "system.systemops", label: "Bouton SystemOps", category: "Dashboard", minRole: "admin" },

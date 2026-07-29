@@ -22,6 +22,13 @@ impl CoudeService {
 }
 #[async_trait]
 impl CoudeProfileUseCase for CoudeService {
+    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError> {
+        // Borne dure : protege la reponse HTTP et la base d'une demande
+        // absurde (?limit=100000) venant du client.
+        let limit = limit.clamp(1, 200);
+        self.repo.list_profiles(guild_id, limit).await
+    }
+
     async fn profile(
         &self,
         guild_id: &str,
