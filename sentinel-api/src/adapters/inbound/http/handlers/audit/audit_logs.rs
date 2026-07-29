@@ -23,7 +23,18 @@ pub async fn create_audit_log(
     Json(dto): Json<CreateAuditLogDto>,
 ) -> Result<Json<AuditLogResponseDto>, ApiError> {
     let log = state.audit_logs_uc.create(dto.into()).await?;
-    Ok(single_dto(log))
+    let response = single_dto(log);
+
+    // Diffusion temps reel. Sans elle, la page Audit ne se rafraichissait que
+    // "par accident", quand un log texte (POST /api/logs) passait en parallele
+    // et declenchait `log_entry_created`. Indispensable des lors que le web
+    // remplace les salons de logs Discord : un evenement manque n'a plus
+    // aucune autre trace visible.
+    state
+        .broadcaster
+        .broadcast("audit_log_created", serde_json::to_value(&response.0).unwrap_or_default());
+
+    Ok(response)
 }
 
 /// DELETE /api/audit-logs/{guild_id} — purge les audit logs d'une guild

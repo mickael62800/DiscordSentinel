@@ -276,6 +276,29 @@ pub async fn log_admin_command(
     full_command: &str,
     reason: Option<&str>,
 ) {
+    // Persistance AVANT le postage Discord, et independamment de lui : le
+    // salon est optionnel et destine a disparaitre (les logs migrent vers le
+    // web), alors qu'une commande admin doit rester tracable. C'etait le seul
+    // evenement poste dans Discord sans aucune ecriture en base.
+    send_event(
+        ctx,
+        AuditEvent {
+            guild_id: guild_id.to_string(),
+            event_type: "admin_command".to_string(),
+            actor_id: Some(user_id.to_string()),
+            actor_name: Some(user_name.to_string()),
+            target_id: None,
+            target_name: None,
+            channel_id: None,
+            channel_name: None,
+            details: serde_json::json!({
+                "command": full_command,
+                "reason": reason.map(str::trim).filter(|r| !r.is_empty()),
+            }),
+        },
+    )
+    .await;
+
     let config = {
         let data = ctx.data.read().await;
         match data.get::<ApiClientKey>() {

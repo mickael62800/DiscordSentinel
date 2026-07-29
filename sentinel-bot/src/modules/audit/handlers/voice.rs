@@ -82,13 +82,23 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         .timestamp(serenity::model::Timestamp::now());
     post_to_channel(ctx, &gid, VOICE_LOG_KEYS, embed).await;
 
+    // Noms de salons resolus a l'ecriture. Sans eux, le journal web n'affiche
+    // que des identifiants numeriques illisibles — et un salon supprime
+    // devient impossible a identifier a posteriori, contrairement a Discord
+    // qui rend la mention <#id> tant que le salon existe.
+    let from_name = channel_name(ctx, old_channel).await;
+    let to_name = channel_name(ctx, new_channel).await;
+
     let mut evt = audit_event::simple(gid.clone(), event_type)
         .with_actor(&user_id, &user_name)
         .with_details(serde_json::json!({
             "from_channel": old_channel.map(|c| c.to_string()),
+            "from_channel_name": from_name,
             "to_channel": new_channel.map(|c| c.to_string()),
+            "to_channel_name": to_name,
         }));
     evt.channel_id = new_channel.map(|c| c.to_string());
+    evt.channel_name = to_name.clone().or_else(|| from_name.clone());
 
     send_event(ctx, evt).await;
 
@@ -100,4 +110,17 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         Some(&voice_msg),
         serde_json::json!({"from": old_channel.map(|c| c.to_string()), "to": new_channel.map(|c| c.to_string())}),
     ).await;
+}
+
+/// Nom lisible d'un salon vocal. Passe par le cache serenity puis l'API HTTP ;
+/// renvoie None plutot que d'echouer, le nom etant un confort d'affichage.
+async fn channel_name(
+    ctx: &Context,
+    channel: Option<serenity::model::id::ChannelId>,
+) -> Option<String> {
+    let id = channel?;
+    match id.to_channel(&ctx).await {
+        Ok(ch) => ch.guild().map(|g| g.name),
+        Err(_) => None,
+    }
 }
