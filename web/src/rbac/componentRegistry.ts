@@ -42,6 +42,11 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // Clef unique de l'univers Nexus : elle pilote a la fois l'affichage de
   // l'onglet et, cote serveur, l'autorisation de la passerelle /nexus-api/
   // (gate `nexus.access` interroge par nginx via auth_request).
+  // Droit d'ACCES a la passerelle /nexus-api : c'est LE gate interroge par
+  // nginx (auth_request) avant chaque appel. Ce n'est pas une entree de
+  // navigation, mais il doit figurer ici, sinon l'owner n'a aucun moyen de
+  // l'ouvrir a un autre role depuis la page RBAC.
+  { key: "nexus.access", label: "Nexus — Acces a la plateforme", category: "Nexus", minRole: "admin" },
   { key: "nexus.servers", label: "Nexus — Serveurs de jeu", category: "Nexus", minRole: "admin" },
   { key: "nexus.economy", label: "Nexus — Economie", category: "Nexus", minRole: "moderator" },
   { key: "nexus.config", label: "Nexus — Configuration", category: "Nexus", minRole: "admin" },
