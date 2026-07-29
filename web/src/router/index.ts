@@ -66,6 +66,12 @@ export const routes: RouteRecordRaw[] = [
   { path: "/members", name: "members", component: () => import("../components/pages/MembersPage.vue") },
   { path: "/watched-users", redirect: "/members" },
 
+  {
+    path: "/journal",
+    name: "journal",
+    component: () => import("@/components/pages/EventLogPage.vue"),
+  },
+
   // ── Jeux ──
   // Univers Nexus : backend distinct (nexus-api) derriere la passerelle
   // /nexus-api/. L'acces est garde cote serveur par le gate `nexus.access`.

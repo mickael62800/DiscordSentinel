@@ -161,6 +161,39 @@ async function request<T>(
 export async function httpGet<T>(path: string): Promise<T> {
   return request<T>(path, "GET");
 }
+
+/**
+ * GET qui expose aussi le total de pagination renvoye par l'API dans
+ * l'en-tete `X-Total-Count`. Necessaire pour une pagination serveur reelle
+ * (journal d'evenements) : le corps ne contient que la page courante.
+ *
+ * Reimplemente le fetch plutot que de reutiliser `request` : ce dernier
+ * consomme la reponse et ne rend que le JSON parse, les en-tetes sont perdus.
+ * On garde le meme comportement d'auth (cookie + refresh silencieux).
+ */
+export async function httpGetWithTotal<T>(path: string): Promise<{ data: T; total: number }> {
+  const url = `${apiBase()}${path}`;
+  const build = (): RequestInit => ({
+    method: "GET",
+    headers: headers(),
+    credentials: "include",
+  });
+
+  let r = await fetchWithRetry503(url, build());
+  if (r.status === 401 && !path.startsWith("/auth/")) {
+    if (await tryRefreshSession()) r = await fetchWithRetry503(url, build());
+  }
+
+  const header = r.headers.get("X-Total-Count");
+  const data = await handle<T>(r);
+  const parsed = header === null ? NaN : Number(header);
+  return {
+    data,
+    // Sans en-tete exploitable, on se rabat sur la taille de la page : mieux
+    // vaut une pagination approximative qu'un compteur a zero.
+    total: Number.isFinite(parsed) ? parsed : Array.isArray(data) ? data.length : 0,
+  };
+}
 export async function httpPost<T>(path: string, body?: unknown): Promise<T> {
   return request<T>(path, "POST", body);
 }

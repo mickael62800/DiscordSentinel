@@ -46,6 +46,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // nginx (auth_request) avant chaque appel. Ce n'est pas une entree de
   // navigation, mais il doit figurer ici, sinon l'owner n'a aucun moyen de
   // l'ouvrir a un autre role depuis la page RBAC.
+  { key: "logs.journal", label: "Journal des evenements", category: "Dashboard", minRole: "moderator" },
   { key: "nexus.access", label: "Nexus — Acces a la plateforme", category: "Nexus", minRole: "admin" },
   { key: "nexus.servers", label: "Nexus — Serveurs de jeu", category: "Nexus", minRole: "admin" },
   { key: "nexus.economy", label: "Nexus — Economie", category: "Nexus", minRole: "moderator" },
