@@ -43,7 +43,7 @@ async function handleLogin() {
 
   await login();
   if (user.value) {
-    router.push("/");
+    router.push("/dashboard");
   }
 }
 </script>

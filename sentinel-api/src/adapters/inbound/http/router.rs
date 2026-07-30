@@ -140,7 +140,14 @@ pub fn build_for_test(state: AppState) -> Router {
             get(handlers::system::oauth::callback),
         )
         .route("/auth/refresh", post(handlers::system::oauth::refresh))
-        .route("/auth/logout", post(handlers::system::oauth::logout));
+        .route("/auth/logout", post(handlers::system::oauth::logout))
+        // ── Site communautaire public ──
+        // Montees DANS le groupe public : aucune authentification, donc
+        // aucune donnee personnelle (cf. handlers::system::public_site).
+        .route(
+            "/api/public/guilds/{guild_id}",
+            get(handlers::system::public_site::public_guild),
+        );
 
     Router::new()
         .merge(protected)

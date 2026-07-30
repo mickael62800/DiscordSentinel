@@ -39,7 +39,7 @@ async function handleLogout() {
 }
 
 function goHome() {
-  if (route.path !== "/") router.push("/");
+  if (route.path !== "/dashboard") router.push("/dashboard");
 }
 
 onMounted(() => {

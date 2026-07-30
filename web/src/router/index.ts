@@ -12,9 +12,20 @@ export const routes: RouteRecordRaw[] = [
   { path: "/login", name: "login", component: LoginPage, meta: { public: true } },
   { path: "/auth/callback", name: "auth-callback", component: AuthCallbackPage, meta: { public: true } },
 
+  // Accueil PUBLIC du site communautaire : visible sans connexion, rendu hors
+  // de MainLayout. Le back-office demarre desormais a /dashboard.
+  {
+    path: "/",
+    name: "public-home",
+    component: () => import("@/components/pages/PublicHomePage.vue"),
+    meta: { public: true },
+  },
+
   // Dashboard reste eager : c'est la 1ere page apres login, autant l'avoir
-  // dans le bundle initial pour eviter un flash de loader.
-  { path: "/", name: "dashboard", component: DashboardPage },
+  // dans le bundle initial pour eviter un flash de loader. Le nom de route
+  // reste "dashboard" : toutes les redirections internes continuent de
+  // fonctionner malgre le changement de chemin.
+  { path: "/dashboard", name: "dashboard", component: DashboardPage },
 
   // ── Stats / Audit ──
   // Statistiques : serveur + modération réunies en onglets (StatsHubPage).

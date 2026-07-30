@@ -29,7 +29,9 @@ function groupColor(prefix: string): string {
 // Un lien est actif si la route courante commence par son path (pour que les
 // hubs a onglets — /moderation — restent surlignes sur leurs sous-vues).
 function isActive(path: string): boolean {
-  if (path === "/") return route.path === "/";
+  // "/" est desormais l'accueil PUBLIC : le lien "maison" du back-office
+  // pointe sur /dashboard.
+  if (path === "/dashboard") return route.path === "/dashboard";
   return route.path === path || route.path.startsWith(path + "/");
 }
 
@@ -51,9 +53,9 @@ function onNavigate() {
   <aside class="sidebar" :class="{ 'is-open': open }">
     <nav class="sidebar-nav" aria-label="Navigation principale">
       <router-link
-        to="/"
+        to="/dashboard"
         class="nav-item nav-home"
-        :class="{ active: isActive('/') }"
+        :class="{ active: isActive('/dashboard') }"
         @click="onNavigate"
       >
         <span class="nav-icon"><SectionIcon name="grid" /></span>

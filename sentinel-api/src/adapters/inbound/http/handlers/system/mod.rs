@@ -20,6 +20,7 @@ pub mod security;
 pub mod server_events;
 pub mod slowmode;
 pub mod tickets;
+pub mod public_site;
 
 // Glob re-export du fichier `info.rs` (l'ancien `system.rs` au root)
 // pour preserver `handlers::system::get_system_info` via son ancien path.
