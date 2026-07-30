@@ -130,6 +130,21 @@ function fmtDate(iso: string): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("fr-FR");
 }
 
+/// Lit un champ texte de `details` (JSON de forme variable selon l'evenement).
+function text(log: AuditLog, key: string): string {
+  const v = (log.details ?? {})[key];
+  return typeof v === "string" ? v : "";
+}
+
+function isEdit(log: AuditLog): boolean {
+  return log.event_type === "message_edit" || log.event_type === "message_update";
+}
+
+/// Contenu d'un message supprime, si le bot l'avait encore en cache.
+function deletedContent(log: AuditLog): string {
+  return log.event_type === "message_delete" ? text(log, "content") : "";
+}
+
 /// Resume lisible d'un evenement, sans afficher le JSON brut.
 function summary(log: AuditLog): string {
   const d = log.details ?? {};
@@ -191,6 +206,41 @@ function summary(log: AuditLog): string {
               <span v-if="e.target_name" class="el-target">→ {{ e.target_name }}</span>
             </div>
             <div v-if="summary(e)" class="el-summary">{{ summary(e) }}</div>
+
+            <!-- Message supprime : le contenu est la raison d'etre du journal.
+                 Absent si le message n'etait plus en cache cote bot. -->
+            <blockquote v-if="deletedContent(e)" class="el-quote deleted">
+              {{ deletedContent(e) }}
+            </blockquote>
+            <p v-else-if="e.event_type === 'message_delete'" class="el-missing">
+              Contenu indisponible (message trop ancien pour le cache du bot).
+            </p>
+
+            <!-- Edition : avant / apres cote a cote. -->
+            <div v-if="isEdit(e)" class="el-diff">
+              <blockquote class="el-quote before">{{ text(e, "old_content") || "(vide)" }}</blockquote>
+              <blockquote class="el-quote after">{{ text(e, "new_content") || "(vide)" }}</blockquote>
+            </div>
+
+            <!-- Pseudo : avant / apres. -->
+            <div v-if="text(e, 'old_nickname') || text(e, 'new_nickname')" class="el-diff">
+              <span class="el-chip before">{{ text(e, "old_nickname") || "(aucun)" }}</span>
+              <span class="el-arrow">→</span>
+              <span class="el-chip after">{{ text(e, "new_nickname") || "(aucun)" }}</span>
+            </div>
+
+            <!-- Avatar : les deux images cote a cote, c'est le seul rendu utile. -->
+            <div v-if="text(e, 'old_avatar_url') || text(e, 'new_avatar_url')" class="el-avatars">
+              <figure>
+                <img v-if="text(e, 'old_avatar_url')" :src="text(e, 'old_avatar_url')" alt="Avant" />
+                <figcaption>Avant</figcaption>
+              </figure>
+              <span class="el-arrow">→</span>
+              <figure>
+                <img v-if="text(e, 'new_avatar_url')" :src="text(e, 'new_avatar_url')" alt="Apres" />
+                <figcaption>Apres</figcaption>
+              </figure>
+            </div>
           </div>
           <time class="el-date">{{ fmtDate(e.created_at) }}</time>
         </li>
@@ -341,6 +391,96 @@ function summary(log: AuditLog): string {
 .el-summary {
   color: var(--text-secondary);
   font-size: 0.88rem;
+}
+
+.el-quote {
+  margin: var(--space-xs) 0 0;
+  padding: var(--space-xs) var(--space-sm);
+  border-left: 3px solid var(--bg-hover);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.el-quote.deleted {
+  border-left-color: var(--danger);
+}
+
+.el-quote.before {
+  border-left-color: var(--warning);
+  opacity: 0.85;
+}
+
+.el-quote.after {
+  border-left-color: var(--success);
+}
+
+.el-missing {
+  margin: var(--space-xs) 0 0;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  font-style: italic;
+}
+
+.el-diff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.el-diff .el-quote {
+  flex: 1 1 14rem;
+  margin: 0;
+}
+
+.el-chip {
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-secondary);
+  font-size: 0.88rem;
+}
+
+.el-chip.before {
+  color: var(--text-secondary);
+  text-decoration: line-through;
+}
+
+.el-chip.after {
+  color: var(--text-primary);
+}
+
+.el-arrow {
+  color: var(--text-secondary);
+}
+
+.el-avatars {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+}
+
+.el-avatars figure {
+  margin: 0;
+  text-align: center;
+}
+
+.el-avatars img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--bg-hover);
+}
+
+.el-avatars figcaption {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
 }
 
 .el-date {

@@ -31,12 +31,13 @@ export const routes: RouteRecordRaw[] = [
   // Statistiques : serveur + modération réunies en onglets (StatsHubPage).
   { path: "/stats", name: "stats", component: () => import("../components/pages/StatsHubPage.vue") },
   { path: "/modstats", redirect: "/stats" },
-  // Observabilité : journaux métier + système + audit réunis en onglets
-  // (ObservabilityHubPage). Les trois chemins pointent le même hub, l'onglet
-  // actif est dérivé de l'URL (chemins bookmarkables).
-  { path: "/logs", name: "logs", component: () => import("../components/pages/ObservabilityHubPage.vue") },
-  { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/ObservabilityHubPage.vue") },
-  { path: "/audit", name: "audit", component: () => import("../components/pages/ObservabilityHubPage.vue") },
+  // Logs TECHNIQUES (bot / worker / API / websocket). Les anciens ecrans
+  // "Journaux metier" et "Audit" ont ete retires : ils faisaient doublon avec
+  // les journaux par entite (/journal/*). Redirections conservees pour les
+  // favoris existants.
+  { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/SystemLogsPage.vue") },
+  { path: "/logs", redirect: "/journal/messages" },
+  { path: "/audit", redirect: "/journal/membres" },
   { path: "/name-history", name: "name-history", component: () => import("../components/pages/NameHistoryPage.vue") },
 
   // ── Modération ──

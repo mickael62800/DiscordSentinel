@@ -49,7 +49,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // Un droit par journal : les anciens salons Discord avaient chacun leurs
   // permissions, on garde cette granularite (ex: un moderateur voit le vocal
   // et les messages, mais pas les commandes admin).
-  { key: "logs.journal", label: "Journal complet", category: "Journaux", minRole: "moderator" },
   { key: "logs.journal.members", label: "Journal — Membres", category: "Journaux", minRole: "moderator" },
   { key: "logs.journal.profiles", label: "Journal — Profils et roles", category: "Journaux", minRole: "moderator" },
   { key: "logs.journal.voice", label: "Journal — Vocal", category: "Journaux", minRole: "moderator" },
@@ -98,7 +97,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "rotation.dashboard", label: "Bouton Administrateur tournant", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : logs / jeux ──
-  { key: "logs.journal", label: "Bouton Journal logs Discord", category: "Dashboard", minRole: "admin" },
+  { key: "logs.system", label: "Logs techniques (bot/API/worker)", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : config (admin) ──
   { key: "config.components", label: "Bouton Config composants", category: "Dashboard", minRole: "admin" },

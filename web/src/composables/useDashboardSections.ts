@@ -30,7 +30,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   // L'acces est garde par le gate RBAC `nexus.access` cote serveur : masquer
   // ces entrees ne suffirait pas, nexus-api n'a aucun controle de role.
   // ── Journaux (un par ancien salon de logs Discord) ──
-  { key: "logs.journal", path: "/journal", label: "Journal complet", icon: "list" },
   { key: "logs.journal.members", path: "/journal/membres", label: "Journal — Membres", icon: "users" },
   { key: "logs.journal.profiles", path: "/journal/profils", label: "Journal — Profils et roles", icon: "user-check" },
   { key: "logs.journal.voice", path: "/journal/vocal", label: "Journal — Vocal", icon: "mic" },
@@ -91,7 +90,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "rotation.dashboard", path: "/rotation-dashboard", label: "Admin tournant", icon: "users", requiredBot: "rotation-bot" },
 
   // Observabilité : journaux métier + système + audit réunis (onglets).
-  { key: "logs.journal", path: "/logs", label: "Journaux & audit", icon: "list" },
+  { key: "logs.system", path: "/system-logs", label: "Logs techniques", icon: "cpu" },
 
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
@@ -114,8 +113,6 @@ const PATH_RBAC_ALIASES: Record<string, string> = {
   "/voice-themes": "community.voice-channels",
   "/levels-config": "community.levels",
   "/modstats": "general.stats",
-  "/system-logs": "logs.journal",
-  "/audit": "logs.journal",
 };
 
 /// Cle RBAC (composant) gouvernant l'acces a un chemin de route, ou `undefined`
