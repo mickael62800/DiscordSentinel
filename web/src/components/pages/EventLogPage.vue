@@ -1,36 +1,36 @@
 <script setup lang="ts">
 // Journal d'evenements — remplace les salons de logs Discord.
 //
-// Tout ce que le bot postait dans #logs-membres, #logs-vocal, #logs-messages,
-// #logs-profils et #commandes-admin se consulte ici.
+// UN journal par nature d'evenement, chacun avec sa propre URL, sa propre
+// entree de menu et son propre droit RBAC — exactement comme les anciens
+// salons #logs-vocal, #logs-messages, #commandes-admin avaient chacun leurs
+// permissions. Ce composant sert tous les journaux : la categorie vient du
+// chemin (`/journal/vocal`, `/journal/messages`…).
 //
 // Choix structurants :
 //   - filtrage et pagination cote SERVEUR. La page Audit historique chargeait
 //     500 entrees puis filtrait en memoire ; comme seule vue des evenements,
 //     ca ne tient pas sur la duree de retention.
-//   - vues par NATURE d'evenement (une par ancien salon) plutot qu'une
-//     timeline unique, pour retrouver le confort des salons dedies.
 //   - temps reel : les nouveaux evenements sont inseres en tete sans recharger
 //     toute la page, et uniquement sur la premiere page (sinon on deplacerait
 //     le contenu sous les yeux de quelqu'un en train de lire l'historique).
 
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useRealtime } from "../../composables/useRealtime";
-import {
-  EVENT_CATEGORIES,
-  eventLogService,
-  type EventCategory,
-} from "@/services/eventLogService";
+import { categoryFromPath, eventLogService } from "@/services/eventLogService";
 import { eventIcon, eventLabel, eventVariant } from "@/utils/variants";
 import type { AuditLog } from "@/types";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 
 const PAGE_SIZE = 50;
 
+const route = useRoute();
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
-const category = ref<EventCategory>(EVENT_CATEGORIES[0]);
+/// Le journal affiche decoule du chemin : chaque journal a son URL.
+const category = computed(() => categoryFromPath(route.path));
 const search = ref("");
 const from = ref("");
 const to = ref("");
@@ -95,6 +95,7 @@ watch(search, () => {
   debounce = setTimeout(resetAndLoad, 350);
 });
 watch([category, from, to], resetAndLoad);
+watch(() => route.path, resetAndLoad);
 watch(selectedGuildId, resetAndLoad, { immediate: true });
 watch(page, load);
 
@@ -151,7 +152,7 @@ function summary(log: AuditLog): string {
 
 <template>
   <AdminPageShell
-    title="Journal des evenements"
+    :title="`Journal — ${category.label}`"
     :subtitle="selectedGuild?.name ?? 'Aucun serveur selectionne'"
   >
     <p v-if="!selectedGuildId" class="el-hint">
@@ -159,19 +160,6 @@ function summary(log: AuditLog): string {
     </p>
 
     <template v-else>
-      <div class="el-tabs">
-        <button
-          v-for="c in EVENT_CATEGORIES"
-          :key="c.key"
-          type="button"
-          class="el-tab"
-          :class="{ active: c.key === category.key }"
-          @click="category = c"
-        >
-          {{ c.label }}
-        </button>
-      </div>
-
       <div class="el-filters">
         <input v-model="search" type="search" placeholder="Rechercher un membre, un salon…" />
         <label>Du <input v-model="from" type="date" /></label>

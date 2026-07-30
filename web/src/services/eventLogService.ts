@@ -17,15 +17,22 @@ import { q } from "./_query";
 export interface EventCategory {
   key: string;
   label: string;
-  /// Types d'`audit_logs` couverts. Vide = tous (vue "Tout").
+  /// Segment d'URL du journal (`/journal/<slug>`). Vide pour le journal global.
+  slug: string;
+  /// Cle RBAC : chaque journal se donne separement, comme les anciens salons
+  /// Discord avaient chacun leurs permissions.
+  rbacKey: string;
+  /// Types d'`audit_logs` couverts. Vide = tous (journal global).
   eventTypes: string[];
 }
 
 export const EVENT_CATEGORIES: EventCategory[] = [
-  { key: "all", label: "Tout", eventTypes: [] },
+  { key: "all", label: "Tout", slug: "", rbacKey: "logs.journal", eventTypes: [] },
   {
     key: "members",
     label: "Membres",
+    slug: "membres",
+    rbacKey: "logs.journal.members",
     eventTypes: [
       "member_join",
       "member_leave",
@@ -39,6 +46,8 @@ export const EVENT_CATEGORIES: EventCategory[] = [
   {
     key: "profiles",
     label: "Profils et roles",
+    slug: "profils",
+    rbacKey: "logs.journal.profiles",
     eventTypes: [
       "member_nickname_update",
       "member_nickname_history",
@@ -49,16 +58,22 @@ export const EVENT_CATEGORIES: EventCategory[] = [
   {
     key: "voice",
     label: "Vocal",
+    slug: "vocal",
+    rbacKey: "logs.journal.voice",
     eventTypes: ["voice_join", "voice_leave", "voice_move"],
   },
   {
     key: "messages",
     label: "Messages",
+    slug: "messages",
+    rbacKey: "logs.journal.messages",
     eventTypes: ["message_delete", "message_update", "message_delete_bulk"],
   },
   {
     key: "server",
     label: "Serveur",
+    slug: "serveur",
+    rbacKey: "logs.journal.server",
     eventTypes: [
       "channel_create",
       "channel_delete",
@@ -76,11 +91,15 @@ export const EVENT_CATEGORIES: EventCategory[] = [
   {
     key: "admin",
     label: "Commandes admin",
+    slug: "commandes",
+    rbacKey: "logs.journal.admin",
     eventTypes: ["admin_command"],
   },
   {
     key: "anomalies",
     label: "Anomalies",
+    slug: "anomalies",
+    rbacKey: "logs.journal.anomalies",
     eventTypes: ["anomaly_detected"],
   },
 ];
@@ -110,3 +129,10 @@ export const eventLogService = {
     return httpGetWithTotal<AuditLog[]>(`/api/audit-logs${query}`);
   },
 };
+
+/// Journal correspondant a un chemin `/journal[/slug]`. Repli sur le journal
+/// global si le slug est inconnu (URL bricolee a la main).
+export function categoryFromPath(path: string): EventCategory {
+  const slug = path.replace(/^\/journal\/?/, "").split("/")[0] ?? "";
+  return EVENT_CATEGORIES.find((c) => c.slug === slug) ?? EVENT_CATEGORIES[0];
+}

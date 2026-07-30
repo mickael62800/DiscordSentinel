@@ -29,12 +29,15 @@ const ALL_SECTIONS: DashboardSection[] = [
   // Backend distinct (nexus-api), accessible via la passerelle /nexus-api/.
   // L'acces est garde par le gate RBAC `nexus.access` cote serveur : masquer
   // ces entrees ne suffirait pas, nexus-api n'a aucun controle de role.
-  {
-    key: "logs.journal",
-    path: "/journal",
-    label: "Journal des evenements",
-    icon: "list",
-  },
+  // ── Journaux (un par ancien salon de logs Discord) ──
+  { key: "logs.journal", path: "/journal", label: "Journal complet", icon: "list" },
+  { key: "logs.journal.members", path: "/journal/membres", label: "Journal — Membres", icon: "users" },
+  { key: "logs.journal.profiles", path: "/journal/profils", label: "Journal — Profils et roles", icon: "user-check" },
+  { key: "logs.journal.voice", path: "/journal/vocal", label: "Journal — Vocal", icon: "mic" },
+  { key: "logs.journal.messages", path: "/journal/messages", label: "Journal — Messages", icon: "list" },
+  { key: "logs.journal.server", path: "/journal/serveur", label: "Journal — Serveur", icon: "server" },
+  { key: "logs.journal.admin", path: "/journal/commandes", label: "Journal — Commandes admin", icon: "shield" },
+  { key: "logs.journal.anomalies", path: "/journal/anomalies", label: "Journal — Anomalies", icon: "zap" },
   {
     key: "nexus.servers",
     path: "/nexus/servers",

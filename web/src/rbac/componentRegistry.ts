@@ -46,7 +46,17 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // nginx (auth_request) avant chaque appel. Ce n'est pas une entree de
   // navigation, mais il doit figurer ici, sinon l'owner n'a aucun moyen de
   // l'ouvrir a un autre role depuis la page RBAC.
-  { key: "logs.journal", label: "Journal des evenements", category: "Dashboard", minRole: "moderator" },
+  // Un droit par journal : les anciens salons Discord avaient chacun leurs
+  // permissions, on garde cette granularite (ex: un moderateur voit le vocal
+  // et les messages, mais pas les commandes admin).
+  { key: "logs.journal", label: "Journal complet", category: "Journaux", minRole: "moderator" },
+  { key: "logs.journal.members", label: "Journal — Membres", category: "Journaux", minRole: "moderator" },
+  { key: "logs.journal.profiles", label: "Journal — Profils et roles", category: "Journaux", minRole: "moderator" },
+  { key: "logs.journal.voice", label: "Journal — Vocal", category: "Journaux", minRole: "moderator" },
+  { key: "logs.journal.messages", label: "Journal — Messages", category: "Journaux", minRole: "moderator" },
+  { key: "logs.journal.server", label: "Journal — Serveur", category: "Journaux", minRole: "admin" },
+  { key: "logs.journal.admin", label: "Journal — Commandes admin", category: "Journaux", minRole: "admin" },
+  { key: "logs.journal.anomalies", label: "Journal — Anomalies", category: "Journaux", minRole: "admin" },
   { key: "nexus.access", label: "Nexus — Acces a la plateforme", category: "Nexus", minRole: "admin" },
   { key: "nexus.servers", label: "Nexus — Serveurs de jeu", category: "Nexus", minRole: "admin" },
   { key: "nexus.economy", label: "Nexus — Economie", category: "Nexus", minRole: "moderator" },

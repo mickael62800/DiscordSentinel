@@ -77,9 +77,16 @@ export const routes: RouteRecordRaw[] = [
   { path: "/members", name: "members", component: () => import("../components/pages/MembersPage.vue") },
   { path: "/watched-users", redirect: "/members" },
 
+  // Un journal par nature d'evenement (cf. EVENT_CATEGORIES). Tous servis par
+  // le meme composant, qui lit la categorie dans le chemin.
   {
     path: "/journal",
     name: "journal",
+    component: () => import("@/components/pages/EventLogPage.vue"),
+  },
+  {
+    path: "/journal/:category",
+    name: "journal-category",
     component: () => import("@/components/pages/EventLogPage.vue"),
   },
 
