@@ -72,7 +72,7 @@ onMounted(() => {
     </button>
     <button class="brand" type="button" title="Accueil" @click="goHome">
       <span class="brand-halo" aria-hidden="true"></span>
-      <img :src="brand.logo" :alt="brand.name" class="logo-icon" @error="onLogoError" />
+      <img :src="brand.mark" :alt="brand.name" class="logo-icon" @error="onLogoError" />
       <span class="logo-text">{{ brand.name }}</span>
     </button>
 

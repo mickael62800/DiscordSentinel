@@ -3,7 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
-import { COMMUNITY, onLogoError } from "@/branding";
+import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
 
 const router = useRouter();
 const route = useRoute();
@@ -53,7 +53,7 @@ async function handleLogin() {
   <div class="login-page">
     <div class="card card--elevated login-card">
       <div class="login-logo">
-        <img :src="COMMUNITY.logo" :alt="COMMUNITY.name" class="logo-img" @error="onLogoError" />
+        <img :src="wordmarkOf(COMMUNITY)" :alt="COMMUNITY.name" class="logo-img" @error="onWordmarkError($event, COMMUNITY)" />
       </div>
       <h1>{{ COMMUNITY.name }}</h1>
       <p class="subtitle">Connexion avec Discord</p>
