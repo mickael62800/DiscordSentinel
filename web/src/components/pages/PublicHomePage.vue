@@ -216,24 +216,15 @@ const APPEAR = {
     <!-- ── Appel final ── -->
     <section v-motion="APPEAR" class="ph-cta">
       <h2>Le canapé est large, il reste de la place</h2>
-      <p>Connexion avec ton compte Discord, rien d'autre à installer.</p>
-      <RouterLink class="ph-btn primary" to="/membre">Entrer</RouterLink>
+      <p>Regarde ce qui s'y passe, sans compte et sans engagement.</p>
+      <RouterLink class="ph-btn primary" to="/membre">Rejoindre la bande</RouterLink>
     </section>
 
-    <!-- ── Deux portes ── -->
-    <section class="ph-portes">
-      <RouterLink class="ph-porte" to="/membre">
-        <span class="ph-porte-emoji" aria-hidden="true">🛋️</span>
-        <span class="ph-porte-titre">Espace membre</span>
-        <span class="ph-porte-texte">Événements, concours, classements</span>
-      </RouterLink>
-
-      <RouterLink class="ph-porte" to="/login?espace=admin">
-        <span class="ph-porte-emoji" aria-hidden="true">🛡️</span>
-        <span class="ph-porte-titre">Administration</span>
-        <span class="ph-porte-texte">Modération, configuration, journaux</span>
-      </RouterLink>
-    </section>
+    <!-- L'administration ne concerne qu'une poignee de personnes : un lien
+         discret en pied de page, pas une porte au meme rang que l'entree. -->
+    <footer class="ph-footer">
+      <RouterLink to="/login?espace=admin">Administration</RouterLink>
+    </footer>
   </div>
 </template>
 
@@ -472,50 +463,21 @@ const APPEAR = {
   color: #cbb8ec;
 }
 
-/* ── Deux portes ── */
+/* ── Pied de page ── */
 
-.ph-portes {
+.ph-footer {
   position: relative;
   z-index: 1;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 1rem;
-  width: 100%;
-  max-width: 44rem;
+  padding-top: 1rem;
 }
 
-.ph-porte {
-  flex: 1 1 15rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.15rem;
-  padding: 1.1rem 1.25rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  text-align: center;
-  transition: transform 0.15s ease, border-color 0.15s ease;
+.ph-footer a {
+  color: #7e68a8;
+  font-size: 0.84rem;
 }
 
-.ph-porte:hover {
-  transform: translateY(-2px);
-  border-color: rgba(168, 85, 247, 0.6);
-}
-
-.ph-porte-emoji {
-  font-size: 1.3rem;
-}
-
-.ph-porte-titre {
-  font-weight: 600;
-  color: #f3eaff;
-}
-
-.ph-porte-texte {
-  font-size: 0.82rem;
-  color: #b49ad8;
+.ph-footer a:hover {
+  color: #cbb8ec;
 }
 
 /* ── Adaptatif ── */
@@ -538,13 +500,11 @@ const APPEAR = {
     scroll-behavior: auto;
   }
 
-  .ph-btn,
-  .ph-porte {
+  .ph-btn {
     transition: none;
   }
 
-  .ph-btn.primary:hover,
-  .ph-porte:hover {
+  .ph-btn.primary:hover {
     transform: none;
   }
 }
