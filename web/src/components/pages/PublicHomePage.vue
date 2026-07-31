@@ -18,6 +18,7 @@ import {
   publicSiteService,
   type PublicGuild,
 } from "@/services/publicSiteService";
+import { COMMUNITY, onLogoError } from "@/branding";
 
 const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
 
@@ -41,14 +42,15 @@ onMounted(async () => {
 <template>
   <div class="ph">
     <header class="ph-hero">
+      <!-- Logo de la communaute en premier : c'est SA vitrine. L'icone du
+           serveur Discord ne sert que de repli si le logo n'est pas fourni. -->
+      <img :src="COMMUNITY.logo" :alt="COMMUNITY.name" class="ph-logo" @error="onLogoError" />
       <img v-if="iconUrl" :src="iconUrl" :alt="guild?.name ?? ''" class="ph-icon" />
-      <h1>{{ guild?.name ?? "Notre communaute" }}</h1>
+      <h1>{{ COMMUNITY.name }}</h1>
       <p v-if="guild" class="ph-members">
         {{ guild.member_count.toLocaleString("fr-FR") }} membres
       </p>
-      <p class="ph-tagline">
-        Evenements, jeux, classements et bien plus. Rejoins-nous.
-      </p>
+      <p class="ph-tagline">{{ COMMUNITY.tagline }}</p>
       <div class="ph-actions">
         <RouterLink class="ph-btn primary" to="/login">Se connecter</RouterLink>
       </div>
@@ -80,6 +82,12 @@ onMounted(async () => {
 
 <style scoped>
 .ph {
+  /* `#app` est un conteneur flex : sans `flex: 1`, cette page ne prend que la
+     largeur de son contenu et tout se tasse a gauche.
+     `overflow-y: auto` car `body` est en `overflow: hidden` — sans lui, la
+     page publique ne defilerait pas. */
+  flex: 1;
+  overflow-y: auto;
   min-height: 100vh;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -94,6 +102,13 @@ onMounted(async () => {
   text-align: center;
   max-width: 42rem;
   padding-top: var(--space-lg);
+}
+
+.ph-logo {
+  max-width: 260px;
+  width: 100%;
+  height: auto;
+  margin-bottom: var(--space-md);
 }
 
 .ph-icon {

@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
+import { COMMUNITY, onLogoError } from "@/branding";
 
 const router = useRouter();
 const route = useRoute();
@@ -52,10 +53,10 @@ async function handleLogin() {
   <div class="login-page">
     <div class="card card--elevated login-card">
       <div class="login-logo">
-        <img src="/logo.png" alt="DiscordSentinel" class="logo-img" />
+        <img :src="COMMUNITY.logo" :alt="COMMUNITY.name" class="logo-img" @error="onLogoError" />
       </div>
-      <h1>DiscordSentinel</h1>
-      <p class="subtitle">Panneau d'administration</p>
+      <h1>{{ COMMUNITY.name }}</h1>
+      <p class="subtitle">Connexion avec Discord</p>
 
       <!-- Message d'erreur si redirection avec ?error=... -->
       <div v-if="queryError" class="query-error">

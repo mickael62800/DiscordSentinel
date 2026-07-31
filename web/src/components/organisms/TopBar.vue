@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import StatusDot from "../atoms/StatusDot.vue";
 import NotificationPanel from "./NotificationPanel.vue";
@@ -9,6 +9,7 @@ import { useRealtime } from "../../composables/useRealtime";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useSidebar } from "../../composables/useSidebar";
 import { useUniverse } from "../../composables/useUniverse";
+import { NEXUS, SENTINEL, onLogoError } from "@/branding";
 
 const route = useRoute();
 const router = useRouter();
@@ -19,6 +20,10 @@ const { connected: wsConnected } = useRealtime();
 const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
 
 const { universe, canAccessNexus, setUniverse } = useUniverse();
+
+/// La marque de la barre suit l'univers courant : on est chez Sentinel ou
+/// chez Nexus, jamais dans un entre-deux ambigu.
+const brand = computed(() => (universe.value === "nexus" ? NEXUS : SENTINEL));
 
 /// Bascule d'univers : on navigue vers la page d'accueil de la cible plutot
 /// que de rester sur une route qui n'existe pas dans l'autre univers.
@@ -67,8 +72,8 @@ onMounted(() => {
     </button>
     <button class="brand" type="button" title="Accueil" @click="goHome">
       <span class="brand-halo" aria-hidden="true"></span>
-      <img src="/logo.png" alt="Sentinel" class="logo-icon" />
-      <span class="logo-text">Sentinel</span>
+      <img :src="brand.logo" :alt="brand.name" class="logo-icon" @error="onLogoError" />
+      <span class="logo-text">{{ brand.name }}</span>
     </button>
 
     <div class="spacer" />

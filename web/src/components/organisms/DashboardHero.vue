@@ -10,7 +10,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
       <div class="hero-pattern" aria-hidden="true"></div>
       <div class="hero-gloss" aria-hidden="true"></div>
       <div class="hero-logo-wrap">
-        <img src="/logo.png" alt="DiscordSentinel" class="hero-logo" />
+        <img src="/sentinel_logo.png" alt="Sentinel" class="hero-logo" />
       </div>
       <div class="hero-text">
         <h1>DiscordSentinel</h1>
