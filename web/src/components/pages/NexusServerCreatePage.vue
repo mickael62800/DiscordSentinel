@@ -168,7 +168,14 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
           :style="t.accent_color ? { '--accent-game': `#${t.accent_color}` } : undefined"
           @click="choose(t)"
         >
-          <span class="nc-game-icon">{{ t.icon || "🎮" }}</span>
+          <img
+            v-if="t.cover_image_url"
+            :src="t.cover_image_url"
+            :alt="t.name"
+            class="nc-game-cover"
+            loading="lazy"
+          />
+          <span v-else class="nc-game-icon">{{ t.icon || "🎮" }}</span>
           <span class="nc-game-name">{{ t.name }}</span>
           <span v-if="t.category" class="nc-game-cat">{{ t.category }}</span>
           <span class="nc-game-ram">{{ t.default_memory_mb }} Mo conseillés</span>
@@ -337,6 +344,14 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
 
 .nc-game-icon {
   font-size: 1.5rem;
+}
+
+.nc-game-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  margin-bottom: 4px;
 }
 
 .nc-game-name {
