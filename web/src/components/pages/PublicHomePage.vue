@@ -20,6 +20,7 @@ import {
   type PublicGuild,
 } from "@/services/publicSiteService";
 import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
+import CommunityBackdrop from "../atoms/CommunityBackdrop.vue";
 
 const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
 
@@ -144,9 +145,7 @@ const APPEAR = {
 
 <template>
   <div class="ph">
-    <!-- Halos décoratifs : reprennent le néon violet du logo. -->
-    <div class="ph-glow ph-glow--1" aria-hidden="true"></div>
-    <div class="ph-glow ph-glow--2" aria-hidden="true"></div>
+    <CommunityBackdrop />
 
     <!-- ── Hero ── -->
     <header class="ph-hero">
@@ -173,7 +172,7 @@ const APPEAR = {
       </div>
 
       <div class="ph-actions">
-        <RouterLink class="ph-btn primary" to="/login?espace=membre">
+        <RouterLink class="ph-btn primary" to="/membre">
           Rejoindre la bande
         </RouterLink>
         <a class="ph-btn ghost" href="#jeux">Découvrir</a>
@@ -218,12 +217,12 @@ const APPEAR = {
     <section v-motion="APPEAR" class="ph-cta">
       <h2>Le canapé est large, il reste de la place</h2>
       <p>Connexion avec ton compte Discord, rien d'autre à installer.</p>
-      <RouterLink class="ph-btn primary" to="/login?espace=membre">Entrer</RouterLink>
+      <RouterLink class="ph-btn primary" to="/membre">Entrer</RouterLink>
     </section>
 
     <!-- ── Deux portes ── -->
     <section class="ph-portes">
-      <RouterLink class="ph-porte" to="/login?espace=membre">
+      <RouterLink class="ph-porte" to="/membre">
         <span class="ph-porte-emoji" aria-hidden="true">🛋️</span>
         <span class="ph-porte-titre">Espace membre</span>
         <span class="ph-porte-texte">Événements, concours, classements</span>
@@ -249,7 +248,7 @@ const APPEAR = {
   overflow-x: hidden;
   overflow-y: auto;
   padding: clamp(2rem, 6vh, 4rem) 1.5rem clamp(2rem, 5vh, 4rem);
-  background: radial-gradient(circle at 50% 0%, #241040 0%, #120821 45%, #0a0512 100%);
+  background: linear-gradient(180deg, #150a28 0%, #0d0619 55%, #08040f 100%);
   color: #f3eaff;
   display: flex;
   flex-direction: column;
@@ -258,35 +257,11 @@ const APPEAR = {
   scroll-behavior: smooth;
 }
 
-.ph-glow {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.45;
-  pointer-events: none;
-}
-
-.ph-glow--1 {
-  width: 30rem;
-  height: 30rem;
-  top: -8rem;
-  left: -6rem;
-  background: #7c3aed;
-}
-
-.ph-glow--2 {
-  width: 24rem;
-  height: 24rem;
-  top: 40rem;
-  right: -6rem;
-  background: #c026d3;
-  opacity: 0.3;
-}
-
 /* ── Hero ── */
 
 .ph-hero {
   position: relative;
+  z-index: 1;
   text-align: center;
   max-width: 44rem;
   padding-top: clamp(1rem, 4vh, 3rem);
@@ -369,6 +344,7 @@ const APPEAR = {
 
 .ph-about {
   position: relative;
+  z-index: 1;
   max-width: 44rem;
   text-align: center;
 }
@@ -391,6 +367,7 @@ const APPEAR = {
 
 .ph-sec {
   position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1fr 1fr;
   align-items: center;
@@ -480,6 +457,7 @@ const APPEAR = {
 
 .ph-cta {
   position: relative;
+  z-index: 1;
   text-align: center;
   padding: clamp(2rem, 5vw, 3rem);
   border-radius: 1.25rem;
@@ -498,6 +476,7 @@ const APPEAR = {
 
 .ph-portes {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;

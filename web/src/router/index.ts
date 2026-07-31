@@ -21,12 +21,15 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
 
-  // Espace MEMBRE : accessible a tout compte connecte, hors back-office.
-  // Pas de cle RBAC associee -> aucun role particulier requis.
+  // Espace MEMBRE : PUBLIC. Un visiteur doit pouvoir voir ce qui se passe
+  // (planning, evenements en cours) avant de decider de creer un compte —
+  // demander la connexion a l'entree revenait a mettre un videur devant une
+  // vitrine. La connexion n'est requise que pour AGIR (s'inscrire).
   {
     path: "/membre",
     name: "membre",
     component: () => import("@/components/pages/MemberHomePage.vue"),
+    meta: { public: true },
   },
 
   // Dashboard reste eager : c'est la 1ere page apres login, autant l'avoir
