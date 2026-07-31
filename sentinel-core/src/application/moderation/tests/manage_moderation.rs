@@ -21,6 +21,14 @@ use crate::ports::outbound::system::cache::CachePort;
 struct NoOpAuditLogs;
 #[async_trait]
 impl crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase for NoOpAuditLogs {
+    async fn count(
+        &self,
+        _guild_id: Option<&str>,
+        _filters: &crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+
     async fn create(
         &self,
         cmd: crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand,

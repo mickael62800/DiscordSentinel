@@ -139,6 +139,14 @@ struct MockAuditLogsUc {
 
 #[async_trait]
 impl ManageAuditLogsUseCase for MockAuditLogsUc {
+    async fn count(
+        &self,
+        _guild_id: Option<&str>,
+        _filters: &AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
+
     async fn create(&self, cmd: CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
         let event_type = cmd.event_type.clone();
         let guild_id = cmd.guild_id.clone();

@@ -68,10 +68,9 @@ async fn list_forwards_filters() {
     let svc = ManageAuditLogsService::new(r.clone());
     let f = AuditLogFilters {
         event_type: Some("x".into()),
-        actor_id: None,
-        target_id: None,
         limit: 50,
         offset: 10,
+        ..Default::default()
     };
     svc.list(Some("guild-1"), f).await.unwrap();
     let calls = r.find_calls.lock().unwrap();
