@@ -1,20 +1,22 @@
 # Illustrations de l'accueil public
 
-Images attendues par `PublicHomePage.vue`. Tant qu'un fichier est absent, la
+Images utilisées par `PublicHomePage.vue`. Tant qu'un fichier est absent, la
 section bascule automatiquement en pleine largeur — la page reste correcte,
 elle n'affiche jamais d'image cassée.
 
-## Format commun
+## Format
 
 - **Proportions : 4/3** (l'affichage recadre en `object-fit: cover`).
-- **Taille : 1200 × 900 px** suffit largement. Au-delà, on alourdit la page
-  sans gain visible : elles s'affichent à ~500 px de large.
-- **Livrer en PNG ou JPG** : le script d optimisation convertit en JPEG progressif 1200x900 (~200 Ko).
-- **PNG ou JPG.** JPG de préférence pour les scènes photo-réalistes, il pèse
-  bien moins lourd. PNG si l'image contient des aplats ou du texte net.
-- **Poids visé : moins de 300 Ko chacune.** Les logos livrés faisaient 2 Mo
-  pour un affichage en 300 px ; ici elles se chargent en différé
-  (`loading="lazy"`) mais restent visibles dès le premier défilement.
+- **1200 × 900 px** suffit : elles s'affichent à ~500 px de large. Au-delà, on
+  alourdit la page sans aucun gain visible.
+- **JPEG progressif, qualité 82**, soit ~200 Ko par image. Les illustrations
+  livrées faisaient 2,3 Mo chacune en PNG : 17 Mo pour la page, redhibitoire
+  sur mobile. Le PNG est très inefficace sur des images photo-réalistes.
+- Les **coins arrondis sont faits en CSS**, pas dans le fichier : plus net,
+  adaptatif, et pas de canal alpha à payer.
+
+Script d'optimisation employé (à rejouer après chaque livraison) : redimension
+en 1200×900 puis export JPEG progressif qualité 82.
 
 ## Direction artistique
 
@@ -23,17 +25,28 @@ Reprendre l'univers du logo pour que l'ensemble se tienne :
 - dominante **violet néon sur fond sombre** ;
 - ambiance **chaleureuse et cosy**, pas corporate ;
 - le **pingouin de la bande** peut apparaître, c'est la mascotte ;
-- pas de texte incrusté dans l'image : il est déjà dans la page, et un texte
-  gravé ne serait ni traduisible ni lisible sur petit écran.
+- **pas de texte incrusté** dans l'image : il est déjà dans la page, et un
+  texte gravé ne serait ni modifiable ni lisible sur petit écran.
 
-## Fichiers (livres, optimises en JPEG)
+## Fichiers utilisés par l'accueil
 
-| Fichier | Section | Contenu suggéré |
+| Fichier | Section | Contenu |
 |---|---|---|
-| `section-jeux.png` | Nos serveurs | Le pingouin devant plusieurs écrans de jeu, ou un établi / rack de serveurs stylisé aux couleurs violettes. Évoque Minecraft et Palworld sans copier leurs visuels. |
-| `section-vocal.png` | La vie du serveur | Plusieurs pingouins sur le canapé avec des casques audio, bulles de discussion, ambiance soirée. |
-| `section-animation.png` | Concours et classements | Podium, coupe, confettis, pièces de la monnaie du serveur. Ton joueur et un peu taquin. |
-| `section-moderation.png` | Un cadre sain | Le pingouin en gardien tranquille : bouclier doux, veilleuse, ambiance rassurante — surtout pas policière ni menaçante. |
+| `section-jeux.jpg` | Nos serveurs | Le pingouin devant ses écrans de jeu, rack de serveurs violet en fond. |
+| `section-vocal.jpg` | La vie du serveur | Plusieurs pingouins au casque sur le canapé, ambiance soirée. |
+| `section-planning.jpg` | Le planning | Calendrier stylisé, campagnes qui s'étalent sur plusieurs semaines. |
+| `section-animation.jpg` | Concours | Tirage au sort, roue de tombola, boîtes-cadeaux. **Pas de podium** : il appartient aux classements. |
+| `section-classements.jpg` | Classements | Podium, coupe, barres de progression. |
+| `section-moderation.jpg` | Un cadre sain | Le pingouin en gardien tranquille — rassurant, jamais policier. |
+
+## Fichiers en réserve
+
+Livrés mais pas encore employés, en attendant leurs pages dédiées :
+
+| Fichier | Destination prévue |
+|---|---|
+| `section-annonces.jpg` | Page des annonces, alimentée par le module du bot. |
+| `section-galerie.jpg` | Galerie de captures d'écran de la communauté. |
 
 ## Ajouter une section
 
