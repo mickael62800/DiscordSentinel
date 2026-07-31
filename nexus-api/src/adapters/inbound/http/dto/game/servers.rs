@@ -13,6 +13,8 @@ pub struct CreateGameServerDto {
     pub name: String,
     /// Memoire en Mo (sinon default du template).
     pub memory_mb: Option<i32>,
+    /// Plafond CPU en coeurs (ex: 2.0). Vide = defaut de l'adapter.
+    pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     /// Overrides initiaux (key/value SCREAMING_SNAKE).
     #[serde(default)]
@@ -42,6 +44,7 @@ pub struct GameServerDto {
     pub host_port: Option<u16>,
     pub rcon_port: Option<u16>,
     pub allocated_memory_mb: i32,
+    pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     pub last_active_at: Option<DateTime<Utc>>,
     pub last_player_count: i32,
@@ -67,6 +70,7 @@ impl From<GameServer> for GameServerDto {
             host_port: s.host_port,
             rcon_port: s.rcon_port,
             allocated_memory_mb: s.allocated_memory_mb,
+            cpu_limit: s.cpu_limit,
             owner_user_id: s.owner_user_id,
             last_active_at: s.last_active_at,
             last_player_count: s.last_player_count,

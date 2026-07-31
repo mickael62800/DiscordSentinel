@@ -82,6 +82,8 @@ pub struct GameServer {
     pub rcon_password: Option<String>,
     pub volume_name: Option<String>,
     pub allocated_memory_mb: i32,
+    /// Plafond CPU en coeurs. None = defaut de l'adapter.
+    pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     pub idle_shutdown_days: Option<i32>,
     pub last_active_at: Option<DateTime<Utc>>,
@@ -193,6 +195,8 @@ pub struct CreateGameServerCommand {
     pub template_slug: String,
     pub name: String,
     pub allocated_memory_mb: Option<i32>,
+    /// Plafond CPU en coeurs (ex: 2.0). None = defaut.
+    pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     pub initial_config: std::collections::HashMap<String, String>,
 }

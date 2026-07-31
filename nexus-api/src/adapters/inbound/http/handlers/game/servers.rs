@@ -33,6 +33,7 @@ pub async fn create_server(
         template_slug: dto.template_slug,
         name: dto.name,
         allocated_memory_mb: dto.memory_mb,
+        cpu_limit: dto.cpu_limit,
         owner_user_id: dto.owner_user_id,
         initial_config: dto.config,
     };

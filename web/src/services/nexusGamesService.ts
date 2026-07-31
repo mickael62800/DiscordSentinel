@@ -24,6 +24,7 @@ export interface GameServer {
   host_port: number | null;
   rcon_port: number | null;
   allocated_memory_mb: number;
+  cpu_limit: number | null;
   owner_user_id: string;
   last_active_at: string | null;
   last_player_count: number;
@@ -43,6 +44,11 @@ export interface GameServer {
 export interface TemplateField {
   key: string;
   label: string;
+  /// Section d'affichage. Sans regroupement, cinquante champs a plat
+  /// sont inutilisables.
+  group?: string | null;
+  /// Aide affichee sous le champ.
+  description?: string | null;
   type: "text" | "number" | "boolean" | "enum";
   default?: string | number | boolean;
   options?: string[];
@@ -86,6 +92,7 @@ export interface CreateServerPayload {
   template_slug: string;
   name: string;
   memory_mb?: number;
+  cpu_limit?: number;
   owner_user_id: string;
   config: Record<string, string>;
   ip_reveal_days?: number;

@@ -109,6 +109,8 @@ pub struct NewGameServer {
     pub template_id: Uuid,
     pub name: String,
     pub allocated_memory_mb: i32,
+    /// Plafond CPU en coeurs. None = defaut de l'adapter.
+    pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     pub idle_shutdown_days: Option<i32>,
 }

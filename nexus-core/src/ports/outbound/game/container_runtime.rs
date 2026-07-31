@@ -28,6 +28,13 @@ pub struct ContainerSpec {
     pub volumes: Vec<VolumeMount>,
     /// Memoire max (bytes). Hard-limit Docker.
     pub memory_bytes: u64,
+    /// Plafond CPU en nombre de coeurs (2.0 = deux coeurs pleins). None =
+    /// plafond par defaut de l'adapter.
+    ///
+    /// C'est une PROTECTION, pas un accelerateur : un serveur ne va pas plus
+    /// vite parce qu'on lui donne des coeurs, mais un serveur emballe ne peut
+    /// plus asphyxier les autres ni la base de donnees.
+    pub cpu_limit: Option<f64>,
     /// Network name (cree au boot si absent).
     pub network: String,
     /// User non-root applique (--user UID:GID). None = laisse le default de l'image.

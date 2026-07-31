@@ -34,6 +34,7 @@ const errorMessage = ref("");
 const chosen = ref<GameTemplate | null>(null);
 const name = ref("");
 const memoryMb = ref<number>(0);
+const cpuLimit = ref<number>(2);
 const ipRevealDays = ref<number | null>(null);
 /// Valeurs des champs du template, indexées par clé.
 const values = ref<Record<string, string>>({});
@@ -98,6 +99,7 @@ async function submit() {
       template_slug: chosen.value.slug,
       name: name.value.trim(),
       memory_mb: memoryMb.value,
+      cpu_limit: cpuLimit.value,
       owner_user_id: user.value?.id ?? "",
       config: values.value,
       ip_reveal_days: ipRevealDays.value ?? undefined,
@@ -110,6 +112,23 @@ async function submit() {
     submitting.value = false;
   }
 }
+
+/// Champs regroupés par section, dans l'ordre d'apparition du schéma.
+/// Un jeu peut avoir cinquante réglages : sans sections, le formulaire
+/// devient illisible.
+const groupes = computed(() => {
+  const out: { nom: string; champs: TemplateField[] }[] = [];
+  for (const f of chosen.value?.config_schema ?? []) {
+    const nom = f.group || "Réglages";
+    let g = out.find((x) => x.nom === nom);
+    if (!g) {
+      g = { nom, champs: [] };
+      out.push(g);
+    }
+    g.champs.push(f);
+  }
+  return out;
+});
 
 /// Un champ booléen du schéma vaut "true"/"false" en base : on convertit pour
 /// la case à cocher.
@@ -190,6 +209,15 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
           </label>
 
           <label class="nc-field">
+            <span>Cœurs processeur</span>
+            <input v-model.number="cpuLimit" type="number" min="0.5" max="32" step="0.5" />
+            <small class="nc-note">
+              Plafond, pas une réservation. Minecraft n'exploite quasiment qu'un
+              cœur : 2 suffisent. Palworld est multithreadé : 4 sont utiles.
+            </small>
+          </label>
+
+          <label class="nc-field">
             <span>Révélation de l'IP (jours)</span>
             <input v-model.number="ipRevealDays" type="number" min="0" placeholder="défaut" />
             <small class="nc-note">
@@ -197,8 +225,13 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
             </small>
           </label>
 
-          <!-- Champs propres au jeu, générés depuis le schéma. -->
-          <label v-for="f in chosen.config_schema ?? []" :key="f.key" class="nc-field">
+        </div>
+
+        <!-- Champs propres au jeu, générés depuis le schéma et regroupés. -->
+        <details v-for="g in groupes" :key="g.nom" class="nc-group" open>
+          <summary>{{ g.nom }}</summary>
+          <div class="nc-form">
+          <label v-for="f in g.champs" :key="f.key" class="nc-field">
             <span>{{ f.label || f.key }}</span>
 
             <select v-if="f.type === 'enum'" v-model="values[f.key]">
@@ -227,8 +260,11 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
               type="text"
               :maxlength="f.max_length"
             />
+
+            <small v-if="f.description" class="nc-note">{{ f.description }}</small>
           </label>
-        </div>
+          </div>
+        </details>
 
         <div class="nc-actions">
           <button type="button" class="nc-submit" :disabled="!canSubmit" @click="submit">
@@ -358,6 +394,23 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
 
 .nc-field small {
   font-size: 0.76rem;
+}
+
+.nc-group {
+  margin-top: var(--space-md);
+  border: 1px solid var(--bg-hover);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.nc-group > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.nc-group > .nc-form {
+  margin-top: var(--space-md);
 }
 
 .nc-actions {

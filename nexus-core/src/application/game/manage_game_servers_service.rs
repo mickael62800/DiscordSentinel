@@ -249,6 +249,7 @@ impl ManageGameServersService {
             port_mappings,
             volumes,
             memory_bytes,
+            cpu_limit: server.cpu_limit,
             network: cfg.docker_network_name.clone(),
             // Si run_as_root=true (Terraria, Valheim, Factorio), on ne
             // passe pas --user et l'image utilise son user par defaut.
@@ -368,6 +369,10 @@ impl ManageGameServersUseCase for ManageGameServersService {
             template_id: template.id,
             name: cmd.name.clone(),
             allocated_memory_mb: memory,
+            // Borne le plafond CPU demande : au-dela, c'est l'host qu'on met
+            // en danger. En dessous de 0.5 coeur, un serveur de jeu ne tourne
+            // simplement pas.
+            cpu_limit: cmd.cpu_limit.map(|c| c.clamp(0.5, 32.0)),
             owner_user_id: cmd.owner_user_id.clone(),
             idle_shutdown_days: None,
         };

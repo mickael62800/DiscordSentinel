@@ -38,10 +38,18 @@ use nexus_core::domain::errors::DomainError;
 const SENTINEL_LABEL_KEY: &str = "sentinel.managed";
 const SENTINEL_LABEL_VALUE: &str = "game-portal";
 
-/// Plafond CPU par container : 2 vCPU (en nano-CPUs, unite Docker).
-/// Empeche un container de monopoliser l'host. Constante (le template
-/// n'expose pas de champ CPU dedie).
-const CONTAINER_NANO_CPUS: i64 = 2_000_000_000;
+/// Plafond CPU par defaut : 2 vCPU (en nano-CPUs, unite Docker). Utilise
+/// quand le serveur n'en definit pas. Empeche un container de monopoliser
+/// l'host.
+const DEFAULT_NANO_CPUS: i64 = 2_000_000_000;
+
+/// Convertit un nombre de coeurs en nano-CPUs Docker (1 coeur = 1e9).
+fn nano_cpus(cpu_limit: Option<f64>) -> i64 {
+    match cpu_limit {
+        Some(c) if c > 0.0 => (c * 1_000_000_000.0) as i64,
+        _ => DEFAULT_NANO_CPUS,
+    }
+}
 /// Plafond du nombre de processus/threads (anti fork-bomb).
 const CONTAINER_PIDS_LIMIT: i64 = 512;
 /// Plafond du nombre de file descriptors ouverts (nofile).
@@ -229,7 +237,7 @@ impl ContainerRuntime for DockerContainerRuntime {
             memory_swap: Some(spec.memory_bytes as i64),
             // Plafonds CPU / PIDs / fichiers ouverts : protegent l'host
             // contre l'epuisement de ressources par un container.
-            nano_cpus: Some(CONTAINER_NANO_CPUS),
+            nano_cpus: Some(nano_cpus(spec.cpu_limit)),
             pids_limit: Some(CONTAINER_PIDS_LIMIT),
             ulimits: Some(vec![ResourcesUlimits {
                 name: Some("nofile".to_string()),

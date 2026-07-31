@@ -23,6 +23,7 @@ import {
   type GameServerStats,
   type GameTemplate,
   type PlayerSession,
+  type TemplateField,
 } from "@/services/nexusGamesService";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 
@@ -202,6 +203,21 @@ watch(onglet, (o) => {
   if (o === "joueurs") void loadSessions();
 });
 
+/// Mêmes sections que le formulaire de création.
+const groupesConfig = computed(() => {
+  const out: { nom: string; champs: TemplateField[] }[] = [];
+  for (const f of template.value?.config_schema ?? []) {
+    const nom = f.group || "Réglages";
+    let g = out.find((x) => x.nom === nom);
+    if (!g) {
+      g = { nom, champs: [] };
+      out.push(g);
+    }
+    g.champs.push(f);
+  }
+  return out;
+});
+
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -232,6 +248,7 @@ function fmtDuration(secs: number | null): string {
         </span>
         <span v-if="server.host_port" class="sd-port">Port {{ server.host_port }}</span>
         <span class="sd-mem">{{ server.allocated_memory_mb }} Mo</span>
+        <span v-if="server.cpu_limit" class="sd-mem">{{ server.cpu_limit }} cœur(s)</span>
 
         <div class="sd-actions">
           <button v-if="!isRunning" :disabled="busy || isTransient" @click="act('start')">
@@ -299,8 +316,10 @@ function fmtDuration(secs: number | null): string {
           Ce jeu n'expose aucun réglage modifiable.
         </p>
         <template v-else>
-          <div class="sd-form">
-            <label v-for="f in template.config_schema" :key="f.key" class="sd-field">
+          <details v-for="g in groupesConfig" :key="g.nom" class="sd-group" open>
+            <summary>{{ g.nom }}</summary>
+            <div class="sd-form">
+            <label v-for="f in g.champs" :key="f.key" class="sd-field">
               <span>{{ f.label || f.key }}</span>
               <select v-if="f.type === 'enum'" v-model="config[f.key]">
                 <option v-for="o in f.options ?? []" :key="o" :value="o">{{ o }}</option>
@@ -313,8 +332,10 @@ function fmtDuration(secs: number | null): string {
                 :max="f.max"
               />
               <input v-else v-model="config[f.key]" type="text" :maxlength="f.max_length" />
+              <small v-if="f.description" class="sd-note">{{ f.description }}</small>
             </label>
-          </div>
+            </div>
+          </details>
           <button class="sd-save" :disabled="savingConfig" @click="saveConfig">
             {{ savingConfig ? "Enregistrement…" : "Enregistrer" }}
           </button>
@@ -538,6 +559,23 @@ function fmtDuration(secs: number | null): string {
   border-radius: var(--radius-sm);
   color: var(--text-primary);
   padding: 6px 10px;
+}
+
+.sd-group {
+  border: 1px solid var(--bg-hover);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.sd-group > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.sd-note {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
 }
 
 .sd-logs {

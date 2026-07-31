@@ -34,6 +34,7 @@ struct ServerRow {
     rcon_password: Option<String>,
     volume_name: Option<String>,
     allocated_memory_mb: i32,
+    cpu_limit: Option<f64>,
     owner_user_id: String,
     idle_shutdown_days: Option<i32>,
     last_active_at: Option<DateTime<Utc>>,
@@ -71,6 +72,7 @@ impl TryFrom<ServerRow> for GameServer {
             rcon_password: r.rcon_password,
             volume_name: r.volume_name,
             allocated_memory_mb: r.allocated_memory_mb,
+            cpu_limit: r.cpu_limit,
             owner_user_id: r.owner_user_id,
             idle_shutdown_days: r.idle_shutdown_days,
             last_active_at: r.last_active_at,
@@ -91,7 +93,7 @@ impl TryFrom<ServerRow> for GameServer {
 }
 
 const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id, container_name, \
-     host_port, rcon_port, rcon_password, volume_name, allocated_memory_mb, \
+     host_port, rcon_port, rcon_password, volume_name, allocated_memory_mb, cpu_limit, \
      owner_user_id, idle_shutdown_days, last_active_at, last_player_count, \
      last_error, created_at, updated_at, started_at, stopped_at, \
      restart_attempts, last_restart_at, \
@@ -102,14 +104,15 @@ impl GameServerRepository for PgGameServerRepository {
     async fn create(&self, new: NewGameServer) -> Result<GameServer, DomainError> {
         let row: ServerRow = sqlx::query_as(&format!(
             "INSERT INTO game_servers \
-                 (guild_id, template_id, name, allocated_memory_mb, owner_user_id, idle_shutdown_days) \
-             VALUES ($1, $2, $3, $4, $5, $6) \
+                 (guild_id, template_id, name, allocated_memory_mb, cpu_limit, owner_user_id, idle_shutdown_days) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7) \
              RETURNING {SELECT_COLS}"
         ))
         .bind(new.guild_id.as_str())
         .bind(new.template_id)
         .bind(&new.name)
         .bind(new.allocated_memory_mb)
+        .bind(new.cpu_limit)
         .bind(&new.owner_user_id)
         .bind(new.idle_shutdown_days)
         .fetch_one(&self.pool)
