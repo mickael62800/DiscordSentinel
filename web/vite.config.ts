@@ -32,6 +32,10 @@ export default defineConfig({
         manualChunks: {
           "vendor-vue": ["vue", "vue-router", "pinia"],
           "vendor-charts": ["chart.js", "vue-chartjs"],
+          // Animations d'apparition de la page publique. Chunk separe : la lib
+          // ne change jamais, elle reste en cache navigateur entre deux
+          // deploiements, contrairement au code applicatif.
+          "vendor-motion": ["@vueuse/motion"],
         },
       },
     },

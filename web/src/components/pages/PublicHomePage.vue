@@ -1,17 +1,17 @@
 <script setup lang="ts">
 // Accueil PUBLIC du site communautaire — visible sans connexion.
 //
-// C'est la vitrine de La Bande du Canapé : un visiteur doit comprendre en
-// quelques secondes ce qu'est la communauté et avoir envie d'entrer. Rendue
-// hors de `MainLayout` (ni barre latérale, ni sélecteur de serveur) : c'est
-// une page publique, pas un back-office.
+// Page longue, assumée : un visiteur doit comprendre ce qu'est La Bande du
+// Canapé, ce qu'on y fait, et avoir envie d'entrer. Le défilement est donc
+// normal ici — contrairement au reste du site, elle raconte quelque chose.
 //
-// Elle n'appelle QUE `/api/public/*`, qui vit en dehors de la pile
-// d'authentification. Aucun token n'est envoyé, aucune donnée personnelle
-// n'est demandée.
+// Rendue hors de `MainLayout` (ni barre latérale, ni sélecteur de serveur) :
+// c'est une vitrine, pas un back-office. Elle n'appelle QUE `/api/public/*`,
+// hors de la pile d'authentification : aucun token, aucune donnée personnelle.
 //
-// Direction artistique reprise du logo : violet néon sur fond sombre. Les
-// dégradés et halos sont en CSS pur — aucune image de fond à télécharger.
+// Images : chaque section en accepte une, déclarée dans SECTIONS. Tant qu'un
+// fichier est absent, `onIllustrationError` masque proprement le bloc et la
+// section reste lisible en pleine largeur.
 
 import { onMounted, ref } from "vue";
 import {
@@ -39,34 +39,79 @@ onMounted(async () => {
   }
 });
 
-/// Ce qu'on trouve sur le serveur. Volontairement concret : un visiteur veut
-/// savoir ce qu'il va y faire, pas lire une charte.
-const PILIERS = [
+/// Masque l'illustration si le fichier n'est pas encore fourni : la section
+/// bascule alors en pleine largeur au lieu d'afficher une image cassée.
+function onIllustrationError(event: Event): void {
+  const el = event.target as HTMLImageElement | null;
+  el?.closest(".sec-media")?.setAttribute("hidden", "true");
+}
+
+/// Sections alternées : l'illustration passe à droite puis à gauche.
+const SECTIONS = [
   {
-    emoji: "🎮",
-    titre: "On joue ensemble",
+    id: "jeux",
+    surtitre: "Nos serveurs",
+    titre: "On monte les serveurs, tu joues",
     texte:
-      "Serveurs de jeu montés à la demande, sessions organisées, et de quoi trouver du monde à toute heure.",
+      "Minecraft, Palworld et d'autres : nos serveurs se créent en quelques clics et tournent sur notre propre machine. Pas de file d'attente, pas de publicité, pas de loyer mensuel à payer pour jouer entre nous.",
+    points: [
+      "Serveurs montés à la demande, éteints quand personne ne joue",
+      "Sauvegardes automatiques du monde",
+      "Un salon Discord dédié créé pour chaque session",
+    ],
+    image: "/site/section-jeux.png",
+    alt: "Serveurs de jeu de la communauté",
   },
   {
-    emoji: "🛋️",
-    titre: "On se pose",
+    id: "vocal",
+    surtitre: "La vie du serveur",
+    titre: "Des vocaux ouverts, tout le temps",
     texte:
-      "Des salons vocaux ouverts en permanence. Personne n'est obligé de parler : venir écouter, ça compte aussi.",
+      "Le cœur de la bande, c'est le vocal. Il y a presque toujours quelqu'un. On y parle de tout, on y joue, ou on laisse simplement tourner en fond pendant qu'on fait autre chose.",
+    points: [
+      "Salons vocaux créés automatiquement quand il en manque",
+      "Personne n'est obligé de parler : venir écouter, ça compte",
+      "Des salons privés à la demande pour les petits groupes",
+    ],
+    image: "/site/section-vocal.png",
+    alt: "Salons vocaux de la communauté",
   },
   {
-    emoji: "🏆",
-    titre: "On se chambre",
+    id: "animation",
+    surtitre: "Concours et classements",
+    titre: "De quoi se chambrer gentiment",
     texte:
-      "Classements, concours, petits jeux internes et une économie maison pour pimenter tout ça.",
+      "Une économie maison, des classements d'activité, des concours réguliers et quelques jeux internes qui tournent directement sur Discord. Rien d'obligatoire, tout est là pour l'ambiance.",
+    points: [
+      "Classements du temps passé en vocal et des messages",
+      "Giveaways avec tirage au sort transparent",
+      "Une monnaie du serveur à dépenser dans nos jeux",
+    ],
+    image: "/site/section-animation.png",
+    alt: "Concours et classements",
   },
   {
-    emoji: "🤝",
-    titre: "On veille",
+    id: "moderation",
+    surtitre: "Un cadre sain",
+    titre: "Modéré, sans être fliqué",
     texte:
-      "Une modération présente et transparente, pour que le canapé reste confortable pour tout le monde.",
+      "On tient à ce que le canapé reste confortable. La modération est présente et outillée, mais discrète : elle intervient sur ce qui gêne réellement, pas sur les blagues.",
+    points: [
+      "Règles claires, affichées, appliquées de la même façon pour tous",
+      "Détection automatique du spam et des raids",
+      "Chaque décision est tracée et peut être contestée",
+    ],
+    image: "/site/section-moderation.png",
+    alt: "Une communauté modérée",
   },
 ];
+
+/// Réglages d'apparition partagés : léger décalage vers le haut, une seule
+/// fois, au passage dans le champ de vision.
+const APPEAR = {
+  initial: { opacity: 0, y: 28 },
+  visibleOnce: { opacity: 1, y: 0, transition: { duration: 550 } },
+};
 </script>
 
 <template>
@@ -75,15 +120,21 @@ const PILIERS = [
     <div class="ph-glow ph-glow--1" aria-hidden="true"></div>
     <div class="ph-glow ph-glow--2" aria-hidden="true"></div>
 
+    <!-- ── Hero ── -->
     <header class="ph-hero">
       <img
+        v-motion
+        :initial="{ opacity: 0, scale: 0.94 }"
+        :enter="{ opacity: 1, scale: 1, transition: { duration: 700 } }"
         :src="wordmarkOf(COMMUNITY)"
         :alt="COMMUNITY.name"
         class="ph-logo"
         @error="onWordmarkError($event, COMMUNITY)"
       />
 
-      <p class="ph-tagline">{{ COMMUNITY.tagline }}</p>
+      <p v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { delay: 250 } }" class="ph-tagline">
+        {{ COMMUNITY.tagline }}
+      </p>
 
       <div v-if="guild" class="ph-stats">
         <img v-if="iconUrl" :src="iconUrl" :alt="guild.name" class="ph-guild-icon" />
@@ -94,11 +145,15 @@ const PILIERS = [
       </div>
 
       <div class="ph-actions">
-        <RouterLink class="ph-btn primary" to="/login?espace=membre">Rejoindre la bande</RouterLink>
+        <RouterLink class="ph-btn primary" to="/login?espace=membre">
+          Rejoindre la bande
+        </RouterLink>
+        <a class="ph-btn ghost" href="#jeux">Découvrir</a>
       </div>
     </header>
 
-    <section class="ph-about">
+    <!-- ── Présentation ── -->
+    <section v-motion="APPEAR" class="ph-about">
       <h2>C'est quoi, La Bande du Canapé&nbsp;?</h2>
       <p>
         Un serveur Discord sans prise de tête. On s'y retrouve pour jouer, pour
@@ -108,17 +163,37 @@ const PILIERS = [
       </p>
     </section>
 
-    <section class="ph-piliers">
-      <article v-for="p in PILIERS" :key="p.titre" class="ph-card">
-        <span class="ph-card-emoji" aria-hidden="true">{{ p.emoji }}</span>
-        <h3>{{ p.titre }}</h3>
-        <p>{{ p.texte }}</p>
-      </article>
+    <!-- ── Sections alternées ── -->
+    <section
+      v-for="(s, i) in SECTIONS"
+      :id="s.id"
+      :key="s.id"
+      v-motion="APPEAR"
+      class="ph-sec"
+      :class="{ reverse: i % 2 === 1 }"
+    >
+      <div class="sec-text">
+        <span class="sec-sur">{{ s.surtitre }}</span>
+        <h2>{{ s.titre }}</h2>
+        <p>{{ s.texte }}</p>
+        <ul>
+          <li v-for="pt in s.points" :key="pt">{{ pt }}</li>
+        </ul>
+      </div>
+
+      <figure class="sec-media">
+        <img :src="s.image" :alt="s.alt" loading="lazy" @error="onIllustrationError" />
+      </figure>
     </section>
 
-    <!-- Deux publics, deux portes : un membre et un moderateur ne viennent
-         pas pour la meme chose. La connexion Discord est la meme, seule la
-         destination change (cf. entrySpace.ts). -->
+    <!-- ── Appel final ── -->
+    <section v-motion="APPEAR" class="ph-cta">
+      <h2>Le canapé est large, il reste de la place</h2>
+      <p>Connexion avec ton compte Discord, rien d'autre à installer.</p>
+      <RouterLink class="ph-btn primary" to="/login?espace=membre">Entrer</RouterLink>
+    </section>
+
+    <!-- ── Deux portes ── -->
     <section class="ph-portes">
       <RouterLink class="ph-porte" to="/login?espace=membre">
         <span class="ph-porte-emoji" aria-hidden="true">🛋️</span>
@@ -139,32 +214,27 @@ const PILIERS = [
 /* Palette locale calée sur le logo (violet néon sur fond très sombre). Elle ne
    dépend pas du thème du back-office : cette page a sa propre identité. */
 .ph {
-  /* `#app` est un conteneur flex : sans `flex: 1`, la page ne prendrait que la
-     largeur de son contenu et tout se tasserait à gauche. */
   flex: 1;
   position: relative;
-  /* `overflow-x: hidden` : les halos décoratifs débordent volontairement des
-     bords (left/right négatifs) et créaient une barre de défilement
-     horizontale. `overflow-y: auto` sert de filet sur les très petits écrans —
-     aux tailles courantes le contenu tient sans défilement. */
+  /* Les halos débordent volontairement des bords : sans ça, ils créeraient une
+     barre de défilement horizontale. */
   overflow-x: hidden;
   overflow-y: auto;
-  /* Tout est dimensionné en `vh` pour tenir sur une seule page. */
-  padding: clamp(1rem, 3vh, 2.5rem) 1.5rem clamp(1rem, 2vh, 2rem);
+  padding: clamp(2rem, 6vh, 4rem) 1.5rem clamp(2rem, 5vh, 4rem);
   background: radial-gradient(circle at 50% 0%, #241040 0%, #120821 45%, #0a0512 100%);
   color: #f3eaff;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: clamp(1rem, 3vh, 2.25rem);
+  gap: clamp(3rem, 9vh, 6rem);
+  scroll-behavior: smooth;
 }
 
 .ph-glow {
   position: absolute;
   border-radius: 50%;
   filter: blur(90px);
-  opacity: 0.5;
+  opacity: 0.45;
   pointer-events: none;
 }
 
@@ -179,30 +249,30 @@ const PILIERS = [
 .ph-glow--2 {
   width: 24rem;
   height: 24rem;
-  top: 18rem;
+  top: 40rem;
   right: -6rem;
   background: #c026d3;
-  opacity: 0.35;
+  opacity: 0.3;
 }
 
-/* ── Héros ── */
+/* ── Hero ── */
 
 .ph-hero {
   position: relative;
   text-align: center;
   max-width: 44rem;
+  padding-top: clamp(1rem, 4vh, 3rem);
 }
 
 .ph-logo {
-  width: min(250px, 26vh, 70vw);
+  width: min(320px, 72vw);
   height: auto;
-  /* Le logo est fourni sur fond noir : le halo l'intègre au dégradé. */
-  filter: drop-shadow(0 0 40px rgba(168, 85, 247, 0.55));
+  filter: drop-shadow(0 0 45px rgba(168, 85, 247, 0.55));
 }
 
 .ph-tagline {
-  margin: clamp(0.5rem, 1.5vh, 1rem) 0 0;
-  font-size: clamp(1rem, 2.2vh, 1.25rem);
+  margin: 1.5rem 0 0;
+  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
   color: #d8c7f5;
 }
 
@@ -210,8 +280,8 @@ const PILIERS = [
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  margin-top: clamp(0.5rem, 1.5vh, 1rem);
-  padding: 0.35rem 0.9rem;
+  margin-top: 1.25rem;
+  padding: 0.4rem 1rem;
   border-radius: 999px;
   background: rgba(168, 85, 247, 0.12);
   border: 1px solid rgba(168, 85, 247, 0.35);
@@ -230,16 +300,20 @@ const PILIERS = [
 }
 
 .ph-actions {
-  margin-top: clamp(0.75rem, 2vh, 1.5rem);
+  margin-top: 2rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
 }
 
 .ph-btn {
   display: inline-block;
-  padding: clamp(0.6rem, 1.4vh, 0.85rem) 2.2rem;
+  padding: 0.85rem 2.2rem;
   border-radius: 999px;
   font-weight: 600;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .ph-btn.primary {
@@ -253,6 +327,16 @@ const PILIERS = [
   box-shadow: 0 12px 38px rgba(168, 85, 247, 0.65);
 }
 
+.ph-btn.ghost {
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  color: #d8c7f5;
+}
+
+.ph-btn.ghost:hover {
+  border-color: rgba(168, 85, 247, 0.9);
+  color: #fff;
+}
+
 /* ── Présentation ── */
 
 .ph-about {
@@ -261,67 +345,132 @@ const PILIERS = [
   text-align: center;
 }
 
-.ph-about h2 {
-  margin: 0 0 clamp(0.4rem, 1.2vh, 0.85rem);
-  font-size: clamp(1.25rem, 3vh, 1.75rem);
+.ph-about h2,
+.ph-cta h2,
+.ph-sec h2 {
+  margin: 0 0 1rem;
+  font-size: clamp(1.4rem, 3.2vw, 2rem);
+  line-height: 1.25;
 }
 
 .ph-about p {
   margin: 0;
-  line-height: 1.6;
-  font-size: clamp(0.9rem, 1.9vh, 1rem);
+  line-height: 1.7;
   color: #cbb8ec;
 }
 
-/* ── Piliers ── */
+/* ── Sections alternées ── */
 
-.ph-piliers {
+.ph-sec {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: clamp(0.6rem, 1.6vh, 1.1rem);
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: clamp(1.5rem, 4vw, 3.5rem);
   width: 100%;
-  max-width: 62rem;
+  max-width: 64rem;
+  scroll-margin-top: 2rem;
 }
 
-.ph-card {
-  padding: clamp(0.85rem, 2vh, 1.35rem);
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(168, 85, 247, 0.22);
-  backdrop-filter: blur(6px);
-  transition: transform 0.15s ease, border-color 0.15s ease;
+/* Une section sur deux inverse texte et image. `direction` plutôt qu'un
+   réordonnancement manuel : le DOM garde l'ordre de lecture. */
+.ph-sec.reverse {
+  direction: rtl;
 }
 
-.ph-card:hover {
-  transform: translateY(-3px);
-  border-color: rgba(168, 85, 247, 0.55);
+.ph-sec.reverse > * {
+  direction: ltr;
 }
 
-.ph-card-emoji {
-  font-size: clamp(1.3rem, 2.8vh, 1.7rem);
+.sec-sur {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  padding: 2px 12px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #cbb0ff;
 }
 
-.ph-card h3 {
-  margin: 0.4rem 0 0.3rem;
-  font-size: clamp(0.98rem, 2vh, 1.08rem);
+.sec-text p {
+  margin: 0 0 1rem;
+  line-height: 1.7;
+  color: #cbb8ec;
 }
 
-.ph-card p {
+.sec-text ul {
   margin: 0;
-  font-size: clamp(0.82rem, 1.7vh, 0.92rem);
-  line-height: 1.5;
-  color: #c3aee6;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sec-text li {
+  position: relative;
+  padding-left: 1.5rem;
+  font-size: 0.94rem;
+  color: #d8c7f5;
+}
+
+.sec-text li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.5em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a855f7;
+  box-shadow: 0 0 10px #a855f7;
+}
+
+.sec-media {
+  margin: 0;
+  border-radius: 1.25rem;
+  overflow: hidden;
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+
+.sec-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
 }
 
 /* ── Appel final ── */
+
+.ph-cta {
+  position: relative;
+  text-align: center;
+  padding: clamp(2rem, 5vw, 3rem);
+  border-radius: 1.25rem;
+  background: rgba(124, 58, 237, 0.12);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  max-width: 44rem;
+  width: 100%;
+}
+
+.ph-cta p {
+  margin: 0 0 1.75rem;
+  color: #cbb8ec;
+}
+
+/* ── Deux portes ── */
 
 .ph-portes {
   position: relative;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: clamp(0.6rem, 1.6vh, 1rem);
+  gap: 1rem;
   width: 100%;
   max-width: 44rem;
 }
@@ -332,7 +481,7 @@ const PILIERS = [
   flex-direction: column;
   align-items: center;
   gap: 0.15rem;
-  padding: clamp(0.7rem, 1.8vh, 1.1rem) 1.25rem;
+  padding: 1.1rem 1.25rem;
   border-radius: 0.9rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(168, 85, 247, 0.25);
@@ -359,16 +508,32 @@ const PILIERS = [
   color: #b49ad8;
 }
 
-/* Respecte le réglage système « animations réduites ». */
+/* ── Adaptatif ── */
+
+@media (max-width: 820px) {
+  .ph-sec,
+  .ph-sec.reverse {
+    grid-template-columns: 1fr;
+    direction: ltr;
+  }
+
+  /* Sur mobile l'illustration passe toujours après le texte. */
+  .sec-media {
+    order: 2;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .ph {
+    scroll-behavior: auto;
+  }
+
   .ph-btn,
-  .ph-card,
   .ph-porte {
     transition: none;
   }
 
   .ph-btn.primary:hover,
-  .ph-card:hover,
   .ph-porte:hover {
     transform: none;
   }

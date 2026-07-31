@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { MotionPlugin } from "@vueuse/motion";
 import { createPinia } from "pinia";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
@@ -69,4 +70,8 @@ router.beforeEach(async (to, _from, next) => {
 const app = createApp(App);
 app.use(createPinia());
 app.use(router);
+// Animations d'apparition au defilement (directive v-motion). Volontairement
+// discretes : elles servent a guider la lecture de la page publique, pas a
+// faire du spectacle. `prefers-reduced-motion` est respecte par la lib.
+app.use(MotionPlugin);
 app.mount("#app");
