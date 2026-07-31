@@ -116,12 +116,6 @@ const PILIERS = [
       </article>
     </section>
 
-    <section class="ph-cta">
-      <h2>Le canapé est large, il reste de la place</h2>
-      <p>Connexion avec ton compte Discord, rien d'autre à installer.</p>
-      <RouterLink class="ph-btn primary" to="/login">Entrer</RouterLink>
-    </section>
-
     <footer class="ph-footer">
       <RouterLink to="/login">Espace membre et administration</RouterLink>
     </footer>
@@ -133,20 +127,24 @@ const PILIERS = [
    dépend pas du thème du back-office : cette page a sa propre identité. */
 .ph {
   /* `#app` est un conteneur flex : sans `flex: 1`, la page ne prendrait que la
-     largeur de son contenu et tout se tasserait à gauche.
-     `overflow-y: auto` car `body` est en `overflow: hidden` — sans lui, la
-     page publique ne défilerait pas du tout. */
+     largeur de son contenu et tout se tasserait à gauche. */
   flex: 1;
-  overflow-y: auto;
   position: relative;
-  min-height: 100vh;
-  padding: clamp(1.5rem, 5vw, 4rem) 1.5rem 3rem;
+  /* `overflow-x: hidden` : les halos décoratifs débordent volontairement des
+     bords (left/right négatifs) et créaient une barre de défilement
+     horizontale. `overflow-y: auto` sert de filet sur les très petits écrans —
+     aux tailles courantes le contenu tient sans défilement. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  /* Tout est dimensionné en `vh` pour tenir sur une seule page. */
+  padding: clamp(1rem, 3vh, 2.5rem) 1.5rem clamp(1rem, 2vh, 2rem);
   background: radial-gradient(circle at 50% 0%, #241040 0%, #120821 45%, #0a0512 100%);
   color: #f3eaff;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(2.5rem, 6vw, 5rem);
+  justify-content: center;
+  gap: clamp(1rem, 3vh, 2.25rem);
 }
 
 .ph-glow {
@@ -183,15 +181,15 @@ const PILIERS = [
 }
 
 .ph-logo {
-  width: min(340px, 78vw);
+  width: min(250px, 26vh, 70vw);
   height: auto;
   /* Le logo est fourni sur fond noir : le halo l'intègre au dégradé. */
   filter: drop-shadow(0 0 40px rgba(168, 85, 247, 0.55));
 }
 
 .ph-tagline {
-  margin: 1.25rem 0 0;
-  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
+  margin: clamp(0.5rem, 1.5vh, 1rem) 0 0;
+  font-size: clamp(1rem, 2.2vh, 1.25rem);
   color: #d8c7f5;
 }
 
@@ -199,8 +197,8 @@ const PILIERS = [
   display: inline-flex;
   align-items: center;
   gap: 0.6rem;
-  margin-top: 1.25rem;
-  padding: 0.4rem 1rem;
+  margin-top: clamp(0.5rem, 1.5vh, 1rem);
+  padding: 0.35rem 0.9rem;
   border-radius: 999px;
   background: rgba(168, 85, 247, 0.12);
   border: 1px solid rgba(168, 85, 247, 0.35);
@@ -219,12 +217,12 @@ const PILIERS = [
 }
 
 .ph-actions {
-  margin-top: 2rem;
+  margin-top: clamp(0.75rem, 2vh, 1.5rem);
 }
 
 .ph-btn {
   display: inline-block;
-  padding: 0.85rem 2.4rem;
+  padding: clamp(0.6rem, 1.4vh, 0.85rem) 2.2rem;
   border-radius: 999px;
   font-weight: 600;
   text-decoration: none;
@@ -250,15 +248,15 @@ const PILIERS = [
   text-align: center;
 }
 
-.ph-about h2,
-.ph-cta h2 {
-  margin: 0 0 1rem;
-  font-size: clamp(1.4rem, 3.2vw, 2rem);
+.ph-about h2 {
+  margin: 0 0 clamp(0.4rem, 1.2vh, 0.85rem);
+  font-size: clamp(1.25rem, 3vh, 1.75rem);
 }
 
 .ph-about p {
   margin: 0;
-  line-height: 1.7;
+  line-height: 1.6;
+  font-size: clamp(0.9rem, 1.9vh, 1rem);
   color: #cbb8ec;
 }
 
@@ -267,14 +265,14 @@ const PILIERS = [
 .ph-piliers {
   position: relative;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  gap: clamp(0.6rem, 1.6vh, 1.1rem);
   width: 100%;
   max-width: 62rem;
 }
 
 .ph-card {
-  padding: 1.5rem;
+  padding: clamp(0.85rem, 2vh, 1.35rem);
   border-radius: 1rem;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(168, 85, 247, 0.22);
@@ -288,42 +286,25 @@ const PILIERS = [
 }
 
 .ph-card-emoji {
-  font-size: 1.8rem;
+  font-size: clamp(1.3rem, 2.8vh, 1.7rem);
 }
 
 .ph-card h3 {
-  margin: 0.6rem 0 0.4rem;
-  font-size: 1.1rem;
+  margin: 0.4rem 0 0.3rem;
+  font-size: clamp(0.98rem, 2vh, 1.08rem);
 }
 
 .ph-card p {
   margin: 0;
-  font-size: 0.94rem;
-  line-height: 1.6;
+  font-size: clamp(0.82rem, 1.7vh, 0.92rem);
+  line-height: 1.5;
   color: #c3aee6;
 }
 
 /* ── Appel final ── */
 
-.ph-cta {
-  position: relative;
-  text-align: center;
-  padding: clamp(2rem, 5vw, 3rem);
-  border-radius: 1.25rem;
-  background: rgba(124, 58, 237, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  max-width: 44rem;
-  width: 100%;
-}
-
-.ph-cta p {
-  margin: 0 0 1.75rem;
-  color: #cbb8ec;
-}
-
 .ph-footer {
   position: relative;
-  margin-top: auto;
 }
 
 .ph-footer a {
