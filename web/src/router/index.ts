@@ -21,6 +21,14 @@ export const routes: RouteRecordRaw[] = [
     meta: { public: true },
   },
 
+  // Espace MEMBRE : accessible a tout compte connecte, hors back-office.
+  // Pas de cle RBAC associee -> aucun role particulier requis.
+  {
+    path: "/membre",
+    name: "membre",
+    component: () => import("@/components/pages/MemberHomePage.vue"),
+  },
+
   // Dashboard reste eager : c'est la 1ere page apres login, autant l'avoir
   // dans le bundle initial pour eviter un flash de loader. Le nom de route
   // reste "dashboard" : toutes les redirections internes continuent de

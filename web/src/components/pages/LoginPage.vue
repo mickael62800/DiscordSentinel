@@ -4,6 +4,7 @@ import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
 import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
+import { rememberEntrySpace, takeEntryDestination } from "@/entrySpace";
 
 const router = useRouter();
 const route = useRoute();
@@ -32,6 +33,10 @@ const showInviteField = ref(false);
 
 const PENDING_INVITE_KEY = "ds.pending_invitation_code";
 
+// L'espace vise arrive en query (`?espace=membre`). On le memorise tout de
+// suite : le detour par Discord quitte la page et la perdrait.
+rememberEntrySpace(route.query.espace);
+
 async function handleLogin() {
   // Si un code est saisi, on le persist en sessionStorage pour que
   // AuthCallbackPage puisse le retrouver apres le redirect Discord.
@@ -44,7 +49,7 @@ async function handleLogin() {
 
   await login();
   if (user.value) {
-    router.push("/dashboard");
+    router.push(takeEntryDestination());
   }
 }
 </script>

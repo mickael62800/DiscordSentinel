@@ -94,7 +94,7 @@ const PILIERS = [
       </div>
 
       <div class="ph-actions">
-        <RouterLink class="ph-btn primary" to="/login">Rejoindre la bande</RouterLink>
+        <RouterLink class="ph-btn primary" to="/login?espace=membre">Rejoindre la bande</RouterLink>
       </div>
     </header>
 
@@ -116,9 +116,22 @@ const PILIERS = [
       </article>
     </section>
 
-    <footer class="ph-footer">
-      <RouterLink to="/login">Espace membre et administration</RouterLink>
-    </footer>
+    <!-- Deux publics, deux portes : un membre et un moderateur ne viennent
+         pas pour la meme chose. La connexion Discord est la meme, seule la
+         destination change (cf. entrySpace.ts). -->
+    <section class="ph-portes">
+      <RouterLink class="ph-porte" to="/login?espace=membre">
+        <span class="ph-porte-emoji" aria-hidden="true">🛋️</span>
+        <span class="ph-porte-titre">Espace membre</span>
+        <span class="ph-porte-texte">Événements, concours, classements</span>
+      </RouterLink>
+
+      <RouterLink class="ph-porte" to="/login?espace=admin">
+        <span class="ph-porte-emoji" aria-hidden="true">🛡️</span>
+        <span class="ph-porte-titre">Administration</span>
+        <span class="ph-porte-texte">Modération, configuration, journaux</span>
+      </RouterLink>
+    </section>
   </div>
 </template>
 
@@ -303,28 +316,60 @@ const PILIERS = [
 
 /* ── Appel final ── */
 
-.ph-footer {
+.ph-portes {
   position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(0.6rem, 1.6vh, 1rem);
+  width: 100%;
+  max-width: 44rem;
 }
 
-.ph-footer a {
-  color: #9d84c4;
-  font-size: 0.88rem;
+.ph-porte {
+  flex: 1 1 15rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: clamp(0.7rem, 1.8vh, 1.1rem) 1.25rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  text-align: center;
+  transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
-.ph-footer a:hover {
-  color: #d8c7f5;
+.ph-porte:hover {
+  transform: translateY(-2px);
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.ph-porte-emoji {
+  font-size: 1.3rem;
+}
+
+.ph-porte-titre {
+  font-weight: 600;
+  color: #f3eaff;
+}
+
+.ph-porte-texte {
+  font-size: 0.82rem;
+  color: #b49ad8;
 }
 
 /* Respecte le réglage système « animations réduites ». */
 @media (prefers-reduced-motion: reduce) {
   .ph-btn,
-  .ph-card {
+  .ph-card,
+  .ph-porte {
     transition: none;
   }
 
   .ph-btn.primary:hover,
-  .ph-card:hover {
+  .ph-card:hover,
+  .ph-porte:hover {
     transform: none;
   }
 }

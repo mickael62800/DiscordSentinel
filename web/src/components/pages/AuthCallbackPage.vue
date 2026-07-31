@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 import { setDiscordUser, setDiscordToken, type DiscordUser } from "@/api/config";
 import { useAuthStore } from "@/stores/authStore";
 import { invitationsService } from "@/services/invitationsService";
+import { takeEntryDestination } from "@/entrySpace";
 
 const router = useRouter();
 const store = useAuthStore();
@@ -91,7 +92,8 @@ onMounted(async () => {
   // Injecte directement dans le store Pinia pour eviter un re-check async.
   store.$patch({ user, initialized: true, error: null });
 
-  router.replace({ name: "dashboard" });
+  // Membre ou administration selon le bouton d'origine.
+  router.replace(takeEntryDestination());
 });
 </script>
 
