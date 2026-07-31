@@ -1,0 +1,590 @@
+<script setup lang="ts">
+// Détail d'un serveur de jeu : pilotage, ressources, configuration, logs,
+// console RCON et historique des joueurs.
+//
+// Choix structurants :
+//   - les statistiques ne sont rafraîchies que si le serveur tourne. Interroger
+//     Docker toutes les 5 s pour un conteneur arrêté ne renverrait que des
+//     zéros, en payant une requête à chaque fois.
+//   - la configuration éditable est générée depuis le `config_schema` du
+//     template, comme le formulaire de création : un nouveau réglage ajouté en
+//     base apparaît ici sans toucher au front.
+//   - la console RCON n'apparaît que si le jeu la supporte ET que le serveur
+//     tourne : afficher un champ qui échouera à coup sûr n'aide personne.
+
+import { computed, onUnmounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useAuth } from "../../composables/useAuth";
+import { useToast } from "../../composables/useToast";
+import {
+  nexusGamesService,
+  type GameServer,
+  type GameServerStats,
+  type GameTemplate,
+  type PlayerSession,
+} from "@/services/nexusGamesService";
+import AdminPageShell from "../layouts/AdminPageShell.vue";
+
+const route = useRoute();
+const router = useRouter();
+const { selectedGuildId } = useGuildSelector();
+const { user } = useAuth();
+const { success, error: showError } = useToast();
+
+const serverId = computed(() => String(route.params.id ?? ""));
+
+const server = ref<GameServer | null>(null);
+const config = ref<Record<string, string>>({});
+const template = ref<GameTemplate | null>(null);
+const stats = ref<GameServerStats | null>(null);
+const logs = ref<string[]>([]);
+const sessions = ref<PlayerSession[]>([]);
+
+const loading = ref(false);
+const errorMessage = ref("");
+const busy = ref(false);
+const savingConfig = ref(false);
+const rconCommand = ref("");
+const rconOutput = ref("");
+
+type Onglet = "apercu" | "config" | "logs" | "console" | "joueurs";
+const onglet = ref<Onglet>("apercu");
+
+const isRunning = computed(() => server.value?.status === "running");
+const isTransient = computed(
+  () => server.value?.status === "starting" || server.value?.status === "stopping",
+);
+
+const STATUS_LABELS: Record<string, string> = {
+  created: "Créé",
+  starting: "Démarrage…",
+  running: "En ligne",
+  stopping: "Arrêt…",
+  stopped: "Arrêté",
+  error: "Erreur",
+  deleted: "Supprimé",
+};
+
+async function load() {
+  if (!selectedGuildId.value || !serverId.value) return;
+  loading.value = true;
+  errorMessage.value = "";
+  try {
+    const detail = await nexusGamesService.getServer(selectedGuildId.value, serverId.value);
+    server.value = detail.server;
+    config.value = { ...detail.config };
+
+    // Le template porte le schéma des réglages et le support RCON.
+    const list = await nexusGamesService
+      .listTemplates(selectedGuildId.value)
+      .catch(() => [] as GameTemplate[]);
+    template.value = list.find((t) => t.id === detail.server.template_id) ?? null;
+  } catch (e) {
+    errorMessage.value = e instanceof Error ? e.message : "Chargement impossible";
+    server.value = null;
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function act(action: "start" | "stop" | "restart") {
+  if (!selectedGuildId.value || !server.value || busy.value) return;
+  busy.value = true;
+  try {
+    await nexusGamesService[action](selectedGuildId.value, server.value.id, user.value?.id ?? "");
+    success("Action envoyée.");
+    // Le conteneur met quelques secondes à changer d'état : on laisse Docker
+    // faire avant de relire, sinon on réafficherait l'état précédent.
+    setTimeout(load, 1500);
+  } catch (e) {
+    showError(e instanceof Error ? e.message : "Action impossible");
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function remove() {
+  if (!selectedGuildId.value || !server.value) return;
+  if (!confirm(`Supprimer définitivement « ${server.value.name} » et ses données ?`)) return;
+  try {
+    await nexusGamesService.remove(selectedGuildId.value, server.value.id, user.value?.id ?? "");
+    success("Serveur supprimé.");
+    router.push("/nexus/servers");
+  } catch (e) {
+    showError(e instanceof Error ? e.message : "Suppression impossible");
+  }
+}
+
+async function saveConfig() {
+  if (!selectedGuildId.value || !server.value) return;
+  savingConfig.value = true;
+  try {
+    await nexusGamesService.updateConfig(
+      selectedGuildId.value,
+      server.value.id,
+      config.value,
+      user.value?.id ?? "",
+    );
+    success("Configuration enregistrée. Redémarre le serveur pour l'appliquer.");
+  } catch (e) {
+    showError(e instanceof Error ? e.message : "Enregistrement impossible");
+  } finally {
+    savingConfig.value = false;
+  }
+}
+
+async function loadLogs() {
+  if (!selectedGuildId.value || !server.value) return;
+  try {
+    logs.value = await nexusGamesService.logs(selectedGuildId.value, server.value.id, 300);
+  } catch (e) {
+    logs.value = [e instanceof Error ? e.message : "Logs indisponibles"];
+  }
+}
+
+async function loadSessions() {
+  if (!selectedGuildId.value || !server.value) return;
+  sessions.value = await nexusGamesService
+    .sessions(selectedGuildId.value, server.value.id)
+    .catch(() => []);
+}
+
+async function sendRcon() {
+  if (!selectedGuildId.value || !server.value || !rconCommand.value.trim()) return;
+  try {
+    const res = await nexusGamesService.rcon(
+      selectedGuildId.value,
+      server.value.id,
+      rconCommand.value.trim(),
+    );
+    rconOutput.value = `> ${rconCommand.value}\n${res.response}\n\n${rconOutput.value}`;
+    rconCommand.value = "";
+  } catch (e) {
+    rconOutput.value = `> ${rconCommand.value}\n[erreur] ${
+      e instanceof Error ? e.message : "échec"
+    }\n\n${rconOutput.value}`;
+  }
+}
+
+// ── Statistiques en direct, uniquement quand le serveur tourne ──
+let statsTimer: ReturnType<typeof setInterval> | null = null;
+
+async function refreshStats() {
+  if (!selectedGuildId.value || !server.value || !isRunning.value) {
+    stats.value = null;
+    return;
+  }
+  stats.value = await nexusGamesService
+    .stats(selectedGuildId.value, server.value.id)
+    .catch(() => null);
+}
+
+function syncStatsTimer() {
+  if (statsTimer) {
+    clearInterval(statsTimer);
+    statsTimer = null;
+  }
+  if (isRunning.value) {
+    void refreshStats();
+    statsTimer = setInterval(refreshStats, 5000);
+  } else {
+    stats.value = null;
+  }
+}
+
+watch(isRunning, syncStatsTimer, { immediate: true });
+onUnmounted(() => statsTimer && clearInterval(statsTimer));
+
+watch([selectedGuildId, serverId], load, { immediate: true });
+watch(onglet, (o) => {
+  if (o === "logs") void loadLogs();
+  if (o === "joueurs") void loadSessions();
+});
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleString("fr-FR");
+}
+
+function fmtDuration(secs: number | null): string {
+  if (secs === null) return "en cours";
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  return h > 0 ? `${h} h ${m} min` : `${m} min`;
+}
+</script>
+
+<template>
+  <AdminPageShell
+    :title="server?.name ?? 'Serveur de jeu'"
+    :subtitle="template?.name ?? ''"
+  >
+    <p v-if="errorMessage" class="sd-error">{{ errorMessage }}</p>
+    <p v-else-if="loading" class="sd-hint">Chargement…</p>
+
+    <template v-else-if="server">
+      <!-- Barre d'état + actions -->
+      <div class="sd-bar">
+        <span class="sd-status" :class="`st-${server.status}`">
+          {{ STATUS_LABELS[server.status] ?? server.status }}
+        </span>
+        <span v-if="server.host_port" class="sd-port">Port {{ server.host_port }}</span>
+        <span class="sd-mem">{{ server.allocated_memory_mb }} Mo</span>
+
+        <div class="sd-actions">
+          <button v-if="!isRunning" :disabled="busy || isTransient" @click="act('start')">
+            Démarrer
+          </button>
+          <button v-else :disabled="busy" @click="act('stop')">Arrêter</button>
+          <button :disabled="busy || isTransient" @click="act('restart')">Redémarrer</button>
+          <button class="danger" @click="remove">Supprimer</button>
+        </div>
+      </div>
+
+      <p v-if="server.last_error" class="sd-lasterror">⚠ {{ server.last_error }}</p>
+
+      <!-- Onglets -->
+      <div class="sd-tabs">
+        <button
+          v-for="t in (['apercu', 'config', 'logs', 'console', 'joueurs'] as Onglet[])"
+          :key="t"
+          type="button"
+          :class="{ active: onglet === t }"
+          @click="onglet = t"
+        >
+          {{
+            { apercu: "Aperçu", config: "Configuration", logs: "Logs", console: "Console", joueurs: "Joueurs" }[t]
+          }}
+        </button>
+      </div>
+
+      <!-- Aperçu -->
+      <section v-if="onglet === 'apercu'" class="sd-pane">
+        <div v-if="stats" class="sd-stats">
+          <div class="sd-stat">
+            <span class="sd-stat-val">{{ stats.cpu_percent.toFixed(1) }} %</span>
+            <span class="sd-stat-lbl">Processeur</span>
+          </div>
+          <div class="sd-stat">
+            <span class="sd-stat-val">
+              {{ stats.memory_used_mb }} / {{ stats.memory_limit_mb }} Mo
+            </span>
+            <span class="sd-stat-lbl">Mémoire</span>
+          </div>
+          <div class="sd-stat">
+            <span class="sd-stat-val">{{ server.last_player_count }}</span>
+            <span class="sd-stat-lbl">Joueurs connectés</span>
+          </div>
+        </div>
+        <p v-else class="sd-hint">
+          Statistiques disponibles uniquement quand le serveur tourne.
+        </p>
+
+        <dl class="sd-meta">
+          <div><dt>Créé le</dt><dd>{{ fmtDate(server.created_at) }}</dd></div>
+          <div><dt>Démarré le</dt><dd>{{ fmtDate(server.started_at) }}</dd></div>
+          <div><dt>Dernière activité</dt><dd>{{ fmtDate(server.last_active_at) }}</dd></div>
+          <div>
+            <dt>Adresse</dt>
+            <dd>{{ server.ip_revealed ? "révélée" : `masquée jusqu'au ${fmtDate(server.ip_reveal_at)}` }}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <!-- Configuration -->
+      <section v-else-if="onglet === 'config'" class="sd-pane">
+        <p v-if="!template?.config_schema?.length" class="sd-hint">
+          Ce jeu n'expose aucun réglage modifiable.
+        </p>
+        <template v-else>
+          <div class="sd-form">
+            <label v-for="f in template.config_schema" :key="f.key" class="sd-field">
+              <span>{{ f.label || f.key }}</span>
+              <select v-if="f.type === 'enum'" v-model="config[f.key]">
+                <option v-for="o in f.options ?? []" :key="o" :value="o">{{ o }}</option>
+              </select>
+              <input
+                v-else-if="f.type === 'number'"
+                v-model="config[f.key]"
+                type="number"
+                :min="f.min"
+                :max="f.max"
+              />
+              <input v-else v-model="config[f.key]" type="text" :maxlength="f.max_length" />
+            </label>
+          </div>
+          <button class="sd-save" :disabled="savingConfig" @click="saveConfig">
+            {{ savingConfig ? "Enregistrement…" : "Enregistrer" }}
+          </button>
+          <p class="sd-hint">
+            Les changements prennent effet au prochain redémarrage du serveur.
+          </p>
+        </template>
+      </section>
+
+      <!-- Logs -->
+      <section v-else-if="onglet === 'logs'" class="sd-pane">
+        <button class="sd-refresh" @click="loadLogs">Rafraîchir</button>
+        <pre class="sd-logs">{{ logs.join("\n") || "Aucune ligne." }}</pre>
+      </section>
+
+      <!-- Console RCON -->
+      <section v-else-if="onglet === 'console'" class="sd-pane">
+        <p v-if="!template?.supports_rcon" class="sd-hint">
+          Ce jeu ne supporte pas RCON.
+        </p>
+        <p v-else-if="!isRunning" class="sd-hint">
+          Démarre le serveur pour lui envoyer des commandes.
+        </p>
+        <template v-else>
+          <form class="sd-rcon" @submit.prevent="sendRcon">
+            <input v-model="rconCommand" type="text" placeholder="say Bonjour" />
+            <button type="submit">Envoyer</button>
+          </form>
+          <pre class="sd-logs">{{ rconOutput || "Aucune commande envoyée." }}</pre>
+        </template>
+      </section>
+
+      <!-- Joueurs -->
+      <section v-else class="sd-pane">
+        <p v-if="!sessions.length" class="sd-hint">Aucune session enregistrée.</p>
+        <table v-else class="sd-table">
+          <thead>
+            <tr><th>Joueur</th><th>Connexion</th><th>Déconnexion</th><th>Durée</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in sessions" :key="s.id">
+              <td>{{ s.player_name }}</td>
+              <td>{{ fmtDate(s.joined_at) }}</td>
+              <td>{{ fmtDate(s.left_at) }}</td>
+              <td>{{ fmtDuration(s.duration_seconds) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </template>
+  </AdminPageShell>
+</template>
+
+<style scoped>
+.sd-hint {
+  color: var(--text-secondary);
+}
+
+.sd-error,
+.sd-lasterror {
+  color: var(--danger);
+}
+
+.sd-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  padding-bottom: var(--space-md);
+  border-bottom: 1px solid var(--bg-hover);
+}
+
+.sd-status {
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.st-running {
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+
+.st-error {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  color: var(--danger);
+}
+
+.st-starting,
+.st-stopping {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
+}
+
+.sd-port,
+.sd-mem {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.sd-actions {
+  margin-left: auto;
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.sd-actions button,
+.sd-refresh,
+.sd-save {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.sd-actions button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.sd-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sd-actions .danger:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.sd-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: var(--space-md) 0;
+}
+
+.sd-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.sd-tabs button.active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.sd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.sd-stat {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-md);
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+}
+
+.sd-stat-val {
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.sd-stat-lbl {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.sd-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-sm);
+  margin: 0;
+}
+
+.sd-meta dt {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.sd-meta dd {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.sd-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.sd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+
+.sd-field > span {
+  color: var(--text-secondary);
+}
+
+.sd-field input,
+.sd-field select,
+.sd-rcon input {
+  background: var(--bg-card);
+  border: 1px solid var(--bg-hover);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  padding: 6px 10px;
+}
+
+.sd-logs {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm);
+  background: #0b0b12;
+  border-radius: var(--radius-sm);
+  max-height: 26rem;
+  overflow: auto;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sd-rcon {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.sd-rcon input {
+  flex: 1;
+}
+
+.sd-rcon button {
+  background: var(--accent);
+  border: none;
+  color: #fff;
+  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  cursor: pointer;
+}
+
+.sd-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.sd-table th,
+.sd-table td {
+  text-align: left;
+  padding: var(--space-sm);
+  border-bottom: 1px solid var(--bg-hover);
+}
+
+.sd-table th {
+  color: var(--text-secondary);
+}
+</style>

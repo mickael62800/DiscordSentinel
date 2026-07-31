@@ -109,6 +109,8 @@ const ALL_SECTIONS: DashboardSection[] = [
 /// Alias : sous-chemins de hubs (fusionnes) qui partagent la gouvernance RBAC
 /// de leur hub — ils n'ont pas de tuile propre mais restent atteignables par URL.
 const PATH_RBAC_ALIASES: Record<string, string> = {
+  // Sous-pages des serveurs de jeu : meme droit que la liste.
+  "/nexus/servers/nouveau": "nexus.servers",
   "/discord-roles": "community.role-panels",
   "/voice-themes": "community.voice-channels",
   "/levels-config": "community.levels",

@@ -3,7 +3,7 @@
 // Passe par la passerelle /nexus-api : l'autorisation est verifiee cote
 // serveur par nginx (gate RBAC `nexus.access`) avant d'atteindre nexus-api.
 
-import { nexusDelete, nexusGet, nexusPost } from "@/api/nexusHttp";
+import { nexusDelete, nexusGet, nexusPost, nexusPut } from "@/api/nexusHttp";
 
 /** Etats possibles d'un serveur, tels que renvoyes par l'API. */
 export type GameServerStatus =
@@ -37,6 +37,20 @@ export interface GameServer {
   ip_revealed: boolean;
 }
 
+/// Un champ configurable d'un template, décrit par son `config_schema`.
+/// Le formulaire de création se construit entièrement à partir de ça : ajouter
+/// une option à un jeu se fait en base, sans toucher au front.
+export interface TemplateField {
+  key: string;
+  label: string;
+  type: "text" | "number" | "boolean" | "enum";
+  default?: string | number | boolean;
+  options?: string[];
+  min?: number;
+  max?: number;
+  max_length?: number;
+}
+
 export interface GameTemplate {
   id: string;
   slug: string;
@@ -44,6 +58,45 @@ export interface GameTemplate {
   description?: string | null;
   icon?: string | null;
   category?: string | null;
+  accent_color?: string | null;
+  cover_image_url?: string | null;
+  container_port: number;
+  default_memory_mb: number;
+  min_memory_mb: number;
+  max_memory_mb: number;
+  supports_rcon: boolean;
+  supports_mods: boolean;
+  config_schema: TemplateField[];
+}
+
+export interface GameServerDetail {
+  server: GameServer;
+  config: Record<string, string>;
+}
+
+export interface GameServerStats {
+  cpu_percent: number;
+  memory_used_mb: number;
+  memory_limit_mb: number;
+  network_rx_bytes: number;
+  network_tx_bytes: number;
+}
+
+export interface CreateServerPayload {
+  template_slug: string;
+  name: string;
+  memory_mb?: number;
+  owner_user_id: string;
+  config: Record<string, string>;
+  ip_reveal_days?: number;
+}
+
+export interface PlayerSession {
+  id: string;
+  player_name: string;
+  joined_at: string;
+  left_at: string | null;
+  duration_seconds: number | null;
 }
 
 export const nexusGamesService = {
@@ -80,6 +133,70 @@ export const nexusGamesService = {
   restart(guildId: string, serverId: string, actorId: string): Promise<void> {
     return nexusPost<void>(
       `/api/games/servers/${encodeURIComponent(serverId)}/restart?actor_id=${encodeURIComponent(actorId)}`,
+      guildId,
+    );
+  },
+
+  /** GET /api/games/servers/{id} — detail + configuration effective. */
+  getServer(guildId: string, serverId: string): Promise<GameServerDetail> {
+    return nexusGet<GameServerDetail>(
+      `/api/games/servers/${encodeURIComponent(serverId)}`,
+      guildId,
+    );
+  },
+
+  /** POST /api/games/{guild}/servers — cree un serveur. */
+  create(guildId: string, payload: CreateServerPayload): Promise<GameServer> {
+    return nexusPost<GameServer>(
+      `/api/games/${encodeURIComponent(guildId)}/servers`,
+      guildId,
+      payload,
+    );
+  },
+
+  /** GET /api/games/servers/{id}/logs — dernieres lignes du conteneur. */
+  logs(guildId: string, serverId: string, lines = 200): Promise<string[]> {
+    return nexusGet<string[]>(
+      `/api/games/servers/${encodeURIComponent(serverId)}/logs?lines=${lines}`,
+      guildId,
+    );
+  },
+
+  /** GET /api/games/servers/{id}/stats — CPU / RAM / reseau en direct. */
+  stats(guildId: string, serverId: string): Promise<GameServerStats> {
+    return nexusGet<GameServerStats>(
+      `/api/games/servers/${encodeURIComponent(serverId)}/stats`,
+      guildId,
+    );
+  },
+
+  /** PUT /api/games/servers/{id}/config — enregistre les overrides. */
+  updateConfig(
+    guildId: string,
+    serverId: string,
+    config: Record<string, string>,
+    actorId: string,
+  ): Promise<void> {
+    return nexusPut<void>(
+      `/api/games/servers/${encodeURIComponent(serverId)}/config?actor_id=${encodeURIComponent(actorId)}`,
+      guildId,
+      { config },
+    );
+  },
+
+  /** POST /api/games/servers/{id}/command — commande RCON. */
+  rcon(guildId: string, serverId: string, command: string): Promise<{ response: string }> {
+    return nexusPost<{ response: string }>(
+      `/api/games/servers/${encodeURIComponent(serverId)}/command`,
+      guildId,
+      { command },
+    );
+  },
+
+  /** GET /api/games/servers/{id}/sessions — historique des joueurs. */
+  sessions(guildId: string, serverId: string): Promise<PlayerSession[]> {
+    return nexusGet<PlayerSession[]>(
+      `/api/games/servers/${encodeURIComponent(serverId)}/sessions`,
       guildId,
     );
   },

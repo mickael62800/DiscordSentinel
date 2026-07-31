@@ -104,9 +104,12 @@ watch(selectedGuildId, load, { immediate: true });
 
     <p v-else-if="loading" class="ns-hint">Chargement…</p>
 
-    <p v-else-if="!servers.length" class="ns-hint">
-      Aucun serveur de jeu pour l'instant. Ils se creent depuis Discord avec
-      <code>/game-admin</code>.
+    <template v-else>
+      <RouterLink to="/nexus/servers/nouveau" class="ns-new">+ Nouveau serveur</RouterLink>
+
+    <p v-if="!servers.length" class="ns-hint">
+      Aucun serveur de jeu pour l'instant. Cree-en un ci-dessus, ou depuis
+      Discord avec <code>/game-admin</code>.
     </p>
 
     <table v-else class="ns-table">
@@ -124,7 +127,7 @@ watch(selectedGuildId, load, { immediate: true });
       <tbody>
         <tr v-for="s in servers" :key="s.id">
           <td>
-            <span class="ns-name">{{ s.name }}</span>
+            <RouterLink :to="`/nexus/servers/${s.id}`" class="ns-name">{{ s.name }}</RouterLink>
             <span v-if="s.last_error" class="ns-lasterror" :title="s.last_error">⚠</span>
           </td>
           <td>{{ templateName(s.template_id) }}</td>
@@ -164,6 +167,7 @@ watch(selectedGuildId, load, { immediate: true });
         </tr>
       </tbody>
     </table>
+    </template>
   </AdminPageShell>
 </template>
 
@@ -197,6 +201,20 @@ watch(selectedGuildId, load, { immediate: true });
 .ns-name {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.ns-name:hover {
+  color: var(--accent);
+}
+
+.ns-new {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  padding: 6px 16px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
 }
 
 .ns-lasterror {
