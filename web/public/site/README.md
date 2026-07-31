@@ -9,6 +9,7 @@ elle n'affiche jamais d'image cassée.
 - **Proportions : 4/3** (l'affichage recadre en `object-fit: cover`).
 - **Taille : 1200 × 900 px** suffit largement. Au-delà, on alourdit la page
   sans gain visible : elles s'affichent à ~500 px de large.
+- **Livrer en PNG ou JPG** : le script d optimisation convertit en JPEG progressif 1200x900 (~200 Ko).
 - **PNG ou JPG.** JPG de préférence pour les scènes photo-réalistes, il pèse
   bien moins lourd. PNG si l'image contient des aplats ou du texte net.
 - **Poids visé : moins de 300 Ko chacune.** Les logos livrés faisaient 2 Mo
@@ -25,7 +26,7 @@ Reprendre l'univers du logo pour que l'ensemble se tienne :
 - pas de texte incrusté dans l'image : il est déjà dans la page, et un texte
   gravé ne serait ni traduisible ni lisible sur petit écran.
 
-## Fichiers
+## Fichiers (livres, optimises en JPEG)
 
 | Fichier | Section | Contenu suggéré |
 |---|---|---|

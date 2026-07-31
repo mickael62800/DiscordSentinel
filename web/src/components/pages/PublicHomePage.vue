@@ -59,7 +59,7 @@ const SECTIONS = [
       "Sauvegardes automatiques du monde",
       "Un salon Discord dédié créé pour chaque session",
     ],
-    image: "/site/section-jeux.png",
+    image: "/site/section-jeux.jpg",
     alt: "Serveurs de jeu de la communauté",
   },
   {
@@ -73,22 +73,50 @@ const SECTIONS = [
       "Personne n'est obligé de parler : venir écouter, ça compte",
       "Des salons privés à la demande pour les petits groupes",
     ],
-    image: "/site/section-vocal.png",
+    image: "/site/section-vocal.jpg",
     alt: "Salons vocaux de la communauté",
   },
   {
-    id: "animation",
-    surtitre: "Concours et classements",
-    titre: "De quoi se chambrer gentiment",
+    id: "planning",
+    surtitre: "Le planning",
+    titre: "Ce qui arrive, et quand",
     texte:
-      "Une économie maison, des classements d'activité, des concours réguliers et quelques jeux internes qui tournent directement sur Discord. Rien d'obligatoire, tout est là pour l'ambiance.",
+      "Une soirée un mardi soir, une saison Minecraft qui dure trois semaines, une campagne Palworld sur un mois : le planning affiche les deux, en vue semaine ou en vue mois. Tu vois d'un coup d'œil ce qui tourne et ce qui se prépare.",
     points: [
-      "Classements du temps passé en vocal et des messages",
-      "Giveaways avec tirage au sort transparent",
-      "Une monnaie du serveur à dépenser dans nos jeux",
+      "Vue semaine pour les soirées, vue mois pour les campagnes",
+      "Les événements longs restent visibles toute leur durée",
+      "Inscription en un clic, avec les « peut-être » qui comptent aussi",
     ],
-    image: "/site/section-animation.png",
-    alt: "Concours et classements",
+    image: "/site/section-planning.jpg",
+    alt: "Planning des événements et campagnes",
+  },
+  {
+    id: "animation",
+    surtitre: "Concours",
+    titre: "Tirages au sort et petits jeux",
+    texte:
+      "Des giveaways réguliers, une monnaie maison à dépenser, et quelques jeux internes qui tournent directement sur Discord. Rien d'obligatoire, tout est là pour l'ambiance — et pour le plaisir de gagner un truc de temps en temps.",
+    points: [
+      "Tirages au sort transparents, gagnants annoncés publiquement",
+      "Une monnaie du serveur à gagner et à dépenser",
+      "Des jeux internes jouables sans rien installer",
+    ],
+    image: "/site/section-animation.jpg",
+    alt: "Concours et tirages au sort",
+  },
+  {
+    id: "classements",
+    surtitre: "Classements",
+    titre: "Qui traîne vraiment le plus sur le canapé",
+    texte:
+      "Temps passé en vocal, messages échangés, niveaux gagnés : tout est compté, et affiché. Sans prise de tête, juste de quoi savoir qui squatte le plus et se chambrer en connaissance de cause.",
+    points: [
+      "Classement du temps en vocal et des messages",
+      "Niveaux et expérience gagnés en participant",
+      "Statistiques du serveur, mois par mois",
+    ],
+    image: "/site/section-classements.jpg",
+    alt: "Classements de la communauté",
   },
   {
     id: "moderation",
@@ -101,7 +129,7 @@ const SECTIONS = [
       "Détection automatique du spam et des raids",
       "Chaque décision est tracée et peut être contestée",
     ],
-    image: "/site/section-moderation.png",
+    image: "/site/section-moderation.jpg",
     alt: "Une communauté modérée",
   },
 ];
@@ -431,7 +459,10 @@ const APPEAR = {
 
 .sec-media {
   margin: 0;
-  border-radius: 1.25rem;
+  /* Arrondi genereux, dans l'esprit du logo. `overflow: hidden` recadre
+     l'image elle-meme : le fichier reste un rectangle, l'arrondi est fait
+     en CSS — plus net qu'un masque grave dans le JPEG, et adaptatif. */
+  border-radius: 1.75rem;
   overflow: hidden;
   border: 1px solid rgba(168, 85, 247, 0.25);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
