@@ -10,3 +10,4 @@ pub mod manage_role_panels;
 pub mod manage_sponsorships;
 pub mod manage_voice_channels;
 pub mod manage_welcome_config;
+pub mod manage_events;

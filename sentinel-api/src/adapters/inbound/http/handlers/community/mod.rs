@@ -11,3 +11,4 @@ pub mod monthly_ranking;
 pub mod role_panels;
 pub mod voice_channels;
 pub mod welcome;
+pub mod events;

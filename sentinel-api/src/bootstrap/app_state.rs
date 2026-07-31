@@ -173,6 +173,17 @@ pub async fn build_app_state(
     ));
     let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
 
+    // Planning communautaire : evenements et campagnes de jeu.
+    let events_uc = Arc::new(
+        sentinel_core::application::community::manage_events_service::ManageEventsService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::community::event_repository::PgEventRepository::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+
     // Detection d'anomalie de moderation (mass ban/delete/role). Le CALCUL
     // (fenetre glissante) vit dans un adapter memoire serveur ; la DECISION
     // (seuil + reset) dans le service coeur. Le bot n'agrege/ne decide plus.
@@ -686,6 +697,7 @@ pub async fn build_app_state(
     );
 
     AppState {
+        events_uc,
         analyze_uc,
         analyze_image_uc,
         dataset_uc,

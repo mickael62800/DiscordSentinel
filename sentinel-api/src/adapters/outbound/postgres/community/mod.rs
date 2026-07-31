@@ -12,3 +12,4 @@ pub mod sponsorship_repository;
 pub mod temp_role_repository;
 pub mod voice_channel_repository;
 pub mod welcome_config_repository;
+pub mod event_repository;

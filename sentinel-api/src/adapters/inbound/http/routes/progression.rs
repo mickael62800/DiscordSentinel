@@ -72,6 +72,26 @@ fn announcement_inner() -> Router<AppState> {
             "/",
             post(handlers::community::announcements::create_announcement),
         )
+        // ── Planning communautaire ──
+        // Les evenements sont sous /api/events/{guild_id} et le detail sous
+        // /api/events/detail/{id} : un segment fixe evite l'ambiguite entre un
+        // guild_id (snowflake) et un uuid d'evenement.
+        .route(
+            "/api/events/{guild_id}",
+            get(handlers::community::events::list_events)
+                .post(handlers::community::events::create_event),
+        )
+        .route(
+            "/api/events/detail/{id}",
+            get(handlers::community::events::get_event)
+                .put(handlers::community::events::update_event)
+                .delete(handlers::community::events::delete_event),
+        )
+        .route(
+            "/api/events/detail/{id}/join",
+            post(handlers::community::events::join_event)
+                .delete(handlers::community::events::leave_event),
+        )
         .route(
             "/{guild_id}",
             get(handlers::community::announcements::list_announcements),

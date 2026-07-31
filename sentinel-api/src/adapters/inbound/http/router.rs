@@ -147,6 +147,12 @@ pub fn build_for_test(state: AppState) -> Router {
         .route(
             "/api/public/guilds/{guild_id}",
             get(handlers::system::public_site::public_guild),
+        )
+        // Planning public : uniquement les evenements publies ET publics,
+        // via un DTO distinct (cf. handlers::community::events).
+        .route(
+            "/api/public/events/{guild_id}",
+            get(handlers::community::events::public_events),
         );
 
     Router::new()
