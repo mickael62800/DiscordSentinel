@@ -443,6 +443,10 @@ services:
     environment:
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       API_BASE_URL: http://api:3000
+      # Adresse PUBLIQUE du site, utilisee pour construire les URL d'images des
+      # embeds Discord (web/public/imgs/). Discord ne peut pas lire un fichier
+      # local du conteneur : il va chercher l'image lui-meme en HTTPS.
+      WEB_FRONT_URL: ${WEB_FRONT_URL:-}
       GRPC_API_URL: http://api:50051
       GRPC_TLS_DIR: /grpc-certs
       API_KEY: ${API_KEY:-}
