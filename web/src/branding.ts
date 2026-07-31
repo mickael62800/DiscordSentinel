@@ -29,6 +29,12 @@ export interface Brand {
   tagline: string;
 }
 
+/// Invitation Discord de la communaute (VITE_DISCORD_INVITE au build).
+///
+/// Absente, le bouton « Rejoindre Discord » n'est pas affiche : un bouton qui
+/// ne mene nulle part est pire que pas de bouton.
+export const DISCORD_INVITE = (import.meta.env.VITE_DISCORD_INVITE as string | undefined) ?? "";
+
 export const COMMUNITY: Brand = {
   name: "La Bande du Canapé",
   mark: "/canape_mark.png",

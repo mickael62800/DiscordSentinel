@@ -23,7 +23,10 @@ import {
   publicEventsService,
   type PublicEvent,
 } from "@/services/publicEventsService";
-import CommunityBackdrop from "../atoms/CommunityBackdrop.vue";
+import {
+  publicGamesService,
+  type PublicGameServer,
+} from "@/services/publicGamesService";
 
 const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
 
@@ -36,9 +39,13 @@ const hasAdminAccess = computed(() => visible("general.stats"));
 const events = ref<PublicEvent[]>([]);
 const loadingEvents = ref(true);
 
+const servers = ref<PublicGameServer[]>([]);
+const loadingServers = ref(true);
+
 onMounted(async () => {
   if (!guildId) {
     loadingEvents.value = false;
+    loadingServers.value = false;
     return;
   }
   // Fenêtre large : ce qui est en cours (commencé avant aujourd'hui) et ce qui
@@ -48,14 +55,29 @@ onMounted(async () => {
   const to = new Date();
   to.setDate(to.getDate() + 60);
 
-  try {
-    events.value = await publicEventsService.list(guildId, from, to);
-  } catch {
-    events.value = [];
-  } finally {
-    loadingEvents.value = false;
-  }
+  // Les deux appels sont indépendants : une plateforme jeux indisponible ne
+  // doit pas priver la page de son planning, et réciproquement.
+  publicEventsService
+    .list(guildId, from, to)
+    .then((r) => (events.value = r))
+    .catch(() => (events.value = []))
+    .finally(() => (loadingEvents.value = false));
+
+  publicGamesService
+    .listServers(guildId)
+    .then((r) => (servers.value = r))
+    .catch(() => (servers.value = []))
+    .finally(() => (loadingServers.value = false));
 });
+
+/// En ligne d'abord : c'est ce qu'on vient chercher.
+const sortedServers = computed(() =>
+  [...servers.value].sort((a, b) => Number(b.online) - Number(a.online)),
+);
+
+const playersOnline = computed(() =>
+  servers.value.reduce((n, s) => n + (s.online ? s.player_count : 0), 0),
+);
 
 /// En cours d'abord, puis à venir par ordre chronologique.
 const ongoing = computed(() => events.value.filter((e) => isOngoing(e)));
@@ -89,13 +111,12 @@ function accent(e: PublicEvent): string | undefined {
 const RUBRIQUES = [
   { emoji: "🎁", titre: "Concours", texte: "Les giveaways en cours et les gagnants." },
   { emoji: "🏆", titre: "Classements", texte: "Ton rang et le top du serveur." },
-  { emoji: "🎮", titre: "Serveurs de jeu", texte: "Ce qui tourne et comment s'y connecter." },
+  { emoji: "🗓️", titre: "Inscriptions", texte: "S'inscrire aux événements en un clic." },
 ];
 </script>
 
 <template>
   <div class="mb">
-    <CommunityBackdrop :intensity="0.8" />
 
     <header class="mb-header">
       <RouterLink to="/" class="mb-brand">
@@ -136,6 +157,52 @@ const RUBRIQUES = [
           </div>
           <p v-if="e.description" class="mb-event-desc">{{ e.description }}</p>
           <span class="mb-event-when">Jusqu'au {{ fmtRange(e).split("→").pop()?.trim() }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── Serveurs de jeu ── -->
+    <section class="mb-block">
+      <h2>
+        Nos serveurs de jeu
+        <span v-if="playersOnline" class="mb-count">
+          {{ playersOnline }} joueur(s) en ligne
+        </span>
+      </h2>
+
+      <p v-if="loadingServers" class="mb-hint">Chargement des serveurs…</p>
+
+      <p v-else-if="!servers.length" class="mb-hint">
+        Aucun serveur de jeu pour le moment.
+      </p>
+
+      <ul v-else class="mb-servers">
+        <li
+          v-for="sv in sortedServers"
+          :key="sv.id"
+          class="mb-server"
+          :class="{ offline: !sv.online }"
+        >
+          <span class="mb-server-icon" aria-hidden="true">{{ sv.icon || "🎮" }}</span>
+
+          <div class="mb-server-main">
+            <strong>{{ sv.name }}</strong>
+            <span class="mb-tag">{{ sv.game }}</span>
+          </div>
+
+          <div class="mb-server-state">
+            <span class="mb-dot" :class="sv.online ? 'on' : 'off'" aria-hidden="true"></span>
+            <span>{{ sv.online ? "En ligne" : "Hors ligne" }}</span>
+            <span v-if="sv.online" class="mb-players">
+              · {{ sv.player_count }} joueur(s)
+            </span>
+          </div>
+
+          <!-- L'adresse suit le mecanisme de revelation differee du
+               game-portal : tant qu'elle est masquee, on annonce que le
+               serveur existe, pas comment s'y connecter. -->
+          <span v-if="sv.online && sv.port" class="mb-port">Port {{ sv.port }}</span>
+          <span v-else-if="sv.online" class="mb-port muted">Adresse bientôt révélée</span>
         </li>
       </ul>
     </section>
@@ -388,6 +455,95 @@ const RUBRIQUES = [
   border: 1px solid rgba(168, 85, 247, 0.3);
   border-radius: 999px;
   padding: 2px 10px;
+}
+
+.mb-count {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #b49ad8;
+}
+
+.mb-servers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.7rem;
+}
+
+.mb-server {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "icon main"
+    "icon state"
+    "icon port";
+  align-items: center;
+  column-gap: 0.75rem;
+  row-gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+/* Un serveur eteint reste visible mais s'efface : il informe sans attirer. */
+.mb-server.offline {
+  opacity: 0.55;
+}
+
+.mb-server-icon {
+  grid-area: icon;
+  font-size: 1.6rem;
+}
+
+.mb-server-main {
+  grid-area: main;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.mb-server-state {
+  grid-area: state;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: #b49ad8;
+}
+
+.mb-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.mb-dot.on {
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+.mb-dot.off {
+  background: #6b7280;
+}
+
+.mb-players {
+  color: #d8c7f5;
+}
+
+.mb-port {
+  grid-area: port;
+  font-size: 0.78rem;
+  color: #d8c7f5;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-port.muted {
+  color: #8f77b8;
+  font-style: italic;
 }
 
 .mb-grid {

@@ -197,8 +197,16 @@ pub fn build_router(state: AppState) -> Router {
             require_api_key,
         ));
 
+    // Vitrine publique : montee HORS du groupe protege par le Bearer, comme
+    // /health. Le DTO est ecrit champ par champ (cf. public_servers.rs).
+    let public = Router::new().route(
+        "/api/public/games/{guild_id}/servers",
+        get(handlers::game::public_servers::public_servers),
+    );
+
     Router::new()
         .route("/health", get(|| async { "ok" }))
+        .merge(public)
         .merge(api)
         .with_state(state)
 }

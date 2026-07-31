@@ -19,8 +19,7 @@ import {
   publicSiteService,
   type PublicGuild,
 } from "@/services/publicSiteService";
-import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
-import CommunityBackdrop from "../atoms/CommunityBackdrop.vue";
+import { COMMUNITY, DISCORD_INVITE, onWordmarkError, wordmarkOf } from "@/branding";
 
 const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
 
@@ -145,7 +144,6 @@ const APPEAR = {
 
 <template>
   <div class="ph">
-    <CommunityBackdrop />
 
     <!-- ── Hero ── -->
     <header class="ph-hero">
@@ -171,9 +169,21 @@ const APPEAR = {
         </span>
       </div>
 
+      <!-- Trois actions DISTINCTES, apres la simplification : entrer sur
+           Discord (la vraie conversion), regarder ce qui s'y passe sans
+           compte, ou parcourir la page. -->
       <div class="ph-actions">
-        <RouterLink class="ph-btn primary" to="/membre">
-          Rejoindre la bande
+        <a
+          v-if="DISCORD_INVITE"
+          class="ph-btn primary"
+          :href="DISCORD_INVITE"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Rejoindre Discord
+        </a>
+        <RouterLink class="ph-btn secondary" to="/membre">
+          Voir la vie du serveur
         </RouterLink>
         <a class="ph-btn ghost" href="#jeux">Découvrir</a>
       </div>
@@ -217,7 +227,16 @@ const APPEAR = {
     <section v-motion="APPEAR" class="ph-cta">
       <h2>Le canapé est large, il reste de la place</h2>
       <p>Regarde ce qui s'y passe, sans compte et sans engagement.</p>
-      <RouterLink class="ph-btn primary" to="/membre">Rejoindre la bande</RouterLink>
+      <a
+        v-if="DISCORD_INVITE"
+        class="ph-btn primary"
+        :href="DISCORD_INVITE"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Rejoindre Discord
+      </a>
+      <RouterLink v-else class="ph-btn primary" to="/membre">Voir la vie du serveur</RouterLink>
     </section>
 
     <!-- L'administration ne concerne qu'une poignee de personnes : un lien
@@ -319,6 +338,17 @@ const APPEAR = {
 .ph-btn.primary:hover {
   transform: translateY(-2px);
   box-shadow: 0 12px 38px rgba(168, 85, 247, 0.65);
+}
+
+.ph-btn.secondary {
+  background: rgba(168, 85, 247, 0.14);
+  border: 1px solid rgba(168, 85, 247, 0.45);
+  color: #e9dcff;
+}
+
+.ph-btn.secondary:hover {
+  background: rgba(168, 85, 247, 0.22);
+  transform: translateY(-2px);
 }
 
 .ph-btn.ghost {
