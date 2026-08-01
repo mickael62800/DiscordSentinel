@@ -164,6 +164,10 @@ impl EventHandler for Handler {
         modules::community::spawn_temp_role_cleanup(ctx.clone());
 
         modules::bump::spawn_background(ctx.clone());
+        // Presence vocale : republication periodique. Sans elle, la page
+        // membre perd un salon des que personne n'y bouge pendant trois
+        // minutes — l'API considere alors l'instantane perime.
+        modules::presence::spawn_background(ctx.clone());
         modules::nasa_apod::spawn_background(ctx.clone());
 
         // Security: sync membres au demarrage + background tasks

@@ -71,8 +71,14 @@ fn instantane(guild: &serenity::model::guild::Guild) -> Vec<VoiceChannelDto> {
 
         // Les bots occupent les salons sans y participer : un lecteur de
         // musique afficherait un faux participant.
+        //
+        // Un membre ABSENT du cache n'est pas ecarte : ce serait le faire
+        // disparaitre du salon alors qu'il y est bel et bien. Le cas est
+        // rare (l'intent GUILD_MEMBERS le remplit) mais il ne doit pas
+        // aboutir a une liste fausse — mieux vaut un nom generique qu'un
+        // absent.
         let membre = guild.members.get(&etat.user_id);
-        if membre.map(|m| m.user.bot).unwrap_or(true) {
+        if membre.is_some_and(|m| m.user.bot) {
             continue;
         }
 
@@ -83,7 +89,8 @@ fn instantane(guild: &serenity::model::guild::Guild) -> Vec<VoiceChannelDto> {
                     .or_else(|| m.user.global_name.clone())
                     .unwrap_or_else(|| m.user.name.clone())
             })
-            .unwrap_or_default();
+            .filter(|n| !n.trim().is_empty())
+            .unwrap_or_else(|| "Un membre".to_string());
 
         par_salon.entry(channel_id).or_default().push(VoiceMemberDto {
             user_id: etat.user_id.to_string(),
@@ -167,6 +174,57 @@ pub async fn on_message(ctx: &Context, msg: &serenity::model::channel::Message) 
         &nom_salon,
         &auteur,
     );
+}
+
+/// Republie la presence de toutes les guildes connues.
+///
+/// A appeler au demarrage : sans cela, les personnes DEJA en vocal quand le
+/// bot se lance n'apparaissent qu'a leur premier mouvement — c'est-a-dire
+/// souvent jamais pendant toute une soiree.
+pub async fn republier_tout(ctx: &Context) {
+    let Some(api) = client_api(ctx).await else {
+        return;
+    };
+
+    for guild_id in ctx.cache.guilds() {
+        let channels = {
+            let Some(guild) = ctx.cache.guild(guild_id) else {
+                continue;
+            };
+            instantane(&guild)
+        };
+        api.publish_voice_presence(&guild_id.to_string(), channels);
+    }
+}
+
+/// Republie la presence a intervalle regulier.
+///
+/// Indispensable, et pas un simple confort : l'API considere un instantane
+/// perime au-dela de trois minutes. Publier uniquement sur changement d'etat
+/// faisait donc disparaitre de la page tout un salon ou personne ne bougeait
+/// — c'est-a-dire un salon ou l'on discute tranquillement, exactement ce
+/// qu'on veut montrer.
+///
+/// L'intervalle doit rester nettement sous ce seuil pour absorber un rate
+/// limit ou une coupure Redis passagere.
+pub fn spawn_background(ctx: Context) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if STARTED.swap(true, Ordering::SeqCst) {
+        return;
+    }
+
+    tokio::spawn(async move {
+        // Premiere publication tout de suite : le cache est deja rempli quand
+        // `ready` se declenche, et attendre une minute laisserait la page
+        // vide juste apres un redemarrage.
+        republier_tout(&ctx).await;
+
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            republier_tout(&ctx).await;
+        }
+    });
 }
 
 async fn client_api(ctx: &Context) -> Option<Arc<BaseApiClient>> {
