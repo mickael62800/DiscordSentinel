@@ -882,7 +882,6 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   gap: clamp(1.75rem, 4vh, 2.75rem);
 }
 
-.mb-bar,
 .mb-hero,
 .mb-block,
 .mb-footer {
@@ -893,9 +892,31 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   margin: 0 auto;
 }
 
+/* Barre collante : la page est longue, et « Se connecter » ne doit pas
+   disparaitre des le premier defilement. Elle etait aussi rognee par le haut
+   quand la fenetre etait courte — le `sticky` avec `top: 0` regle les deux.
+
+   Pas de `backdrop-filter` : le flou avait fait ramer la machine sur ce
+   projet. Un degrade opaque qui se fond dans le fond suffit a rendre le
+   bouton lisible au-dessus du contenu qui defile. */
 .mb-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  min-height: 3rem;
+  /* Deborde la zone de contenu pour couvrir toute la largeur : sinon le
+     contenu apparaitrait sur les cotes en passant dessous. */
+  margin: calc(-1 * clamp(1rem, 3vh, 2rem)) calc(-1 * clamp(1rem, 4vw, 3rem)) 0;
+  padding: 0.6rem clamp(1rem, 4vw, 3rem);
+  background: linear-gradient(180deg, #150a28 62%, rgba(21, 10, 40, 0));
+}
+
+.mb-bar > * {
+  /* Le contenu de la barre reste aligne sur la colonne du reste de la page. */
+  margin-right: max(0px, calc((100% - 68rem) / 2));
 }
 
 .mb-user {
