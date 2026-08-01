@@ -67,6 +67,11 @@ struct VoiceChannelRaw {
     channel_id: String,
     channel_name: String,
     members: Vec<VoiceMemberRaw>,
+    /// Absent des instantanes publies avant l'introduction du marqueur. Sans
+    /// defaut, ils deviendraient illisibles et la presence disparaitrait le
+    /// temps que le bot republie.
+    #[serde(default)]
+    restreint: bool,
 }
 
 #[derive(Deserialize)]
@@ -112,6 +117,7 @@ impl PresenceRepository for RedisPresenceRepository {
                 .map(|c| VoiceChannelPresence {
                     channel_id: c.channel_id,
                     channel_name: c.channel_name,
+                    restreint: c.restreint,
                     members: c
                         .members
                         .into_iter()

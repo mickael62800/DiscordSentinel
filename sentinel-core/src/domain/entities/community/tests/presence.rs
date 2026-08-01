@@ -22,6 +22,14 @@ fn salon(nom: &str, n: usize) -> VoiceChannelPresence {
         channel_id: nom.into(),
         channel_name: nom.into(),
         members: (0..n).map(|i| membre(&format!("u{i}"), false, false, false)).collect(),
+        restreint: false,
+    }
+}
+
+fn salon_restreint(nom: &str, n: usize) -> VoiceChannelPresence {
+    VoiceChannelPresence {
+        restreint: true,
+        ..salon(nom, n)
     }
 }
 
@@ -124,4 +132,22 @@ fn fenetre_ecrite_couvre_un_quart_d_heure() {
     assert!(a.is_within_window(t(TEXT_WINDOW_SECONDS - 1)));
     assert!(!a.is_within_window(t(TEXT_WINDOW_SECONDS + 1)));
     assert_eq!(Duration::seconds(TEXT_WINDOW_SECONDS).num_minutes(), 15);
+}
+
+#[test]
+fn sans_restreints_ne_garde_que_les_salons_publics() {
+    let p = presence(vec![salon("general", 2), salon_restreint("staff", 3)], 0);
+    let filtre = p.sans_restreints();
+
+    let noms: Vec<&str> = filtre.channels.iter().map(|c| c.channel_name.as_str()).collect();
+    assert_eq!(noms, vec!["general"]);
+}
+
+#[test]
+fn sans_restreints_retire_aussi_du_total() {
+    // Le total sert d'accroche (« 5 personnes en vocal »). S'il comptait les
+    // salons prives, il trahirait leur existence malgre le filtrage.
+    let p = presence(vec![salon("general", 2), salon_restreint("staff", 3)], 0);
+    assert_eq!(p.clone().total_members(), 5);
+    assert_eq!(p.sans_restreints().total_members(), 2);
 }

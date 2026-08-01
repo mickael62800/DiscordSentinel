@@ -683,8 +683,15 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
       <div v-else class="mb-vocaux">
         <article v-for="c in presence.voice" :key="c.channel_name" class="mb-vc">
           <header class="mb-vc-head">
-            <span aria-hidden="true">🔊</span>
+            <span aria-hidden="true">{{ c.restricted ? "🔒" : "🔊" }}</span>
             <span class="mb-vc-nom">{{ c.channel_name }}</span>
+            <span
+              v-if="c.restricted"
+              class="mb-vc-prive"
+              title="Salon réservé : visible parce que tu es connecté"
+            >
+              privé
+            </span>
             <span class="mb-vc-n">{{ c.members.length }}</span>
           </header>
 
@@ -1511,6 +1518,17 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-vc-nom {
   font-weight: 600;
+}
+
+/* Discret : le salon réservé n'est pas une alerte, juste une précision. */
+.mb-vc-prive {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--site-ink-3);
+  border: 1px solid var(--site-ink-4);
+  border-radius: var(--radius-xs);
+  padding: 0 0.3em;
 }
 
 .mb-vc-n {

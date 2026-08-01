@@ -25,7 +25,12 @@ use crate::shared::presence::{VoiceChannelDto, VoiceMemberDto};
 ///
 /// Sur Discord, le role @everyone porte l'identifiant de la guilde. On
 /// interroge les permissions de ce role sur le salon : s'il n'a pas
-/// `VIEW_CHANNEL`, le salon est reserve, donc hors de la vitrine publique.
+/// `VIEW_CHANNEL`, le salon est reserve.
+///
+/// Le salon reserve n'est plus ECARTE mais MARQUE : c'est l'API qui tranche
+/// selon l'appelant, un membre connecte ayant de toute facon acces a ces
+/// salons sur Discord. Le bot reste seul juge des permissions — l'API n'a
+/// aucune vue dessus — mais il ne decide plus du public.
 fn est_public(guild: &serenity::model::guild::Guild, channel_id: serenity::model::id::ChannelId) -> bool {
     let Some(channel) = guild.channels.get(&channel_id) else {
         // Salon inconnu du cache : on s'abstient plutot que de supposer.
@@ -65,10 +70,6 @@ fn instantane(guild: &serenity::model::guild::Guild) -> Vec<VoiceChannelDto> {
         let Some(channel_id) = etat.channel_id else {
             continue;
         };
-        if !est_public(guild, channel_id) {
-            continue;
-        }
-
         // Les bots occupent les salons sans y participer : un lecteur de
         // musique afficherait un faux participant.
         //
@@ -111,6 +112,7 @@ fn instantane(guild: &serenity::model::guild::Guild) -> Vec<VoiceChannelDto> {
                 channel_id: channel_id.to_string(),
                 channel_name: channel.name.clone(),
                 members,
+                restreint: !est_public(guild, channel_id),
             })
         })
         .collect()

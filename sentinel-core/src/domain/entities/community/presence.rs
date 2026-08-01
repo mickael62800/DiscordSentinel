@@ -10,8 +10,17 @@
 //!
 //! La page membre est PUBLIQUE. Or la presence dans un salon prive est une
 //! information privee : annoncer « Kalyx est dans #staff » a tout Internet
-//! serait une fuite. Seuls les salons visibles par @everyone sont publies, et
-//! le filtrage se fait cote bot — lui seul connait les permissions Discord.
+//! serait une fuite.
+//!
+//! Le bot publie donc TOUS les salons, mais marque ceux que @everyone ne peut
+//! pas voir (`restreint`) — lui seul connait les permissions Discord. C'est
+//! l'API qui decide ensuite quoi montrer : les salons restreints ne partent
+//! qu'aux membres CONNECTES, jamais dans la reponse anonyme.
+//!
+//! Ce partage est volontaire. Filtrer cote bot, comme au depart, rendait les
+//! salons reserves invisibles a tout le monde, membres compris — alors qu'un
+//! membre du serveur y a legitimement acces sur Discord. Filtrer cote API
+//! permet de servir la meme collecte a deux publics differents.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -56,6 +65,17 @@ pub struct VoiceChannelPresence {
     pub channel_id: String,
     pub channel_name: String,
     pub members: Vec<VoiceMember>,
+    /// Salon que @everyone ne peut pas voir sur Discord.
+    ///
+    /// `default` : les instantanes deja publies dans Redis n'ont pas ce champ.
+    /// Sans valeur par defaut, ils cesseraient d'etre deserialisables et la
+    /// presence disparaitrait le temps que le TTL les renouvelle.
+    ///
+    /// Le defaut est `false` — un salon d'origine inconnue est traite comme
+    /// public. C'est le bon sens ici : ces anciens instantanes ne contiennent
+    /// QUE des salons publics, l'ancien bot filtrant les autres a la source.
+    #[serde(default)]
+    pub restreint: bool,
 }
 
 /// Instantane de la presence vocale d'une guilde.
@@ -78,6 +98,12 @@ impl VoicePresence {
 
     pub fn total_members(&self) -> usize {
         self.channels.iter().map(|c| c.members.len()).sum()
+    }
+
+    /// Retire les salons restreints. A appliquer avant toute reponse anonyme.
+    pub fn sans_restreints(mut self) -> Self {
+        self.channels.retain(|c| !c.restreint);
+        self
     }
 
     /// Salons non vides, les plus peuples d'abord.

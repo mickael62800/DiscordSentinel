@@ -6,6 +6,7 @@
 // dire « je viens ») passent par `api/http.ts`, qui porte la session.
 
 import { httpDelete, httpGet, httpPost } from "@/api/http";
+import { getDiscordToken } from "@/api/config";
 import { publicGet, query } from "./publicHttp";
 
 // ── Recherche de joueurs ──
@@ -110,6 +111,9 @@ export interface VoiceMember {
 export interface VoiceChannel {
   channel_name: string;
   members: VoiceMember[];
+  /// Salon réservé sur Discord. Toujours `false` pour un visiteur anonyme :
+  /// l'API ne lui sert jamais ces salons.
+  restricted: boolean;
 }
 
 export interface TextChannel {
@@ -160,8 +164,22 @@ export const communityLifeService = {
 
   /// Présence en direct. Renvoie des listes vides — jamais une erreur —
   /// quand le bot ne publie pas ou que l'instantané est périmé.
-  presence(guildId: string): Promise<Presence> {
-    return publicGet<Presence>(`/presence/${encodeURIComponent(guildId)}`);
+  /// Un membre connecté voit en plus les salons réservés : il y a de toute
+  /// façon accès sur Discord. Les deux routes sont distinctes côté API, la
+  /// publique étant incapable de servir ces salons.
+  ///
+  /// Repli sur la vue publique si l'appel authentifié échoue (session
+  /// expirée) : mieux vaut la présence partielle que la section vide.
+  async presence(guildId: string): Promise<Presence> {
+    const chemin = `/presence/${encodeURIComponent(guildId)}`;
+    if (getDiscordToken()) {
+      try {
+        return await httpGet<Presence>(`/api${chemin}`);
+      } catch {
+        /* on retombe sur la vue publique */
+      }
+    }
+    return publicGet<Presence>(chemin);
   },
 
   news(guildId: string, limit = 3): Promise<NewsItem[]> {

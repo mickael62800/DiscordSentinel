@@ -36,6 +36,7 @@ fn presence(age_secondes: i64, salons: usize) -> VoicePresence {
                 channel_id: format!("c{i}"),
                 channel_name: format!("salon {i}"),
                 members: vec![],
+                restreint: false,
             })
             .collect(),
         updated_at: Utc::now() - Duration::seconds(age_secondes),

@@ -60,6 +60,9 @@ pub struct VoiceChannelDto {
     pub channel_id: String,
     pub channel_name: String,
     pub members: Vec<VoiceMemberDto>,
+    /// Salon que @everyone ne peut pas voir. L'API s'en sert pour ne pas le
+    /// servir aux visiteurs anonymes.
+    pub restreint: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

@@ -2,9 +2,17 @@
 //!
 //! # Ce qui est publie et pourquoi
 //!
-//! Seuls les salons visibles par @everyone remontent ici — le filtrage est
-//! fait par le bot, qui seul connait les permissions Discord. L'API ne peut
-//! pas le refaire et ne doit surtout pas le contourner.
+//! Le bot publie tous les salons en marquant ceux que @everyone ne peut pas
+//! voir (`restreint`) — lui seul connait les permissions Discord. Deux routes
+//! s'en servent differemment :
+//!
+//!   - `public_presence` : anonyme, ecarte systematiquement les restreints ;
+//!   - `member_presence` : authentifiee, les inclut en les signalant.
+//!
+//! Deux routes plutot qu'une seule au contenu variable selon l'en-tete
+//! d'authentification : une route dont la reponse depend d'un jeton optionnel
+//! fuit au premier oubli, et l'oubli ne se voit pas. Ici la route anonyme ne
+//! sait meme pas construire la reponse etendue.
 //!
 //! Le DTO expose les pseudos mais PAS les identifiants Discord, comme les
 //! autres surfaces publiques : un pseudo suffit a afficher une pastille,
@@ -15,12 +23,14 @@
 //! s'afficher entiere meme quand cette brique est muette.
 
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use sentinel_core::domain::errors::DomainError;
 
 /// Salons ecrits remontes. Au-dela, la liste cesse d'informer.
 const TEXT_CHANNELS: i64 = 5;
@@ -40,6 +50,8 @@ pub struct VoiceMemberDto {
 pub struct VoiceChannelDto {
     pub channel_name: String,
     pub members: Vec<VoiceMemberDto>,
+    /// Salon reserve sur Discord. Toujours `false` sur la route anonyme.
+    pub restricted: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -56,14 +68,46 @@ pub struct PresenceDto {
     pub text: Vec<TextChannelDto>,
 }
 
-/// GET /api/public/presence/{guild_id}
+/// GET /api/public/presence/{guild_id} — visiteurs anonymes.
 pub async fn public_presence(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PresenceDto>, ApiError> {
+    presence_dto(state, guild_id, false).await
+}
+
+/// GET /api/presence/{guild_id} — membres connectes.
+///
+/// Inclut les salons reserves : un membre du serveur y a de toute facon acces
+/// sur Discord, les lui masquer ici ne protegeait rien et donnait une image
+/// fausse de qui est connecte.
+pub async fn member_presence(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<PresenceDto>, ApiError> {
+    // Le contexte RBAC est exige : sans lui, cette route serait la route
+    // publique avec les salons prives en plus.
+    if rbac.is_none() {
+        return Err(ApiError(DomainError::Forbidden(
+            "connexion Discord requise".into(),
+        )));
+    }
+    presence_dto(state, guild_id, true).await
+}
+
+async fn presence_dto(
+    state: AppState,
+    guild_id: String,
+    inclure_restreints: bool,
+) -> Result<Json<PresenceDto>, ApiError> {
     ensure_guild_id(&guild_id)?;
 
-    let presence = state.presence_uc.voice(&guild_id).await?;
+    let presence = state
+        .presence_uc
+        .voice(&guild_id)
+        .await?
+        .map(|p| if inclure_restreints { p } else { p.sans_restreints() });
     let text = state
         .presence_uc
         .text_activity(&guild_id, TEXT_CHANNELS)
@@ -77,6 +121,7 @@ pub async fn public_presence(
                 .into_iter()
                 .map(|c| VoiceChannelDto {
                     channel_name: c.channel_name.clone(),
+                    restricted: c.restreint,
                     members: c
                         .members
                         .iter()

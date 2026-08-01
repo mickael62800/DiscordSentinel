@@ -272,6 +272,12 @@ pub fn routes() -> Router<AppState> {
             "/api/me/polls/{guild_id}",
             get(handlers::community::polls::my_polls),
         )
+        // Presence incluant les salons reserves. Route distincte de la
+        // publique : celle-ci exige un contexte RBAC.
+        .route(
+            "/api/presence/{guild_id}",
+            get(handlers::community::presence::member_presence),
+        )
         .route(
             "/api/me/games/wallet",
             get(handlers::community::games::my_wallet),
