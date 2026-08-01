@@ -16,6 +16,8 @@ fn cfg(host: &str, port: u16, grpc_port: u16) -> AppConfig {
         // Vide = verrou mono-serveur desactive : les tests ne doivent pas
         // dependre d'un identifiant de serveur particulier.
         guild_id: String::new(),
+        nexus_api_url: String::new(),
+        nexus_api_key: String::new(),
         discord_bot_token: String::new(),
         superadmin_user_ids: vec![],
         discord_oauth_client_id: String::new(),

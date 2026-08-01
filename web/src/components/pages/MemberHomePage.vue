@@ -414,6 +414,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
         <span v-if="lfg.length" class="mb-chip">
           <b>{{ lfg.length }}</b> recherche(s) de joueurs
         </span>
+        <RouterLink to="/jeux" class="mb-chip link">🎡 Les jeux</RouterLink>
         <a v-if="discordInvite()" class="mb-chip link" :href="discordInvite()" target="_blank" rel="noopener">
           Rejoindre le Discord
         </a>

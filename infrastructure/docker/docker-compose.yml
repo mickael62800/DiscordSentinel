@@ -259,6 +259,11 @@ services:
       retries: 5
       start_period: 30s
     environment:
+      # Relais des jeux joues depuis le site. Le navigateur ne joint
+      # jamais nexus-api : il passe par sentinel-api, seul composant a
+      # savoir QUI est connecte. La cle ne quitte donc pas le reseau interne.
+      NEXUS_API_URL: http://nexus-api:3100
+      NEXUS_API_KEY: ${NEXUS_API_KEY:-}
       # Serveur Discord unique servi par cette installation.
       # Les API refusent tout autre guild_id ; les bots quittent toute
       # autre guilde. Vide = verrou desactive.

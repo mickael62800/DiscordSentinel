@@ -139,6 +139,26 @@ fn announcement_inner() -> Router<AppState> {
             "/api/me/polls/{guild_id}",
             get(handlers::community::polls::my_polls),
         )
+        // ── Jeux joues depuis le site ──
+        // Aucun `{guild_id}` ni `{user_id}` dans ces chemins : les deux sont
+        // derives du serveur configure et de la session Discord. Les laisser
+        // au client permettrait de jouer a la place de quelqu'un d'autre.
+        .route(
+            "/api/me/games/wallet",
+            get(handlers::community::games::my_wallet),
+        )
+        .route(
+            "/api/me/games/history",
+            get(handlers::community::games::my_history),
+        )
+        .route(
+            "/api/me/games/leaderboard",
+            get(handlers::community::games::leaderboard),
+        )
+        .route(
+            "/api/me/games/wheel/spin",
+            post(handlers::community::games::spin_wheel),
+        )
         // La suppression d'une designation porte le guild_id dans l'URL : le
         // controle RBAC est par guilde, il lui faut cette information avant
         // d'aller chercher la ligne.

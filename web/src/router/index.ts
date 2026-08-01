@@ -31,6 +31,14 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("@/components/pages/MemberHomePage.vue"),
     meta: { public: true },
   },
+  // Publique comme l'espace membre : un visiteur voit la roue et le
+  // classement, la connexion n'est exigee que pour jouer.
+  {
+    path: "/jeux",
+    name: "jeux",
+    component: () => import("@/components/pages/GamesPage.vue"),
+    meta: { public: true },
+  },
 
   // Dashboard reste eager : c'est la 1ere page apres login, autant l'avoir
   // dans le bundle initial pour eviter un flash de loader. Le nom de route

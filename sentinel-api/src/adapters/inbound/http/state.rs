@@ -106,6 +106,9 @@ pub struct AppState {
     /// Serveur Discord unique servi par cette installation. Vide =
     /// verrou desactive (cf. `middleware::single_guild`).
     pub guild_id: String,
+    /// Relais vers la plateforme jeux. Seul chemin d'acces aux jeux
+    /// depuis le web : le navigateur ne joint jamais nexus-api.
+    pub nexus_games: Arc<crate::adapters::outbound::nexus_games::NexusGamesClient>,
     /// Token optionnel protégeant `/metrics` (vide = ouvert). Voir config.
     pub metrics_token: String,
     #[allow(dead_code)]

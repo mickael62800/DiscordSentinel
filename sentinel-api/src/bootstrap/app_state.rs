@@ -809,6 +809,12 @@ pub async fn build_app_state(
         inference: inference.clone(),
         api_key: config.api_key.clone(),
         guild_id: config.guild_id.clone(),
+        nexus_games: Arc::new(
+            crate::adapters::outbound::nexus_games::NexusGamesClient::new(
+                config.nexus_api_url.clone(),
+                config.nexus_api_key.clone(),
+            ),
+        ),
         metrics_token: config.metrics_token.clone(),
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),

@@ -55,6 +55,13 @@ pub struct AppConfig {
     /// developpement et pour ne pas bloquer une installation existante qui
     /// n'aurait pas encore renseigne la variable.
     pub guild_id: String,
+    /// URL interne de nexus-api, pour relayer les jeux joues depuis le
+    /// site. Vide = jeux indisponibles sur le web (le bot Discord, lui,
+    /// continue de fonctionner : il appelle nexus-api directement).
+    pub nexus_api_url: String,
+    /// Cle d'API de nexus-api. Ne transite JAMAIS jusqu'au navigateur :
+    /// c'est precisement pour cela que le site passe par sentinel-api.
+    pub nexus_api_key: String,
 }
 
 impl AppConfig {
@@ -109,6 +116,9 @@ impl AppConfig {
             // Meme variable que celle lue par le conteneur web : une seule
             // source de verite pour « de quel serveur parle cette
             // installation ». `GUILD_ID` reste accepte en repli.
+            nexus_api_url: std::env::var("NEXUS_API_URL")
+                .unwrap_or_else(|_| "http://nexus-api:3100".into()),
+            nexus_api_key: std::env::var("NEXUS_API_KEY").unwrap_or_default(),
             guild_id: std::env::var("PUBLIC_GUILD_ID")
                 .or_else(|_| std::env::var("GUILD_ID"))
                 .unwrap_or_default()

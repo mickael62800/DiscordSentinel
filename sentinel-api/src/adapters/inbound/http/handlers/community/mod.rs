@@ -19,3 +19,4 @@ pub mod spotlight;
 pub mod news;
 pub mod pulse;
 pub mod presence;
+pub mod games;

@@ -6,6 +6,7 @@ pub mod host_security;
 pub mod inference_service;
 pub mod job_client;
 pub mod postgres;
+pub mod nexus_games;
 pub mod redis_cache;
 // Nomme a plat comme ses voisins : un module `redis` masquerait la crate du
 // meme nom pour tout ce sous-arbre.

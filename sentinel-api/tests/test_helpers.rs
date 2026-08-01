@@ -2877,6 +2877,14 @@ fn base_state() -> AppState {
         // Vide = verrou mono-serveur desactive : les tests d'integration
         // utilisent des identifiants de guilde arbitraires.
         guild_id: String::new(),
+        // URL vide : le client se declare non configure et les handlers
+        // de jeux repondent « indisponible » au lieu d'appeler dans le vide.
+        nexus_games: Arc::new(
+            sentinel_api::adapters::outbound::nexus_games::NexusGamesClient::new(
+                String::new(),
+                String::new(),
+            ),
+        ),
         discord_bot_token: String::new(),
         system_probe: Arc::new(StubSystemProbe),
         pg_pool,
