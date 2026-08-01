@@ -48,6 +48,13 @@ RUN sed -i 's/\r$//' /docker-entrypoint.d/30-nexus-key.sh \
 # Assets statiques
 COPY --from=builder /app/dist /usr/share/nginx/html
 
+# Configuration PUBLIQUE du site (guilde, invitation Discord), ecrite a
+# l'execution. Doit passer APRES la copie des assets : elle ecrit dans le
+# meme repertoire, que le COPY ci-dessus remplacerait.
+COPY web/docker-entrypoint-site.sh /docker-entrypoint.d/35-site-config.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/35-site-config.sh \
+    && chmod +x /docker-entrypoint.d/35-site-config.sh
+
 EXPOSE 80 443
 
 # Healthcheck : endpoint HTTP /healthz expose par nginx sur le port 80

@@ -25,8 +25,14 @@ impl EventPublisher {
         }
     }
 
-    /// Publie un event sur la stream (lazy-connect au premier appel).
-    pub async fn publish(&self, event: &str, data: serde_json::Value) {
+    /// Connexion prete a l'emploi, etablie au premier appel.
+    ///
+    /// Renvoie le garde plutot que la connexion : l'appelant garde le verrou
+    /// le temps de sa commande, ce qui evite deux connexions concurrentes au
+    /// premier appel.
+    async fn connect(
+        &self,
+    ) -> Option<tokio::sync::MutexGuard<'_, Option<redis::aio::MultiplexedConnection>>> {
         let mut guard = self.client.lock().await;
 
         if guard.is_none() {
@@ -35,19 +41,66 @@ impl EventPublisher {
                     Ok(conn) => *guard = Some(conn),
                     Err(e) => {
                         tracing::warn!(error = %e, "Redis connect failed for event publisher");
-                        return;
+                        return None;
                     }
                 },
                 Err(e) => {
                     tracing::warn!(error = %e, "Redis client creation failed");
-                    return;
+                    return None;
                 }
             }
         }
+        Some(guard)
+    }
 
+    /// Publie un event sur la stream (lazy-connect au premier appel).
+    pub async fn publish(&self, event: &str, data: serde_json::Value) {
+        let Some(mut guard) = self.connect().await else {
+            return;
+        };
         if let Some(ref mut conn) = *guard {
             if let Err(e) = super::event_bus::publish(conn, event, data).await {
                 tracing::warn!(error = %e, "Redis XADD failed");
+                // Connexion invalidee : le prochain appel se reconnectera.
+                *guard = None;
+            }
+        }
+    }
+
+    /// Remplace l'instantane de presence vocale d'une guilde.
+    pub async fn publish_voice_presence(
+        &self,
+        guild_id: &str,
+        channels: Vec<super::presence::VoiceChannelDto>,
+    ) {
+        let Some(mut guard) = self.connect().await else {
+            return;
+        };
+        if let Some(ref mut conn) = *guard {
+            if let Err(e) = super::presence::publish_voice(conn, guild_id, channels).await {
+                tracing::warn!(error = %e, "publication de la presence vocale echouee");
+                *guard = None;
+            }
+        }
+    }
+
+    /// Note qu'un membre vient d'ecrire dans un salon.
+    pub async fn touch_text_presence(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+        channel_name: &str,
+        username: &str,
+    ) {
+        let Some(mut guard) = self.connect().await else {
+            return;
+        };
+        if let Some(ref mut conn) = *guard {
+            if let Err(e) =
+                super::presence::touch_text(conn, guild_id, channel_id, channel_name, username)
+                    .await
+            {
+                tracing::warn!(error = %e, "publication de l'activite ecrite echouee");
                 *guard = None;
             }
         }
@@ -236,6 +289,46 @@ impl BaseApiClient {
             let event = event.to_string();
             tokio::spawn(async move {
                 publisher.publish(&event, data).await;
+            });
+        }
+    }
+
+    // ── Presence en direct (alimente la page membre du site) ──
+
+    /// Republie l'instantane vocal complet d'une guilde.
+    /// Fire-and-forget : la presence ne doit jamais retarder le bot.
+    pub fn publish_voice_presence(
+        &self,
+        guild_id: &str,
+        channels: Vec<super::presence::VoiceChannelDto>,
+    ) {
+        if let Some(ref publisher) = self.event_publisher {
+            let publisher = Arc::clone(publisher);
+            let guild_id = guild_id.to_string();
+            tokio::spawn(async move {
+                publisher.publish_voice_presence(&guild_id, channels).await;
+            });
+        }
+    }
+
+    /// Note une prise de parole ecrite.
+    pub fn touch_text_presence(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+        channel_name: &str,
+        username: &str,
+    ) {
+        if let Some(ref publisher) = self.event_publisher {
+            let publisher = Arc::clone(publisher);
+            let (g, c, n, u) = (
+                guild_id.to_string(),
+                channel_id.to_string(),
+                channel_name.to_string(),
+                username.to_string(),
+            );
+            tokio::spawn(async move {
+                publisher.touch_text_presence(&g, &c, &n, &u).await;
             });
         }
     }

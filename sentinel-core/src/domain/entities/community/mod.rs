@@ -18,3 +18,4 @@ pub mod poll;
 pub mod spotlight;
 pub mod news;
 pub mod milestone;
+pub mod presence;

@@ -19,9 +19,14 @@ import {
   publicSiteService,
   type PublicGuild,
 } from "@/services/publicSiteService";
-import { COMMUNITY, DISCORD_INVITE, onWordmarkError, wordmarkOf } from "@/branding";
+import { COMMUNITY, discordInvite, onWordmarkError, wordmarkOf } from "@/branding";
+import { siteConfig } from "@/siteConfig";
 
-const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
+/// Serveur mis en avant. Lu à l'exécution (cf. `siteConfig.ts`), avec repli
+/// sur la variable de build pour le développement local.
+const guildId =
+  siteConfig().guildId ||
+  ((import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined) ?? "");
 
 const guild = ref<PublicGuild | null>(null);
 const iconUrl = ref<string | null>(null);
@@ -174,9 +179,9 @@ const APPEAR = {
            compte, ou parcourir la page. -->
       <div class="ph-actions">
         <a
-          v-if="DISCORD_INVITE"
+          v-if="discordInvite()"
           class="ph-btn primary"
-          :href="DISCORD_INVITE"
+          :href="discordInvite()"
           target="_blank"
           rel="noopener noreferrer"
         >
@@ -228,9 +233,9 @@ const APPEAR = {
       <h2>Le canapé est large, il reste de la place</h2>
       <p>Regarde ce qui s'y passe, sans compte et sans engagement.</p>
       <a
-        v-if="DISCORD_INVITE"
+        v-if="discordInvite()"
         class="ph-btn primary"
-        :href="DISCORD_INVITE"
+        :href="discordInvite()"
         target="_blank"
         rel="noopener noreferrer"
       >

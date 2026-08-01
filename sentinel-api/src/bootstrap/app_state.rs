@@ -224,6 +224,18 @@ pub async fn build_app_state(
         ),
     );
 
+    // Presence en direct. Le bot publie, l'API lit : elle n'a aucun moyen de
+    // savoir qui est en vocal, et fabriquer cette donnee ici serait mentir.
+    let presence_uc = Arc::new(
+        sentinel_core::application::community::read_presence_service::ReadPresenceService::new(
+            Arc::new(
+                crate::adapters::outbound::redis_presence::RedisPresenceRepository::new(
+                    redis_client.clone(),
+                ),
+            ),
+        ),
+    );
+
     // Detection d'anomalie de moderation (mass ban/delete/role). Le CALCUL
     // (fenetre glissante) vit dans un adapter memoire serveur ; la DECISION
     // (seuil + reset) dans le service coeur. Le bot n'agrege/ne decide plus.
@@ -742,6 +754,7 @@ pub async fn build_app_state(
         polls_uc,
         spotlight_uc,
         news_uc,
+        presence_uc,
         analyze_uc,
         analyze_image_uc,
         dataset_uc,

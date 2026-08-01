@@ -8,5 +8,6 @@ pub mod event_bus;
 pub mod grpc_client;
 pub mod heartbeat;
 pub mod parsers;
+pub mod presence;
 pub mod shard_launcher;
 pub mod svg;

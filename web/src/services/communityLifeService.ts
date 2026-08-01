@@ -96,6 +96,34 @@ export interface Pulse {
   newcomers: Newcomer[];
 }
 
+// ── Présence en direct ──
+
+export interface VoiceMember {
+  username: string;
+  /// Micro coupé, quelle qu'en soit la cause. L'API ne distingue pas une
+  /// coupure volontaire d'une sanction : ce serait exposer une modération.
+  muted: boolean;
+  streaming: boolean;
+  video: boolean;
+}
+
+export interface VoiceChannel {
+  channel_name: string;
+  members: VoiceMember[];
+}
+
+export interface TextChannel {
+  channel_name: string;
+  recent_authors: string[];
+  last_message_at: string;
+}
+
+export interface Presence {
+  voice: VoiceChannel[];
+  voice_total: number;
+  text: TextChannel[];
+}
+
 // ── Annonces ──
 
 export interface NewsItem {
@@ -128,6 +156,12 @@ export const communityLifeService = {
 
   pulse(guildId: string): Promise<Pulse> {
     return publicGet<Pulse>(`/pulse/${encodeURIComponent(guildId)}`);
+  },
+
+  /// Présence en direct. Renvoie des listes vides — jamais une erreur —
+  /// quand le bot ne publie pas ou que l'instantané est périmé.
+  presence(guildId: string): Promise<Presence> {
+    return publicGet<Presence>(`/presence/${encodeURIComponent(guildId)}`);
   },
 
   news(guildId: string, limit = 3): Promise<NewsItem[]> {

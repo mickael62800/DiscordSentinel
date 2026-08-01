@@ -15,3 +15,4 @@ pub mod manage_lfg_service;
 pub mod manage_polls_service;
 pub mod manage_spotlight_service;
 pub mod manage_news_service;
+pub mod read_presence_service;

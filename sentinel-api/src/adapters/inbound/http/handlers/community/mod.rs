@@ -18,3 +18,4 @@ pub mod polls;
 pub mod spotlight;
 pub mod news;
 pub mod pulse;
+pub mod presence;

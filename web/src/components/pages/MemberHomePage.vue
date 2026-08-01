@@ -17,7 +17,7 @@
 // Rendue hors de `MainLayout` : un membre n'a rien à faire dans la barre
 // latérale d'administration.
 
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
 import { useComponentVisibility } from "../../composables/useComponentVisibility";
 import {
@@ -27,7 +27,8 @@ import {
   weekDays,
   weekLabel,
 } from "../../composables/useWeekPlanning";
-import { COMMUNITY, DISCORD_INVITE, onWordmarkError, wordmarkOf } from "@/branding";
+import { COMMUNITY, discordInvite, onWordmarkError, wordmarkOf } from "@/branding";
+import { siteConfig } from "@/siteConfig";
 import {
   isOngoing,
   publicEventsService,
@@ -44,11 +45,20 @@ import {
   type Newcomer,
   type NewsItem,
   type Poll,
+  type Presence,
   type PublicLfgPost,
   type Spotlight,
 } from "@/services/communityLifeService";
 
-const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
+/// Serveur dont on affiche la vie. Lu à l'exécution depuis `site-config.json`
+/// (écrit par l'entrypoint nginx), avec repli sur la variable de build pour le
+/// développement local.
+///
+/// Sans lui, la page ne sait pas de quel serveur parler : elle n'affiche que
+/// l'accueil, et l'explique au lieu de rester muette.
+const guildId =
+  siteConfig().guildId ||
+  ((import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined) ?? "");
 
 const { user, avatarUrl, logout } = useAuth();
 const { visible } = useComponentVisibility();
@@ -66,6 +76,13 @@ const spotlight = ref<Spotlight | null>(null);
 const anniversaries = ref<Anniversary[]>([]);
 const newcomers = ref<Newcomer[]>([]);
 const news = ref<NewsItem[]>([]);
+const presence = ref<Presence>({ voice: [], voice_total: 0, text: [] });
+
+/// Rafraîchissement de la présence. Elle est la seule donnée qui change à la
+/// minute : tout recharger pour elle serait du gâchis, la laisser figée
+/// afficherait un salon vide comme occupé.
+const RAFRAICHISSEMENT_MS = 20_000;
+let timerPresence: number | undefined;
 
 const loadingEvents = ref(true);
 const loadingServers = ref(true);
@@ -139,7 +156,26 @@ onMounted(() => {
     .news(guildId)
     .then((r) => (news.value = r))
     .catch(() => (news.value = []));
+
+  chargerPresence();
+  timerPresence = window.setInterval(chargerPresence, RAFRAICHISSEMENT_MS);
 });
+
+/// Le timer survivrait à la navigation et continuerait d'interroger l'API
+/// depuis une page démontée.
+onUnmounted(() => {
+  if (timerPresence) window.clearInterval(timerPresence);
+});
+
+function chargerPresence() {
+  if (!guildId) return;
+  communityLifeService
+    .presence(guildId)
+    // En cas d'échec on VIDE plutôt que de garder l'état précédent : afficher
+    // « 11 en vocal » figé depuis dix minutes est pire que ne rien afficher.
+    .then((r) => (presence.value = r))
+    .catch(() => (presence.value = { voice: [], voice_total: 0, text: [] }));
+}
 
 // ── Serveurs de jeu ──
 
@@ -340,10 +376,21 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
         <span v-if="lfg.length" class="mb-chip">
           <b>{{ lfg.length }}</b> recherche(s) de joueurs
         </span>
-        <a v-if="DISCORD_INVITE" class="mb-chip link" :href="DISCORD_INVITE" target="_blank" rel="noopener">
+        <a v-if="discordInvite()" class="mb-chip link" :href="discordInvite()" target="_blank" rel="noopener">
           Rejoindre le Discord
         </a>
       </div>
+    </section>
+
+    <!-- Sans identifiant de serveur, la page n'a rien à interroger. Le dire
+         franchement plutôt que d'afficher un héros seul : la page paraîtrait
+         cassée sans qu'on sache pourquoi. -->
+    <section v-if="!guildId" class="mb-block">
+      <p class="mb-config">
+        Le serveur à afficher n'est pas configuré. Définis
+        <code>PUBLIC_GUILD_ID</code> dans <code>infrastructure/docker/.env</code>,
+        puis redémarre le conteneur web.
+      </p>
     </section>
 
     <!-- ── En cours ── -->
@@ -550,6 +597,60 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
             <span v-if="e.span_days > 1" class="mb-tag neutral">{{ e.span_days }} jours</span>
           </div>
           <span class="mb-event-when">{{ fmtRange(e) }}</span>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── En vocal maintenant ──
+         Ne s'affiche que si quelqu'un y est vraiment : un cadre « personne en
+         vocal » occuperait un écran entier pour dire qu'il ne se passe rien.
+         L'API ne publie que les salons visibles par @everyone. -->
+    <section v-if="presence.voice.length" class="mb-block">
+      <h2>
+        <span class="mb-live" aria-hidden="true"></span> En vocal maintenant
+        <span class="mb-count">{{ presence.voice_total }} personne(s)</span>
+      </h2>
+
+      <div class="mb-vocaux">
+        <article v-for="c in presence.voice" :key="c.channel_name" class="mb-vc">
+          <header class="mb-vc-head">
+            <span aria-hidden="true">🔊</span>
+            <span class="mb-vc-nom">{{ c.channel_name }}</span>
+            <span class="mb-vc-n">{{ c.members.length }}</span>
+          </header>
+
+          <ul class="mb-vc-list">
+            <li v-for="m in c.members" :key="m.username" class="mb-vm">
+              <span class="mb-av sm" :style="{ '--c': couleurDe(m.username) }">
+                {{ initiale(m.username) }}
+              </span>
+              <span class="mb-vm-nom">{{ m.username }}</span>
+              <span v-if="m.streaming" class="mb-vm-ico" title="Partage son écran">🖥️</span>
+              <span v-else-if="m.video" class="mb-vm-ico" title="Caméra activée">📹</span>
+              <span v-if="m.muted" class="mb-vm-ico" title="Micro coupé">🔇</span>
+            </li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- ── Ça discute à l'écrit ── -->
+    <section v-if="presence.text.length" class="mb-block">
+      <h2>Ça discute aussi à l'écrit</h2>
+      <ul class="mb-textes">
+        <li v-for="t in presence.text" :key="t.channel_name" class="mb-tc">
+          <span class="mb-tc-hash" aria-hidden="true">#</span>
+          <span class="mb-tc-nom">{{ t.channel_name }}</span>
+          <span class="mb-tc-avs">
+            <span
+              v-for="a in t.recent_authors.slice(0, 6)"
+              :key="a"
+              class="mb-av sm"
+              :style="{ '--c': couleurDe(a) }"
+              :title="a"
+            >{{ initiale(a) }}</span>
+          </span>
+          <span class="mb-tc-when">{{ depuis(t.last_message_at) }}</span>
         </li>
       </ul>
     </section>
@@ -1295,6 +1396,142 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   margin-top: 0.35rem;
   font-size: 0.82rem;
   color: var(--ink-4);
+}
+
+/* ── Message de configuration ── */
+.mb-config {
+  margin: 0;
+  padding: 0.9rem 1.1rem;
+  border-radius: 0.9rem;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #f8d9a0;
+  font-size: 0.9rem;
+}
+
+.mb-config code {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-size: 0.85em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* ── Vocal ── */
+.mb-vocaux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.9rem;
+}
+
+.mb-vc {
+  border-radius: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.mb-vc-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.6rem 0.85rem;
+  background: rgba(168, 85, 247, 0.09);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.mb-vc-nom {
+  font-weight: 600;
+}
+
+.mb-vc-n {
+  margin-left: auto;
+  font-size: 0.78rem;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-vc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.mb-vm {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.45rem;
+  border-radius: 0.5rem;
+  font-size: 0.88rem;
+}
+
+.mb-vm-nom {
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mb-vm-ico {
+  font-size: 0.78rem;
+  opacity: 0.75;
+}
+
+/* Le premier pousse les suivants à droite ; sans ça, deux icônes se
+   colleraient au pseudo au lieu de s'aligner en bout de ligne. */
+.mb-vm-ico:first-of-type {
+  margin-left: auto;
+}
+
+/* ── Écrit ── */
+.mb-textes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.mb-tc {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+
+.mb-tc-hash {
+  color: var(--ink-4);
+  font-weight: 700;
+}
+
+.mb-tc-nom {
+  font-weight: 600;
+}
+
+.mb-tc-avs {
+  display: flex;
+  margin-left: auto;
+}
+
+.mb-tc-avs .mb-av {
+  margin-left: -6px;
+  border: 2px solid #0d0619;
+}
+
+.mb-tc-when {
+  font-size: 0.78rem;
+  color: var(--ink-4);
+  white-space: nowrap;
 }
 
 /* ── Sondages ── */

@@ -176,6 +176,13 @@ pub fn build_for_test(state: AppState) -> Router {
         .route(
             "/api/public/pulse/{guild_id}",
             get(handlers::community::pulse::public_pulse),
+        )
+        // Presence en direct. Le bot ne publie que les salons visibles par
+        // @everyone : l'API ne peut pas refaire ce filtrage, elle n'a aucune
+        // vue sur les permissions Discord.
+        .route(
+            "/api/public/presence/{guild_id}",
+            get(handlers::community::presence::public_presence),
         );
 
     Router::new()

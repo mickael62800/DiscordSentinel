@@ -17,6 +17,7 @@ const router = createRouter({
 // suffit en prod. L'OAuth Discord est gere par le backend, le front n'a
 // rien a saisir. Cette fonction garantit qu'au moins une config existe.
 import { setApiConfig, getApiConfig } from "./api/config";
+import { loadSiteConfig } from "./siteConfig";
 function ensureProdConfig() {
   if (!getApiConfig()) {
     setApiConfig({ api_url: window.location.origin, api_key: "" });
@@ -74,4 +75,11 @@ app.use(router);
 // discretes : elles servent a guider la lecture de la page publique, pas a
 // faire du spectacle. `prefers-reduced-motion` est respecte par la lib.
 app.use(MotionPlugin);
-app.mount("#app");
+
+// La configuration publique (guilde affichée, invitation Discord) est chargée
+// AVANT le montage : la page membre la lit dès son `onMounted`, et l'attendre
+// ici évite un premier rendu sans aucune section suivi d'un saut.
+//
+// Un échec n'empêche pas le montage : le site reste consultable, les sections
+// publiques se masquent simplement.
+loadSiteConfig().finally(() => app.mount("#app"));

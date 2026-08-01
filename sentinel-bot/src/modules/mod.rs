@@ -14,6 +14,7 @@ pub mod guild_backup;
 pub mod help_panel;
 pub mod moderation;
 pub mod nasa_apod;
+pub mod presence;
 pub mod progression;
 pub mod rotation;
 pub mod security;

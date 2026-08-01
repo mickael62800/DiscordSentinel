@@ -15,3 +15,4 @@ pub mod manage_lfg;
 pub mod manage_polls;
 pub mod manage_spotlight;
 pub mod manage_news;
+pub mod read_presence;

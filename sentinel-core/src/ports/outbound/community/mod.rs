@@ -17,3 +17,4 @@ pub mod lfg_repository;
 pub mod poll_repository;
 pub mod spotlight_repository;
 pub mod news_repository;
+pub mod presence_repository;

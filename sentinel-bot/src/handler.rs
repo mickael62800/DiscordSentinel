@@ -246,6 +246,11 @@ impl EventHandler for Handler {
         if msg.author.bot {
             return;
         }
+
+        // Activite ecrite affichee sur le site. Le module filtre lui-meme les
+        // salons non visibles par @everyone.
+        modules::presence::on_message(&ctx, &msg).await;
+
         // Salons "commandes uniquement" : supprime le message classique en
         // premier (avant l'XP / automod, qui n'ont pas a traiter un message
         // qui va disparaitre).
@@ -392,6 +397,14 @@ impl EventHandler for Handler {
         modules::voice::on_voice_state_update(&ctx, &old, &new).await;
         modules::welcome::on_voice_state_update(&ctx, &old, &new).await;
         modules::progression::on_voice_state_update(&ctx, old, &new).await;
+
+        // Presence publiee sur le site. En dernier : elle republie un
+        // instantane complet, donc elle doit voir le cache une fois que les
+        // autres modules ont fini d'agir dessus (creation ou suppression de
+        // salon temporaire).
+        if let Some(guild_id) = new.guild_id {
+            modules::presence::on_voice_state_update(&ctx, guild_id).await;
+        }
     }
 
     async fn guild_role_create(&self, ctx: Context, new: Role) {

@@ -17,6 +17,8 @@
 // composants — c'est precisement ce qui avait laisse un `/logo.png`
 // inexistant reference a trois endroits + le favicon.
 
+import { siteConfig } from "./siteConfig";
+
 export interface Brand {
   /// Nom affiche.
   name: string;
@@ -29,11 +31,20 @@ export interface Brand {
   tagline: string;
 }
 
-/// Invitation Discord de la communaute (VITE_DISCORD_INVITE au build).
+/// Invitation Discord de la communaute.
+///
+/// Lue a l'execution depuis `site-config.json` (cf. `siteConfig.ts`), avec
+/// repli sur `VITE_DISCORD_INVITE` fixe au build pour le developpement local.
+/// Corriger un lien ne doit pas obliger a reconstruire l'image.
 ///
 /// Absente, le bouton « Rejoindre Discord » n'est pas affiche : un bouton qui
 /// ne mene nulle part est pire que pas de bouton.
-export const DISCORD_INVITE = (import.meta.env.VITE_DISCORD_INVITE as string | undefined) ?? "";
+export function discordInvite(): string {
+  return (
+    siteConfig().discordInvite ||
+    ((import.meta.env.VITE_DISCORD_INVITE as string | undefined) ?? "")
+  );
+}
 
 export const COMMUNITY: Brand = {
   name: "La Bande du Canapé",

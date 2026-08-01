@@ -589,6 +589,34 @@ impl sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlight
 }
 
 #[async_trait]
+impl sentinel_core::ports::inbound::community::read_presence::ReadPresenceUseCase
+    for StubCommunityLife
+{
+    // Vide plutôt que `NotImplemented` : c'est la reponse NORMALE quand
+    // personne n'est en vocal, et la page doit s'afficher sans presence.
+    async fn voice(
+        &self,
+        _: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::community::presence::VoicePresence>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+
+    async fn text_activity(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::presence::TextChannelActivity>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+}
+
+#[async_trait]
 impl sentinel_core::ports::inbound::community::manage_news::ManageNewsUseCase
     for StubCommunityLife
 {
@@ -2740,6 +2768,7 @@ fn base_state() -> AppState {
         polls_uc: Arc::new(StubCommunityLife),
         spotlight_uc: Arc::new(StubCommunityLife),
         news_uc: Arc::new(StubCommunityLife),
+        presence_uc: Arc::new(StubCommunityLife),
         detect_anomaly_uc: Arc::new(
             sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
                 Arc::new(sentinel_api::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(500, 100)),

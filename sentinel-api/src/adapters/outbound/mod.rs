@@ -7,6 +7,9 @@ pub mod inference_service;
 pub mod job_client;
 pub mod postgres;
 pub mod redis_cache;
+// Nomme a plat comme ses voisins : un module `redis` masquerait la crate du
+// meme nom pour tout ce sous-arbre.
+pub mod redis_presence;
 pub mod redis_service_registry;
 pub mod system;
 pub mod text_tokenizer;

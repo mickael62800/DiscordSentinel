@@ -497,6 +497,11 @@ services:
       # navigateur : nexus-api n'a qu'une cle statique, la divulguer donnerait
       # un acces admin complet a la plateforme jeux.
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
+      # Configuration PUBLIQUE du site, ecrite dans site-config.json au
+      # demarrage. Sans PUBLIC_GUILD_ID, l'espace membre n'affiche aucune
+      # section : il ne sait pas de quel serveur parler.
+      PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
+      DISCORD_INVITE: ${DISCORD_INVITE:-}
     volumes:
       - letsencrypt_etc:/etc/letsencrypt
       - letsencrypt_www:/var/www/certbot

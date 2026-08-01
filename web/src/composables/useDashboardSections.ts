@@ -76,6 +76,9 @@ const ALL_SECTIONS: DashboardSection[] = [
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
   { key: "community.announcements", path: "/announcements", label: "Annonces planifiées", icon: "clock" },
+  // Ce qui alimente l'espace membre du site : nouvelles, sondages, membre du
+  // mois, modération des annonces de recherche de joueurs.
+  { key: "community.life", path: "/vie-communaute", label: "Vie de la communauté", icon: "heart" },
   { key: "community.confessions", path: "/confessions", label: "Confessions", icon: "edit-3" },
   { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
   { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
