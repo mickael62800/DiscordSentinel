@@ -77,110 +77,20 @@ fn announcement_inner() -> Router<AppState> {
         // Les evenements sont sous /api/events/{guild_id} et le detail sous
         // /api/events/detail/{id} : un segment fixe evite l'ambiguite entre un
         // guild_id (snowflake) et un uuid d'evenement.
-        .route(
-            "/api/events/{guild_id}",
-            get(handlers::community::events::list_events)
-                .post(handlers::community::events::create_event),
-        )
-        .route(
-            "/api/events/detail/{id}",
-            get(handlers::community::events::get_event)
-                .put(handlers::community::events::update_event)
-                .delete(handlers::community::events::delete_event),
-        )
-        .route(
-            "/api/events/detail/{id}/join",
-            post(handlers::community::events::join_event)
-                .delete(handlers::community::events::leave_event),
-        )
         // ── Vie de la communaute ──
         // Meme convention que le planning : `{guild_id}` pour la collection,
         // `detail/{id}` pour l'element, un segment fixe evitant l'ambiguite
         // entre un snowflake et un uuid.
-        .route(
-            "/api/lfg/{guild_id}",
-            get(handlers::community::lfg::list_lfg)
-                .post(handlers::community::lfg::create_lfg),
-        )
-        .route(
-            "/api/lfg/detail/{id}",
-            delete(handlers::community::lfg::delete_lfg),
-        )
-        .route(
-            "/api/lfg/detail/{id}/close",
-            post(handlers::community::lfg::close_lfg),
-        )
-        .route(
-            "/api/lfg/detail/{id}/join",
-            post(handlers::community::lfg::join_lfg)
-                .delete(handlers::community::lfg::leave_lfg),
-        )
-        .route(
-            "/api/polls/{guild_id}",
-            get(handlers::community::polls::list_polls)
-                .post(handlers::community::polls::create_poll),
-        )
-        .route(
-            "/api/polls/detail/{id}",
-            delete(handlers::community::polls::delete_poll),
-        )
-        .route(
-            "/api/polls/detail/{id}/close",
-            post(handlers::community::polls::close_poll),
-        )
-        .route(
-            "/api/polls/detail/{id}/vote",
-            post(handlers::community::polls::vote_poll),
-        )
         // Surface membre : authentifiee mais sans exigence de role. Un membre
         // ordinaire n'est pas `Viewer` et ne peut donc pas passer par
         // /api/polls/{guild_id}.
-        .route(
-            "/api/me/polls/{guild_id}",
-            get(handlers::community::polls::my_polls),
-        )
         // ── Jeux joues depuis le site ──
         // Aucun `{guild_id}` ni `{user_id}` dans ces chemins : les deux sont
         // derives du serveur configure et de la session Discord. Les laisser
         // au client permettrait de jouer a la place de quelqu'un d'autre.
-        .route(
-            "/api/me/games/wallet",
-            get(handlers::community::games::my_wallet),
-        )
-        .route(
-            "/api/me/games/history",
-            get(handlers::community::games::my_history),
-        )
-        .route(
-            "/api/me/games/leaderboard",
-            get(handlers::community::games::leaderboard),
-        )
-        .route(
-            "/api/me/games/wheel/spin",
-            post(handlers::community::games::spin_wheel),
-        )
         // La suppression d'une designation porte le guild_id dans l'URL : le
         // controle RBAC est par guilde, il lui faut cette information avant
         // d'aller chercher la ligne.
-        .route(
-            "/api/spotlight/{guild_id}",
-            get(handlers::community::spotlight::list_spotlight)
-                .post(handlers::community::spotlight::designate_spotlight),
-        )
-        .route(
-            "/api/spotlight/{guild_id}/detail/{id}",
-            delete(handlers::community::spotlight::delete_spotlight),
-        )
-        .route(
-            "/api/news/{guild_id}",
-            get(handlers::community::news::list_news)
-                .post(handlers::community::news::create_news),
-        )
-        .route(
-            "/api/news/detail/{id}",
-            put(handlers::community::news::update_news)
-                .delete(handlers::community::news::delete_news),
-        )
         .route(
             "/{guild_id}",
             get(handlers::community::announcements::list_announcements),
@@ -300,6 +210,103 @@ fn age_ban_inner() -> Router<AppState> {
 
 pub fn routes() -> Router<AppState> {
     Router::new()
+        // ── Routes a chemin ABSOLU ──
+        //
+        // Declarees ici et non dans un `*_inner()` : ces fonctions sont
+        // montees via `.nest("/api/xxx", ...)`, qui PREFIXE tout ce qu'elles
+        // contiennent. Une route `/api/news/{guild_id}` ecrite dans
+        // `announcement_inner` devenait `/api/announcements/api/news/...` et
+        // repondait 404, sans qu'aucune erreur de compilation ne le signale.
+        .route(
+            "/api/events/{guild_id}",
+            get(handlers::community::events::list_events)
+                .post(handlers::community::events::create_event),
+        )
+        .route(
+            "/api/events/detail/{id}",
+            get(handlers::community::events::get_event)
+                .put(handlers::community::events::update_event)
+                .delete(handlers::community::events::delete_event),
+        )
+        .route(
+            "/api/events/detail/{id}/join",
+            post(handlers::community::events::join_event)
+                .delete(handlers::community::events::leave_event),
+        )
+        .route(
+            "/api/lfg/{guild_id}",
+            get(handlers::community::lfg::list_lfg)
+                .post(handlers::community::lfg::create_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}",
+            delete(handlers::community::lfg::delete_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}/close",
+            post(handlers::community::lfg::close_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}/join",
+            post(handlers::community::lfg::join_lfg)
+                .delete(handlers::community::lfg::leave_lfg),
+        )
+        .route(
+            "/api/polls/{guild_id}",
+            get(handlers::community::polls::list_polls)
+                .post(handlers::community::polls::create_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}",
+            delete(handlers::community::polls::delete_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}/close",
+            post(handlers::community::polls::close_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}/vote",
+            post(handlers::community::polls::vote_poll),
+        )
+        .route(
+            "/api/me/polls/{guild_id}",
+            get(handlers::community::polls::my_polls),
+        )
+        .route(
+            "/api/me/games/wallet",
+            get(handlers::community::games::my_wallet),
+        )
+        .route(
+            "/api/me/games/history",
+            get(handlers::community::games::my_history),
+        )
+        .route(
+            "/api/me/games/leaderboard",
+            get(handlers::community::games::leaderboard),
+        )
+        .route(
+            "/api/me/games/wheel/spin",
+            post(handlers::community::games::spin_wheel),
+        )
+        .route(
+            "/api/spotlight/{guild_id}",
+            get(handlers::community::spotlight::list_spotlight)
+                .post(handlers::community::spotlight::designate_spotlight),
+        )
+        .route(
+            "/api/spotlight/{guild_id}/detail/{id}",
+            delete(handlers::community::spotlight::delete_spotlight),
+        )
+        .route(
+            "/api/news/{guild_id}",
+            get(handlers::community::news::list_news)
+                .post(handlers::community::news::create_news),
+        )
+        .route(
+            "/api/news/detail/{id}",
+            put(handlers::community::news::update_news)
+                .delete(handlers::community::news::delete_news),
+        )
         .nest("/api/levels", level_inner())
         .nest("/api/announcements", announcement_inner())
         .nest("/api/confessions", confession_inner())
