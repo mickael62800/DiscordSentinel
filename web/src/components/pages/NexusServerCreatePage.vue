@@ -115,9 +115,26 @@ async function submit() {
   }
 }
 
-/// Champs regroupés par section, dans l'ordre d'apparition du schéma.
-/// Un jeu peut avoir cinquante réglages : sans sections, le formulaire
-/// devient illisible.
+/// Ordre d'affichage à l'intérieur d'une section.
+///
+/// Les interrupteurs se lisent d'un coup d'œil, les champs de saisie
+/// demandent de s'arrêter. Les alterner obligeait l'œil à changer de mode à
+/// chaque ligne — d'où l'impression de fouillis sur une section de vingt
+/// réglages.
+///
+/// Regrouper par nature met les interrupteurs en tête, en bloc compact, puis
+/// les listes, puis les nombres, puis les textes libres qui prennent le plus
+/// de place.
+const ORDRE_TYPES: Record<string, number> = {
+  boolean: 0,
+  enum: 1,
+  number: 2,
+  text: 3,
+};
+
+/// Champs regroupés par section, puis par nature à l'intérieur de chacune.
+/// Un jeu peut avoir cinquante réglages : sans cela, le formulaire devient
+/// illisible.
 const groupes = computed(() => {
   const out: { nom: string; champs: TemplateField[] }[] = [];
   for (const f of chosen.value?.config_schema ?? []) {
@@ -129,6 +146,21 @@ const groupes = computed(() => {
     }
     g.champs.push(f);
   }
+
+  // Tri STABLE : à nature égale, l'ordre du schéma est conservé. C'est lui
+  // qui porte l'intention de celui qui a écrit les réglages — un tri
+  // alphabétique séparerait `SPAWN_ANIMALS` de `SPAWN_MONSTERS`.
+  for (const g of out) {
+    g.champs = g.champs
+      .map((f, i) => ({ f, i }))
+      .sort((a, b) => {
+        const ta = ORDRE_TYPES[a.f.type] ?? 9;
+        const tb = ORDRE_TYPES[b.f.type] ?? 9;
+        return ta !== tb ? ta - tb : a.i - b.i;
+      })
+      .map(({ f }) => f);
+  }
+
   return out;
 });
 
@@ -240,7 +272,12 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
         <details v-for="g in groupes" :key="g.nom" class="nc-group" open>
           <summary>{{ g.nom }}</summary>
           <div class="nc-form">
-          <label v-for="f in g.champs" :key="f.key" class="nc-field">
+          <label
+            v-for="f in g.champs"
+            :key="f.key"
+            class="nc-field"
+            :class="`nc-${f.type}`"
+          >
             <span>{{ f.label || f.key }}</span>
 
             <select v-if="f.type === 'enum'" v-model="values[f.key]">
@@ -463,5 +500,23 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
   color: var(--text-primary);
   font-size: 12px;
   line-height: 1.5;
+}
+
+/* Un interrupteur tient sur une ligne : le laisser occuper une colonne de
+   16 rem gaspillait la moitie de la largeur et etirait les sections. */
+.nc-field.nc-boolean {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+/* Un texte libre — liste de mods, URL de modpack — se saisit mal dans une
+   colonne etroite. Il prend toute la largeur. */
+.nc-field.nc-text {
+  grid-column: 1 / -1;
 }
 </style>
