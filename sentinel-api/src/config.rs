@@ -43,6 +43,18 @@ pub struct AppConfig {
     /// routes légitimes non mappées) AVANT de basculer en enforce. Activé quand
     /// `RBAC_GLOBAL_GATE=audit`. Mutuellement exclusif avec l'enforce.
     pub rbac_global_gate_audit: bool,
+    /// Serveur Discord unique servi par cette installation.
+    ///
+    /// L'application est mono-serveur : toute requete portant un autre
+    /// `guild_id` est refusee par `single_guild_middleware`. Le modele de
+    /// donnees garde sa colonne `guild_id` — la retirer serait un refactor
+    /// enorme pour aucun gain, la colonne valant simplement toujours la meme
+    /// chose — mais la surface HTTP, elle, n'accepte qu'une valeur.
+    ///
+    /// Vide = verrou desactive (toutes les guildes passent). Utile en
+    /// developpement et pour ne pas bloquer une installation existante qui
+    /// n'aurait pas encore renseigne la variable.
+    pub guild_id: String,
 }
 
 impl AppConfig {
@@ -94,6 +106,14 @@ impl AppConfig {
                 .unwrap_or(30),
             allowed_origins: std::env::var("ALLOWED_ORIGINS").unwrap_or_default(),
             metrics_token: std::env::var("METRICS_TOKEN").unwrap_or_default(),
+            // Meme variable que celle lue par le conteneur web : une seule
+            // source de verite pour « de quel serveur parle cette
+            // installation ». `GUILD_ID` reste accepte en repli.
+            guild_id: std::env::var("PUBLIC_GUILD_ID")
+                .or_else(|_| std::env::var("GUILD_ID"))
+                .unwrap_or_default()
+                .trim()
+                .to_string(),
             // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
             // fallback sur DISCORD_TOKEN. Les anciens noms par bot
             // (AUTOMOD_DISCORD_TOKEN, MODERATION_DISCORD_TOKEN) sont abandonnes.

@@ -103,6 +103,9 @@ pub struct AppState {
     pub discord_api: Arc<dyn DiscordApi>,
     pub inference: Arc<InferenceService>,
     pub api_key: String,
+    /// Serveur Discord unique servi par cette installation. Vide =
+    /// verrou desactive (cf. `middleware::single_guild`).
+    pub guild_id: String,
     /// Token optionnel protégeant `/metrics` (vide = ouvert). Voir config.
     pub metrics_token: String,
     #[allow(dead_code)]

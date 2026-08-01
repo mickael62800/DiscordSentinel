@@ -102,18 +102,29 @@ impl Handler {
 
     /// Exige un serveur : retourne le guild_id ou repond une erreur ephemere.
     async fn require_guild(&self, ctx: &Context, cmd: &CommandInteraction) -> Option<String> {
-        match cmd.guild_id {
-            Some(g) => Some(g.to_string()),
-            None => {
-                self.reply_error(
-                    ctx,
-                    cmd,
-                    "Cette commande s'utilise sur un serveur, pas en MP.",
-                )
+        let Some(g) = cmd.guild_id else {
+            self.reply_error(
+                ctx,
+                cmd,
+                "Cette commande s'utilise sur un serveur, pas en MP.",
+            )
+            .await;
+            return None;
+        };
+
+        // Mono-serveur. Ce controle vit ici parce que TOUTES les commandes
+        // passent par `require_guild` : le placer dans chaque handler en
+        // aurait laisse passer au moins un.
+        //
+        // L'API refuserait de toute facon, mais avec une erreur technique
+        // illisible ; autant repondre clairement.
+        if !guilde_autorisee(g) {
+            self.reply_error(ctx, cmd, "Ce bot ne sert pas ce serveur.")
                 .await;
-                None
-            }
+            return None;
         }
+
+        Some(g.to_string())
     }
 
     async fn handle_solde(&self, ctx: &Context, cmd: &CommandInteraction) {
@@ -395,8 +406,46 @@ impl Handler {
     }
 }
 
+/// La guilde est-elle celle servie par cette installation ?
+///
+/// `PUBLIC_GUILD_ID` absente = aucun verrou. C'est le seul defaut sur :
+/// refuser par defaut ferait quitter tous ses serveurs au bot au premier
+/// demarrage mal configure, et un depart ne se rattrape pas d'un clic.
+fn guilde_autorisee(guild_id: serenity::model::id::GuildId) -> bool {
+    let attendu = std::env::var("PUBLIC_GUILD_ID")
+        .or_else(|_| std::env::var("GUILD_ID"))
+        .unwrap_or_default();
+    let attendu = attendu.trim();
+
+    attendu.is_empty() || attendu == guild_id.to_string()
+}
+
 #[async_trait]
 impl EventHandler for Handler {
+    /// Mono-serveur : le bot quitte toute autre guilde.
+    ///
+    /// Sans `is_new` ici : cet evenement arrive AUSSI au demarrage pour les
+    /// guildes deja rejointes, et c'est precisement le cas qu'on veut
+    /// nettoyer — un bot ajoute ailleurs avant la mise en place du verrou.
+    async fn guild_create(
+        &self,
+        ctx: Context,
+        guild: serenity::model::guild::Guild,
+        _is_new: Option<bool>,
+    ) {
+        if guilde_autorisee(guild.id) {
+            return;
+        }
+        tracing::warn!(
+            guild_id = %guild.id,
+            name = %guild.name,
+            "mono-serveur : guilde non autorisee, le bot la quitte"
+        );
+        if let Err(e) = guild.id.leave(&ctx.http).await {
+            tracing::error!(error = %e, guild_id = %guild.id, "echec du depart");
+        }
+    }
+
     async fn ready(&self, ctx: Context, ready: Ready) {
         tracing::info!("nexus-bot connecte en tant que {}", ready.user.name);
         // Consumer des evenements game-portal (cycle de vie des salons de

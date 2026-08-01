@@ -13,6 +13,9 @@ fn cfg(host: &str, port: u16, grpc_port: u16) -> AppConfig {
         shutdown_timeout_secs: 30,
         allowed_origins: String::new(),
         metrics_token: String::new(),
+        // Vide = verrou mono-serveur desactive : les tests ne doivent pas
+        // dependre d'un identifiant de serveur particulier.
+        guild_id: String::new(),
         discord_bot_token: String::new(),
         superadmin_user_ids: vec![],
         discord_oauth_client_id: String::new(),

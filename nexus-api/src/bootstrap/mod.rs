@@ -109,6 +109,12 @@ pub struct AppState {
     pub events: Arc<dyn EventPublisher>,
     /// Si Some, toutes les routes /api exigent `Authorization: Bearer <key>`.
     pub api_key: Option<String>,
+    /// Serveur Discord unique servi par cette installation.
+    ///
+    /// `None` = verrou desactive. Voir `single_guild` cote HTTP : Nexus
+    /// expose sa propre surface, il lui faut donc son propre verrou —
+    /// celui de sentinel-api ne le protege pas.
+    pub guild_id: Option<String>,
 }
 
 /// Connecte le pool Postgres (NEXUS_DATABASE_URL), applique les migrations
@@ -230,6 +236,19 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     );
 
     let api_key = std::env::var("NEXUS_API_KEY").ok().filter(|k| !k.is_empty());
+    // Meme variable que sentinel-api et que le conteneur web : une seule
+    // source de verite pour « de quel serveur parle cette installation ».
+    let guild_id = std::env::var("PUBLIC_GUILD_ID")
+        .or_else(|_| std::env::var("GUILD_ID"))
+        .ok()
+        .map(|g| g.trim().to_string())
+        .filter(|g| !g.is_empty());
+    match &guild_id {
+        Some(g) => tracing::info!(guild_id = %g, "mono-serveur : verrou actif"),
+        None => tracing::warn!(
+            "PUBLIC_GUILD_ID absente — toutes les guildes sont acceptees"
+        ),
+    }
     if api_key.is_none() {
         tracing::warn!("NEXUS_API_KEY absente — API SANS auth (dev uniquement)");
     }
@@ -262,5 +281,6 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         game_repo,
         events,
         api_key,
+        guild_id,
     })
 }

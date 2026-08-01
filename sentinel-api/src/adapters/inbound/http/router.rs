@@ -360,6 +360,16 @@ pub fn build(
     Router::new()
         .merge(protected)
         .merge(public)
+        // Verrou mono-serveur, applique a TOUT le routeur — protege et public
+        // confondus. Un controle par handler aurait laisse passer la premiere
+        // route ajoutee sans y penser.
+        //
+        // Pose ici, sous le logger : une requete refusee reste tracee, ce qui
+        // permet de voir qu'une autre guilde a tente d'entrer.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::adapters::inbound::http::middleware::single_guild::single_guild_middleware,
+        ))
         .layer(middleware::from_fn_with_state(
             logger_state,
             api_logger_middleware,

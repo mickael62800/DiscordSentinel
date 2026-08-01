@@ -430,6 +430,25 @@ impl EventHandler for Handler {
     /// slash commands + register cote API uniquement pour les vraies
     /// nouvelles guilds, sinon on duplique le travail deja fait dans `ready`.
     async fn guild_create(&self, ctx: Context, guild: Guild, is_new: Option<bool>) {
+        // Mono-serveur : le bot QUITTE toute autre guilde. L'installation ne
+        // sert qu'un serveur, et y rester consommerait des evenements, de la
+        // memoire et des quotas Discord pour des donnees que l'API refusera
+        // de toute facon.
+        //
+        // Le controle vient avant `is_new` : une invitation acceptee pendant
+        // une coupure du bot arrive au demarrage avec `is_new == None`.
+        if !guilde_autorisee(guild.id) {
+            tracing::warn!(
+                guild_id = %guild.id,
+                name = %guild.name,
+                "mono-serveur : guilde non autorisee, le bot la quitte"
+            );
+            if let Err(e) = guild.id.leave(&ctx.http).await {
+                tracing::error!(error = %e, guild_id = %guild.id, "echec du depart");
+            }
+            return;
+        }
+
         if is_new != Some(true) {
             return;
         }
@@ -688,4 +707,19 @@ impl EventHandler for Handler {
             _ => {}
         }
     }
+}
+
+/// La guilde est-elle celle servie par cette installation ?
+///
+/// `PUBLIC_GUILD_ID` absente = aucun verrou : une installation qui ne l'a pas
+/// encore renseignee ne doit pas voir son bot quitter tous ses serveurs.
+/// C'est le seul defaut sur : refuser par defaut ferait disparaitre le bot au
+/// premier demarrage mal configure, et un depart ne se rattrape pas d'un clic.
+fn guilde_autorisee(guild_id: serenity::model::id::GuildId) -> bool {
+    let attendu = std::env::var("PUBLIC_GUILD_ID")
+        .or_else(|_| std::env::var("GUILD_ID"))
+        .unwrap_or_default();
+    let attendu = attendu.trim();
+
+    attendu.is_empty() || attendu == guild_id.to_string()
 }

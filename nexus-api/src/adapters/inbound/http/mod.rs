@@ -208,7 +208,59 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(|| async { "ok" }))
         .merge(public)
         .merge(api)
+        // Verrou mono-serveur applique a TOUT le routeur, public compris.
+        // Nexus expose sa propre surface : le verrou de sentinel-api, qui
+        // vit dans un autre processus, ne le protege pas.
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            single_guild,
+        ))
         .with_state(state)
+}
+
+/// Refuse toute requete portant un `guild_id` autre que celui configure.
+///
+/// L'application ne sert qu'un serveur Discord. La colonne `guild_id` reste
+/// dans le modele de donnees — la retirer serait un refactor massif pour
+/// aucun gain — mais la surface HTTP n'accepte qu'une valeur.
+///
+/// Les requetes sans identifiant de serveur (sante, routes globales) passent,
+/// de meme que TOUT si la variable n'est pas configuree : une installation
+/// qui ne l'a pas encore renseignee ne doit pas tomber en panne.
+async fn single_guild(
+    State(state): State<AppState>,
+    req: Request,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let Some(attendu) = state.guild_id.clone() else {
+        return Ok(next.run(req).await);
+    };
+
+    // Toutes les routes concernees portent le `guild_id` dans leur chemin.
+    // On cherche le premier segment qui ressemble a un identifiant Discord :
+    // ici un faux positif provoque un REFUS, d'ou la fenetre stricte de 17 a
+    // 20 chiffres, qui ecarte les uuid et les petits entiers.
+    let trouve = req
+        .uri()
+        .path()
+        .split('/')
+        .find(|seg| {
+            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit())
+        })
+        .map(str::to_string);
+
+    if let Some(gid) = trouve {
+        if gid != attendu {
+            tracing::warn!(
+                guild_id = %gid,
+                attendu = %attendu,
+                "mono-serveur : requete refusee pour une autre guilde"
+            );
+            return Err(StatusCode::FORBIDDEN);
+        }
+    }
+
+    Ok(next.run(req).await)
 }
 
 /// Auth simple : si NEXUS_API_KEY est definie, exige `Authorization: Bearer <key>`

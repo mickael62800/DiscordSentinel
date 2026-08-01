@@ -2874,6 +2874,9 @@ fn base_state() -> AppState {
         discord_api: Arc::new(DiscordApiService::new(String::new())),
         inference: Arc::new(sentinel_api::adapters::outbound::inference_service::InferenceService::new(None, None)),
         api_key: String::new(),
+        // Vide = verrou mono-serveur desactive : les tests d'integration
+        // utilisent des identifiants de guilde arbitraires.
+        guild_id: String::new(),
         discord_bot_token: String::new(),
         system_probe: Arc::new(StubSystemProbe),
         pg_pool,

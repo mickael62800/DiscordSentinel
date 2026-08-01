@@ -259,6 +259,10 @@ services:
       retries: 5
       start_period: 30s
     environment:
+      # Serveur Discord unique servi par cette installation.
+      # Les API refusent tout autre guild_id ; les bots quittent toute
+      # autre guilde. Vide = verrou desactive.
+      PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_KEY: ${API_KEY}
@@ -441,6 +445,10 @@ services:
       retries: 3
       start_period: 20s
     environment:
+      # Serveur Discord unique servi par cette installation.
+      # Les API refusent tout autre guild_id ; les bots quittent toute
+      # autre guilde. Vide = verrou desactive.
+      PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       API_BASE_URL: http://api:3000
       # Adresse PUBLIQUE du site, utilisee pour construire les URL d'images des
@@ -716,6 +724,10 @@ services:
       retries: 3
       start_period: 15s
     environment:
+      # Serveur Discord unique servi par cette installation.
+      # Les API refusent tout autre guild_id ; les bots quittent toute
+      # autre guilde. Vide = verrou desactive.
+      PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
       # Connexion DIRECTE a postgres (base nexus) : pgbouncer ne route que
       # discord_sentinel. Volume faible (jeux) -> pas besoin de pooler.
       NEXUS_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/nexus
@@ -764,6 +776,10 @@ services:
       args:
         BIN_NAME: nexus-bot
     environment:
+      # Serveur Discord unique servi par cette installation.
+      # Les API refusent tout autre guild_id ; les bots quittent toute
+      # autre guilde. Vide = verrou desactive.
+      PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
       NEXUS_DISCORD_TOKEN: ${NEXUS_DISCORD_TOKEN:-}
       NEXUS_API_URL: http://nexus-api:3100
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}

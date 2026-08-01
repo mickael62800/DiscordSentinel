@@ -7,6 +7,7 @@ import { useAuth } from "../../composables/useAuth";
 import { useNotifications } from "../../composables/useNotifications";
 import { useRealtime } from "../../composables/useRealtime";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { siteConfig } from "@/siteConfig";
 import { useSidebar } from "../../composables/useSidebar";
 import { useUniverse } from "../../composables/useUniverse";
 import { NEXUS, SENTINEL, onLogoError } from "@/branding";
@@ -18,6 +19,9 @@ const { user, logout, avatarUrl } = useAuth();
 const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
 const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
+
+/// Installation mono-serveur : la guilde vient de la configuration.
+const guildeImposee = computed(() => !!siteConfig().guildId);
 
 const { universe, canAccessNexus, setUniverse } = useUniverse();
 
@@ -99,7 +103,9 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="guild-selector">
+    <!-- Masque en mono-serveur : proposer un choix qui n'en est pas un
+         laisse croire qu'on gere plusieurs serveurs. -->
+    <div v-if="!guildeImposee" class="guild-selector">
       <select
         class="guild-select"
         :value="selectedGuildId ?? ''"

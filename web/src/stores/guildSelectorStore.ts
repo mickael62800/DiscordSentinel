@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { guildsService } from "@/services/guildsService";
+import { siteConfig } from "@/siteConfig";
 import type { Guild } from "@/types";
 
 const GUILDS_CACHE_KEY = "sentinel_guilds_cache";
@@ -31,9 +32,22 @@ function saveCache(data: Guild[]): void {
   }
 }
 
+/// Serveur unique de l'installation, impose par la configuration.
+///
+/// Quand il est defini, l'application est mono-serveur : la selection n'a
+/// plus lieu d'etre et vaut toujours cette valeur. Le store garde sa forme
+/// (`guilds`, `selectedGuildId`) pour que les dizaines de pages qui les
+/// lisent continuent de fonctionner sans modification — seule la LIBERTE de
+/// choisir disparait, pas la donnee.
+function guildeImposee(): string | null {
+  return siteConfig().guildId || null;
+}
+
 export const useGuildSelectorStore = defineStore("guildSelector", () => {
   const guilds = ref<Guild[]>([]);
-  const selectedGuildId = ref<string | null>(null);
+  // Positionne des la creation du store : les pages montees avant le premier
+  // `fetchGuilds` doivent deja voir la bonne guilde.
+  const selectedGuildId = ref<string | null>(guildeImposee());
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -47,13 +61,17 @@ export const useGuildSelectorStore = defineStore("guildSelector", () => {
    * puis refetch en background pour valider. TTL 6h sur le cache local.
    */
   async function fetchGuilds() {
+    const imposee = guildeImposee();
+
     // 1. Hydratation instantanee depuis le cache (si valide)
     const cached = loadCache();
     if (cached && guilds.value.length === 0) {
       guilds.value = cached;
-      const saved = localStorage.getItem("sentinel_selected_guild");
-      if (saved && guilds.value.some((g) => g.guild_id === saved)) {
-        selectedGuildId.value = saved;
+      if (!imposee) {
+        const saved = localStorage.getItem("sentinel_selected_guild");
+        if (saved && guilds.value.some((g) => g.guild_id === saved)) {
+          selectedGuildId.value = saved;
+        }
       }
     }
 
@@ -64,6 +82,16 @@ export const useGuildSelectorStore = defineStore("guildSelector", () => {
       const fresh = await guildsService.getAll();
       guilds.value = fresh;
       saveCache(fresh);
+
+      if (imposee) {
+        // Mono-serveur : la selection ne bouge pas, meme si la liste renvoyee
+        // par l'API ne contient pas encore la guilde (bot pas encore
+        // enregistre au premier demarrage). La deselectionner rendrait tout
+        // le back-office inutilisable.
+        selectedGuildId.value = imposee;
+        return;
+      }
+
       const saved = localStorage.getItem("sentinel_selected_guild");
       if (saved && guilds.value.some((g) => g.guild_id === saved)) {
         selectedGuildId.value = saved;
@@ -79,6 +107,10 @@ export const useGuildSelectorStore = defineStore("guildSelector", () => {
   }
 
   function selectGuild(guildId: string | null) {
+    // Mono-serveur : la demande est ignoree. Silencieusement, car aucun
+    // appelant legitime ne la formule — l'interface de selection est masquee.
+    if (guildeImposee()) return;
+
     selectedGuildId.value = guildId;
     if (guildId) localStorage.setItem("sentinel_selected_guild", guildId);
     else localStorage.removeItem("sentinel_selected_guild");

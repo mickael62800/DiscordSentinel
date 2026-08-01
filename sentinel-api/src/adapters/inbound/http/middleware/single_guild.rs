@@ -1,0 +1,90 @@
+//! Verrou mono-serveur.
+//!
+//! Cette installation ne sert qu'un seul serveur Discord. Le modele de
+//! donnees conserve sa colonne `guild_id` — la retirer serait un refactor de
+//! centaines de fichiers pour aucun gain, puisqu'elle vaudrait toujours la
+//! meme chose — mais la surface HTTP, elle, n'accepte qu'une valeur.
+//!
+//! Un point de passage UNIQUE plutot qu'un controle recopie dans chaque
+//! handler : c'est la seule facon d'etre sur que la centaine de routes
+//! portant un `{guild_id}` soit couverte, y compris celles ajoutees demain.
+//!
+//! # Pourquoi ici et pas seulement dans le front
+//!
+//! Masquer le selecteur de serveur ne protege rien : l'API reste joignable
+//! directement. Sans ce verrou, quelqu'un possedant un jeton valide pourrait
+//! lire ou ecrire les donnees d'un autre serveur ou le bot serait installe.
+//!
+//! # Interaction avec `guild_auth`
+//!
+//! `guild_auth_middleware` verifie que l'APPELANT appartient a la guilde
+//! demandee. Ce verrou-ci verifie que la GUILDE est celle de l'installation.
+//! Les deux sont complementaires : le premier protege les membres les uns des
+//! autres, le second cloisonne l'installation.
+
+use axum::body::Body;
+use axum::extract::State;
+use axum::http::{Request, StatusCode};
+use axum::middleware::Next;
+use axum::response::Response;
+
+use crate::adapters::inbound::http::state::AppState;
+
+/// Refuse toute requete portant un `guild_id` autre que celui configure.
+///
+/// Laisse passer :
+///   - les requetes sans `guild_id` (endpoints globaux, sante, OAuth) ;
+///   - toutes les requetes si `guild_id` n'est pas configure, pour ne pas
+///     bloquer une installation qui n'a pas encore renseigne la variable.
+pub async fn single_guild_middleware(
+    State(state): State<AppState>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let attendu = state.guild_id.clone();
+    if attendu.is_empty() {
+        return Ok(next.run(request).await);
+    }
+
+    let (mut parts, body) = request.into_parts();
+
+    // Source autoritaire : le parametre de route matche par axum. L'heuristique
+    // sur le chemin sert aux routes qui ne declarent pas `{guild_id}` mais
+    // transportent quand meme un identifiant.
+    let path = parts.uri.path().to_string();
+    let trouve = super::guild_auth::guild_id_from_route_param(&mut parts, &state)
+        .await
+        .or_else(|| guild_id_from_path(&path));
+
+    if let Some(gid) = trouve {
+        if gid != attendu {
+            tracing::warn!(
+                guild_id = %gid,
+                attendu = %attendu,
+                path = %path,
+                "mono-serveur : requete refusee pour une autre guilde"
+            );
+            return Err(StatusCode::FORBIDDEN);
+        }
+    }
+
+    Ok(next.run(Request::from_parts(parts, body)).await)
+}
+
+/// Premier segment du chemin qui ressemble a un identifiant Discord.
+///
+/// Volontairement plus strict que l'heuristique de `guild_auth` : ici un
+/// faux positif provoque un refus, donc on n'accepte qu'un snowflake
+/// plausible (17 a 20 chiffres). Un identifiant plus court est ignore plutot
+/// que de bloquer une route legitime.
+fn guild_id_from_path(path: &str) -> Option<String> {
+    path.split('/')
+        .find(|seg| {
+            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit())
+        })
+        .map(str::to_string)
+}
+
+#[cfg(test)]
+#[path = "tests/single_guild.rs"]
+mod tests;

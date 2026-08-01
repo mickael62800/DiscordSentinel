@@ -5,4 +5,5 @@ pub mod global_rbac;
 pub mod guild_auth;
 pub mod rate_limit;
 pub mod rbac;
+pub mod single_guild;
 pub mod whitelist;
