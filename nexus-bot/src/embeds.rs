@@ -141,25 +141,6 @@ pub fn build_coude_challenge_embed(attacker_id: u64, defender_id: u64, mise: i64
         .footer(CreateEmbedFooter::new("Le defi expire lorsqu'il est refuse ou resolu."))
 }
 
-pub fn build_coude_result_embed(
-    attacker_id: u64,
-    defender_id: u64,
-    attacker_roll: i32,
-    defender_roll: i32,
-    winner_id: Option<u64>,
-    mise: i64,
-) -> CreateEmbed {
-    let description = match winner_id {
-        Some(winner) => format!(
-            "<@{attacker_id}> lance **{attacker_roll}** • <@{defender_id}> lance **{defender_roll}**\n\n🏆 <@{winner}> remporte **{mise} coins** !"
-        ),
-        None => format!(
-            "<@{attacker_id}> lance **{attacker_roll}** • <@{defender_id}> lance **{defender_roll}**\n\n🤝 Egalite : personne ne perd de coins."
-        ),
-    };
-    CreateEmbed::new().title("👊 Resultat du Coup de Coude").description(description).color(0x57F287)
-}
-
 pub fn build_coude_profile_embed(p: &crate::api_client::CoudeProfileResponse) -> CreateEmbed {
     CreateEmbed::new().title(format!("👊 Profil Coude — {}", p.username)).color(0x5865F2)
         .description(format!("**{}** · Niveau **{}** — {} XP\n❤️ {}/{} HP · 🪙 {} coins", p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins))

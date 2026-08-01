@@ -363,32 +363,6 @@ impl ApiClient {
         Ok(resp.status().is_success())
     }
 
-    /// Reset tous les strikes actifs d'un utilisateur.
-    ///
-    /// NOTE : reset GLOBAL (efface aussi les strikes automod). N'est plus
-    /// appele par `/unwarn all` (qui supprime warn par warn pour preserver les
-    /// strikes automod), mais conserve pour un eventuel reset administratif.
-    #[allow(dead_code)]
-    pub async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
-        let req = self.base.client().delete(format!(
-            "{}/api/strikes/{}/{}",
-            self.base.base_url(),
-            guild_id,
-            user_id
-        ));
-        let resp = self
-            .base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur HTTP reset_strikes: {e}"))?;
-        if resp.status().is_success() {
-            Ok(())
-        } else {
-            Err(format!("reset_strikes: HTTP {}", resp.status()))
-        }
-    }
-
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
     pub async fn get_active_reminders(
         &self,
@@ -539,19 +513,11 @@ impl ApiClient {
 
     // ── Pending Actions (mode apprenti) ──
 
-    /// Persiste une action en attente d'approbation (fire-and-forget).
-    #[allow(dead_code)]
-    pub async fn create_pending_action(&self, action: &ModerationAction) {
-        self.base
-            .post_fire_and_forget("/api/moderation/pending", action)
-            .await;
-    }
-
     /// Met a jour le statut d'une action en attente (approved/rejected).
     pub async fn resolve_pending_action(&self, action_id: &str, status: &str, reviewed_by: &str) {
         self.base
             .patch_fire_and_forget(
-                &format!("/api/moderation/pending/{action_id}"),
+                &format!("/api/moderation/pending/{action_id}/resolve"),
                 &serde_json::json!({
                     "status": status,
                     "reviewed_by": reviewed_by,

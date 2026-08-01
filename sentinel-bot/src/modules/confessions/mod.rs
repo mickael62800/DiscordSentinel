@@ -887,17 +887,6 @@ async fn modal_reply_ephemeral(ctx: &Context, modal: &ModalInteraction, content:
     }
 }
 
-// Used externally via consumer
-#[allow(dead_code)]
-pub fn module_name() -> &'static str {
-    MODULE_BOT_NAME
-}
-
-#[allow(dead_code)]
-pub fn ensure_used(_ctx: &Context, _g: GuildId) {
-    info!("confessions module loaded");
-}
-
 // ── Consumer Redis stream pour sync bidirectionnelle Web -> Discord ─────
 
 /// Spawn le consumer durable Redis stream sentinel:events filtre sur les

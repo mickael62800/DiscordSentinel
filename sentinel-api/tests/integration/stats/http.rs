@@ -112,7 +112,7 @@ impl ManageStatsUseCase for MockStatsUC {
             .filter(|u| u.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
-        matching.sort_by(|a, b| b.message_count.cmp(&a.message_count));
+        matching.sort_by_key(|u| std::cmp::Reverse(u.message_count));
         matching.truncate(limit as usize);
         Ok(matching)
     }

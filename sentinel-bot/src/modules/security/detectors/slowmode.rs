@@ -109,12 +109,6 @@ impl SlowmodeManager {
         );
     }
 
-    /// Desactive le slowmode en restaurant les valeurs precedentes.
-    #[allow(dead_code)]
-    pub async fn deactivate(&self, ctx: &Context, guild_id: GuildId) {
-        self.deactivate_with_http(&ctx.http, guild_id).await;
-    }
-
     /// Desactive le slowmode via un Arc<Http> (pour les background tasks sans Context).
     pub async fn deactivate_with_http(&self, http: &serenity::http::Http, guild_id: GuildId) {
         let (_, imposed, previous_states) = match self.active.remove(&guild_id) {

@@ -3,7 +3,6 @@
 //! (`sentinel_core::domain::services::security::captcha`) ; ce module ne garde
 //! que l'envoi en DM et le rendu des boutons.
 
-use rand::Rng;
 use serenity::builder::{CreateActionRow, CreateButton, CreateMessage};
 use serenity::model::id::{GuildId, UserId};
 use serenity::prelude::*;
@@ -96,22 +95,6 @@ pub async fn send_math_challenge(
             false
         }
     }
-}
-
-/// Genere un code captcha simple (6 caracteres alphanumeriques).
-#[allow(dead_code)]
-pub fn generate_code() -> String {
-    let mut rng = rand::thread_rng();
-    (0..6)
-        .map(|_| {
-            let idx = rng.gen_range(0..36);
-            if idx < 10 {
-                (b'0' + idx) as char
-            } else {
-                (b'A' + idx - 10) as char
-            }
-        })
-        .collect()
 }
 
 /// Envoie un message de verification en DM avec un bouton.

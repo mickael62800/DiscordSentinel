@@ -163,7 +163,7 @@ impl PresenceRepository for RedisPresenceRepository {
             .filter(|(_, v)| v.last_message_at >= seuil)
             .collect();
 
-        salons.sort_by(|a, b| b.1.last_message_at.cmp(&a.1.last_message_at));
+        salons.sort_by_key(|(_, meta)| std::cmp::Reverse(meta.last_message_at));
         salons.truncate(limit.max(0) as usize);
 
         let mut out = Vec::with_capacity(salons.len());

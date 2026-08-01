@@ -35,20 +35,6 @@ fn parse_custom(s: &str) -> Option<ReactionType> {
     })
 }
 
-/// Compare un emoji stocke en DB avec un ReactionType recu de Discord.
-#[allow(dead_code)]
-pub fn emoji_matches(stored: &str, reaction: &ReactionType) -> bool {
-    let parsed = match parse_reaction_type(stored) {
-        Some(p) => p,
-        None => return false,
-    };
-    match (&parsed, reaction) {
-        (ReactionType::Unicode(a), ReactionType::Unicode(b)) => a == b,
-        (ReactionType::Custom { id: a, .. }, ReactionType::Custom { id: b, .. }) => a == b,
-        _ => false,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,21 +70,4 @@ mod tests {
         }
     }
 
-    #[test]
-    fn matches_unicode() {
-        let r = ReactionType::Unicode("🎮".to_string());
-        assert!(emoji_matches("🎮", &r));
-        assert!(!emoji_matches("🎯", &r));
-    }
-
-    #[test]
-    fn matches_custom_by_id() {
-        let r = ReactionType::Custom {
-            animated: false,
-            id: EmojiId::new(42),
-            name: Some("x".into()),
-        };
-        assert!(emoji_matches("<:other:42>", &r));
-        assert!(!emoji_matches("<:other:99>", &r));
-    }
 }

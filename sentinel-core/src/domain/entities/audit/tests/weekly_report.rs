@@ -47,11 +47,13 @@ fn ignores_unknown_event_types() {
 
     assert_eq!(report.member_joins, 5);
     // Les event_type non mappes n'affectent aucun compteur.
-    assert_eq!(report, {
-        let mut expected = WeeklyReport::default();
-        expected.member_joins = 5;
-        expected
-    });
+    assert_eq!(
+        report,
+        WeeklyReport {
+            member_joins: 5,
+            ..Default::default()
+        }
+    );
 }
 
 #[test]

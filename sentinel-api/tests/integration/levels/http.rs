@@ -114,7 +114,7 @@ impl ManageLevelsUseCase for MockLevelsUC {
             .filter(|u| u.guild_id.as_str() == guild_id)
             .cloned()
             .collect();
-        matching.sort_by(|a, b| b.xp.cmp(&a.xp));
+        matching.sort_by_key(|u| std::cmp::Reverse(u.xp));
         matching.truncate(limit as usize);
         Ok(matching)
     }

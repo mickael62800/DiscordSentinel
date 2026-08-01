@@ -161,27 +161,9 @@ impl ApiClient {
         crate::grpc_call!(@unit self.grpc, tickets, reply_ticket, req)
     }
 
-    #[allow(dead_code)]
-    pub async fn update_status(&self, id: &str, status: &str) -> Result<(), String> {
-        let req = proto::UpdateStatusRequest {
-            id: id.to_string(),
-            status: status.to_string(),
-        };
-        crate::grpc_call!(@unit self.grpc, tickets, update_status, req)
-    }
-
     pub async fn close_ticket(&self, id: &str) -> Result<(), String> {
         let req = proto::CloseTicketRequest { id: id.to_string() };
         crate::grpc_call!(@unit self.grpc, tickets, close_ticket, req)
-    }
-
-    #[allow(dead_code)]
-    pub async fn assign_ticket(&self, id: &str, assignee: &str) -> Result<(), String> {
-        let req = proto::AssignTicketRequest {
-            ticket_id: id.to_string(),
-            assignee: assignee.to_string(),
-        };
-        crate::grpc_call!(@unit self.grpc, tickets, assign_ticket, req)
     }
 
     pub async fn update_ticket_channel(

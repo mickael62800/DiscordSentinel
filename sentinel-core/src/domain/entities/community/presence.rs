@@ -113,7 +113,7 @@ impl VoicePresence {
     pub fn occupied_channels(&self) -> Vec<&VoiceChannelPresence> {
         let mut occupes: Vec<&VoiceChannelPresence> =
             self.channels.iter().filter(|c| !c.members.is_empty()).collect();
-        occupes.sort_by(|a, b| b.members.len().cmp(&a.members.len()));
+        occupes.sort_by_key(|c| std::cmp::Reverse(c.members.len()));
         occupes
     }
 }

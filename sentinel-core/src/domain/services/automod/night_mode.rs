@@ -48,12 +48,14 @@ mod tests {
 
     #[test]
     fn night_mode_halves_with_floors() {
-        let mut cfg = DetectorConfig::default();
-        cfg.spam_repeat_char_threshold = 10;
-        cfg.spam_repeat_word_threshold = 8;
-        cfg.caps_threshold_chars = 20;
-        cfg.emoji_spam_max = 12;
-        cfg.mentions_max = 9;
+        let mut cfg = DetectorConfig {
+            spam_repeat_char_threshold: 10,
+            spam_repeat_word_threshold: 8,
+            caps_threshold_chars: 20,
+            emoji_spam_max: 12,
+            mentions_max: 9,
+            ..Default::default()
+        };
         apply_night_mode(&mut cfg);
         assert_eq!(cfg.spam_repeat_char_threshold, 5);
         assert_eq!(cfg.spam_repeat_word_threshold, 4);
@@ -64,12 +66,14 @@ mod tests {
 
     #[test]
     fn night_mode_floors_hold() {
-        let mut cfg = DetectorConfig::default();
-        cfg.spam_repeat_char_threshold = 1;
-        cfg.spam_repeat_word_threshold = 1;
-        cfg.caps_threshold_chars = 1;
-        cfg.emoji_spam_max = 1;
-        cfg.mentions_max = 1;
+        let mut cfg = DetectorConfig {
+            spam_repeat_char_threshold: 1,
+            spam_repeat_word_threshold: 1,
+            caps_threshold_chars: 1,
+            emoji_spam_max: 1,
+            mentions_max: 1,
+            ..Default::default()
+        };
         apply_night_mode(&mut cfg);
         assert_eq!(cfg.spam_repeat_char_threshold, 4);
         assert_eq!(cfg.spam_repeat_word_threshold, 3);

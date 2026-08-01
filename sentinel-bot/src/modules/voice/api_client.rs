@@ -151,14 +151,6 @@ pub struct VoiceChannelResponse {
     pub created_at: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct VoiceChannelDetailResponse {
-    pub channel: VoiceChannelResponse,
-    pub co_admins: Vec<serde_json::Value>,
-    pub bans: Vec<serde_json::Value>,
-}
-
 // ── Client ──
 
 pub struct ApiClient {

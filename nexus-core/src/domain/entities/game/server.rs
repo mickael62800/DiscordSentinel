@@ -215,6 +215,27 @@ pub fn validate_server_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Memoire a accorder au CONTENEUR pour un jeu dote de `heap_mb` de memoire.
+///
+/// Le conteneur doit toujours en avoir PLUS que le jeu. Une JVM configuree
+/// avec 2 Go de tas consomme davantage : metaespace, piles de threads,
+/// cache de code, structures du ramasse-miettes, tampons directs. Lui donner
+/// exactement son tas la fait tuer par le noyau des le demarrage — c'est
+/// silencieux du cote de Docker, le journal du jeu s'arrete simplement sur un
+/// code de sortie -1.
+///
+/// La marge vaut un quart du tas, avec un plancher de 512 Mo : en proportion
+/// seule, un petit serveur n'aurait pas de quoi couvrir les couts fixes de la
+/// machine virtuelle, qui ne diminuent pas avec le tas.
+///
+/// S'applique aussi aux jeux natifs : la marge y sert de coussin plutot que
+/// de laisser le noyau arbitrer au premier pic.
+pub fn container_memory_mb(heap_mb: i32) -> i32 {
+    const MARGE_MINIMALE_MB: i32 = 512;
+    let marge = (heap_mb / 4).max(MARGE_MINIMALE_MB);
+    heap_mb.saturating_add(marge)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,25 +460,4 @@ mod tests {
     fn une_valeur_extreme_ne_deborde_pas() {
         assert!(container_memory_mb(i32::MAX) >= i32::MAX - 1);
     }
-}
-
-/// Memoire a accorder au CONTENEUR pour un jeu dote de `heap_mb` de memoire.
-///
-/// Le conteneur doit toujours en avoir PLUS que le jeu. Une JVM configuree
-/// avec 2 Go de tas consomme davantage : metaespace, piles de threads,
-/// cache de code, structures du ramasse-miettes, tampons directs. Lui donner
-/// exactement son tas la fait tuer par le noyau des le demarrage — c'est
-/// silencieux du cote de Docker, le journal du jeu s'arrete simplement sur un
-/// code de sortie -1.
-///
-/// La marge vaut un quart du tas, avec un plancher de 512 Mo : en proportion
-/// seule, un petit serveur n'aurait pas de quoi couvrir les couts fixes de la
-/// machine virtuelle, qui ne diminuent pas avec le tas.
-///
-/// S'applique aussi aux jeux natifs : la marge y sert de coussin plutot que
-/// de laisser le noyau arbitrer au premier pic.
-pub fn container_memory_mb(heap_mb: i32) -> i32 {
-    const MARGE_MINIMALE_MB: i32 = 512;
-    let marge = (heap_mb / 4).max(MARGE_MINIMALE_MB);
-    heap_mb.saturating_add(marge)
 }

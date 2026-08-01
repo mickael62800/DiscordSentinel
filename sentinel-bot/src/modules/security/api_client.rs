@@ -126,18 +126,6 @@ impl ApiClient {
         crate::grpc_call!(@unit self.grpc, members, register_member, req)
     }
 
-    /// Hard-delete d'un membre (gRPC). Plus appele sur depart de membre (on
-    /// fait un soft-delete via le lifecycle `/leave` pour garder la detection
-    /// de retour), conserve pour un eventuel usage admin/purge.
-    #[allow(dead_code)]
-    pub async fn remove_member(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
-        let req = proto_members::RemoveMemberRequest {
-            guild_id: guild_id.to_string(),
-            user_id: user_id.to_string(),
-        };
-        crate::grpc_call!(@unit self.grpc, members, remove_member, req)
-    }
-
     pub async fn update_member(
         &self,
         guild_id: &str,
