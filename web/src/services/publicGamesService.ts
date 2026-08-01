@@ -10,6 +10,9 @@ export interface PublicGameServer {
   /// Nom lisible du jeu, pas son slug technique.
   game: string;
   icon: string | null;
+  /// Jaquette du jeu, chemin relatif servi par le site (`/imgs/...`).
+  /// Absente : la page retombe sur l'emoji `icon`.
+  cover_image_url: string | null;
   online: boolean;
   player_count: number;
   /// Renseigné uniquement si l'adresse a été révélée.

@@ -94,6 +94,19 @@ impl ManageAuditLogsUseCase for MockAuditLogsUC {
             .collect();
         Ok(matching)
     }
+    /// Le mock ignore les filtres : les tests qui s'appuient sur `count`
+    /// verifient l'en-tete de pagination, pas le comptage lui-meme.
+    async fn count(
+        &self,
+        guild_id: Option<&str>,
+        _: &AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        let all = self.items.lock().unwrap();
+        Ok(all
+            .iter()
+            .filter(|l| guild_id.is_none_or(|g| l.guild_id.as_str() == g))
+            .count() as i64)
+    }
     async fn delete_older_than_days(&self, guild_id: &str, _: i32) -> Result<u64, DomainError> {
         let mut items = self.items.lock().unwrap();
         let before = items.len();

@@ -184,6 +184,46 @@ pub async fn build_app_state(
         ),
     );
 
+    // Vie de la communaute : annonces de recherche de joueurs, sondages,
+    // membre du mois, nouvelles du site. Quatre concepts distincts mais un
+    // seul public : la page de l'espace membre.
+    let lfg_uc = Arc::new(
+        sentinel_core::application::community::manage_lfg_service::ManageLfgService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::community::lfg_repository::PgLfgRepository::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+    let polls_uc = Arc::new(
+        sentinel_core::application::community::manage_polls_service::ManagePollsService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::community::poll_repository::PgPollRepository::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+    let spotlight_uc = Arc::new(
+        sentinel_core::application::community::manage_spotlight_service::ManageSpotlightService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::community::spotlight_repository::PgSpotlightRepository::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+    let news_uc = Arc::new(
+        sentinel_core::application::community::manage_news_service::ManageNewsService::new(
+            Arc::new(
+                crate::adapters::outbound::postgres::community::news_repository::PgNewsRepository::new(
+                    pg_pool.clone(),
+                ),
+            ),
+        ),
+    );
+
     // Detection d'anomalie de moderation (mass ban/delete/role). Le CALCUL
     // (fenetre glissante) vit dans un adapter memoire serveur ; la DECISION
     // (seuil + reset) dans le service coeur. Le bot n'agrege/ne decide plus.
@@ -698,6 +738,10 @@ pub async fn build_app_state(
 
     AppState {
         events_uc,
+        lfg_uc,
+        polls_uc,
+        spotlight_uc,
+        news_uc,
         analyze_uc,
         analyze_image_uc,
         dataset_uc,

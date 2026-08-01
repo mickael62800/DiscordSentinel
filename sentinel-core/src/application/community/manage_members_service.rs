@@ -217,6 +217,32 @@ impl ManageMembersUseCase for ManageMembersService {
     async fn rejoin_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError> {
         self.member_repo.mark_rejoined(guild_id, user_id).await
     }
+
+    async fn upcoming_anniversaries(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<
+        Vec<crate::domain::entities::community::milestone::JoinAnniversary>,
+        DomainError,
+    > {
+        // Fenetre bornee : au-dela de deux mois, ce ne sont plus des
+        // « anniversaires a venir » mais un annuaire.
+        self.member_repo
+            .list_join_anniversaries(guild_id, days.clamp(1, 60))
+            .await
+    }
+
+    async fn recent_joins(
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
+    ) -> Result<Vec<GuildMember>, DomainError> {
+        self.member_repo
+            .list_recent_joins(guild_id, days.clamp(1, 90), limit.clamp(1, 50))
+            .await
+    }
 }
 
 #[cfg(test)]

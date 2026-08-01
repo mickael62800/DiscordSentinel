@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::entities::community::guild_member::MemberSummary;
+use crate::domain::entities::community::milestone::JoinAnniversary;
 use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::entities::system::discord_ids::UserId;
 use crate::domain::errors::DomainError;
@@ -53,4 +54,20 @@ pub trait ManageMembersUseCase: Send + Sync {
 
     /// Marque un membre comme revenu. Renvoie le nombre de lignes MAJ.
     async fn rejoin_member(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
+
+    /// Anniversaires d'arrivee a venir dans les `days` prochains jours.
+    /// Sert la section « anniversaires » de l'espace membre.
+    async fn upcoming_anniversaries(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<Vec<JoinAnniversary>, DomainError>;
+
+    /// Membres arrives dans les `days` derniers jours.
+    async fn recent_joins(
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
+    ) -> Result<Vec<GuildMember>, DomainError>;
 }

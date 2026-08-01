@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::community::guild_member::GuildMember;
+use crate::domain::entities::community::milestone::JoinAnniversary;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -38,4 +39,27 @@ pub trait MemberRepository: Send + Sync {
     /// Marque un membre comme revenu (left_at = NULL, joined_at = NOW()).
     /// Renvoie le nombre de lignes guild_members MAJ.
     async fn mark_rejoined(&self, guild_id: &str, user_id: &str) -> Result<u64, DomainError>;
+
+    /// Membres dont l'arrivee tombe dans les `days` prochains jours.
+    ///
+    /// Le filtrage se fait en SQL sur le jour et le mois : charger toute la
+    /// guilde pour ne garder que trois anniversaires serait absurde sur un
+    /// serveur de plusieurs centaines de membres.
+    ///
+    /// Exclut les bots et les partis : ni les uns ni les autres n'ont
+    /// d'anniversaire a feter.
+    async fn list_join_anniversaries(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<Vec<JoinAnniversary>, DomainError>;
+
+    /// Membres arrives dans les `days` derniers jours, les plus recents
+    /// d'abord. Bots et partis exclus pour la meme raison.
+    async fn list_recent_joins(
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
+    ) -> Result<Vec<GuildMember>, DomainError>;
 }

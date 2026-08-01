@@ -2,14 +2,17 @@
 // Espace membre — la vie du serveur, consultable SANS connexion.
 //
 // Choix structurant : cette page est publique. Un visiteur doit pouvoir voir
-// ce qui se passe — le planning, ce qui est en cours — avant de décider de
-// créer un compte. Demander la connexion à l'entrée revenait à mettre un
-// videur devant une vitrine.
+// ce qui se passe — le planning, les serveurs en ligne, qui cherche des
+// joueurs — avant de décider de créer un compte. Demander la connexion à
+// l'entrée revenait à mettre un videur devant une vitrine.
 //
-// La connexion n'est requise que pour AGIR : s'inscrire à un événement,
-// retrouver ses stats. Les boutons d'action affichent alors une invitation à
-// se connecter plutôt que de disparaître — l'utilisateur comprend ce qu'il
-// gagnerait à le faire.
+// La connexion n'est requise que pour AGIR : s'inscrire, voter, dire « je
+// viens ». Les boutons d'action affichent alors une invitation à se connecter
+// plutôt que de disparaître — l'utilisateur comprend ce qu'il gagnerait.
+//
+// Chaque section charge indépendamment et se masque si elle est vide : une
+// plateforme jeux indisponible ne doit pas priver la page de son planning, et
+// une communauté sans sondage en cours ne doit pas afficher un cadre vide.
 //
 // Rendue hors de `MainLayout` : un membre n'a rien à faire dans la barre
 // latérale d'administration.
@@ -17,7 +20,14 @@
 import { computed, onMounted, ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
 import { useComponentVisibility } from "../../composables/useComponentVisibility";
-import { COMMUNITY, onLogoError } from "@/branding";
+import {
+  addWeeks,
+  layoutWeek,
+  startOfWeek,
+  weekDays,
+  weekLabel,
+} from "../../composables/useWeekPlanning";
+import { COMMUNITY, DISCORD_INVITE, onWordmarkError, wordmarkOf } from "@/branding";
 import {
   isOngoing,
   publicEventsService,
@@ -27,6 +37,16 @@ import {
   publicGamesService,
   type PublicGameServer,
 } from "@/services/publicGamesService";
+import {
+  communityActionsService,
+  communityLifeService,
+  type Anniversary,
+  type Newcomer,
+  type NewsItem,
+  type Poll,
+  type PublicLfgPost,
+  type Spotlight,
+} from "@/services/communityLifeService";
 
 const guildId = import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined;
 
@@ -36,27 +56,42 @@ const { visible } = useComponentVisibility();
 /// Le lien vers l'administration n'apparaît que pour qui y a réellement accès.
 const hasAdminAccess = computed(() => visible("general.stats"));
 
+// ── État ──
+
 const events = ref<PublicEvent[]>([]);
-const loadingEvents = ref(true);
-
 const servers = ref<PublicGameServer[]>([]);
-const loadingServers = ref(true);
+const lfg = ref<PublicLfgPost[]>([]);
+const polls = ref<Poll[]>([]);
+const spotlight = ref<Spotlight | null>(null);
+const anniversaries = ref<Anniversary[]>([]);
+const newcomers = ref<Newcomer[]>([]);
+const news = ref<NewsItem[]>([]);
 
-onMounted(async () => {
+const loadingEvents = ref(true);
+const loadingServers = ref(true);
+const loadingLfg = ref(true);
+
+/// Semaine affichée dans le calendrier. Décalable sans recharger : la fenêtre
+/// interrogée couvre déjà deux mois.
+const weekStart = ref(startOfWeek(new Date()));
+
+onMounted(() => {
   if (!guildId) {
     loadingEvents.value = false;
     loadingServers.value = false;
+    loadingLfg.value = false;
     return;
   }
+
   // Fenêtre large : ce qui est en cours (commencé avant aujourd'hui) et ce qui
-  // arrive dans les deux mois.
+  // arrive dans les deux mois. Permet de naviguer de semaine en semaine sans
+  // nouvel appel.
   const from = new Date();
   from.setDate(from.getDate() - 30);
   const to = new Date();
   to.setDate(to.getDate() + 60);
 
-  // Les deux appels sont indépendants : une plateforme jeux indisponible ne
-  // doit pas priver la page de son planning, et réciproquement.
+  // Appels indépendants : l'échec de l'un ne prive pas la page des autres.
   publicEventsService
     .list(guildId, from, to)
     .then((r) => (events.value = r))
@@ -68,7 +103,45 @@ onMounted(async () => {
     .then((r) => (servers.value = r))
     .catch(() => (servers.value = []))
     .finally(() => (loadingServers.value = false));
+
+  communityLifeService
+    .lfg(guildId)
+    .then((r) => (lfg.value = r))
+    .catch(() => (lfg.value = []))
+    .finally(() => (loadingLfg.value = false));
+
+  // Un membre connecté voit son propre vote pré-coché, ce que la surface
+  // publique ne peut pas renseigner.
+  const chargerSondages = user.value
+    ? communityActionsService.myPolls(guildId)
+    : communityLifeService.polls(guildId);
+  chargerSondages
+    .then((r) => (polls.value = r.filter((p) => p.is_open).slice(0, 2)))
+    .catch(() => (polls.value = []));
+
+  communityLifeService
+    .spotlight(guildId)
+    .then((r) => (spotlight.value = r))
+    .catch(() => (spotlight.value = null));
+
+  communityLifeService
+    .pulse(guildId)
+    .then((r) => {
+      anniversaries.value = r.anniversaries;
+      newcomers.value = r.newcomers;
+    })
+    .catch(() => {
+      anniversaries.value = [];
+      newcomers.value = [];
+    });
+
+  communityLifeService
+    .news(guildId)
+    .then((r) => (news.value = r))
+    .catch(() => (news.value = []));
 });
+
+// ── Serveurs de jeu ──
 
 /// En ligne d'abord : c'est ce qu'on vient chercher.
 const sortedServers = computed(() =>
@@ -79,50 +152,164 @@ const playersOnline = computed(() =>
   servers.value.reduce((n, s) => n + (s.online ? s.player_count : 0), 0),
 );
 
-/// En cours d'abord, puis à venir par ordre chronologique.
+const serversOnline = computed(() => servers.value.filter((s) => s.online).length);
+
+// ── Planning ──
+
+const weekBars = computed(() => layoutWeek(events.value, weekStart.value));
+const days = computed(() => weekDays(weekStart.value));
+const label = computed(() => weekLabel(weekStart.value));
+
+/// Nombre de lignes de la grille. Minimum 2, sinon une semaine à un seul
+/// événement donnerait un calendrier écrasé sur une bande.
+const weekRows = computed(() =>
+  Math.max(2, ...weekBars.value.map((b) => b.row), 0),
+);
+
+/// Recalculée à chaque clic plutôt que figée au chargement : un onglet laissé
+/// ouvert une nuit ramènerait sinon à la semaine de la veille.
+function semaineCourante(): Date {
+  return startOfWeek(new Date());
+}
+
+function isToday(d: Date): boolean {
+  const now = new Date();
+  return (
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear()
+  );
+}
+
 const ongoing = computed(() => events.value.filter((e) => isOngoing(e)));
+
+/// Le prochain rendez-vous, mis en avant. Le premier à venir, pas le plus
+/// proche d'aujourd'hui : une campagne en cours n'est pas un rendez-vous.
+const nextEvent = computed(() => {
+  const now = new Date();
+  return (
+    events.value
+      .filter((e) => new Date(e.starts_at) > now)
+      .sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0] ?? null
+  );
+});
+
 const upcoming = computed(() => {
   const now = new Date();
   return events.value
     .filter((e) => new Date(e.starts_at) > now)
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-    .slice(0, 6);
+    .slice(1, 5);
 });
+
+// ── Actions ──
+
+const busyLfg = ref<string | null>(null);
+const lfgError = ref<string | null>(null);
+
+/// « Je viens ». Recharge la liste publique après coup : la réponse
+/// authentifiée porte les identifiants, la vue publique n'en veut pas.
+async function joinLfg(id: string) {
+  if (!user.value || !guildId) return;
+  busyLfg.value = id;
+  lfgError.value = null;
+  try {
+    await communityActionsService.joinLfg(id);
+    lfg.value = await communityLifeService.lfg(guildId);
+  } catch (e) {
+    lfgError.value = e instanceof Error ? e.message : "Impossible de rejoindre.";
+  } finally {
+    busyLfg.value = null;
+  }
+}
+
+const busyVote = ref<string | null>(null);
+
+async function vote(pollId: string, optionId: string) {
+  if (!user.value) return;
+  busyVote.value = pollId;
+  try {
+    const maj = await communityActionsService.vote(pollId, optionId);
+    polls.value = polls.value.map((p) => (p.id === pollId ? maj : p));
+  } catch {
+    // Un vote qui échoue laisse les barres inchangées : rien à annoncer de
+    // plus que l'absence de mouvement.
+  } finally {
+    busyVote.value = null;
+  }
+}
+
+// ── Formats ──
+
+const JOUR: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
+const HEURE: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
 
 function fmtRange(e: PublicEvent): string {
   const start = new Date(e.starts_at);
   const end = new Date(e.ends_at);
-  const jour: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
-  const heure: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" };
 
-  // Une campagne s'annonce par ses dates, une soirée par son horaire : afficher
-  // « 21:00 » pour un événement de trois semaines n'aurait aucun sens.
+  // Une campagne s'annonce par ses dates, une soirée par son horaire :
+  // afficher « 21:00 » pour un événement de trois semaines n'aurait aucun sens.
   if (e.span_days > 1) {
-    return `${start.toLocaleDateString("fr-FR", jour)} → ${end.toLocaleDateString("fr-FR", jour)}`;
+    return `${start.toLocaleDateString("fr-FR", JOUR)} → ${end.toLocaleDateString("fr-FR", JOUR)}`;
   }
-  if (e.all_day) return start.toLocaleDateString("fr-FR", jour);
-  return `${start.toLocaleDateString("fr-FR", jour)} · ${start.toLocaleTimeString("fr-FR", heure)}`;
+  if (e.all_day) return start.toLocaleDateString("fr-FR", JOUR);
+  return `${start.toLocaleDateString("fr-FR", JOUR)} · ${start.toLocaleTimeString("fr-FR", HEURE)}`;
+}
+
+function fmtHeure(iso: string): string {
+  return new Date(iso).toLocaleTimeString("fr-FR", HEURE);
+}
+
+function fmtJour(iso: string): string {
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long" });
+}
+
+/// Ancienneté en clair. Les repères courts d'abord : c'est ce qu'on regarde.
+function depuis(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(ms / 60000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const heures = Math.floor(minutes / 60);
+  if (heures < 24) return `il y a ${heures} h`;
+  const jours = Math.floor(heures / 24);
+  return jours === 1 ? "hier" : `il y a ${jours} jours`;
 }
 
 function accent(e: PublicEvent): string | undefined {
   return e.color ? `#${e.color}` : undefined;
 }
 
-const RUBRIQUES = [
-  { emoji: "🎁", titre: "Concours", texte: "Les giveaways en cours et les gagnants." },
-  { emoji: "🏆", titre: "Classements", texte: "Ton rang et le top du serveur." },
-  { emoji: "🗓️", titre: "Inscriptions", texte: "S'inscrire aux événements en un clic." },
-];
+/// Palette des pastilles d'avatar, choisie de façon stable à partir du pseudo
+/// pour qu'une même personne garde sa couleur d'un chargement à l'autre.
+const PALETTE = ["#a855f7", "#22c55e", "#f39c12", "#c026d3", "#38bdf8", "#f43f5e", "#14b8a6"];
+
+function couleurDe(nom: string): string {
+  let somme = 0;
+  for (const c of nom) somme += c.codePointAt(0) ?? 0;
+  return PALETTE[somme % PALETTE.length];
+}
+
+function initiale(nom: string): string {
+  return (nom.trim()[0] ?? "?").toUpperCase();
+}
+
+/// Les surfaces publiques ne publient pas les identifiants Discord — c'est
+/// délibéré, ils permettraient de retrouver quelqu'un hors du serveur. Or une
+/// URL d'avatar Discord se construit à partir de cet identifiant. On affiche
+/// donc toujours la pastille à initiale, sauf si l'API a fourni une URL
+/// complète (cas d'un avatar hébergé ailleurs).
+function avatarUrlDe(hash: string | null): string | null {
+  return hash?.startsWith("http") ? hash : null;
+}
+
+const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 </script>
 
 <template>
   <div class="mb">
-
-    <header class="mb-header">
-      <RouterLink to="/" class="mb-brand">
-        <img :src="COMMUNITY.mark" :alt="COMMUNITY.name" @error="onLogoError" />
-      </RouterLink>
-
+    <header class="mb-bar">
       <div v-if="user" class="mb-user">
         <img v-if="avatarUrl" :src="avatarUrl" alt="" class="mb-avatar" />
         <span>{{ user.username }}</span>
@@ -131,14 +318,32 @@ const RUBRIQUES = [
       <RouterLink v-else to="/login?espace=membre" class="mb-ghost">Se connecter</RouterLink>
     </header>
 
+    <!-- ── Accueil ──
+         Le wordmark est une illustration complète, avec son propre décor : il
+         occupe seul le héros. Le poser sur une photo ferait deux images qui
+         se coupent. -->
     <section class="mb-hero">
-      <h1 v-if="user">Salut {{ user.username }}&nbsp;!</h1>
-      <h1 v-else>La vie du serveur</h1>
-      <p v-if="user">Voici ce qui se passe chez {{ COMMUNITY.name }}.</p>
-      <p v-else>
-        Ce qui se passe en ce moment chez {{ COMMUNITY.name }}. Connecte-toi pour
-        t'inscrire aux événements.
-      </p>
+      <img
+        class="mb-hero-logo"
+        :src="wordmarkOf(COMMUNITY)"
+        :alt="COMMUNITY.name"
+        @error="onWordmarkError($event, COMMUNITY)"
+      />
+      <p v-if="user">Content de te revoir, {{ user.username }}. Voici ce qui se passe.</p>
+      <p v-else>Ce qui se passe en ce moment. Connecte-toi pour participer.</p>
+
+      <div class="mb-chips">
+        <span v-if="serversOnline" class="mb-chip">
+          <span class="mb-pip on"></span><b>{{ serversOnline }}</b> serveur(s) en ligne
+        </span>
+        <span v-if="playersOnline" class="mb-chip"><b>{{ playersOnline }}</b> joueur(s) en jeu</span>
+        <span v-if="lfg.length" class="mb-chip">
+          <b>{{ lfg.length }}</b> recherche(s) de joueurs
+        </span>
+        <a v-if="DISCORD_INVITE" class="mb-chip link" :href="DISCORD_INVITE" target="_blank" rel="noopener">
+          Rejoindre le Discord
+        </a>
+      </div>
     </section>
 
     <!-- ── En cours ── -->
@@ -156,68 +361,183 @@ const RUBRIQUES = [
             <span v-if="e.game" class="mb-tag">{{ e.game }}</span>
           </div>
           <p v-if="e.description" class="mb-event-desc">{{ e.description }}</p>
-          <span class="mb-event-when">Jusqu'au {{ fmtRange(e).split("→").pop()?.trim() }}</span>
+          <span class="mb-event-when">Jusqu'au {{ fmtJour(e.ends_at) }}</span>
         </li>
       </ul>
     </section>
 
     <!-- ── Serveurs de jeu ── -->
-    <section class="mb-block">
+    <section v-if="loadingServers || servers.length" class="mb-block">
       <h2>
         Nos serveurs de jeu
-        <span v-if="playersOnline" class="mb-count">
-          {{ playersOnline }} joueur(s) en ligne
-        </span>
+        <span v-if="playersOnline" class="mb-count">{{ playersOnline }} joueur(s) en ligne</span>
       </h2>
 
       <p v-if="loadingServers" class="mb-hint">Chargement des serveurs…</p>
 
-      <p v-else-if="!servers.length" class="mb-hint">
-        Aucun serveur de jeu pour le moment.
-      </p>
-
-      <ul v-else class="mb-servers">
+      <ul v-else class="mb-games">
         <li
           v-for="sv in sortedServers"
           :key="sv.id"
-          class="mb-server"
-          :class="{ offline: !sv.online }"
+          class="mb-game"
+          :class="{ off: !sv.online }"
         >
-          <span class="mb-server-icon" aria-hidden="true">{{ sv.icon || "🎮" }}</span>
+          <span v-if="sv.online && sv.player_count" class="mb-badge">
+            {{ sv.player_count }} EN JEU
+          </span>
 
-          <div class="mb-server-main">
+          <img v-if="sv.cover_image_url" :src="sv.cover_image_url" :alt="sv.game" />
+          <!-- Sans jaquette, l'emoji du template tient lieu de visuel plutôt
+               qu'une carte vide. -->
+          <div v-else class="mb-game-fallback" aria-hidden="true">{{ sv.icon || "🎮" }}</div>
+
+          <div class="mb-game-in">
             <strong>{{ sv.name }}</strong>
-            <span class="mb-tag">{{ sv.game }}</span>
-          </div>
-
-          <div class="mb-server-state">
-            <span class="mb-dot" :class="sv.online ? 'on' : 'off'" aria-hidden="true"></span>
-            <span>{{ sv.online ? "En ligne" : "Hors ligne" }}</span>
-            <span v-if="sv.online" class="mb-players">
-              · {{ sv.player_count }} joueur(s)
+            <span class="mb-game-state">
+              <span class="mb-pip" :class="sv.online ? 'on' : 'off'"></span>
+              {{ sv.online ? sv.game : "Hors ligne" }}
             </span>
+            <span v-if="sv.online && sv.port" class="mb-game-addr">Port {{ sv.port }}</span>
+            <span v-else-if="sv.online" class="mb-game-addr muted">Adresse bientôt révélée</span>
           </div>
-
-          <!-- L'adresse suit le mecanisme de revelation differee du
-               game-portal : tant qu'elle est masquee, on annonce que le
-               serveur existe, pas comment s'y connecter. -->
-          <span v-if="sv.online && sv.port" class="mb-port">Port {{ sv.port }}</span>
-          <span v-else-if="sv.online" class="mb-port muted">Adresse bientôt révélée</span>
         </li>
       </ul>
     </section>
 
-    <!-- ── À venir ── -->
-    <section class="mb-block">
-      <h2>Prochainement</h2>
+    <!-- ── Cherche des joueurs ──
+         Placée haut : c'est la section qui fait revenir les gens chaque jour. -->
+    <section v-if="loadingLfg || lfg.length || user" class="mb-block">
+      <h2>
+        Cherche des joueurs
+        <span v-if="lfg.length" class="mb-count">{{ lfg.length }} annonce(s) ouverte(s)</span>
+      </h2>
 
-      <p v-if="loadingEvents" class="mb-hint">Chargement du planning…</p>
-      <p v-else-if="!upcoming.length" class="mb-hint">
-        Rien de prévu pour l'instant. Ça ne veut pas dire qu'il ne se passe rien
-        sur le vocal&nbsp;!
+      <p v-if="loadingLfg" class="mb-hint">Chargement des annonces…</p>
+
+      <p v-else-if="!lfg.length" class="mb-hint">
+        Personne ne cherche de monde pour l'instant. Lance la première annonce&nbsp;!
       </p>
 
-      <ul v-else class="mb-events">
+      <div v-else class="mb-lfgs">
+        <article v-for="a in lfg" :key="a.id" class="mb-lfg">
+          <div class="mb-lfg-top">
+            <span class="mb-av" :style="{ '--c': couleurDe(a.author_name) }">
+              {{ initiale(a.author_name || "?") }}
+            </span>
+            <span class="mb-lfg-auteur">{{ a.author_name || "Un membre" }}</span>
+            <span class="mb-tag">{{ a.game }}</span>
+            <span class="mb-lfg-quand">{{ depuis(a.created_at) }}</span>
+          </div>
+
+          <p v-if="a.description" class="mb-lfg-texte">{{ a.description }}</p>
+
+          <div class="mb-lfg-foot">
+            <span class="mb-lfg-besoin">
+              Cherche <b>{{ a.slots }}</b> joueur(s) · {{ a.when_text }}
+            </span>
+
+            <span class="mb-lfg-avs">
+              <span
+                v-for="(nom, i) in a.interested_names.slice(0, 5)"
+                :key="i"
+                class="mb-av sm"
+                :style="{ '--c': couleurDe(nom) }"
+                :title="nom"
+              >{{ initiale(nom) }}</span>
+              <span v-if="a.interested_names.length" class="mb-lfg-n">
+                {{ a.interested_names.length }} intéressé(s)
+              </span>
+              <span v-else class="mb-lfg-n muted">personne encore</span>
+            </span>
+
+            <button
+              v-if="user"
+              type="button"
+              class="mb-lfg-btn"
+              :disabled="busyLfg === a.id"
+              @click="joinLfg(a.id)"
+            >
+              {{ busyLfg === a.id ? "…" : "Je viens" }}
+            </button>
+            <RouterLink v-else to="/login?espace=membre" class="mb-lfg-btn">
+              Se connecter pour répondre
+            </RouterLink>
+          </div>
+        </article>
+      </div>
+
+      <p v-if="lfgError" class="mb-erreur">{{ lfgError }}</p>
+    </section>
+
+    <!-- ── Le planning ── -->
+    <section v-if="loadingEvents || events.length" class="mb-block">
+      <h2>
+        Le planning
+        <span class="mb-count">semaine du {{ label }}</span>
+        <span class="mb-nav">
+          <button type="button" @click="weekStart = addWeeks(weekStart, -1)" aria-label="Semaine précédente">‹</button>
+          <button type="button" @click="weekStart = semaineCourante()">Aujourd'hui</button>
+          <button type="button" @click="weekStart = addWeeks(weekStart, 1)" aria-label="Semaine suivante">›</button>
+        </span>
+      </h2>
+
+      <p v-if="loadingEvents" class="mb-hint">Chargement du planning…</p>
+
+      <div v-else class="mb-cal">
+        <div class="mb-cal-head">
+          <div v-for="d in days" :key="d.toISOString()" :class="{ today: isToday(d) }">
+            {{ d.toLocaleDateString("fr-FR", { weekday: "short" }) }}
+            <b>{{ d.getDate() }}</b>
+          </div>
+        </div>
+
+        <div class="mb-cal-body" :style="{ '--rows': weekRows }">
+          <div
+            v-for="b in weekBars"
+            :key="b.event.id"
+            class="mb-bar"
+            :class="{ clipped: b.clippedStart || b.clippedEnd }"
+            :style="{
+              '--row': b.row,
+              '--from': b.from,
+              '--span': b.span,
+              '--ev': accent(b.event) || '#a855f7',
+            }"
+            :title="b.event.title"
+          >
+            <strong>{{ b.event.title }}</strong>
+            <span v-if="b.event.span_days > 1">
+              {{ b.event.game || "campagne" }}
+            </span>
+            <span v-else>{{ fmtHeure(b.event.starts_at) }}</span>
+          </div>
+
+          <p v-if="!weekBars.length" class="mb-cal-vide">Rien de prévu cette semaine.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Le prochain rendez-vous ── -->
+    <section v-if="nextEvent" class="mb-block">
+      <h2><span class="mb-live" aria-hidden="true"></span> Le prochain rendez-vous</h2>
+
+      <div class="mb-feature" :style="{ '--accent-event': accent(nextEvent) }">
+        <div class="mb-feature-body">
+          <div class="mb-tags">
+            <span v-if="nextEvent.game" class="mb-tag">{{ nextEvent.game }}</span>
+            <span class="mb-tag neutral">{{ fmtRange(nextEvent) }}</span>
+          </div>
+          <h3>{{ nextEvent.title }}</h3>
+          <p v-if="nextEvent.description">{{ nextEvent.description }}</p>
+
+          <RouterLink v-if="!user" to="/login?espace=membre" class="mb-cta">
+            Se connecter pour s'inscrire
+          </RouterLink>
+          <span v-else class="mb-soon">Inscription bientôt</span>
+        </div>
+      </div>
+
+      <ul v-if="upcoming.length" class="mb-events secondaires">
         <li
           v-for="e in upcoming"
           :key="e.id"
@@ -227,30 +547,114 @@ const RUBRIQUES = [
           <div class="mb-event-main">
             <strong>{{ e.title }}</strong>
             <span v-if="e.game" class="mb-tag">{{ e.game }}</span>
-            <span v-if="e.span_days > 1" class="mb-tag long">{{ e.span_days }} jours</span>
+            <span v-if="e.span_days > 1" class="mb-tag neutral">{{ e.span_days }} jours</span>
           </div>
-          <p v-if="e.description" class="mb-event-desc">{{ e.description }}</p>
-          <div class="mb-event-foot">
-            <span class="mb-event-when">{{ fmtRange(e) }}</span>
-            <!-- L'inscription arrive : le bouton explique déjà à quoi sert le
-                 compte, plutôt que de cacher la fonctionnalité. -->
-            <RouterLink v-if="!user" to="/login?espace=membre" class="mb-join">
-              Se connecter pour s'inscrire
-            </RouterLink>
-            <span v-else class="mb-soon">Inscription bientôt</span>
-          </div>
+          <span class="mb-event-when">{{ fmtRange(e) }}</span>
         </li>
       </ul>
     </section>
 
-    <!-- ── Rubriques à venir ── -->
-    <section class="mb-block">
-      <h2>Bientôt sur le site</h2>
-      <div class="mb-grid">
-        <article v-for="r in RUBRIQUES" :key="r.titre" class="mb-card">
-          <span class="mb-card-emoji" aria-hidden="true">{{ r.emoji }}</span>
-          <h3>{{ r.titre }}</h3>
-          <p>{{ r.texte }}</p>
+    <!-- ── On vote ── -->
+    <section v-if="polls.length" class="mb-block">
+      <h2>On vote</h2>
+
+      <article v-for="p in polls" :key="p.id" class="mb-poll">
+        <h3>{{ p.question }}</h3>
+        <p v-if="p.description" class="mb-poll-desc">{{ p.description }}</p>
+
+        <ul class="mb-poll-list">
+          <li v-for="o in p.options" :key="o.id" class="mb-poll-opt">
+            <button
+              type="button"
+              class="mb-poll-line"
+              :class="{ mine: p.my_vote === o.id, votable: !!user }"
+              :disabled="!user || busyVote === p.id"
+              @click="vote(p.id, o.id)"
+            >
+              <span>{{ o.label }}</span>
+              <span class="mb-poll-pct">{{ o.share }} %</span>
+            </button>
+            <div class="mb-poll-bar">
+              <i :style="{ width: `${o.share}%`, background: `#${o.color}` }"></i>
+            </div>
+            <span class="mb-poll-n">{{ o.votes }} voix</span>
+          </li>
+        </ul>
+
+        <p class="mb-poll-foot">
+          {{ p.total_votes }} vote(s) · se termine le {{ fmtJour(p.closes_at) }}
+        </p>
+        <RouterLink v-if="!user" to="/login?espace=membre" class="mb-cta">
+          Se connecter pour voter
+        </RouterLink>
+      </article>
+    </section>
+
+    <!-- ── Membre du mois et anniversaires ── -->
+    <section v-if="spotlight || anniversaries.length" class="mb-block mb-duo">
+      <article v-if="spotlight" class="mb-panel">
+        <h3>Membre du mois</h3>
+        <div class="mb-mom">
+          <img
+            v-if="avatarUrlDe(spotlight.avatar)"
+            :src="avatarUrlDe(spotlight.avatar)!"
+            alt=""
+            class="mb-mom-av"
+          />
+          <span v-else class="mb-av lg" :style="{ '--c': couleurDe(spotlight.username) }">
+            {{ initiale(spotlight.username) }}
+          </span>
+          <div>
+            <div class="mb-mom-nom">{{ spotlight.username }}</div>
+            <!-- La raison est ce qui donne son sens à la distinction : sans
+                 elle, la section n'afficherait qu'un nom. -->
+            <div class="mb-mom-quoi">{{ spotlight.reason }}</div>
+          </div>
+        </div>
+      </article>
+
+      <article v-if="anniversaries.length" class="mb-panel">
+        <h3>Anniversaires à venir</h3>
+        <ul class="mb-annivs">
+          <li v-for="a in anniversaries" :key="a.username + a.joined_at" class="mb-anniv">
+            <span class="mb-av" :style="{ '--c': couleurDe(a.username) }">
+              {{ initiale(a.username) }}
+            </span>
+            <span class="mb-anniv-nom">{{ a.username }}</span>
+            <span class="mb-anniv-age">{{ anneesLabel(a.years) }}</span>
+            <span class="mb-anniv-date">le {{ fmtJour(a.joined_at) }}</span>
+          </li>
+        </ul>
+      </article>
+    </section>
+
+    <!-- ── Nouveaux venus ── -->
+    <section v-if="newcomers.length" class="mb-block">
+      <h2>
+        Ils nous ont rejoints cette semaine
+        <span class="mb-count">{{ newcomers.length }} nouveau(x)</span>
+      </h2>
+      <div class="mb-nouveaux">
+        <span v-for="n in newcomers" :key="n.username" class="mb-nv">
+          <span class="mb-av" :style="{ '--c': couleurDe(n.username) }">
+            {{ initiale(n.username) }}
+          </span>
+          <span>{{ n.username }}</span>
+        </span>
+      </div>
+    </section>
+
+    <!-- ── Annonces ── -->
+    <section v-if="news.length" class="mb-block">
+      <h2>Les dernières annonces</h2>
+      <div class="mb-anns">
+        <article v-for="n in news" :key="n.id" class="mb-ann" :class="{ pinned: n.is_pinned }">
+          <img v-if="n.image_url" :src="n.image_url" alt="" class="mb-ann-img" />
+          <div>
+            <h3>{{ n.title }}</h3>
+            <p>{{ n.excerpt }}</p>
+            <span class="mb-ann-when">{{ depuis(n.published_at) }}</span>
+          </div>
         </article>
       </div>
     </section>
@@ -265,40 +669,43 @@ const RUBRIQUES = [
 
 <style scoped>
 .mb {
+  --surface: rgba(255, 255, 255, 0.045);
+  --line: rgba(168, 85, 247, 0.22);
+  --line-strong: rgba(168, 85, 247, 0.5);
+  --accent: #a855f7;
+  --ink: #f3eaff;
+  --ink-2: #d8c7f5;
+  --ink-3: #c3aee6;
+  --ink-4: #b49ad8;
+  --live: #22c55e;
+  --off: #6b7280;
+
   flex: 1;
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
   padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 4vw, 3rem) 3rem;
   background: linear-gradient(180deg, #150a28 0%, #0d0619 55%, #08040f 100%);
-  color: #f3eaff;
+  color: var(--ink);
   display: flex;
   flex-direction: column;
-  gap: clamp(1.5rem, 4vh, 2.5rem);
+  gap: clamp(1.75rem, 4vh, 2.75rem);
 }
 
-.mb-header,
+.mb-bar,
 .mb-hero,
 .mb-block,
 .mb-footer {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 60rem;
+  max-width: 68rem;
   margin: 0 auto;
 }
 
-.mb-header {
+.mb-bar {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
-.mb-brand img {
-  width: 46px;
-  height: 46px;
-  display: block;
+  justify-content: flex-end;
 }
 
 .mb-user {
@@ -306,7 +713,7 @@ const RUBRIQUES = [
   align-items: center;
   gap: 0.6rem;
   font-size: 0.92rem;
-  color: #d8c7f5;
+  color: var(--ink-2);
 }
 
 .mb-avatar {
@@ -317,50 +724,113 @@ const RUBRIQUES = [
 
 .mb-ghost {
   background: none;
-  border: 1px solid rgba(168, 85, 247, 0.35);
-  color: #cbb8ec;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
   border-radius: 999px;
   padding: 0.3rem 0.95rem;
+  font: inherit;
   font-size: 0.88rem;
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
 
 .mb-ghost:hover {
-  border-color: rgba(168, 85, 247, 0.85);
+  border-color: var(--accent);
   color: #fff;
 }
 
+/* ── Accueil ── */
 .mb-hero {
   text-align: center;
-  margin-top: clamp(0.5rem, 2vh, 1.5rem);
 }
 
-.mb-hero h1 {
-  margin: 0 0 0.4rem;
-  font-size: clamp(1.5rem, 4vh, 2.2rem);
+.mb-hero-logo {
+  display: block;
+  margin: 0 auto 1rem;
+  width: min(340px, 62vw);
+  height: auto;
+  filter: drop-shadow(0 10px 40px rgba(168, 85, 247, 0.35));
 }
 
 .mb-hero p {
-  margin: 0;
-  color: #cbb8ec;
+  margin: 0 0 1.1rem;
+  color: var(--ink-2);
 }
 
+.mb-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.mb-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.mb-chip b {
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-chip.link:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Communs ── */
 .mb-block h2 {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0 0 0.9rem;
   font-size: 1.15rem;
 }
 
-/* Pastille « en direct » : discrète, elle pulse doucement. */
+.mb-count {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-nav {
+  margin-left: auto;
+  display: flex;
+  gap: 0.3rem;
+}
+
+.mb-nav button {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-3);
+  border-radius: 999px;
+  padding: 0.15rem 0.7rem;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.mb-nav button:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .mb-live {
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: #22c55e;
-  box-shadow: 0 0 10px #22c55e;
+  background: var(--live);
+  box-shadow: 0 0 10px var(--live);
   animation: pulse 2.2s ease-in-out infinite;
 }
 
@@ -370,11 +840,416 @@ const RUBRIQUES = [
   }
 }
 
+.mb-pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  display: inline-block;
+}
+
+.mb-pip.on {
+  background: var(--live);
+  box-shadow: 0 0 8px var(--live);
+}
+
+.mb-pip.off {
+  background: var(--off);
+}
+
 .mb-hint {
-  color: #b49ad8;
+  color: var(--ink-4);
   margin: 0;
 }
 
+.mb-erreur {
+  margin: 0.6rem 0 0;
+  color: #fca5a5;
+  font-size: 0.86rem;
+}
+
+.mb-tag {
+  font-size: 0.74rem;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.16);
+  color: var(--ink-2);
+}
+
+.mb-tag.neutral {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mb-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.mb-av {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  flex: none;
+  display: grid;
+  place-items: center;
+  background: var(--c);
+  color: #0d0619;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.mb-av.sm {
+  width: 20px;
+  height: 20px;
+  font-size: 0.66rem;
+}
+
+.mb-av.lg {
+  width: 46px;
+  height: 46px;
+  font-size: 1.1rem;
+}
+
+.mb-cta {
+  align-self: flex-start;
+  display: inline-block;
+  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.86rem;
+  border-radius: 999px;
+  padding: 0.45rem 1.2rem;
+  text-decoration: none;
+}
+
+.mb-soon {
+  align-self: flex-start;
+  font-size: 0.74rem;
+  color: var(--ink-4);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+
+/* ── Serveurs de jeu ── */
+.mb-games {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16.5rem, 1fr));
+  gap: 1.1rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mb-game {
+  position: relative;
+  border-radius: 1.1rem;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.mb-game img,
+.mb-game-fallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.mb-game-fallback {
+  display: grid;
+  place-items: center;
+  font-size: 4rem;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.mb-game::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 42%, rgba(10, 4, 20, 0.94) 92%);
+}
+
+.mb-game-in {
+  position: absolute;
+  inset: auto 0 0 0;
+  z-index: 1;
+  padding: 0.9rem 1rem;
+}
+
+.mb-game-in strong {
+  display: block;
+  font-size: 1.08rem;
+}
+
+.mb-game-state {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--ink-3);
+}
+
+/* Un serveur éteint reste visible mais s'efface : il informe sans attirer. */
+.mb-game.off img,
+.mb-game.off .mb-game-fallback {
+  filter: grayscale(0.85) brightness(0.55);
+}
+
+.mb-game-addr {
+  display: block;
+  margin-top: 0.2rem;
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mb-game-addr.muted {
+  color: #8f77b8;
+  font-style: italic;
+}
+
+.mb-badge {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  z-index: 1;
+  background: rgba(34, 197, 94, 0.92);
+  color: #04220f;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* ── Cherche des joueurs ── */
+.mb-lfgs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.mb-lfg {
+  padding: 0.85rem 1.05rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.mb-lfg-top {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.mb-lfg-auteur {
+  font-weight: 600;
+}
+
+.mb-lfg-quand {
+  margin-left: auto;
+  font-size: 0.76rem;
+  color: var(--ink-4);
+}
+
+.mb-lfg-texte {
+  margin: 0;
+  font-size: 0.89rem;
+  color: var(--ink-3);
+}
+
+.mb-lfg-foot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.mb-lfg-besoin {
+  font-size: 0.83rem;
+  color: var(--ink-2);
+}
+
+.mb-lfg-besoin b {
+  color: var(--accent);
+}
+
+.mb-lfg-avs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: auto;
+}
+
+.mb-lfg-avs .mb-av {
+  margin-left: -6px;
+  border: 2px solid #0d0619;
+}
+
+.mb-lfg-n {
+  font-size: 0.78rem;
+  color: var(--ink-3);
+}
+
+.mb-lfg-n.muted {
+  color: var(--ink-4);
+  font-style: italic;
+}
+
+.mb-lfg-btn {
+  background: rgba(168, 85, 247, 0.18);
+  border: 1px solid var(--line-strong);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.28rem 0.95rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.mb-lfg-btn:hover:not(:disabled) {
+  background: rgba(168, 85, 247, 0.3);
+}
+
+.mb-lfg-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ── Calendrier ── */
+.mb-cal {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.mb-cal-head {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--line);
+}
+
+.mb-cal-head div {
+  padding: 0.6rem 0.4rem;
+  text-align: center;
+  font-size: 0.78rem;
+  color: var(--ink-4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.mb-cal-head div.today {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.mb-cal-head b {
+  display: block;
+  font-size: 1.05rem;
+  color: var(--ink);
+  letter-spacing: 0;
+}
+
+.mb-cal-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-template-rows: repeat(var(--rows, 2), minmax(2.6rem, auto));
+  gap: 0.3rem;
+  padding: 0.6rem;
+  /* Filets verticaux dessinés en dégradé plutôt qu'en éléments : sept bordures
+     de plus alourdiraient l'arbre sans rien apporter. */
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / 7 - 1px),
+    rgba(168, 85, 247, 0.08) calc(100% / 7 - 1px),
+    rgba(168, 85, 247, 0.08) calc(100% / 7)
+  );
+}
+
+.mb-bar {
+  grid-row: var(--row);
+  grid-column: var(--from) / span var(--span);
+  border-radius: 0.55rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.8rem;
+  background: color-mix(in srgb, var(--ev) 26%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ev) 55%, transparent);
+  border-left: 3px solid var(--ev);
+  overflow: hidden;
+}
+
+/* Un événement qui déborde de la semaine perd son arrondi côté tronqué :
+   le lecteur voit qu'il continue au-delà. */
+.mb-bar.clipped {
+  border-radius: 0.55rem 0.15rem 0.15rem 0.55rem;
+}
+
+.mb-bar strong {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mb-bar span {
+  color: var(--ink-3);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mb-cal-vide {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  margin: 0;
+  align-self: center;
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 0.88rem;
+}
+
+/* ── Prochain rendez-vous ── */
+.mb-feature {
+  --accent-event: var(--accent);
+  padding: 1.2rem 1.3rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent-event);
+}
+
+.mb-feature-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.mb-feature-body h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.mb-feature-body p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-3);
+}
+
+/* ── Événements en liste ── */
 .mb-events {
   list-style: none;
   margin: 0;
@@ -384,12 +1259,16 @@ const RUBRIQUES = [
   gap: 0.7rem;
 }
 
+.mb-events.secondaires {
+  margin-top: 0.8rem;
+}
+
 .mb-event {
-  --accent-event: #a855f7;
+  --accent-event: var(--accent);
   padding: 0.9rem 1.1rem;
   border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-left: 3px solid var(--accent-event);
 }
 
@@ -405,176 +1284,254 @@ const RUBRIQUES = [
   gap: 0.5rem;
 }
 
-.mb-tag {
-  font-size: 0.74rem;
-  padding: 1px 9px;
-  border-radius: 999px;
-  background: rgba(168, 85, 247, 0.16);
-  color: #d8c7f5;
-}
-
-.mb-tag.long {
-  background: rgba(255, 255, 255, 0.08);
-}
-
 .mb-event-desc {
   margin: 0.35rem 0 0;
   font-size: 0.88rem;
-  line-height: 1.5;
-  color: #c3aee6;
-}
-
-.mb-event-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.5rem;
-  margin-top: 0.55rem;
+  color: var(--ink-3);
 }
 
 .mb-event-when {
   display: inline-block;
+  margin-top: 0.35rem;
   font-size: 0.82rem;
-  color: #b49ad8;
+  color: var(--ink-4);
 }
 
-.mb-join {
-  font-size: 0.82rem;
-  color: #d8c7f5;
-  border-bottom: 1px dotted rgba(216, 199, 245, 0.5);
+/* ── Sondages ── */
+.mb-poll {
+  padding: 1.1rem 1.2rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.mb-join:hover {
-  color: #fff;
+.mb-poll + .mb-poll {
+  margin-top: 0.8rem;
 }
 
-.mb-soon {
-  font-size: 0.74rem;
-  color: #b49ad8;
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  border-radius: 999px;
-  padding: 2px 10px;
+.mb-poll h3 {
+  margin: 0;
+  font-size: 1.02rem;
 }
 
-.mb-count {
-  font-size: 0.8rem;
-  font-weight: 400;
-  color: #b49ad8;
+.mb-poll-desc {
+  margin: 0;
+  font-size: 0.87rem;
+  color: var(--ink-3);
 }
 
-.mb-servers {
+.mb-poll-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
-  gap: 0.7rem;
-}
-
-.mb-server {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-areas:
-    "icon main"
-    "icon state"
-    "icon port";
-  align-items: center;
-  column-gap: 0.75rem;
-  row-gap: 0.15rem;
-  padding: 0.85rem 1rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(168, 85, 247, 0.2);
-}
-
-/* Un serveur eteint reste visible mais s'efface : il informe sans attirer. */
-.mb-server.offline {
-  opacity: 0.55;
-}
-
-.mb-server-icon {
-  grid-area: icon;
-  font-size: 1.6rem;
-}
-
-.mb-server-main {
-  grid-area: main;
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem;
+  flex-direction: column;
+  gap: 0.6rem;
 }
 
-.mb-server-state {
-  grid-area: state;
+.mb-poll-line {
+  width: 100%;
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
-  color: #b49ad8;
+  justify-content: space-between;
+  gap: 0.6rem;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.88rem;
+  color: var(--ink);
+  text-align: left;
+  cursor: default;
 }
 
-.mb-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.mb-poll-line.votable {
+  cursor: pointer;
 }
 
-.mb-dot.on {
-  background: #22c55e;
-  box-shadow: 0 0 8px #22c55e;
+.mb-poll-line.votable:hover {
+  color: #fff;
 }
 
-.mb-dot.off {
-  background: #6b7280;
+/* Le choix du lecteur se distingue par la graisse, pas par une couleur : la
+   couleur est déjà porteuse de sens sur les barres. */
+.mb-poll-line.mine {
+  font-weight: 700;
 }
 
-.mb-players {
-  color: #d8c7f5;
-}
-
-.mb-port {
-  grid-area: port;
-  font-size: 0.78rem;
-  color: #d8c7f5;
+.mb-poll-pct {
+  color: var(--ink-2);
   font-variant-numeric: tabular-nums;
 }
 
-.mb-port.muted {
-  color: #8f77b8;
-  font-style: italic;
+.mb-poll-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 0.2rem 0 0.1rem;
+  overflow: hidden;
 }
 
-.mb-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
-  gap: 0.9rem;
+.mb-poll-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.35s ease;
 }
 
-.mb-card {
-  padding: 1.1rem;
-  border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(168, 85, 247, 0.2);
+.mb-poll-n {
+  font-size: 0.75rem;
+  color: var(--ink-4);
+  font-variant-numeric: tabular-nums;
 }
 
-.mb-card-emoji {
-  font-size: 1.5rem;
-}
-
-.mb-card h3 {
-  margin: 0.4rem 0 0.3rem;
-  font-size: 1rem;
-}
-
-.mb-card p {
+.mb-poll-foot {
   margin: 0;
-  font-size: 0.87rem;
-  line-height: 1.5;
-  color: #c3aee6;
+  font-size: 0.8rem;
+  color: var(--ink-4);
 }
 
+/* ── Deux colonnes ── */
+.mb-duo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: 1.1rem;
+}
+
+.mb-panel {
+  padding: 1.1rem 1.2rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.mb-panel h3 {
+  margin: 0 0 0.7rem;
+  font-size: 1.02rem;
+}
+
+.mb-mom {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.mb-mom-av {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+}
+
+.mb-mom-nom {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.mb-mom-quoi {
+  font-size: 0.86rem;
+  color: var(--ink-3);
+}
+
+.mb-annivs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.mb-anniv {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+}
+
+.mb-anniv-nom {
+  font-weight: 600;
+}
+
+.mb-anniv-age {
+  font-size: 0.76rem;
+  padding: 1px 9px;
+  border-radius: 999px;
+  background: rgba(168, 85, 247, 0.18);
+  color: var(--ink-2);
+}
+
+.mb-anniv-date {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: var(--ink-4);
+}
+
+/* ── Nouveaux venus ── */
+.mb-nouveaux {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.mb-nv {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.7rem 0.25rem 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+/* ── Annonces ── */
+.mb-anns {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.mb-ann {
+  display: grid;
+  grid-template-columns: 8rem 1fr;
+  gap: 0.9rem;
+  padding: 0.75rem;
+  border-radius: 0.9rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.mb-ann.pinned {
+  border-color: var(--line-strong);
+}
+
+.mb-ann-img {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 0.6rem;
+}
+
+.mb-ann h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.98rem;
+}
+
+.mb-ann p {
+  margin: 0 0 0.3rem;
+  font-size: 0.86rem;
+  color: var(--ink-3);
+}
+
+.mb-ann-when {
+  font-size: 0.76rem;
+  color: var(--ink-4);
+}
+
+/* ── Pied ── */
 .mb-footer {
   margin-top: auto;
   padding-top: 1rem;
@@ -587,12 +1544,27 @@ const RUBRIQUES = [
 }
 
 .mb-admin-link:hover {
-  color: #d8c7f5;
+  color: var(--ink-2);
+}
+
+@media (max-width: 760px) {
+  .mb-ann {
+    grid-template-columns: 1fr;
+  }
+
+  .mb-nav {
+    margin-left: 0;
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .mb-live {
     animation: none;
+  }
+
+  .mb-poll-bar i {
+    transition: none;
   }
 }
 </style>

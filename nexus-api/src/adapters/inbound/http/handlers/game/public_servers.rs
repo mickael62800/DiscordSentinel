@@ -31,6 +31,13 @@ pub struct PublicGameServerDto {
     /// Nom lisible du jeu (resolu depuis le template), pas son slug technique.
     pub game: String,
     pub icon: Option<String>,
+    /// Jaquette du jeu, chemin RELATIF (`/imgs/...`) resolu depuis le
+    /// template. C'est ce que la page membre affiche en grille ; l'emoji
+    /// `icon` ne sert plus que de repli.
+    ///
+    /// Relatif et non absolu : le site le sert tel quel, et une URL absolue
+    /// figerait le domaine en base.
+    pub cover_image_url: Option<String>,
     /// `running` | `stopped` — les etats transitoires sont ramenes a l'un des
     /// deux : un visiteur n'a que faire de « stopping ».
     pub online: bool,
@@ -71,6 +78,7 @@ pub async fn public_servers(
                 name: s.name,
                 game: tpl.map(|t| t.name.clone()).unwrap_or_else(|| "Jeu".into()),
                 icon: tpl.and_then(|t| t.icon.clone()),
+                cover_image_url: tpl.and_then(|t| t.cover_image_url.clone()),
                 online: matches!(s.status, GameServerStatus::Running),
                 player_count: s.last_player_count,
                 port: if s.ip_revealed { s.host_port } else { None },

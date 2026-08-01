@@ -17,14 +17,7 @@ export interface PublicEvent {
   span_days: number;
 }
 
-async function publicGet<T>(path: string): Promise<T> {
-  const res = await fetch(`/api/public${path}`, {
-    credentials: "omit",
-    headers: { Accept: "application/json" },
-  });
-  if (!res.ok) throw new Error(`Erreur ${res.status}`);
-  return (await res.json()) as T;
-}
+import { publicGet } from "./publicHttp";
 
 export const publicEventsService = {
   /**

@@ -71,6 +71,8 @@ async fn audit_log_save_and_find_all() {
                 target_id: None,
                 limit: 50,
                 offset: 0,
+
+                ..Default::default()
             },
         )
         .await
@@ -94,6 +96,8 @@ async fn audit_log_filter_by_event_type() {
                 target_id: None,
                 limit: 50,
                 offset: 0,
+
+                ..Default::default()
             },
         )
         .await
@@ -123,6 +127,8 @@ async fn audit_log_filter_combinations() {
                 target_id: Some("victim1".into()),
                 limit: 50,
                 offset: 0,
+
+                ..Default::default()
             },
         )
         .await
@@ -161,6 +167,8 @@ async fn audit_log_delete_older_than_days() {
                 target_id: None,
                 limit: 50,
                 offset: 0,
+
+                ..Default::default()
             },
         )
         .await

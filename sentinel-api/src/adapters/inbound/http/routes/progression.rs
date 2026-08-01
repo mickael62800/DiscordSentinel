@@ -4,6 +4,7 @@ use axum::routing::delete;
 use axum::routing::get;
 use axum::routing::patch;
 use axum::routing::post;
+use axum::routing::put;
 use axum::Router;
 
 use super::super::handlers;
@@ -91,6 +92,67 @@ fn announcement_inner() -> Router<AppState> {
             "/api/events/detail/{id}/join",
             post(handlers::community::events::join_event)
                 .delete(handlers::community::events::leave_event),
+        )
+        // ── Vie de la communaute ──
+        // Meme convention que le planning : `{guild_id}` pour la collection,
+        // `detail/{id}` pour l'element, un segment fixe evitant l'ambiguite
+        // entre un snowflake et un uuid.
+        .route(
+            "/api/lfg/{guild_id}",
+            get(handlers::community::lfg::list_lfg)
+                .post(handlers::community::lfg::create_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}",
+            delete(handlers::community::lfg::delete_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}/close",
+            post(handlers::community::lfg::close_lfg),
+        )
+        .route(
+            "/api/lfg/detail/{id}/join",
+            post(handlers::community::lfg::join_lfg)
+                .delete(handlers::community::lfg::leave_lfg),
+        )
+        .route(
+            "/api/polls/{guild_id}",
+            get(handlers::community::polls::list_polls)
+                .post(handlers::community::polls::create_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}",
+            delete(handlers::community::polls::delete_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}/close",
+            post(handlers::community::polls::close_poll),
+        )
+        .route(
+            "/api/polls/detail/{id}/vote",
+            post(handlers::community::polls::vote_poll),
+        )
+        // La suppression d'une designation porte le guild_id dans l'URL : le
+        // controle RBAC est par guilde, il lui faut cette information avant
+        // d'aller chercher la ligne.
+        .route(
+            "/api/spotlight/{guild_id}",
+            get(handlers::community::spotlight::list_spotlight)
+                .post(handlers::community::spotlight::designate_spotlight),
+        )
+        .route(
+            "/api/spotlight/{guild_id}/detail/{id}",
+            delete(handlers::community::spotlight::delete_spotlight),
+        )
+        .route(
+            "/api/news/{guild_id}",
+            get(handlers::community::news::list_news)
+                .post(handlers::community::news::create_news),
+        )
+        .route(
+            "/api/news/detail/{id}",
+            put(handlers::community::news::update_news)
+                .delete(handlers::community::news::delete_news),
         )
         .route(
             "/{guild_id}",

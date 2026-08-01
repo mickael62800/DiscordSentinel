@@ -11,3 +11,7 @@ pub mod manage_sponsorships;
 pub mod manage_voice_channels;
 pub mod manage_welcome_config;
 pub mod manage_events;
+pub mod manage_lfg;
+pub mod manage_polls;
+pub mod manage_spotlight;
+pub mod manage_news;

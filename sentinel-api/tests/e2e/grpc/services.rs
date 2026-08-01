@@ -475,6 +475,30 @@ impl ManageMembersUseCase for MockMembersUc {
     async fn rejoin_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
         unimplemented!()
     }
+
+    // Lectures servant la page membre : hors du perimetre de ces tests.
+    async fn upcoming_anniversaries(
+        &self,
+        _: &str,
+        _: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::milestone::JoinAnniversary>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+
+    async fn recent_joins(
+        &self,
+        _: &str,
+        _: i32,
+        _: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::guild_member::GuildMember>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
 }
 
 fn sample_member(guild_id: &str, user_id: &str) -> GuildMember {

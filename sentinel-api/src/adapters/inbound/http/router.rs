@@ -153,6 +153,29 @@ pub fn build_for_test(state: AppState) -> Router {
         .route(
             "/api/public/events/{guild_id}",
             get(handlers::community::events::public_events),
+        )
+        // Vie de la communaute, vue publique. Chaque endpoint force son
+        // filtre restrictif cote handler : les parametres du back-office
+        // (`?all=1`) ne peuvent pas exposer brouillons ou archives ici.
+        .route(
+            "/api/public/lfg/{guild_id}",
+            get(handlers::community::lfg::public_lfg),
+        )
+        .route(
+            "/api/public/polls/{guild_id}",
+            get(handlers::community::polls::public_polls),
+        )
+        .route(
+            "/api/public/spotlight/{guild_id}",
+            get(handlers::community::spotlight::public_spotlight),
+        )
+        .route(
+            "/api/public/news/{guild_id}",
+            get(handlers::community::news::public_news),
+        )
+        .route(
+            "/api/public/pulse/{guild_id}",
+            get(handlers::community::pulse::public_pulse),
         );
 
     Router::new()

@@ -50,6 +50,16 @@ pub struct AppState {
     /// Planning communautaire (evenements et campagnes de jeu).
     pub events_uc:
         Arc<dyn sentinel_core::ports::inbound::community::manage_events::ManageEventsUseCase>,
+    /// Vie de la communaute affichee dans l'espace membre.
+    pub lfg_uc:
+        Arc<dyn sentinel_core::ports::inbound::community::manage_lfg::ManageLfgUseCase>,
+    pub polls_uc:
+        Arc<dyn sentinel_core::ports::inbound::community::manage_polls::ManagePollsUseCase>,
+    pub spotlight_uc: Arc<
+        dyn sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlightUseCase,
+    >,
+    pub news_uc:
+        Arc<dyn sentinel_core::ports::inbound::community::manage_news::ManageNewsUseCase>,
     pub detect_anomaly_uc: Arc<dyn crate::ports::inbound::audit::detect_moderation_anomaly::DetectModerationAnomalyUseCase>,
     pub weekly_report_uc: Arc<dyn crate::ports::inbound::audit::get_weekly_report::GetWeeklyReportUseCase>,
     pub snapshots_uc: Arc<dyn crate::ports::inbound::audit::manage_snapshots::ManageSnapshotsUseCase>,

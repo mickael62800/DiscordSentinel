@@ -226,6 +226,7 @@ async fn audit_find_all_delegates_with_filters() {
         target_id: None,
         limit: 100,
         offset: 0,
+        ..Default::default()
     };
     let logs = repo.find_all(Some(&guild_id), &filters).await.unwrap();
     assert_eq!(logs.len(), 3);

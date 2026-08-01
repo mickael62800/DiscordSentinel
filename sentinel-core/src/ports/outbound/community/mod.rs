@@ -13,3 +13,7 @@ pub mod temp_role_repository;
 pub mod voice_channel_repository;
 pub mod welcome_config_repository;
 pub mod event_repository;
+pub mod lfg_repository;
+pub mod poll_repository;
+pub mod spotlight_repository;
+pub mod news_repository;

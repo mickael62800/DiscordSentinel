@@ -74,6 +74,9 @@ impl ManageAuditLogsUseCase for MockAuditUC {
     ) -> Result<Vec<AuditLog>, DomainError> {
         Ok(vec![])
     }
+    async fn count(&self, _: Option<&str>, _: &AuditLogFilters) -> Result<i64, DomainError> {
+        Ok(0)
+    }
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
         self.purged.lock().unwrap().push((guild_id.into(), days));
         Ok(7)

@@ -83,6 +83,27 @@ impl MemberRepository for MockMemberRepo {
     async fn mark_rejoined(&self, _: &str, _: &str) -> Result<u64, DomainError> {
         Ok(0)
     }
+
+    // Lectures servant la page membre : hors du perimetre teste ici.
+    async fn list_join_anniversaries(
+        &self,
+        _: &str,
+        _: i32,
+    ) -> Result<
+        Vec<crate::domain::entities::community::milestone::JoinAnniversary>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+
+    async fn list_recent_joins(
+        &self,
+        _: &str,
+        _: i32,
+        _: i64,
+    ) -> Result<Vec<GuildMember>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 // ── Stubs minimaux pour les use cases satellites (non utilises ici) ──

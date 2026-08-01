@@ -13,3 +13,8 @@ pub mod progression_calc;
 pub mod role_panel;
 pub mod voice_channel;
 pub mod event;
+pub mod lfg;
+pub mod poll;
+pub mod spotlight;
+pub mod news;
+pub mod milestone;

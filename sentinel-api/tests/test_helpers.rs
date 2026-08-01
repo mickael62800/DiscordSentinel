@@ -382,8 +382,245 @@ impl ManageAuditLogsUseCase for StubAuditLogs {
     ) -> Result<Vec<AuditLog>, DomainError> {
         unimplemented!()
     }
+    async fn count(
+        &self,
+        _: Option<&str>,
+        _: &manage_audit_logs::AuditLogFilters,
+    ) -> Result<i64, DomainError> {
+        Ok(0)
+    }
     async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> {
         unimplemented!()
+    }
+}
+
+/// Stub commun aux use cases de la vie communautaire (planning, annonces de
+/// recherche de joueurs, sondages, membre du mois, nouvelles).
+///
+/// Aucun test de ce fichier n'exerce ces routes. Plutot que cinq stubs qui
+/// renverraient des listes vides — ce qui ferait passer silencieusement un
+/// test mal cable —, chaque methode remonte `NotImplemented` : si une de ces
+/// routes est touchee un jour, l'erreur le dit.
+pub struct StubCommunityLife;
+
+fn pas_cable<T>(quoi: &str) -> Result<T, DomainError> {
+    Err(DomainError::NotImplemented(format!(
+        "{quoi} n'est pas cable dans les tests d'integration"
+    )))
+}
+
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_events::ManageEventsUseCase
+    for StubCommunityLife
+{
+    async fn list_window(
+        &self,
+        _: &str,
+        _: sentinel_core::ports::outbound::community::event_repository::EventWindow,
+        _: bool,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::event::CommunityEvent>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+    ) -> Result<
+        sentinel_core::ports::inbound::community::manage_events::EventWithParticipants,
+        DomainError,
+    > {
+        pas_cable("le planning")
+    }
+    async fn create(
+        &self,
+        _: sentinel_core::domain::entities::community::event::UpsertEventCommand,
+    ) -> Result<sentinel_core::domain::entities::community::event::CommunityEvent, DomainError>
+    {
+        pas_cable("le planning")
+    }
+    async fn update(
+        &self,
+        _: Uuid,
+        _: sentinel_core::domain::entities::community::event::UpsertEventCommand,
+    ) -> Result<sentinel_core::domain::entities::community::event::CommunityEvent, DomainError>
+    {
+        pas_cable("le planning")
+    }
+    async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
+        pas_cable("le planning")
+    }
+    async fn join(
+        &self,
+        _: Uuid,
+        _: &str,
+        _: &str,
+        _: sentinel_core::domain::entities::community::event::EventAnswer,
+    ) -> Result<(), DomainError> {
+        pas_cable("le planning")
+    }
+    async fn leave(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+        pas_cable("le planning")
+    }
+}
+
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_lfg::ManageLfgUseCase
+    for StubCommunityLife
+{
+    async fn list(
+        &self,
+        _: &str,
+        _: bool,
+        _: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::lfg::LfgPost>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::lfg::LfgPost, DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+    async fn create(
+        &self,
+        _: sentinel_core::domain::entities::community::lfg::UpsertLfgCommand,
+    ) -> Result<sentinel_core::domain::entities::community::lfg::LfgPost, DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+    async fn close(&self, _: Uuid, _: &str, _: bool) -> Result<(), DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+    async fn delete(&self, _: Uuid, _: &str, _: bool) -> Result<(), DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+    async fn join(
+        &self,
+        _: Uuid,
+        _: &str,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::community::lfg::LfgPost, DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+    async fn leave(
+        &self,
+        _: Uuid,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::community::lfg::LfgPost, DomainError> {
+        pas_cable("les annonces de joueurs")
+    }
+}
+
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_polls::ManagePollsUseCase
+    for StubCommunityLife
+{
+    async fn list(
+        &self,
+        _: &str,
+        _: bool,
+        _: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::poll::Poll>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+        _: Option<&str>,
+    ) -> Result<
+        sentinel_core::ports::inbound::community::manage_polls::PollWithVote,
+        DomainError,
+    > {
+        pas_cable("les sondages")
+    }
+    async fn create(
+        &self,
+        _: sentinel_core::domain::entities::community::poll::UpsertPollCommand,
+    ) -> Result<sentinel_core::domain::entities::community::poll::Poll, DomainError> {
+        pas_cable("les sondages")
+    }
+    async fn close(&self, _: Uuid) -> Result<(), DomainError> {
+        pas_cable("les sondages")
+    }
+    async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
+        pas_cable("les sondages")
+    }
+    async fn vote(
+        &self,
+        _: Uuid,
+        _: Uuid,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::community::poll::Poll, DomainError> {
+        pas_cable("les sondages")
+    }
+}
+
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlightUseCase
+    for StubCommunityLife
+{
+    async fn current(
+        &self,
+        _: &str,
+        _: Option<&str>,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::community::spotlight::Spotlight>,
+        DomainError,
+    > {
+        Ok(None)
+    }
+    async fn list(
+        &self,
+        _: &str,
+        _: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::spotlight::Spotlight>, DomainError>
+    {
+        Ok(vec![])
+    }
+    async fn designate(
+        &self,
+        _: sentinel_core::domain::entities::community::spotlight::UpsertSpotlightCommand,
+    ) -> Result<sentinel_core::domain::entities::community::spotlight::Spotlight, DomainError>
+    {
+        pas_cable("le membre du mois")
+    }
+    async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
+        pas_cable("le membre du mois")
+    }
+}
+
+#[async_trait]
+impl sentinel_core::ports::inbound::community::manage_news::ManageNewsUseCase
+    for StubCommunityLife
+{
+    async fn list(
+        &self,
+        _: &str,
+        _: bool,
+        _: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::news::NewsPost>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get(
+        &self,
+        _: Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::news::NewsPost, DomainError> {
+        pas_cable("les nouvelles du site")
+    }
+    async fn create(
+        &self,
+        _: sentinel_core::domain::entities::community::news::UpsertNewsCommand,
+    ) -> Result<sentinel_core::domain::entities::community::news::NewsPost, DomainError> {
+        pas_cable("les nouvelles du site")
+    }
+    async fn update(
+        &self,
+        _: Uuid,
+        _: sentinel_core::domain::entities::community::news::UpsertNewsCommand,
+    ) -> Result<sentinel_core::domain::entities::community::news::NewsPost, DomainError> {
+        pas_cable("les nouvelles du site")
+    }
+    async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
+        pas_cable("les nouvelles du site")
     }
 }
 
@@ -1131,6 +1368,30 @@ impl ManageMembersUseCase for StubMembers {
     }
     async fn rejoin_member(&self, _: &str, _: &str) -> Result<u64, DomainError> {
         unimplemented!()
+    }
+
+    // Lectures servant la page membre : hors du perimetre de ces tests.
+    async fn upcoming_anniversaries(
+        &self,
+        _: &str,
+        _: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::milestone::JoinAnniversary>,
+        DomainError,
+    > {
+        Ok(vec![])
+    }
+
+    async fn recent_joins(
+        &self,
+        _: &str,
+        _: i32,
+        _: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::community::guild_member::GuildMember>,
+        DomainError,
+    > {
+        Ok(vec![])
     }
 }
 
@@ -2474,6 +2735,11 @@ fn base_state() -> AppState {
         voice_channels_uc: Arc::new(StubVoiceChannels),
         watched_users_uc: Arc::new(StubWatchedUsers),
         audit_logs_uc: Arc::new(StubAuditLogs),
+        events_uc: Arc::new(StubCommunityLife),
+        lfg_uc: Arc::new(StubCommunityLife),
+        polls_uc: Arc::new(StubCommunityLife),
+        spotlight_uc: Arc::new(StubCommunityLife),
+        news_uc: Arc::new(StubCommunityLife),
         detect_anomaly_uc: Arc::new(
             sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
                 Arc::new(sentinel_api::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(500, 100)),

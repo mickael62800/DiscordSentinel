@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use crate::ports::outbound::community::member_repository::MemberRepository;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
+use sentinel_core::domain::entities::community::milestone::JoinAnniversary;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgMemberRepository {
@@ -262,4 +263,112 @@ impl MemberRepository for PgMemberRepository {
         .map_err(pg_ctx("mark_rejoined update"))?;
         Ok(res.rows_affected())
     }
+
+    async fn list_join_anniversaries(
+        &self,
+        guild_id: &str,
+        days: i32,
+    ) -> Result<Vec<JoinAnniversary>, DomainError> {
+        // Le CROSS JOIN sur (annee courante, annee suivante) resout le
+        // passage d'annee : consulte le 28 decembre, la fenetre doit inclure
+        // les arrivees du 2 janvier.
+        //
+        // Le LEAST(jour, dernier jour du mois) evite que `make_date` echoue
+        // sur un 29 fevrier en annee commune — sinon la requete entiere
+        // planterait a cause d'un seul membre.
+        //
+        // Le filtre `annee > annee d'arrivee` ecarte les « 0 an » : quelqu'un
+        // arrive il y a trois semaines n'a pas d'anniversaire a feter, il est
+        // dans les nouveaux venus.
+        let rows: Vec<AnniversaryRow> = sqlx::query_as(
+            "WITH base AS ( \
+                 SELECT user_id, username, avatar, joined_at, \
+                        EXTRACT(MONTH FROM joined_at)::int AS m, \
+                        EXTRACT(DAY   FROM joined_at)::int AS d \
+                 FROM guild_members \
+                 WHERE guild_id = $1 \
+                   AND left_at IS NULL \
+                   AND COALESCE(is_bot, false) = false \
+                   AND joined_at IS NOT NULL \
+             ), \
+             occ AS ( \
+                 SELECT b.user_id, b.username, b.avatar, b.joined_at, y.annee, \
+                        make_date( \
+                            y.annee, b.m, \
+                            LEAST( \
+                                b.d, \
+                                EXTRACT(DAY FROM ( \
+                                    make_date(y.annee, b.m, 1) \
+                                    + INTERVAL '1 month' - INTERVAL '1 day' \
+                                ))::int \
+                            ) \
+                        ) AS anniv \
+                 FROM base b \
+                 CROSS JOIN ( \
+                     VALUES (EXTRACT(YEAR FROM now())::int), \
+                            (EXTRACT(YEAR FROM now())::int + 1) \
+                 ) AS y(annee) \
+             ) \
+             SELECT user_id, username, avatar, joined_at, \
+                    (annee - EXTRACT(YEAR FROM joined_at)::int) AS years \
+             FROM occ \
+             WHERE anniv >= now()::date \
+               AND anniv < now()::date + $2::int \
+               AND annee > EXTRACT(YEAR FROM joined_at)::int \
+             ORDER BY anniv ASC",
+        )
+        .bind(guild_id)
+        .bind(days)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_ctx("list_join_anniversaries"))?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| JoinAnniversary {
+                user_id: r.user_id,
+                username: r.username,
+                avatar: r.avatar,
+                joined_at: r.joined_at,
+                years: r.years,
+            })
+            .collect())
+    }
+
+    async fn list_recent_joins(
+        &self,
+        guild_id: &str,
+        days: i32,
+        limit: i64,
+    ) -> Result<Vec<GuildMember>, DomainError> {
+        let rows: Vec<MemberRow> = sqlx::query_as(
+            "SELECT guild_id, user_id, username, display_name, avatar, roles, \
+                    joined_at, account_created, is_bot, last_seen_at, left_at \
+             FROM guild_members \
+             WHERE guild_id = $1 \
+               AND left_at IS NULL \
+               AND COALESCE(is_bot, false) = false \
+               AND joined_at IS NOT NULL \
+               AND joined_at >= now() - make_interval(days => $2::int) \
+             ORDER BY joined_at DESC \
+             LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(days)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_ctx("list_recent_joins"))?;
+
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct AnniversaryRow {
+    user_id: String,
+    username: String,
+    avatar: Option<String>,
+    joined_at: DateTime<Utc>,
+    years: i32,
 }
