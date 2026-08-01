@@ -212,7 +212,7 @@ const fondRoue = computed(() => {
 </script>
 
 <template>
-  <div class="jx">
+  <div class="jx theme-communaute">
     <header class="jx-bar">
       <RouterLink to="/membre" class="jx-ghost">← L'espace membre</RouterLink>
       <span v-if="user" class="jx-solde" :class="{ pulse: !!resultat }">
@@ -404,23 +404,10 @@ const fondRoue = computed(() => {
 
 <style scoped>
 .jx {
-  --surface: rgba(255, 255, 255, 0.045);
-  --line: rgba(168, 85, 247, 0.22);
-  --line-strong: rgba(168, 85, 247, 0.5);
-  --accent: #a855f7;
-  --ink: #f3eaff;
-  --ink-2: #d8c7f5;
-  --ink-3: #c3aee6;
-  --ink-4: #b49ad8;
-  --plus: #22c55e;
-  --moins: #f43f5e;
-
   flex: 1;
   overflow-x: hidden;
   overflow-y: auto;
   padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 4vw, 3rem) 3rem;
-  background: linear-gradient(180deg, #150a28 0%, #0d0619 55%, #08040f 100%);
-  color: var(--ink);
   display: flex;
   flex-direction: column;
   gap: clamp(1.75rem, 4vh, 2.5rem);
@@ -442,9 +429,9 @@ const fondRoue = computed(() => {
 }
 
 .jx-ghost {
-  border: 1px solid var(--line-strong);
-  color: var(--ink-2);
-  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
   padding: 0.3rem 0.95rem;
   font-size: 0.88rem;
   text-decoration: none;
@@ -460,9 +447,9 @@ const fondRoue = computed(() => {
   font-weight: 700;
   font-size: 1.05rem;
   padding: 0.3rem 1rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 /* Le solde change à l'issue du tirage : un bref éclat signale la mise à
@@ -498,7 +485,7 @@ const fondRoue = computed(() => {
 
 .jx-hero p {
   margin: 0;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .jx-block h2 {
@@ -512,34 +499,34 @@ const fondRoue = computed(() => {
 .jx-count {
   font-size: 0.8rem;
   font-weight: 400;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 .jx-hint {
   text-align: center;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 .jx-vide {
   margin: 0;
   padding: 0.85rem 1.05rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.025);
-  border: 1px dashed var(--line);
-  color: var(--ink-4);
+  border: 1px dashed var(--border);
+  color: var(--site-ink-4);
   font-size: 0.9rem;
   line-height: 1.5;
 }
 
 .jx-vide code {
   font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .jx-alerte {
   margin: 0;
   padding: 0.85rem 1.05rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   background: rgba(244, 63, 94, 0.1);
   border: 1px solid rgba(244, 63, 94, 0.35);
   color: #fca5a5;
@@ -550,13 +537,13 @@ const fondRoue = computed(() => {
   display: inline-block;
   align-self: flex-start;
   margin-top: 0.8rem;
-  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   font: inherit;
   font-weight: 600;
   font-size: 0.9rem;
   border: none;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.5rem 1.4rem;
   cursor: pointer;
   text-decoration: none;
@@ -598,7 +585,7 @@ const fondRoue = computed(() => {
   height: 0;
   border-left: 0.7rem solid transparent;
   border-right: 0.7rem solid transparent;
-  border-top: 1.1rem solid var(--ink);
+  border-top: 1.1rem solid var(--text-primary);
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
 }
 
@@ -639,9 +626,9 @@ const fondRoue = computed(() => {
   flex-direction: column;
   gap: 0.3rem;
   padding: 1rem 1.2rem;
-  border-radius: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .jx-resultat.rare {
@@ -656,21 +643,21 @@ const fondRoue = computed(() => {
 }
 
 .jx-gain.plus {
-  color: var(--plus);
+  color: var(--success);
 }
 
 .jx-gain.moins {
-  color: var(--moins);
+  color: var(--danger);
 }
 
 .jx-gain.neutre {
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-size: 1rem;
 }
 
 .jx-apres {
   font-size: 0.85rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 /* ── Classement ── */
@@ -689,20 +676,20 @@ const fondRoue = computed(() => {
   align-items: center;
   gap: 0.8rem;
   padding: 0.6rem 1rem;
-  border-radius: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .jx-rang.moi {
-  border-color: var(--line-strong);
+  border-color: var(--border-strong);
   background: rgba(168, 85, 247, 0.1);
 }
 
 .jx-place {
   font-variant-numeric: tabular-nums;
   font-weight: 700;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   text-align: right;
 }
 
@@ -737,14 +724,14 @@ const fondRoue = computed(() => {
   align-items: center;
   gap: 0.8rem;
   padding: 0.55rem 1rem;
-  border-radius: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   font-size: 0.9rem;
 }
 
 .jx-tx-desc {
-  color: var(--ink-3);
+  color: var(--site-ink-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -756,16 +743,16 @@ const fondRoue = computed(() => {
 }
 
 .jx-tx-montant.plus {
-  color: var(--plus);
+  color: var(--success);
 }
 
 .jx-tx-montant.moins {
-  color: var(--moins);
+  color: var(--danger);
 }
 
 .jx-tx-date {
   font-size: 0.78rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   white-space: nowrap;
 }
 
@@ -781,9 +768,9 @@ const fondRoue = computed(() => {
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   background: none;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
   font-size: 1.1rem;
   line-height: 1;
   cursor: pointer;
@@ -819,10 +806,10 @@ const fondRoue = computed(() => {
   gap: 0.3rem;
   min-width: 9rem;
   padding: 0.9rem 1rem;
-  border-radius: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  color: var(--ink-2);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
   font: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, transform 0.15s ease;
@@ -837,7 +824,7 @@ const fondRoue = computed(() => {
 .jx-vignette.active {
   border-color: var(--c);
   box-shadow: 0 0 24px color-mix(in srgb, var(--c) 35%, transparent);
-  color: var(--ink);
+  color: var(--text-primary);
 }
 
 .jx-vignette-emoji {
@@ -854,14 +841,14 @@ const fondRoue = computed(() => {
 .jx-vignette-tag {
   font-size: 0.68rem;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 .jx-pitch {
   margin: 0.8rem 0 0;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
   font-size: 0.92rem;
 }
 

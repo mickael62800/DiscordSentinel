@@ -382,7 +382,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 </script>
 
 <template>
-  <div class="mb">
+  <div class="mb theme-communaute">
     <header class="mb-bar">
       <div v-if="user" class="mb-user">
         <img v-if="avatarUrl" :src="avatarUrl" alt="" class="mb-avatar" />
@@ -602,7 +602,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
               '--row': b.row,
               '--from': b.from,
               '--span': b.span,
-              '--ev': accent(b.event) || '#a855f7',
+              '--ev': accent(b.event) || 'var(--accent)',
             }"
             :title="b.event.title"
           >
@@ -860,24 +860,11 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 <style scoped>
 .mb {
-  --surface: rgba(255, 255, 255, 0.045);
-  --line: rgba(168, 85, 247, 0.22);
-  --line-strong: rgba(168, 85, 247, 0.5);
-  --accent: #a855f7;
-  --ink: #f3eaff;
-  --ink-2: #d8c7f5;
-  --ink-3: #c3aee6;
-  --ink-4: #b49ad8;
-  --live: #22c55e;
-  --off: #6b7280;
-
   flex: 1;
   position: relative;
   overflow-x: hidden;
   overflow-y: auto;
   padding: clamp(1rem, 3vh, 2rem) clamp(1rem, 4vw, 3rem) 3rem;
-  background: linear-gradient(180deg, #150a28 0%, #0d0619 55%, #08040f 100%);
-  color: var(--ink);
   display: flex;
   flex-direction: column;
   gap: clamp(1.75rem, 4vh, 2.75rem);
@@ -912,7 +899,6 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
      contenu apparaitrait sur les cotes en passant dessous. */
   margin: calc(-1 * clamp(1rem, 3vh, 2rem)) calc(-1 * clamp(1rem, 4vw, 3rem)) 0;
   padding: 0.6rem clamp(1rem, 4vw, 3rem);
-  background: linear-gradient(180deg, #150a28 62%, rgba(21, 10, 40, 0));
 }
 
 .mb-bar > * {
@@ -925,7 +911,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.6rem;
   font-size: 0.92rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-avatar {
@@ -936,9 +922,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-ghost {
   background: none;
-  border: 1px solid var(--line-strong);
-  color: var(--ink-2);
-  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  border-radius: var(--radius-pill);
   padding: 0.3rem 0.95rem;
   font: inherit;
   font-size: 0.88rem;
@@ -966,7 +952,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-hero p {
   margin: 0 0 1.1rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-chips {
@@ -981,11 +967,11 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.4rem;
   padding: 0.35rem 0.9rem;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   font-size: 0.85rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-chip b {
@@ -1011,7 +997,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-count {
   font-size: 0.8rem;
   font-weight: 400;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1023,9 +1009,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-nav button {
   background: none;
-  border: 1px solid var(--line);
-  color: var(--ink-3);
-  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--site-ink-3);
+  border-radius: var(--radius-pill);
   padding: 0.15rem 0.7rem;
   font: inherit;
   font-size: 0.8rem;
@@ -1041,8 +1027,8 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  background: var(--live);
-  box-shadow: 0 0 10px var(--live);
+  background: var(--site-live);
+  box-shadow: 0 0 10px var(--site-live);
   animation: pulse 2.2s ease-in-out infinite;
 }
 
@@ -1061,16 +1047,16 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 }
 
 .mb-pip.on {
-  background: var(--live);
-  box-shadow: 0 0 8px var(--live);
+  background: var(--site-live);
+  box-shadow: 0 0 8px var(--site-live);
 }
 
 .mb-pip.off {
-  background: var(--off);
+  background: var(--site-off);
 }
 
 .mb-hint {
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   margin: 0;
 }
 
@@ -1083,9 +1069,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-tag {
   font-size: 0.74rem;
   padding: 1px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(168, 85, 247, 0.16);
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-tag.neutral {
@@ -1106,7 +1092,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   display: grid;
   place-items: center;
   background: var(--c);
-  color: #0d0619;
+  color: var(--bg-primary);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -1126,11 +1112,11 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-cta {
   align-self: flex-start;
   display: inline-block;
-  background: linear-gradient(135deg, var(--accent), #7c3aed);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   font-weight: 600;
   font-size: 0.86rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.45rem 1.2rem;
   text-decoration: none;
 }
@@ -1138,9 +1124,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-soon {
   align-self: flex-start;
   font-size: 0.74rem;
-  color: var(--ink-4);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  color: var(--site-ink-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
   padding: 2px 10px;
 }
 
@@ -1156,10 +1142,10 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-game {
   position: relative;
-  border-radius: 1.1rem;
+  border-radius: var(--radius-xl);
   overflow: hidden;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
 }
 
 .mb-game img,
@@ -1201,7 +1187,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.35rem;
   font-size: 0.85rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 /* Un serveur éteint reste visible mais s'efface : il informe sans attirer. */
@@ -1215,14 +1201,14 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   margin-top: 0.2rem;
   font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
   font-size: 0.78rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .mb-game-addr.muted {
-  color: #8f77b8;
+  color: var(--site-ink-4);
   font-style: italic;
 }
 
@@ -1236,7 +1222,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   font-size: 0.76rem;
   font-weight: 700;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 /* ── Cherche des joueurs ── */
@@ -1248,9 +1234,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-lfg {
   padding: 0.85rem 1.05rem;
-  border-radius: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -1270,13 +1256,13 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-lfg-quand {
   margin-left: auto;
   font-size: 0.76rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 .mb-lfg-texte {
   margin: 0;
   font-size: 0.89rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-lfg-foot {
@@ -1288,7 +1274,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-lfg-besoin {
   font-size: 0.83rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-lfg-besoin b {
@@ -1304,27 +1290,27 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-lfg-avs .mb-av {
   margin-left: -6px;
-  border: 2px solid #0d0619;
+  border: 2px solid var(--bg-primary);
 }
 
 .mb-lfg-n {
   font-size: 0.78rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-lfg-n.muted {
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-style: italic;
 }
 
 .mb-lfg-btn {
   background: rgba(168, 85, 247, 0.18);
-  border: 1px solid var(--line-strong);
-  color: var(--ink);
+  border: 1px solid var(--border-strong);
+  color: var(--text-primary);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 0.28rem 0.95rem;
   cursor: pointer;
   text-decoration: none;
@@ -1341,23 +1327,23 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 /* ── Calendrier ── */
 .mb-cal {
-  border: 1px solid var(--line);
-  border-radius: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  background: var(--surface);
+  background: var(--bg-card);
 }
 
 .mb-cal-head {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
 }
 
 .mb-cal-head div {
   padding: 0.6rem 0.4rem;
   text-align: center;
   font-size: 0.78rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -1370,7 +1356,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-cal-head b {
   display: block;
   font-size: 1.05rem;
-  color: var(--ink);
+  color: var(--text-primary);
   letter-spacing: 0;
 }
 
@@ -1395,7 +1381,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-bar {
   grid-row: var(--row);
   grid-column: var(--from) / span var(--span);
-  border-radius: 0.55rem;
+  border-radius: var(--radius-sm);
   padding: 0.4rem 0.6rem;
   font-size: 0.8rem;
   background: color-mix(in srgb, var(--ev) 26%, transparent);
@@ -1407,7 +1393,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 /* Un événement qui déborde de la semaine perd son arrondi côté tronqué :
    le lecteur voit qu'il continue au-delà. */
 .mb-bar.clipped {
-  border-radius: 0.55rem 0.15rem 0.15rem 0.55rem;
+  border-radius: var(--radius-sm) 0.15rem 0.15rem 0.55rem;
 }
 
 .mb-bar strong {
@@ -1419,7 +1405,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 }
 
 .mb-bar span {
-  color: var(--ink-3);
+  color: var(--site-ink-3);
   font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
@@ -1430,7 +1416,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   margin: 0;
   align-self: center;
   text-align: center;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-size: 0.88rem;
 }
 
@@ -1438,9 +1424,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-feature {
   --accent-event: var(--accent);
   padding: 1.2rem 1.3rem;
-  border-radius: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent-event);
 }
 
@@ -1458,7 +1444,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-feature-body p {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 /* ── Événements en liste ── */
@@ -1478,9 +1464,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-event {
   --accent-event: var(--accent);
   padding: 0.9rem 1.1rem;
-  border-radius: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-left: 3px solid var(--accent-event);
 }
 
@@ -1499,14 +1485,14 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-event-desc {
   margin: 0.35rem 0 0;
   font-size: 0.88rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-event-when {
   display: inline-block;
   margin-top: 0.35rem;
   font-size: 0.82rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 /* État vide : présent mais discret. Il informe de ce qui viendra sans
@@ -1514,10 +1500,10 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-vide {
   margin: 0;
   padding: 0.85rem 1.05rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   background: rgba(255, 255, 255, 0.025);
-  border: 1px dashed var(--line);
-  color: var(--ink-4);
+  border: 1px dashed var(--border);
+  color: var(--site-ink-4);
   font-size: 0.88rem;
   line-height: 1.5;
 }
@@ -1526,7 +1512,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-config {
   margin: 0;
   padding: 0.9rem 1.1rem;
-  border-radius: 0.9rem;
+  border-radius: var(--radius-lg);
   background: rgba(245, 158, 11, 0.1);
   border: 1px solid rgba(245, 158, 11, 0.35);
   color: #f8d9a0;
@@ -1537,7 +1523,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
   font-size: 0.85em;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: rgba(0, 0, 0, 0.3);
 }
 
@@ -1549,9 +1535,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 }
 
 .mb-vc {
-  border-radius: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   overflow: hidden;
 }
 
@@ -1561,7 +1547,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   gap: 0.45rem;
   padding: 0.6rem 0.85rem;
   background: rgba(168, 85, 247, 0.09);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
 }
 
@@ -1572,7 +1558,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-vc-n {
   margin-left: auto;
   font-size: 0.78rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1590,12 +1576,12 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.55rem;
   padding: 0.3rem 0.45rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius-sm);
   font-size: 0.88rem;
 }
 
 .mb-vm-nom {
-  color: var(--ink-2);
+  color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1627,14 +1613,14 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.6rem;
   padding: 0.6rem 0.9rem;
-  border-radius: 0.75rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   font-size: 0.9rem;
 }
 
 .mb-tc-hash {
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-weight: 700;
 }
 
@@ -1649,21 +1635,21 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-tc-avs .mb-av {
   margin-left: -6px;
-  border: 2px solid #0d0619;
+  border: 2px solid var(--bg-primary);
 }
 
 .mb-tc-when {
   font-size: 0.78rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   white-space: nowrap;
 }
 
 /* ── Sondages ── */
 .mb-poll {
   padding: 1.1rem 1.2rem;
-  border-radius: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -1681,7 +1667,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-poll-desc {
   margin: 0;
   font-size: 0.87rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-poll-list {
@@ -1703,7 +1689,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   padding: 0;
   font: inherit;
   font-size: 0.88rem;
-  color: var(--ink);
+  color: var(--text-primary);
   text-align: left;
   cursor: default;
 }
@@ -1723,13 +1709,13 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 }
 
 .mb-poll-pct {
-  color: var(--ink-2);
+  color: var(--text-secondary);
   font-variant-numeric: tabular-nums;
 }
 
 .mb-poll-bar {
   height: 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.07);
   margin: 0.2rem 0 0.1rem;
   overflow: hidden;
@@ -1738,20 +1724,20 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-poll-bar i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: width 0.35s ease;
 }
 
 .mb-poll-n {
   font-size: 0.75rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
   font-variant-numeric: tabular-nums;
 }
 
 .mb-poll-foot {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 /* ── Deux colonnes ── */
@@ -1763,9 +1749,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-panel {
   padding: 1.1rem 1.2rem;
-  border-radius: 1rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .mb-panel h3 {
@@ -1792,7 +1778,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
 .mb-mom-quoi {
   font-size: 0.86rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-annivs {
@@ -1818,15 +1804,15 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-anniv-age {
   font-size: 0.76rem;
   padding: 1px 9px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(168, 85, 247, 0.18);
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 .mb-anniv-date {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 /* ── Nouveaux venus ── */
@@ -1841,11 +1827,11 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   align-items: center;
   gap: 0.4rem;
   padding: 0.25rem 0.7rem 0.25rem 0.25rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--line);
+  border: 1px solid var(--border);
   font-size: 0.85rem;
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 /* ── Annonces ── */
@@ -1860,20 +1846,20 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   grid-template-columns: 8rem 1fr;
   gap: 0.9rem;
   padding: 0.75rem;
-  border-radius: 0.9rem;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .mb-ann.pinned {
-  border-color: var(--line-strong);
+  border-color: var(--border-strong);
 }
 
 .mb-ann-img {
   width: 100%;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 0.6rem;
+  border-radius: var(--radius-sm);
 }
 
 .mb-ann h3 {
@@ -1884,12 +1870,12 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 .mb-ann p {
   margin: 0 0 0.3rem;
   font-size: 0.86rem;
-  color: var(--ink-3);
+  color: var(--site-ink-3);
 }
 
 .mb-ann-when {
   font-size: 0.76rem;
-  color: var(--ink-4);
+  color: var(--site-ink-4);
 }
 
 /* ── Pied ── */
@@ -1900,12 +1886,12 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 }
 
 .mb-admin-link {
-  color: #9d84c4;
+  color: var(--site-ink-4);
   font-size: 0.9rem;
 }
 
 .mb-admin-link:hover {
-  color: var(--ink-2);
+  color: var(--text-secondary);
 }
 
 @media (max-width: 760px) {

@@ -65,6 +65,25 @@
   --transition-fast: 0.15s ease;
   --transition-base: 0.2s ease;
 
+  /* ─── Thème « communauté » ─────────────────────────
+   * Le site public (accueil, espace membre, jeux) porte l'identité de La
+   * Bande du Canapé : violet néon sur fond profond. Le back-office, lui,
+   * garde le bleu Discord — ce sont deux publics et deux usages.
+   *
+   * Ce thème REDÉFINIT les tokens sémantiques plutôt que d'en inventer de
+   * nouveaux. Conséquence voulue : les atomes existants (AppButton, AppInput…)
+   * s'y adaptent sans modification, et deviennent utilisables sur le site
+   * public. Une palette parallèle aurait interdit cette réutilisation.
+   *
+   * S'applique en posant la classe `.theme-communaute` sur la racine de la
+   * page. Les deux pages concernées portaient jusqu'ici ces valeurs en dur,
+   * ce qui les rendait impossibles à faire évoluer d'un seul endroit.
+   */
+  --site-ink-3: #c3aee6;
+  --site-ink-4: #b49ad8;
+  --site-live: #22c55e;
+  --site-off: #6b7280;
+
   /* ─── Layout ─── */
   --sidebar-width: 240px;
 
@@ -88,6 +107,34 @@
   color: var(--text-primary);
   background-color: var(--bg-primary);
 }
+
+/* Racine d'une page du site public. Redéfinit les tokens sémantiques : tout
+   ce qui vit dedans — y compris les atomes partagés — suit automatiquement. */
+.theme-communaute {
+  --bg-primary: #0d0619;
+  --bg-secondary: #150a28;
+  --bg-card: rgba(255, 255, 255, 0.045);
+  --bg-hover: rgba(255, 255, 255, 0.08);
+  --text-primary: #f3eaff;
+  --text-secondary: #d8c7f5;
+  --accent: #a855f7;
+  --accent-hover: #7c3aed;
+  --accent-alt: #c026d3;
+  --border: rgba(168, 85, 247, 0.22);
+  --accent-bg: rgba(168, 85, 247, 0.16);
+  --success: #22c55e;
+  --danger: #f43f5e;
+  --focus-ring: 0 0 0 2px rgba(168, 85, 247, 0.4);
+
+  /* Bordure appuyée : boutons et contours actifs. Le `--border` de base est
+     volontairement discret, il ne convient pas à un élément cliquable. */
+  --border-strong: rgba(168, 85, 247, 0.5);
+
+  /* Dégradé de fond commun aux pages publiques. */
+  background: linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 55%, #08040f 100%);
+  color: var(--text-primary);
+}
+
 
 body {
   min-height: 100vh;
