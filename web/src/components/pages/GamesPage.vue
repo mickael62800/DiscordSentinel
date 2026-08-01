@@ -26,8 +26,30 @@ import {
   type Transaction,
   type Wallet,
 } from "@/services/gamesService";
+import { GAMES, jeuMemorise, memoriserJeu } from "@/games/catalog";
 
 const { user } = useAuth();
+
+// ── Carrousel ──
+
+/// Jeu affiché. Restauré du dernier passage : revenir sur la page doit
+/// ramener là où on était, pas au début du catalogue.
+const jeuActif = ref(jeuMemorise());
+
+const jeu = computed(() => GAMES.find((g) => g.key === jeuActif.value) ?? GAMES[0]);
+const indexActif = computed(() => GAMES.findIndex((g) => g.key === jeuActif.value));
+
+function choisir(key: string) {
+  jeuActif.value = key;
+  memoriserJeu(key);
+}
+
+/// Décale d'un cran, en bouclant. Boucler plutôt que buter : avec deux ou
+/// trois jeux, un bouton désactivé aux extrémités serait plus gênant qu'utile.
+function decaler(pas: number) {
+  const n = GAMES.length;
+  choisir(GAMES[(indexActif.value + pas + n) % n].key);
+}
 
 const wallet = ref<Wallet | null>(null);
 const history = ref<Transaction[]>([]);
@@ -64,13 +86,22 @@ const erreurRoue = ref<string | null>(null);
 const dejaJoue = ref(false);
 /// Angle cumulé, jamais remis à zéro : revenir en arrière ferait tourner la
 /// roue à l'envers entre deux tirages.
-const angle = ref(0);
+///
+/// Départ à un demi-secteur, et non à zéro : à zéro la flèche tombe pile sur
+/// la FRONTIÈRE entre la dernière case et la première. Elle semblait alors
+/// désigner la licorne à chaque position de repos — y compris après un tirage
+/// refusé, qui ramène la roue à son point de départ. Le hasard n'y était pour
+/// rien, seule la géométrie.
+const angle = ref(-SECTEUR / 2);
 
 async function tirer() {
   if (enCours.value || dejaJoue.value || !user.value) return;
   enCours.value = true;
   erreurRoue.value = null;
   resultat.value = null;
+
+  // Mémorisé pour pouvoir revenir ici si le tirage est refusé.
+  const avant = angle.value;
 
   // Quelques tours pleins avant même de connaître l'issue : l'attente fait
   // partie du jeu, et la requête se déroule pendant ce temps.
@@ -106,9 +137,9 @@ async function tirer() {
       dejaJoue.value = true;
     }
 
-    // La roue s'arrête net : la laisser finir ses trois secondes ferait
-    // croire à un tirage qui n'a pas eu lieu.
-    angle.value -= 360 * 4;
+    // La roue revient exactement où elle était : la laisser finir ses trois
+    // secondes ferait croire à un tirage qui n'a pas eu lieu.
+    angle.value = avant;
   } finally {
     enCours.value = false;
   }
@@ -130,6 +161,9 @@ onMounted(async () => {
     wallet.value = w;
     history.value = h;
     ranking.value = l;
+    // Le serveur sait déjà si le tirage du jour est consommé : on ferme le
+    // bouton avant tout clic, au lieu de le faire découvrir par un refus.
+    dejaJoue.value = !w.can_spin;
   } catch {
     // Plateforme jeux éteinte ou non configurée : on le dit, plutôt que
     // d'afficher un portefeuille vide qui ferait croire à une perte de coins.
@@ -218,8 +252,47 @@ const fondRoue = computed(() => {
     </section>
 
     <template v-else>
-      <!-- ── La Roue ── -->
+      <!-- ── Choix du jeu ── -->
       <section class="jx-block">
+        <div class="jx-carrousel">
+          <button
+            v-if="GAMES.length > 1"
+            type="button"
+            class="jx-fleche-nav"
+            aria-label="Jeu précédent"
+            @click="decaler(-1)"
+          >‹</button>
+
+          <ul class="jx-vignettes">
+            <li v-for="g in GAMES" :key="g.key">
+              <button
+                type="button"
+                class="jx-vignette"
+                :class="{ active: g.key === jeuActif }"
+                :style="{ '--c': g.couleur }"
+                @click="choisir(g.key)"
+              >
+                <span class="jx-vignette-emoji" aria-hidden="true">{{ g.emoji }}</span>
+                <span class="jx-vignette-nom">{{ g.nom }}</span>
+                <span v-if="!g.jouable" class="jx-vignette-tag">Discord</span>
+              </button>
+            </li>
+          </ul>
+
+          <button
+            v-if="GAMES.length > 1"
+            type="button"
+            class="jx-fleche-nav"
+            aria-label="Jeu suivant"
+            @click="decaler(1)"
+          >›</button>
+        </div>
+
+        <p class="jx-pitch">{{ jeu.pitch }}</p>
+      </section>
+
+      <!-- ── La Roue ── -->
+      <section v-if="jeuActif === 'roue'" class="jx-block">
         <h2>La Roue du Destin <span class="jx-count">un tirage par jour</span></h2>
 
         <div class="jx-roue-zone">
@@ -278,6 +351,17 @@ const fondRoue = computed(() => {
             </p>
           </div>
         </div>
+      </section>
+
+      <!-- Jeu qui ne se joue pas ici : on l'assume et on explique pourquoi,
+           plutôt que de laisser une page vide. -->
+      <section v-else class="jx-block">
+        <h2>{{ jeu.emoji }} {{ jeu.nom }}</h2>
+        <p class="jx-vide">
+          Ce jeu se joue sur Discord. Son intérêt tient à ce qui se passe dans
+          le salon — les réactions, les represailles — et ça ne se transpose
+          pas sur une page web.
+        </p>
       </section>
 
       <!-- ── Classement ── -->
@@ -683,6 +767,102 @@ const fondRoue = computed(() => {
   font-size: 0.78rem;
   color: var(--ink-4);
   white-space: nowrap;
+}
+
+/* ── Carrousel ── */
+.jx-carrousel {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.jx-fleche-nav {
+  flex: none;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: none;
+  color: var(--ink-3);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.jx-fleche-nav:hover {
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.jx-vignettes {
+  list-style: none;
+  margin: 0;
+  padding: 0.2rem;
+  display: flex;
+  gap: 0.7rem;
+  overflow-x: auto;
+  /* Chaque vignette s'aligne proprement au défilement plutôt que de rester
+     coupée entre deux. */
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+
+.jx-vignettes::-webkit-scrollbar {
+  display: none;
+}
+
+.jx-vignette {
+  scroll-snap-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.jx-vignette:hover {
+  transform: translateY(-2px);
+}
+
+/* Le jeu courant se distingue par sa couleur propre : avec plusieurs jeux,
+   un simple surlignage ne dirait pas lequel. */
+.jx-vignette.active {
+  border-color: var(--c);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--c) 35%, transparent);
+  color: var(--ink);
+}
+
+.jx-vignette-emoji {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.jx-vignette-nom {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.jx-vignette-tag {
+  font-size: 0.68rem;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ink-4);
+}
+
+.jx-pitch {
+  margin: 0.8rem 0 0;
+  color: var(--ink-3);
+  font-size: 0.92rem;
 }
 
 @media (max-width: 760px) {

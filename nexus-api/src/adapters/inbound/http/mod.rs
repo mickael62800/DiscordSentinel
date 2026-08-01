@@ -22,6 +22,10 @@ pub fn build_router(state: AppState) -> Router {
             post(handlers::wheel::spin),
         )
         .route(
+            "/api/wheel/{guild_id}/{user_id}/status",
+            get(handlers::wheel::status),
+        )
+        .route(
             "/api/wallet/{guild_id}/transfer",
             post(handlers::wallet::transfer),
         )

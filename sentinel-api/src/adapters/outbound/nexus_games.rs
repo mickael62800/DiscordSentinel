@@ -53,6 +53,11 @@ pub struct Transaction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WheelStatus {
+    pub can_spin: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpinResult {
     pub spin_id: String,
     pub case_key: String,
@@ -161,6 +166,16 @@ impl NexusGamesClient {
                 .json(&serde_json::json!({ "username": username })),
         )
         .await
+    }
+
+    /// Le joueur peut-il encore tirer aujourd'hui ? Lecture seule.
+    pub async fn wheel_status(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<WheelStatus, DomainError> {
+        let url = self.url(&format!("/api/wheel/{guild_id}/{user_id}/status"));
+        self.envoyer(self.client.get(url)).await
     }
 
     pub async fn wallet(&self, guild_id: &str, user_id: &str) -> Result<Wallet, DomainError> {

@@ -34,6 +34,26 @@ impl WheelRepository for PgWheelRepository {
         Ok(res.rows_affected() > 0)
     }
 
+    async fn has_claimed_today(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<bool, DomainError> {
+        // `CURRENT_DATE` et non un calcul cote Rust : la meme reference de
+        // journee que `try_claim_today`, sinon les deux pourraient etre en
+        // desaccord autour de minuit.
+        let row: Option<(i32,)> = sqlx::query_as(
+            "SELECT 1 FROM nexus_wheel_daily_claims
+             WHERE guild_id = $1 AND user_id = $2 AND day = CURRENT_DATE",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row.is_some())
+    }
+
     async fn log_spin(&self, spin: &WheelSpin) -> Result<(), DomainError> {
         sqlx::query(
             "INSERT INTO nexus_wheel_spin_log

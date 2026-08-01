@@ -16,6 +16,9 @@ export interface Wallet {
   coins: number;
   total_earned: number;
   total_spent: number;
+  /// Tirage du jour encore disponible. Livré avec le portefeuille : la page
+  /// a besoin des deux au même moment.
+  can_spin: boolean;
 }
 
 export interface Transaction {

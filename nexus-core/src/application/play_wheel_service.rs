@@ -119,6 +119,10 @@ impl PlayWheelUseCase for PlayWheelService {
             spin,
         })
     }
+
+    async fn can_spin(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
+        Ok(!self.wheel_repo.has_claimed_today(guild_id, user_id).await?)
+    }
 }
 
 #[async_trait]
@@ -127,6 +131,7 @@ impl GetWalletUseCase for PlayWheelService {
         get_or_create_wallet(self.wallet_repo.as_ref(), guild_id, user_id, "").await
     }
 }
+
 
 #[cfg(test)]
 #[path = "tests/play_wheel.rs"]

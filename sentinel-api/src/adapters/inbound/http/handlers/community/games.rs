@@ -49,6 +49,10 @@ pub struct WalletDto {
     pub coins: i64,
     pub total_earned: i64,
     pub total_spent: i64,
+    /// Tirage du jour encore disponible ? Livre avec le portefeuille plutot
+    /// que par un appel separe : la page a besoin des deux au meme moment,
+    /// et un second aller-retour ferait clignoter le bouton.
+    pub can_spin: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -131,12 +135,24 @@ pub async fn my_wallet(
     let ctx = require_ctx(&rbac)?;
     let g = guild(&state)?;
 
-    let w = client(&state)?.wallet(g, &ctx.discord_user_id).await?;
+    let c = client(&state)?;
+    let w = c.wallet(g, &ctx.discord_user_id).await?;
+
+    // Le statut ne doit pas faire echouer le portefeuille : en cas de
+    // probleme on suppose le tirage disponible, quitte a ce que le clic soit
+    // refuse. L'inverse fermerait le bouton a tort.
+    let can_spin = c
+        .wheel_status(g, &ctx.discord_user_id)
+        .await
+        .map(|s| s.can_spin)
+        .unwrap_or(true);
+
     Ok(Json(WalletDto {
         username: w.username,
         coins: w.coins,
         total_earned: w.total_earned,
         total_spent: w.total_spent,
+        can_spin,
     }))
 }
 

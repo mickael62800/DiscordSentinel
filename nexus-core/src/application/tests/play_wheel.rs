@@ -30,6 +30,11 @@ impl WheelRepository for MockWheelRepo {
     async fn try_claim_today(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
         Ok(self.claim_ok)
     }
+    /// Le mock decrit un joueur qui n'a pas encore tire quand le claim est
+    /// possible : les deux informations decrivent le meme etat.
+    async fn has_claimed_today(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
+        Ok(!self.claim_ok)
+    }
     async fn log_spin(&self, spin: &WheelSpin) -> Result<(), DomainError> {
         self.logged.lock().unwrap().push(spin.clone());
         Ok(())

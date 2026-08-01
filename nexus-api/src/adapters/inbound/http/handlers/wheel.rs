@@ -54,3 +54,22 @@ pub async fn spin(
         .await?;
     Ok(Json(WheelSpinResponseDto::from(result)))
 }
+
+#[derive(Debug, Serialize)]
+pub struct WheelStatusDto {
+    /// Le joueur peut-il encore tirer aujourd'hui ?
+    pub can_spin: bool,
+}
+
+/// GET /api/wheel/{guild_id}/{user_id}/status
+///
+/// Lecture seule : permet a une interface de fermer son bouton avant tout
+/// clic. La regle reste arbitree par `spin` — deux clics simultanes passent
+/// tous deux ce controle, seul le claim atomique tranche.
+pub async fn status(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<WheelStatusDto>, ApiError> {
+    let can_spin = state.play_wheel.can_spin(&guild_id, &user_id).await?;
+    Ok(Json(WheelStatusDto { can_spin }))
+}

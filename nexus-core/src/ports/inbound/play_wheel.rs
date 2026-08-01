@@ -25,4 +25,10 @@ pub trait PlayWheelUseCase: Send + Sync {
     /// 1 spin par joueur par jour (claim quotidien).
     /// Erreur `Validation` si le joueur a deja tire aujourd'hui.
     async fn spin(&self, cmd: PlayWheelCommand) -> Result<PlayWheelResult, DomainError>;
+
+    /// Le joueur peut-il encore tirer aujourd'hui ?
+    ///
+    /// Permet a une interface de fermer son bouton AVANT le clic. La regle
+    /// reste arbitree par `spin` : ce n'est qu'une indication.
+    async fn can_spin(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 }
