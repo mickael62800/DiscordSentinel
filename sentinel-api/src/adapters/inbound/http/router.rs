@@ -112,25 +112,26 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::system::routes())
 }
 
-/// Construit le router sans rate limiter ni ConnectInfo — pour les tests d'integration.
-pub fn build_for_test(state: AppState) -> Router {
-    let protected = Router::new()
-        // Endpoints lourds (sans rate limit en test)
-        .route("/analyze", post(handlers::ai::analyze::analyze))
-        .route(
-            "/analyze/image",
-            post(handlers::ai::analyze_image::analyze_image),
-        )
-        .merge(routes::analytics::routes())
-        // Routes standard
-        .merge(protected_domain_routes())
-        .route_layer(middleware::from_fn_with_state(
-            state.clone(),
-            auth_middleware,
-        ));
-
-    let public = Router::new()
+/// Routes accessibles SANS authentification.
+///
+/// Source unique, partagee par `build` et `build_for_test`. Ces deux routeurs
+/// sont independants, et declarer une route dans un seul donnait des tests
+/// verts sur une API qui repondait 404 en production — c'est exactement ce qui
+/// est arrive a tout `/api/public/*`. Une fonction commune rend la
+/// desynchronisation impossible.
+///
+/// Ce qui entre ici n'exige aucune identite, donc ne doit exposer aucune
+/// donnee personnelle. Chaque handler ecrit son DTO champ par champ et force
+/// son filtre restrictif : les parametres du back-office (`?all=1`) ne peuvent
+/// pas y faire remonter brouillons ni archives.
+///
+/// `/metrics` n'y figure pas : il porte son propre jeton et reste declare
+/// cote production uniquement.
+fn public_routes() -> Router<AppState> {
+    Router::new()
         .route("/health", get(handlers::system::health::health))
+        // OAuth Discord web : publiques car pas de token prealable.
+        // Le state CSRF + l'echange code cote serveur protegent le flux.
         .route(
             "/auth/discord/authorize",
             get(handlers::system::oauth::authorize),
@@ -139,24 +140,21 @@ pub fn build_for_test(state: AppState) -> Router {
             "/auth/discord/callback",
             get(handlers::system::oauth::callback),
         )
+        // Refresh/logout de session web (cookie httpOnly) : publiques car
+        // l'auth se fait via le cookie de session, pas le X-Discord-Token.
         .route("/auth/refresh", post(handlers::system::oauth::refresh))
         .route("/auth/logout", post(handlers::system::oauth::logout))
-        // ── Site communautaire public ──
-        // Montees DANS le groupe public : aucune authentification, donc
-        // aucune donnee personnelle (cf. handlers::system::public_site).
+        // ── Site communautaire ──
         .route(
             "/api/public/guilds/{guild_id}",
             get(handlers::system::public_site::public_guild),
         )
-        // Planning public : uniquement les evenements publies ET publics,
-        // via un DTO distinct (cf. handlers::community::events).
+        // Planning : uniquement les evenements publies ET publics, via un DTO
+        // distinct (cf. handlers::community::events).
         .route(
             "/api/public/events/{guild_id}",
             get(handlers::community::events::public_events),
         )
-        // Vie de la communaute, vue publique. Chaque endpoint force son
-        // filtre restrictif cote handler : les parametres du back-office
-        // (`?all=1`) ne peuvent pas exposer brouillons ou archives ici.
         .route(
             "/api/public/lfg/{guild_id}",
             get(handlers::community::lfg::public_lfg),
@@ -177,13 +175,32 @@ pub fn build_for_test(state: AppState) -> Router {
             "/api/public/pulse/{guild_id}",
             get(handlers::community::pulse::public_pulse),
         )
-        // Presence en direct. Le bot ne publie que les salons visibles par
-        // @everyone : l'API ne peut pas refaire ce filtrage, elle n'a aucune
-        // vue sur les permissions Discord.
+        // Presence en direct : le bot ne publie que les salons visibles par
+        // @everyone, l'API n'a aucune vue sur les permissions Discord.
         .route(
             "/api/public/presence/{guild_id}",
             get(handlers::community::presence::public_presence),
-        );
+        )
+}
+
+/// Construit le router sans rate limiter ni ConnectInfo — pour les tests d'integration.
+pub fn build_for_test(state: AppState) -> Router {
+    let protected = Router::new()
+        // Endpoints lourds (sans rate limit en test)
+        .route("/analyze", post(handlers::ai::analyze::analyze))
+        .route(
+            "/analyze/image",
+            post(handlers::ai::analyze_image::analyze_image),
+        )
+        .merge(routes::analytics::routes())
+        // Routes standard
+        .merge(protected_domain_routes())
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let public = public_routes();
 
     Router::new()
         .merge(protected)
@@ -286,68 +303,8 @@ pub fn build(
     // interne ; le port API est bind 127.0.0.1 et non proxifie par nginx).
     // Pour durcir : definir METRICS_TOKEN cote API + configurer l'`authorization`
     // du job Prometheus avec le meme token (cf. metrics_handler).
-    let public = Router::new()
-        .route("/health", get(handlers::system::health::health))
-        .route("/metrics", get(metrics_handler))
-        // OAuth Discord web : publiques car pas de token prealable.
-        // Le state CSRF + l'echange code cote serveur protegent le flux.
-        .route(
-            "/auth/discord/authorize",
-            get(handlers::system::oauth::authorize),
-        )
-        .route(
-            "/auth/discord/callback",
-            get(handlers::system::oauth::callback),
-        )
-        // Refresh/logout de session web (cookie httpOnly) : publiques car
-        // l'auth se fait via le cookie de session, pas le X-Discord-Token.
-        .route("/auth/refresh", post(handlers::system::oauth::refresh))
-        .route("/auth/logout", post(handlers::system::oauth::logout))
-        // ── Site public ──
-        //
-        // Montees DANS le groupe public : aucune authentification, donc
-        // aucune donnee personnelle. Chaque handler ecrit son DTO champ par
-        // champ et force son filtre restrictif — les parametres du
-        // back-office (`?all=1`) ne peuvent pas exposer brouillons ni
-        // archives ici.
-        //
-        // Ces routes doivent etre declarees a la fois ici et dans
-        // `build_for_test` : les deux routeurs sont independants, et n'en
-        // servir qu'un donne des tests verts sur une API qui repond 404.
-        .route(
-            "/api/public/guilds/{guild_id}",
-            get(handlers::system::public_site::public_guild),
-        )
-        .route(
-            "/api/public/events/{guild_id}",
-            get(handlers::community::events::public_events),
-        )
-        .route(
-            "/api/public/lfg/{guild_id}",
-            get(handlers::community::lfg::public_lfg),
-        )
-        .route(
-            "/api/public/polls/{guild_id}",
-            get(handlers::community::polls::public_polls),
-        )
-        .route(
-            "/api/public/spotlight/{guild_id}",
-            get(handlers::community::spotlight::public_spotlight),
-        )
-        .route(
-            "/api/public/news/{guild_id}",
-            get(handlers::community::news::public_news),
-        )
-        .route(
-            "/api/public/pulse/{guild_id}",
-            get(handlers::community::pulse::public_pulse),
-        )
-        // Presence en direct : le bot ne publie que les salons visibles par
-        // @everyone, l'API n'a aucune vue sur les permissions Discord.
-        .route(
-            "/api/public/presence/{guild_id}",
-            get(handlers::community::presence::public_presence),
-        );
+    // `/metrics` porte son propre jeton et n'a de sens qu'en production.
+    let public = public_routes().route("/metrics", get(metrics_handler));
 
     // Helper : true pour les endpoints bruyants (heartbeat des bots toutes
     // les 1-3s, /health du frontend toutes les 90s). On veut les voir en
