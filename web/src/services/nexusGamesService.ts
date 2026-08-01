@@ -36,6 +36,21 @@ export interface GameServer {
   voice_channel_id: string | null;
   ip_reveal_at: string | null;
   ip_revealed: boolean;
+  /**
+   * Hote public, servi a l'administration sans attendre la revelation :
+   * celle-ci protege l'adresse des joueurs, pas des administrateurs.
+   * `null` = pas encore configure dans le module game-portal.
+   */
+  public_host: string | null;
+}
+
+/**
+ * Adresse de connexion complete, ou `null` s'il manque l'hote ou le port.
+ * Le port n'est attribue qu'au demarrage du conteneur.
+ */
+export function adresseServeur(s: GameServer): string | null {
+  if (!s.public_host || !s.host_port) return null;
+  return `${s.public_host}:${s.host_port}`;
 }
 
 /// Un champ configurable d'un template, décrit par son `config_schema`.

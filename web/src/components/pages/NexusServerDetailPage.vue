@@ -20,6 +20,7 @@ import { useAuth } from "../../composables/useAuth";
 import { useToast } from "../../composables/useToast";
 import {
   nexusGamesService,
+  adresseServeur,
   type GameServer,
   type GameServerStats,
   type GameTemplate,
@@ -54,6 +55,21 @@ type Onglet = "apercu" | "config" | "logs" | "console" | "joueurs";
 const onglet = ref<Onglet>("apercu");
 
 const isRunning = computed(() => server.value?.status === "running");
+
+/// Adresse de connexion, disponible des la creation cote administration.
+const adresse = computed(() => (server.value ? adresseServeur(server.value) : null));
+
+/// `writeText` echoue hors HTTPS ou sans autorisation : on le dit plutot que
+/// de laisser croire au succes.
+async function copier(valeur: string) {
+  try {
+    await navigator.clipboard.writeText(valeur);
+    success(`Adresse copiee : ${valeur}`);
+  } catch {
+    showError("Copie impossible, selectionne l'adresse a la main");
+  }
+}
+
 const isTransient = computed(
   () => server.value?.status === "starting" || server.value?.status === "stopping",
 );
@@ -247,7 +263,18 @@ function fmtDuration(secs: number | null): string {
         <span class="sd-status" :class="`st-${server.status}`">
           {{ STATUS_LABELS[server.status] ?? server.status }}
         </span>
-        <span v-if="server.host_port" class="sd-port">Port {{ server.host_port }}</span>
+        <button
+          v-if="adresse"
+          type="button"
+          class="sd-port sd-copie"
+          :title="`Copier ${adresse}`"
+          @click="copier(adresse)"
+        >
+          {{ adresse }}
+        </button>
+        <span v-else-if="server.host_port" class="sd-port" title="Hote public non configure">
+          Port {{ server.host_port }}
+        </span>
         <span class="sd-mem">{{ server.allocated_memory_mb }} Mo</span>
         <span v-if="server.cpu_limit" class="sd-mem">{{ server.cpu_limit }} cœur(s)</span>
 
@@ -431,6 +458,17 @@ function fmtDuration(secs: number | null): string {
 .st-stopping {
   background: color-mix(in srgb, var(--warning) 20%, transparent);
   color: var(--warning);
+}
+
+.sd-copie {
+  font: inherit;
+  cursor: pointer;
+  border-style: dashed;
+}
+
+.sd-copie:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .sd-port,

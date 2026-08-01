@@ -59,7 +59,28 @@ pub async fn create_server(
             .await;
     }
 
-    Ok((StatusCode::CREATED, Json(server.into())))
+    let hote = hote_public(&state, &guild_id).await;
+    Ok((
+        StatusCode::CREATED,
+        Json(GameServerDto::from(server).avec_hote(hote.as_deref())),
+    ))
+}
+
+/// Hote public annonce aux joueurs, lu dans la config game-portal de la guild.
+///
+/// Le bot le lit deja sous la meme cle pour composer l'adresse au moment de la
+/// revelation. On le sert aussi a l'administration, mais sans attendre cette
+/// revelation : elle protege l'adresse des JOUEURS, pas des administrateurs,
+/// qui ont besoin de tester la connexion avant d'ouvrir la session.
+async fn hote_public(state: &AppState, guild_id: &str) -> Option<String> {
+    let cfg = state
+        .bot_config_repo
+        .get_config(guild_id, super::GAME_PORTAL_BOT)
+        .await
+        .unwrap_or_default();
+    nexus_core::domain::entities::system::bot_config::cfg_str(&cfg, "session_public_host")
+        .filter(|h| !h.trim().is_empty())
+        .map(str::to_string)
 }
 
 /// GET /api/games/{guild_id}/servers
@@ -68,7 +89,13 @@ pub async fn list_servers(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<GameServerDto>>, ApiError> {
     let list = state.game_servers_uc.list_for_guild(&guild_id).await?;
-    Ok(Json(list.into_iter().map(GameServerDto::from).collect()))
+    // Un seul appel de config pour toute la liste : l'hote est commun a la guild.
+    let hote = hote_public(&state, &guild_id).await;
+    Ok(Json(
+        list.into_iter()
+            .map(|s| GameServerDto::from(s).avec_hote(hote.as_deref()))
+            .collect(),
+    ))
 }
 
 /// GET /api/games/servers/{server_id}
@@ -77,7 +104,8 @@ pub async fn get_server(
     Path(server_id): Path<Uuid>,
 ) -> Result<Json<GameServerDetailDto>, ApiError> {
     let detail = state.game_servers_uc.get(server_id).await?;
-    Ok(Json(detail.into()))
+    let hote = hote_public(&state, &detail.server.guild_id).await;
+    Ok(Json(GameServerDetailDto::from(detail).avec_hote(hote.as_deref())))
 }
 
 #[derive(Debug, Deserialize)]

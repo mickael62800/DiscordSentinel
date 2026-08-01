@@ -12,6 +12,7 @@ import { useAuth } from "../../composables/useAuth";
 import { useToast } from "../../composables/useToast";
 import {
   nexusGamesService,
+  adresseServeur,
   type GameServer,
   type GameTemplate,
 } from "@/services/nexusGamesService";
@@ -27,6 +28,17 @@ const loading = ref(false);
 const errorMessage = ref("");
 /// Id du serveur dont une action est en cours (desactive ses boutons).
 const busyId = ref<string | null>(null);
+
+/// Copie l'adresse pour la coller dans le jeu. `writeText` echoue hors HTTPS
+/// ou sans autorisation : on le dit plutot que de laisser croire au succes.
+async function copier(adresse: string) {
+  try {
+    await navigator.clipboard.writeText(adresse);
+    success(`Adresse copiee : ${adresse}`);
+  } catch {
+    showError("Copie impossible, selectionne l'adresse a la main");
+  }
+}
 
 const templateName = computed(() => {
   const byId = new Map(templates.value.map((t) => [t.id, t.name]));
@@ -119,7 +131,7 @@ watch(selectedGuildId, load, { immediate: true });
           <th>Jeu</th>
           <th>Etat</th>
           <th>Joueurs</th>
-          <th>Port</th>
+          <th>Adresse</th>
           <th>Memoire</th>
           <th>Actions</th>
         </tr>
@@ -137,7 +149,21 @@ watch(selectedGuildId, load, { immediate: true });
             </span>
           </td>
           <td>{{ s.last_player_count }}</td>
-          <td>{{ s.host_port ?? "—" }}</td>
+          <td class="ns-adresse">
+            <button
+              v-if="adresseServeur(s)"
+              type="button"
+              class="ns-copie"
+              :title="`Copier ${adresseServeur(s)}`"
+              @click="copier(adresseServeur(s)!)"
+            >
+              {{ adresseServeur(s) }}
+            </button>
+            <span v-else-if="s.host_port" class="ns-partiel" title="Hote public non configure">
+              :{{ s.host_port }}
+            </span>
+            <span v-else>—</span>
+          </td>
           <td>{{ s.allocated_memory_mb }} Mo</td>
           <td class="ns-actions">
             <button
@@ -215,6 +241,31 @@ watch(selectedGuildId, load, { immediate: true });
   color: #fff;
   border-radius: var(--radius-md);
   font-size: 0.9rem;
+}
+
+.ns-adresse {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Bouton discret : l'adresse reste lisible comme du texte, mais se copie. */
+.ns-copie {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-primary);
+  cursor: pointer;
+  border-bottom: 1px dashed var(--border-subtle);
+}
+
+.ns-copie:hover {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.ns-partiel {
+  color: var(--text-muted);
 }
 
 .ns-lasterror {

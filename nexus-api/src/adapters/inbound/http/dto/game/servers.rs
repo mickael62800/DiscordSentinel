@@ -57,6 +57,15 @@ pub struct GameServerDto {
     pub voice_channel_id: Option<String>,
     pub ip_reveal_at: Option<DateTime<Utc>>,
     pub ip_revealed: bool,
+    /// Hote public du serveur, tel qu'il sera annonce aux joueurs.
+    ///
+    /// Renseigne independamment de `ip_revealed` : la revelation programmee
+    /// concerne les JOUEURS, pas l'administration. Un admin qui prepare une
+    /// session a besoin de l'adresse pour la tester avant de l'ouvrir.
+    ///
+    /// Cette route est derriere la cle d'API, jamais exposee publiquement —
+    /// c'est `PublicGameServerDto` qui gere la revelation cote joueurs.
+    pub public_host: Option<String>,
 }
 
 impl From<GameServer> for GameServerDto {
@@ -82,7 +91,19 @@ impl From<GameServer> for GameServerDto {
             voice_channel_id: s.voice_channel_id,
             ip_reveal_at: s.ip_reveal_at,
             ip_revealed: s.ip_revealed,
+            // L'hote ne vit pas sur l'entite : il est commun a la guild et
+            // releve de la configuration. Renseigne par `avec_hote`.
+            public_host: None,
         }
+    }
+}
+
+impl GameServerDto {
+    /// Renseigne l'hote public. Vide = non configure, on laisse `None` plutot
+    /// qu'une chaine vide, pour que le front distingue les deux cas.
+    pub fn avec_hote(mut self, hote: Option<&str>) -> Self {
+        self.public_host = hote.filter(|h| !h.trim().is_empty()).map(str::to_string);
+        self
     }
 }
 
@@ -102,6 +123,13 @@ impl From<GameServerDetail> for GameServerDetailDto {
             server: GameServerDto::from(d.server),
             config: d.config,
         }
+    }
+}
+
+impl GameServerDetailDto {
+    pub fn avec_hote(mut self, hote: Option<&str>) -> Self {
+        self.server = self.server.avec_hote(hote);
+        self
     }
 }
 
