@@ -63,8 +63,52 @@ pub struct CoudeCombatResult {
     pub resolved_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
+/// Un pari place sur un combat.
+#[derive(Debug, Clone)]
+pub struct CoudeBet {
+    pub id: uuid::Uuid,
+    pub backed_id: String,
+    pub amount: i64,
+    /// `None` tant que le combat n'est pas resolu.
+    pub won: Option<bool>,
+    pub payout: i64,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Une prime posee sur la tete d'un joueur.
+#[derive(Debug, Clone)]
+pub struct CoudePrime {
+    pub id: uuid::Uuid,
+    pub target_id: String,
+    pub target_name: String,
+    pub placed_by_id: String,
+    pub placed_by_name: String,
+    pub amount: i64,
+    pub claimed: bool,
+    pub claimed_by_id: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
 #[async_trait]
 pub trait CoudeRepository: Send + Sync {
+    /// Paris places par un joueur, les plus recents d'abord.
+    async fn list_bets(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeBet>, DomainError>;
+
+    /// Primes qui concernent un joueur : celles qu'il a posees ET celles
+    /// posees sur sa tete. Les separer cote appelant serait deux requetes
+    /// pour une information qui se lit ensemble.
+    async fn list_primes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudePrime>, DomainError>;
+
     /// Derniers combats RESOLUS d'un joueur, attaquant ou defenseur.
     ///
     /// Lecture qui manquait completement : le jeu ecrivait ses combats sans

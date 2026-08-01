@@ -3,7 +3,8 @@ use async_trait::async_trait;
 use nexus_core::{
     domain::{entities::coude::PlayerClass, errors::DomainError},
     ports::outbound::coude_repository::{
-        CoudeCombat, CoudeCombatResult, CoudeCombatSnapshot, CoudeProfile, CoudeRepository,
+        CoudeBet, CoudeCombat, CoudeCombatResult, CoudeCombatSnapshot, CoudePrime,
+        CoudeProfile, CoudeRepository,
     },
 };
 use sqlx::PgPool;
@@ -58,6 +59,69 @@ impl CoudeRepository for PgCoudeRepository {
             })
         .transpose()
     }
+    async fn list_bets(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeBet>, DomainError> {
+        let rows: Vec<BetRow> = sqlx::query_as(
+            "SELECT id, backed_id, amount, won, payout, created_at              FROM nexus_coude_bets              WHERE guild_id = $1 AND bettor_id = $2              ORDER BY created_at DESC LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| CoudeBet {
+                id: r.id,
+                backed_id: r.backed_id,
+                amount: r.amount,
+                won: r.won,
+                payout: r.payout,
+                created_at: r.created_at,
+            })
+            .collect())
+    }
+
+    async fn list_primes(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudePrime>, DomainError> {
+        // Posees PAR lui ou SUR lui : les deux le concernent, et savoir
+        // qu'on a une prime sur la tete est meme l'information la plus utile.
+        let rows: Vec<PrimeRow> = sqlx::query_as(
+            "SELECT id, target_id, target_name, placed_by_id, placed_by_name,                     amount, claimed, claimed_by_id, created_at              FROM nexus_coude_primes              WHERE guild_id = $1 AND (target_id = $2 OR placed_by_id = $2)              ORDER BY created_at DESC LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| CoudePrime {
+                id: r.id,
+                target_id: r.target_id,
+                target_name: r.target_name,
+                placed_by_id: r.placed_by_id,
+                placed_by_name: r.placed_by_name,
+                amount: r.amount,
+                claimed: r.claimed,
+                claimed_by_id: r.claimed_by_id,
+                created_at: r.created_at,
+            })
+            .collect())
+    }
+
     async fn list_combat_history(
         &self,
         guild_id: &str,
@@ -300,4 +364,27 @@ struct CombatRow {
     result_message: Option<String>,
     coins_transferred: i64,
     resolved_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
+#[derive(sqlx::FromRow)]
+struct BetRow {
+    id: uuid::Uuid,
+    backed_id: String,
+    amount: i64,
+    won: Option<bool>,
+    payout: i64,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct PrimeRow {
+    id: uuid::Uuid,
+    target_id: String,
+    target_name: String,
+    placed_by_id: String,
+    placed_by_name: String,
+    amount: i64,
+    claimed: bool,
+    claimed_by_id: Option<String>,
+    created_at: chrono::DateTime<chrono::Utc>,
 }

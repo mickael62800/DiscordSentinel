@@ -21,6 +21,40 @@ impl CoudeStealRepository for PgCoudeStealRepository {
         sqlx::query("UPDATE nexus_wallets SET coins=coins+$3,total_earned=total_earned+$3 WHERE guild_id=$1 AND user_id=$2").bind(guild).bind(to).bind(amount).execute(&mut *tx).await.map_err(pg_err)?;
         if success { sqlx::query("UPDATE nexus_coude_players SET total_stolen=total_stolen+$3 WHERE guild_id=$1 AND user_id=$2").bind(guild).bind(thief).bind(amount).execute(&mut *tx).await.map_err(pg_err)?; }
         sqlx::query("INSERT INTO nexus_coude_cooldowns (guild_id,user_id,action,available_at) VALUES ($1,$2,'steal',NOW()+INTERVAL '30 minutes') ON CONFLICT (guild_id,user_id,action) DO UPDATE SET available_at=EXCLUDED.available_at").bind(guild).bind(thief).execute(&mut *tx).await.map_err(pg_err)?;
+
+        // Trace du vol dans l'historique du portefeuille, pour les DEUX
+        // parties. Sans elle, un vol ne laissait qu'un compteur agrege et un
+        // solde qui bougeait : impossible de savoir qui avait pris quoi, ni
+        // quand. Une victime voyait ses coins disparaitre sans explication.
+        //
+        // Ecrit dans la MEME transaction que le transfert : une trace qui
+        // pourrait manquer alors que les coins ont bouge vaudrait moins que
+        // pas de trace du tout.
+        let (source, recit_debiteur, recit_crediteur) = if success {
+            ("coude_steal", "Vol subi", "Vol reussi")
+        } else {
+            ("coude_steal_failed", "Vol rate", "Dedommagement")
+        };
+
+        for (user, montant, recit) in [
+            (from, -amount, recit_debiteur),
+            (to, amount, recit_crediteur),
+        ] {
+            sqlx::query(
+                "INSERT INTO nexus_wallet_transactions
+                     (guild_id, user_id, amount, balance_after, source, description)
+                 SELECT $1, $2, $3, coins, $4, $5
+                 FROM nexus_wallets WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(guild)
+            .bind(user)
+            .bind(montant)
+            .bind(source)
+            .bind(recit)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+        }
         tx.commit().await.map_err(pg_err)
     }
 }
