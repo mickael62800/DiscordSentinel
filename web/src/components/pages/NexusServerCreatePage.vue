@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 // Création d'un serveur de jeu — choix du jeu puis réglages.
 //
 // Le formulaire est ENTIÈREMENT piloté par le `config_schema` du template
@@ -274,9 +275,9 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
         </details>
 
         <div class="nc-actions">
-          <button type="button" class="nc-submit" :disabled="!canSubmit" @click="submit">
+          <AppButton variant="primary" :disabled="!canSubmit" @click="submit">
             {{ submitting ? "Création…" : "Créer le serveur" }}
-          </button>
+          </AppButton>
           <RouterLink to="/nexus/servers" class="nc-cancel">Annuler</RouterLink>
         </div>
 
@@ -435,20 +436,7 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
   margin-top: var(--space-lg);
 }
 
-.nc-submit {
-  background: var(--accent);
-  border: none;
-  color: #fff;
-  border-radius: var(--radius-md);
-  padding: 8px 20px;
-  font-weight: 600;
-  cursor: pointer;
-}
 
-.nc-submit:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
 
 .nc-cancel {
   color: var(--text-secondary);

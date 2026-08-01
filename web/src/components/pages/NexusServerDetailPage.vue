@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 // Détail d'un serveur de jeu : pilotage, ressources, configuration, logs,
 // console RCON et historique des joueurs.
 //
@@ -256,7 +257,7 @@ function fmtDuration(secs: number | null): string {
           </button>
           <button v-else :disabled="busy" @click="act('stop')">Arrêter</button>
           <button :disabled="busy || isTransient" @click="act('restart')">Redémarrer</button>
-          <button class="danger" @click="remove">Supprimer</button>
+          <AppButton variant="danger" size="sm" @click="remove">Supprimer</AppButton>
         </div>
       </div>
 
@@ -336,9 +337,9 @@ function fmtDuration(secs: number | null): string {
             </label>
             </div>
           </details>
-          <button class="sd-save" :disabled="savingConfig" @click="saveConfig">
+          <AppButton variant="secondary" size="sm" :disabled="savingConfig" @click="saveConfig">
             {{ savingConfig ? "Enregistrement…" : "Enregistrer" }}
-          </button>
+          </AppButton>
           <p class="sd-hint">
             Les changements prennent effet au prochain redémarrage du serveur.
           </p>
@@ -347,7 +348,7 @@ function fmtDuration(secs: number | null): string {
 
       <!-- Logs -->
       <section v-else-if="onglet === 'logs'" class="sd-pane">
-        <button class="sd-refresh" @click="loadLogs">Rafraîchir</button>
+        <AppButton variant="ghost" size="sm" @click="loadLogs">Rafraîchir</AppButton>
         <pre class="sd-logs">{{ logs.join("\n") || "Aucune ligne." }}</pre>
       </section>
 
@@ -446,14 +447,6 @@ function fmtDuration(secs: number | null): string {
 
 .sd-actions button,
 .sd-refresh,
-.sd-save {
-  background: var(--bg-card);
-  border: 1px solid var(--bg-hover);
-  color: var(--text-primary);
-  border-radius: var(--radius-sm);
-  padding: 5px 12px;
-  cursor: pointer;
-}
 
 .sd-actions button:hover:not(:disabled) {
   border-color: var(--accent);
