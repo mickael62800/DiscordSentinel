@@ -3,6 +3,7 @@ import { watch } from "vue";
 import { useComponentVisibilityStore } from "@/stores/componentVisibilityStore";
 import { useMyRoleStore } from "@/stores/myRoleStore";
 import { useGuildSelector } from "./useGuildSelector";
+import { getDiscordToken } from "@/api/config";
 
 /**
  * Wrapper composable : delegue aux stores Pinia componentVisibility +
@@ -19,7 +20,16 @@ export function useComponentVisibility() {
   watch(
     selectedGuildId,
     (gid) => {
-      if (gid) void store.load(gid);
+      // Sans session, on ne charge RIEN. La visibilité des composants
+      // d'administration n'a de sens que pour quelqu'un d'identifié, et
+      // l'endpoint exige un jeton : l'appeler anonymement provoquait un 401,
+      // que le client HTTP traduit en redirection vers /login.
+      //
+      // Le cas est apparu avec le mode mono-serveur : la guilde est désormais
+      // imposée par la configuration, donc toujours renseignée. Auparavant
+      // elle restait nulle pour un visiteur anonyme et la garde ci-dessous
+      // était fournie par accident.
+      if (gid && getDiscordToken()) void store.load(gid);
     },
     { immediate: true },
   );

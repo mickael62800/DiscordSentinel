@@ -30,11 +30,15 @@ const balise = computed(() => {
   return "button";
 });
 
-/// Un lien externe s'ouvre dans un onglet neuf, avec les garde-fous d'usage :
+/// Un lien EXTERNE s'ouvre dans un onglet neuf, avec les garde-fous d'usage :
 /// `noopener` empêche la page cible d'accéder à la nôtre via `window.opener`.
+///
+/// Une ancre (`#section`) reste dans l'onglet courant : l'ouvrir ailleurs
+/// rechargerait la page pour la faire défiler, ce qui est absurde.
 const attributs = computed(() => {
   if (props.to) return { to: props.to };
   if (props.href) {
+    if (props.href.startsWith("#")) return { href: props.href };
     return { href: props.href, target: "_blank", rel: "noopener noreferrer" };
   }
   return { type: "button", disabled: props.disabled };
