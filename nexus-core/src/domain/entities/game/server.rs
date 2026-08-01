@@ -395,4 +395,69 @@ mod tests {
             assert_eq!(GameServerStatus::from_str(st.as_str()), Some(st));
         }
     }
+
+    // ── Marge memoire du conteneur ──
+
+    /// Le bug qui empechait tout serveur Minecraft de demarrer : tas et limite
+    /// du conteneur identiques, donc mort par le noyau des le lancement.
+    #[test]
+    fn le_conteneur_recoit_toujours_plus_que_le_jeu() {
+        for tas in [512, 1024, 2048, 4096, 8192] {
+            assert!(
+                container_memory_mb(tas) > tas,
+                "un tas de {tas} Mo doit obtenir un conteneur plus grand"
+            );
+        }
+    }
+
+    /// Les couts fixes d'une JVM ne diminuent pas avec le tas : un quart de
+    /// 512 Mo ne suffirait pas.
+    #[test]
+    fn un_petit_serveur_obtient_le_plancher() {
+        assert_eq!(container_memory_mb(512), 512 + 512);
+        assert_eq!(container_memory_mb(1024), 1024 + 512);
+    }
+
+    /// Au-dela, la marge suit le tas : 2 Go de tas demandent plus de structures
+    /// internes que 512 Mo.
+    #[test]
+    fn un_gros_serveur_obtient_un_quart_de_marge() {
+        assert_eq!(container_memory_mb(4096), 4096 + 1024);
+        assert_eq!(container_memory_mb(8192), 8192 + 2048);
+    }
+
+    /// La bascule entre plancher et proportion se fait a 2048 Mo, ou les deux
+    /// valent 512.
+    #[test]
+    fn la_bascule_est_continue() {
+        assert_eq!(container_memory_mb(2048), 2048 + 512);
+        assert!(container_memory_mb(2049) >= container_memory_mb(2048));
+    }
+
+    /// Une valeur absurde ne doit pas deborder l'entier.
+    #[test]
+    fn une_valeur_extreme_ne_deborde_pas() {
+        assert!(container_memory_mb(i32::MAX) >= i32::MAX - 1);
+    }
+}
+
+/// Memoire a accorder au CONTENEUR pour un jeu dote de `heap_mb` de memoire.
+///
+/// Le conteneur doit toujours en avoir PLUS que le jeu. Une JVM configuree
+/// avec 2 Go de tas consomme davantage : metaespace, piles de threads,
+/// cache de code, structures du ramasse-miettes, tampons directs. Lui donner
+/// exactement son tas la fait tuer par le noyau des le demarrage — c'est
+/// silencieux du cote de Docker, le journal du jeu s'arrete simplement sur un
+/// code de sortie -1.
+///
+/// La marge vaut un quart du tas, avec un plancher de 512 Mo : en proportion
+/// seule, un petit serveur n'aurait pas de quoi couvrir les couts fixes de la
+/// machine virtuelle, qui ne diminuent pas avec le tas.
+///
+/// S'applique aussi aux jeux natifs : la marge y sert de coussin plutot que
+/// de laisser le noyau arbitrer au premier pic.
+pub fn container_memory_mb(heap_mb: i32) -> i32 {
+    const MARGE_MINIMALE_MB: i32 = 512;
+    let marge = (heap_mb / 4).max(MARGE_MINIMALE_MB);
+    heap_mb.saturating_add(marge)
 }
