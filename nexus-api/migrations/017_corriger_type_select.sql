@@ -10,9 +10,14 @@
 -- des modeles de jeu repondait 500 — pas seulement les cinq champs fautifs.
 -- Un seul champ invalide empeche de lire le tableau entier.
 --
--- Les migrations 012 et 013 sont corrigees pour les installations futures ;
--- celle-ci repare celles ou elles sont deja passees. Les deux sont
--- necessaires : sqlx ne rejoue pas une migration deja appliquee.
+-- 012 et 013 gardent volontairement leur `select` fautif : sqlx enregistre
+-- une EMPREINTE de chaque migration appliquee et refuse de demarrer si elle
+-- change. Les corriger apres coup a immobilise nexus-api sur
+-- « migration 12 was previously applied but has been modified ».
+--
+-- Une migration appliquee ne se modifie jamais. On la repare par une
+-- suivante. Une installation neuve passera donc par l'erreur puis par sa
+-- correction — sans consequence, 017 s'executant dans la foulee.
 --
 -- Idempotente : sans occurrence de `select`, elle ne modifie rien.
 

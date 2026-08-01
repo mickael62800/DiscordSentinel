@@ -57,7 +57,7 @@ WHERE slug = 'minecraft-vanilla';
 
 -- Reglages de jeu supplementaires : ce qui change reellement une partie.
 UPDATE game_templates SET config_schema = config_schema || '[
-  {"key": "LEVEL_TYPE", "type": "enum", "label": "Type de monde",
+  {"key": "LEVEL_TYPE", "type": "select", "label": "Type de monde",
    "group": "Monde", "default": "minecraft:normal", "required": false,
    "options": ["minecraft:normal", "minecraft:flat", "minecraft:large_biomes", "minecraft:amplified", "minecraft:single_biome_surface"],
    "description": "Plat pour construire, amplifie pour des reliefs extremes."},
@@ -151,11 +151,11 @@ UPDATE game_templates SET config_schema = config_schema || '[
    "group": "Mods", "default": "false", "required": false,
    "description": "Serveur alternatif qui apporte les plugins, les permissions et des commandes d''administration."},
 
-  {"key": "WORLD_SIZE", "type": "enum", "label": "Taille du monde",
+  {"key": "WORLD_SIZE", "type": "select", "label": "Taille du monde",
    "group": "Monde", "default": "2", "required": false, "options": ["1", "2", "3"],
    "description": "1 petit, 2 moyen, 3 grand."},
 
-  {"key": "DIFFICULTY", "type": "enum", "label": "Difficulte",
+  {"key": "DIFFICULTY", "type": "select", "label": "Difficulte",
    "group": "Monde", "default": "0", "required": false, "options": ["0", "1", "2", "3"],
    "description": "0 classique, 1 expert, 2 maitre, 3 voyage."},
 
@@ -196,7 +196,7 @@ UPDATE game_templates SET config_schema = config_schema || '[
   {"key": "SERVERCONFIG_DayLightLength", "type": "number", "label": "Duree du jour (h)",
    "group": "Monde", "default": "18", "min": 1, "max": 24, "required": false},
 
-  {"key": "SERVERCONFIG_ZombiesRun", "type": "enum", "label": "Zombies courent",
+  {"key": "SERVERCONFIG_ZombiesRun", "type": "select", "label": "Zombies courent",
    "group": "Monde", "default": "0", "required": false, "options": ["0", "1", "2", "3"],
    "description": "0 la nuit seulement, 1 jamais, 2 toujours, 3 sans jamais courir."},
 
