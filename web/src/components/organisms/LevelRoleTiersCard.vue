@@ -67,8 +67,17 @@ const niveauxEnDouble = computed(() => {
   return doubles;
 });
 
-const incomplets = computed(() =>
-  paliers.value.some((p) => !p.roleId || p.niveau <= 0),
+/// Une ligne sans rôle n'est PAS une erreur : tous les niveaux ne donnent pas
+/// un nouveau rôle. On génère l'échelle complète, on remplit les seuils qui
+/// comptent, et le reste sert de repère visuel sans rien changer.
+///
+/// Elle n'est simplement pas enregistrée. Ce compteur le dit sans alarmer.
+const sansRole = computed(() => paliers.value.filter((p) => !p.roleId).length);
+
+/// Ce qui est vraiment faux : un rôle choisi sur un niveau invalide. Là, la
+/// ligne serait perdue sans que rien ne l'explique.
+const niveauxInvalides = computed(() =>
+  paliers.value.some((p) => p.roleId && (!Number.isFinite(p.niveau) || p.niveau <= 0)),
 );
 
 function analyser(brut: string): Palier[] {
@@ -116,6 +125,36 @@ function retirer(index: number) {
   paliers.value.splice(index, 1);
 }
 
+/// Bornes de l'échelle. 100 couvre largement une communauté active ; au-delà,
+/// on ajoute les paliers un par un.
+const echelleJusqua = ref(100);
+const echellePas = ref(5);
+
+/// Construit l'échelle : niveau 1, puis un palier tous les N niveaux.
+///
+/// Le niveau 1 est toujours présent — c'est le premier level-up, celui où le
+/// membre doit déjà porter un rôle. Il n'est pas couvert par « Rôles attribués
+/// par défaut », qui se donne à l'ARRIVÉE et ne dépend d'aucun niveau.
+///
+/// Les rôles déjà choisis sont conservés quand le niveau retombe sur un palier
+/// existant : régénérer l'échelle après en avoir rempli la moitié ne doit pas
+/// effacer le travail fait.
+function genererEchelle() {
+  const pas = Math.max(1, echellePas.value);
+  const max = Math.min(1000, Math.max(1, echelleJusqua.value));
+
+  const dejaChoisi = new Map(paliers.value.map((p) => [p.niveau, p.roleId]));
+  const niveaux = [1];
+  for (let n = pas; n <= max; n += pas) {
+    if (n !== 1) niveaux.push(n);
+  }
+
+  paliers.value = niveaux.map((niveau) => ({
+    niveau,
+    roleId: dejaChoisi.get(niveau) ?? "",
+  }));
+}
+
 async function enregistrer() {
   if (!selectedGuildId.value) return;
   enregistrement.value = true;
@@ -158,7 +197,7 @@ onMounted(charger);
       </p>
 
       <ul v-else class="lrt-liste">
-        <li v-for="(p, i) in paliers" :key="i" class="lrt-ligne">
+        <li v-for="(p, i) in paliers" :key="i" class="lrt-ligne" :class="{ 'lrt-inactive': !p.roleId }">
           <label class="lrt-niveau">
             <span>Niveau</span>
             <input
@@ -187,8 +226,11 @@ onMounted(charger);
       <p v-if="niveauxEnDouble.size" class="lrt-avert">
         Deux paliers portent le même niveau : un seul sera conservé.
       </p>
-      <p v-if="incomplets" class="lrt-avert">
-        Une ligne est incomplète — elle ne sera pas enregistrée.
+      <p v-if="niveauxInvalides" class="lrt-avert">
+        Un rôle est posé sur un niveau invalide — cette ligne serait perdue.
+      </p>
+      <p v-else-if="sansRole" class="lrt-neutre">
+        {{ sansRole }} niveau(x) sans rôle : normal, ils ne changent rien.
       </p>
 
       <div class="lrt-mode">
@@ -207,6 +249,14 @@ onMounted(charger);
             Le membre garde tous les rôles obtenus au fil des paliers.
           </template>
         </p>
+      </div>
+
+      <div class="lrt-echelle">
+        <span>Créer l'échelle : niveau 1, puis tous les</span>
+        <input v-model.number="echellePas" type="number" min="1" max="100" />
+        <span>niveaux jusqu'au niveau</span>
+        <input v-model.number="echelleJusqua" type="number" min="1" max="1000" />
+        <button type="button" class="lrt-ajout" @click="genererEchelle">Générer</button>
       </div>
 
       <div class="lrt-actions">
@@ -253,6 +303,9 @@ onMounted(charger);
   flex-wrap: wrap;
 }
 
+.lrt-inactive { opacity: 0.55; }
+.lrt-inactive:focus-within { opacity: 1; }
+
 .lrt-niveau {
   display: flex;
   align-items: center;
@@ -282,6 +335,12 @@ onMounted(charger);
   margin-bottom: 8px;
 }
 
+.lrt-neutre {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
 .lrt-mode {
   border-top: 1px solid var(--border);
   padding-top: 16px;
@@ -301,6 +360,28 @@ onMounted(charger);
   color: var(--text-secondary);
   line-height: 1.5;
   margin-top: 6px;
+}
+
+.lrt-echelle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-top: 16px;
+}
+
+.lrt-echelle input {
+  width: 70px;
+  padding: 6px 8px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .lrt-actions {
