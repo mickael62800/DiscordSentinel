@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, reactive, watch } from "vue";
 import { useWelcome } from "@/composables/useWelcome";
@@ -437,9 +438,9 @@ async function onSave() {
     </fieldset>
 
     <div class="actions">
-      <button type="submit" class="btn-primary" :disabled="saving">
+      <AppButton variant="primary" type="submit"  :disabled="saving">
         {{ saving ? "Enregistrement…" : "Enregistrer" }}
-      </button>
+      </AppButton>
     </div>
   </form>
 </template>

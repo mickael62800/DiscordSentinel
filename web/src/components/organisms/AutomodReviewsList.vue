@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { onMounted, onUnmounted, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useAuth } from "@/composables/useAuth";
@@ -92,7 +93,7 @@ onUnmounted(() => {
   <section class="card reviews-section">
     <div class="reviews-header">
       <h2>🛎️ Reviews en attente <span v-if="reviews.length" class="badge">{{ reviews.length }}</span></h2>
-      <button class="btn-secondary" @click="fetchReviews" :disabled="reviewsLoading">↻</button>
+      <AppButton variant="secondary" @click="fetchReviews" :disabled="reviewsLoading">↻</AppButton>
     </div>
     <p class="lede small">
       Cartes postées par le bot dans le salon de logs avec boutons (Apply / Warn / Mute / Ban / Ignorer).

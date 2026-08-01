@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { onMounted, onUnmounted, ref } from "vue";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
@@ -94,9 +95,9 @@ onUnmounted(() => {
                 </span>
               </td>
               <td>
-                <button class="btn-secondary" @click="reloadModel(m.model_type)">
+                <AppButton variant="secondary" @click="reloadModel(m.model_type)">
                   Reload
-                </button>
+                </AppButton>
               </td>
             </tr>
           </tbody>

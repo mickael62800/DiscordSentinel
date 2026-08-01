@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import { Line } from "vue-chartjs";
@@ -102,7 +103,7 @@ const chartOptions = computed(() => ({
   <section class="dash-section">
     <div class="head">
       <h2 class="section-title">📈 Tendance espace disque</h2>
-      <button class="btn xs" @click="load">↻</button>
+      <AppButton variant="ghost" size="xs" @click="load">↻</AppButton>
     </div>
     <div v-if="loading" class="muted">Chargement…</div>
     <div v-else-if="error" class="info">

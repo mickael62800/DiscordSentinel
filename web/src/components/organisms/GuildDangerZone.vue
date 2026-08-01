@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { computed, ref } from "vue";
 import AppModal from "@/components/atoms/AppModal.vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -73,9 +74,9 @@ async function doReset() {
         Réservé au <strong>propriétaire</strong> du serveur.
       </p>
 
-      <button class="btn-danger" @click="openDialog">
+      <AppButton variant="danger" @click="openDialog">
         Réinitialiser complètement ce serveur…
-      </button>
+      </AppButton>
     </div>
 
     <AppModal
@@ -114,12 +115,12 @@ async function doReset() {
 
       <template #footer>
         <button class="btn-ghost" :disabled="submitting" @click="closeDialog">Annuler</button>
-        <button v-if="step === 1" class="btn-danger" @click="step = 2">
+        <AppButton variant="danger" v-if="step === 1"  @click="step = 2">
           Je comprends, continuer
-        </button>
-        <button v-else class="btn-danger" :disabled="!canConfirm" @click="doReset">
+        </AppButton>
+        <AppButton variant="danger" v-else  :disabled="!canConfirm" @click="doReset">
           {{ submitting ? "Suppression…" : "Tout supprimer définitivement" }}
-        </button>
+        </AppButton>
       </template>
     </AppModal>
   </section>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive, ref } from "vue";
@@ -70,9 +71,9 @@ async function grant() {
         </AppSelect>
       </label>
       <div class="actions full">
-        <button type="submit" class="btn-primary" :disabled="granting">
+        <AppButton variant="primary" type="submit"  :disabled="granting">
           {{ granting ? "…" : "Attribuer" }}
-        </button>
+        </AppButton>
       </div>
     </form>
   </section>

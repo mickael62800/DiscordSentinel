@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { onMounted, reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -83,7 +84,7 @@ watch(guildIdFilter, fetchSponsorships);
           <AppInput v-model="draft.sponsored_id" required />
         </label>
         <div class="actions full">
-          <button type="submit" class="btn-primary">Enregistrer</button>
+          <AppButton variant="primary" type="submit">Enregistrer</AppButton>
         </div>
       </form>
     </section>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { computed } from "vue";
 import { useConfessions } from "@/composables/useConfessions";
 import { useConfirm } from "@/composables/useConfirm";
@@ -60,8 +61,8 @@ async function onDelete(c: Confession) {
           <span v-else class="badge">active</span>
         </td>
         <td class="actions">
-          <button class="btn-secondary xs" @click="showReplies(c)" title="Voir les replies">💬</button>
-          <button v-if="!c.deleted_at" class="btn-danger xs" @click="onDelete(c)" title="Supprimer">🗑</button>
+          <AppButton variant="secondary" size="xs" @click="showReplies(c)" title="Voir les replies">💬</AppButton>
+          <AppButton variant="danger" size="xs" v-if="!c.deleted_at"  @click="onDelete(c)" title="Supprimer">🗑</AppButton>
         </td>
       </tr>
     </tbody>

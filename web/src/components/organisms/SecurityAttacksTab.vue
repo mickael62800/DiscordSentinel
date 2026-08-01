@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
@@ -104,7 +105,7 @@ onMounted(refresh);
             <option value="24h">24h</option>
             <option value="7d">7j</option>
           </AppSelect>
-          <button class="btn-secondary xs" @click="loadTopIps">↻</button>
+          <AppButton variant="secondary" size="xs" @click="loadTopIps">↻</AppButton>
         </div>
       </div>
       <table v-if="topIps.length > 0" class="data-table">
@@ -125,7 +126,7 @@ onMounted(refresh);
             <td class="num" :class="{ danger: ip.failed > 10 }">{{ ip.failed }}</td>
             <td class="muted small">{{ fmtDate(ip.last_seen) }}</td>
             <td class="actions">
-              <button v-if="canManage" class="btn-secondary xs danger" @click="banIp(ip.client_ip)" title="Bannir">🚫 Ban</button>
+              <AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(ip.client_ip)" title="Bannir">🚫 Ban</AppButton>
             </td>
           </tr>
         </tbody>
@@ -143,7 +144,7 @@ onMounted(refresh);
             <option value="24h">24h</option>
             <option value="7d">7j</option>
           </AppSelect>
-          <button class="btn-secondary xs" @click="loadAuthFailures">↻</button>
+          <AppButton variant="secondary" size="xs" @click="loadAuthFailures">↻</AppButton>
         </div>
       </div>
       <table v-if="authFailures.length > 0" class="data-table">
@@ -163,7 +164,7 @@ onMounted(refresh);
             <td class="small mono">{{ e.client_ip }}</td>
             <td class="small muted ua">{{ truncate(e.user_agent, 80) }}</td>
             <td class="actions">
-              <button v-if="canManage && e.client_ip && e.client_ip !== '-'" class="btn-secondary xs danger" @click="banIp(e.client_ip)" title="Bannir">🚫</button>
+              <AppButton variant="danger" size="xs" v-if="canManage && e.client_ip && e.client_ip !== '-'"  @click="banIp(e.client_ip)" title="Bannir">🚫</AppButton>
             </td>
           </tr>
         </tbody>
@@ -175,7 +176,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🔑 Tentatives SSH échouées</h2>
-        <button class="btn-secondary xs" @click="loadSshFailures">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadSshFailures">↻</AppButton>
       </div>
       <div v-if="sshError" class="info-banner">
         <p class="small">{{ sshError }}</p>
@@ -193,7 +194,7 @@ onMounted(refresh);
               <td class="small mono">{{ e.user }}</td>
               <td class="small mono">{{ e.ip }}</td>
               <td class="actions">
-                <button v-if="canManage && e.ip !== '?'" class="btn-secondary xs danger" @click="banIp(e.ip)">🚫 Ban</button>
+                <AppButton variant="danger" size="xs" v-if="canManage && e.ip !== '?'"  @click="banIp(e.ip)">🚫 Ban</AppButton>
               </td>
             </tr>
           </tbody>
@@ -206,7 +207,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🕷 Patterns suspects nginx (24h)</h2>
-        <button class="btn-secondary xs" @click="loadSuspicious">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadSuspicious">↻</AppButton>
       </div>
       <div v-if="suspiciousError" class="info-banner">
         <p class="small">{{ suspiciousError }}</p>
@@ -230,7 +231,7 @@ onMounted(refresh);
               <td class="small">{{ e.status }}</td>
               <td><span class="badge" :class="e.category === 'sqli' ? 'danger' : 'warning'">{{ e.category }}</span></td>
               <td class="small">{{ truncate(e.user_agent, 30) }}</td>
-              <td><button v-if="canManage" class="btn-secondary xs danger" @click="banIp(e.ip)">🚫</button></td>
+              <td><AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(e.ip)">🚫</AppButton></td>
             </tr>
           </tbody>
         </table>

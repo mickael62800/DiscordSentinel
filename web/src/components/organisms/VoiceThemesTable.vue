@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useVoiceThemes } from "@/composables/useVoiceThemes";
 import { useConfirm } from "@/composables/useConfirm";
 import type { VoiceChannelTheme } from "@/types/voice-extended";
@@ -27,7 +28,7 @@ async function onRemove(theme: VoiceChannelTheme) {
   <section class="card">
     <div class="card-header">
       <h2>Thèmes existants</h2>
-      <button class="btn-primary" @click="emit('create')">+ Nouveau thème</button>
+      <AppButton variant="primary" @click="emit('create')">+ Nouveau thème</AppButton>
     </div>
 
     <div v-if="loading" class="loading">Chargement…</div>
@@ -63,8 +64,8 @@ async function onRemove(theme: VoiceChannelTheme) {
             <span v-if="t.stage_enabled" class="flag stage">stage</span>
           </td>
           <td class="row-actions">
-            <button class="btn-secondary" @click="emit('edit', t)">Modifier</button>
-            <button class="btn-danger" @click="onRemove(t)">🗑️</button>
+            <AppButton variant="secondary" @click="emit('edit', t)">Modifier</AppButton>
+            <AppButton variant="danger" @click="onRemove(t)">🗑️</AppButton>
           </td>
         </tr>
       </tbody>

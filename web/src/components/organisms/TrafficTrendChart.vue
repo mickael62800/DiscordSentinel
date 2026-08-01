@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref, watch } from "vue";
@@ -84,7 +85,7 @@ const chartOptions = computed(() => ({
           <option value="24h">24h</option>
           <option value="7d">7j</option>
         </AppSelect>
-        <button class="btn xs" @click="load">↻</button>
+        <AppButton variant="ghost" size="xs" @click="load">↻</AppButton>
       </div>
     </div>
 

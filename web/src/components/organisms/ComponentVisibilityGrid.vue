@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref, watch } from "vue";
 import type { ComponentVisibilityEntry, RbacRole } from "@/types";
@@ -120,10 +121,10 @@ watch(selectedGuildId, load);
         </p>
       </div>
       <div class="vis-actions">
-        <button class="btn" :disabled="loading || saving" @click="resetToDefaults">Réinitialiser</button>
-        <button class="btn primary" :disabled="saving" @click="save">
+        <AppButton variant="ghost" :disabled="loading || saving" @click="resetToDefaults">Réinitialiser</AppButton>
+        <AppButton variant="primary" :disabled="saving" @click="save">
           {{ saving ? "Enregistrement…" : "💾 Enregistrer" }}
-        </button>
+        </AppButton>
       </div>
     </div>
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import {
@@ -130,7 +131,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🌍 Géolocalisation IPs ({{ geoRows.length }})</h2>
-        <button class="btn-secondary xs" @click="loadGeoForAll">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadGeoForAll">↻</AppButton>
       </div>
       <p class="muted small">
         Pays / FAI / ASN pour les IPs vues sur Top IPs et Auth failures.
@@ -157,7 +158,7 @@ onMounted(refresh);
             <td class="num">{{ r.total }}</td>
             <td class="num" :class="{ danger: (r.failed ?? 0) > 10 }">{{ r.failed ?? 0 }}</td>
             <td class="actions">
-              <button v-if="canManage" class="btn-secondary xs danger" @click="banIp(r.ip)">🚫</button>
+              <AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(r.ip)">🚫</AppButton>
             </td>
           </tr>
         </tbody>
@@ -169,7 +170,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🔗 Connexions actives ({{ connections?.total ?? 0 }})</h2>
-        <button class="btn-secondary xs" @click="loadConnections">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadConnections">↻</AppButton>
       </div>
       <div v-if="connectionsError" class="info-banner">
         <p class="small">{{ connectionsError }}</p>
@@ -195,7 +196,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🔍 Ports ouverts ({{ openPorts?.ports.length ?? 0 }})</h2>
-        <button class="btn-secondary xs" @click="loadOpenPorts">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadOpenPorts">↻</AppButton>
       </div>
       <div v-if="portsError" class="info-banner">
         <p class="small">{{ portsError }}</p>
@@ -228,7 +229,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🌐 Connexions outbound ({{ outbound?.total ?? 0 }})</h2>
-        <button class="btn-secondary xs" @click="loadOutbound">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadOutbound">↻</AppButton>
       </div>
       <div v-if="outboundError" class="info-banner">
         <p class="small">{{ outboundError }}</p>
@@ -254,7 +255,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🔐 Erreurs handshake TLS (24h)</h2>
-        <button class="btn-secondary xs" @click="loadTlsErrors">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadTlsErrors">↻</AppButton>
       </div>
       <div v-if="tlsErrorsError" class="info-banner">
         <p class="small">{{ tlsErrorsError }}</p>
@@ -268,7 +269,7 @@ onMounted(refresh);
             <tr v-for="(e, i) in tlsErrors.entries.slice(0, 30)" :key="i">
               <td class="small mono">{{ e.client }}</td>
               <td class="small">{{ truncate(e.error, 120) }}</td>
-              <td><button v-if="canManage && e.client !== '?'" class="btn-secondary xs danger" @click="banIp(e.client)">🚫</button></td>
+              <td><AppButton variant="danger" size="xs" v-if="canManage && e.client !== '?'"  @click="banIp(e.client)">🚫</AppButton></td>
             </tr>
           </tbody>
         </table>

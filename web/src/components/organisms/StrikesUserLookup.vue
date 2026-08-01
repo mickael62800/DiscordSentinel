@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useStrikes } from "@/composables/useStrikes";
 import { useFormatDate } from "@/composables/useFormatDate";
 
@@ -22,7 +23,7 @@ const { formatDateTimeNumeric: formatDate } = useFormatDate();
         placeholder="ID de l'utilisateur"
         @keyup.enter="lookupStrikes"
       />
-      <button class="btn-secondary" @click="lookupStrikes">Rechercher</button>
+      <AppButton variant="secondary" @click="lookupStrikes">Rechercher</AppButton>
       <button
         v-if="userStrikes.length > 0"
         class="btn-danger"

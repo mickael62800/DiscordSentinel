@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -129,7 +130,7 @@ const sortedRoles = computed(() =>
           <NumberInputWithUnit v-model.number="draft.duration_hours" :min="1" required unit="h" />
         </label>
         <div class="actions full">
-          <button type="submit" class="btn-primary">Créer</button>
+          <AppButton variant="primary" type="submit">Créer</AppButton>
         </div>
       </form>
     </section>

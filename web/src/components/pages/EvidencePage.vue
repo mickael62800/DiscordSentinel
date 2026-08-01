@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import { useInfractions } from "@/composables/useInfractions";
@@ -119,9 +120,9 @@ watch(lookupUserId, async (id) => {
           placeholder="ID Discord de l'utilisateur (ex: 123456789012345678)"
           @keyup.enter="searchUser"
         />
-        <button class="btn-secondary" :disabled="!lookupUserId.trim() || infractionsLoading" @click="searchUser">
+        <AppButton variant="secondary" :disabled="!lookupUserId.trim() || infractionsLoading" @click="searchUser">
           {{ infractionsLoading ? "Recherche…" : "Rechercher" }}
-        </button>
+        </AppButton>
       </div>
     </section>
 
@@ -152,9 +153,9 @@ watch(lookupUserId, async (id) => {
             <td>{{ a.reason }}</td>
             <td>{{ a.moderator }}</td>
             <td>
-              <button class="btn-secondary" @click="selectAction(a.id)">
+              <AppButton variant="secondary" @click="selectAction(a.id)">
                 {{ selectedActionId === a.id ? "✓ Sélectionnée" : "Choisir" }}
-              </button>
+              </AppButton>
             </td>
           </tr>
         </tbody>
@@ -184,9 +185,9 @@ watch(lookupUserId, async (id) => {
           <AppTextarea v-model="draft.description" :rows="2" />
         </label>
         <div class="actions">
-          <button type="submit" class="btn-primary" :disabled="!draft.url.trim()">
+          <AppButton variant="primary" type="submit"  :disabled="!draft.url.trim()">
             Joindre
-          </button>
+          </AppButton>
         </div>
       </form>
     </section>

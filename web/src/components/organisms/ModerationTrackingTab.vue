@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { ref, watch } from "vue";
 import AppTabs from "../molecules/AppTabs.vue";
 import StrikesPage from "../pages/StrikesPage.vue";
@@ -53,9 +54,9 @@ watch(
             placeholder="ID Discord de l'utilisateur (ex: 123456789012345678)"
             type="text"
           />
-          <button v-if="sharedUserId" class="btn-secondary" @click="sharedUserId = ''">
+          <AppButton variant="secondary" v-if="sharedUserId"  @click="sharedUserId = ''">
             Effacer
-          </button>
+          </AppButton>
         </div>
       </section>
 

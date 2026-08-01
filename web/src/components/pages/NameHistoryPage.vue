@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -60,7 +61,7 @@ const { formatDateTimeShort: formatDate } = useFormatDate();
           placeholder="ID Discord de l'utilisateur"
           @keyup.enter="lookup"
         />
-        <button class="btn-secondary" @click="lookup">Rechercher</button>
+        <AppButton variant="secondary" @click="lookup">Rechercher</AppButton>
       </div>
     </section>
 

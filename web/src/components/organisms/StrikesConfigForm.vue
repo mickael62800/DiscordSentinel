@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { reactive, watch } from "vue";
 import { useStrikes } from "@/composables/useStrikes";
@@ -111,13 +112,13 @@ async function onSave() {
             </tr>
           </tbody>
         </table>
-        <button type="button" class="btn-secondary" @click="addThreshold">+ Ajouter un seuil</button>
+        <AppButton variant="secondary" @click="addThreshold">+ Ajouter un seuil</AppButton>
       </div>
 
       <div class="actions">
-        <button type="submit" class="btn-primary" :disabled="saving">
+        <AppButton variant="primary" type="submit"  :disabled="saving">
           {{ saving ? "Enregistrement…" : "Enregistrer la config" }}
-        </button>
+        </AppButton>
       </div>
     </form>
   </section>

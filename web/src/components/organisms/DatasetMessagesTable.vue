@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useAiDataset } from "@/composables/useAiDataset";
 import { useFormatDate } from "@/composables/useFormatDate";
 
@@ -38,9 +39,9 @@ function truncate(s: string, n: number): string {
     </table>
 
     <div v-if="items.length > 0" class="pagination">
-      <button class="btn" :disabled="offset === 0 || loading" @click="prevPage">← Précédent</button>
+      <AppButton variant="ghost" :disabled="offset === 0 || loading" @click="prevPage">← Précédent</AppButton>
       <span class="muted">{{ offset + 1 }} – {{ Math.min(offset + items.length, total) }} sur {{ total }}</span>
-      <button class="btn" :disabled="offset + limit >= total || loading" @click="nextPage">Suivant →</button>
+      <AppButton variant="ghost" :disabled="offset + limit>= total || loading" @click="nextPage">Suivant →</AppButton>
     </div>
   </section>
 </template>

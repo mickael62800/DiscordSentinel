@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { ref, watch } from "vue";
@@ -115,8 +116,8 @@ async function onSave() {
         </div>
 
         <div class="actions full">
-          <button type="button" class="btn-secondary" @click="emit('close')">Annuler</button>
-          <button type="submit" class="btn-primary">{{ editing ? "Enregistrer" : "Créer" }}</button>
+          <AppButton variant="secondary" @click="emit('close')">Annuler</AppButton>
+          <AppButton variant="primary" type="submit">{{ editing ? "Enregistrer" : "Créer" }}</AppButton>
         </div>
       </form>
     </div>

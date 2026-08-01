@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { ref, onMounted, watch } from "vue";
 import { errMsg } from "@/utils/errMsg";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -152,9 +153,9 @@ function fmtDate(iso: string | null): string {
           Messages Discord postés automatiquement (ponctuel, quotidien, hebdo, mensuel).
         </p>
       </div>
-      <button class="btn-primary" :disabled="!selectedGuildId" @click="openCreate">
+      <AppButton variant="primary" :disabled="!selectedGuildId" @click="openCreate">
         + Nouvelle annonce
-      </button>
+      </AppButton>
     </header>
 
     <div v-if="loading" class="muted">Chargement…</div>
@@ -187,10 +188,10 @@ function fmtDate(iso: string | null): string {
           </td>
           <td class="small">{{ a.channel_ids.length }} salon{{ a.channel_ids.length > 1 ? "s" : "" }}</td>
           <td class="actions">
-            <button class="btn-secondary xs" @click="showPreview(a)" title="Aperçu">👁</button>
-            <button class="btn-secondary xs" @click="showRuns(a)" title="Historique">📜</button>
-            <button class="btn-secondary xs" @click="openEdit(a)" title="Editer">✎</button>
-            <button class="btn-secondary xs danger" @click="removeAnnouncement(a)" title="Supprimer">🗑</button>
+            <AppButton variant="secondary" size="xs" @click="showPreview(a)" title="Aperçu">👁</AppButton>
+            <AppButton variant="secondary" size="xs" @click="showRuns(a)" title="Historique">📜</AppButton>
+            <AppButton variant="secondary" size="xs" @click="openEdit(a)" title="Editer">✎</AppButton>
+            <AppButton variant="danger" size="xs" @click="removeAnnouncement(a)" title="Supprimer">🗑</AppButton>
           </td>
         </tr>
       </tbody>
@@ -253,15 +254,5 @@ function fmtDate(iso: string | null): string {
   border-color: var(--success);
 }
 
-.btn-primary {
-  padding: 8px 14px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  border: 1px solid var(--accent);
-  background: var(--accent);
-  color: white;
-}
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>

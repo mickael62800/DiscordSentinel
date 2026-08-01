@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive } from "vue";
@@ -100,7 +101,7 @@ async function onSavePanel() {
       <div class="entries-section full">
         <div class="entries-header">
           <h3>Rôles ({{ draft.entries.length }})</h3>
-          <button type="button" class="btn-secondary" @click="addEntry">+ Ajouter un rôle</button>
+          <AppButton variant="secondary" @click="addEntry">+ Ajouter un rôle</AppButton>
         </div>
 
         <div v-if="draft.entries.length === 0" class="empty">
@@ -123,7 +124,7 @@ async function onSavePanel() {
 
       <div class="actions full">
         <router-link to="/role-panels" class="btn-secondary">Annuler</router-link>
-        <button type="submit" class="btn-primary">Créer le panel</button>
+        <AppButton variant="primary" type="submit">Créer le panel</AppButton>
       </div>
     </form>
   </section>

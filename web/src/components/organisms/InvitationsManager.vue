@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
@@ -129,9 +130,9 @@ watch(selectedGuildId, load);
           automatiquement le rôle choisi quand l'invité se connecte avec son compte Discord.
         </p>
       </div>
-      <button class="btn primary" @click="showForm = !showForm">
+      <AppButton variant="primary" @click="showForm = !showForm">
         {{ showForm ? "✕ Annuler" : "+ Générer un code" }}
-      </button>
+      </AppButton>
     </div>
 
     <!-- Form génération -->
@@ -161,9 +162,9 @@ watch(selectedGuildId, load);
         </label>
       </div>
       <div class="form-actions">
-        <button class="btn primary" :disabled="generating" @click="generate">
+        <AppButton variant="primary" :disabled="generating" @click="generate">
           {{ generating ? "Génération…" : "🎫 Générer le code" }}
-        </button>
+        </AppButton>
       </div>
     </div>
 
@@ -182,8 +183,8 @@ watch(selectedGuildId, load);
           utilisation.
         </p>
         <div class="generated-actions">
-          <button class="btn primary" @click="copyCode(generatedCode.code)">📋 Copier</button>
-          <button class="btn" @click="generatedCode = null">Fermer</button>
+          <AppButton variant="primary" @click="copyCode(generatedCode.code)">📋 Copier</AppButton>
+          <AppButton variant="ghost" @click="generatedCode = null">Fermer</AppButton>
         </div>
       </div>
     </div>
@@ -196,7 +197,7 @@ watch(selectedGuildId, load);
         <option value="used">Utilisés ({{ counts.used }})</option>
         <option value="expired">Expirés ({{ counts.expired }})</option>
       </AppSelect>
-      <button class="btn xs" @click="load">↻</button>
+      <AppButton variant="ghost" size="xs" @click="load">↻</AppButton>
     </div>
 
     <!-- Table -->
@@ -227,8 +228,8 @@ watch(selectedGuildId, load);
           <td class="small mono">{{ inv.used_by_discord_id ?? "—" }}</td>
           <td class="small muted notes">{{ inv.notes ?? "—" }}</td>
           <td class="actions">
-            <button v-if="inv.status === 'active'" class="btn xs" @click="copyCode(inv.code)">📋</button>
-            <button v-if="inv.status === 'active'" class="btn xs danger" @click="revoke(inv.code)">🗑</button>
+            <AppButton variant="ghost" size="xs" v-if="inv.status === 'active'"  @click="copyCode(inv.code)">📋</AppButton>
+            <AppButton variant="danger" size="xs" v-if="inv.status === 'active'"  @click="revoke(inv.code)">🗑</AppButton>
             <span v-else class="muted">—</span>
           </td>
         </tr>

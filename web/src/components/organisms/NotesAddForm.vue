@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, ref } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -55,7 +56,7 @@ async function onAdd() {
         <AppTextarea v-model="draft.content" :rows="3" required />
       </label>
       <div class="actions">
-        <button type="submit" class="btn-primary" :disabled="!canSubmit">Ajouter</button>
+        <AppButton variant="primary" type="submit"  :disabled="!canSubmit">Ajouter</AppButton>
       </div>
     </form>
   </section>

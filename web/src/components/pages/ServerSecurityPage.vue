@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, onMounted, ref } from "vue";
@@ -169,10 +170,10 @@ const tabs = [
       Surveillance des attaques, intégrité et protections actives.
     </template>
     <template #actions>
-      <button v-if="canManage" class="btn-secondary danger" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</button>
-      <button class="btn-primary" :disabled="refreshing" @click="refreshAll">
+      <AppButton variant="danger" v-if="canManage"  :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</AppButton>
+      <AppButton variant="primary" :disabled="refreshing" @click="refreshAll">
         {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
-      </button>
+      </AppButton>
     </template>
 
     <AppTabs
@@ -244,7 +245,7 @@ const tabs = [
             <ul v-if="jail.banned_ips.length > 0" class="ip-list">
               <li v-for="ip in jail.banned_ips" :key="ip" class="ip-pill">
                 <code>{{ ip }}</code>
-                <button v-if="canManage" class="btn-secondary xs" @click="unbanIp(ip)" title="Débannir">↻ Débannir</button>
+                <AppButton variant="secondary" size="xs" v-if="canManage"  @click="unbanIp(ip)" title="Débannir">↻ Débannir</AppButton>
               </li>
             </ul>
             <div v-else class="muted small">Aucune IP actuellement bannie sur cette jail.</div>
@@ -256,7 +257,7 @@ const tabs = [
       <section class="card">
         <div class="card-head">
           <h2>🛑 Bans manuels ({{ manualBans.length }})</h2>
-          <button class="btn-secondary xs" @click="loadManualBans">↻</button>
+          <AppButton variant="secondary" size="xs" @click="loadManualBans">↻</AppButton>
         </div>
         <p class="muted small">
           IPs bannies depuis le panel sécurité. À chaque ban, les logs API
@@ -274,7 +275,7 @@ const tabs = [
               <td class="small mono">{{ b.banned_by ?? "—" }}</td>
               <td class="small">{{ b.reason ?? "—" }}</td>
               <td>
-                <button v-if="canManage" class="btn-secondary xs" @click="unbanIp(b.ip)">↻ Débannir</button>
+                <AppButton variant="secondary" size="xs" v-if="canManage"  @click="unbanIp(b.ip)">↻ Débannir</AppButton>
               </td>
             </tr>
           </tbody>
@@ -298,7 +299,7 @@ const tabs = [
       <section class="card">
         <div class="card-head">
           <h2>✅ Derniers logins Discord OAuth ({{ lastLogins.length }})</h2>
-          <button class="btn-secondary xs" @click="loadLastLogins">↻</button>
+          <AppButton variant="secondary" size="xs" @click="loadLastLogins">↻</AppButton>
         </div>
         <p class="muted small">20 derniers utilisateurs qui se sont connectés via OAuth Discord.</p>
         <table v-if="lastLogins.length > 0" class="data-table">
@@ -334,7 +335,7 @@ const tabs = [
               <option value="security">Sécurité</option>
               <option value="rbac">RBAC</option>
             </AppSelect>
-            <button class="btn-secondary xs" @click="loadServerEvents">↻</button>
+            <AppButton variant="secondary" size="xs" @click="loadServerEvents">↻</AppButton>
           </div>
         </div>
         <p class="muted small">Actions admin sur l'infra (start/stop conteneurs, ban IP, cleanup logs, etc.).</p>
@@ -432,10 +433,10 @@ const tabs = [
           </label>
         </div>
         <div class="modal-actions">
-          <button class="btn-secondary" :disabled="cleaning" @click="showCleanupModal = false">Annuler</button>
-          <button class="btn-secondary danger" :disabled="cleaning" @click="runCleanup">
+          <AppButton variant="secondary" :disabled="cleaning" @click="showCleanupModal = false">Annuler</AppButton>
+          <AppButton variant="danger" :disabled="cleaning" @click="runCleanup">
             {{ cleaning ? "Nettoyage…" : "🗑 Confirmer" }}
-          </button>
+          </AppButton>
         </div>
       </div>
     </div>
@@ -447,13 +448,7 @@ const tabs = [
 .muted.small, .small { font-size: 11px; }
 .mono { font-family: "JetBrains Mono", monospace; }
 
-.btn-primary {
-  padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--accent);
-  background: var(--accent); color: white;
-  font-size: 12px; font-weight: 600; cursor: pointer;
-}
 .btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
-.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .security-tabs-wrap { margin-bottom: 20px; overflow-x: auto; }
 .tab-content { animation: fadeIn 0.15s ease; }

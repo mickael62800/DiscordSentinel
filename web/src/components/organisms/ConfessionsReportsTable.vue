@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useConfessions } from "@/composables/useConfessions";
 import { useFormatDate } from "@/composables/useFormatDate";
 
@@ -38,8 +39,8 @@ function truncate(s: string, n = 80): string {
         <td class="small">{{ truncate(r.reason, 80) }}</td>
         <td><span class="badge" :class="`status-${r.status}`">{{ r.status }}</span></td>
         <td class="actions">
-          <button class="btn-secondary xs" @click="resolveReport(r, 'resolved')" title="Résoudre">✓</button>
-          <button class="btn-secondary xs" @click="resolveReport(r, 'dismissed')" title="Rejeter">×</button>
+          <AppButton variant="secondary" size="xs" @click="resolveReport(r, 'resolved')" title="Résoudre">✓</AppButton>
+          <AppButton variant="secondary" size="xs" @click="resolveReport(r, 'dismissed')" title="Rejeter">×</AppButton>
         </td>
       </tr>
     </tbody>

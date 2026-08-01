@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
@@ -63,7 +64,7 @@ async function onAdd() {
       <RoleSelect v-model="draft.role_id" :guild-id="selectedGuildId" />
       <AppInput v-model="draft.role_name" placeholder="Nom (optionnel)" />
       <NumberInputWithUnit v-model.number="draft.delay_secs" :min="0" unit="s" placeholder="Délai" />
-      <button class="btn-primary" @click="onAdd">Ajouter</button>
+      <AppButton variant="primary" @click="onAdd">Ajouter</AppButton>
     </div>
   </section>
 </template>

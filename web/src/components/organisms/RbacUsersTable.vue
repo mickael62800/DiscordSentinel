@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { ref, computed } from "vue";
 import { useRbac } from "@/composables/useRbac";
@@ -70,9 +71,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
 <template>
   <div>
     <section v-if="canEdit" class="add-section">
-      <button v-if="!showAddForm" class="btn-primary" @click="showAddForm = true">
+      <AppButton variant="primary" v-if="!showAddForm"  @click="showAddForm = true">
         + Ajouter un utilisateur
-      </button>
+      </AppButton>
       <form v-else class="add-form" @submit.prevent="submitAdd">
         <input
           v-model="newUserId"
@@ -143,9 +144,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
             <td class="col-meta">{{ fmt(user.granted_at) }}</td>
             <td class="col-meta">{{ user.granted_by ?? "—" }}</td>
             <td v-if="canEdit">
-              <button class="btn-danger" @click="onRevoke(user.discord_user_id, user.display_name)">
+              <AppButton variant="danger" @click="onRevoke(user.discord_user_id, user.display_name)">
                 Revoquer
-              </button>
+              </AppButton>
             </td>
           </tr>
         </tbody>

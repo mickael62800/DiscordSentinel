@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useAiDataset } from "@/composables/useAiDataset";
 
 const { items, total, counts, exporting, markAllVisible, exportAndClean } = useAiDataset();
@@ -11,11 +12,11 @@ const { items, total, counts, exporting, markAllVisible, exportAndClean } = useA
     <div class="stat severe"><span class="lbl">⚠️ Severe</span><span class="val">{{ counts.severe }}</span></div>
     <div class="stat"><span class="lbl">↩ Skip</span><span class="val">{{ counts.skip }}</span></div>
     <div class="grow"></div>
-    <button class="btn ghost" @click="markAllVisible('skip')">Tout skip (page)</button>
-    <button class="btn ghost" @click="markAllVisible('safe')">Tout safe (page)</button>
-    <button class="btn primary" :disabled="exporting || counts.total === 0" @click="exportAndClean">
+    <AppButton variant="ghost" @click="markAllVisible('skip')">Tout skip (page)</AppButton>
+    <AppButton variant="ghost" @click="markAllVisible('safe')">Tout safe (page)</AppButton>
+    <AppButton variant="primary" :disabled="exporting || counts.total === 0" @click="exportAndClean">
       {{ exporting ? "Export…" : `📥 Exporter ${counts.total} & nettoyer` }}
-    </button>
+    </AppButton>
   </section>
 </template>
 

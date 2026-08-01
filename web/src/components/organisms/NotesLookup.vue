@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useNotes } from "@/composables/useNotes";
 
 const { lookupUserId, fetch } = useNotes();
@@ -17,7 +18,7 @@ async function onSearch() {
         placeholder="ID de l'utilisateur"
         @keyup.enter="onSearch"
       />
-      <button class="btn-secondary" @click="onSearch">Rechercher</button>
+      <AppButton variant="secondary" @click="onSearch">Rechercher</AppButton>
     </div>
   </section>
 </template>

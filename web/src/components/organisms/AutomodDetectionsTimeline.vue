@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useAutomod } from "@/composables/useAutomod";
 import { useFormatDate } from "@/composables/useFormatDate";
 
@@ -23,7 +24,7 @@ function severityLabel(s: number): { label: string; color: string } {
           placeholder="Filtrer par user ID"
           @keyup.enter="fetchDetections"
         />
-        <button class="btn-secondary" @click="fetchDetections">Filtrer</button>
+        <AppButton variant="secondary" @click="fetchDetections">Filtrer</AppButton>
       </div>
     </div>
 

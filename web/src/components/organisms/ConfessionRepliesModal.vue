@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { useConfessions } from "@/composables/useConfessions";
 import { useConfirm } from "@/composables/useConfirm";
 import type { ConfessionReply } from "@/services/confessionsService";
@@ -35,7 +36,7 @@ async function onDelete(r: ConfessionReply) {
             <span v-if="r.is_anonymous" class="badge">anonyme</span>
             <span v-else class="badge">{{ r.author_user_id }}</span>
             <span class="muted small">{{ fmtDate(r.created_at) }}</span>
-            <button v-if="!r.deleted_at" class="btn-danger xs" @click="onDelete(r)">🗑</button>
+            <AppButton variant="danger" size="xs" v-if="!r.deleted_at"  @click="onDelete(r)">🗑</AppButton>
           </div>
           <div class="reply-content">
             <span v-if="r.deleted_at" class="muted">[supprimée]</span>

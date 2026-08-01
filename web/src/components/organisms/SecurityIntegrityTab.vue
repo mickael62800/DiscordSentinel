@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import { computed, onMounted, ref } from "vue";
 import {
@@ -89,7 +90,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🐳 Conteneurs surveillés</h2>
-        <button class="btn-secondary xs" @click="loadContainers">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadContainers">↻</AppButton>
       </div>
       <div v-if="containersError" class="info-banner">
         <p class="small">{{ containersError }}</p>
@@ -136,7 +137,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>🐳 Vulnérabilités Docker (Trivy)</h2>
-        <button class="btn-secondary xs" @click="loadTrivy">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadTrivy">↻</AppButton>
       </div>
       <div v-if="trivyError" class="info-banner">
         <p class="small">{{ trivyError }}</p>
@@ -174,7 +175,7 @@ onMounted(refresh);
     <section class="card">
       <div class="card-head">
         <h2>📁 Intégrité fichiers critiques ({{ integrity?.files.length ?? 0 }})</h2>
-        <button class="btn-secondary xs" @click="loadIntegrity">↻</button>
+        <AppButton variant="secondary" size="xs" @click="loadIntegrity">↻</AppButton>
       </div>
       <div v-if="integrityError" class="info-banner">
         <p class="small">{{ integrityError }}</p>

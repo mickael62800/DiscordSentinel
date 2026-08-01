@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 // Back-office de la vie communautaire.
 //
 // Quatre entités sur un seul écran à onglets : elles alimentent la même page
@@ -241,9 +242,9 @@ const expire = (iso: string) => new Date(iso) <= new Date();
       <!-- ── Annonces du site ── -->
       <section v-if="tab === 'news'" class="cl-sec">
         <div class="cl-actions">
-          <button type="button" class="btn primary" @click="ouvrirNews()">
+          <AppButton variant="primary" @click="ouvrirNews()">
             Nouvelle annonce
-          </button>
+          </AppButton>
         </div>
 
         <form v-if="newsEdite !== null" class="cl-form" @submit.prevent="enregistrerNews">
@@ -282,8 +283,8 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </div>
 
           <div class="cl-form-foot">
-            <button type="submit" class="btn primary" :disabled="busy">Enregistrer</button>
-            <button type="button" class="btn" @click="newsEdite = null">Annuler</button>
+            <AppButton variant="primary" type="submit"  :disabled="busy">Enregistrer</AppButton>
+            <AppButton variant="ghost" @click="newsEdite = null">Annuler</AppButton>
           </div>
         </form>
 
@@ -302,14 +303,11 @@ const expire = (iso: string) => new Date(iso) <= new Date();
               <span class="muted small">{{ fmt(n.published_at) }}</span>
             </div>
             <div class="cl-item-actions">
-              <button type="button" class="btn small" @click="ouvrirNews(n.id)">Modifier</button>
-              <button
-                type="button"
-                class="btn small danger"
-                @click="supprimer(n.title, () => communityAdminService.deleteNews(n.id))"
+              <AppButton variant="ghost" size="sm" @click="ouvrirNews(n.id)">Modifier</AppButton>
+              <AppButton variant="danger" size="sm" @click="supprimer(n.title, () => communityAdminService.deleteNews(n.id))"
               >
                 Supprimer
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>
@@ -318,9 +316,9 @@ const expire = (iso: string) => new Date(iso) <= new Date();
       <!-- ── Sondages ── -->
       <section v-else-if="tab === 'polls'" class="cl-sec">
         <div class="cl-actions">
-          <button type="button" class="btn primary" @click="ouvrirSondage">
+          <AppButton variant="primary" @click="ouvrirSondage">
             Nouveau sondage
-          </button>
+          </AppButton>
         </div>
 
         <form v-if="sondageOuvert" class="cl-form" @submit.prevent="enregistrerSondage">
@@ -354,14 +352,12 @@ const expire = (iso: string) => new Date(iso) <= new Date();
                 ✕
               </button>
             </div>
-            <button
-              v-if="formPoll.options.length < 10"
-              type="button"
-              class="btn small"
-              @click="formPoll.options.push({ label: '' })"
-            >
+            <AppButton variant="ghost" size="sm" v-if="formPoll.options.length < 10"
+              
+              
+              @click="formPoll.options.push({ label: '' })">
               Ajouter un choix
-            </button>
+            </AppButton>
             <p v-if="!optionsValides" class="muted small">
               Il faut au moins deux choix renseignés.
             </p>
@@ -373,10 +369,10 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </label>
 
           <div class="cl-form-foot">
-            <button type="submit" class="btn primary" :disabled="busy || !optionsValides">
+            <AppButton variant="primary" type="submit"  :disabled="busy || !optionsValides">
               Ouvrir le sondage
-            </button>
-            <button type="button" class="btn" @click="sondageOuvert = false">Annuler</button>
+            </AppButton>
+            <AppButton variant="ghost" @click="sondageOuvert = false">Annuler</AppButton>
           </div>
         </form>
 
@@ -406,22 +402,18 @@ const expire = (iso: string) => new Date(iso) <= new Date();
             </div>
 
             <div class="cl-item-actions">
-              <button
-                v-if="p.is_open"
-                type="button"
-                class="btn small"
+              <AppButton variant="ghost" size="sm" v-if="p.is_open"
+                
+                
                 :disabled="busy"
                 @click="agir(() => communityAdminService.closePoll(p.id), 'Sondage clos.')"
               >
                 Clore
-              </button>
-              <button
-                type="button"
-                class="btn small danger"
-                @click="supprimer(p.question, () => communityAdminService.deletePoll(p.id))"
+              </AppButton>
+              <AppButton variant="danger" size="sm" @click="supprimer(p.question, () => communityAdminService.deletePoll(p.id))"
               >
                 Supprimer
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>
@@ -430,9 +422,9 @@ const expire = (iso: string) => new Date(iso) <= new Date();
       <!-- ── Membre du mois ── -->
       <section v-else-if="tab === 'spotlight'" class="cl-sec">
         <div class="cl-actions">
-          <button type="button" class="btn primary" @click="ouvrirDesignation">
+          <AppButton variant="primary" @click="ouvrirDesignation">
             Désigner
-          </button>
+          </AppButton>
         </div>
 
         <form v-if="designationOuverte" class="cl-form" @submit.prevent="enregistrerDesignation">
@@ -464,8 +456,8 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </label>
 
           <div class="cl-form-foot">
-            <button type="submit" class="btn primary" :disabled="busy">Désigner</button>
-            <button type="button" class="btn" @click="designationOuverte = false">Annuler</button>
+            <AppButton variant="primary" type="submit"  :disabled="busy">Désigner</AppButton>
+            <AppButton variant="ghost" @click="designationOuverte = false">Annuler</AppButton>
           </div>
         </form>
 
@@ -481,10 +473,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
               <p class="muted small">{{ s.reason }}</p>
             </div>
             <div class="cl-item-actions">
-              <button
-                type="button"
-                class="btn small danger"
-                @click="
+              <AppButton variant="danger" size="sm" @click="
                   supprimer(
                     `${s.username} (${s.period})`,
                     () => communityAdminService.deleteSpotlight(guildId!, s.id),
@@ -492,7 +481,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
                 "
               >
                 Retirer
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>
@@ -523,22 +512,18 @@ const expire = (iso: string) => new Date(iso) <= new Date();
               </span>
             </div>
             <div class="cl-item-actions">
-              <button
-                v-if="a.is_open"
-                type="button"
-                class="btn small"
+              <AppButton variant="ghost" size="sm" v-if="a.is_open"
+                
+                
                 :disabled="busy"
                 @click="agir(() => communityAdminService.closeLfg(a.id), 'Annonce fermée.')"
               >
                 Fermer
-              </button>
-              <button
-                type="button"
-                class="btn small danger"
-                @click="supprimer(`l'annonce de ${a.author_name}`, () => communityAdminService.deleteLfg(a.id))"
+              </AppButton>
+              <AppButton variant="danger" size="sm" @click="supprimer(`l'annonce de ${a.author_name}`, () => communityAdminService.deleteLfg(a.id))"
               >
                 Supprimer
-              </button>
+              </AppButton>
             </div>
           </li>
         </ul>

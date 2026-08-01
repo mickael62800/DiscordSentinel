@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import { onMounted, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
@@ -91,8 +92,8 @@ watch(guildIdFilter, fetchPending);
           </div>
           <div class="review-actions">
             <button class="btn-success" @click="startResolve(r.id, 'approved')">✅ Approuver</button>
-            <button class="btn-warn" @click="startResolve(r.id, 'changed')">🔁 À modifier</button>
-            <button class="btn-danger" @click="startResolve(r.id, 'rejected')">❌ Rejeter</button>
+            <AppButton variant="warning" @click="startResolve(r.id, 'changed')">🔁 À modifier</AppButton>
+            <AppButton variant="danger" @click="startResolve(r.id, 'rejected')">❌ Rejeter</AppButton>
           </div>
         </li>
       </ul>
@@ -108,8 +109,8 @@ watch(guildIdFilter, fetchPending);
           <AppTextarea v-model="resolveDialog.notes" :rows="3" />
         </label>
         <div class="actions">
-          <button class="btn-secondary" @click="resolveDialog = null">Annuler</button>
-          <button class="btn-primary" @click="confirmResolve">Confirmer</button>
+          <AppButton variant="secondary" @click="resolveDialog = null">Annuler</AppButton>
+          <AppButton variant="primary" @click="confirmResolve">Confirmer</AppButton>
         </div>
       </div>
     </div>

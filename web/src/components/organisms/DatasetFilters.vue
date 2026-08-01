@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { useAiDataset } from "@/composables/useAiDataset";
@@ -42,7 +43,7 @@ function search() {
       </AppSelect>
     </div>
     <div class="filter actions">
-      <button class="btn" :disabled="loading" @click="search">🔍 Rechercher</button>
+      <AppButton variant="ghost" :disabled="loading" @click="search">🔍 Rechercher</AppButton>
     </div>
   </section>
 </template>
