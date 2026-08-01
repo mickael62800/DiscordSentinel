@@ -618,10 +618,15 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Le prochain rendez-vous ── -->
-    <section v-if="nextEvent" class="mb-block">
+    <section class="mb-block">
       <h2><span class="mb-live" aria-hidden="true"></span> Le prochain rendez-vous</h2>
 
-      <div class="mb-feature" :style="{ '--accent-event': accent(nextEvent) }">
+      <p v-if="!nextEvent" class="mb-vide">
+        Rien de programmé pour l'instant. Les soirées et les campagnes de jeu
+        s'annoncent ici.
+      </p>
+
+      <div v-else class="mb-feature" :style="{ '--accent-event': accent(nextEvent) }">
         <div class="mb-feature-body">
           <div class="mb-tags">
             <span v-if="nextEvent.game" class="mb-tag">{{ nextEvent.game }}</span>
@@ -658,13 +663,19 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
          Ne s'affiche que si quelqu'un y est vraiment : un cadre « personne en
          vocal » occuperait un écran entier pour dire qu'il ne se passe rien.
          L'API ne publie que les salons visibles par @everyone. -->
-    <section v-if="presence.voice.length" class="mb-block">
+    <section class="mb-block">
       <h2>
         <span class="mb-live" aria-hidden="true"></span> En vocal maintenant
-        <span class="mb-count">{{ presence.voice_total }} personne(s)</span>
+        <span v-if="presence.voice_total" class="mb-count">
+          {{ presence.voice_total }} personne(s)
+        </span>
       </h2>
 
-      <div class="mb-vocaux">
+      <p v-if="!presence.voice.length" class="mb-vide">
+        Personne en vocal pour le moment.
+      </p>
+
+      <div v-else class="mb-vocaux">
         <article v-for="c in presence.voice" :key="c.channel_name" class="mb-vc">
           <header class="mb-vc-head">
             <span aria-hidden="true">🔊</span>
@@ -688,9 +699,14 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Ça discute à l'écrit ── -->
-    <section v-if="presence.text.length" class="mb-block">
+    <section class="mb-block">
       <h2>Ça discute aussi à l'écrit</h2>
-      <ul class="mb-textes">
+
+      <p v-if="!presence.text.length" class="mb-vide">
+        Aucun salon actif dans le dernier quart d'heure.
+      </p>
+
+      <ul v-else class="mb-textes">
         <li v-for="t in presence.text" :key="t.channel_name" class="mb-tc">
           <span class="mb-tc-hash" aria-hidden="true">#</span>
           <span class="mb-tc-nom">{{ t.channel_name }}</span>
