@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
 import ActionButton from "../atoms/ActionButton.vue";
+import LevelRoleTiersCard from "../organisms/LevelRoleTiersCard.vue";
 import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
 </script>
 
 <template>
-  <AdminPageShell title="Niveaux — XP manuelle" icon="⚙️">
+  <AdminPageShell title="Niveaux — configuration" icon="⚙️">
     <template #lede>
-      Ajustement manuel de l'XP des membres (admin).
+      Paliers de rôles et ajustement manuel de l'XP.
     </template>
 
     <!--
@@ -17,11 +18,11 @@ import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
     -->
     <section class="lc-ailleurs">
       <div class="lc-texte">
-        <h2>Le reste se règle sur le composant Progression</h2>
+        <h2>Les autres réglages d'XP</h2>
         <p>
-          Gains d'XP, cooldown, message de level-up, et les
-          <strong>paliers de rôles par niveau</strong> — le rôle attribué
-          quand un membre franchit un seuil.
+          Gains par message et par minute de vocal, cooldown anti-farm,
+          message de level-up, salons et rôles ignorés — sur la page du
+          composant Progression.
         </p>
       </div>
       <ActionButton to="/component-config?bot=progression-bot" variant="primary">
@@ -30,6 +31,7 @@ import LevelsManualXpCard from "../organisms/LevelsManualXpCard.vue";
     </section>
 
     <div class="grid">
+      <LevelRoleTiersCard />
       <LevelsManualXpCard />
     </div>
   </AdminPageShell>
