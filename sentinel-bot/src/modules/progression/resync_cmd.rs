@@ -165,6 +165,9 @@ async fn handle_single(
     };
 
     let outcome = apply_level_prefix(ctx, guild_id, target, level).await;
+    // Le resync rattrape aussi les paliers : sans cela, un membre deja au bon
+    // niveau devrait attendre un level-up pour recevoir son role.
+    super::role_tiers::appliquer_paliers(ctx, guild_id, target, level).await;
     let embed = build_single_embed(target, level, &outcome);
     if let Err(e) = command
         .create_followup(
@@ -231,6 +234,7 @@ async fn handle_all(ctx: &Context, command: &CommandInteraction, guild_id: Guild
             ResyncOutcome::Skipped => skipped += 1,
             ResyncOutcome::Error(_) => errors += 1,
         }
+        super::role_tiers::appliquer_paliers(ctx, guild_id, user_id, entry.level).await;
         sleep(Duration::from_millis(RESYNC_ALL_INTERVAL_MS)).await;
     }
 

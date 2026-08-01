@@ -7,6 +7,7 @@ pub mod classement_cmd;
 pub mod level_channel;
 pub mod level_cmd;
 pub mod nickname;
+pub mod role_tiers;
 pub mod resync_cmd;
 pub mod stats_cmd;
 pub mod tracker;
@@ -393,6 +394,8 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             if result.user.level > result.old_level_global {
                 drop(data);
                 nickname::apply_level_prefix(ctx, guild_id, msg.author.id, result.user.level).await;
+                role_tiers::appliquer_paliers(ctx, guild_id, msg.author.id, result.user.level)
+                    .await;
             }
         }
         Err(e) => {
@@ -546,6 +549,10 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                         let new_level = result.user.level;
                                         drop(data);
                                         nickname::apply_level_prefix(
+                                            ctx, guild_id, user_id, new_level,
+                                        )
+                                        .await;
+                                        role_tiers::appliquer_paliers(
                                             ctx, guild_id, user_id, new_level,
                                         )
                                         .await;

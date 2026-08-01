@@ -3,4 +3,5 @@
 //! type Discord). Partageable par le bot et tout autre adaptateur.
 
 pub mod nickname;
+pub mod role_tiers;
 pub mod tracker;
