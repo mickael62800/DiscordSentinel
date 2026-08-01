@@ -374,7 +374,17 @@ async fn channel_exists(ctx: &Context, channel_id: ChannelId) -> bool {
 }
 
 /// Salon prive : @everyone ne voit rien, le role du jeu voit et participe.
-fn build_overwrites(guild_id: GuildId, role_id: Option<RoleId>) -> Vec<PermissionOverwrite> {
+///
+/// Les permissions accordees dependent du TYPE de salon. Discord refuse une
+/// creation (50013) quand l'overwrite accorde une permission que le bot ne
+/// possede pas lui-meme : demander CONNECT et SPEAK sur un salon textuel, ou
+/// SEND_MESSAGES sur un vocal, expose a un echec pour une permission dont le
+/// salon n'a de toute facon aucun usage.
+fn build_overwrites(
+    guild_id: GuildId,
+    role_id: Option<RoleId>,
+    kind: ChannelType,
+) -> Vec<PermissionOverwrite> {
     // @everyone porte le meme ID que la guild.
     let mut ows = vec![PermissionOverwrite {
         allow: Permissions::empty(),
@@ -382,12 +392,13 @@ fn build_overwrites(guild_id: GuildId, role_id: Option<RoleId>) -> Vec<Permissio
         kind: PermissionOverwriteType::Role(RoleId::new(guild_id.get())),
     }];
     if let Some(rid) = role_id {
+        let specifiques = if kind == ChannelType::Voice {
+            Permissions::CONNECT | Permissions::SPEAK
+        } else {
+            Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY
+        };
         ows.push(PermissionOverwrite {
-            allow: Permissions::VIEW_CHANNEL
-                | Permissions::SEND_MESSAGES
-                | Permissions::CONNECT
-                | Permissions::SPEAK
-                | Permissions::READ_MESSAGE_HISTORY,
+            allow: Permissions::VIEW_CHANNEL | specifiques,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Role(rid),
         });
@@ -403,19 +414,51 @@ async fn create_channel(
     category: Option<ChannelId>,
     overwrites: &[PermissionOverwrite],
 ) -> Option<ChannelId> {
-    let mut builder = CreateChannel::new(name)
-        .kind(kind)
-        .permissions(overwrites.to_vec());
-    if let Some(cat) = category {
-        builder = builder.category(cat);
-    }
-    match guild_id.create_channel(&ctx.http, builder).await {
-        Ok(ch) => Some(ch.id),
-        Err(e) => {
-            tracing::warn!(error = %e, name, "game-portal: echec creation salon");
-            None
+    let construire = |cat: Option<ChannelId>| {
+        let mut b = CreateChannel::new(name)
+            .kind(kind)
+            .permissions(overwrites.to_vec());
+        if let Some(c) = cat {
+            b = b.category(c);
+        }
+        b
+    };
+
+    let premiere = match guild_id.create_channel(&ctx.http, construire(category)).await {
+        Ok(ch) => return Some(ch.id),
+        Err(e) => e,
+    };
+
+    // Une categorie Discord plafonne a 50 salons. Le vocal etant cree apres le
+    // textuel, c'est lui qui bute en premier sur la limite — le textuel passe
+    // et le vocal manque, sans que rien ne le signale.
+    //
+    // Plutot que d'abandonner la session, on recree hors categorie : le salon
+    // est moins bien range mais il existe, ce qui est preferable a une session
+    // muette. Le log dit pourquoi.
+    if category.is_some() {
+        tracing::warn!(
+            error = %premiere,
+            name,
+            ?kind,
+            "game-portal: echec creation salon dans la categorie -> nouvel essai hors categorie"
+        );
+        match guild_id.create_channel(&ctx.http, construire(None)).await {
+            Ok(ch) => return Some(ch.id),
+            Err(e) => {
+                tracing::error!(
+                    error = %e,
+                    name,
+                    ?kind,
+                    "game-portal: echec creation salon, y compris hors categorie"
+                );
+                return None;
+            }
         }
     }
+
+    tracing::error!(error = %premiere, name, ?kind, "game-portal: echec creation salon");
+    None
 }
 
 /// Nom de salon Discord valide : minuscules, tirets, sans accents.
@@ -483,14 +526,13 @@ async fn on_started(ctx: &Context, api: &ApiClient, guild_id: GuildId, server_id
         .unwrap_or_default();
     let category = ensure_session_category(ctx, api, guild_id, &cfg).await;
 
-    let overwrites = build_overwrites(guild_id, role_id);
     let text_ch = create_channel(
         ctx,
         guild_id,
         &format!("game-{}", slugify(&server.name)),
         ChannelType::Text,
         category,
-        &overwrites,
+        &build_overwrites(guild_id, role_id, ChannelType::Text),
     )
     .await;
     let voice_ch = create_channel(
@@ -499,7 +541,7 @@ async fn on_started(ctx: &Context, api: &ApiClient, guild_id: GuildId, server_id
         &format!("Vocal {}", server.name),
         ChannelType::Voice,
         category,
-        &overwrites,
+        &build_overwrites(guild_id, role_id, ChannelType::Voice),
     )
     .await;
 
