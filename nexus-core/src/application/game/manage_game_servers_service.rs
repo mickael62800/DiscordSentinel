@@ -117,6 +117,19 @@ impl ManageGameServersService {
         let memory = cmd
             .allocated_memory_mb
             .unwrap_or(template.default_memory_mb);
+        // Refus D'EMBLEE si la plateforme ne peut pas piloter de conteneurs.
+        //
+        // Sans ce controle, la creation reussissait et le serveur n'existait
+        // qu'en base : il apparaissait dans la liste, en erreur, et chaque
+        // tentative de demarrage renvoyait une erreur 500. Mieux vaut refuser
+        // clairement que fabriquer quelque chose d'inutilisable.
+        if !self.container_runtime.is_operational() {
+            return Err(DomainError::NotImplemented(
+                "La plateforme de jeux n'est pas activee : aucun serveur ne peut                  etre cree. Definis NEXUS_GAME_RUNTIME=docker dans .env, puis                  redemarre nexus-api."
+                    .into(),
+            ));
+        }
+
         template
             .validate_memory(memory)
             .map_err(DomainError::ValidationError)?;

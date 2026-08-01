@@ -12,12 +12,22 @@ use nexus_core::domain::errors::DomainError;
 
 pub struct NoopContainerRuntime;
 
+/// `NotImplemented` et non `Internal` : ce n'est pas une panne, c'est une
+/// fonctionnalite non activee. Le message dit quoi faire — un « Erreur
+/// interne » laissait chercher un bug inexistant.
 fn err() -> DomainError {
-    DomainError::Internal("Docker socket indisponible (Game Portal desactive)".into())
+    DomainError::NotImplemented(
+        "La plateforme de jeux n'est pas activee sur ce serveur :          definis NEXUS_GAME_RUNTIME=docker dans .env, puis redemarre nexus-api."
+            .into(),
+    )
 }
 
 #[async_trait]
 impl ContainerRuntime for NoopContainerRuntime {
+    fn is_operational(&self) -> bool {
+        false
+    }
+
     async fn ensure_network(&self, _: &str) -> Result<(), DomainError> {
         Err(err())
     }

@@ -110,6 +110,19 @@ pub struct ContainerStats {
 
 #[async_trait]
 pub trait ContainerRuntime: Send + Sync {
+    /// Ce runtime peut-il reellement piloter des conteneurs ?
+    ///
+    /// `false` pour l'implementation de repli, utilisee quand le socket
+    /// Docker est indisponible. Elle laisse le listing et la configuration
+    /// fonctionner mais echoue sur toute operation de cycle de vie.
+    ///
+    /// Permet de REFUSER une creation d'emblee au lieu de laisser fabriquer
+    /// un serveur qui ne demarrera jamais. Par defaut `true` : un runtime qui
+    /// ne se declare pas est suppose fonctionnel.
+    fn is_operational(&self) -> bool {
+        true
+    }
+
     /// Cree le network dedie (idempotent).
     async fn ensure_network(&self, name: &str) -> Result<(), DomainError>;
 
