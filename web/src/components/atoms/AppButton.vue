@@ -15,7 +15,7 @@ defineProps<{
 button {
   cursor: pointer;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-weight: 500;
   transition: opacity var(--transition-fast);
 }
@@ -36,9 +36,11 @@ button.primary {
   color: white;
 }
 
+/* `--surface` et `--text` n'ont jamais existe dans les tokens : la variante
+   etait donc transparente avec du texte herite, dans toute l'application. */
 button.secondary {
-  background-color: var(--surface);
-  color: var(--text);
+  background-color: var(--bg-card);
+  color: var(--text-primary);
   border: 1px solid var(--border);
 }
 

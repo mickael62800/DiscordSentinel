@@ -3,23 +3,29 @@
 //
 // Page longue, assumée : un visiteur doit comprendre ce qu'est La Bande du
 // Canapé, ce qu'on y fait, et avoir envie d'entrer. Le défilement est donc
-// normal ici — contrairement au reste du site, elle raconte quelque chose.
+// normal ici — contrairement au reste du site, cette page raconte quelque
+// chose.
 //
 // Rendue hors de `MainLayout` (ni barre latérale, ni sélecteur de serveur) :
 // c'est une vitrine, pas un back-office. Elle n'appelle QUE `/api/public/*`,
 // hors de la pile d'authentification : aucun token, aucune donnée personnelle.
 //
-// Images : chaque section en accepte une, déclarée dans SECTIONS. Tant qu'un
-// fichier est absent, `onIllustrationError` masque proprement le bloc et la
-// section reste lisible en pleine largeur.
+// Composition : le heros, les sections et les actions sont des composants
+// partagés (`SiteHero`, `FeatureSection`, `ActionButton`). Cette page ne
+// porte donc plus que son CONTENU et son enchaînement — l'apparence vit dans
+// les briques, où elle est corrigée une fois pour les trois pages publiques.
 
 import { onMounted, ref } from "vue";
+
+import ActionButton from "../atoms/ActionButton.vue";
+import FeatureSection from "../molecules/FeatureSection.vue";
+import SiteHero from "../molecules/SiteHero.vue";
 import {
   guildIconUrl,
   publicSiteService,
   type PublicGuild,
 } from "@/services/publicSiteService";
-import { COMMUNITY, discordInvite, onWordmarkError, wordmarkOf } from "@/branding";
+import { COMMUNITY, discordInvite } from "@/branding";
 import { siteConfig } from "@/siteConfig";
 
 /// Serveur mis en avant. Lu à l'exécution (cf. `siteConfig.ts`), avec repli
@@ -43,13 +49,6 @@ onMounted(async () => {
     guild.value = null;
   }
 });
-
-/// Masque l'illustration si le fichier n'est pas encore fourni : la section
-/// bascule alors en pleine largeur au lieu d'afficher une image cassée.
-function onIllustrationError(event: Event): void {
-  const el = event.target as HTMLImageElement | null;
-  el?.closest(".sec-media")?.setAttribute("hidden", "true");
-}
 
 /// Sections alternées : l'illustration passe à droite puis à gauche.
 const SECTIONS = [
@@ -148,51 +147,36 @@ const APPEAR = {
 </script>
 
 <template>
-  <div class="ph">
-
-    <!-- ── Hero ── -->
-    <header class="ph-hero">
-      <img
-        v-motion
-        :initial="{ opacity: 0, scale: 0.94 }"
-        :enter="{ opacity: 1, scale: 1, transition: { duration: 700 } }"
-        :src="wordmarkOf(COMMUNITY)"
-        :alt="COMMUNITY.name"
-        class="ph-logo"
-        @error="onWordmarkError($event, COMMUNITY)"
-      />
-
-      <p v-motion :initial="{ opacity: 0 }" :enter="{ opacity: 1, transition: { delay: 250 } }" class="ph-tagline">
-        {{ COMMUNITY.tagline }}
-      </p>
-
-      <div v-if="guild" class="ph-stats">
-        <img v-if="iconUrl" :src="iconUrl" :alt="guild.name" class="ph-guild-icon" />
-        <span>
-          <strong>{{ guild.member_count.toLocaleString("fr-FR") }}</strong>
-          membres sur {{ guild.name }}
+  <div class="ph theme-communaute">
+    <SiteHero
+      v-motion
+      :initial="{ opacity: 0, scale: 0.94 }"
+      :enter="{ opacity: 1, scale: 1, transition: { duration: 700 } }"
+      :tagline="COMMUNITY.tagline"
+    >
+      <template v-if="guild" #info>
+        <span class="ph-guild">
+          <img v-if="iconUrl" :src="iconUrl" :alt="guild.name" class="ph-guild-icon" />
+          <span>
+            <strong>{{ guild.member_count.toLocaleString("fr-FR") }}</strong>
+            membres sur {{ guild.name }}
+          </span>
         </span>
-      </div>
+      </template>
 
-      <!-- Trois actions DISTINCTES, apres la simplification : entrer sur
-           Discord (la vraie conversion), regarder ce qui s'y passe sans
-           compte, ou parcourir la page. -->
-      <div class="ph-actions">
-        <a
-          v-if="discordInvite()"
-          class="ph-btn primary"
-          :href="discordInvite()"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+      <!-- Trois actions DISTINCTES : entrer sur Discord (la vraie
+           conversion), regarder ce qui s'y passe sans compte, ou parcourir
+           la page. -->
+      <template #actions>
+        <ActionButton v-if="discordInvite()" :href="discordInvite()" size="lg">
           Rejoindre Discord
-        </a>
-        <RouterLink class="ph-btn secondary" to="/membre">
+        </ActionButton>
+        <ActionButton to="/membre" variant="secondary" size="lg">
           Voir la vie du serveur
-        </RouterLink>
-        <a class="ph-btn ghost" href="#jeux">Découvrir</a>
-      </div>
-    </header>
+        </ActionButton>
+        <ActionButton href="#jeux" variant="ghost" size="lg">Découvrir</ActionButton>
+      </template>
+    </SiteHero>
 
     <!-- ── Présentation ── -->
     <section v-motion="APPEAR" class="ph-about">
@@ -206,46 +190,33 @@ const APPEAR = {
     </section>
 
     <!-- ── Sections alternées ── -->
-    <section
+    <FeatureSection
       v-for="(s, i) in SECTIONS"
       :id="s.id"
       :key="s.id"
       v-motion="APPEAR"
-      class="ph-sec"
-      :class="{ reverse: i % 2 === 1 }"
-    >
-      <div class="sec-text">
-        <span class="sec-sur">{{ s.surtitre }}</span>
-        <h2>{{ s.titre }}</h2>
-        <p>{{ s.texte }}</p>
-        <ul>
-          <li v-for="pt in s.points" :key="pt">{{ pt }}</li>
-        </ul>
-      </div>
-
-      <figure class="sec-media">
-        <img :src="s.image" :alt="s.alt" loading="lazy" @error="onIllustrationError" />
-      </figure>
-    </section>
+      :surtitre="s.surtitre"
+      :titre="s.titre"
+      :texte="s.texte"
+      :points="s.points"
+      :image="s.image"
+      :alt="s.alt"
+      :inverse="i % 2 === 1"
+    />
 
     <!-- ── Appel final ── -->
     <section v-motion="APPEAR" class="ph-cta">
       <h2>Le canapé est large, il reste de la place</h2>
       <p>Regarde ce qui s'y passe, sans compte et sans engagement.</p>
-      <a
-        v-if="discordInvite()"
-        class="ph-btn primary"
-        :href="discordInvite()"
-        target="_blank"
-        rel="noopener noreferrer"
-      >
+
+      <ActionButton v-if="discordInvite()" :href="discordInvite()" size="lg">
         Rejoindre Discord
-      </a>
-      <RouterLink v-else class="ph-btn primary" to="/membre">Voir la vie du serveur</RouterLink>
+      </ActionButton>
+      <ActionButton v-else to="/membre" size="lg">Voir la vie du serveur</ActionButton>
     </section>
 
-    <!-- L'administration ne concerne qu'une poignee de personnes : un lien
-         discret en pied de page, pas une porte au meme rang que l'entree. -->
+    <!-- L'administration ne concerne qu'une poignée de personnes : un lien
+         discret en pied de page, pas une porte au même rang que l'entrée. -->
     <footer class="ph-footer">
       <RouterLink to="/login?espace=admin">Administration</RouterLink>
     </footer>
@@ -253,62 +224,44 @@ const APPEAR = {
 </template>
 
 <style scoped>
-/* Palette locale calée sur le logo (violet néon sur fond très sombre). Elle ne
-   dépend pas du thème du back-office : cette page a sa propre identité. */
+/* Cette page ne définit plus aucune couleur : tout vient de
+   `.theme-communaute` (cf. styles/global.css). Il ne reste ici que la mise en
+   page propre à l'accueil. */
 .ph {
   flex: 1;
   position: relative;
-  /* Les halos débordent volontairement des bords : sans ça, ils créeraient une
-     barre de défilement horizontale. */
+  /* Le heros déborde volontairement : sans ça, il créerait une barre de
+     défilement horizontale. */
   overflow-x: hidden;
   overflow-y: auto;
-  padding: clamp(2rem, 6vh, 4rem) 1.5rem clamp(2rem, 5vh, 4rem);
-  background: linear-gradient(180deg, #150a28 0%, #0d0619 55%, #08040f 100%);
-  color: #f3eaff;
+  padding: clamp(2rem, 6vh, 4rem) var(--space-lg) clamp(2rem, 5vh, 4rem);
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: clamp(3rem, 9vh, 6rem);
-  scroll-behavior: smooth;
 }
 
-/* ── Hero ── */
-
-.ph-hero {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  max-width: 44rem;
-  padding-top: clamp(1rem, 4vh, 3rem);
+.ph > * {
+  width: 100%;
+  max-width: 68rem;
+  margin: 0 auto;
 }
 
-.ph-logo {
-  width: min(320px, 72vw);
-  height: auto;
-  filter: drop-shadow(0 0 45px rgba(168, 85, 247, 0.55));
-}
-
-.ph-tagline {
-  margin: 1.5rem 0 0;
-  font-size: clamp(1.05rem, 2.4vw, 1.35rem);
-  color: #d8c7f5;
-}
-
-.ph-stats {
+/* ── Chiffre du serveur ── */
+.ph-guild {
   display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  margin-top: 1.25rem;
-  padding: 0.4rem 1rem;
-  border-radius: 999px;
-  background: rgba(168, 85, 247, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.35);
-  font-size: 0.95rem;
-  color: #e9dcff;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.92rem;
 }
 
-.ph-stats strong {
-  color: #fff;
+.ph-guild strong {
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .ph-guild-icon {
@@ -317,230 +270,63 @@ const APPEAR = {
   border-radius: 50%;
 }
 
-.ph-actions {
-  margin-top: 2rem;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.75rem;
-}
-
-.ph-btn {
-  display: inline-block;
-  padding: 0.85rem 2.2rem;
-  border-radius: 999px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-
-.ph-btn.primary {
-  background: linear-gradient(135deg, #a855f7, #7c3aed);
-  color: #fff;
-  box-shadow: 0 8px 30px rgba(124, 58, 237, 0.5);
-}
-
-.ph-btn.primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 38px rgba(168, 85, 247, 0.65);
-}
-
-.ph-btn.secondary {
-  background: rgba(168, 85, 247, 0.14);
-  border: 1px solid rgba(168, 85, 247, 0.45);
-  color: #e9dcff;
-}
-
-.ph-btn.secondary:hover {
-  background: rgba(168, 85, 247, 0.22);
-  transform: translateY(-2px);
-}
-
-.ph-btn.ghost {
-  border: 1px solid rgba(168, 85, 247, 0.45);
-  color: #d8c7f5;
-}
-
-.ph-btn.ghost:hover {
-  border-color: rgba(168, 85, 247, 0.9);
-  color: #fff;
-}
-
 /* ── Présentation ── */
-
 .ph-about {
-  position: relative;
-  z-index: 1;
-  max-width: 44rem;
+  max-width: 46rem;
   text-align: center;
 }
 
-.ph-about h2,
-.ph-cta h2,
-.ph-sec h2 {
-  margin: 0 0 1rem;
-  font-size: clamp(1.4rem, 3.2vw, 2rem);
-  line-height: 1.25;
+.ph-about h2 {
+  margin: 0 0 var(--space-lg);
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  text-wrap: balance;
 }
 
 .ph-about p {
   margin: 0;
+  color: var(--text-secondary);
+  font-size: 1.02rem;
   line-height: 1.7;
-  color: #cbb8ec;
-}
-
-/* ── Sections alternées ── */
-
-.ph-sec {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  align-items: center;
-  gap: clamp(1.5rem, 4vw, 3.5rem);
-  width: 100%;
-  max-width: 64rem;
-  scroll-margin-top: 2rem;
-}
-
-/* Une section sur deux inverse texte et image. `direction` plutôt qu'un
-   réordonnancement manuel : le DOM garde l'ordre de lecture. */
-.ph-sec.reverse {
-  direction: rtl;
-}
-
-.ph-sec.reverse > * {
-  direction: ltr;
-}
-
-.sec-sur {
-  display: inline-block;
-  margin-bottom: 0.6rem;
-  padding: 2px 12px;
-  border-radius: 999px;
-  background: rgba(168, 85, 247, 0.15);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  font-size: 0.76rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: #cbb0ff;
-}
-
-.sec-text p {
-  margin: 0 0 1rem;
-  line-height: 1.7;
-  color: #cbb8ec;
-}
-
-.sec-text ul {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sec-text li {
-  position: relative;
-  padding-left: 1.5rem;
-  font-size: 0.94rem;
-  color: #d8c7f5;
-}
-
-.sec-text li::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 0.5em;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #a855f7;
-  box-shadow: 0 0 10px #a855f7;
-}
-
-.sec-media {
-  margin: 0;
-  /* Arrondi genereux, dans l'esprit du logo. `overflow: hidden` recadre
-     l'image elle-meme : le fichier reste un rectangle, l'arrondi est fait
-     en CSS — plus net qu'un masque grave dans le JPEG, et adaptatif. */
-  border-radius: 1.75rem;
-  overflow: hidden;
-  border: 1px solid rgba(168, 85, 247, 0.25);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
-}
-
-.sec-media img {
-  display: block;
-  width: 100%;
-  height: auto;
-  aspect-ratio: 4 / 3;
-  object-fit: cover;
 }
 
 /* ── Appel final ── */
-
 .ph-cta {
-  position: relative;
-  z-index: 1;
+  max-width: 46rem;
   text-align: center;
-  padding: clamp(2rem, 5vw, 3rem);
-  border-radius: 1.25rem;
-  background: rgba(124, 58, 237, 0.12);
-  border: 1px solid rgba(168, 85, 247, 0.3);
-  max-width: 44rem;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: clamp(2rem, 5vh, 3rem) var(--space-xl);
+  border-radius: var(--radius-xl);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.ph-cta h2 {
+  margin: 0;
+  font-size: clamp(1.4rem, 3vw, 1.85rem);
+  text-wrap: balance;
 }
 
 .ph-cta p {
-  margin: 0 0 1.75rem;
-  color: #cbb8ec;
+  margin: 0;
+  color: var(--text-secondary);
 }
 
 /* ── Pied de page ── */
-
 .ph-footer {
-  position: relative;
-  z-index: 1;
-  padding-top: 1rem;
+  text-align: center;
+  padding-top: var(--space-lg);
 }
 
 .ph-footer a {
-  color: #7e68a8;
-  font-size: 0.84rem;
+  color: var(--site-ink-4);
+  font-size: 0.88rem;
+  text-decoration: none;
 }
 
 .ph-footer a:hover {
-  color: #cbb8ec;
-}
-
-/* ── Adaptatif ── */
-
-@media (max-width: 820px) {
-  .ph-sec,
-  .ph-sec.reverse {
-    grid-template-columns: 1fr;
-    direction: ltr;
-  }
-
-  /* Sur mobile l'illustration passe toujours après le texte. */
-  .sec-media {
-    order: 2;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ph {
-    scroll-behavior: auto;
-  }
-
-  .ph-btn {
-    transition: none;
-  }
-
-  .ph-btn.primary:hover {
-    transform: none;
-  }
+  color: var(--text-secondary);
 }
 </style>
