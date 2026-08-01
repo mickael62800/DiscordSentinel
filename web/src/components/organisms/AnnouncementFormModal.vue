@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppCheckbox from "../atoms/AppCheckbox.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppInput from "@/components/atoms/AppInput.vue";
@@ -361,14 +362,8 @@ async function save() {
     <hr class="sep" />
 
     <div class="checkbox-row">
-      <label class="cb">
-        <input v-model="form.mention_everyone" type="checkbox" />
-        <span>Mentionner @everyone</span>
-      </label>
-      <label class="cb">
-        <input v-model="form.mention_here" type="checkbox" />
-        <span>Mentionner @here</span>
-      </label>
+      <AppCheckbox v-model="form.mention_everyone">Mentionner @everyone</AppCheckbox>
+      <AppCheckbox v-model="form.mention_here">Mentionner @here</AppCheckbox>
     </div>
 
     <!-- Picker rôles -->
@@ -533,7 +528,6 @@ label > input[type="color"] { padding: 2px; height: 36px; }
 
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .checkbox-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
-.cb { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; margin-bottom: 0; }
 .cb input { width: auto; margin: 0; }
 .sep { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 

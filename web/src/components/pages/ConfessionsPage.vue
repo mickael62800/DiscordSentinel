@@ -1,10 +1,21 @@
 <script setup lang="ts">
+import AppCheckbox from "../atoms/AppCheckbox.vue";
+import { computed } from "vue";
+
 import { useConfessions } from "@/composables/useConfessions";
+import AppTabs from "../molecules/AppTabs.vue";
 import ConfessionsTable from "../organisms/ConfessionsTable.vue";
 import ConfessionsReportsTable from "../organisms/ConfessionsReportsTable.vue";
 import ConfessionRepliesModal from "../organisms/ConfessionRepliesModal.vue";
 
 const { tab, showDeleted, confessions, reports, loading } = useConfessions();
+
+/// Les compteurs vivent dans le libellé : c'est l'information qu'on vient
+/// chercher en regardant un onglet de modération.
+const TABS = computed(() => [
+  { key: "confessions", label: `Confessions (${confessions.value.length})` },
+  { key: "reports", label: `Signalements (${reports.value.length})`, icon: "🚩" },
+]);
 </script>
 
 <template>
@@ -17,21 +28,15 @@ const { tab, showDeleted, confessions, reports, loading } = useConfessions();
         </p>
       </div>
       <div class="actions">
-        <label class="cb">
-          <input v-model="showDeleted" type="checkbox" />
-          <span>Afficher supprimées</span>
-        </label>
+        <AppCheckbox v-model="showDeleted">Afficher supprimées</AppCheckbox>
       </div>
     </header>
 
-    <div class="tabs">
-      <button :class="['tab', { active: tab === 'confessions' }]" @click="tab = 'confessions'">
-        Confessions ({{ confessions.length }})
-      </button>
-      <button :class="['tab', { active: tab === 'reports' }]" @click="tab = 'reports'">
-        🚩 Signalements ({{ reports.length }})
-      </button>
-    </div>
+    <AppTabs
+      :model-value="tab"
+      :tabs="TABS"
+      @update:model-value="tab = $event as typeof tab"
+    />
 
     <div v-if="loading" class="muted">Chargement…</div>
     <ConfessionsTable v-else-if="tab === 'confessions'" />
@@ -47,9 +52,4 @@ const { tab, showDeleted, confessions, reports, loading } = useConfessions();
 .page-head h1 { margin: 0; font-size: 24px; }
 .muted { color: var(--text-secondary); }
 .small { font-size: 12px; }
-.tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
-.tab { background: transparent; border: 0; padding: 10px 16px; font-size: 13px; color: var(--text-secondary); cursor: pointer; border-bottom: 2px solid transparent; font-weight: 600; }
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.cb { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
 </style>

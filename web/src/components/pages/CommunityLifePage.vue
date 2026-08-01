@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppCheckbox from "../atoms/AppCheckbox.vue";
 import AppButton from "../atoms/AppButton.vue";
 // Back-office de la vie communautaire.
 //
@@ -224,10 +225,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           rédige pas.
         </p>
       </div>
-      <label class="cb">
-        <input v-model="showArchived" type="checkbox" />
-        <span>Afficher les éléments clos et brouillons</span>
-      </label>
+      <AppCheckbox v-model="showArchived">Afficher les éléments clos et brouillons</AppCheckbox>
     </header>
 
     <!-- `AppTabs` parle en `string` ; l'onglet est un type fermé. On projette
@@ -272,14 +270,8 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </label>
 
           <div class="cl-checks">
-            <label class="cb">
-              <input v-model="formNews.is_pinned" type="checkbox" />
-              <span>Épingler en tête de liste</span>
-            </label>
-            <label class="cb">
-              <input v-model="formNews.is_public" type="checkbox" />
-              <span>Visible par les visiteurs non connectés</span>
-            </label>
+            <AppCheckbox v-model="formNews.is_pinned">Épingler en tête de liste</AppCheckbox>
+            <AppCheckbox v-model="formNews.is_public">Visible par les visiteurs non connectés</AppCheckbox>
           </div>
 
           <div class="cl-form-foot">
@@ -363,10 +355,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
             </p>
           </fieldset>
 
-          <label class="cb">
-            <input v-model="formPoll.is_public" type="checkbox" />
-            <span>Visible par les visiteurs non connectés</span>
-          </label>
+          <AppCheckbox v-model="formPoll.is_public">Visible par les visiteurs non connectés</AppCheckbox>
 
           <div class="cl-form-foot">
             <AppButton variant="primary" type="submit"  :disabled="busy || !optionsValides">
@@ -560,13 +549,6 @@ const expire = (iso: string) => new Date(iso) <= new Date();
   font-size: 12px;
 }
 
-.cb {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  white-space: nowrap;
-}
 
 .cl-sec {
   margin-top: 16px;
