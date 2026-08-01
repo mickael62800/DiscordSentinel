@@ -148,7 +148,11 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     let coude_insurance_repo: Arc<dyn CoudeInsuranceRepository> = Arc::new(PgCoudeInsuranceRepository::new(pool.clone()));
     let coude_insurance: Arc<dyn CoudeInsuranceUseCase> = Arc::new(CoudeInsuranceService::new(coude_insurance_repo));
     let coude_steal_repo: Arc<dyn CoudeStealRepository> = Arc::new(PgCoudeStealRepository::new(pool.clone()));
-    let coude_steal: Arc<dyn CoudeStealUseCase> = Arc::new(CoudeStealService::new(coude_steal_repo));
+    // Construit avant les services qui le lisent : l'equilibre du jeu
+    // (taux de vol, cooldowns, gains) vient desormais de la configuration.
+    let bot_config_repo: Arc<dyn BotConfigRepository> =
+        Arc::new(PgBotConfigRepository::new(pool.clone()));
+    let coude_steal: Arc<dyn CoudeStealUseCase> = Arc::new(CoudeStealService::new(coude_steal_repo, bot_config_repo.clone()));
     let coude_prime_repo: Arc<dyn CoudePrimeRepository> = Arc::new(PgCoudePrimeRepository::new(pool.clone()));
     let coude_prime: Arc<dyn CoudePrimeUseCase> = Arc::new(CoudePrimeService::new(coude_prime_repo));
     let coude_bet_repo: Arc<dyn CoudeBetRepository> = Arc::new(PgCoudeBetRepository::new(pool.clone()));
@@ -168,8 +172,6 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         Arc::new(PgGameTemplateSettingsRepository::new(pool.clone()));
     let game_session_reg_repo: Arc<dyn GameSessionRegistrationRepository> =
         Arc::new(PgGameSessionRegistrationRepository::new(pool.clone()));
-    let bot_config_repo: Arc<dyn BotConfigRepository> =
-        Arc::new(PgBotConfigRepository::new(pool.clone()));
     let game_repo: Arc<dyn GameRepository> = Arc::new(PgGameRepository::new(pool.clone()));
 
     // ── Game Portal : runtime container (docker | noop) ──
