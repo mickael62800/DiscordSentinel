@@ -10,9 +10,13 @@
 // viens ». Les boutons d'action affichent alors une invitation à se connecter
 // plutôt que de disparaître — l'utilisateur comprend ce qu'il gagnerait.
 //
-// Chaque section charge indépendamment et se masque si elle est vide : une
-// plateforme jeux indisponible ne doit pas priver la page de son planning, et
-// une communauté sans sondage en cours ne doit pas afficher un cadre vide.
+// Chaque section charge indépendamment : une plateforme jeux indisponible ne
+// doit pas priver la page de son planning.
+//
+// Les sections restent AFFICHÉES même vides, avec un texte qui annonce ce qui
+// s'y trouvera. Les masquer paraissait plus propre, mais sur une communauté
+// qui démarre — base neuve, aucun contenu — il ne restait que le logo, et la
+// page semblait cassée alors qu'elle fonctionnait.
 //
 // Rendue hors de `MainLayout` : un membre n'a rien à faire dans la barre
 // latérale d'administration.
@@ -84,6 +88,21 @@ const presence = ref<Presence>({ voice: [], voice_total: 0, text: [] });
 const RAFRAICHISSEMENT_MS = 20_000;
 let timerPresence: number | undefined;
 
+/// Nombre de requêtes publiques en échec.
+///
+/// Sans lui, une base vide et une API en panne donnent exactement la même
+/// page — et on cherche le problème du mauvais côté. Ce compteur permet de
+/// dire lequel des deux on regarde.
+const echecs = ref(0);
+const APPELS_PUBLICS = 6;
+
+function echec() {
+  echecs.value += 1;
+}
+
+/// Tout est tombé : c'est une panne, pas un serveur calme.
+const toutEnEchec = computed(() => echecs.value >= APPELS_PUBLICS);
+
 const loadingEvents = ref(true);
 const loadingServers = ref(true);
 const loadingLfg = ref(true);
@@ -112,19 +131,28 @@ onMounted(() => {
   publicEventsService
     .list(guildId, from, to)
     .then((r) => (events.value = r))
-    .catch(() => (events.value = []))
+    .catch(() => {
+      echec();
+      events.value = [];
+    })
     .finally(() => (loadingEvents.value = false));
 
   publicGamesService
     .listServers(guildId)
     .then((r) => (servers.value = r))
-    .catch(() => (servers.value = []))
+    .catch(() => {
+      echec();
+      servers.value = [];
+    })
     .finally(() => (loadingServers.value = false));
 
   communityLifeService
     .lfg(guildId)
     .then((r) => (lfg.value = r))
-    .catch(() => (lfg.value = []))
+    .catch(() => {
+      echec();
+      lfg.value = [];
+    })
     .finally(() => (loadingLfg.value = false));
 
   // Un membre connecté voit son propre vote pré-coché, ce que la surface
@@ -134,12 +162,18 @@ onMounted(() => {
     : communityLifeService.polls(guildId);
   chargerSondages
     .then((r) => (polls.value = r.filter((p) => p.is_open).slice(0, 2)))
-    .catch(() => (polls.value = []));
+    .catch(() => {
+      echec();
+      polls.value = [];
+    });
 
   communityLifeService
     .spotlight(guildId)
     .then((r) => (spotlight.value = r))
-    .catch(() => (spotlight.value = null));
+    .catch(() => {
+      echec();
+      spotlight.value = null;
+    });
 
   communityLifeService
     .pulse(guildId)
@@ -148,6 +182,7 @@ onMounted(() => {
       newcomers.value = r.newcomers;
     })
     .catch(() => {
+      echec();
       anniversaries.value = [];
       newcomers.value = [];
     });
@@ -155,7 +190,10 @@ onMounted(() => {
   communityLifeService
     .news(guildId)
     .then((r) => (news.value = r))
-    .catch(() => (news.value = []));
+    .catch(() => {
+      echec();
+      news.value = [];
+    });
 
   chargerPresence();
   timerPresence = window.setInterval(chargerPresence, RAFRAICHISSEMENT_MS);
@@ -393,6 +431,16 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
       </p>
     </section>
 
+    <!-- Base vide et API en panne donnent la même page. Le dire évite de
+         chercher le problème du mauvais côté. -->
+    <section v-if="toutEnEchec" class="mb-block">
+      <p class="mb-config">
+        Le site n'arrive pas à joindre l'API. Les sections restent vides tant
+        que la connexion n'est pas rétablie — vérifie que les conteneurs
+        <code>api</code> et <code>nexus-api</code> tournent.
+      </p>
+    </section>
+
     <!-- ── En cours ── -->
     <section v-if="ongoing.length" class="mb-block">
       <h2><span class="mb-live" aria-hidden="true"></span> En ce moment</h2>
@@ -414,13 +462,18 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Serveurs de jeu ── -->
-    <section v-if="loadingServers || servers.length" class="mb-block">
+    <section class="mb-block">
       <h2>
         Nos serveurs de jeu
         <span v-if="playersOnline" class="mb-count">{{ playersOnline }} joueur(s) en ligne</span>
       </h2>
 
       <p v-if="loadingServers" class="mb-hint">Chargement des serveurs…</p>
+
+      <p v-else-if="!servers.length" class="mb-vide">
+        Aucun serveur de jeu déclaré. Ils apparaîtront ici avec leur jaquette
+        et le nombre de joueurs connectés.
+      </p>
 
       <ul v-else class="mb-games">
         <li
@@ -453,7 +506,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
 
     <!-- ── Cherche des joueurs ──
          Placée haut : c'est la section qui fait revenir les gens chaque jour. -->
-    <section v-if="loadingLfg || lfg.length || user" class="mb-block">
+    <section class="mb-block">
       <h2>
         Cherche des joueurs
         <span v-if="lfg.length" class="mb-count">{{ lfg.length }} annonce(s) ouverte(s)</span>
@@ -517,7 +570,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Le planning ── -->
-    <section v-if="loadingEvents || events.length" class="mb-block">
+    <section class="mb-block">
       <h2>
         Le planning
         <span class="mb-count">semaine du {{ label }}</span>
@@ -656,7 +709,7 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── On vote ── -->
-    <section v-if="polls.length" class="mb-block">
+    <section class="mb-block">
       <h2>On vote</h2>
 
       <article v-for="p in polls" :key="p.id" class="mb-poll">
@@ -689,13 +742,22 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
           Se connecter pour voter
         </RouterLink>
       </article>
+
+      <p v-if="!polls.length" class="mb-vide">
+        Aucun vote en cours. Le staff en ouvre pour choisir les prochains jeux
+        ou les horaires des soirées.
+      </p>
     </section>
 
     <!-- ── Membre du mois et anniversaires ── -->
-    <section v-if="spotlight || anniversaries.length" class="mb-block mb-duo">
-      <article v-if="spotlight" class="mb-panel">
+    <section class="mb-block mb-duo">
+      <article class="mb-panel">
         <h3>Membre du mois</h3>
-        <div class="mb-mom">
+        <p v-if="!spotlight" class="mb-vide">
+          Personne n'est encore mis en avant. Le staff distingue chaque mois
+          quelqu'un qui a fait vivre le serveur.
+        </p>
+        <div v-else class="mb-mom">
           <img
             v-if="avatarUrlDe(spotlight.avatar)"
             :src="avatarUrlDe(spotlight.avatar)!"
@@ -714,9 +776,12 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
         </div>
       </article>
 
-      <article v-if="anniversaries.length" class="mb-panel">
+      <article class="mb-panel">
         <h3>Anniversaires à venir</h3>
-        <ul class="mb-annivs">
+        <p v-if="!anniversaries.length" class="mb-vide">
+          Aucun anniversaire d'arrivée dans les deux prochaines semaines.
+        </p>
+        <ul v-else class="mb-annivs">
           <li v-for="a in anniversaries" :key="a.username + a.joined_at" class="mb-anniv">
             <span class="mb-av" :style="{ '--c': couleurDe(a.username) }">
               {{ initiale(a.username) }}
@@ -730,12 +795,16 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Nouveaux venus ── -->
-    <section v-if="newcomers.length" class="mb-block">
+    <section class="mb-block">
       <h2>
         Ils nous ont rejoints cette semaine
         <span class="mb-count">{{ newcomers.length }} nouveau(x)</span>
       </h2>
-      <div class="mb-nouveaux">
+      <p v-if="!newcomers.length" class="mb-vide">
+        Personne de nouveau cette semaine.
+      </p>
+
+      <div v-else class="mb-nouveaux">
         <span v-for="n in newcomers" :key="n.username" class="mb-nv">
           <span class="mb-av" :style="{ '--c': couleurDe(n.username) }">
             {{ initiale(n.username) }}
@@ -746,9 +815,13 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
     </section>
 
     <!-- ── Annonces ── -->
-    <section v-if="news.length" class="mb-block">
+    <section class="mb-block">
       <h2>Les dernières annonces</h2>
-      <div class="mb-anns">
+      <p v-if="!news.length" class="mb-vide">
+        Rien à annoncer pour le moment. Les nouvelles du serveur s'afficheront ici.
+      </p>
+
+      <div v-else class="mb-anns">
         <article v-for="n in news" :key="n.id" class="mb-ann" :class="{ pinned: n.is_pinned }">
           <img v-if="n.image_url" :src="n.image_url" alt="" class="mb-ann-img" />
           <div>
@@ -1396,6 +1469,19 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   margin-top: 0.35rem;
   font-size: 0.82rem;
   color: var(--ink-4);
+}
+
+/* État vide : présent mais discret. Il informe de ce qui viendra sans
+   occuper la place d'un vrai contenu. */
+.mb-vide {
+  margin: 0;
+  padding: 0.85rem 1.05rem;
+  border-radius: 0.9rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px dashed var(--line);
+  color: var(--ink-4);
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
 /* ── Message de configuration ── */
