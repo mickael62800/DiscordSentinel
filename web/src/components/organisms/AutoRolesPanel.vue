@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { reactive } from "vue";
@@ -53,10 +54,7 @@ async function onAdd() {
         <span><strong>{{ ar.role_name || ar.role_id }}</strong></span>
         <span v-if="ar.delay_secs > 0" class="muted">délai {{ ar.delay_secs }}s</span>
         <span v-else class="muted">immédiat</span>
-        <button
-          class="btn-icon-danger"
-          @click="removeAutoRole(selectedGuildId ?? '', ar.role_id)"
-        >🗑️</button>
+        <IconButton label="Supprimer" variant="danger" @click="removeAutoRole(selectedGuildId ?? '', ar.role_id)">🗑️</IconButton>
       </div>
     </div>
 
@@ -97,10 +95,5 @@ async function onAdd() {
   border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
-}
-.btn-icon-danger {
-  background: none; border: none;
-  color: var(--danger, var(--danger));
-  cursor: pointer; font-size: 1rem; padding: 4px;
 }
 </style>

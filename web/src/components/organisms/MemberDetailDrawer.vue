@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import { ref, watch } from "vue";
 import { useMembers } from "../../composables/useMembers";
 import { useFormatDate } from "../../composables/useFormatDate";
@@ -180,7 +181,7 @@ function discordProfileUrl(userId: string): string {
       >
         {{ resetting ? "Nettoyage…" : "Tout reinitialiser" }}
       </button>
-      <button class="close-btn" @click="closeMember">&times;</button>
+      <IconButton label="Fermer" variant="neutral" @click="closeMember">&times;</IconButton>
     </div>
 
     <div v-if="loadingSummary" class="loading">Chargement...</div>
@@ -353,20 +354,6 @@ function discordProfileUrl(userId: string): string {
 .reset-top-btn:hover:not(:disabled) { background: var(--danger); color: white; }
 .reset-top-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-.close-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
-  font-size: 18px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
 .close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
 .profile-header {

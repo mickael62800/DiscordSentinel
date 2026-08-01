@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import { useRolePanels } from "../../composables/useRolePanels";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useConfirm } from "../../composables/useConfirm";
@@ -68,11 +69,7 @@ function styleColor(style: string): string {
             </div>
             <span v-if="ar.delay_secs > 0" class="ar-delay">Delai : {{ ar.delay_secs }}s</span>
             <span v-else class="ar-delay">Immediat</span>
-            <button
-              class="btn-icon-danger"
-              title="Retirer cet auto-role"
-              @click="onRemoveAutoRole(ar.role_id, ar.role_name || ar.role_id)"
-            >🗑️</button>
+            <IconButton label="Retirer cet auto-role" variant="danger" @click="onRemoveAutoRole(ar.role_id, ar.role_name || ar.role_id)">🗑️</IconButton>
           </div>
         </div>
       </section>
@@ -98,11 +95,7 @@ function styleColor(style: string): string {
                 :label="panel.message_id ? 'Deploye' : 'Non deploye'"
                 :variant="panel.message_id ? 'success' : 'warning'"
               />
-              <button
-                class="btn-icon-danger"
-                title="Supprimer le panel"
-                @click="onDelete(panel.id, panel.title, $event)"
-              >🗑️</button>
+              <IconButton label="Supprimer le panel" variant="danger" @click="onDelete(panel.id, panel.title, $event)">🗑️</IconButton>
             </div>
             <p v-if="panel.description" class="panel-desc">{{ panel.description }}</p>
             <div class="panel-meta">
@@ -217,6 +210,5 @@ function styleColor(style: string): string {
 .header-actions { display: flex; gap: 12px; align-items: center; }
 .btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent, var(--accent)); color: white; cursor: pointer; text-decoration: none; }
 .btn-primary:hover { opacity: 0.9; }
-.btn-icon-danger { background: none; border: none; color: var(--danger, var(--danger)); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
 .btn-icon-danger:hover { opacity: 1; }
 </style>

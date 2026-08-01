@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { reactive, watch } from "vue";
@@ -107,7 +108,7 @@ async function onSave() {
                 </div>
               </td>
               <td>
-                <button type="button" class="btn-icon" @click="removeThreshold(idx)">🗑️</button>
+                <IconButton label="Action" variant="neutral" @click="removeThreshold(idx)">🗑️</IconButton>
               </td>
             </tr>
           </tbody>
@@ -192,13 +193,6 @@ label.full input[type="number"]::-webkit-inner-spin-button,
 .cell-inline { display: flex; align-items: center; gap: 10px; }
 .cell-inline input { flex: 1; min-width: 0; }
 .cell-inline .muted { white-space: nowrap; flex-shrink: 0; }
-.btn-icon {
-  width: 32px; height: 32px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent; border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px); color: var(--text-secondary);
-  cursor: pointer; font-size: 14px; transition: all .15s;
-}
 .btn-icon:hover {
   color: var(--danger); border-color: var(--danger);
   background: color-mix(in srgb, var(--danger) 10%, transparent);

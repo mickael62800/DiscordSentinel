@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { ref, computed } from "vue";
@@ -153,7 +154,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
       </table>
     </div>
 
-    <button v-if="!loading" class="btn-refresh" @click="refresh">🔄 Actualiser</button>
+    <IconButton label="Rafraîchir" variant="neutral" v-if="!loading"  @click="refresh">🔄 Actualiser</IconButton>
   </div>
 </template>
 
@@ -227,14 +228,6 @@ function roleVariant(role: RbacRole): BadgeVariant {
   cursor: pointer; font-size: 0.85rem;
 }
 .btn-danger:hover { background: var(--danger); }
-.btn-refresh {
-  margin-top: 1rem;
-  padding: 0.5rem 1rem;
-  background: var(--bg-card);
-  color: var(--color-text, #eee);
-  border: 1px solid var(--color-border, #444);
-  border-radius: var(--radius-sm); cursor: pointer;
-}
 @media (max-width: 768px) {
   .col-meta { display: none; }
 }

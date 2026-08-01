@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import { ref, computed, onMounted, watch, onUnmounted } from "vue";
 import { errMsg } from "@/utils/errMsg";
 import { infractionsService } from "@/services/infractionsService";
@@ -156,9 +157,9 @@ function scoreClass(s: number | undefined): string {
           <input type="checkbox" v-model="autoRefresh" />
           Live
         </label>
-        <button class="btn-refresh" :disabled="loading" @click="refresh">
+        <IconButton label="Rafraîchir" variant="neutral" :disabled="loading" @click="refresh">
           {{ loading ? "..." : "Rafraichir" }}
-        </button>
+        </IconButton>
         <button class="btn-wipe" :disabled="wiping || !props.guildId" @click="wipe">
           {{ wiping ? "..." : "Vider l'historique" }}
         </button>
@@ -284,9 +285,6 @@ function scoreClass(s: number | undefined): string {
   color: #fff;
 }
 
-.btn-refresh {
-  background: #2563eb;
-}
 
 .btn-wipe {
   background: var(--danger);

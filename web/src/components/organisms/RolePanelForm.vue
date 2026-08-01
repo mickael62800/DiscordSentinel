@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
@@ -117,7 +118,7 @@ async function onSavePanel() {
             <AppSelect v-model="entry.style" class="style">
               <option v-for="s in STYLES" :key="s.key" :value="s.key">{{ s.label }}</option>
             </AppSelect>
-            <button type="button" class="btn-icon-danger" @click="removeEntry(idx)">🗑️</button>
+            <IconButton label="Supprimer" variant="danger" @click="removeEntry(idx)">🗑️</IconButton>
           </div>
         </div>
       </div>
@@ -167,9 +168,4 @@ async function onSavePanel() {
   font-size: 0.85rem;
 }
 .role-id { font-family: monospace; }
-.btn-icon-danger {
-  background: none; border: none;
-  color: var(--danger, var(--danger));
-  cursor: pointer; font-size: 1rem; padding: 4px;
-}
 </style>

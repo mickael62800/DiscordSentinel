@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
@@ -158,7 +159,7 @@ const sortedRoles = computed(() =>
             <td>{{ formatDate(t.expires_at) }}</td>
             <td><strong>{{ timeRemaining(t.expires_at) }}</strong></td>
             <td>
-              <button class="btn-icon-danger" @click="onDelete(t)">🗑️</button>
+              <IconButton label="Supprimer" variant="danger" @click="onDelete(t)">🗑️</IconButton>
             </td>
           </tr>
         </tbody>
@@ -189,12 +190,5 @@ const sortedRoles = computed(() =>
 }
 .actions.full {
   justify-content: flex-end;
-}
-.btn-icon-danger {
-  background: none;
-  border: none;
-  color: var(--danger, var(--danger));
-  cursor: pointer;
-  font-size: 1rem;
 }
 </style>

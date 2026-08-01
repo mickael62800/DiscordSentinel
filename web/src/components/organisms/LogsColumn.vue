@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppSelect from "@/components/atoms/AppSelect.vue";
 import { computed, ref, watch } from "vue";
 import { useLogs } from "@/composables/useLogs";
@@ -72,7 +73,7 @@ async function handleClear() {
           <option value="warn">Warn</option>
           <option value="error">Error</option>
         </AppSelect>
-        <button class="clear-btn" title="Vider tous les journaux" @click="handleClear">
+        <IconButton label="Vider tous les journaux" variant="neutral" @click="handleClear">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M3 6h18" />
             <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
@@ -81,7 +82,7 @@ async function handleClear() {
             <path d="M14 11v6" />
           </svg>
           <span>Vider</span>
-        </button>
+        </IconButton>
       </div>
     </header>
 
@@ -158,26 +159,10 @@ async function handleClear() {
 }
 .level-select:hover { border-color: var(--accent); }
 
-.clear-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 12px;
-  font-size: 12px;
-  font-weight: 600;
-  background: transparent;
-  border: 1px solid color-mix(in srgb, var(--danger, var(--danger)) 50%, var(--border));
-  color: var(--danger, var(--danger));
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s;
-}
 .clear-btn:hover {
   background: color-mix(in srgb, var(--danger, var(--danger)) 12%, transparent);
   border-color: var(--danger, var(--danger));
 }
-.clear-btn:active { transform: translateY(1px); }
 .clear-btn svg { width: 14px; height: 14px; }
 
 .log-list {

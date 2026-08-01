@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
 import { computed, ref } from "vue";
 import { useLogs } from "../../composables/useLogs";
@@ -158,7 +159,7 @@ async function handleClear() {
         <label>Du <input type="date" v-model="dateFrom" class="date-input" /></label>
         <label>Au <input type="date" v-model="dateTo" class="date-input" /></label>
       </div>
-      <button v-if="showClearButton" class="clear-btn" @click="handleClear">Tout supprimer</button>
+      <IconButton label="Effacer" variant="neutral" v-if="showClearButton"  @click="handleClear">Tout supprimer</IconButton>
     </div>
 
     <LoadingState v-if="loading" />
@@ -209,7 +210,6 @@ async function handleClear() {
 .date-filters label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
 .date-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-family: monospace; }
 .date-input:focus { outline: none; border-color: var(--accent); }
-.clear-btn { margin-left: auto; padding: 8px 16px; background: var(--danger); color: white; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
 .clear-btn:hover { opacity: 0.85; }
 .details-text { font-size: 11px; color: var(--text-secondary); }
 </style>

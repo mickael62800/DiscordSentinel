@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import { useNotifications } from "../../composables/useNotifications";
 import AppBadge from "../atoms/AppBadge.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
@@ -35,7 +36,7 @@ function typeIcon(type: string): string {
         <button v-if="unreadCount > 0" class="mark-all" @click="markAllAsRead">
           Tout marquer comme lu
         </button>
-        <button class="close-btn" @click="closePanel">&times;</button>
+        <IconButton label="Fermer" variant="neutral" @click="closePanel">&times;</IconButton>
       </div>
     </div>
 
@@ -112,17 +113,7 @@ function typeIcon(type: string): string {
   text-decoration: underline;
 }
 
-.close-btn {
-  background: none;
-  color: var(--text-secondary);
-  font-size: 18px;
-  padding: 2px 6px;
-  line-height: 1;
-}
 
-.close-btn:hover {
-  color: var(--text-primary);
-}
 
 .panel-list {
   overflow-y: auto;

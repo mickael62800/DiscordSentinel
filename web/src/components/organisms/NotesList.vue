@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import IconButton from "../atoms/IconButton.vue";
 import { useNotes } from "@/composables/useNotes";
 import { useFormatDate } from "@/composables/useFormatDate";
 
@@ -35,7 +36,7 @@ function categoryLabel(key: string): string {
           </span>
           <span class="note-author">{{ n.author_name }}</span>
           <span class="note-date">{{ formatDate(n.created_at) }}</span>
-          <button class="btn-icon" @click="remove(n.id)" title="Supprimer">🗑️</button>
+          <IconButton label="Supprimer" variant="neutral" @click="remove(n.id)">🗑️</IconButton>
         </div>
         <div class="note-content">{{ n.content }}</div>
       </li>
@@ -89,16 +90,6 @@ function categoryLabel(key: string): string {
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-primary);
-}
-.btn-icon {
-  width: 30px; height: 30px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm, 6px);
-  color: var(--text-secondary);
-  cursor: pointer; font-size: 14px;
-  transition: all .15s;
 }
 .btn-icon:hover {
   color: var(--danger);
