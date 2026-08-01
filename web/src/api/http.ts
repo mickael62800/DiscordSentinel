@@ -106,7 +106,7 @@ async function handle<T>(resp: Response): Promise<T> {
       throw new Error("Unauthorized: session expired");
     }
     const body = await resp.text().catch(() => "");
-    throw new Error(`API error ${resp.status}: ${body}`);
+    throw new Error(messageErreur(resp.status, body));
   }
   const txt = await resp.text();
   if (!txt) return undefined as unknown as T;
@@ -156,6 +156,51 @@ async function request<T>(
     }
   }
   return handle<T>(r);
+}
+
+/// Préfixes techniques ajoutés par le typage des erreurs côté serveur. Ils
+/// n'apprennent rien à qui lit le message : « Données invalides : tu as déjà
+/// tiré la Roue aujourd'hui » dit deux fois moins bien la même chose.
+///
+/// Le bot Discord applique déjà ce nettoyage de son côté ; la même liste vaut
+/// ici, pour que les deux surfaces parlent pareil.
+const PREFIXES_TECHNIQUES = [
+  "Données invalides : ",
+  "Données invalides: ",
+  "Donnees invalides : ",
+  "Donnees invalides: ",
+  "Conflit : ",
+  "Conflit: ",
+  "Validation : ",
+  "Validation: ",
+];
+
+/// Transforme une réponse d'erreur en phrase lisible.
+///
+/// L'API répond `{"error": "..."}` avec un message déjà rédigé pour un
+/// humain. On le remonte tel quel plutôt que d'afficher le corps JSON brut
+/// précédé d'un code HTTP, qui obligeait le lecteur à décoder lui-même.
+function messageErreur(status: number, body: string): string {
+  let message = "";
+  try {
+    const json = JSON.parse(body) as { error?: string; message?: string };
+    message = json.error ?? json.message ?? "";
+  } catch {
+    // Corps non JSON (page d'erreur d'un proxy, réponse vide) : on garde le
+    // texte brut, tronqué — une page HTML entière dans un toast est inutile.
+    message = body.slice(0, 200);
+  }
+
+  message = message.trim();
+  for (const p of PREFIXES_TECHNIQUES) {
+    if (message.startsWith(p)) {
+      message = message.slice(p.length);
+      break;
+    }
+  }
+
+  // Sans message exploitable, le code HTTP est tout ce qu'on peut dire.
+  return message || `Erreur ${status}`;
 }
 
 export async function httpGet<T>(path: string): Promise<T> {
