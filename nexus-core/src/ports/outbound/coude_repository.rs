@@ -40,8 +40,43 @@ pub struct CoudeCombatSnapshot {
     pub defender: CoudeProfile,
 }
 
+/// Un combat resolu, tel qu'on le raconte apres coup.
+///
+/// Distinct de `CoudeCombat`, qui decrit un combat EN COURS de negociation
+/// (en attente, accepte, refuse). Ici tout est joue : il y a un vainqueur,
+/// des jets de des et un recit.
+#[derive(Debug, Clone)]
+pub struct CoudeCombatResult {
+    pub id: uuid::Uuid,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub defender_id: String,
+    pub defender_name: String,
+    pub mise: i64,
+    pub winner_id: Option<String>,
+    pub attacker_roll: Option<i32>,
+    pub defender_roll: Option<i32>,
+    pub chaos_event: Option<String>,
+    pub special_attack: Option<String>,
+    pub result_message: Option<String>,
+    pub coins_transferred: i64,
+    pub resolved_at: Option<chrono::DateTime<chrono::Utc>>,
+}
+
 #[async_trait]
 pub trait CoudeRepository: Send + Sync {
+    /// Derniers combats RESOLUS d'un joueur, attaquant ou defenseur.
+    ///
+    /// Lecture qui manquait completement : le jeu ecrivait ses combats sans
+    /// jamais offrir de les relire. Le recit et les jets de des etaient donc
+    /// perdus des que le message Discord defilait.
+    async fn list_combat_history(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeCombatResult>, DomainError>;
+
     async fn find_profile(
         &self,
         guild_id: &str,

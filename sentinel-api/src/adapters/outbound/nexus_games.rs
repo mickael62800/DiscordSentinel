@@ -67,6 +67,52 @@ pub struct SpinResult {
     pub is_memorable: bool,
 }
 
+/// Profil Coup de Coude : classe, statistiques, palmares.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoudeProfile {
+    pub username: String,
+    pub class: String,
+    pub level: i32,
+    pub xp: i32,
+    pub atk: i32,
+    pub def: i32,
+    pub hp_current: i32,
+    pub hp_max: i32,
+    pub coins: i64,
+    pub stat_points: i32,
+    pub title: Option<String>,
+    pub total_wins: i32,
+    pub total_losses: i32,
+    pub total_draws: i32,
+    pub total_stolen: i64,
+    pub cowardice_count: i32,
+    pub chaos_events: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoudeItem {
+    pub item_key: String,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoudeCombat {
+    pub id: String,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub defender_id: String,
+    pub defender_name: String,
+    pub mise: i64,
+    pub winner_id: Option<String>,
+    pub attacker_roll: Option<i32>,
+    pub defender_roll: Option<i32>,
+    pub chaos_event: Option<String>,
+    pub special_attack: Option<String>,
+    pub result_message: Option<String>,
+    pub coins_transferred: i64,
+    pub resolved_at: Option<String>,
+}
+
 pub struct NexusGamesClient {
     client: reqwest::Client,
     base_url: String,
@@ -195,6 +241,58 @@ impl NexusGamesClient {
         self.envoyer(self.client.get(url)).await
     }
 
+    // ── Coup de Coude ──
+    //
+    // Lectures SEULEMENT. Les actions du jeu — coup de coude, vol, prime,
+    // pari — restent sur Discord : leur interet tient a la reaction dans le
+    // salon, et les ouvrir au web viderait la conversation de ce qui la fait
+    // vivre.
+
+    /// Profil du joueur. `username` sert a creer le profil au premier appel :
+    /// le jeu inscrit un joueur des sa premiere consultation.
+    pub async fn coude_profile(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+    ) -> Result<CoudeProfile, DomainError> {
+        let url = self.url(&format!(
+            "/api/coude/{guild_id}/{user_id}/profile?username={}",
+            urlencoding(username)
+        ));
+        self.envoyer(self.client.get(url)).await
+    }
+
+    pub async fn coude_inventory(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<CoudeItem>, DomainError> {
+        let url = self.url(&format!("/api/coude/{guild_id}/{user_id}/inventory"));
+        self.envoyer(self.client.get(url)).await
+    }
+
+    pub async fn coude_combats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError> {
+        let url = self.url(&format!(
+            "/api/coude/{guild_id}/{user_id}/combats?limit={limit}"
+        ));
+        self.envoyer(self.client.get(url)).await
+    }
+
+    pub async fn coude_ranking(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeProfile>, DomainError> {
+        let url = self.url(&format!("/api/coude/{guild_id}/classement?limit={limit}"));
+        self.envoyer(self.client.get(url)).await
+    }
+
     pub async fn leaderboard(
         &self,
         guild_id: &str,
@@ -203,4 +301,20 @@ impl NexusGamesClient {
         let url = self.url(&format!("/api/wallet/{guild_id}/leaderboard?limit={limit}"));
         self.envoyer(self.client.get(url)).await
     }
+}
+
+/// Encodage minimal pour un parametre de requete.
+///
+/// Les pseudos Discord contiennent espaces, accents et emojis : les laisser
+/// bruts casserait l'URL. Une dependance dediee serait disproportionnee pour
+/// le seul parametre qu'on transmet.
+fn urlencoding(v: &str) -> String {
+    v.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                (b as char).to_string()
+            }
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
 }

@@ -127,6 +127,54 @@ async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String
     }
 }
 
+// ── Coup de Coude ──
+
+#[derive(Debug, Serialize)]
+pub struct CoudeDto {
+    pub profile: crate::adapters::outbound::nexus_games::CoudeProfile,
+    pub items: Vec<crate::adapters::outbound::nexus_games::CoudeItem>,
+    pub combats: Vec<crate::adapters::outbound::nexus_games::CoudeCombat>,
+    /// Classement de la guilde, pour situer le joueur.
+    pub ranking: Vec<crate::adapters::outbound::nexus_games::CoudeProfile>,
+}
+
+/// GET /api/me/games/coude
+///
+/// Tout le dossier du joueur en UNE reponse : profil, objets, derniers
+/// combats, classement. Quatre appels separes auraient fait apparaitre la
+/// page par morceaux, et le classement seul n'a aucun sens sans le profil
+/// pour s'y situer.
+///
+/// Lecture seule. Les actions du jeu restent sur Discord : leur interet
+/// tient a la reaction dans le salon.
+pub async fn my_coude(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<CoudeDto>, ApiError> {
+    let ctx = require_ctx(&rbac)?;
+    let g = guild(&state)?;
+    let c = client(&state)?;
+    let uid = &ctx.discord_user_id;
+
+    // Le profil d'abord : c'est lui qui inscrit le joueur au premier appel,
+    // et sans lui le reste n'a rien a decrire.
+    let nom = display_name(&state, g, uid).await;
+    let profile = c.coude_profile(g, uid, &nom).await?;
+
+    // Les trois autres sont accessoires : un echec les vide sans priver la
+    // page du profil, qui est l'essentiel.
+    let items = c.coude_inventory(g, uid).await.unwrap_or_default();
+    let combats = c.coude_combats(g, uid, 10).await.unwrap_or_default();
+    let ranking = c.coude_ranking(g, 10).await.unwrap_or_default();
+
+    Ok(Json(CoudeDto {
+        profile,
+        items,
+        combats,
+        ranking,
+    }))
+}
+
 /// GET /api/me/games/wallet
 pub async fn my_wallet(
     State(state): State<AppState>,

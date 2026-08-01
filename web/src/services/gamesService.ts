@@ -67,4 +67,66 @@ export const gamesService = {
   spinWheel(): Promise<SpinResult> {
     return httpPost<SpinResult>("/api/me/games/wheel/spin", {});
   },
+
+  /// Dossier complet du joueur à Coup de Coude : profil, objets, derniers
+  /// combats, classement. Une seule requête — la page a besoin des quatre en
+  /// même temps, et le classement seul n'a aucun sens sans le profil.
+  coude(): Promise<CoudeFile> {
+    return httpGet<CoudeFile>("/api/me/games/coude");
+  },
 };
+
+// ── Coup de Coude ──
+
+export interface CoudeProfile {
+  username: string;
+  /// `bourrin` | `agile` | `fourbe` | `tank`, ou vide si non choisie.
+  class: string;
+  level: number;
+  xp: number;
+  atk: number;
+  def: number;
+  hp_current: number;
+  hp_max: number;
+  coins: number;
+  /// Points à répartir, gagnés en montant de niveau.
+  stat_points: number;
+  title: string | null;
+  total_wins: number;
+  total_losses: number;
+  total_draws: number;
+  total_stolen: number;
+  /// Combats refusés. Le jeu les compte, autant les assumer.
+  cowardice_count: number;
+  chaos_events: number;
+}
+
+export interface CoudeItem {
+  item_key: string;
+  quantity: number;
+}
+
+export interface CoudeCombat {
+  id: string;
+  attacker_id: string;
+  attacker_name: string;
+  defender_id: string;
+  defender_name: string;
+  mise: number;
+  winner_id: string | null;
+  attacker_roll: number | null;
+  defender_roll: number | null;
+  chaos_event: string | null;
+  special_attack: string | null;
+  /// Récit du combat, tel qu'il a été posté sur Discord.
+  result_message: string | null;
+  coins_transferred: number;
+  resolved_at: string | null;
+}
+
+export interface CoudeFile {
+  profile: CoudeProfile;
+  items: CoudeItem[];
+  combats: CoudeCombat[];
+  ranking: CoudeProfile[];
+}

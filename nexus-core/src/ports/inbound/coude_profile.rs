@@ -11,6 +11,14 @@ pub trait CoudeProfileUseCase: Send + Sync {
         user_id: &str,
         username: &str,
     ) -> Result<CoudeProfile, DomainError>;
+    /// Derniers combats resolus du joueur. Lecture seule.
+    async fn combat_history(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<crate::ports::outbound::coude_repository::CoudeCombatResult>, DomainError>;
+
     async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoudeProfile, DomainError>;
     async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoudeProfile, DomainError>;
     /// Classement des joueurs de la guild (supervision). Lecture seule :

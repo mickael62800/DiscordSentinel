@@ -22,6 +22,22 @@ impl CoudeService {
 }
 #[async_trait]
 impl CoudeProfileUseCase for CoudeService {
+    async fn combat_history(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<
+        Vec<crate::ports::outbound::coude_repository::CoudeCombatResult>,
+        DomainError,
+    > {
+        // Meme borne dure que le classement : une demande absurde ne doit
+        // atteindre ni la base ni la reponse HTTP.
+        self.repo
+            .list_combat_history(guild_id, user_id, limit.clamp(1, 50))
+            .await
+    }
+
     async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError> {
         // Borne dure : protege la reponse HTTP et la base d'une demande
         // absurde (?limit=100000) venant du client.

@@ -15,7 +15,7 @@
 // le résultat laisserait croire que l'animation le détermine. Ici elle ne fait
 // que le mettre en scène.
 
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 
 import ActionButton from "../atoms/ActionButton.vue";
 import SiteHero from "../molecules/SiteHero.vue";
@@ -25,6 +25,8 @@ import {
   type Rank,
   type SpinResult,
   type Transaction,
+  type CoudeCombat,
+  type CoudeFile,
   type Wallet,
 } from "@/services/gamesService";
 import { GAMES, jeuMemorise, memoriserJeu } from "@/games/catalog";
@@ -144,6 +146,84 @@ async function tirer() {
   } finally {
     enCours.value = false;
   }
+}
+
+// ── Coup de Coude ──
+
+const coude = ref<CoudeFile | null>(null);
+const coudeErreur = ref<string | null>(null);
+
+/// Chargé à la demande, pas au montage : quelqu'un qui vient pour la Roue
+/// n'a pas à payer quatre requêtes pour un jeu qu'il ne regardera pas.
+async function chargerCoude() {
+  if (coude.value || !user.value) return;
+  coudeErreur.value = null;
+  try {
+    coude.value = await gamesService.coude();
+  } catch (e) {
+    coudeErreur.value =
+      e instanceof Error ? e.message : "Impossible de charger ton profil.";
+  }
+}
+
+watch(
+  () => jeuActif.value,
+  (k) => {
+    if (k === "coude") void chargerCoude();
+  },
+  { immediate: true },
+);
+
+/// Libellés des classes : le serveur renvoie une clé technique.
+const CLASSES: Record<string, { nom: string; emoji: string; trait: string }> = {
+  bourrin: { nom: "Bourrin", emoji: "🪓", trait: "Frappe fort, encaisse mal" },
+  agile: { nom: "Agile", emoji: "🏃", trait: "Esquive souvent, frappe vite" },
+  fourbe: { nom: "Fourbe", emoji: "🗡️", trait: "Vole mieux, joue sale" },
+  tank: { nom: "Tank", emoji: "🛡️", trait: "Encaisse tout, frappe lentement" },
+};
+
+const classe = computed(() => {
+  const k = coude.value?.profile.class ?? "";
+  return CLASSES[k] ?? { nom: "Sans classe", emoji: "❔", trait: "Classe pas encore choisie" };
+});
+
+/// Part de victoires. `null` quand rien n'a été joué : afficher « 0 % » à
+/// quelqu'un qui n'a jamais combattu serait un jugement, pas une statistique.
+const tauxVictoire = computed(() => {
+  const p = coude.value?.profile;
+  if (!p) return null;
+  const total = p.total_wins + p.total_losses + p.total_draws;
+  return total === 0 ? null : Math.round((p.total_wins / total) * 100);
+});
+
+/// Le combat a-t-il été gagné par le lecteur ?
+function gagne(c: CoudeCombat): boolean | null {
+  if (!c.winner_id) return null; // égalité
+  return c.winner_id === adversaireContexte(c).moi;
+}
+
+/// Identifie le lecteur et son adversaire dans un combat, quel que soit le
+/// côté où il se trouvait.
+function adversaireContexte(c: CoudeCombat): { moi: string; nom: string } {
+  const p = coude.value?.profile;
+  // Le profil ne porte pas l'identifiant : on se reconnaît au pseudo, qui
+  // est celui enregistré au moment du combat.
+  const jeSuisAttaquant = c.attacker_name === p?.username;
+  return jeSuisAttaquant
+    ? { moi: c.attacker_id, nom: c.defender_name }
+    : { moi: c.defender_id, nom: c.attacker_name };
+}
+
+/// Objets : le serveur renvoie une clé technique, on l'habille.
+const OBJETS: Record<string, string> = {
+  potion: "🧪 Potion",
+  bouclier: "🛡️ Bouclier",
+  poison: "☠️ Poison",
+  assurance: "📜 Assurance",
+};
+
+function objet(cle: string): string {
+  return OBJETS[cle] ?? `📦 ${cle}`;
 }
 
 // ── Chargement ──
@@ -347,15 +427,156 @@ const fondRoue = computed(() => {
         </div>
       </section>
 
-      <!-- Jeu qui ne se joue pas ici : on l'assume et on explique pourquoi,
-           plutôt que de laisser une page vide. -->
+      <!-- Coup de Coude : le jeu se JOUE sur Discord, mais tout ce qu'on y a
+           accompli se consulte ici. Le web fait ce que Discord fait mal —
+           garder une trace lisible. -->
+      <section v-else-if="jeuActif === 'coude'" class="jx-block">
+        <h2>{{ jeu.emoji }} {{ jeu.nom }}</h2>
+
+        <p v-if="!user" class="jx-vide">
+          Connecte-toi pour voir ta fiche, tes combats et ton inventaire.
+        </p>
+        <p v-else-if="coudeErreur" class="jx-alerte">{{ coudeErreur }}</p>
+        <p v-else-if="!coude" class="jx-hint">Chargement de ta fiche…</p>
+
+        <template v-else>
+          <!-- ── Fiche du personnage ── -->
+          <div class="cd-fiche">
+            <div class="cd-classe">
+              <span class="cd-classe-emoji" aria-hidden="true">{{ classe.emoji }}</span>
+              <div>
+                <div class="cd-classe-nom">{{ classe.nom }}</div>
+                <div class="cd-classe-trait">{{ classe.trait }}</div>
+              </div>
+            </div>
+
+            <div class="cd-identite">
+              <strong>{{ coude.profile.username || "Toi" }}</strong>
+              <span v-if="coude.profile.title" class="cd-titre">
+                « {{ coude.profile.title }} »
+              </span>
+              <span class="cd-niveau">Niveau {{ coude.profile.level }}</span>
+            </div>
+
+            <!-- Points de vie : une jauge dit d'un coup d'œil ce qu'un
+                 « 34/50 » demande de calculer. -->
+            <div class="cd-pv">
+              <div class="cd-pv-ligne">
+                <span>Points de vie</span>
+                <span>{{ coude.profile.hp_current }} / {{ coude.profile.hp_max }}</span>
+              </div>
+              <div class="cd-jauge">
+                <i
+                  :style="{
+                    width: `${Math.max(0, Math.round((coude.profile.hp_current / Math.max(1, coude.profile.hp_max)) * 100))}%`,
+                  }"
+                ></i>
+              </div>
+            </div>
+
+            <ul class="cd-stats">
+              <li><span>⚔️ Attaque</span><b>{{ coude.profile.atk }}</b></li>
+              <li><span>🛡️ Défense</span><b>{{ coude.profile.def }}</b></li>
+              <li><span>✨ Expérience</span><b>{{ coude.profile.xp }}</b></li>
+              <li v-if="coude.profile.stat_points > 0" class="cd-dispo">
+                <span>🎯 Points à répartir</span><b>{{ coude.profile.stat_points }}</b>
+              </li>
+            </ul>
+
+            <p v-if="coude.profile.stat_points > 0" class="jx-vide">
+              Tu as {{ coude.profile.stat_points }} point(s) à placer.
+              Utilise <code>/coude entrainement</code> sur Discord.
+            </p>
+          </div>
+
+          <!-- ── Palmarès ── -->
+          <h3 class="cd-sous-titre">Ton palmarès</h3>
+          <ul class="cd-palmares">
+            <li class="gagne"><b>{{ coude.profile.total_wins }}</b><span>victoires</span></li>
+            <li class="perdu"><b>{{ coude.profile.total_losses }}</b><span>défaites</span></li>
+            <li><b>{{ coude.profile.total_draws }}</b><span>égalités</span></li>
+            <li v-if="tauxVictoire !== null"><b>{{ tauxVictoire }} %</b><span>de réussite</span></li>
+            <li><b>{{ fmtCoins(coude.profile.total_stolen) }}</b><span>coins volés</span></li>
+            <li><b>{{ coude.profile.chaos_events }}</b><span>événements chaotiques</span></li>
+            <li v-if="coude.profile.cowardice_count > 0" class="perdu">
+              <b>{{ coude.profile.cowardice_count }}</b><span>combats refusés</span>
+            </li>
+          </ul>
+
+          <!-- ── Inventaire ── -->
+          <h3 class="cd-sous-titre">Ton inventaire</h3>
+          <p v-if="!coude.items.length" class="jx-vide">
+            Rien en poche. La boutique s'ouvre avec <code>/coude boutique</code>.
+          </p>
+          <ul v-else class="cd-objets">
+            <li v-for="o in coude.items" :key="o.item_key" class="cd-objet">
+              <span>{{ objet(o.item_key) }}</span>
+              <b>×{{ o.quantity }}</b>
+            </li>
+          </ul>
+
+          <!-- ── Derniers combats ── -->
+          <h3 class="cd-sous-titre">Tes derniers combats</h3>
+          <p v-if="!coude.combats.length" class="jx-vide">
+            Aucun combat pour l'instant. Le premier coup se donne avec
+            <code>/coude</code> sur Discord.
+          </p>
+          <ul v-else class="cd-combats">
+            <li
+              v-for="c in coude.combats"
+              :key="c.id"
+              class="cd-combat"
+              :class="{ gagne: gagne(c) === true, perdu: gagne(c) === false }"
+            >
+              <div class="cd-combat-tete">
+                <span class="cd-issue">
+                  {{ gagne(c) === true ? "Victoire" : gagne(c) === false ? "Défaite" : "Égalité" }}
+                </span>
+                <span class="cd-adversaire">contre {{ adversaireContexte(c).nom }}</span>
+                <span v-if="c.coins_transferred" class="cd-mise">
+                  {{ gagne(c) ? "+" : "−" }}{{ fmtCoins(Math.abs(c.coins_transferred)) }} coins
+                </span>
+                <span v-if="c.resolved_at" class="cd-quand">{{ fmtDate(c.resolved_at) }}</span>
+              </div>
+
+              <!-- Les jets de dés : c'est ce qu'on relit pour savoir si on a
+                   perdu de peu ou pris une correction. -->
+              <div v-if="c.attacker_roll !== null" class="cd-des">
+                🎲 {{ c.attacker_name }} {{ c.attacker_roll }}
+                — {{ c.defender_name }} {{ c.defender_roll }}
+              </div>
+
+              <div v-if="c.special_attack" class="cd-special">
+                💫 {{ c.special_attack }}
+              </div>
+              <div v-if="c.chaos_event" class="cd-chaos">
+                🌀 {{ c.chaos_event }}
+              </div>
+              <p v-if="c.result_message" class="cd-recit">{{ c.result_message }}</p>
+            </li>
+          </ul>
+
+          <!-- ── Classement ── -->
+          <h3 class="cd-sous-titre">Le classement</h3>
+          <ol class="jx-rangs">
+            <li
+              v-for="(r, i) in coude.ranking"
+              :key="r.username + i"
+              class="jx-rang"
+              :class="{ moi: r.username === coude.profile.username }"
+            >
+              <span class="jx-place">{{ i + 1 }}</span>
+              <span class="jx-nom">{{ r.username || "Un membre" }}</span>
+              <span class="jx-coins">niv. {{ r.level }}</span>
+            </li>
+          </ol>
+        </template>
+      </section>
+
+      <!-- Jeu qui ne se joue pas ici et n'a pas de fiche : on l'assume. -->
       <section v-else class="jx-block">
         <h2>{{ jeu.emoji }} {{ jeu.nom }}</h2>
-        <p class="jx-vide">
-          Ce jeu se joue sur Discord. Son intérêt tient à ce qui se passe dans
-          le salon — les réactions, les represailles — et ça ne se transpose
-          pas sur une page web.
-        </p>
+        <p class="jx-vide">{{ jeu.pitch }}</p>
       </section>
 
       <!-- ── Classement ── -->
@@ -790,6 +1011,263 @@ const fondRoue = computed(() => {
   margin: 0.8rem 0 0;
   color: var(--site-ink-3);
   font-size: 0.92rem;
+}
+
+/* ── Coup de Coude ── */
+.cd-sous-titre {
+  margin: var(--space-2xl) 0 var(--space-lg);
+  font-size: 1.02rem;
+}
+
+.cd-fiche {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-xl);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.cd-classe {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.cd-classe-emoji {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.cd-classe-nom {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.cd-classe-trait {
+  color: var(--site-ink-4);
+  font-size: 0.86rem;
+}
+
+.cd-identite {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.cd-titre {
+  color: var(--accent);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.cd-niveau {
+  margin-left: auto;
+  padding: 2px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-bg);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.cd-pv-ligne {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--site-ink-3);
+  margin-bottom: var(--space-xs);
+}
+
+.cd-jauge {
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+/* Du vert au rouge selon ce qui reste : la couleur dit l'état avant que le
+   chiffre soit lu. */
+.cd-jauge i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--danger), var(--accent-warm), var(--success));
+  background-size: 300% 100%;
+  background-position: right;
+  transition: width var(--transition-base);
+}
+
+.cd-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: var(--space-sm);
+}
+
+.cd-stats li {
+  display: flex;
+  justify-content: space-between;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.88rem;
+}
+
+.cd-stats b {
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-stats .cd-dispo {
+  border: 1px solid var(--border-strong);
+}
+
+.cd-palmares {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-md);
+}
+
+.cd-palmares li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+}
+
+.cd-palmares b {
+  font-size: 1.4rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-palmares span {
+  color: var(--site-ink-4);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.cd-palmares .gagne b {
+  color: var(--success);
+}
+
+.cd-palmares .perdu b {
+  color: var(--danger);
+}
+
+.cd-objets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.cd-objet {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.cd-combats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.cd-combat {
+  padding: var(--space-md) var(--space-lg);
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  /* Le bord gauche porte l'issue : lisible en diagonale, sans lire le texte. */
+  border-left: 3px solid var(--site-off);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.cd-combat.gagne {
+  border-left-color: var(--success);
+}
+
+.cd-combat.perdu {
+  border-left-color: var(--danger);
+}
+
+.cd-combat-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.cd-issue {
+  font-weight: 700;
+}
+
+.cd-combat.gagne .cd-issue {
+  color: var(--success);
+}
+
+.cd-combat.perdu .cd-issue {
+  color: var(--danger);
+}
+
+.cd-adversaire {
+  color: var(--site-ink-3);
+  font-size: 0.9rem;
+}
+
+.cd-mise {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.cd-quand {
+  font-size: 0.76rem;
+  color: var(--site-ink-4);
+  white-space: nowrap;
+}
+
+.cd-des,
+.cd-special,
+.cd-chaos {
+  font-size: 0.84rem;
+  color: var(--site-ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.cd-chaos {
+  color: var(--accent);
+}
+
+.cd-recit {
+  margin: var(--space-xs) 0 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--site-ink-4);
+  font-style: italic;
 }
 
 @media (max-width: 760px) {

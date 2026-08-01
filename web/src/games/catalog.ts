@@ -35,9 +35,11 @@ export const GAMES: GameCard[] = [
     key: "coude",
     nom: "Coup de Coude",
     emoji: "💥",
-    // Volontairement non jouable ici : l'intérêt du jeu est la réaction dans
-    // le salon. Sur le web, on jouerait seul et le Discord se viderait.
-    pitch: "Se joue sur Discord — tout le sel est dans la réaction des autres.",
+    // Les ACTIONS restent sur Discord — leur sel est la réaction du salon,
+    // et les ouvrir ici le viderait. Mais tout ce qu'on y accomplit se
+    // consulte sur le site : c'est ce que Discord fait mal, garder une trace
+    // lisible d'un message qui a défilé.
+    pitch: "Ta fiche, tes combats, ton inventaire. Les coups se donnent sur Discord.",
     couleur: "#f39c12",
     jouable: false,
   },

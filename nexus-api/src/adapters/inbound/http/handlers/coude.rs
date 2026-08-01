@@ -175,3 +175,62 @@ pub async fn challenge(
 pub async fn accept(State(state): State<AppState>, Path(id): Path<uuid::Uuid>, Json(req): Json<DefenderRequest>) -> Result<Json<serde_json::Value>, ApiError> { let ok = state.coude_combat.accept(id, &req.defender_id).await?; Ok(Json(serde_json::json!({"ok": ok}))) }
 pub async fn refuse(State(state): State<AppState>, Path(id): Path<uuid::Uuid>, Json(req): Json<DefenderRequest>) -> Result<Json<serde_json::Value>, ApiError> { let ok = state.coude_combat.refuse(id, &req.defender_id).await?; Ok(Json(serde_json::json!({"ok": ok}))) }
 pub async fn resolve(State(state): State<AppState>, Path(id): Path<uuid::Uuid>) -> Result<Json<serde_json::Value>, ApiError> { let ok=state.coude_combat.resolve(id).await?; Ok(Json(serde_json::json!({"ok":ok}))) }
+
+#[derive(Debug, Serialize)]
+pub struct CombatDto {
+    pub id: String,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub defender_id: String,
+    pub defender_name: String,
+    pub mise: i64,
+    pub winner_id: Option<String>,
+    pub attacker_roll: Option<i32>,
+    pub defender_roll: Option<i32>,
+    /// Evenement chaotique survenu pendant le combat, s'il y en a eu un.
+    pub chaos_event: Option<String>,
+    pub special_attack: Option<String>,
+    /// Recit du combat, tel qu'il a ete poste sur Discord.
+    pub result_message: Option<String>,
+    pub coins_transferred: i64,
+    pub resolved_at: Option<String>,
+}
+
+/// GET /api/coude/{guild_id}/{user_id}/combats?limit=
+pub async fn combat_history(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Query(q): Query<HistoryQuery>,
+) -> Result<Json<Vec<CombatDto>>, ApiError> {
+    let combats = state
+        .coude_profile
+        .combat_history(&guild_id, &user_id, q.limit.unwrap_or(10))
+        .await?;
+
+    Ok(Json(
+        combats
+            .into_iter()
+            .map(|c| CombatDto {
+                id: c.id.to_string(),
+                attacker_id: c.attacker_id,
+                attacker_name: c.attacker_name,
+                defender_id: c.defender_id,
+                defender_name: c.defender_name,
+                mise: c.mise,
+                winner_id: c.winner_id,
+                attacker_roll: c.attacker_roll,
+                defender_roll: c.defender_roll,
+                chaos_event: c.chaos_event,
+                special_attack: c.special_attack,
+                result_message: c.result_message,
+                coins_transferred: c.coins_transferred,
+                resolved_at: c.resolved_at.map(|d| d.to_rfc3339()),
+            })
+            .collect(),
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct HistoryQuery {
+    pub limit: Option<i64>,
+}

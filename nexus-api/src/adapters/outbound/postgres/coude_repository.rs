@@ -2,7 +2,9 @@ use super::pg_err;
 use async_trait::async_trait;
 use nexus_core::{
     domain::{entities::coude::PlayerClass, errors::DomainError},
-    ports::outbound::coude_repository::{CoudeCombat, CoudeCombatSnapshot, CoudeProfile, CoudeRepository},
+    ports::outbound::coude_repository::{
+        CoudeCombat, CoudeCombatResult, CoudeCombatSnapshot, CoudeProfile, CoudeRepository,
+    },
 };
 use sqlx::PgPool;
 pub struct PgCoudeRepository {
@@ -56,6 +58,46 @@ impl CoudeRepository for PgCoudeRepository {
             })
         .transpose()
     }
+    async fn list_combat_history(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoudeCombatResult>, DomainError> {
+        // Uniquement les combats RESOLUS : un defi en attente n'a ni
+        // vainqueur ni recit, l'afficher dans un historique n'apprendrait
+        // rien. Le joueur peut etre d'un cote comme de l'autre.
+        let rows: Vec<CombatRow> = sqlx::query_as(
+            "SELECT id, attacker_id, attacker_name, defender_id, defender_name,                     mise, winner_id, attacker_roll, defender_roll, chaos_event,                     special_attack, result_message, coins_transferred, resolved_at              FROM nexus_coude_combats              WHERE guild_id = $1 AND (attacker_id = $2 OR defender_id = $2)                AND status = 'resolved'              ORDER BY resolved_at DESC NULLS LAST              LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(rows
+            .into_iter()
+            .map(|r| CoudeCombatResult {
+                id: r.id,
+                attacker_id: r.attacker_id,
+                attacker_name: r.attacker_name,
+                defender_id: r.defender_id,
+                defender_name: r.defender_name,
+                mise: r.mise,
+                winner_id: r.winner_id,
+                attacker_roll: r.attacker_roll,
+                defender_roll: r.defender_roll,
+                chaos_event: r.chaos_event,
+                special_attack: r.special_attack,
+                result_message: r.result_message,
+                coins_transferred: r.coins_transferred,
+                resolved_at: r.resolved_at,
+            })
+            .collect())
+    }
+
     async fn list_profiles(&self, guild: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError> {
         let rows: Vec<ProfileRow> = sqlx::query_as(
             "SELECT p.guild_id,p.user_id,p.username,p.class,p.level,p.xp,p.atk,p.def,p.hp_current,p.hp_max,COALESCE(w.coins, 0) AS coins,p.stat_points,p.title,p.total_wins,p.total_losses,p.total_draws,p.total_stolen,p.cowardice_count,p.chaos_events FROM nexus_coude_players p LEFT JOIN nexus_wallets w ON w.guild_id=p.guild_id AND w.user_id=p.user_id WHERE p.guild_id=$1 ORDER BY p.level DESC, p.xp DESC LIMIT $2",
@@ -240,4 +282,22 @@ impl CoudeRepository for PgCoudeRepository {
         tx.commit().await.map_err(pg_err)?;
         Ok(result.rows_affected() == 1)
     }
+}
+
+#[derive(sqlx::FromRow)]
+struct CombatRow {
+    id: uuid::Uuid,
+    attacker_id: String,
+    attacker_name: String,
+    defender_id: String,
+    defender_name: String,
+    mise: i64,
+    winner_id: Option<String>,
+    attacker_roll: Option<i32>,
+    defender_roll: Option<i32>,
+    chaos_event: Option<String>,
+    special_attack: Option<String>,
+    result_message: Option<String>,
+    coins_transferred: i64,
+    resolved_at: Option<chrono::DateTime<chrono::Utc>>,
 }
