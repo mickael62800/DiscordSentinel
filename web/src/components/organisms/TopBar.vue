@@ -82,6 +82,16 @@ onMounted(() => {
 
     <div class="spacer" />
 
+    <!-- Retour vers le site public. Sans ces liens, un administrateur
+         connecte n'avait aucun moyen d'atteindre l'espace membre ni les
+         jeux : le back-office etait un cul-de-sac. -->
+    <RouterLink to="/membre" class="side-link" title="L'espace membre du site">
+      🛋️ Espace membre
+    </RouterLink>
+    <RouterLink to="/jeux" class="side-link" title="Les jeux de la communaute">
+      🎡 Jeux
+    </RouterLink>
+
     <!-- Bascule Sentinel / Nexus : affichee seulement si l'utilisateur a
          acces aux deux univers. Sinon il ne voit que le sien. -->
     <div v-if="canAccessNexus" class="universe-switch">
@@ -547,6 +557,33 @@ onMounted(() => {
 @media (max-width: 700px) {
   .universe-switch {
     display: none;
+  }
+}
+
+.side-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.side-link:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+@media (max-width: 900px) {
+  /* Sur petit ecran la barre est deja chargee : on garde l'emoji seul. */
+  .side-link {
+    font-size: 0;
+    padding: 0.25rem 0.5rem;
+    gap: 0;
   }
 }
 </style>

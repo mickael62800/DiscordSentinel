@@ -29,11 +29,18 @@ router.beforeEach(async (to, _from, next) => {
   const { user, checkSession } = useAuth();
   await checkSession();
   if (!to.meta.public && !user.value) { next({ name: "login" }); return; }
-  // Un membre ordinaire n'a pas acces au back-office : l'y envoyer
-  // afficherait une page vide ou une cascade de 403. Le role n'est pas
-  // encore charge a cet instant, donc on route vers l'espace membre, qui
-  // porte lui-meme un lien vers l'administration pour qui y a droit.
-  if (user.value && to.name === "login") { next({ name: "membre" }); return; }
+  // Deja connecte et pourtant sur /login : la page n'a rien a offrir, on
+  // redirige. La destination suit le parametre `espace` de l'URL, sinon un
+  // administrateur cliquant « Se connecter » depuis l'espace membre se
+  // retrouverait sur le tableau de bord sans l'avoir demande.
+  //
+  // Defaut : l'espace membre. Un membre ordinaire n'a pas acces au
+  // back-office, et son role n'est pas encore resolu a cet instant.
+  if (user.value && to.name === "login") {
+    const vise = to.query.espace === "admin" ? "dashboard" : "membre";
+    next({ name: vise });
+    return;
+  }
 
   // Prefetch async des donnees stables apres login. Non bloquant : on next()
   // immediatement. Les composables singleton (useBotDefinitions, useBotEnabledStatus,
