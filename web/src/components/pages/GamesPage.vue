@@ -58,12 +58,16 @@ const SECTEUR = 360 / CASES.length;
 const enCours = ref(false);
 const resultat = ref<SpinResult | null>(null);
 const erreurRoue = ref<string | null>(null);
+/// Passe à vrai dès que le serveur refuse pour cause de tirage déjà consommé.
+/// Sans ça, le bouton reste engageant et on réessaie indéfiniment un geste
+/// dont le refus est certain.
+const dejaJoue = ref(false);
 /// Angle cumulé, jamais remis à zéro : revenir en arrière ferait tourner la
 /// roue à l'envers entre deux tirages.
 const angle = ref(0);
 
 async function tirer() {
-  if (enCours.value || !user.value) return;
+  if (enCours.value || dejaJoue.value || !user.value) return;
   enCours.value = true;
   erreurRoue.value = null;
   resultat.value = null;
@@ -92,7 +96,19 @@ async function tirer() {
     history.value = await gamesService.history();
     ranking.value = await gamesService.leaderboard();
   } catch (e) {
-    erreurRoue.value = e instanceof Error ? e.message : "Le tirage a échoué.";
+    const message = e instanceof Error ? e.message : "Le tirage a échoué.";
+    erreurRoue.value = message;
+
+    // Refus pour tirage déjà consommé : c'est définitif jusqu'à demain, on
+    // ferme le bouton. Les autres échecs (réseau, plateforme éteinte) sont
+    // passagers et méritent une nouvelle tentative.
+    if (/déjà tiré|deja tire/i.test(message)) {
+      dejaJoue.value = true;
+    }
+
+    // La roue s'arrête net : la laisser finir ses trois secondes ferait
+    // croire à un tirage qui n'a pas eu lieu.
+    angle.value -= 360 * 4;
   } finally {
     enCours.value = false;
   }
@@ -231,13 +247,17 @@ const fondRoue = computed(() => {
             <button
               type="button"
               class="jx-cta grand"
-              :disabled="enCours"
+              :disabled="enCours || dejaJoue"
               @click="tirer"
             >
-              {{ enCours ? "Ça tourne…" : "Tirer la Roue" }}
+              <template v-if="enCours">Ça tourne…</template>
+              <template v-else-if="dejaJoue">Reviens demain</template>
+              <template v-else>Tirer la Roue</template>
             </button>
 
-            <p v-if="erreurRoue" class="jx-alerte">{{ erreurRoue }}</p>
+            <p v-if="erreurRoue" :class="dejaJoue ? 'jx-vide' : 'jx-alerte'">
+              {{ erreurRoue }}
+            </p>
 
             <div v-else-if="resultat" class="jx-resultat" :class="{ rare: resultat.is_memorable }">
               <strong>{{ resultat.case_label }}</strong>
