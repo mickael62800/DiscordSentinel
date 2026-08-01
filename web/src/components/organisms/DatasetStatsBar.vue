@@ -23,7 +23,7 @@ const { items, total, counts, exporting, markAllVisible, exportAndClean } = useA
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -36,7 +36,7 @@ const { items, total, counts, exporting, markAllVisible, exportAndClean } = useA
 .grow { flex: 1; }
 .btn {
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);

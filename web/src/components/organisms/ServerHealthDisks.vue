@@ -64,7 +64,7 @@ function diskBarColor(pct: number): string {
   top: 2px;
   bottom: 14px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
 }
 
@@ -76,7 +76,7 @@ function diskBarColor(pct: number): string {
 .disk-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
 }
 .disk-header {
@@ -105,7 +105,7 @@ function diskBarColor(pct: number): string {
 .disk-fs, .disk-name {
   background: var(--bg-secondary);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: "JetBrains Mono", monospace;
   color: var(--text-secondary);
 }
@@ -113,12 +113,12 @@ function diskBarColor(pct: number): string {
 .bar {
   height: 8px;
   background: var(--bg-secondary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.4s ease, background 0.3s ease;
 }
 </style>

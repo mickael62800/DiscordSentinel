@@ -72,7 +72,7 @@ function fmtDate(iso: string | null): string {
 .badge {
   display: inline-block;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   color: var(--text-secondary);
   font-size: 10px;

@@ -120,7 +120,7 @@ const chartOptions = computed(() => ({
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   margin-bottom: 16px;
 }
@@ -136,7 +136,7 @@ const chartOptions = computed(() => ({
 .alert-banner {
   background: color-mix(in srgb, var(--danger) 12%, transparent);
   border-left: 3px solid var(--danger);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   margin-bottom: 12px;
   font-size: 13px;
@@ -153,8 +153,8 @@ const chartOptions = computed(() => ({
 .stat .lbl { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
 .stat strong { font-size: 18px; color: var(--text-primary); }
 
-.btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; cursor: pointer; }
+.btn { padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; cursor: pointer; }
 .btn.xs { padding: 3px 8px; font-size: 11px; }
 .btn:hover { border-color: var(--accent); color: var(--accent); }
-select { padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; }
+select { padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; }
 </style>

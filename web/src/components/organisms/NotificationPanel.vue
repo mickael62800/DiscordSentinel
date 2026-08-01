@@ -157,7 +157,7 @@ function typeIcon(type: string): string {
 .notif-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;

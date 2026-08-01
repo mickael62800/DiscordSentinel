@@ -236,7 +236,7 @@ onMounted(() => {
   height: 34px;
   padding: 7px;
   background: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   align-items: center;
   justify-content: center;
@@ -265,7 +265,7 @@ onMounted(() => {
   gap: 10px;
   background: none;
   padding: 4px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
   z-index: 1;
   transition: background-color 0.2s ease,
@@ -285,7 +285,7 @@ onMounted(() => {
 .brand-halo {
   position: absolute;
   inset: -4px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: radial-gradient(circle at 18px 50%,
     color-mix(in srgb, var(--accent) 40%, transparent) 0%,
     transparent 60%);
@@ -303,7 +303,7 @@ onMounted(() => {
 .logo-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   object-fit: contain;
   filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent));
   transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -346,7 +346,7 @@ onMounted(() => {
 .guild-select {
   padding: 7px 28px 7px 10px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 13px;
@@ -378,7 +378,7 @@ onMounted(() => {
   height: 34px;
   padding: 7px;
   background: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -401,7 +401,7 @@ onMounted(() => {
   right: 2px;
   min-width: 16px;
   height: 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background-color: var(--danger);
   color: white;
   font-size: 10px;
@@ -457,7 +457,7 @@ onMounted(() => {
   height: 30px;
   padding: 5px;
   background: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -565,7 +565,7 @@ onMounted(() => {
   align-items: center;
   gap: 0.35rem;
   padding: 0.25rem 0.8rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   color: var(--text-secondary);
   font-size: 0.82rem;

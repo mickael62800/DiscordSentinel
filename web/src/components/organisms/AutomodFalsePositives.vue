@@ -153,7 +153,7 @@ watch([guildIdFilter, days], fetchStats, { immediate: true });
 .win-btn {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
   color: var(--text-secondary);
   cursor: pointer;
@@ -174,7 +174,7 @@ watch([guildIdFilter, days], fetchStats, { immediate: true });
 .kpi-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -199,7 +199,7 @@ watch([guildIdFilter, days], fetchStats, { immediate: true });
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
 }
 .card h3 {
@@ -235,13 +235,13 @@ watch([guildIdFilter, days], fetchStats, { immediate: true });
 .bar-track {
   height: 8px;
   background: var(--bg-primary, rgba(127, 127, 127, 0.15));
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .bar-fill {
   height: 100%;
   background: var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   min-width: 2px;
   transition: width 0.2s ease;
 }

@@ -47,7 +47,7 @@ const tooltip = computed(() => {
   align-items: center;
   gap: 4px;
   padding: 2px 7px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;

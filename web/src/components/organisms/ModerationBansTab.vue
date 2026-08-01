@@ -216,7 +216,7 @@ async function onUnbanAll() {
   max-width: 400px;
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   color: var(--text-primary);
   font-size: 13px;
@@ -239,7 +239,7 @@ async function onUnbanAll() {
   background: transparent;
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
@@ -273,7 +273,7 @@ async function onUnbanAll() {
   background-color: var(--danger);
   color: white;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .ban-list { display: flex; flex-direction: column; gap: 12px; }
@@ -356,7 +356,7 @@ async function onUnbanAll() {
   background-color: transparent;
   color: var(--accent, #22c55e);
   border: 1px solid var(--accent, #22c55e);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 16px;
   font-size: 13px;
   font-weight: 600;

@@ -91,7 +91,7 @@ const perPageOptions = [10, 25, 50, 100];
   justify-content: space-between;
   padding: var(--space-md) var(--space-lg);
   margin-top: var(--space-lg);
-  border-radius: 10px; /* override .card pour un look plus compact */
+  border-radius: var(--radius-md); /* override .card pour un look plus compact */
   font-size: 13px;
   color: var(--text-secondary);
 }

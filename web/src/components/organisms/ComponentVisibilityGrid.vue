@@ -176,7 +176,7 @@ watch(selectedGuildId, load);
 .vis-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   margin-top: 20px;
 }
@@ -244,7 +244,7 @@ watch(selectedGuildId, load);
 
 .btn {
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -277,7 +277,7 @@ watch(selectedGuildId, load);
   .vis-table tr {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     padding: 10px 12px;
     margin-bottom: 8px;
   }
@@ -295,7 +295,7 @@ watch(selectedGuildId, load);
     align-items: center;
     justify-content: space-between;
     padding: 8px 10px !important;
-    border-radius: 6px;
+    border-radius: var(--radius-sm);
     text-align: left;
   }
   .cell-role-label {

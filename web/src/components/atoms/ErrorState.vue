@@ -54,7 +54,7 @@ defineEmits<{
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 20px;
   font-size: 13px;
   font-weight: 600;

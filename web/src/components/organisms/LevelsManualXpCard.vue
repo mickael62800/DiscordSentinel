@@ -86,7 +86,7 @@ async function grant() {
 .form input, .form select {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
   font-family: inherit;

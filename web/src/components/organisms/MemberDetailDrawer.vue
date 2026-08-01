@@ -311,7 +311,7 @@ function discordProfileUrl(userId: string): string {
 .unwatch-top-btn {
   padding: 6px 14px;
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--danger-bg);
   color: var(--danger);
   font-size: 12px;
@@ -326,7 +326,7 @@ function discordProfileUrl(userId: string): string {
 .watch-top-btn {
   padding: 6px 14px;
   border: 1px solid var(--warning);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--warning-bg);
   color: var(--warning);
   font-size: 12px;
@@ -341,7 +341,7 @@ function discordProfileUrl(userId: string): string {
 .reset-top-btn {
   padding: 6px 14px;
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--danger);
   font-size: 12px;
@@ -359,7 +359,7 @@ function discordProfileUrl(userId: string): string {
   color: var(--text-secondary);
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 18px;
   display: flex;
   align-items: center;
@@ -389,7 +389,7 @@ function discordProfileUrl(userId: string): string {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: #5865F2;
   color: white;
   text-decoration: none;
@@ -410,7 +410,7 @@ function discordProfileUrl(userId: string): string {
 
 .detail-row {
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 14px;
   margin-bottom: 6px;
 }
@@ -434,7 +434,7 @@ function discordProfileUrl(userId: string): string {
 .dossier-summary { display: flex; gap: 12px; margin-bottom: 20px; }
 .summary-card {
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;

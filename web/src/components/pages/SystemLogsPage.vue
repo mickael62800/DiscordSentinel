@@ -69,7 +69,7 @@ const globalLevel = ref<"all" | "info" | "warn" | "error">("all");
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   min-width: 140px;
 }
 

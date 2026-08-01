@@ -133,7 +133,7 @@ async function onSave() {
 }
 .modal {
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 24px;
   width: 90%; max-width: 700px;
   max-height: 90vh; overflow-y: auto;
@@ -145,7 +145,7 @@ async function onSave() {
 .form-grid input, .form-grid select {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
   font-family: inherit;

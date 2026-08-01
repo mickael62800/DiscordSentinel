@@ -55,7 +55,7 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
 .audit-entry {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 18px;
   display: flex;
   gap: 14px;
@@ -63,7 +63,7 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
 }
 .event-icon {
   width: 32px; height: 32px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 14px;
   color: white; flex-shrink: 0;

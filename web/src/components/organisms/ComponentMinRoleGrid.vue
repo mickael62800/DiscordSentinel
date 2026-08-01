@@ -251,7 +251,7 @@ onMounted(load);
   padding: 2px 8px;
   background: var(--muted-bg, rgba(148, 149, 176, 0.15));
   color: var(--text-secondary);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 11px;
   font-family: monospace;
 }
@@ -259,7 +259,7 @@ onMounted(load);
 .badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -311,7 +311,7 @@ onMounted(load);
   .grid-table tr {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     margin-bottom: 8px;
     padding: 10px 12px;
   }

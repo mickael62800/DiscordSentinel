@@ -47,7 +47,7 @@ import DatasetMessagesTable from "../organisms/DatasetMessagesTable.vue";
   .mobile-block-card {
     background: var(--bg-secondary);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 32px 20px;
     text-align: center;
     max-width: 360px;

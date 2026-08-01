@@ -85,7 +85,7 @@ onUnmounted(() => {
   background: transparent;
   border: 1px solid rgba(239, 68, 68, 0.5);
   color: #fca5a5;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 4px 12px;
   font-size: 12px;
   cursor: pointer;

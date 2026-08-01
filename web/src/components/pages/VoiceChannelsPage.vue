@@ -97,7 +97,7 @@ function backToList() {
 .stat-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px 24px;
   display: flex;
   flex-direction: column;

@@ -118,7 +118,7 @@ async function handleRefresh() {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 3px;
   position: relative;
   box-shadow:
@@ -128,7 +128,7 @@ async function handleRefresh() {
 .period-btn {
   position: relative;
   padding: 6px 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-secondary);
   font-size: 12px;
@@ -143,7 +143,7 @@ async function handleRefresh() {
   bottom: 3px;
   width: 0;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   transform: translateX(-50%);
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -175,7 +175,7 @@ async function handleRefresh() {
   align-items: center;
   gap: 7px;
   padding: 7px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background:
     linear-gradient(180deg,
       color-mix(in srgb, white 4%, var(--bg-card)),

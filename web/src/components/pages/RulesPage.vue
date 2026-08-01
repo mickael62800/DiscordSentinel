@@ -128,7 +128,7 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
   margin-bottom: 20px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 12px 16px;
 }
 .rules-help summary {
@@ -150,7 +150,7 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 .rules-help-body code {
   background: color-mix(in srgb, var(--accent) 8%, transparent);
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-family: "JetBrains Mono", monospace;
   font-size: 0.92em;
   color: var(--accent);

@@ -477,13 +477,13 @@ onMounted(fetchSnapshots);
 .ro-banner {
   background: color-mix(in srgb, var(--warning, #e67e22) 10%, var(--bg-secondary));
   border-left: 3px solid var(--warning, #e67e22);
-  padding: 10px 14px; border-radius: 4px;
+  padding: 10px 14px; border-radius: var(--radius-sm);
   font-size: 13px; margin-bottom: 14px;
 }
 .async-hint {
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));
   border-left: 3px solid var(--accent);
-  padding: 10px 14px; border-radius: 4px;
+  padding: 10px 14px; border-radius: var(--radius-sm);
   font-size: 13px; line-height: 1.5; margin-bottom: 18px;
 }
 
@@ -496,7 +496,7 @@ onMounted(fetchSnapshots);
 .link-btn:hover { opacity: 1; }
 
 .count-pill {
-  display: inline-block; padding: 2px 10px; border-radius: 999px;
+  display: inline-block; padding: 2px 10px; border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 15%, transparent);
   font-size: 0.8rem; font-weight: 600;
 }
@@ -507,7 +507,7 @@ onMounted(fetchSnapshots);
   margin: 14px 0;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--accent) 4%, transparent);
 }
 .preview-cols { display: flex; gap: 20px; flex-wrap: wrap; }
@@ -518,7 +518,7 @@ onMounted(fetchSnapshots);
 
 .input {
   background: var(--bg, var(--bg-secondary)); color: var(--text, var(--text-primary));
-  border: 1px solid var(--border); border-radius: 8px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
   padding: 8px 12px; font-size: 0.9rem; font-family: inherit;
   outline: none; width: 100%;
 }
@@ -532,7 +532,7 @@ onMounted(fetchSnapshots);
 }
 .modal-card {
   background: var(--bg-card, var(--surface)); border: 1px solid var(--border);
-  border-radius: 14px; padding: 24px 28px; max-width: 520px; width: 100%;
+  border-radius: var(--radius-lg); padding: 24px 28px; max-width: 520px; width: 100%;
 }
 .modal-card h3 { margin: 0 0 12px; font-size: 17px; }
 .modal-form { display: flex; flex-direction: column; gap: 14px; margin: 18px 0; }
@@ -555,11 +555,11 @@ onMounted(fetchSnapshots);
 .danger-box {
   background: color-mix(in srgb, var(--danger) 8%, transparent);
   border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
-  border-radius: 8px; padding: 12px 14px;
+  border-radius: var(--radius-md); padding: 12px 14px;
 }
 .wipe-confirm {
   margin-top: 14px; padding: 14px;
-  border: 1px solid var(--danger); border-radius: 8px;
+  border: 1px solid var(--danger); border-radius: var(--radius-md);
   background: color-mix(in srgb, var(--danger) 6%, transparent);
   display: flex; flex-direction: column; gap: 12px;
 }

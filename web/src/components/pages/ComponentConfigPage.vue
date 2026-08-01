@@ -137,7 +137,7 @@ onMounted(async () => {
   padding: 10px 16px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
 }
 .server-label { color: var(--text-secondary); margin-right: 8px; }

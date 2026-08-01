@@ -67,7 +67,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
 }
 .card h2 { margin: 0; font-size: 1.1rem; }
@@ -83,7 +83,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .filters input {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
 }
@@ -92,7 +92,7 @@ function severityLabel(s: number): { label: string; color: string } {
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 14px;
   cursor: pointer;
 }
@@ -128,7 +128,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .severity-badge {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   color: white;
   font-size: 0.75rem;
   font-weight: 600;

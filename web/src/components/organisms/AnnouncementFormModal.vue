@@ -524,7 +524,7 @@ label > select {
   padding: 8px 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13px;
   box-sizing: border-box;
@@ -583,13 +583,13 @@ label > input[type="color"] { padding: 2px; height: 36px; }
   overflow-y: auto;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
 .picker-option {
   display: flex; align-items: center; gap: 8px;
   padding: 7px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   font-size: 13px;
   cursor: pointer;
 }
@@ -616,7 +616,7 @@ label > input[type="color"] { padding: 2px; height: 36px; }
   background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
   border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 12px; font-weight: 500;
   cursor: pointer; user-select: none;
   transition: background-color 0.15s, border-color 0.15s;

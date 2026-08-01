@@ -312,7 +312,7 @@ const membersChartData = computed(() => ({
   top: 2px;
   bottom: 14px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(to bottom,
     var(--accent),
     color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
@@ -343,7 +343,7 @@ const membersChartData = computed(() => ({
   min-width: 0; /* empeche l'expansion due au contenu */
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-card);
   /* Stagger entrance + transition cosy au hover. */
   opacity: 0;
@@ -422,7 +422,7 @@ const membersChartData = computed(() => ({
 }
 .heatmap-cell {
   height: 24px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   cursor: default;
 }
 .heatmap-empty {
@@ -436,7 +436,7 @@ const membersChartData = computed(() => ({
   color: var(--danger);
   background-color: var(--danger-bg);
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px 16px;
   font-size: 13px;
 }

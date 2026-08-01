@@ -86,7 +86,7 @@ async function onRemove(theme: VoiceChannelTheme) {
   display: inline-block;
   margin-right: 4px;
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.7rem;
   font-weight: 600;
   color: white;

@@ -245,7 +245,7 @@ onMounted(refresh);
 <style scoped>
 .tab-content { display: flex; flex-direction: column; }
 .card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 18px 20px; margin-bottom: 16px;
 }
 .card h2 { margin: 0 0 12px; font-size: 16px; }
@@ -253,7 +253,7 @@ onMounted(refresh);
 .muted.small, .small { font-size: 11px; }
 .mono { font-family: "JetBrains Mono", monospace; }
 select {
-  padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+  padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);
   background: var(--bg-secondary); color: var(--text-primary); font-size: 12px;
 }
 </style>

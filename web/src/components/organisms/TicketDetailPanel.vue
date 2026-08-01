@@ -161,7 +161,7 @@ async function closeTicket() {
 
 .message {
   padding: 16px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   max-width: 75%;
 }
 .message--user {
@@ -203,7 +203,7 @@ async function closeTicket() {
   width: 100%;
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px;
   color: var(--text-primary);
   font-family: inherit;

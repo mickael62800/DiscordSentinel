@@ -132,7 +132,7 @@ async function handleClear() {
   min-height: 400px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 .col-head {
@@ -153,7 +153,7 @@ async function handleClear() {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
 .level-select:hover { border-color: var(--accent); }
@@ -169,7 +169,7 @@ async function handleClear() {
   background: transparent;
   border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border));
   color: var(--danger, #ef4444);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
 }
@@ -222,7 +222,7 @@ async function handleClear() {
   margin: 6px 0 0 0;
   padding: 6px 8px;
   background: var(--bg-secondary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 10px;
   color: var(--text-secondary);
   max-height: 200px;
@@ -260,7 +260,7 @@ async function handleClear() {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 12px;
   font-weight: 600;

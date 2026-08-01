@@ -71,7 +71,7 @@ function closeEdit() {
   text-decoration: none;
   padding: 8px 16px;
   border: 1px solid var(--accent);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   white-space: nowrap;
   transition: all var(--transition-fast);
 }
@@ -82,7 +82,7 @@ function closeEdit() {
   color: var(--text-secondary);
   background: var(--bg-card);
   padding: 4px 10px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
 }
 
 .toolbar {
@@ -97,7 +97,7 @@ function closeEdit() {
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 20px;
   font-size: 13px;
   font-weight: 600;

@@ -86,7 +86,7 @@ watch(
 .shared-user-bar .lookup input {
   flex: 1;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
@@ -101,7 +101,7 @@ watch(
   color: var(--text-secondary);
   font-style: italic;
   border: 1px dashed var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .stacked-sections {
@@ -115,7 +115,7 @@ watch(
 }
 .stacked-block {
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 20px;
   background: var(--bg-secondary);
 }

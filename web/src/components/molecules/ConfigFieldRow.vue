@@ -274,7 +274,7 @@ const mapDefaults = computed(() => {
   padding: 12px 14px;
   background: var(--bg-card, #1a1d24);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   min-width: 0;
   /* h-full implicite : le grid parent stretch les cellules a la hauteur
      de la plus grande, on doit donc pouvoir pousser l input en bas. */
@@ -356,7 +356,7 @@ const mapDefaults = computed(() => {
   font-weight: 600;
   color: var(--warning, #f0a020);
   border: 1px solid var(--warning, #f0a020);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 1px 6px;
   white-space: nowrap;
   opacity: 0.85;
@@ -366,7 +366,7 @@ const mapDefaults = computed(() => {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;

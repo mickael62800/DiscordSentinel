@@ -190,7 +190,7 @@ async function saveEdit() {
   padding: 8px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13px;
   box-sizing: border-box;
@@ -205,7 +205,7 @@ async function saveEdit() {
   width: 44px;
   height: 44px;
   border: 2px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   padding: 0;
 }
@@ -225,7 +225,7 @@ async function saveEdit() {
   gap: 2px;
   cursor: pointer;
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-primary);
   transition: all var(--transition-fast);
@@ -244,7 +244,7 @@ async function saveEdit() {
   gap: 8px;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-primary);
   font-size: 13px;

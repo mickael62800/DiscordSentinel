@@ -139,7 +139,7 @@ const chartOptions = computed(() => ({
 }
 .section-title::before {
   content: ""; position: absolute; left: 0; top: 2px; bottom: 2px;
-  width: 3px; border-radius: 2px;
+  width: 3px; border-radius: var(--radius-xs);
   background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
 }
 .muted { color: var(--text-secondary); font-size: 12px; }
@@ -149,17 +149,17 @@ const chartOptions = computed(() => ({
   padding: 14px;
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));
   border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .hint { font-family: "JetBrains Mono", monospace; }
 .empty { padding: 30px; text-align: center; color: var(--text-secondary); font-style: italic; font-size: 12px; }
 .chart-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
 }
 .chart-wrap { height: 280px; margin-top: 10px; }
-.btn { padding: 3px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 11px; cursor: pointer; }
+.btn { padding: 3px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 11px; cursor: pointer; }
 .btn:hover { border-color: var(--accent); color: var(--accent); }
 </style>

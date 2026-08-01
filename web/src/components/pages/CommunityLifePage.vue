@@ -595,7 +595,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text-primary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 14px;
   font: inherit;
   font-size: 13px;
@@ -636,7 +636,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
   padding: 16px;
   margin-bottom: 16px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: var(--bg-elevated, rgba(255, 255, 255, 0.02));
 }
 
@@ -662,7 +662,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 .cl-form textarea {
   background: var(--bg-input, rgba(0, 0, 0, 0.25));
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 10px;
   color: var(--text-primary);
   font: inherit;
@@ -681,7 +681,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 
 .cl-options {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -724,14 +724,14 @@ const expire = (iso: string) => new Date(iso) <= new Date();
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .cl-thumb {
   width: 92px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   flex: none;
 }
 
@@ -763,7 +763,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 .pill {
   font-size: 11px;
   padding: 1px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(168, 85, 247, 0.16);
   color: var(--text-secondary);
 }
@@ -799,7 +799,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 
 .cl-bar {
   height: 7px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
@@ -807,7 +807,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 .cl-bar i {
   display: block;
   height: 100%;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
 }
 
 @media (max-width: 700px) {

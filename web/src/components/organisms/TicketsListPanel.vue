@@ -256,7 +256,7 @@ async function handleBulkDelete() {
 .filter-field select {
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   color: var(--text-primary);
   font-size: 13px;
@@ -278,7 +278,7 @@ async function handleBulkDelete() {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -291,7 +291,7 @@ async function handleBulkDelete() {
   background: transparent;
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -336,7 +336,7 @@ async function handleBulkDelete() {
 .category {
   background-color: var(--bg-hover);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .ticket-side {

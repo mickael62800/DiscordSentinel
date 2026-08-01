@@ -130,7 +130,7 @@ async function doReset() {
 .danger-zone h2 { font-size: 1.1rem; margin-bottom: 10px; color: #E74C3C; }
 .danger-card {
   border: 1px solid #E74C3C;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: color-mix(in srgb, #E74C3C 8%, var(--bg-secondary));
   padding: 18px;
 }
@@ -138,27 +138,27 @@ async function doReset() {
   background: #E74C3C;
   color: #fff;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin-bottom: 12px;
   font-size: 0.95rem;
 }
 .warn-text { font-size: 0.9rem; line-height: 1.55; margin: 0 0 10px; color: var(--text-primary); }
 .warn-text.danger { color: #E74C3C; }
 .btn-danger {
-  background: #E74C3C; color: #fff; border: none; border-radius: 6px;
+  background: #E74C3C; color: #fff; border: none; border-radius: var(--radius-sm);
   padding: 10px 18px; font-weight: 700; cursor: pointer;
 }
 .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-ghost {
   background: transparent; color: var(--text-secondary);
-  border: 1px solid var(--border); border-radius: 6px; padding: 10px 18px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 18px; cursor: pointer;
 }
 .modal-warn { font-size: 0.92rem; line-height: 1.55; margin: 0 0 12px; }
-.modal-warn code { background: var(--bg-card); padding: 2px 8px; border-radius: 4px; color: #E74C3C; font-weight: 700; }
+.modal-warn code { background: var(--bg-card); padding: 2px 8px; border-radius: var(--radius-sm); color: #E74C3C; font-weight: 700; }
 .opt { font-size: 0.88rem; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .confirm-input {
   width: 100%;
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
   padding: 9px 12px; color: var(--text-primary); font-size: 0.95rem;
 }
 </style>

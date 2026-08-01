@@ -130,7 +130,7 @@ const { formatDateTimeShort: formatDate } = useFormatDate();
   background: #2ECC71;
   color: white;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 0.75rem;
   font-weight: 600;
 }

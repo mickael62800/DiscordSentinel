@@ -97,7 +97,7 @@ const cpuPct = computed(() => props.info.host.cpu_percent ?? 0);
   top: 2px;
   bottom: 14px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
 }
 
@@ -110,7 +110,7 @@ const cpuPct = computed(() => props.info.host.cpu_percent ?? 0);
 .metric-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
 }
 .metric-header {
@@ -140,13 +140,13 @@ const cpuPct = computed(() => props.info.host.cpu_percent ?? 0);
 .bar {
   height: 8px;
   background: var(--bg-secondary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   position: relative;
 }
 .bar-fill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.4s ease, background 0.3s ease;
 }
 </style>

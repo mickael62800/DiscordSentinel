@@ -142,7 +142,7 @@ const hasDetails = computed(() => Object.keys(props.details).length > 0);
   margin-top: 8px;
   padding: 10px 12px;
   background-color: var(--bg-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   display: flex;
   flex-direction: column;

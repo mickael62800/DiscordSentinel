@@ -89,7 +89,7 @@ function rel(d: string | null): string {
   padding: 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 .card-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
 .card-value { font-size: 18px; font-weight: 700; color: var(--text-primary); }

@@ -163,7 +163,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
   background: #3498db;
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 500;
 }
@@ -172,19 +172,19 @@ function roleVariant(role: RbacRole): BadgeVariant {
   display: flex; flex-wrap: wrap; gap: 0.5rem;
   padding: 1rem;
   background: var(--bg-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .add-form input, .add-form select {
   padding: 0.5rem;
   border: 1px solid var(--color-border, #444);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--color-text, #eee);
 }
 .add-form input[type="text"] { flex: 1; min-width: 180px; }
 .add-form button {
   padding: 0.5rem 1rem;
-  border: none; border-radius: 4px;
+  border: none; border-radius: var(--radius-sm);
   cursor: pointer; font-weight: 500;
 }
 .add-form button[type="submit"] { background: #27ae60; color: white; }
@@ -193,7 +193,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 .rbac-table {
   width: 100%; border-collapse: collapse;
   background: var(--bg-secondary);
-  border-radius: 6px; overflow: hidden;
+  border-radius: var(--radius-sm); overflow: hidden;
 }
 .rbac-table th, .rbac-table td {
   padding: 0.75rem 1rem;
@@ -222,7 +222,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 .btn-danger {
   padding: 0.25rem 0.75rem;
   background: #e74c3c; color: white;
-  border: none; border-radius: 4px;
+  border: none; border-radius: var(--radius-sm);
   cursor: pointer; font-size: 0.85rem;
 }
 .btn-danger:hover { background: #c0392b; }
@@ -232,7 +232,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
   background: var(--bg-card);
   color: var(--color-text, #eee);
   border: 1px solid var(--color-border, #444);
-  border-radius: 4px; cursor: pointer;
+  border-radius: var(--radius-sm); cursor: pointer;
 }
 @media (max-width: 768px) {
   .col-meta { display: none; }

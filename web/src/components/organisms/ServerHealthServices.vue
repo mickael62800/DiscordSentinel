@@ -60,7 +60,7 @@ const totalWorkers = computed(() => props.info.workers.length);
   top: 2px;
   bottom: 14px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(to bottom, var(--accent), color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
 }
 
@@ -76,7 +76,7 @@ const totalWorkers = computed(() => props.info.workers.length);
 .services-col {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
 }
 .services-col h3 {

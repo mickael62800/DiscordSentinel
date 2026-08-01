@@ -128,7 +128,7 @@ watch(guildIdFilter, fetchPending);
   border-left: 4px solid #F1C40F;
   padding: 12px 16px;
   margin-bottom: 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .review-header {
   display: flex;
@@ -140,7 +140,7 @@ watch(guildIdFilter, fetchPending);
 .review-action {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   font-size: 0.85rem;
   font-weight: 600;
@@ -174,7 +174,7 @@ watch(guildIdFilter, fetchPending);
 }
 .modal {
   background: var(--bg-secondary);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 24px;
   width: 90%;
   max-width: 500px;
@@ -194,7 +194,7 @@ watch(guildIdFilter, fetchPending);
 .modal textarea {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
   font-family: inherit;

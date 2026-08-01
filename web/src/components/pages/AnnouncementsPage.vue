@@ -228,7 +228,7 @@ function fmtDate(iso: string | null): string {
 .badge {
   display: inline-block;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--bg-secondary);
   color: var(--text-secondary);
   font-size: 10px;
@@ -242,7 +242,7 @@ function fmtDate(iso: string | null): string {
   font-size: 11px;
   font-weight: 700;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
   cursor: pointer;
@@ -255,7 +255,7 @@ function fmtDate(iso: string | null): string {
 
 .btn-primary {
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;

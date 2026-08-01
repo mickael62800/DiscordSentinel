@@ -63,7 +63,7 @@ const badgeText = (() => {
   padding: 10px 8px;
   height: 100%;
   min-height: 70px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background-color: var(--theme-bg);
   border: 1px solid var(--theme-border);
   color: var(--text-secondary);
@@ -197,7 +197,7 @@ const badgeText = (() => {
   font-weight: 700;
   letter-spacing: 0.4px;
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--theme-color) 18%, transparent);
   color: var(--theme-color);
   text-transform: uppercase;

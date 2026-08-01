@@ -61,7 +61,7 @@ const { formatDateTimeNumeric: formatDate } = useFormatDate();
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
   margin-bottom: 20px;
 }

@@ -134,7 +134,7 @@ function eventIcon(type: string): string {
   margin-left: auto;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
@@ -145,7 +145,7 @@ function eventIcon(type: string): string {
   background: transparent;
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -168,7 +168,7 @@ function eventIcon(type: string): string {
 .event-card:hover { border-color: var(--accent); transform: translateY(-2px); }
 .event-icon {
   width: 40px; height: 40px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -215,7 +215,7 @@ function eventIcon(type: string): string {
 .user-chip {
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-hover);
   color: var(--text-secondary);
   font-family: monospace;

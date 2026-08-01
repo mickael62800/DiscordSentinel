@@ -70,7 +70,7 @@ function categoryLabel(key: string): string {
 .category-badge {
   display: inline-block;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   color: white;
   font-size: 11px;
   font-weight: 700;

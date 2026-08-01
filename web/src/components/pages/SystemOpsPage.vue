@@ -172,7 +172,7 @@ onUnmounted(() => {
 .hit-bar {
   height: 8px;
   background: var(--bg-card);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
   margin-top: 8px;
 }

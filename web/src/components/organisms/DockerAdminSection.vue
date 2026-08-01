@@ -481,7 +481,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   margin-bottom: 24px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
 }
 .docker-header {
@@ -500,7 +500,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tabs button {
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   color: var(--text-secondary);
@@ -525,7 +525,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .ov-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
 }
 .ov-card.highlight {
@@ -574,7 +574,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .state-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -590,7 +590,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   display: inline-block;
   margin-left: 6px;
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 9px;
   font-weight: 700;
   text-transform: uppercase;
@@ -603,7 +603,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 /* Buttons */
 .btn {
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -641,7 +641,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .prune-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;

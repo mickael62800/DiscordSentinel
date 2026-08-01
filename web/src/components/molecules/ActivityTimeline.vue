@@ -82,7 +82,7 @@ function eventLabel(type: string): string {
   align-items: flex-start;
   gap: 10px;
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   transition: background var(--transition-fast);
 }
 

@@ -149,7 +149,7 @@ async function confirmAddWatch() {
   width: 100%;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   color: var(--text-primary);
   font-size: 13px;

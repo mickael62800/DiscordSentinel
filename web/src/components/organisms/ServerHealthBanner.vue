@@ -84,7 +84,7 @@ const allHealthy = computed(() => {
   padding: 12px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   transition: border-color 0.2s ease;
 }
 .health-card.ok {

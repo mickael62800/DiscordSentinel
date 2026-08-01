@@ -521,7 +521,7 @@ function openActionModal() {
 .date-input {
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 10px;
   color: var(--text-primary);
   font-size: 13px;
@@ -572,7 +572,7 @@ function openActionModal() {
   inset: 0;
   background: color-mix(in srgb, var(--bg-card) 80%, transparent);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   transition: background-color 0.25s ease, border-color 0.25s ease;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
 }
@@ -611,7 +611,7 @@ function openActionModal() {
     var(--bg-card));
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -635,7 +635,7 @@ function openActionModal() {
 .bulk-menu-btn {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 14px;
   color: var(--text-secondary);
   font-size: 13px;
@@ -657,7 +657,7 @@ function openActionModal() {
   min-width: 240px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-shadow: 0 8px 24px rgba(0,0,0,0.35);
   padding: 4px;
   z-index: 50;
@@ -668,7 +668,7 @@ function openActionModal() {
   text-align: left;
   background: transparent;
   border: 0;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
@@ -705,7 +705,7 @@ function openActionModal() {
   text-transform: uppercase;
   letter-spacing: 0.3px;
   padding: 3px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 1px solid;
   white-space: nowrap;
 }
@@ -743,7 +743,7 @@ function openActionModal() {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
@@ -765,7 +765,7 @@ function openActionModal() {
     var(--bg-card));
   color: #57f287;
   border: 1px solid color-mix(in srgb, #57f287 60%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
@@ -797,7 +797,7 @@ function openActionModal() {
     var(--bg-card));
   color: var(--danger);
   border: 1px solid color-mix(in srgb, var(--danger) 60%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;

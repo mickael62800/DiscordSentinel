@@ -178,7 +178,7 @@ h1 {
   font-size: 12px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 .invite-toggle-btn:hover {
   color: var(--accent);

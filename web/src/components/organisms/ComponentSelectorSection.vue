@@ -79,7 +79,7 @@ function isOn(botName: string): boolean {
   color: var(--accent);
   background: rgba(99, 102, 241, 0.12);
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
 }
 
 .component-grid {
@@ -96,7 +96,7 @@ function isOn(botName: string): boolean {
 .component-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 16px;
   cursor: pointer;
   transition: border-color var(--transition-fast);
@@ -126,7 +126,7 @@ function isOn(botName: string): boolean {
   font-weight: 700;
   letter-spacing: 0.6px;
   padding: 2px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background: var(--danger);
   color: white;
 }

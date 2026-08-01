@@ -325,7 +325,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .config-form {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 24px;
 }
 
@@ -350,7 +350,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   background: rgba(99, 102, 241, 0.06);
   border: 1px solid var(--border);
   border-left: 3px solid var(--accent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 10px 14px;
   margin-bottom: 16px;
   line-height: 1.4;
@@ -387,7 +387,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 400;
   font-style: normal;
@@ -431,7 +431,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .btn-toggle-all {
   padding: 5px 14px;
   border: 1px solid var(--accent);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: rgba(99, 102, 241, 0.08);
   color: var(--accent);
   font-size: 12px;
@@ -461,7 +461,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .toggle-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
@@ -551,7 +551,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -564,7 +564,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 14px;
   cursor: pointer;
 }

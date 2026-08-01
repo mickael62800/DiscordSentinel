@@ -176,7 +176,7 @@ onUnmounted(() => {
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
 }
 
@@ -192,7 +192,7 @@ onUnmounted(() => {
   background: #E67E22;
   color: white;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 0.75rem;
   margin-left: 6px;
 }
@@ -207,7 +207,7 @@ onUnmounted(() => {
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 14px;
   cursor: pointer;
 }
@@ -220,7 +220,7 @@ onUnmounted(() => {
   background: var(--bg-card);
   border-left: 4px solid #E67E22;
   padding: 12px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   margin-bottom: 10px;
 }
 .review-head {
@@ -236,7 +236,7 @@ onUnmounted(() => {
 
 .suggested-badge {
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 0.75rem;
   font-weight: 600;
   color: white;
@@ -250,7 +250,7 @@ onUnmounted(() => {
   background: #8E44AD;
   color: white;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   font-size: 0.72rem;
 }
 
@@ -273,7 +273,7 @@ onUnmounted(() => {
 .content-preview pre {
   background: #0d0d0d;
   padding: 8px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   white-space: pre-wrap;
   word-break: break-word;
   max-height: 120px;
@@ -287,7 +287,7 @@ onUnmounted(() => {
   border: 1px solid var(--border);
   background: transparent;
   color: inherit;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
   cursor: pointer;
   font-size: 0.85rem;

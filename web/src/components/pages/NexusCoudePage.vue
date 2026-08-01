@@ -195,7 +195,7 @@ watch(selectedGuildId, load, { immediate: true });
 .nc-hp {
   width: 5rem;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   background: var(--bg-hover);
   overflow: hidden;
 }

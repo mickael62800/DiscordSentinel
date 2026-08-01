@@ -448,7 +448,7 @@ const tabs = [
 .mono { font-family: "JetBrains Mono", monospace; }
 
 .btn-primary {
-  padding: 7px 14px; border-radius: 8px; border: 1px solid var(--accent);
+  padding: 7px 14px; border-radius: var(--radius-md); border: 1px solid var(--accent);
   background: var(--accent); color: white;
   font-size: 12px; font-weight: 600; cursor: pointer;
 }
@@ -469,7 +469,7 @@ const tabs = [
 .kpi-card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px 18px;
   display: flex; flex-direction: column; gap: 4px;
 }
@@ -485,13 +485,13 @@ const tabs = [
 .overview-hint {
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));
   border-left: 3px solid var(--accent);
-  padding: 14px 16px; border-radius: 4px;
+  padding: 14px 16px; border-radius: var(--radius-sm);
   font-size: 13px; line-height: 1.5;
 }
 
 /* Cards */
 .card {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg);
   padding: 18px 20px; margin-bottom: 16px;
 }
 .card h2 { margin: 0 0 12px; font-size: 16px; }
@@ -500,7 +500,7 @@ const tabs = [
 .jail-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 12px 14px;
   margin-bottom: 10px;
 }
@@ -515,17 +515,17 @@ const tabs = [
 .ip-pill {
   display: inline-flex; align-items: center; gap: 6px;
   background: var(--bg-card); border: 1px solid var(--border);
-  padding: 4px 6px 4px 10px; border-radius: 6px;
+  padding: 4px 6px 4px 10px; border-radius: var(--radius-sm);
 }
 .ip-list li code { font-family: "JetBrains Mono", monospace; font-size: 11px; }
 
 .event-type {
   font-family: "JetBrains Mono", monospace; font-size: 11px;
-  background: var(--bg-secondary); padding: 2px 6px; border-radius: 4px;
+  background: var(--bg-secondary); padding: 2px 6px; border-radius: var(--radius-sm);
 }
 
 select {
-  padding: 5px 8px; border-radius: 6px; border: 1px solid var(--border);
+  padding: 5px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border);
   background: var(--bg-secondary); color: var(--text-primary); font-size: 12px;
 }
 
@@ -537,7 +537,7 @@ select {
 }
 .modal-card {
   background: var(--bg-card); border: 1px solid var(--border);
-  border-radius: 14px; padding: 24px 28px; max-width: 500px; width: 100%;
+  border-radius: var(--radius-lg); padding: 24px 28px; max-width: 500px; width: 100%;
 }
 .modal-card h3 { margin: 0 0 12px; font-size: 17px; }
 .modal-form { display: flex; flex-direction: column; gap: 14px; margin: 18px 0; }
@@ -547,7 +547,7 @@ select {
 }
 .modal-form label.checkbox { flex-direction: row; align-items: center; gap: 8px; }
 .modal-form select {
-  padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border);
+  padding: 7px 10px; border-radius: var(--radius-sm); border: 1px solid var(--border);
   background: var(--bg-secondary); color: var(--text-primary); font-size: 13px;
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }

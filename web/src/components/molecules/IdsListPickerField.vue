@@ -229,7 +229,7 @@ const placeholderTxt = computed(() =>
   padding: 4px 4px 4px 10px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
   color: var(--text-primary);
   max-width: 100%;

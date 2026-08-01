@@ -151,7 +151,7 @@ function styleColor(style: string): string {
 .auto-role-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
@@ -185,7 +185,7 @@ function styleColor(style: string): string {
 .entry-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -199,7 +199,7 @@ function styleColor(style: string): string {
   gap: 6px;
   padding: 8px 14px;
   border: 2px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background-color: var(--bg-secondary);
 }
 .entry-emoji { font-size: 16px; }
@@ -212,10 +212,10 @@ function styleColor(style: string): string {
 /* Cross-link */
 .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .page-header-row h1 { margin-bottom: 0; }
-.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: var(--radius-md); white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
 .header-actions { display: flex; gap: 12px; align-items: center; }
-.btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent, var(--accent)); color: white; cursor: pointer; text-decoration: none; }
+.btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent, var(--accent)); color: white; cursor: pointer; text-decoration: none; }
 .btn-primary:hover { opacity: 0.9; }
 .btn-icon-danger { background: none; border: none; color: var(--danger, #E74C3C); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
 .btn-icon-danger:hover { opacity: 1; }

@@ -173,7 +173,7 @@ function formatPermissions(perms: string): string {
   background: rgba(88, 101, 242, 0.1);
   color: var(--accent);
   border: 1px solid rgba(88, 101, 242, 0.2);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
   font-size: 12px;
   font-weight: 600;
@@ -186,7 +186,7 @@ function formatPermissions(perms: string): string {
   background: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 6px 12px;
   font-size: 12px;
   cursor: pointer;

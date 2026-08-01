@@ -80,9 +80,9 @@ async function onDelete(c: Confession) {
 .data-table tr.deleted { opacity: .5; }
 .data-table .actions-h, .data-table .actions { text-align: right; white-space: nowrap; }
 .data-table .actions button { margin-left: 4px; }
-.badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 10px; margin-left: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-secondary); font-size: 10px; margin-left: 6px; text-transform: uppercase; letter-spacing: .5px; }
 .badge.danger { background: rgba(231, 76, 60, .15); color: #e74c3c; }
-.btn-secondary, .btn-danger { padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--text-primary); }
+.btn-secondary, .btn-danger { padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--text-primary); }
 .btn-secondary:hover { background: var(--bg-hover); }
 .btn-danger { color: var(--danger, #ef4444); border-color: color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border)); }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent); }

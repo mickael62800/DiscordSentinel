@@ -201,15 +201,15 @@ async function handleClear() {
 
 <style scoped>
 .logs h1 { margin-bottom: 24px; }
-.search-global { width: 100%; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 14px; outline: none; }
+.search-global { width: 100%; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-card); color: var(--text-primary); font-size: 14px; outline: none; }
 .search-global:focus { border-color: var(--accent); }
 .search-global::placeholder { color: var(--text-secondary); opacity: 0.6; }
 .filters-row { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .date-filters { display: flex; gap: 12px; align-items: center; }
 .date-filters label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-secondary); }
-.date-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-family: monospace; }
+.date-input { padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); font-size: 13px; font-family: monospace; }
 .date-input:focus { outline: none; border-color: var(--accent); }
-.clear-btn { margin-left: auto; padding: 8px 16px; background: var(--danger); color: white; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.clear-btn { margin-left: auto; padding: 8px 16px; background: var(--danger); color: white; border: none; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600; cursor: pointer; }
 .clear-btn:hover { opacity: 0.85; }
 .details-text { font-size: 11px; color: var(--text-secondary); }
 </style>

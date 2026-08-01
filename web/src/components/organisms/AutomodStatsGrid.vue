@@ -79,7 +79,7 @@ const categoryChartOptions = makeBarOptions({}, true);
 .kpi-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
@@ -96,7 +96,7 @@ const categoryChartOptions = makeBarOptions({}, true);
 .card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 20px;
 }
 .card h2 { margin: 0 0 12px 0; font-size: 1.1rem; }

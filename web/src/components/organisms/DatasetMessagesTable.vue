@@ -49,7 +49,7 @@ function truncate(s: string, n: number): string {
 .card {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 16px;
 }
@@ -75,7 +75,7 @@ function truncate(s: string, n: number): string {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   margin-right: 2px;
   font-size: 14px;
@@ -89,7 +89,7 @@ tr.row-severe { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 }
 .btn {
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);

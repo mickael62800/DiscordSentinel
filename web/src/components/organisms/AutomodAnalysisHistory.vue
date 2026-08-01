@@ -209,7 +209,7 @@ function scoreClass(s: number | undefined): string {
   padding: 20px;
   background: #1a1d24;
   border: 1px dashed #4a5568;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .header {
@@ -232,7 +232,7 @@ function scoreClass(s: number | undefined): string {
   background: #d97706;
   color: #fff;
   padding: 2px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   margin-left: 6px;
   font-weight: bold;
   vertical-align: middle;
@@ -249,7 +249,7 @@ function scoreClass(s: number | undefined): string {
 .subtitle code {
   background: #0f1115;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   font-size: 11px;
 }
 
@@ -278,7 +278,7 @@ function scoreClass(s: number | undefined): string {
 .btn-wipe {
   border: none;
   padding: 6px 14px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 12px;
   cursor: pointer;
   color: #fff;
@@ -304,7 +304,7 @@ function scoreClass(s: number | undefined): string {
   background: #7f1d1d;
   color: #fef2f2;
   padding: 8px 12px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   margin-bottom: 12px;
   font-size: 12px;
 }
@@ -319,7 +319,7 @@ function scoreClass(s: number | undefined): string {
 .table-wrap {
   overflow-x: auto;
   background: #0f1115;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
 }
 
 table {
@@ -410,7 +410,7 @@ td.num {
 .action-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;

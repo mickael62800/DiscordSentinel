@@ -76,7 +76,7 @@ function select(t: TabItem) {
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   width: fit-content;
   box-shadow:
     inset 0 1px 2px rgba(0, 0, 0, 0.18),
@@ -85,7 +85,7 @@ function select(t: TabItem) {
 
 .app-tabs--polished .app-tab {
   padding: 8px 22px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   font-size: 0.9rem;
 }
@@ -97,7 +97,7 @@ function select(t: TabItem) {
   bottom: 4px;
   width: 0;
   height: 2px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--accent);
   transform: translateX(-50%);
   transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -166,7 +166,7 @@ function select(t: TabItem) {
   .app-tabs::-webkit-scrollbar { height: 4px; }
   .app-tabs::-webkit-scrollbar-thumb {
     background: var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
   }
   .app-tab { flex-shrink: 0; white-space: nowrap; }
   .app-tabs--polished .app-tab { padding: 8px 14px; font-size: 0.85rem; }

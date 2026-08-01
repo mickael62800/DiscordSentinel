@@ -254,19 +254,19 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
   color: var(--accent);
   background-color: var(--accent-bg);
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .progress-container { display: flex; align-items: center; gap: 10px; }
 .progress-bar {
   flex: 1; height: 8px;
   background-color: var(--bg-hover);
-  border-radius: 4px; overflow: hidden;
+  border-radius: var(--radius-sm); overflow: hidden;
 }
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent), var(--accent-alt));
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.3s;
 }
 .progress-text {
@@ -280,7 +280,7 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
 .mini-stats { display: flex; gap: 8px; margin-top: 4px; }
 .mini-stat {
   font-size: 10px; font-weight: 600;
-  padding: 1px 6px; border-radius: 3px;
+  padding: 1px 6px; border-radius: var(--radius-xs);
 }
 .mini-stat.text { color: #3498DB; background: rgba(52, 152, 219, 0.1); }
 .mini-stat.voice { color: #E91E63; background: rgba(233, 30, 99, 0.1); }
@@ -300,7 +300,7 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
 .action-btn {
   font-size: 11px; font-weight: 600;
   padding: 5px 10px;
-  border-radius: 6px; cursor: pointer;
+  border-radius: var(--radius-sm); cursor: pointer;
   border: 1px solid var(--border);
   background: transparent;
   color: var(--text-secondary);
@@ -333,7 +333,7 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
   padding: 10px 12px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: "JetBrains Mono", monospace;
   font-size: 14px;

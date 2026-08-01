@@ -330,7 +330,7 @@ function heatColorMod(v: number, max: number): string {
   top: 2px;
   bottom: 14px;
   width: 3px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: linear-gradient(to bottom,
     var(--accent),
     color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
@@ -354,7 +354,7 @@ function heatColorMod(v: number, max: number): string {
   min-width: 0;
   position: relative;
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   background: var(--bg-card);
   opacity: 0;
   animation: chart-card-enter 0.5s ease-out forwards;
@@ -430,7 +430,7 @@ function heatColorMod(v: number, max: number): string {
 }
 .heatmap-cell {
   height: 24px;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   cursor: default;
 }
 

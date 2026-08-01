@@ -50,9 +50,9 @@ async function onDelete(r: ConfessionReply) {
 <style scoped>
 .muted { color: var(--text-secondary); }
 .small { font-size: 12px; }
-.badge { display: inline-block; padding: 2px 6px; border-radius: 4px; background: var(--bg-secondary); color: var(--text-secondary); font-size: 10px; margin-left: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.badge { display: inline-block; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-secondary); font-size: 10px; margin-left: 6px; text-transform: uppercase; letter-spacing: .5px; }
 .modal-overlay { position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,.6); display: flex; align-items: center; justify-content: center; padding: 20px; }
-.modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; }
+.modal-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); width: 100%; max-width: 720px; max-height: 90vh; display: flex; flex-direction: column; }
 .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .modal-head h3 { margin: 0; font-size: 16px; }
 .modal-close { background: transparent; border: 0; cursor: pointer; font-size: 24px; line-height: 1; color: var(--text-secondary); padding: 0 6px; }
@@ -62,7 +62,7 @@ async function onDelete(r: ConfessionReply) {
 .reply-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .reply-head .btn-danger { margin-left: auto; }
 .reply-content { font-size: 13px; padding: 4px 0 4px 16px; word-wrap: break-word; }
-.btn-danger { padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--danger, #ef4444); border-color: color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border)); }
+.btn-danger { padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--danger, #ef4444); border-color: color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border)); }
 .btn-danger:hover { background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent); }
 .xs { padding: 4px 8px; }
 </style>

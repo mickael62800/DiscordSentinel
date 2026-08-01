@@ -75,7 +75,7 @@ async function handlePurgeAll() {
   flex: 1;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
@@ -89,7 +89,7 @@ async function handlePurgeAll() {
 .event-select {
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
@@ -101,7 +101,7 @@ async function handlePurgeAll() {
   background: transparent;
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 14px;
   font-size: 12px;
   font-weight: 600;

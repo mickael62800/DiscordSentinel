@@ -51,7 +51,7 @@ function icon(type: string): string {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 13px;
   line-height: 1.4;
   box-shadow: var(--shadow-md);

@@ -241,7 +241,7 @@ watch(selectedGuildId, load);
 .inv-section {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   padding: 18px 20px;
   margin-top: 20px;
 }
@@ -262,7 +262,7 @@ watch(selectedGuildId, load);
 .form-card {
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 16px;
   margin-bottom: 16px;
 }
@@ -284,7 +284,7 @@ watch(selectedGuildId, load);
 .form-row label.grow { flex: 1; min-width: 200px; }
 .form-row input, .form-row select {
   padding: 7px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-primary);
@@ -305,7 +305,7 @@ watch(selectedGuildId, load);
 .generated-card {
   background: var(--bg-card);
   border: 2px solid var(--accent);
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   padding: 24px 28px;
   max-width: 500px;
   width: 100%;
@@ -319,7 +319,7 @@ watch(selectedGuildId, load);
   letter-spacing: 4px;
   background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 25%, var(--bg-secondary)), var(--bg-secondary));
   padding: 18px 24px;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   margin: 16px 0;
   color: var(--accent);
   user-select: all;
@@ -344,7 +344,7 @@ watch(selectedGuildId, load);
 }
 .filter-bar select {
   padding: 5px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);
@@ -380,14 +380,14 @@ watch(selectedGuildId, load);
   font-weight: 700;
   background: var(--bg-secondary);
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   letter-spacing: 1px;
 }
 
 .role-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 10px;
   text-transform: uppercase;
   font-weight: 700;
@@ -399,7 +399,7 @@ watch(selectedGuildId, load);
 .status-pill {
   display: inline-block;
   padding: 2px 8px;
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -411,7 +411,7 @@ watch(selectedGuildId, load);
 
 .btn {
   padding: 7px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border);
   background: var(--bg-secondary);
   color: var(--text-primary);

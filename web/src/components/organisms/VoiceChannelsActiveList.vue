@@ -144,7 +144,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
 .filter-select {
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 13px;
@@ -155,7 +155,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   background: transparent;
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
@@ -169,7 +169,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   background: transparent;
   color: var(--danger);
   border: 1px solid var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 4px 10px;
   font-size: 11px;
   font-weight: 600;

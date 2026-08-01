@@ -46,7 +46,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   gap: 20px;
   padding: 26px 30px;
   margin-bottom: 24px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   /* Mesh gradient anime : 3 radial-gradients qui flottent en arriere-plan
      pour donner une sensation vivante sans etre distrayant. */
   background:
@@ -91,7 +91,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   content: "";
   position: absolute;
   inset: -1px;
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   padding: 1px;
   background: conic-gradient(
     from var(--border-angle, 0deg),
@@ -219,7 +219,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
 .hero-logo {
   width: 84px;
   height: 84px;
-  border-radius: 18px;
+  border-radius: var(--radius-xl);
   object-fit: contain;
   filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.4));
   position: relative;
@@ -290,7 +290,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   margin: 0 0 14px;
   background: color-mix(in srgb, var(--warning, #e67e22) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--warning, #e67e22) 35%, var(--border));
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
   text-decoration: none;
   font-size: 13px;
@@ -324,7 +324,7 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   .hero-logo {
     width: 56px;
     height: 56px;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
   }
   .hero-logo-wrap::before { inset: -8px; }
   .hero-text h1 { font-size: 1.3rem; }
@@ -338,12 +338,12 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   .dash-hero {
     padding: 14px 12px;
     gap: 10px;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
   }
   .hero-logo {
     width: 44px;
     height: 44px;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
   }
   .hero-text { min-width: 0; flex: 1; }
   .hero-text h1 { font-size: 1.1rem; margin-bottom: 2px; }

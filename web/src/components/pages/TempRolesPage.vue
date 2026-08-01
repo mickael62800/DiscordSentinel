@@ -181,7 +181,7 @@ const sortedRoles = computed(() =>
 .form input {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   color: inherit;
   font-size: 13px;

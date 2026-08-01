@@ -93,7 +93,7 @@ async function createRole() {
   padding: 8px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
   font-size: 13px;
   box-sizing: border-box;
@@ -108,7 +108,7 @@ async function createRole() {
   width: 36px;
   height: 36px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   padding: 0;
 }

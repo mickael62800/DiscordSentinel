@@ -184,7 +184,7 @@ function statusClass(code: unknown): string {
 
 .detail-tag {
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   font-family: monospace;
   font-weight: 600;

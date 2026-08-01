@@ -169,14 +169,14 @@ onMounted(load);
   width: 90px;
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
 }
 .sev-select {
   padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
 }
@@ -189,7 +189,7 @@ onMounted(load);
   color: var(--danger);
   padding: 10px;
   border: 1px solid var(--danger);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 .footer-hint {
   margin-top: 16px;

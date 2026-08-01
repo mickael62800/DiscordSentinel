@@ -82,7 +82,7 @@ async function onAdd() {
   align-items: center;
   padding: 6px 12px;
   background: var(--bg-card);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 .auto-role-form {
   display: grid;
@@ -93,7 +93,7 @@ async function onAdd() {
 .auto-role-form input {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 6px 10px;
   color: inherit;
 }

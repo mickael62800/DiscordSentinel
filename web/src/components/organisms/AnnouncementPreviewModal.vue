@@ -43,16 +43,16 @@ const emit = defineEmits<{ close: [] }>();
 .prev-embed {
   background: var(--bg-secondary);
   border-left: 4px solid var(--accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   padding: 12px;
 }
 .prev-embed h4 { margin: 0 0 6px 0; font-size: 14px; }
 .prev-desc { white-space: pre-wrap; margin: 0; font-size: 13px; }
 .prev-text { white-space: pre-wrap; margin: 0; font-size: 13px; }
-.prev-img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
+.prev-img { max-width: 100%; border-radius: var(--radius-sm); margin-top: 8px; }
 .prev-thumb {
   max-width: 80px; max-height: 80px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   float: right;
   margin-left: 10px;
 }
