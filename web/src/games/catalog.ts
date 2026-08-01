@@ -18,8 +18,26 @@ export interface GameCard {
   pitch: string;
   /// Couleur d'accent de la vignette.
   couleur: string;
-  /// Jouable sur le site ? Faux = renvoie vers Discord.
-  jouable: boolean;
+  /// Où le jeu se pratique. Affiché en badge sur la vignette : savoir AVANT
+  /// de cliquer si une partie se lance ici ou sur Discord évite d'ouvrir un
+  /// onglet pour rien.
+  ///
+  /// Remplace un booléen `jouable` : il ne distinguait pas « uniquement sur
+  /// Discord » de « sur les deux », alors que c'est justement ce que le
+  /// lecteur veut savoir.
+  canaux: Canal[];
+}
+
+export type Canal = "discord" | "web";
+
+const LIBELLES: Record<Canal, string> = {
+  discord: "Discord",
+  web: "Web",
+};
+
+/// Badge de la vignette : « Discord », « Web », ou « Discord / Web ».
+export function badgeCanaux(jeu: GameCard): string {
+  return jeu.canaux.map((c) => LIBELLES[c]).join(" / ");
 }
 
 export const GAMES: GameCard[] = [
@@ -29,7 +47,9 @@ export const GAMES: GameCard[] = [
     emoji: "🎡",
     pitch: "Un tirage par jour. Dix cases, de la ruine à la licorne.",
     couleur: "#a855f7",
-    jouable: true,
+    // Le même tirage des deux côtés : un seul quota quotidien, un seul
+    // porte-monnaie.
+    canaux: ["discord", "web"],
   },
   {
     key: "coude",
@@ -41,7 +61,9 @@ export const GAMES: GameCard[] = [
     // lisible d'un message qui a défilé.
     pitch: "Ta fiche, tes combats, ton inventaire. Les coups se donnent sur Discord.",
     couleur: "#f39c12",
-    jouable: false,
+    // Consultable ici, jouable seulement là-bas : le badge ne dit QUE où l'on
+    // joue, sinon il promettrait une partie qui ne se lancera pas.
+    canaux: ["discord"],
   },
 ];
 

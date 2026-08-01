@@ -29,7 +29,7 @@ import {
   type CoudeFile,
   type Wallet,
 } from "@/services/gamesService";
-import { GAMES, jeuMemorise, memoriserJeu } from "@/games/catalog";
+import { badgeCanaux, GAMES, jeuMemorise, memoriserJeu } from "@/games/catalog";
 
 const { user } = useAuth();
 
@@ -349,7 +349,9 @@ const fondRoue = computed(() => {
               >
                 <span class="jx-vignette-emoji" aria-hidden="true">{{ g.emoji }}</span>
                 <span class="jx-vignette-nom">{{ g.nom }}</span>
-                <span v-if="!g.jouable" class="jx-vignette-tag">Discord</span>
+                <span class="jx-vignette-tag" :class="{ double: g.canaux.length > 1 }">
+                  {{ badgeCanaux(g) }}
+                </span>
               </button>
             </li>
           </ul>
@@ -1005,6 +1007,14 @@ const fondRoue = computed(() => {
   border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.08);
   color: var(--site-ink-4);
+  white-space: nowrap;
+}
+
+/* Jouable des deux côtés : c'est l'information la plus utile de la vignette,
+   elle prend la couleur du jeu au lieu de se lire comme une mention grise. */
+.jx-vignette-tag.double {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  color: var(--text-primary);
 }
 
 .jx-pitch {
