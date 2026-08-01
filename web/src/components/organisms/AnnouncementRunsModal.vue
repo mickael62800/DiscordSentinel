@@ -79,8 +79,8 @@ function fmtDate(iso: string | null): string {
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.badge.status-success { background: rgba(46, 204, 113, 0.15); color: #2ecc71; }
-.badge.status-partial { background: rgba(241, 196, 15, 0.15); color: #f1c40f; }
-.badge.status-error { background: rgba(231, 76, 60, 0.15); color: #e74c3c; }
+.badge.status-success { background: rgba(46, 204, 113, 0.15); color: var(--success); }
+.badge.status-partial { background: rgba(241, 196, 15, 0.15); color: var(--warning); }
+.badge.status-error { background: rgba(231, 76, 60, 0.15); color: var(--danger); }
 .badge.status-pending { background: rgba(138, 150, 168, 0.15); color: var(--text-secondary); }
 </style>

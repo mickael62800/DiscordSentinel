@@ -92,8 +92,8 @@ async function onRemove(theme: VoiceChannelTheme) {
   color: white;
 }
 .flag.default { background: var(--accent); }
-.flag.locked { background: #E67E22; }
+.flag.locked { background: var(--accent-warm); }
 .flag.queue { background: #9B59B6; }
-.flag.stage { background: #2ECC71; }
+.flag.stage { background: var(--success); }
 .row-actions { display: flex; gap: 4px; }
 </style>

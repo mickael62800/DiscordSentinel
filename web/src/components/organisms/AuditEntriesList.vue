@@ -69,8 +69,8 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
   color: white; flex-shrink: 0;
 }
 .icon--danger { background-color: var(--danger); }
-.icon--warning { background-color: var(--warning); color: #1a1b2e; }
-.icon--success { background-color: var(--success); color: #1a1b2e; }
+.icon--warning { background-color: var(--warning); color: var(--bg-primary); }
+.icon--success { background-color: var(--success); color: var(--bg-primary); }
 .icon--info { background-color: var(--info); }
 .icon--default { background-color: var(--bg-hover); color: var(--text-secondary); }
 .entry-content { flex: 1; min-width: 0; }

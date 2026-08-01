@@ -164,10 +164,10 @@ onUnmounted(() => {
   border-bottom: none;
 }
 .hit-rate {
-  color: #2ECC71;
+  color: var(--success);
 }
 .hit-rate.low {
-  color: #E67E22;
+  color: var(--accent-warm);
 }
 .hit-bar {
   height: 8px;
@@ -178,7 +178,7 @@ onUnmounted(() => {
 }
 .hit-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #2ECC71);
+  background: linear-gradient(90deg, var(--accent), var(--success));
   transition: width 0.3s ease;
 }
 

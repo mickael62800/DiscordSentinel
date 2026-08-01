@@ -330,7 +330,7 @@ const mapDefaults = computed(() => {
 }
 
 .field-hint-inline.hint-db {
-  color: var(--success, #57f287);
+  color: var(--success, var(--success));
 }
 
 .field-hint-inline.hint-default {

@@ -20,6 +20,11 @@
   --info: #5bc0eb;
   /* Orange : niveau de severite "mute" (entre warning et danger). */
   --severity-mute: #ff9500;
+  /* Orange d'accentuation, distinct de `--warning` (jaune) : etats
+     intermediaires, jauges, categories. Il etait deja partout en dur
+     (#e67e22, 31 fois) sans jamais avoir ete nomme. */
+  --accent-warm: #e67e22;
+  --accent-warm-bg: rgba(230, 126, 34, 0.15);
   /* Violet secondaire (gradients hero, avatars placeholder). */
   --accent-alt: #7c5cfc;
   --border: #3a3b5c;

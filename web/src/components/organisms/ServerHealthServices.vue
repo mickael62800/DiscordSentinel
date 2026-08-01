@@ -108,8 +108,8 @@ const totalWorkers = computed(() => props.info.workers.length);
   flex-shrink: 0;
 }
 .status-dot.on {
-  background: var(--success, #2ecc71);
-  box-shadow: 0 0 6px color-mix(in srgb, var(--success, #2ecc71) 60%, transparent);
+  background: var(--success, var(--success));
+  box-shadow: 0 0 6px color-mix(in srgb, var(--success, var(--success)) 60%, transparent);
 }
 .status-dot.off { background: var(--danger); }
 

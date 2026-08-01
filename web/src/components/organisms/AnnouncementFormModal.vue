@@ -622,9 +622,9 @@ label > input[type="color"] { padding: 2px; height: 36px; }
   transition: background-color 0.15s, border-color 0.15s;
 }
 .chip:hover {
-  background: color-mix(in srgb, var(--danger, #ef4444) 18%, transparent);
-  border-color: var(--danger, #ef4444);
-  color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, var(--danger)) 18%, transparent);
+  border-color: var(--danger, var(--danger));
+  color: var(--danger, var(--danger));
 }
 .chip-remove { font-weight: 700; font-size: 14px; line-height: 1; }
 </style>

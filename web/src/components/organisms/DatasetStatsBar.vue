@@ -31,7 +31,7 @@ const { items, total, counts, exporting, markAllVisible, exportAndClean } = useA
 .stat { display: flex; flex-direction: column; }
 .stat .lbl { font-size: 10px; text-transform: uppercase; color: var(--text-secondary); }
 .stat .val { font-size: 20px; font-weight: 700; }
-.stat.safe .val { color: var(--success, #2ecc71); }
+.stat.safe .val { color: var(--success, var(--success)); }
 .stat.severe .val { color: var(--danger); }
 .grow { flex: 1; }
 .btn {

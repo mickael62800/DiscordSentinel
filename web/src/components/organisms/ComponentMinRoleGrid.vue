@@ -273,7 +273,7 @@ onMounted(load);
 
 .badge.override {
   background: var(--warning-bg, rgba(254, 231, 92, 0.15));
-  color: var(--warning, #fee75c);
+  color: var(--warning, var(--warning));
 }
 
 .btn-reset {

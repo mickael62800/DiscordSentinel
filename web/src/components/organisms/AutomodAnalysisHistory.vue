@@ -289,7 +289,7 @@ function scoreClass(s: number | undefined): string {
 }
 
 .btn-wipe {
-  background: #dc2626;
+  background: var(--danger);
   font-weight: 600;
 }
 
@@ -405,7 +405,7 @@ td.num {
 .score-warn { color: #facc15; }
 .score-delete { color: #fb923c; }
 .score-mute { color: #f87171; }
-.score-ban { color: #ef4444; font-weight: 700; }
+.score-ban { color: var(--danger); font-weight: 700; }
 
 .action-pill {
   display: inline-block;

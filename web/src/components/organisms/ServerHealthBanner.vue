@@ -88,8 +88,8 @@ const allHealthy = computed(() => {
   transition: border-color 0.2s ease;
 }
 .health-card.ok {
-  border-color: color-mix(in srgb, var(--success, #2ecc71) 35%, var(--border));
-  background: color-mix(in srgb, var(--success, #2ecc71) 6%, var(--bg-card));
+  border-color: color-mix(in srgb, var(--success, var(--success)) 35%, var(--border));
+  background: color-mix(in srgb, var(--success, var(--success)) 6%, var(--bg-card));
 }
 .health-card.ko {
   border-color: color-mix(in srgb, var(--danger) 50%, var(--border));

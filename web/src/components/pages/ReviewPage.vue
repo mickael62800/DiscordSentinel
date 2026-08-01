@@ -125,7 +125,7 @@ watch(guildIdFilter, fetchPending);
 }
 .review {
   background: var(--bg-card);
-  border-left: 4px solid #F1C40F;
+  border-left: 4px solid var(--warning);
   padding: 12px 16px;
   margin-bottom: 12px;
   border-radius: var(--radius-sm);

@@ -288,8 +288,8 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   gap: 10px;
   padding: 8px 14px;
   margin: 0 0 14px;
-  background: color-mix(in srgb, var(--warning, #e67e22) 12%, transparent);
-  border: 1px solid color-mix(in srgb, var(--warning, #e67e22) 35%, var(--border));
+  background: color-mix(in srgb, var(--warning, var(--accent-warm)) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning, var(--accent-warm)) 35%, var(--border));
   border-radius: var(--radius-md);
   color: var(--text-primary);
   text-decoration: none;
@@ -297,19 +297,19 @@ const { disabledBots, disabledCount } = useBotEnabledStatus();
   transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
 }
 .disabled-banner:hover {
-  background: color-mix(in srgb, var(--warning, #e67e22) 20%, transparent);
-  border-color: var(--warning, #e67e22);
+  background: color-mix(in srgb, var(--warning, var(--accent-warm)) 20%, transparent);
+  border-color: var(--warning, var(--accent-warm));
   transform: translateY(-1px);
 }
 .disabled-icon { font-size: 14px; flex-shrink: 0; }
 .disabled-text { flex: 1; }
 .disabled-text strong {
-  color: var(--warning, #e67e22);
+  color: var(--warning, var(--accent-warm));
   font-weight: 700;
 }
 .disabled-arrow {
   font-size: 16px;
-  color: var(--warning, #e67e22);
+  color: var(--warning, var(--accent-warm));
   font-weight: 700;
   flex-shrink: 0;
 }

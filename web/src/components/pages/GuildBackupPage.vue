@@ -475,8 +475,8 @@ onMounted(fetchSnapshots);
 .muted.small, .small { font-size: 11px; }
 
 .ro-banner {
-  background: color-mix(in srgb, var(--warning, #e67e22) 10%, var(--bg-secondary));
-  border-left: 3px solid var(--warning, #e67e22);
+  background: color-mix(in srgb, var(--warning, var(--accent-warm)) 10%, var(--bg-secondary));
+  border-left: 3px solid var(--warning, var(--accent-warm));
   padding: 10px 14px; border-radius: var(--radius-sm);
   font-size: 13px; margin-bottom: 14px;
 }

@@ -134,7 +134,7 @@ onMounted(async () => {
   animation-duration: 1.5s;
 }
 .spinner.ok {
-  border-top-color: var(--success, #2ecc71);
+  border-top-color: var(--success, var(--success));
 }
 @keyframes spin {
   to { transform: rotate(360deg); }

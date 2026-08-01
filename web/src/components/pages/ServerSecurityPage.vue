@@ -478,9 +478,9 @@ const tabs = [
   text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
 }
 .kpi-value { font-size: 28px; font-weight: 700; color: var(--text-primary); }
-.kpi-value.warning { color: var(--warning, #e67e22); }
+.kpi-value.warning { color: var(--warning, var(--accent-warm)); }
 .kpi-value.danger { color: var(--danger); }
-.kpi-value.ok { color: var(--success, #2ecc71); }
+.kpi-value.ok { color: var(--success, var(--success)); }
 .kpi-hint { font-size: 11px; color: var(--text-secondary); }
 .overview-hint {
   background: color-mix(in srgb, var(--accent) 6%, var(--bg-secondary));

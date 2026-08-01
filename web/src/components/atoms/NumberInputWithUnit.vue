@@ -278,7 +278,7 @@ function onUnitChange(e: Event) {
 }
 
 .num-input-row.out-of-range {
-  border-color: var(--danger, #ef4444);
+  border-color: var(--danger, var(--danger));
 }
 
 .num-input-row.is-disabled {
@@ -384,6 +384,6 @@ function onUnitChange(e: Event) {
 
 .num-warn {
   font-size: 11px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--danger));
 }
 </style>

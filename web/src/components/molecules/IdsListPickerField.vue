@@ -213,7 +213,7 @@ const placeholderTxt = computed(() =>
 
 .err {
   font-size: 11px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--danger));
 }
 
 .chips {
@@ -259,7 +259,7 @@ const placeholderTxt = computed(() =>
 
 .chip-remove:hover {
   background: var(--danger-bg, rgba(237, 66, 69, 0.2));
-  color: var(--danger, #ed4245);
+  color: var(--danger, var(--danger));
   opacity: 1;
 }
 

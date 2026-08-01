@@ -62,7 +62,7 @@ async function onDelete(r: ConfessionReply) {
 .reply-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .reply-head .btn-danger { margin-left: auto; }
 .reply-content { font-size: 13px; padding: 4px 0 4px 16px; word-wrap: break-word; }
-.btn-danger { padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--danger, #ef4444); border-color: color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border)); }
-.btn-danger:hover { background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent); }
+.btn-danger { padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--danger, var(--danger)); border-color: color-mix(in srgb, var(--danger, var(--danger)) 50%, var(--border)); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger, var(--danger)) 12%, transparent); }
 .xs { padding: 4px 8px; }
 </style>

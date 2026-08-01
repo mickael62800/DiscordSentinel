@@ -168,7 +168,7 @@ async function onSavePanel() {
 .role-id { font-family: monospace; }
 .btn-icon-danger {
   background: none; border: none;
-  color: var(--danger, #E74C3C);
+  color: var(--danger, var(--danger));
   cursor: pointer; font-size: 1rem; padding: 4px;
 }
 </style>

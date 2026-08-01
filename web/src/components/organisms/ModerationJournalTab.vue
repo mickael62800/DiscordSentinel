@@ -710,12 +710,12 @@ function openActionModal() {
   white-space: nowrap;
 }
 .source-chip.proposal {
-  color: #fee75c;
+  color: var(--warning);
   border-color: rgba(254, 231, 92, 0.5);
   background-color: rgba(254, 231, 92, 0.08);
 }
 .source-chip.applied {
-  color: #57f287;
+  color: var(--success);
   border-color: rgba(87, 242, 135, 0.5);
   background-color: rgba(87, 242, 135, 0.08);
 }
@@ -761,10 +761,10 @@ function openActionModal() {
   align-items: center;
   gap: 6px;
   background: linear-gradient(180deg,
-    color-mix(in srgb, #57f287 8%, var(--bg-card)),
+    color-mix(in srgb, var(--success) 8%, var(--bg-card)),
     var(--bg-card));
-  color: #57f287;
-  border: 1px solid color-mix(in srgb, #57f287 60%, var(--border));
+  color: var(--success);
+  border: 1px solid color-mix(in srgb, var(--success) 60%, var(--border));
   border-radius: var(--radius-md);
   padding: 8px 16px;
   font-size: 13px;
@@ -776,13 +776,13 @@ function openActionModal() {
 }
 .apply-btn:hover:not(:disabled) {
   color: #0a0a0a;
-  border-color: #57f287;
+  border-color: var(--success);
   background: linear-gradient(180deg,
-    color-mix(in srgb, #57f287 95%, white),
-    #57f287);
+    color-mix(in srgb, var(--success) 95%, white),
+    var(--success));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
-    0 4px 14px color-mix(in srgb, #57f287 40%, transparent);
+    0 4px 14px color-mix(in srgb, var(--success) 40%, transparent);
 }
 .apply-btn:active:not(:disabled) { transform: scale(0.97); transition-duration: 0.08s; }
 .apply-btn:disabled { opacity: 0.4; cursor: not-allowed; }

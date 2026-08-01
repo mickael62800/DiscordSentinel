@@ -127,15 +127,15 @@ async function doReset() {
 
 <style scoped>
 .danger-zone { margin-top: 28px; }
-.danger-zone h2 { font-size: 1.1rem; margin-bottom: 10px; color: #E74C3C; }
+.danger-zone h2 { font-size: 1.1rem; margin-bottom: 10px; color: var(--danger); }
 .danger-card {
-  border: 1px solid #E74C3C;
+  border: 1px solid var(--danger);
   border-radius: var(--radius-md);
-  background: color-mix(in srgb, #E74C3C 8%, var(--bg-secondary));
+  background: color-mix(in srgb, var(--danger) 8%, var(--bg-secondary));
   padding: 18px;
 }
 .warn-banner {
-  background: #E74C3C;
+  background: var(--danger);
   color: #fff;
   padding: 8px 12px;
   border-radius: var(--radius-sm);
@@ -143,9 +143,9 @@ async function doReset() {
   font-size: 0.95rem;
 }
 .warn-text { font-size: 0.9rem; line-height: 1.55; margin: 0 0 10px; color: var(--text-primary); }
-.warn-text.danger { color: #E74C3C; }
+.warn-text.danger { color: var(--danger); }
 .btn-danger {
-  background: #E74C3C; color: #fff; border: none; border-radius: var(--radius-sm);
+  background: var(--danger); color: #fff; border: none; border-radius: var(--radius-sm);
   padding: 10px 18px; font-weight: 700; cursor: pointer;
 }
 .btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -154,7 +154,7 @@ async function doReset() {
   border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 18px; cursor: pointer;
 }
 .modal-warn { font-size: 0.92rem; line-height: 1.55; margin: 0 0 12px; }
-.modal-warn code { background: var(--bg-card); padding: 2px 8px; border-radius: var(--radius-sm); color: #E74C3C; font-weight: 700; }
+.modal-warn code { background: var(--bg-card); padding: 2px 8px; border-radius: var(--radius-sm); color: var(--danger); font-weight: 700; }
 .opt { font-size: 0.88rem; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .confirm-input {
   width: 100%;

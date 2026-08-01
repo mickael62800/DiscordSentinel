@@ -309,10 +309,10 @@ const periods = computed(() => [7, 14, 30, 90]);
   padding: 7px 14px;
   border-radius: var(--radius-md);
   background: linear-gradient(180deg,
-    color-mix(in srgb, #dc2626 8%, var(--bg-card)),
+    color-mix(in srgb, var(--danger) 8%, var(--bg-card)),
     var(--bg-card));
-  border: 1px solid color-mix(in srgb, #dc2626 35%, var(--border));
-  color: color-mix(in srgb, #dc2626 80%, var(--text-secondary));
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+  color: color-mix(in srgb, var(--danger) 80%, var(--text-secondary));
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -322,11 +322,11 @@ const periods = computed(() => [7, 14, 30, 90]);
 
 .reset-btn:hover:not(:disabled) {
   color: white;
-  border-color: #dc2626;
-  background: linear-gradient(180deg, #ef4444, #dc2626);
+  border-color: var(--danger);
+  background: linear-gradient(180deg, var(--danger), var(--danger));
   box-shadow:
     inset 0 1px 0 color-mix(in srgb, white 25%, transparent),
-    0 4px 12px color-mix(in srgb, #dc2626 30%, transparent);
+    0 4px 12px color-mix(in srgb, var(--danger) 30%, transparent);
 }
 
 .reset-btn:active:not(:disabled) {

@@ -249,8 +249,8 @@ function fmtDate(iso: string | null): string {
 }
 .toggle.on {
   background: rgba(46, 204, 113, 0.18);
-  color: #2ecc71;
-  border-color: #2ecc71;
+  color: var(--success);
+  border-color: var(--success);
 }
 
 .btn-primary {

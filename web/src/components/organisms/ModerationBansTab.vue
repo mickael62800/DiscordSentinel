@@ -354,8 +354,8 @@ async function onUnbanAll() {
 
 .unban-btn {
   background-color: transparent;
-  color: var(--accent, #22c55e);
-  border: 1px solid var(--accent, #22c55e);
+  color: var(--accent, var(--success));
+  border: 1px solid var(--accent, var(--success));
   border-radius: var(--radius-sm);
   padding: 6px 16px;
   font-size: 13px;
@@ -364,7 +364,7 @@ async function onUnbanAll() {
   transition: all var(--transition-base);
 }
 .unban-btn:hover:not(:disabled) {
-  background-color: var(--accent, #22c55e);
+  background-color: var(--accent, var(--success));
   color: white;
 }
 .unban-btn:disabled { opacity: 0.5; cursor: not-allowed; }

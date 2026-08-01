@@ -81,7 +81,7 @@ function truncate(s: string, n: number): string {
   font-size: 14px;
 }
 .seg.active { background: var(--accent); border-color: var(--accent); color: white; }
-tr.row-safe { background: color-mix(in srgb, var(--success, #2ecc71) 6%, transparent); }
+tr.row-safe { background: color-mix(in srgb, var(--success, var(--success)) 6%, transparent); }
 tr.row-severe { background: color-mix(in srgb, var(--danger) 7%, transparent); }
 .pagination {
   display: flex; justify-content: center; align-items: center;

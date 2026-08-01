@@ -220,7 +220,7 @@ onMounted(refresh);
 .muted { color: var(--text-secondary); }
 .muted.small, .small { font-size: 11px; }
 .mono { font-family: "JetBrains Mono", monospace; }
-.alert { color: var(--warning, #e67e22); font-weight: 600; }
+.alert { color: var(--warning, var(--accent-warm)); font-weight: 600; }
 
 .tls-info { display: flex; flex-direction: column; gap: 10px; }
 .tls-row {

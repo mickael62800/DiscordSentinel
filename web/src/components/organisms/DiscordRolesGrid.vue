@@ -194,7 +194,7 @@ function formatPermissions(perms: string): string {
 }
 .btn-delete:hover {
   background: rgba(239, 68, 68, 0.1);
-  color: #ef4444;
+  color: var(--danger);
   border-color: rgba(239, 68, 68, 0.3);
 }
 .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }

@@ -224,7 +224,7 @@ const badgeText = (() => {
 /* ── Couleurs par theme ─────────────────────── */
 .theme-general    { --theme-color: #38bdf8; } /* sky    */
 .theme-moderation { --theme-color: #f43f5e; } /* rose   */
-.theme-community  { --theme-color: #22c55e; } /* green  */
+.theme-community  { --theme-color: var(--success); } /* green  */
 .theme-security   { --theme-color: #f59e0b; } /* amber  */
 .theme-logs       { --theme-color: #a855f7; } /* purple */
 .theme-config     { --theme-color: #64748b; } /* slate  */

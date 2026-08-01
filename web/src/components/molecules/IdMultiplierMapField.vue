@@ -351,7 +351,7 @@ const placeholderTxt = computed(() =>
 }
 
 .btn-add:hover:not(:disabled) {
-  background: var(--accent-hover, #4752c4);
+  background: var(--accent-hover, var(--accent-hover));
 }
 
 .btn-add:disabled {
@@ -361,7 +361,7 @@ const placeholderTxt = computed(() =>
 
 .err {
   font-size: 11px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--danger));
 }
 
 .entries {
@@ -441,8 +441,8 @@ const placeholderTxt = computed(() =>
 
 .btn-remove:hover {
   background: var(--danger-bg, rgba(237, 66, 69, 0.15));
-  border-color: var(--danger, #ed4245);
-  color: var(--danger, #ed4245);
+  border-color: var(--danger, var(--danger));
+  color: var(--danger, var(--danger));
 }
 
 .empty {

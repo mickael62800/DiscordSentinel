@@ -145,8 +145,8 @@ onUnmounted(stopPolling);
   transition: all 0.2s ease;
 }
 .auto-toggle.active {
-  color: var(--success, #2ecc71);
-  border-color: color-mix(in srgb, var(--success, #2ecc71) 50%, var(--border));
+  color: var(--success, var(--success));
+  border-color: color-mix(in srgb, var(--success, var(--success)) 50%, var(--border));
 }
 
 .dot {
@@ -156,7 +156,7 @@ onUnmounted(stopPolling);
   background: var(--text-secondary);
 }
 .dot.pulse {
-  background: var(--success, #2ecc71);
+  background: var(--success, var(--success));
   animation: dot-pulse 1.2s ease-in-out infinite;
 }
 @keyframes dot-pulse {

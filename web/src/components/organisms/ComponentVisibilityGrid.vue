@@ -236,7 +236,7 @@ watch(selectedGuildId, load);
   user-select: none;
   transition: background 0.15s ease;
 }
-.cell.on { background: color-mix(in srgb, var(--success, #2ecc71) 14%, transparent); color: var(--success, #2ecc71); }
+.cell.on { background: color-mix(in srgb, var(--success, var(--success)) 14%, transparent); color: var(--success, var(--success)); }
 .cell.off { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
 .cell.override { box-shadow: inset 0 0 0 2px var(--accent); }
 .cell.locked { cursor: not-allowed; opacity: 0.6; }

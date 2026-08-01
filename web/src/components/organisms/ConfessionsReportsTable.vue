@@ -57,8 +57,8 @@ function truncate(s: string, n = 80): string {
 .data-table .actions-h, .data-table .actions { text-align: right; white-space: nowrap; }
 .data-table .actions button { margin-left: 4px; }
 .badge { display: inline-block; padding: 2px 6px; border-radius: var(--radius-sm); background: var(--bg-secondary); color: var(--text-secondary); font-size: 10px; margin-left: 6px; text-transform: uppercase; letter-spacing: .5px; }
-.badge.status-pending { background: rgba(241, 196, 15, .15); color: #f1c40f; }
-.badge.status-resolved { background: rgba(46, 204, 113, .15); color: #2ecc71; }
+.badge.status-pending { background: rgba(241, 196, 15, .15); color: var(--warning); }
+.badge.status-resolved { background: rgba(46, 204, 113, .15); color: var(--success); }
 .badge.status-dismissed { background: rgba(138, 150, 168, .15); color: var(--text-secondary); }
 .btn-secondary { padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer; font-size: 11px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--text-primary); }
 .btn-secondary:hover { background: var(--bg-hover); }

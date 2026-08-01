@@ -234,7 +234,7 @@ function statusClass(code: unknown): string {
 
 .clients {
   background: var(--success-bg);
-  color: #57f287;
+  color: var(--success);
 }
 
 .relayed {
@@ -244,6 +244,6 @@ function statusClass(code: unknown): string {
 
 .skipped {
   background: var(--danger-bg);
-  color: #ed4245;
+  color: var(--danger);
 }
 </style>

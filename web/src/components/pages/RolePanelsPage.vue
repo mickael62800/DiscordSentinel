@@ -217,6 +217,6 @@ function styleColor(style: string): string {
 .header-actions { display: flex; gap: 12px; align-items: center; }
 .btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: var(--radius-md); background: var(--accent, var(--accent)); color: white; cursor: pointer; text-decoration: none; }
 .btn-primary:hover { opacity: 0.9; }
-.btn-icon-danger { background: none; border: none; color: var(--danger, #E74C3C); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
+.btn-icon-danger { background: none; border: none; color: var(--danger, var(--danger)); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
 .btn-icon-danger:hover { opacity: 1; }
 </style>

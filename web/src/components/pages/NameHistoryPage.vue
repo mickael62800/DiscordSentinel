@@ -127,7 +127,7 @@ const { formatDateTimeShort: formatDate } = useFormatDate();
   font-size: 0.95rem;
 }
 .badge.current {
-  background: #2ECC71;
+  background: var(--success);
   color: white;
   padding: 2px 8px;
   border-radius: var(--radius-lg);

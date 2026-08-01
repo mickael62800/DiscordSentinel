@@ -192,7 +192,7 @@ const sortedRoles = computed(() =>
 .btn-icon-danger {
   background: none;
   border: none;
-  color: var(--danger, #E74C3C);
+  color: var(--danger, var(--danger));
   cursor: pointer;
   font-size: 1rem;
 }

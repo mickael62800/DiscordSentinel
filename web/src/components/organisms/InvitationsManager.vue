@@ -405,7 +405,7 @@ watch(selectedGuildId, load);
   text-transform: uppercase;
   letter-spacing: 0.4px;
 }
-.status-pill.active { background: color-mix(in srgb, var(--success, #2ecc71) 18%, transparent); color: var(--success, #2ecc71); }
+.status-pill.active { background: color-mix(in srgb, var(--success, var(--success)) 18%, transparent); color: var(--success, var(--success)); }
 .status-pill.used { background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent); }
 .status-pill.expired { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
 

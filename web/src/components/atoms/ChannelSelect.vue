@@ -99,6 +99,6 @@ function onChange(e: Event) {
 
 .ch-err {
   font-size: 11px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--danger));
 }
 </style>

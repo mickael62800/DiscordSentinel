@@ -167,15 +167,15 @@ async function handleClear() {
   font-size: 12px;
   font-weight: 600;
   background: transparent;
-  border: 1px solid color-mix(in srgb, var(--danger, #ef4444) 50%, var(--border));
-  color: var(--danger, #ef4444);
+  border: 1px solid color-mix(in srgb, var(--danger, var(--danger)) 50%, var(--border));
+  color: var(--danger, var(--danger));
   border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s;
 }
 .clear-btn:hover {
-  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
-  border-color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, var(--danger)) 12%, transparent);
+  border-color: var(--danger, var(--danger));
 }
 .clear-btn:active { transform: translateY(1px); }
 .clear-btn svg { width: 14px; height: 14px; }
@@ -196,7 +196,7 @@ async function handleClear() {
 }
 .log-item:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
 .log-item.lvl-warn { border-left: 3px solid var(--warning, #f59e0b); }
-.log-item.lvl-error { border-left: 3px solid var(--danger, #ef4444); }
+.log-item.lvl-error { border-left: 3px solid var(--danger, var(--danger)); }
 
 .log-line1 {
   display: flex;

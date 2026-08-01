@@ -390,7 +390,7 @@ function discordProfileUrl(userId: string): string {
   gap: 6px;
   padding: 6px 12px;
   border-radius: var(--radius-md);
-  background: #5865F2;
+  background: var(--accent);
   color: white;
   text-decoration: none;
   font-size: 12px;
@@ -398,7 +398,7 @@ function discordProfileUrl(userId: string): string {
   transition: background 0.2s ease, transform 0.2s ease;
   white-space: nowrap;
 }
-.discord-link-btn:hover { background: #4752c4; transform: translateY(-1px); }
+.discord-link-btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
 
 .detail-tabs-wrap { margin-bottom: 16px; }
 .tab-content { margin-top: 4px; }

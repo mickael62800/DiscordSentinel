@@ -282,7 +282,7 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
   font-size: 10px; font-weight: 600;
   padding: 1px 6px; border-radius: var(--radius-xs);
 }
-.mini-stat.text { color: #3498DB; background: rgba(52, 152, 219, 0.1); }
+.mini-stat.text { color: var(--info); background: rgba(52, 152, 219, 0.1); }
 .mini-stat.voice { color: #E91E63; background: rgba(233, 30, 99, 0.1); }
 
 .user-xp {
@@ -312,12 +312,12 @@ const sortedLeaderboard = computed<UserLevel[]>(() =>
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 .action-btn.reset {
-  color: var(--danger, #ef4444);
-  border-color: color-mix(in srgb, var(--danger, #ef4444) 40%, var(--border));
+  color: var(--danger, var(--danger));
+  border-color: color-mix(in srgb, var(--danger, var(--danger)) 40%, var(--border));
 }
 .action-btn.reset:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--danger, #ef4444) 12%, transparent);
-  border-color: var(--danger, #ef4444);
+  background: color-mix(in srgb, var(--danger, var(--danger)) 12%, transparent);
+  border-color: var(--danger, var(--danger));
 }
 .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 

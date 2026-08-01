@@ -33,7 +33,7 @@ defineEmits<{
   height: 48px;
   border-radius: 50%;
   background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
+  color: var(--danger);
   display: flex;
   align-items: center;
   justify-content: center;

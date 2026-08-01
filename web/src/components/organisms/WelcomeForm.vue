@@ -495,7 +495,7 @@ async function onSave() {
 
 .publish-btn {
   align-self: flex-start;
-  background: var(--accent, #5865f2);
+  background: var(--accent, var(--accent));
   color: #fff;
   border: none;
   border-radius: var(--radius-md, 8px);

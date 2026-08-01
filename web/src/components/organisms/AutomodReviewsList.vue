@@ -189,7 +189,7 @@ onUnmounted(() => {
 }
 .reviews-header h2 { margin: 0; font-size: 1.1rem; }
 .badge {
-  background: #E67E22;
+  background: var(--accent-warm);
   color: white;
   padding: 2px 8px;
   border-radius: var(--radius-md);
@@ -218,7 +218,7 @@ onUnmounted(() => {
 .reviews-list { list-style: none; padding: 0; margin: 0; }
 .review-card {
   background: var(--bg-card);
-  border-left: 4px solid #E67E22;
+  border-left: 4px solid var(--accent-warm);
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   margin-bottom: 10px;
@@ -241,10 +241,10 @@ onUnmounted(() => {
   font-weight: 600;
   color: white;
 }
-.sa-warn { background: #F1C40F; color: #222; }
+.sa-warn { background: var(--warning); color: #222; }
 .sa-delete { background: #95A5A6; }
-.sa-mute { background: #E67E22; }
-.sa-ban { background: #E74C3C; }
+.sa-mute { background: var(--accent-warm); }
+.sa-ban { background: var(--danger); }
 
 .badge.agg {
   background: #8E44AD;
@@ -297,13 +297,13 @@ onUnmounted(() => {
 .action-btn:hover:not(:disabled) { background: rgba(255,255,255,0.05); }
 .action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .action-btn.suggested {
-  border-color: #2ECC71;
-  color: #2ECC71;
+  border-color: var(--success);
+  color: var(--success);
   font-weight: 600;
 }
-.action-btn.btn-prevention { border-color: #3498DB; color: #3498DB; }
-.action-btn.btn-ban { border-color: #E74C3C; color: #E74C3C; }
-.action-btn.btn-mute { border-color: #E67E22; color: #E67E22; }
-.action-btn.btn-warn { border-color: #F1C40F; color: #F1C40F; }
+.action-btn.btn-prevention { border-color: var(--info); color: var(--info); }
+.action-btn.btn-ban { border-color: var(--danger); color: var(--danger); }
+.action-btn.btn-mute { border-color: var(--accent-warm); color: var(--accent-warm); }
+.action-btn.btn-warn { border-color: var(--warning); color: var(--warning); }
 .action-btn.btn-ignore { border-color: #95A5A6; color: #95A5A6; }
 </style>

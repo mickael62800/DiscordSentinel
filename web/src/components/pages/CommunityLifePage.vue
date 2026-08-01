@@ -624,8 +624,8 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 }
 
 .btn.danger:hover:not(:disabled) {
-  border-color: #ef4444;
-  color: #ef4444;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 /* ── Formulaires ── */

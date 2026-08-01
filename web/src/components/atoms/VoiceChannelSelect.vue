@@ -111,6 +111,6 @@ function icon(kind?: string): string {
 
 .vc-err {
   font-size: 11px;
-  color: var(--danger, #ef4444);
+  color: var(--danger, var(--danger));
 }
 </style>

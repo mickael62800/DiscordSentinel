@@ -535,7 +535,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .ov-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
 .ov-value { font-size: 22px; font-weight: 700; margin-top: 4px; }
 .ov-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
-.ov-sub.reclaimable { color: var(--warning, #e67e22); font-weight: 600; }
+.ov-sub.reclaimable { color: var(--warning, var(--accent-warm)); font-weight: 600; }
 
 /* Tables */
 .filters {
@@ -565,7 +565,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .docker-table td.small { font-size: 11px; }
 .docker-table td.mono, .docker-table .ports { font-family: "JetBrains Mono", monospace; }
 .docker-table tr.dangling, .docker-table tr.orphan {
-  background: color-mix(in srgb, var(--warning, #e67e22) 6%, transparent);
+  background: color-mix(in srgb, var(--warning, var(--accent-warm)) 6%, transparent);
 }
 .actions-h { text-align: right; }
 .actions { text-align: right; white-space: nowrap; }
@@ -582,9 +582,9 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   background: var(--bg-secondary);
   color: var(--text-secondary);
 }
-.state-pill.running { background: color-mix(in srgb, var(--success, #2ecc71) 20%, var(--bg-secondary)); color: var(--success, #2ecc71); }
+.state-pill.running { background: color-mix(in srgb, var(--success, var(--success)) 20%, var(--bg-secondary)); color: var(--success, var(--success)); }
 .state-pill.exited, .state-pill.dead { background: color-mix(in srgb, var(--danger) 18%, var(--bg-secondary)); color: var(--danger); }
-.state-pill.paused, .state-pill.restarting { background: color-mix(in srgb, var(--warning, #e67e22) 20%, var(--bg-secondary)); color: var(--warning, #e67e22); }
+.state-pill.paused, .state-pill.restarting { background: color-mix(in srgb, var(--warning, var(--accent-warm)) 20%, var(--bg-secondary)); color: var(--warning, var(--accent-warm)); }
 
 .badge {
   display: inline-block;
@@ -596,7 +596,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
   text-transform: uppercase;
 }
 .dangling-badge, .orphan-badge {
-  background: var(--warning, #e67e22);
+  background: var(--warning, var(--accent-warm));
   color: white;
 }
 
@@ -629,8 +629,8 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .btn.xs { padding: 3px 8px; font-size: 11px; }
 .btn.danger { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); color: var(--danger); }
 .btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 15%, var(--bg-secondary)); }
-.btn.warning { border-color: color-mix(in srgb, var(--warning, #e67e22) 50%, var(--border)); color: var(--warning, #e67e22); }
-.btn.warning:hover:not(:disabled) { background: color-mix(in srgb, var(--warning, #e67e22) 15%, var(--bg-secondary)); }
+.btn.warning { border-color: color-mix(in srgb, var(--warning, var(--accent-warm)) 50%, var(--border)); color: var(--warning, var(--accent-warm)); }
+.btn.warning:hover:not(:disabled) { background: color-mix(in srgb, var(--warning, var(--accent-warm)) 15%, var(--bg-secondary)); }
 
 /* Prune grid */
 .prune-grid {
@@ -653,7 +653,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 }
 .prune-card h4 { margin: 0; font-size: 14px; }
 .prune-card p { margin: 0; font-size: 12px; }
-.prune-card .reclaim { color: var(--warning, #e67e22); font-weight: 600; font-size: 12px; }
+.prune-card .reclaim { color: var(--warning, var(--accent-warm)); font-weight: 600; font-size: 12px; }
 
 .muted { color: var(--text-secondary); font-size: 12px; }
 .small { font-size: 11px; }
