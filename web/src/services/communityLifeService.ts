@@ -205,7 +205,10 @@ export const communityActionsService = {
 
   /// Sondages vus par un membre connecté : `my_vote` est renseigné, ce que
   /// la surface publique ne peut pas faire.
+  ///
+  /// Passe par `/api/me/` et non `/api/polls/` : cette dernière exige
+  /// `viewer`, que les membres ordinaires n'ont pas.
   myPolls(guildId: string): Promise<Poll[]> {
-    return httpGet<Poll[]>(`/api/polls/${encodeURIComponent(guildId)}`);
+    return httpGet<Poll[]>(`/api/me/polls/${encodeURIComponent(guildId)}`);
   },
 };

@@ -22,13 +22,21 @@ export interface ComponentDef {
   minRole: RbacRole;
 }
 
+/// Doit rester aligne sur `Role` cote Rust (sentinel-core/domain/enums/system).
+/// `member` vaut 0 : c'est le role de toute personne du serveur Discord qui se
+/// connecte, et il ne satisfait aucun gate du back-office.
 export const ROLE_RANK: Record<RbacRole, number> = {
-  viewer: 0,
-  moderator: 1,
-  admin: 2,
-  owner: 3,
+  member: 0,
+  viewer: 1,
+  moderator: 2,
+  admin: 3,
+  owner: 4,
 };
 
+/// Roles ATTRIBUABLES depuis la page RBAC. `member` en est volontairement
+/// absent : il n'est pas accorde, il est ce qu'on est par defaut. L'y mettre
+/// laisserait croire qu'on peut « retrograder » quelqu'un alors qu'il suffit
+/// de retirer son acces.
 export const ROLES_ORDER: RbacRole[] = ["viewer", "moderator", "admin", "owner"];
 
 export const COMPONENT_REGISTRY: ComponentDef[] = [

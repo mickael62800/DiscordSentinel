@@ -580,7 +580,9 @@ export interface MemberSummary {
 // Phase 7 B — RBAC fin
 // ═══════════════════════════════════════════════════
 
-export type RbacRole = "owner" | "admin" | "moderator" | "viewer";
+/// `member` est le role par defaut de toute personne du serveur Discord :
+/// acces a l'espace membre, aucun acces au back-office.
+export type RbacRole = "owner" | "admin" | "moderator" | "viewer" | "member";
 
 export interface GuildUserRole {
   discord_user_id: string;

@@ -248,6 +248,50 @@ pub async fn vote_poll(
     Ok(Json(to_dto(poll, Some(dto.option_id))))
 }
 
+/// GET /api/me/polls/{guild_id}
+///
+/// Sondages ouverts, avec le vote du LECTEUR pre-coche.
+///
+/// Distinct de `list_polls`, qui exige `Viewer` : un membre ordinaire n'a pas
+/// ce role et se verrait refuser sa propre page. Distinct aussi de
+/// `public_polls`, qui ne connait aucune identite et ne peut donc pas dire
+/// pour quoi on a vote.
+///
+/// Aucun parametre `all` ici : un membre n'a pas a fouiller les archives.
+pub async fn my_polls(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<PollDto>>, ApiError> {
+    let Some(Extension(ctx)) = rbac else {
+        return Err(ApiError(DomainError::Forbidden(
+            "auth Discord requise".into(),
+        )));
+    };
+
+    // L'appartenance a la guilde est deja verifiee par `guild_auth_middleware`
+    // sur les routes portant `{guild_id}` : inutile de la revalider ici.
+    let polls = state
+        .polls_uc
+        .list(&guild_id, true, DEFAULT_LIMIT)
+        .await?;
+
+    // Le vote personnel se recupere sondage par sondage : le port de liste ne
+    // le porte pas, et l'ajouter obligerait tous les appelants a fournir une
+    // identite qu'ils n'ont pas.
+    let mut out = Vec::with_capacity(polls.len());
+    for p in polls {
+        let mien = state
+            .polls_uc
+            .get(p.id, Some(&ctx.discord_user_id))
+            .await
+            .ok()
+            .and_then(|v| v.my_vote);
+        out.push(to_dto(p, mien));
+    }
+    Ok(Json(out))
+}
+
 // ── Surface PUBLIQUE ──
 
 /// GET /api/public/polls/{guild_id}

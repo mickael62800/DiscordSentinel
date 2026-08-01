@@ -132,6 +132,13 @@ fn announcement_inner() -> Router<AppState> {
             "/api/polls/detail/{id}/vote",
             post(handlers::community::polls::vote_poll),
         )
+        // Surface membre : authentifiee mais sans exigence de role. Un membre
+        // ordinaire n'est pas `Viewer` et ne peut donc pas passer par
+        // /api/polls/{guild_id}.
+        .route(
+            "/api/me/polls/{guild_id}",
+            get(handlers::community::polls::my_polls),
+        )
         // La suppression d'une designation porte le guild_id dans l'URL : le
         // controle RBAC est par guilde, il lui faut cette information avant
         // d'aller chercher la ligne.

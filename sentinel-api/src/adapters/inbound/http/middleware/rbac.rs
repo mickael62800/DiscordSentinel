@@ -99,10 +99,10 @@ pub async fn rbac_middleware(
     // completement, donnant un acces read-only a TOUS les users Discord
     // authentifies sur la guild, meme ceux pas dans `api_user_guilds`).
     //
-    // Note : `lookup_role` retourne deja Ok(Role::Viewer) quand la row
-    // n'existe pas (principe du moindre privilege pour un user legitime
-    // de la guild Discord). L'Err ici est reserve aux VRAIES erreurs DB
-    // (pool sature, connexion timeout, query malformee).
+    // Note : `lookup_role` retourne deja Ok(Role::Member) quand la row
+    // n'existe pas — un membre legitime du serveur Discord, sans acces au
+    // back-office. L'Err ici est reserve aux VRAIES erreurs DB (pool sature,
+    // connexion timeout, query malformee).
     let role = if let Some(ref gid) = guild_id {
         match lookup_role(&state, &user_id, gid).await {
             Ok(r) => Some(r),
@@ -199,8 +199,8 @@ pub fn require_superadmin(state: &AppState, ctx: &RoleContext) -> Result<(), Sta
 /// - Sinon → `Err(FORBIDDEN)`
 ///
 /// Note : si la row `api_user_guilds` n'existe pas pour ce (user, guild),
-/// on retombe sur `Role::Viewer` (principe du moindre privilege) — identique
-/// au comportement du middleware.
+/// on retombe sur `Role::Member` (aucun acces back-office) — identique au
+/// comportement du middleware.
 pub async fn require_role_for_guild(
     state: &AppState,
     ctx: &RoleContext,
@@ -391,8 +391,16 @@ async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<St
 /// derivent les privileges du principal AUTHENTIFIE au lieu de faire confiance
 /// a des booleens fournis dans le body (trust-boundary).
 ///
-/// Fail-safe : une row absente retombe sur `Role::Viewer` (moindre privilege) ;
-/// l'`Err` est reserve aux VRAIES erreurs DB (que le handler mappe en 503).
+/// Fail-safe : une row absente retombe sur `Role::Member` — le role le plus
+/// faible, qui n'ouvre AUCUN gate du back-office.
+///
+/// Ce defaut valait `Viewer` auparavant, ce qui donnait a toute personne du
+/// serveur Discord se connectant au site un acces en lecture aux journaux,
+/// a la liste des membres et aux donnees de moderation. Le staff est
+/// explicitement inscrit dans `api_user_guilds` ; l'absence de row signifie
+/// donc « membre ordinaire », pas « lecteur du back-office ».
+///
+/// L'`Err` reste reserve aux VRAIES erreurs DB (que le handler mappe en 503).
 pub(crate) async fn lookup_role(
     state: &AppState,
     user_id: &str,
@@ -400,7 +408,7 @@ pub(crate) async fn lookup_role(
 ) -> Result<Role, String> {
     Ok(lookup_role_row(state, user_id, guild_id)
         .await?
-        .unwrap_or(Role::Viewer))
+        .unwrap_or(Role::Member))
 }
 
 /// Variante de `lookup_role` qui distingue l'ABSENCE de row (`None`) du

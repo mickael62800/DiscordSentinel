@@ -60,6 +60,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
     case "admin": return "warning";
     case "moderator": return "info";
     case "viewer": return "default";
+    // Palier par defaut de tout membre du serveur : n'apparait pas dans les
+    // tables RBAC, qui ne listent que les acces explicitement accordes.
+    case "member": return "default";
   }
 }
 </script>
