@@ -1,4 +1,4 @@
-//! Tests de la validation de `config_key` (SCREAMING_SNAKE_CASE).
+//! Tests de la validation de `config_key`.
 
 use super::*;
 
@@ -8,6 +8,14 @@ fn accepts_valid_keys() {
     assert!(validate_config_key("MAX_PLAYERS").is_ok());
     assert!(validate_config_key("LEVEL_2_CAP").is_ok());
     assert!(validate_config_key("A").is_ok());
+}
+
+#[test]
+fn accepts_mixed_case_after_first_char() {
+    // Noms imposes par l'image 7 Days to Die, lus tels quels par le serveur.
+    assert!(validate_config_key("SERVERCONFIG_BuildCreate").is_ok());
+    assert!(validate_config_key("SERVERCONFIG_ZombieMove").is_ok());
+    assert!(validate_config_key("SERVERCONFIG_XPMultiplier").is_ok());
 }
 
 #[test]
@@ -35,5 +43,6 @@ fn rejects_lowercase_first_char() {
 fn rejects_invalid_body_chars() {
     assert!(validate_config_key("MAX-PLAYERS").is_err());
     assert!(validate_config_key("MAX PLAYERS").is_err());
-    assert!(validate_config_key("MAXplayers").is_err());
+    assert!(validate_config_key("MAX.PLAYERS").is_err());
+    assert!(validate_config_key("MAX/PLAYERS").is_err());
 }
