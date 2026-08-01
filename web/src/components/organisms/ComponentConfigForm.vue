@@ -54,6 +54,12 @@ const channelFields = computed(() => configFields.value.filter((f) => f.type ===
 const categoryFields = computed(() => configFields.value.filter((f) => f.type === "category"));
 const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));
 const enumFields = computed(() => configFields.value.filter((f) => f.type === "enum"));
+const voiceFields = computed(() => configFields.value.filter((f) => f.type === "voice"));
+const listFields = computed(() =>
+  configFields.value.filter((f) =>
+    f.type === "channel_list" || f.type === "role_list" || f.type === "voice_list",
+  ),
+);
 
 function isMultilineKey(k: string): boolean {
   return k.endsWith("_message") || k.endsWith("_multipliers");
@@ -65,15 +71,40 @@ const shortTextFields = computed(() =>
   configFields.value.filter((f) => f.type === "text" && !isMultilineKey(f.key)),
 );
 
+/**
+ * Types deja repartis dans une section nommee. Sert au filet de securite
+ * ci-dessous : tout ce qui n'est pas ici doit quand meme s'afficher.
+ */
+const TYPES_CLASSES = new Set([
+  "boolean", "number", "enum", "channel", "voice", "category", "role",
+  "channel_list", "role_list", "voice_list", "text",
+]);
+
+/**
+ * Champs d'un type qu'aucune section ne connait.
+ *
+ * Sans ce filet, un type ajoute cote base disparaissait PUREMENT du
+ * formulaire : le reglage existait, le bot le lisait, mais personne ne
+ * pouvait le renseigner et rien ne le signalait. C'est ce qui est arrive aux
+ * lobbies vocaux — sans eux, le module ne savait pas quel salon declenche la
+ * creation d'un vocal temporaire.
+ */
+const unclassifiedFields = computed(() =>
+  configFields.value.filter((f) => !TYPES_CLASSES.has(f.type)),
+);
+
 const visibleSections = computed(() => {
   const all = [
     { title: "Valeurs", fields: numberFields.value, wide: false },
     { title: "Choix", fields: enumFields.value, wide: false },
     { title: "Salons", fields: channelFields.value, wide: false },
+    { title: "Salons vocaux", fields: voiceFields.value, wide: false },
     { title: "Categories", fields: categoryFields.value, wide: false },
     { title: "Roles", fields: roleFields.value, wide: false },
+    { title: "Listes", fields: listFields.value, wide: true },
     { title: "Textes courts", fields: shortTextFields.value, wide: false },
     { title: "Textes longs", fields: longTextFields.value, wide: true },
+    { title: "Autres reglages", fields: unclassifiedFields.value, wide: true },
   ];
   return all.filter((s) => s.fields.length > 0);
 });

@@ -214,6 +214,11 @@ impl EventHandler for Handler {
         // Progression: hydrate voice sessions + tick periodique credit XP
         modules::progression::on_ready(&ctx, &ready).await;
         modules::progression::spawn_voice_tick(ctx.clone());
+        // Filet des paliers de roles : le level-up les applique deja sur
+        // l'instant, cette boucle rattrape ce qu'aucun evenement ne signale
+        // (role retire a la main, palier ajoute en configuration, bot arrete
+        // pendant un level-up).
+        modules::progression::role_tiers::spawn_verification_periodique(ctx.clone());
 
         // Announcements : consumer Redis stream pour les annonces planifiees
         // publiees par announcement-worker.
