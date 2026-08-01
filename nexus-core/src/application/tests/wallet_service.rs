@@ -101,7 +101,10 @@ impl WalletRepository for MockRepo {
 }
 
 fn service(repo: Arc<MockRepo>) -> WalletService {
-    WalletService::new(repo)
+    WalletService::new(
+        repo,
+        Arc::new(crate::application::economy_config::EmptyBotConfigRepository),
+    )
 }
 
 fn seed_wallet(repo: &MockRepo, user: &str, coins: i64) {

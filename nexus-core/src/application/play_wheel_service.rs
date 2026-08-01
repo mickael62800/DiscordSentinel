@@ -32,13 +32,21 @@ use crate::ports::outbound::wheel_repository::WheelRepository;
 pub struct PlayWheelService {
     wheel_repo: Arc<dyn WheelRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
+    config_repo: Arc<dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository>,
 }
 
 impl PlayWheelService {
-    pub fn new(wheel_repo: Arc<dyn WheelRepository>, wallet_repo: Arc<dyn WalletRepository>) -> Self {
+    pub fn new(
+        wheel_repo: Arc<dyn WheelRepository>,
+        wallet_repo: Arc<dyn WalletRepository>,
+        config_repo: Arc<
+            dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository,
+        >,
+    ) -> Self {
         Self {
             wheel_repo,
             wallet_repo,
+            config_repo,
         }
     }
 }
@@ -46,21 +54,42 @@ impl PlayWheelService {
 #[async_trait]
 impl PlayWheelUseCase for PlayWheelService {
     async fn spin(&self, cmd: PlayWheelCommand) -> Result<PlayWheelResult, DomainError> {
-        // 1. Claim quotidien atomique.
+        let cfg = crate::application::economy_config::load_economy(
+            &self.config_repo,
+            &cmd.guild_id,
+        )
+        .await?;
+
+        if !cfg.enabled || !cfg.wheel_enabled {
+            return Err(DomainError::Validation(
+                "La Roue du Destin est desactivee sur ce serveur.".into(),
+            ));
+        }
+
+        // 1. Reservation atomique du tirage, selon le delai configure.
         let claimed = self
             .wheel_repo
-            .try_claim_today(&cmd.guild_id, &cmd.user_id)
+            .try_claim(&cmd.guild_id, &cmd.user_id, cfg.wheel_cooldown_hours)
             .await?;
         if !claimed {
-            return Err(DomainError::Validation(
-                "Tu as deja tire la Roue du Destin aujourd'hui.".into(),
-            ));
+            // Le message suit le delai reel : annoncer « aujourd'hui » alors
+            // que le delai est de six heures serait faux.
+            return Err(DomainError::Validation(if cfg.wheel_cooldown_hours >= 24 {
+                "Tu as deja tire la Roue du Destin aujourd'hui.".into()
+            } else {
+                format!(
+                    "Tu as deja tire la Roue. Reviens dans moins de {} h.",
+                    cfg.wheel_cooldown_hours
+                )
+            }));
         }
 
         // 2. Spin RNG (entropie OS).
         let mut rng = rand::rngs::StdRng::from_entropy();
         let outcome = spin_with_rng(&mut rng);
-        let payout = outcome.case.payout;
+        // Le multiplicateur s'applique aux gains COMME aux pertes : ne
+        // multiplier que les gains transformerait la roue en distributeur.
+        let payout = cfg.apply_payout(outcome.case.payout);
 
         // 3. Wallet : regles pures de credit/debit (creation via le socle
         // partage : solde de depart credite pour un nouveau joueur).
@@ -121,7 +150,15 @@ impl PlayWheelUseCase for PlayWheelService {
     }
 
     async fn can_spin(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
-        Ok(!self.wheel_repo.has_claimed_today(guild_id, user_id).await?)
+        let cfg =
+            crate::application::economy_config::load_economy(&self.config_repo, guild_id).await?;
+        if !cfg.enabled || !cfg.wheel_enabled {
+            return Ok(false);
+        }
+        Ok(!self
+            .wheel_repo
+            .has_claimed_recently(guild_id, user_id, cfg.wheel_cooldown_hours)
+            .await?)
     }
 }
 

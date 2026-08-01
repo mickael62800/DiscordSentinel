@@ -27,12 +27,17 @@ struct MockWheelRepo {
 
 #[async_trait]
 impl WheelRepository for MockWheelRepo {
-    async fn try_claim_today(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
+    async fn try_claim(&self, _g: &str, _u: &str, _h: i64) -> Result<bool, DomainError> {
         Ok(self.claim_ok)
     }
     /// Le mock decrit un joueur qui n'a pas encore tire quand le claim est
     /// possible : les deux informations decrivent le meme etat.
-    async fn has_claimed_today(&self, _g: &str, _u: &str) -> Result<bool, DomainError> {
+    async fn has_claimed_recently(
+        &self,
+        _g: &str,
+        _u: &str,
+        _h: i64,
+    ) -> Result<bool, DomainError> {
         Ok(!self.claim_ok)
     }
     async fn log_spin(&self, spin: &WheelSpin) -> Result<(), DomainError> {
@@ -103,7 +108,7 @@ fn service(claim_ok: bool, initial_coins: i64) -> (PlayWheelService, Arc<MockWhe
         ..Default::default()
     });
     (
-        PlayWheelService::new(wheel.clone(), wallet.clone()),
+        PlayWheelService::new(wheel.clone(), wallet.clone(), Arc::new(crate::application::economy_config::EmptyBotConfigRepository)),
         wheel,
         wallet,
     )

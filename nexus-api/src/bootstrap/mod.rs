@@ -136,10 +136,15 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
 
     sqlx::migrate!("./migrations").run(&pool).await?;
 
+    // Declare en tete : plusieurs services le lisent pour connaitre
+    // l'equilibre du jeu (taux de vol, delais, bornes de transfert).
+    let bot_config_repo: Arc<dyn BotConfigRepository> =
+        Arc::new(PgBotConfigRepository::new(pool.clone()));
+
     let wheel_repo = Arc::new(PgWheelRepository::new(pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pool.clone()));
-    let service = Arc::new(PlayWheelService::new(wheel_repo, wallet_repo.clone()));
-    let wallet_service = Arc::new(WalletService::new(wallet_repo));
+    let service = Arc::new(PlayWheelService::new(wheel_repo, wallet_repo.clone(), bot_config_repo.clone()));
+    let wallet_service = Arc::new(WalletService::new(wallet_repo, bot_config_repo.clone()));
     let coude_repo: Arc<dyn CoudeRepository> = Arc::new(PgCoudeRepository::new(pool.clone()));
     let coude_profile: Arc<dyn CoudeProfileUseCase> = Arc::new(CoudeService::new(coude_repo));
     let coude_combat: Arc<dyn CoudeCombatUseCase> = Arc::new(CoudeService::new(Arc::new(PgCoudeRepository::new(pool.clone()))));
@@ -148,10 +153,6 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     let coude_insurance_repo: Arc<dyn CoudeInsuranceRepository> = Arc::new(PgCoudeInsuranceRepository::new(pool.clone()));
     let coude_insurance: Arc<dyn CoudeInsuranceUseCase> = Arc::new(CoudeInsuranceService::new(coude_insurance_repo));
     let coude_steal_repo: Arc<dyn CoudeStealRepository> = Arc::new(PgCoudeStealRepository::new(pool.clone()));
-    // Construit avant les services qui le lisent : l'equilibre du jeu
-    // (taux de vol, cooldowns, gains) vient desormais de la configuration.
-    let bot_config_repo: Arc<dyn BotConfigRepository> =
-        Arc::new(PgBotConfigRepository::new(pool.clone()));
     let coude_steal: Arc<dyn CoudeStealUseCase> = Arc::new(CoudeStealService::new(coude_steal_repo, bot_config_repo.clone()));
     let coude_prime_repo: Arc<dyn CoudePrimeRepository> = Arc::new(PgCoudePrimeRepository::new(pool.clone()));
     let coude_prime: Arc<dyn CoudePrimeUseCase> = Arc::new(CoudePrimeService::new(coude_prime_repo));

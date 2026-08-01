@@ -63,11 +63,18 @@ pub async fn get_or_create_wallet(
 
 pub struct WalletService {
     repo: Arc<dyn WalletRepository>,
+    config_repo:
+        Arc<dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository>,
 }
 
 impl WalletService {
-    pub fn new(repo: Arc<dyn WalletRepository>) -> Self {
-        Self { repo }
+    pub fn new(
+        repo: Arc<dyn WalletRepository>,
+        config_repo: Arc<
+            dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository,
+        >,
+    ) -> Self {
+        Self { repo, config_repo }
     }
 }
 
@@ -103,6 +110,15 @@ impl TransferCoinsUseCase for WalletService {
         // Regles pures : auto-transfert, montant, solde suffisant (refus
         // explicite — le repo re-verifie sous verrou dans la transaction).
         validate_transfer(&cmd.from_user_id, &cmd.to_user_id, cmd.amount, from.coins)?;
+
+        // Bornes propres au serveur, par-dessus les regles universelles.
+        let cfg = crate::application::economy_config::load_economy(
+            &self.config_repo,
+            &cmd.guild_id,
+        )
+        .await?;
+        cfg.validate_transfer(cmd.amount)
+            .map_err(DomainError::Validation)?;
 
         let outcome = self
             .repo

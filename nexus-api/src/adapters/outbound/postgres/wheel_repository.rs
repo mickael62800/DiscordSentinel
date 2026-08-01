@@ -20,34 +20,54 @@ impl PgWheelRepository {
 
 #[async_trait]
 impl WheelRepository for PgWheelRepository {
-    async fn try_claim_today(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
+    async fn try_claim(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cooldown_hours: i64,
+    ) -> Result<bool, DomainError> {
+        // L'insertion CONDITIONNELLE fait office de verrou : le `NOT EXISTS`
+        // et l'insertion sont evalues dans la meme instruction, donc deux
+        // clics simultanes ne peuvent pas accorder deux tirages.
+        //
+        // `NOW()` cote base et non une date calculee en Rust : deux processus
+        // aux horloges legerement decalees appliqueraient sinon des delais
+        // differents.
         let res = sqlx::query(
             "INSERT INTO nexus_wheel_daily_claims (guild_id, user_id, day)
-             VALUES ($1, $2, CURRENT_DATE)
-             ON CONFLICT (guild_id, user_id, day) DO NOTHING",
+             SELECT $1, $2, CURRENT_DATE
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM nexus_wheel_daily_claims
+                 WHERE guild_id = $1 AND user_id = $2
+                   AND claimed_at > NOW() - make_interval(hours => $3::int)
+             )",
         )
         .bind(guild_id)
         .bind(user_id)
+        .bind(cooldown_hours.clamp(1, 8760) as i32)
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;
         Ok(res.rows_affected() > 0)
     }
 
-    async fn has_claimed_today(
+    async fn has_claimed_recently(
         &self,
         guild_id: &str,
         user_id: &str,
+        cooldown_hours: i64,
     ) -> Result<bool, DomainError> {
-        // `CURRENT_DATE` et non un calcul cote Rust : la meme reference de
-        // journee que `try_claim_today`, sinon les deux pourraient etre en
-        // desaccord autour de minuit.
+        // Meme reference de temps que `try_claim` : les deux doivent
+        // s'accorder, sinon le bouton s'ouvre alors que le tirage sera refuse.
         let row: Option<(i32,)> = sqlx::query_as(
             "SELECT 1 FROM nexus_wheel_daily_claims
-             WHERE guild_id = $1 AND user_id = $2 AND day = CURRENT_DATE",
+             WHERE guild_id = $1 AND user_id = $2
+               AND claimed_at > NOW() - make_interval(hours => $3::int)
+             LIMIT 1",
         )
         .bind(guild_id)
         .bind(user_id)
+        .bind(cooldown_hours.clamp(1, 8760) as i32)
         .fetch_optional(&self.pool)
         .await
         .map_err(pg_err)?;

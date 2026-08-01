@@ -282,6 +282,37 @@ pub async fn load_coude(
     })
 }
 
+/// Depot de configuration VIDE, pour les tests.
+///
+/// Les services retombent alors sur leurs defauts, qui reproduisent le
+/// comportement historique. Declare ici et non recopie dans chaque fichier
+/// de test : cinq copies auraient diverge des la premiere evolution du
+/// contrat.
+#[cfg(test)]
+pub(crate) struct EmptyBotConfigRepository;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl BotConfigRepository for EmptyBotConfigRepository {
+    async fn get_definitions(
+        &self,
+    ) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/economy_config.rs"]
 mod tests;
