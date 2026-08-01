@@ -63,7 +63,7 @@ UPDATE game_templates SET config_schema = config_schema || '[
    "description": "Identifiants Workshop separes par virgule. Telecharges au demarrage.",
    "warning": "ARK charge ses mods au demarrage : chaque mod ajoute plusieurs minutes au lancement, et les gros packs peuvent depasser le quart d''heure."},
 
-  {"key": "MAP", "type": "select", "label": "Carte", "group": "Monde",
+  {"key": "MAP", "type": "enum", "label": "Carte", "group": "Monde",
    "default": "TheIsland", "required": false,
    "options": ["TheIsland", "TheCenter", "ScorchedEarth_P", "Ragnarok", "Aberration_P", "Extinction", "Valguero_P", "Genesis", "CrystalIsles", "Gen2", "LostIsland", "Fjordur"],
    "warning": "Changer de carte demarre un monde VIERGE. L''ancien reste sur le disque mais n''est plus charge."},
