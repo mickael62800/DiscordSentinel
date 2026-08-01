@@ -42,6 +42,10 @@ export interface GameServer {
 /// Le formulaire de création se construit entièrement à partir de ça : ajouter
 /// une option à un jeu se fait en base, sans toucher au front.
 export interface TemplateField {
+  /// Avertissement sur ce que le réglage CASSE, par opposition à
+  /// `description` qui explique ce qu'il fait. Affiché distinctement :
+  /// noyé dans le texte courant, il ne serait pas lu.
+  warning?: string | null;
   key: string;
   label: string;
   /// Section d'affichage. Sans regroupement, cinquante champs a plat

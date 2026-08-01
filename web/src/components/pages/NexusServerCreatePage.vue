@@ -272,6 +272,12 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
             />
 
             <small v-if="f.description" class="nc-note">{{ f.description }}</small>
+
+            <!-- Ce que le réglage casse, pas ce qu'il fait. Séparé de la
+                 description : c'est précisément la ligne à ne pas rater. -->
+            <small v-if="f.warning" class="nc-warning">
+              <span aria-hidden="true">⚠️</span> {{ f.warning }}
+            </small>
           </label>
           </div>
         </details>
@@ -443,5 +449,19 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
   margin-top: var(--space-md);
   font-size: 0.84rem;
   color: var(--text-secondary);
+}
+
+.nc-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  background: var(--accent-warm-bg);
+  border-left: 3px solid var(--accent-warm);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.5;
 }
 </style>
