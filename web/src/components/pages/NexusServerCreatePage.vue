@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AppToggle from "../atoms/AppToggle.vue";
 import AppButton from "../atoms/AppButton.vue";
 // Création d'un serveur de jeu — choix du jeu puis réglages.
 //
@@ -246,12 +247,13 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
               <option v-for="o in f.options ?? []" :key="o" :value="o">{{ o }}</option>
             </select>
 
-            <input
+            <!-- Interrupteur et non case a cocher : ces reglages ACTIVENT un
+                 comportement du serveur (PvP, vol, feu ami). Un interrupteur
+                 montre son etat de loin, une case demande de la regarder. -->
+            <AppToggle
               v-else-if="f.type === 'boolean'"
-              type="checkbox"
-              class="nc-check"
-              :checked="boolValue(f)"
-              @change="setBool(f, ($event.target as HTMLInputElement).checked)"
+              :model-value="boolValue(f)"
+              @update:model-value="setBool(f, $event)"
             />
 
             <input
@@ -402,11 +404,6 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
   border-color: var(--accent);
 }
 
-.nc-check {
-  width: 1.1rem;
-  height: 1.1rem;
-  align-self: flex-start;
-}
 
 .nc-field small {
   font-size: 0.76rem;
