@@ -17,8 +17,9 @@
 
 import { computed, onMounted, ref } from "vue";
 
+import ActionButton from "../atoms/ActionButton.vue";
+import SiteHero from "../molecules/SiteHero.vue";
 import { useAuth } from "../../composables/useAuth";
-import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
 import {
   gamesService,
   type Rank,
@@ -214,32 +215,26 @@ const fondRoue = computed(() => {
 <template>
   <div class="jx theme-communaute">
     <header class="jx-bar">
-      <RouterLink to="/membre" class="jx-ghost">← L'espace membre</RouterLink>
+      <ActionButton to="/membre" variant="ghost" size="md">
+        ← L'espace membre
+      </ActionButton>
       <span v-if="user" class="jx-solde" :class="{ pulse: !!resultat }">
         🪙 {{ fmtCoins(solde) }}
       </span>
     </header>
 
-    <section class="jx-hero">
-      <img
-        class="jx-logo"
-        :src="wordmarkOf(COMMUNITY)"
-        :alt="COMMUNITY.name"
-        @error="onWordmarkError($event, COMMUNITY)"
-      />
-      <h1>Les jeux du canapé</h1>
-      <p>
-        Le même porte-monnaie que sur Discord. Ce que tu gagnes ici, tu le
-        retrouves là-bas.
-      </p>
-    </section>
+    <SiteHero
+      taille="compact"
+      titre="Les jeux du canapé"
+      tagline="Le même porte-monnaie que sur Discord. Ce que tu gagnes ici, tu le retrouves là-bas."
+    />
 
     <!-- Non connecté : on montre le jeu, on demande la connexion pour agir. -->
     <section v-if="!user" class="jx-block">
       <p class="jx-vide">
         Connecte-toi pour tirer la Roue et retrouver ton porte-monnaie.
       </p>
-      <RouterLink to="/login?espace=membre" class="jx-cta">Se connecter</RouterLink>
+      <ActionButton to="/login?espace=membre">Se connecter</ActionButton>
     </section>
 
     <p v-else-if="chargement" class="jx-hint">Chargement…</p>
@@ -317,16 +312,15 @@ const fondRoue = computed(() => {
           </div>
 
           <div class="jx-roue-cote">
-            <button
-              type="button"
-              class="jx-cta grand"
+            <ActionButton
+              size="lg"
               :disabled="enCours || dejaJoue"
               @click="tirer"
             >
               <template v-if="enCours">Ça tourne…</template>
               <template v-else-if="dejaJoue">Reviens demain</template>
               <template v-else>Tirer la Roue</template>
-            </button>
+            </ActionButton>
 
             <p v-if="erreurRoue" :class="dejaJoue ? 'jx-vide' : 'jx-alerte'">
               {{ erreurRoue }}
@@ -428,19 +422,7 @@ const fondRoue = computed(() => {
   gap: 1rem;
 }
 
-.jx-ghost {
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  border-radius: var(--radius-pill);
-  padding: 0.3rem 0.95rem;
-  font-size: 0.88rem;
-  text-decoration: none;
-}
 
-.jx-ghost:hover {
-  border-color: var(--accent);
-  color: #fff;
-}
 
 .jx-solde {
   font-variant-numeric: tabular-nums;
@@ -466,27 +448,9 @@ const fondRoue = computed(() => {
   }
 }
 
-.jx-hero {
-  text-align: center;
-}
 
-.jx-logo {
-  display: block;
-  margin: 0 auto 0.75rem;
-  width: min(180px, 40vw);
-  height: auto;
-  filter: drop-shadow(0 8px 30px rgba(168, 85, 247, 0.3));
-}
 
-.jx-hero h1 {
-  margin: 0 0 0.3rem;
-  font-size: clamp(1.4rem, 4vh, 2rem);
-}
 
-.jx-hero p {
-  margin: 0;
-  color: var(--text-secondary);
-}
 
 .jx-block h2 {
   display: flex;
@@ -533,32 +497,8 @@ const fondRoue = computed(() => {
   font-size: 0.9rem;
 }
 
-.jx-cta {
-  display: inline-block;
-  align-self: flex-start;
-  margin-top: 0.8rem;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  font-size: 0.9rem;
-  border: none;
-  border-radius: var(--radius-pill);
-  padding: 0.5rem 1.4rem;
-  cursor: pointer;
-  text-decoration: none;
-}
 
-.jx-cta.grand {
-  font-size: 1rem;
-  padding: 0.7rem 2rem;
-  margin-top: 0;
-}
 
-.jx-cta:disabled {
-  opacity: 0.55;
-  cursor: default;
-}
 
 /* ── La roue ── */
 .jx-roue-zone {

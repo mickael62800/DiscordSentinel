@@ -12,6 +12,9 @@
 import { COMMUNITY, onWordmarkError, wordmarkOf } from "@/branding";
 
 defineProps<{
+  /// Titre de la page, sous le logo. Absent sur l'accueil, où le wordmark
+  /// EST le titre : l'y répéter ferait doublon.
+  titre?: string;
   /// Phrase sous le logo. Absente = pas de ligne vide.
   tagline?: string;
   /// `grand` pour l'accueil, `compact` pour les pages intérieures : le même
@@ -28,6 +31,8 @@ defineProps<{
       :alt="COMMUNITY.name"
       @error="onWordmarkError($event, COMMUNITY)"
     />
+
+    <h1 v-if="titre" class="hero-titre">{{ titre }}</h1>
 
     <p v-if="tagline" class="hero-tagline">{{ tagline }}</p>
 
@@ -51,6 +56,12 @@ defineProps<{
   gap: var(--space-lg);
 }
 
+/* Le titre reste collé au logo : ensemble ils forment l'identité de la page,
+   séparés ils se liraient comme deux blocs sans rapport. */
+.hero-titre + .hero-tagline {
+  margin-top: calc(-1 * var(--space-sm));
+}
+
 .hero-logo {
   display: block;
   height: auto;
@@ -65,6 +76,13 @@ defineProps<{
 
 .hero.compact .hero-logo {
   width: min(200px, 44vw);
+}
+
+.hero-titre {
+  margin: 0;
+  font-size: clamp(1.4rem, 4vw, 2rem);
+  line-height: 1.2;
+  text-wrap: balance;
 }
 
 .hero-tagline {

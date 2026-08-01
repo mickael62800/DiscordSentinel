@@ -31,7 +31,9 @@ import {
   weekDays,
   weekLabel,
 } from "../../composables/useWeekPlanning";
-import { COMMUNITY, discordInvite, onWordmarkError, wordmarkOf } from "@/branding";
+import ActionButton from "../atoms/ActionButton.vue";
+import SiteHero from "../molecules/SiteHero.vue";
+import { discordInvite } from "@/branding";
 import { siteConfig } from "@/siteConfig";
 import {
   isOngoing,
@@ -387,26 +389,25 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
       <div v-if="user" class="mb-user">
         <img v-if="avatarUrl" :src="avatarUrl" alt="" class="mb-avatar" />
         <span>{{ user.username }}</span>
-        <button type="button" class="mb-ghost" @click="logout">Déconnexion</button>
+        <ActionButton variant="ghost" @click="logout">Déconnexion</ActionButton>
       </div>
-      <RouterLink v-else to="/login?espace=membre" class="mb-ghost">Se connecter</RouterLink>
+      <ActionButton v-else to="/login?espace=membre" variant="ghost">
+        Se connecter
+      </ActionButton>
     </header>
 
     <!-- ── Accueil ──
          Le wordmark est une illustration complète, avec son propre décor : il
          occupe seul le héros. Le poser sur une photo ferait deux images qui
          se coupent. -->
-    <section class="mb-hero">
-      <img
-        class="mb-hero-logo"
-        :src="wordmarkOf(COMMUNITY)"
-        :alt="COMMUNITY.name"
-        @error="onWordmarkError($event, COMMUNITY)"
-      />
-      <p v-if="user">Content de te revoir, {{ user.username }}. Voici ce qui se passe.</p>
-      <p v-else>Ce qui se passe en ce moment. Connecte-toi pour participer.</p>
-
-      <div class="mb-chips">
+    <SiteHero
+      :tagline="
+        user
+          ? `Content de te revoir, ${user.username}. Voici ce qui se passe.`
+          : 'Ce qui se passe en ce moment. Connecte-toi pour participer.'
+      "
+    >
+      <template #info>
         <span v-if="serversOnline" class="mb-chip">
           <span class="mb-pip on"></span><b>{{ serversOnline }}</b> serveur(s) en ligne
         </span>
@@ -414,12 +415,15 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
         <span v-if="lfg.length" class="mb-chip">
           <b>{{ lfg.length }}</b> recherche(s) de joueurs
         </span>
-        <RouterLink to="/jeux" class="mb-chip link">🎡 Les jeux</RouterLink>
-        <a v-if="discordInvite()" class="mb-chip link" :href="discordInvite()" target="_blank" rel="noopener">
+      </template>
+
+      <template #actions>
+        <ActionButton to="/jeux" variant="secondary">🎡 Les jeux</ActionButton>
+        <ActionButton v-if="discordInvite()" :href="discordInvite()">
           Rejoindre le Discord
-        </a>
-      </div>
-    </section>
+        </ActionButton>
+      </template>
+    </SiteHero>
 
     <!-- Sans identifiant de serveur, la page n'a rien à interroger. Le dire
          franchement plutôt que d'afficher un héros seul : la page paraîtrait
@@ -560,9 +564,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
             >
               {{ busyLfg === a.id ? "…" : "Je viens" }}
             </button>
-            <RouterLink v-else to="/login?espace=membre" class="mb-lfg-btn">
+            <ActionButton v-else to="/login?espace=membre" variant="secondary">
               Se connecter pour répondre
-            </RouterLink>
+            </ActionButton>
           </div>
         </article>
       </div>
@@ -636,9 +640,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
           <h3>{{ nextEvent.title }}</h3>
           <p v-if="nextEvent.description">{{ nextEvent.description }}</p>
 
-          <RouterLink v-if="!user" to="/login?espace=membre" class="mb-cta">
+          <ActionButton v-if="!user" to="/login?espace=membre">
             Se connecter pour s'inscrire
-          </RouterLink>
+        </ActionButton>
           <span v-else class="mb-soon">Inscription bientôt</span>
         </div>
       </div>
@@ -755,9 +759,9 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
         <p class="mb-poll-foot">
           {{ p.total_votes }} vote(s) · se termine le {{ fmtJour(p.closes_at) }}
         </p>
-        <RouterLink v-if="!user" to="/login?espace=membre" class="mb-cta">
+        <ActionButton v-if="!user" to="/login?espace=membre">
           Se connecter pour voter
-        </RouterLink>
+        </ActionButton>
       </article>
 
       <p v-if="!polls.length" class="mb-vide">
@@ -920,47 +924,12 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   border-radius: 50%;
 }
 
-.mb-ghost {
-  background: none;
-  border: 1px solid var(--border-strong);
-  color: var(--text-secondary);
-  border-radius: var(--radius-pill);
-  padding: 0.3rem 0.95rem;
-  font: inherit;
-  font-size: 0.88rem;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
 
-.mb-ghost:hover {
-  border-color: var(--accent);
-  color: #fff;
-}
 
 /* ── Accueil ── */
-.mb-hero {
-  text-align: center;
-}
 
-.mb-hero-logo {
-  display: block;
-  margin: 0 auto 1rem;
-  width: min(340px, 62vw);
-  height: auto;
-  filter: drop-shadow(0 10px 40px rgba(168, 85, 247, 0.35));
-}
 
-.mb-hero p {
-  margin: 0 0 1.1rem;
-  color: var(--text-secondary);
-}
 
-.mb-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  justify-content: center;
-}
 
 .mb-chip {
   display: inline-flex;
@@ -1109,17 +1078,6 @@ const anneesLabel = (n: number) => (n === 1 ? "1 an" : `${n} ans`);
   font-size: 1.1rem;
 }
 
-.mb-cta {
-  align-self: flex-start;
-  display: inline-block;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  color: #fff;
-  font-weight: 600;
-  font-size: 0.86rem;
-  border-radius: var(--radius-pill);
-  padding: 0.45rem 1.2rem;
-  text-decoration: none;
-}
 
 .mb-soon {
   align-self: flex-start;
