@@ -28,12 +28,10 @@ pub struct EconomyConfig {
     pub transfer_min: i64,
     /// 0 = pas de plafond.
     pub transfer_max: i64,
-    pub transfer_fee_pct: i64,
     pub wheel_enabled: bool,
     pub wheel_cooldown_hours: i64,
     /// En pourcentage : 100 = gains inchanges.
     pub wheel_payout_multiplier: i64,
-    pub leaderboard_size: i64,
 }
 
 impl Default for EconomyConfig {
@@ -44,11 +42,9 @@ impl Default for EconomyConfig {
             transfer_enabled: true,
             transfer_min: 1,
             transfer_max: 0,
-            transfer_fee_pct: 0,
             wheel_enabled: true,
             wheel_cooldown_hours: 24,
             wheel_payout_multiplier: 100,
-            leaderboard_size: 10,
         }
     }
 }
@@ -69,14 +65,6 @@ impl EconomyConfig {
 
     /// Frais preleves sur un transfert, arrondis a l'entier inferieur.
     ///
-    /// Arrondi vers le BAS : prelever plus que le pourcentage annonce serait
-    /// une mauvaise surprise, prelever moins ne lese personne.
-    pub fn transfer_fee(&self, amount: i64) -> i64 {
-        if self.transfer_fee_pct <= 0 {
-            return 0;
-        }
-        amount.saturating_mul(self.transfer_fee_pct) / 100
-    }
 
     /// Le montant est-il acceptable pour un transfert ?
     pub fn validate_transfer(&self, amount: i64) -> Result<(), String> {
@@ -98,15 +86,6 @@ impl EconomyConfig {
 #[derive(Debug, Clone)]
 pub struct CoudeConfig {
     pub enabled: bool,
-    pub max_level: i32,
-    pub stat_points_per_level: i32,
-    pub xp_winner: i32,
-    pub xp_loser: i32,
-    pub xp_underdog_bonus: i32,
-    pub combat_cooldown_minutes: i64,
-    pub combat_mise_min: i64,
-    /// 0 = pas de plafond.
-    pub combat_mise_max: i64,
     pub steal_enabled: bool,
     pub steal_success_pct: u32,
     pub steal_success_pct_fourbe: u32,
@@ -119,24 +98,14 @@ pub struct CoudeConfig {
     pub prime_max: i64,
     pub bet_enabled: bool,
     pub bet_min: i64,
-    pub bet_payout_multiplier: i64,
     pub insurance_enabled: bool,
     pub insurance_cost: i64,
-    pub hp_regen_per_hour: i32,
 }
 
 impl Default for CoudeConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            max_level: 25,
-            stat_points_per_level: 1,
-            xp_winner: 10,
-            xp_loser: 3,
-            xp_underdog_bonus: 5,
-            combat_cooldown_minutes: 0,
-            combat_mise_min: 10,
-            combat_mise_max: 0,
             steal_enabled: true,
             // Les quatre valeurs historiques du service de vol.
             steal_success_pct: 30,
@@ -150,10 +119,8 @@ impl Default for CoudeConfig {
             prime_max: 0,
             bet_enabled: true,
             bet_min: 10,
-            bet_payout_multiplier: 200,
             insurance_enabled: true,
             insurance_cost: 100,
-            hp_regen_per_hour: 5,
         }
     }
 }
@@ -182,20 +149,7 @@ impl CoudeConfig {
         (thief_coins.saturating_mul(self.steal_penalty_pct) / 100).max(1)
     }
 
-    /// Experience gagnee par le vainqueur, bonus compris s'il partait perdant.
-    pub fn combat_xp(&self, is_underdog: bool) -> i32 {
-        self.xp_winner + if is_underdog { self.xp_underdog_bonus } else { 0 }
-    }
 
-    pub fn validate_mise(&self, mise: i64) -> Result<(), String> {
-        if mise < self.combat_mise_min {
-            return Err(format!("la mise minimum est de {} coins", self.combat_mise_min));
-        }
-        if self.combat_mise_max > 0 && mise > self.combat_mise_max {
-            return Err(format!("la mise maximum est de {} coins", self.combat_mise_max));
-        }
-        Ok(())
-    }
 }
 
 // ── Lecture ──
@@ -235,11 +189,9 @@ pub async fn load_economy(
         transfer_enabled: b(&items, "transfer_enabled", d.transfer_enabled),
         transfer_min: n(&items, "transfer_min", d.transfer_min),
         transfer_max: n(&items, "transfer_max", d.transfer_max),
-        transfer_fee_pct: n(&items, "transfer_fee_pct", d.transfer_fee_pct),
         wheel_enabled: b(&items, "wheel_enabled", d.wheel_enabled),
         wheel_cooldown_hours: n(&items, "wheel_cooldown_hours", d.wheel_cooldown_hours),
         wheel_payout_multiplier: n(&items, "wheel_payout_multiplier", d.wheel_payout_multiplier),
-        leaderboard_size: n(&items, "leaderboard_size", d.leaderboard_size),
     })
 }
 
@@ -251,14 +203,6 @@ pub async fn load_coude(
     let d = CoudeConfig::default();
     Ok(CoudeConfig {
         enabled: b(&items, "enabled", d.enabled),
-        max_level: n(&items, "max_level", d.max_level),
-        stat_points_per_level: n(&items, "stat_points_per_level", d.stat_points_per_level),
-        xp_winner: n(&items, "xp_winner", d.xp_winner),
-        xp_loser: n(&items, "xp_loser", d.xp_loser),
-        xp_underdog_bonus: n(&items, "xp_underdog_bonus", d.xp_underdog_bonus),
-        combat_cooldown_minutes: n(&items, "combat_cooldown_minutes", d.combat_cooldown_minutes),
-        combat_mise_min: n(&items, "combat_mise_min", d.combat_mise_min),
-        combat_mise_max: n(&items, "combat_mise_max", d.combat_mise_max),
         steal_enabled: b(&items, "steal_enabled", d.steal_enabled),
         steal_success_pct: n(&items, "steal_success_pct", d.steal_success_pct),
         steal_success_pct_fourbe: n(
@@ -275,10 +219,8 @@ pub async fn load_coude(
         prime_max: n(&items, "prime_max", d.prime_max),
         bet_enabled: b(&items, "bet_enabled", d.bet_enabled),
         bet_min: n(&items, "bet_min", d.bet_min),
-        bet_payout_multiplier: n(&items, "bet_payout_multiplier", d.bet_payout_multiplier),
         insurance_enabled: b(&items, "insurance_enabled", d.insurance_enabled),
         insurance_cost: n(&items, "insurance_cost", d.insurance_cost),
-        hp_regen_per_hour: n(&items, "hp_regen_per_hour", d.hp_regen_per_hour),
     })
 }
 

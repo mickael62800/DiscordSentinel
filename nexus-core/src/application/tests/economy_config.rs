@@ -34,21 +34,7 @@ fn multiplicateur_n_ecrase_pas_les_petits_montants() {
     assert_eq!(c.apply_payout(50), 60);
 }
 
-#[test]
-fn frais_de_transfert_nuls_par_defaut() {
-    assert_eq!(EconomyConfig::default().transfer_fee(1000), 0);
-}
 
-/// Arrondi vers le BAS : prelever plus que le pourcentage annonce serait une
-/// mauvaise surprise.
-#[test]
-fn frais_arrondis_vers_le_bas() {
-    let c = EconomyConfig {
-        transfer_fee_pct: 5,
-        ..Default::default()
-    };
-    assert_eq!(c.transfer_fee(199), 9); // 9.95 -> 9
-}
 
 #[test]
 fn transfert_dans_les_bornes_est_accepte() {
@@ -132,34 +118,8 @@ fn penalite_d_echec_est_toujours_d_au_moins_un_coin() {
     assert_eq!(CoudeConfig::default().steal_penalty(0), 1);
 }
 
-#[test]
-fn experience_de_combat_inclut_le_bonus_d_outsider() {
-    let c = CoudeConfig::default();
-    assert_eq!(c.combat_xp(false), 10);
-    assert_eq!(c.combat_xp(true), 15);
-}
 
-#[test]
-fn mise_dans_les_bornes_est_acceptee() {
-    let c = CoudeConfig {
-        combat_mise_min: 10,
-        combat_mise_max: 500,
-        ..Default::default()
-    };
-    assert!(c.validate_mise(10).is_ok());
-    assert!(c.validate_mise(500).is_ok());
-    assert!(c.validate_mise(9).is_err());
-    assert!(c.validate_mise(501).is_err());
-}
 
-#[test]
-fn mise_maximum_a_zero_signifie_aucun_plafond() {
-    let c = CoudeConfig {
-        combat_mise_max: 0,
-        ..Default::default()
-    };
-    assert!(c.validate_mise(1_000_000).is_ok());
-}
 
 // ── Lecture des valeurs stockees ──
 

@@ -79,7 +79,14 @@ impl CoudeStealUseCase for CoudeStealService {
         };
 
         self.repo
-            .transfer(guild_id, thief_id, victim_id, amount, success)
+            .transfer(
+                guild_id,
+                thief_id,
+                victim_id,
+                amount,
+                success,
+                cfg.steal_cooldown_minutes,
+            )
             .await?;
 
         Ok(StealResult { success, amount })
