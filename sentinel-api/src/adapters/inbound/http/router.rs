@@ -302,7 +302,52 @@ pub fn build(
         // Refresh/logout de session web (cookie httpOnly) : publiques car
         // l'auth se fait via le cookie de session, pas le X-Discord-Token.
         .route("/auth/refresh", post(handlers::system::oauth::refresh))
-        .route("/auth/logout", post(handlers::system::oauth::logout));
+        .route("/auth/logout", post(handlers::system::oauth::logout))
+        // ── Site public ──
+        //
+        // Montees DANS le groupe public : aucune authentification, donc
+        // aucune donnee personnelle. Chaque handler ecrit son DTO champ par
+        // champ et force son filtre restrictif — les parametres du
+        // back-office (`?all=1`) ne peuvent pas exposer brouillons ni
+        // archives ici.
+        //
+        // Ces routes doivent etre declarees a la fois ici et dans
+        // `build_for_test` : les deux routeurs sont independants, et n'en
+        // servir qu'un donne des tests verts sur une API qui repond 404.
+        .route(
+            "/api/public/guilds/{guild_id}",
+            get(handlers::system::public_site::public_guild),
+        )
+        .route(
+            "/api/public/events/{guild_id}",
+            get(handlers::community::events::public_events),
+        )
+        .route(
+            "/api/public/lfg/{guild_id}",
+            get(handlers::community::lfg::public_lfg),
+        )
+        .route(
+            "/api/public/polls/{guild_id}",
+            get(handlers::community::polls::public_polls),
+        )
+        .route(
+            "/api/public/spotlight/{guild_id}",
+            get(handlers::community::spotlight::public_spotlight),
+        )
+        .route(
+            "/api/public/news/{guild_id}",
+            get(handlers::community::news::public_news),
+        )
+        .route(
+            "/api/public/pulse/{guild_id}",
+            get(handlers::community::pulse::public_pulse),
+        )
+        // Presence en direct : le bot ne publie que les salons visibles par
+        // @everyone, l'API n'a aucune vue sur les permissions Discord.
+        .route(
+            "/api/public/presence/{guild_id}",
+            get(handlers::community::presence::public_presence),
+        );
 
     // Helper : true pour les endpoints bruyants (heartbeat des bots toutes
     // les 1-3s, /health du frontend toutes les 90s). On veut les voir en
