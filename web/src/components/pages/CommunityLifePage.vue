@@ -14,6 +14,7 @@ import AppButton from "../atoms/AppButton.vue";
 import { computed, ref } from "vue";
 
 import AppTabs from "../molecules/AppTabs.vue";
+import ImagePicker from "../molecules/ImagePicker.vue";
 import ConfirmDialog from "../molecules/ConfirmDialog.vue";
 import { useCommunityLife, type LifeTab } from "@/composables/useCommunityLife";
 import { useConfirm } from "@/composables/useConfirm";
@@ -260,7 +261,11 @@ const expire = (iso: string) => new Date(iso) <= new Date();
 
           <label>
             Image
-            <input v-model="formNews.image_url" type="text" placeholder="/imgs/annonce_staff.jpg" />
+            <ImagePicker
+              :model-value="formNews.image_url ?? ''"
+              mode="relative"
+              @update:model-value="formNews.image_url = $event || null"
+            />
             <!-- Le serveur refuse toute URL absolue : elle figerait le domaine
                  en base et ouvrirait la porte à un `javascript:` dans un src. -->
             <small class="muted">

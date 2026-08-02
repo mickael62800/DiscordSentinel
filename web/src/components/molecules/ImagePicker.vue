@@ -23,6 +23,18 @@ const props = defineProps<{
   modelValue: string;
   /// Sans image : `true` masque l'option « Aucune ».
   requis?: boolean;
+  /**
+   * Forme de l'URL enregistrée. Les deux destinations ont des exigences
+   * OPPOSÉES, d'où le choix explicite :
+   *
+   * - `absolue` (défaut) — l'image part dans un embed Discord, et c'est
+   *   Discord qui va la chercher sur Internet. Un chemin relatif ne lui dit
+   *   rien : l'embed s'afficherait sans image et sans erreur.
+   * - `relative` — l'image est affichée par le site. L'API REFUSE une URL
+   *   absolue : elle figerait le domaine en base et ouvrirait la porte à un
+   *   `javascript:` dans un attribut `src`.
+   */
+  mode?: "absolue" | "relative";
 }>();
 
 const emit = defineEmits<{ "update:modelValue": [value: string] }>();
@@ -51,7 +63,12 @@ const groupes = computed(() =>
 
 function selectionner(e: Event) {
   const fichier = (e.target as HTMLSelectElement).value;
-  emit("update:modelValue", fichier ? urlBanniere(fichier) : "");
+  if (!fichier) {
+    emit("update:modelValue", "");
+    return;
+  }
+  const url = props.mode === "relative" ? cheminBanniere(fichier) : urlBanniere(fichier);
+  emit("update:modelValue", url);
 }
 
 function basculer() {
@@ -82,12 +99,18 @@ function basculer() {
     <AppInput
       v-else
       :model-value="modelValue"
-      placeholder="https://..."
+      :placeholder="mode === 'relative' ? '/imgs/mon-image.jpg' : 'https://...'"
       @update:model-value="emit('update:modelValue', String($event))"
     />
 
     <button type="button" class="ip-bascule" @click="basculer">
-      {{ externe ? "Choisir une image du site" : "Utiliser une URL externe" }}
+      {{
+        externe
+          ? "Choisir une image du site"
+          : mode === "relative"
+            ? "Saisir un chemin manuellement"
+            : "Utiliser une URL externe"
+      }}
     </button>
   </div>
 </template>

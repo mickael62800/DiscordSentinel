@@ -345,12 +345,12 @@ async function save() {
         </label>
       </div>
       <label>
-        URL image (grande, en bas)
-        <AppInput v-model="form.embed_image_url" type="url" placeholder="https://..." />
+        Image (grande, en bas)
+        <ImagePicker v-model="form.embed_image_url" />
       </label>
       <label>
-        URL thumbnail (petite, à droite)
-        <AppInput v-model="form.embed_thumbnail_url" type="url" placeholder="https://..." />
+        Vignette (petite, à droite)
+        <ImagePicker v-model="form.embed_thumbnail_url" />
       </label>
     </template>
 
