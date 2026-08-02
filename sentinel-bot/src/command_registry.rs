@@ -67,7 +67,15 @@ pub const BOT_NAMES_WITH_COMMANDS: &[&str] = &[
 /// Si la cle "enabled" n'est pas definie, le module est considere
 /// active (defaut).
 async fn compute_guild_commands(api: &BaseApiClient, guild_id: &str) -> Vec<CreateCommand> {
-    let mut commands = Vec::new();
+    // Socle : commandes d'INSTALLATION, publiees quel que soit l'etat des
+    // modules.
+    //
+    // `/logs-init` cree les salons de logs et renseigne les reglages de cinq
+    // modules a la fois. La rattacher a l'un d'eux la ferait disparaitre quand
+    // il est desactive — or tout est desactive sur un serveur neuf, c'est-a-dire
+    // exactement le moment ou on en a besoin.
+    let mut commands = vec![crate::modules::logs_setup::register()];
+
     for bot_name in BOT_NAMES_WITH_COMMANDS {
         // is_bot_enabled retourne true par defaut (pas de cle = active).
         let enabled = crate::shared::discord_helpers::is_bot_enabled(api, guild_id, bot_name).await;

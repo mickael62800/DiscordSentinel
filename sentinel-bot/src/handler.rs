@@ -39,6 +39,7 @@ fn command_module(name: &str) -> &'static str {
         "ticket" | "ticket-admin" => "tickets",
         "confess" | "confess-admin" => "confessions",
         "backup" => "guild_backup",
+        "logs-init" => "logs_setup",
         _ => "unknown",
     }
 }
@@ -607,6 +608,7 @@ impl EventHandler for Handler {
                             modules::community::handle_command(&ctx, &command).await
                         }
                         "audit" => modules::audit::handle_command(&ctx, &command).await,
+                        "logs-init" => modules::logs_setup::handle(&ctx, &command).await,
                         "level" | "stats" | "progression-resync" | "classement" => {
                             modules::progression::handle_command(&ctx, &command).await
                         }

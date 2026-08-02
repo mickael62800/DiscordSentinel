@@ -12,6 +12,7 @@ pub mod confessions;
 pub mod emoji;
 pub mod guild_backup;
 pub mod help_panel;
+pub mod logs_setup;
 pub mod moderation;
 pub mod nasa_apod;
 pub mod presence;
