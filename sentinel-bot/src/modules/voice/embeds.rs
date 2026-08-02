@@ -58,23 +58,6 @@ pub async fn create_session_card(
     creator_name: &str,
     channel_type: &str,
 ) {
-    // Journal web d'abord : la carte Discord ne part que si un salon de logs
-    // est configure, alors que l'ouverture d'un salon vocal merite d'etre
-    // tracee dans tous les cas.
-    crate::modules::audit::send_event(
-        ctx,
-        crate::modules::audit::audit_event::simple(guild_id.to_string(), "voice_session_open")
-            .with_channel(voice_channel_id, None)
-            .with_details(serde_json::json!({
-                "action": "Salon vocal ouvert",
-                "action_kind": "voice_session_open",
-                "emoji": "\u{1f3a4}",
-                "actor": creator_name,
-                "reason": format!("Type : {channel_type}"),
-            })),
-    )
-    .await;
-
     let log_channel = match resolve_log_channel(ctx, guild_id).await {
         Some(ch) => ch,
         None => return,

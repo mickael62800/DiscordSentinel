@@ -102,32 +102,6 @@ export const EVENT_CATEGORIES: EventCategory[] = [
     rbacKey: "logs.journal.anomalies",
     eventTypes: ["anomaly_detected"],
   },
-  {
-    // Sanctions posées par un modérateur ou par l'automod. Remplace le salon
-    // Discord `sanctions_log_channel_id` : même contenu, même code couleur,
-    // mais consultable, filtrable et daté.
-    key: "moderation",
-    label: "Modération",
-    slug: "moderation",
-    rbacKey: "logs.journal.moderation",
-    eventTypes: ["sanction_applied", "age_verification_ban"],
-  },
-  {
-    // Détections de l'automod. La carte Discord reste posée — elle porte les
-    // boutons de vote — mais l'historique se consulte ici.
-    key: "automod",
-    label: "Automod",
-    slug: "automod",
-    rbacKey: "logs.journal.automod",
-    eventTypes: ["automod_flagged"],
-  },
-  {
-    key: "sessions",
-    label: "Sessions vocales",
-    slug: "sessions",
-    rbacKey: "logs.journal.sessions",
-    eventTypes: ["voice_session_open"],
-  },
 ];
 
 export interface EventLogQuery {

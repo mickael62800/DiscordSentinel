@@ -402,20 +402,6 @@ impl SanctionKind {
         }
     }
 
-    /// Cle stable, destinee au journal web et au stockage.
-    ///
-    /// Distincte de `label` : celui-ci est un libelle affichable, susceptible
-    /// d'etre traduit ou reformule. Une cle qui bouge casserait le filtrage
-    /// des evenements deja enregistres.
-    pub fn as_key(self) -> &'static str {
-        match self {
-            SanctionKind::Warn => "warn",
-            SanctionKind::Mute => "mute",
-            SanctionKind::Ban => "ban",
-            SanctionKind::Kick => "kick",
-        }
-    }
-
     pub fn color(self) -> Colour {
         match self {
             SanctionKind::Warn => Colour::new(0xF1C40F), // jaune
@@ -441,29 +427,6 @@ pub async fn post_sanction_card(
     reason: &str,
     duration: Option<&str>,
 ) {
-    // Le journal web recoit la sanction QUOI QU'IL ARRIVE, avant meme de
-    // regarder si un salon Discord est configure.
-    //
-    // L'ordre compte : la carte Discord ne part que si `sanctions_log_channel_id`
-    // est renseigne. Emettre l'evenement apres, ou sous la meme condition,
-    // rendrait le journal web dependant d'un reglage Discord — et un serveur
-    // qui n'utilise plus de salon de logs n'aurait plus AUCUNE trace.
-    crate::modules::audit::send_event(
-        ctx,
-        crate::modules::audit::audit_event::simple(guild_id.to_string(), "sanction_applied")
-            .with_target(target_id, target_tag.unwrap_or("Membre inconnu"))
-            .with_details(serde_json::json!({
-                "action": action.label(),
-                "action_kind": action.as_key(),
-                "emoji": action.emoji(),
-                "actor": actor,
-                "reason": reason.trim(),
-                "duration": duration,
-                "color": action.color().0,
-            })),
-    )
-    .await;
-
     let Some(channel) = get_channel_from_config(
         ctx,
         guild_id,

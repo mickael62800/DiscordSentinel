@@ -37,9 +37,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "logs.journal.server", path: "/journal/serveur", label: "Journal — Serveur", icon: "server" },
   { key: "logs.journal.admin", path: "/journal/commandes", label: "Journal — Commandes admin", icon: "shield" },
   { key: "logs.journal.anomalies", path: "/journal/anomalies", label: "Journal — Anomalies", icon: "zap" },
-  { key: "logs.journal.moderation", path: "/journal/moderation", label: "Journal — Moderation", icon: "shield" },
-  { key: "logs.journal.automod", path: "/journal/automod", label: "Journal — Automod", icon: "zap" },
-  { key: "logs.journal.sessions", path: "/journal/sessions", label: "Journal — Sessions vocales", icon: "mic" },
   {
     key: "nexus.servers",
     path: "/nexus/servers",
