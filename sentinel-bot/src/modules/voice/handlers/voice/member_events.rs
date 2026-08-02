@@ -23,7 +23,7 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
     };
     let user_id = new.user_id;
 
-    let (public_creator_id, private_creator_id, game_creator_id, observed_channels) = {
+    let (public_creator_id, private_creator_id, game_creator_id, observed_channels, afk_id) = {
         let data = ctx.data.read().await;
         let env_config = match data.get::<ConfigKey>() {
             Some(config) => (
@@ -63,15 +63,24 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
                     // Vocaux PERMANENTS a observer pour les logs (liste d'IDs
                     // separes par des virgules, configuree depuis la web).
                     let observed = parse_observed_channels(config.get("observed_voice_channels"));
-                    (public_id, private_id, game_id, observed)
+                    // Salon AFK : exclu des cartes de session. Il se remplit de
+                    // membres inactifs et ne se vide jamais vraiment — sa carte
+                    // resterait ouverte en permanence, a n'annoncer que des
+                    // mises en veille.
+                    let afk = config
+                        .get("afk_channel_id")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .filter(|id| *id > 0)
+                        .map(ChannelId::new);
+                    (public_id, private_id, game_id, observed, afk)
                 }
                 Err(e) => {
                     warn!(error = %e, "Config API indisponible, fallback sur env vars");
-                    (env_config.0, env_config.1, None, Vec::new())
+                    (env_config.0, env_config.1, None, Vec::new(), None)
                 }
             }
         } else {
-            (env_config.0, env_config.1, None, Vec::new())
+            (env_config.0, env_config.1, None, Vec::new(), None)
         }
     };
 
@@ -92,7 +101,8 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
         if let Some(channel_id) = new_channel {
             let is_creator = channel_id == public_creator_id
                 || channel_id == private_creator_id
-                || game_creator_id == Some(channel_id);
+                || game_creator_id == Some(channel_id)
+                || afk_id == Some(channel_id);
             if !is_creator {
                 if is_temp_channel(ctx, channel_id).await {
                     // Bans persistants (issue #2) : filet de securite au cas ou
@@ -106,7 +116,7 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
                     }
                     // Temporaire : carte deja creee a la creation du salon.
                     embeds::session_member_joined(ctx, channel_id, &user_label).await;
-                } else if observed_channels.contains(&channel_id) {
+                } else if est_suivi(channel_id, &observed_channels) {
                     // Permanent observe : creation paresseuse de la carte.
                     let count = count_members_in_channel(ctx, guild_id, channel_id);
                     embeds::ensure_card_and_member_joined(
@@ -129,7 +139,8 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
             // supprimer le salon). Les temporaires sont clotures par
             // `check_and_delete_empty` qui appelle deja `session_closed`.
             if !is_temp_channel(ctx, old_channel_id).await
-                && observed_channels.contains(&old_channel_id)
+                && afk_id != Some(old_channel_id)
+                && est_suivi(old_channel_id, &observed_channels)
                 && count_members_in_channel(ctx, guild_id, old_channel_id) == 0
             {
                 embeds::session_closed(ctx, old_channel_id, "session terminee").await;
@@ -174,6 +185,23 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
             }
         }
     }
+}
+
+/// Ce salon permanent recoit-il une carte de session ?
+///
+/// Liste VIDE = tous les vocaux permanents sont suivis. C'est le comportement
+/// attendu par defaut : une carte de session par salon, ouverte a la premiere
+/// arrivee et fermee quand il se vide.
+///
+/// Auparavant une liste vide ne suivait RIEN, et il fallait enumerer chaque
+/// salon a la main — dans un champ qui n'apparaissait meme pas dans le
+/// formulaire de configuration. Resultat : aucun vocal permanent n'avait de
+/// carte, sans que rien ne l'explique.
+///
+/// La liste garde son utilite comme RESTRICTION : renseignee, seuls les
+/// salons cites sont suivis.
+fn est_suivi(channel_id: ChannelId, observes: &[ChannelId]) -> bool {
+    observes.is_empty() || observes.contains(&channel_id)
 }
 
 /// Parse la liste des vocaux permanents observes depuis la config
@@ -607,3 +635,43 @@ pub(super) fn should_run_leave_handlers(
 #[cfg(test)]
 #[path = "tests/member_events.rs"]
 mod tests;
+
+#[cfg(test)]
+mod tests_suivi {
+    use super::*;
+
+    fn c(id: u64) -> ChannelId {
+        ChannelId::new(id)
+    }
+
+    #[test]
+    fn liste_vide_suit_tous_les_vocaux() {
+        // Comportement attendu par defaut : une carte de session partout,
+        // sans avoir a enumerer les salons.
+        assert!(est_suivi(c(1), &[]));
+        assert!(est_suivi(c(999), &[]));
+    }
+
+    #[test]
+    fn liste_renseignee_restreint_aux_salons_cites() {
+        let observes = vec![c(10), c(20)];
+        assert!(est_suivi(c(10), &observes));
+        assert!(est_suivi(c(20), &observes));
+        assert!(!est_suivi(c(30), &observes));
+    }
+
+    #[test]
+    fn parse_ignore_les_entrees_illisibles() {
+        // Une virgule en trop ou un identifiant tronque ne doit pas priver de
+        // carte les salons correctement saisis.
+        let brut = "10, , abc, 20,0".to_string();
+        let ids = parse_observed_channels(Some(&brut));
+        assert_eq!(ids, vec![c(10), c(20)]);
+    }
+
+    #[test]
+    fn parse_sans_valeur_donne_une_liste_vide() {
+        // Donc : tous les vocaux suivis, cf. `liste_vide_suit_tous_les_vocaux`.
+        assert!(parse_observed_channels(None).is_empty());
+    }
+}
