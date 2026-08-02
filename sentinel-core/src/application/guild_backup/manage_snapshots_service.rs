@@ -208,6 +208,7 @@ mod tests {
                 afk_channel_old_id: None,
                 afk_timeout: 300,
                 system_channel_old_id: None,
+                everyone_permissions: String::new(),
             },
             roles: vec![],
             categories: vec![],

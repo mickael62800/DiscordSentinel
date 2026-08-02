@@ -470,6 +470,40 @@ async fn apply_settings(
         builder = builder.icon(Some(att));
     }
 
+    // Permissions de base de @everyone.
+    //
+    // Edition SEPAREE : ce n'est pas un reglage de serveur mais un role, qui
+    // passe par une autre route de l'API Discord.
+    //
+    // Une chaine vide veut dire « sauvegarde prise avant que ce champ existe » :
+    // on ne touche a rien. Ecrire un bitfield nul retirerait au contraire TOUS
+    // les droits a tout le monde — un serveur muet, sans que rien ne l'explique.
+    if !s.everyone_permissions.is_empty() {
+        match s.everyone_permissions.parse::<u64>() {
+            Ok(bits) => {
+                let perms = Permissions::from_bits_truncate(bits);
+                if let Err(e) = guild_id
+                    .edit_role(
+                        &ctx.http,
+                        guild_id.everyone_role(),
+                        EditRole::new().permissions(perms),
+                    )
+                    .await
+                {
+                    warn!(error = %e, "guild_backup: echec permissions @everyone");
+                    report
+                        .notes
+                        .push("permissions @everyone non restaurees".to_string());
+                }
+            }
+            Err(_) => {
+                report
+                    .notes
+                    .push("permissions @everyone illisibles dans la sauvegarde".to_string());
+            }
+        }
+    }
+
     if let Err(e) = guild_id.edit(&ctx.http, builder).await {
         warn!(error = %e, "guild_backup: echec application des reglages");
         report

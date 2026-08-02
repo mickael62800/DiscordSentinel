@@ -146,6 +146,13 @@ pub async fn capture(
         afk_channel_old_id,
         afk_timeout,
         system_channel_old_id: partial.system_channel_id.map(|c| c.to_string()),
+        // Permissions de base de @everyone. Ce role est exclu de la liste
+        // des roles (il ne se recree pas), ses permissions se perdaient donc.
+        everyone_permissions: partial
+            .roles
+            .get(&guild_id.everyone_role())
+            .map(|r| r.permissions.bits().to_string())
+            .unwrap_or_default(),
     };
 
     // 5. Bans (best-effort : perms MANAGE_GUILD/BAN requises).

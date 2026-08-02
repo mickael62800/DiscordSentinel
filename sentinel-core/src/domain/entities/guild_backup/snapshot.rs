@@ -70,6 +70,20 @@ pub struct GuildSettings {
     /// Salon systeme d'origine (remappe a la restauration).
     #[serde(default)]
     pub system_channel_old_id: Option<String>,
+    /// Permissions de base de `@everyone`, en bitfield textuel.
+    ///
+    /// Ce role est exclu de la liste des roles — il ne se recree pas, il
+    /// existe deja sur le serveur cible. Ses permissions n'etaient donc
+    /// sauvegardees NULLE PART, alors qu'elles definissent ce que tout membre
+    /// peut faire par defaut : ecrire, se connecter en vocal, mentionner
+    /// @everyone. Une restauration laissait les valeurs par defaut de Discord
+    /// a la place de la configuration d'origine.
+    ///
+    /// `default` : les sauvegardes prises avant ce champ ne l'ont pas. Vide =
+    /// on n'y touche pas a la restauration, plutot que d'imposer un bitfield
+    /// nul qui retirerait tout a tout le monde.
+    #[serde(default)]
+    pub everyone_permissions: String,
 }
 
 /// Un role du serveur.
@@ -167,5 +181,49 @@ impl GuildSnapshot {
     /// Nombre de salons captures (categories exclues).
     pub fn channel_count(&self) -> usize {
         self.channels.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Une sauvegarde prise AVANT l'ajout du champ doit rester lisible.
+    ///
+    /// Sans ce test, ajouter un champ sans `default` rendrait illisibles
+    /// toutes les sauvegardes deja en base — decouvert au moment ou on en a
+    /// besoin, c'est-a-dire au pire moment.
+    #[test]
+    fn ancienne_sauvegarde_sans_permissions_everyone_reste_lisible() {
+        let brut = r#"{
+            "name": "Mon serveur",
+            "verification_level": 1,
+            "default_notifications": 0,
+            "explicit_content_filter": 2,
+            "afk_timeout": 300
+        }"#;
+        let s: GuildSettings = serde_json::from_str(brut).expect("ancien format illisible");
+        assert_eq!(s.name, "Mon serveur");
+        // Vide = « inconnu », pas « aucune permission ». La restauration ne
+        // touchera pas a @everyone plutot que de tout lui retirer.
+        assert!(s.everyone_permissions.is_empty());
+    }
+
+    #[test]
+    fn permissions_everyone_font_l_aller_retour() {
+        let s = GuildSettings {
+            name: "S".into(),
+            icon: None,
+            verification_level: 0,
+            default_notifications: 0,
+            explicit_content_filter: 0,
+            afk_channel_old_id: None,
+            afk_timeout: 300,
+            system_channel_old_id: None,
+            everyone_permissions: "137411140374081".into(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let relu: GuildSettings = serde_json::from_str(&json).unwrap();
+        assert_eq!(relu, s);
     }
 }
