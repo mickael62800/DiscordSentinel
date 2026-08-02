@@ -154,6 +154,12 @@ export interface ModerationRule {
   rule_type: string;
   action: string;
   description: string;
+  /// Valeurs réelles enregistrées, servies par l'API.
+  weight: number;
+  threshold_warn: number;
+  threshold_delete: number;
+  threshold_mute: number;
+  threshold_ban: number;
 }
 
 export interface UpdateRuleParams {

@@ -33,23 +33,6 @@ function ruleTypeToFlagType(ruleType: string): string {
   }
 }
 
-// Valeurs par defaut selon l'action configuree.
-function defaultsForAction(action: string) {
-  switch (action) {
-    case "warn":
-      return { weight: 2.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 };
-    case "delete":
-      return { weight: 3.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 };
-    case "mute":
-      return { weight: 5.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 };
-    case "ban":
-    case "lockdown":
-      return { weight: 7.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 };
-    default:
-      return { weight: 3.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 };
-  }
-}
-
 // Etat local des parametres (edition inline).
 const weight = ref(3.0);
 const thresholdWarn = ref(2.0);
@@ -62,14 +45,27 @@ const error = ref<string | null>(null);
 // Snapshot "baseline" pour detecter les changements non sauvegardes.
 const baseline = ref({ weight: 3.0, warn: 2.0, del: 4.0, mute: 6.0, ban: 9.0 });
 
+/// Recharge les curseurs depuis les valeurs REELLES de la regle.
+///
+/// Elles etaient auparavant deduites de `action` via une table figee, sans
+/// jamais lire ce qui etait enregistre. Comme ce reset se declenche a chaque
+/// changement du prop, un enregistrement reussi etait aussitot ecrase par la
+/// valeur inventee : on saisissait 3.5, l'API acceptait, et l'ecran
+/// reaffichait 2.
 function resetFromRule() {
-  const d = defaultsForAction(props.rule.action);
-  weight.value = d.weight;
-  thresholdWarn.value = d.warn;
-  thresholdDelete.value = d.del;
-  thresholdMute.value = d.mute;
-  thresholdBan.value = d.ban;
-  baseline.value = { ...d };
+  const r = props.rule;
+  weight.value = r.weight;
+  thresholdWarn.value = r.threshold_warn;
+  thresholdDelete.value = r.threshold_delete;
+  thresholdMute.value = r.threshold_mute;
+  thresholdBan.value = r.threshold_ban;
+  baseline.value = {
+    weight: r.weight,
+    warn: r.threshold_warn,
+    del: r.threshold_delete,
+    mute: r.threshold_mute,
+    ban: r.threshold_ban,
+  };
   error.value = null;
 }
 

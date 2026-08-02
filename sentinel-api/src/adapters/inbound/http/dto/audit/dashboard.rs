@@ -161,6 +161,18 @@ pub struct DashboardRuleDto {
     pub rule_type: String,
     pub action: String,
     pub description: String,
+    /// Valeurs REELLES de la regle.
+    ///
+    /// Elles manquaient. Le back-office ne pouvait donc pas afficher ce qui
+    /// est enregistre : il reconstituait des valeurs plausibles a partir de
+    /// `action`, via une table figee. Consequence directe : on modifiait un
+    /// poids, l'enregistrement reussissait, et le rechargement de la liste
+    /// ecrasait la saisie par la valeur inventee.
+    pub weight: f64,
+    pub threshold_warn: f64,
+    pub threshold_delete: f64,
+    pub threshold_mute: f64,
+    pub threshold_ban: f64,
 }
 
 impl From<Rule> for DashboardRuleDto {
@@ -206,6 +218,11 @@ impl From<Rule> for DashboardRuleDto {
         );
 
         Self {
+            weight: rule.weight,
+            threshold_warn: rule.threshold_warn,
+            threshold_delete: rule.threshold_delete,
+            threshold_mute: rule.threshold_mute,
+            threshold_ban: rule.threshold_ban,
             id: rule.id.to_string(),
             name: format!("{} ({})", flag_label, rule.guild_id),
             enabled: rule.enabled,
